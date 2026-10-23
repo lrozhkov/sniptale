@@ -1,3 +1,5 @@
+import { materializeVideoProjectCursorSourceObservations } from '../cursor-source-observations';
+import type { VideoProject } from '../types';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../factories/creation';
 import { normalizeVideoProjectCursorSkin } from '../cursor';
@@ -5,6 +7,8 @@ import { applyVideoProjectMutationPatch } from '../mutation';
 import { hydrateVideoProject } from '../hydration';
 import {
   deriveProjectCursorFocusPath,
+  resolveProjectSourceCursorObservation,
+  projectCursorFocusKeyOccurrences,
   resolveProjectCursorFocus,
   resolveProjectCursorFocusSamples,
   resolveProjectCursorFocusPath,
@@ -184,4 +188,86 @@ it('offers the same sparse focus in Video Editor and restores an authored dense-
     outgoing: { x: 0.6, y: 0.7 },
   });
   expect(project.cursorTrack).toEqual(before);
+});
+
+it('retains captured and authored source focus plus its key occurrence in a held-only slice', () => {
+  const project = fixture();
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  clip.sourceInstanceId ??= clip.id;
+  const instance = clip.sourceInstanceId;
+  project.version = 33;
+  project.cursorTrack!.sourceObservations = [
+    {
+      recordingId: 'recording',
+      sourceInstanceId: instance,
+      samples: project.cursorTrack!.samples.map(
+        ({ sourceAnchor: _anchor, timeBasis: _basis, ...sample }) => sample
+      ),
+    },
+  ];
+  project.cursorFocusPath = {
+    version: 1,
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'source-focus',
+        binding: { kind: 'recording-source', recordingId: 'recording', sourceInstanceId: instance },
+        start: 0,
+        end: 4,
+        keys: [
+          { id: 'focus-start', time: 0, x: 0.1, y: 0.1, anchor: 'manual', interpolation: 'linear' },
+          {
+            id: 'focus-middle',
+            time: 1,
+            x: 0.4,
+            y: 0.5,
+            anchor: 'manual',
+            interpolation: 'linear',
+          },
+          { id: 'focus-end', time: 4, x: 0.8, y: 0.8, anchor: 'manual', interpolation: 'linear' },
+        ],
+      },
+    ],
+  };
+  const expectedFocus = resolveProjectCursorFocus(project, 1)!;
+  const expectedObserved = resolveProjectSourceCursorObservation(project, 1)!;
+  expect(expectedFocus).toMatchObject({ sourceTime: 1, x: 40, y: 50 });
+  expect(expectedObserved.recordingPoint).toEqual({ x: 0.4, y: 0.5 });
+  const candidate: VideoProject = {
+    ...project,
+    version: 43,
+    duration: 10.2,
+    clips: [
+      {
+        ...clip,
+        startTime: 10,
+        duration: 0.2,
+        playbackWindow: { offset: 1.5, extent: 1.7, holdAt: 1 },
+      },
+    ],
+  };
+  candidate.cursorTrack = materializeVideoProjectCursorSourceObservations(candidate);
+  expect(isValidVideoProject(candidate)).toBe(true);
+  const before = structuredClone(candidate);
+  expect(resolveProjectCursorFocus(candidate, 10.1)).toMatchObject({
+    sourceTime: 1,
+    x: expectedFocus.x,
+    y: expectedFocus.y,
+  });
+  expect(resolveProjectSourceCursorObservation(candidate, 10.1)?.recordingPoint).toEqual(
+    expectedObserved.recordingPoint
+  );
+  expect(
+    resolveProjectSourceCursorObservation(candidate, 10.2, clip.id, { includeSourceEnd: true })
+      ?.sourceAnchor?.sourceTime
+  ).toBe(1);
+  expect(
+    projectCursorFocusKeyOccurrences(candidate, project.cursorFocusPath.segments[0]!).map(
+      (item) => [item.key.id, item.time]
+    )
+  ).toEqual([['focus-middle', 10]]);
+  expect(candidate).toEqual(before);
 });

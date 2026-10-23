@@ -19,7 +19,7 @@ export interface PreviewTransformGestureHooks {
 interface PreviewTransformGestureParams extends PreviewTransformGestureHooks {
   onCommit: (clipId: string, transform: VideoProjectTransform) => void;
   onFinish?: () => void;
-  resolveTransform: (point: PreviewTransformClientPoint) => VideoProjectTransform;
+  resolveTransform: (point: PreviewTransformClientPoint) => VideoProjectTransform | null;
   state: PreviewTransformGestureState;
 }
 
@@ -31,8 +31,11 @@ function hasFinitePointerPoint(point: PreviewTransformClientPoint): boolean {
   return Number.isFinite(point.clientX) && Number.isFinite(point.clientY);
 }
 
-function updatePreviewTransform(params: PreviewTransformGestureParams): VideoProjectTransform {
+function updatePreviewTransform(
+  params: PreviewTransformGestureParams
+): VideoProjectTransform | null {
   const transform = params.resolveTransform(params.state.latestPoint);
+  if (!transform) return null;
   params.state.previewTransform = { ...transform };
   params.onPreviewTransform?.(params.state.clipId, params.state.previewTransform);
   return transform;
@@ -78,15 +81,13 @@ export function startPreviewTransformGesture(params: PreviewTransformGesturePara
     if (params.state.animationFrameId !== null) cancelAnimationFrame(params.state.animationFrameId);
     removeGestureListeners(handleMove, handleUp, handleCancel);
     window.removeEventListener('keydown', handleKeyDown, true);
-    if (reason === 'commit') {
-      const transform = updatePreviewTransform(params);
-      params.onCommit(params.state.clipId, transform);
-    } else {
-      params.onRestore?.(params.state.clipId);
-    }
+    const transform = reason === 'commit' ? updatePreviewTransform(params) : null;
+    const settledReason = transform ? 'commit' : 'cancel';
+    if (transform) params.onCommit(params.state.clipId, transform);
+    else params.onRestore?.(params.state.clipId);
     if (params.state.activated) params.onPreviewTransform?.(params.state.clipId, null);
     params.onCacheBypassChange?.(false);
-    params.onSettle?.(reason);
+    params.onSettle?.(settledReason);
     params.onFinish?.();
   };
   const handleMove = (event: PointerEvent) => {

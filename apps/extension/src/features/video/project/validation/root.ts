@@ -1,8 +1,40 @@
+import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
+import { hasValidVideoProjectCursorSourceObservations } from '../cursor-source-observations';
+import {
+  parseVideoProjectSourceVoiceoverDocuments,
+  hasValidVideoProjectSourceVoiceoverReferences,
+} from '../source-voiceover';
+import {
+  parseVideoProjectSourceAudioDocuments,
+  hasValidVideoProjectSourceAudioReferences,
+} from '../source-audio';
+import {
+  parseVideoProjectCompositionJoins,
+  hasValidVideoProjectCompositionJoinReferences,
+} from '../scene/joins';
+import {
+  parseVideoProjectBookendPresets,
+  hasValidVideoProjectBookendReferences,
+} from '../scene/bookend-presets';
+import { parseVideoProjectSceneEdges } from '../scene/edge-fades';
+import {
+  parseVideoProjectCommentDocuments,
+  hasValidVideoProjectCommentReferences,
+} from '../comments/validation';
+import {
+  getVideoProjectWatermarkAsset,
+  parseQuickEditWatermark,
+  parseVideoProjectWatermarkSource,
+} from '../scene/watermark';
+import { parseSceneBackgroundSettings } from '../scene/background-settings';
+import {
+  parseVideoProjectTextDocuments,
+  hasValidVideoProjectTextReferences,
+} from '../text/validation';
 import { parseVideoProjectActionFeedback } from '../action-feedback/validation';
 import { parseCursorFocusPath } from '../cursor-focus-path/validation';
 import { parseCameraFollowSettings } from '../camera/cursor-policy';
 import { resolveVideoProjectActionOccurrences } from '../action-occurrences';
-import { parsePaint } from '@sniptale/foundation/paint';
 import type { VideoProject, VideoProjectClip, VideoProjectSourceTimeAnchor } from '../types/index';
 import {
   VideoProjectClipType,
@@ -25,6 +57,7 @@ import {
   MAX_VIDEO_PROJECT_DIMENSION,
   MAX_VIDEO_PROJECT_DURATION_SECONDS,
   MAX_VIDEO_PROJECT_FPS,
+  MAX_VIDEO_PROJECT_ITEMS,
   isBoundedNumber,
   isBoundedArray,
   isColorString,
@@ -52,14 +85,16 @@ function isProjectSource(value: unknown): boolean {
   return true;
 }
 
-function isSceneBackground(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    ((value['kind'] === VideoSceneBackgroundKind.SOLID && isColorString(value['color'])) ||
-      (value['kind'] === VideoSceneBackgroundKind.GRADIENT &&
-        parsePaint({ kind: 'gradient', gradient: value['gradient'] }) !== null) ||
-      (value['kind'] === VideoSceneBackgroundKind.IMAGE && isString(value['assetId'])))
-  );
+function isActionEventCollection(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  let authoredCount = 0;
+  return value.every((event) => {
+    if (!isActionEvent(event) || !isRecord(event) || !isRecord(event['anchor'])) return false;
+    // Captured source facts retain the source telemetry collection admission.
+    if (event['anchor']['kind'] === 'recording-source') return true;
+    authoredCount += 1;
+    return authoredCount <= MAX_VIDEO_PROJECT_ITEMS;
+  });
 }
 
 function isTransition(value: unknown): boolean {
@@ -74,23 +109,189 @@ function isTransition(value: unknown): boolean {
   );
 }
 
-function isHydratableProjectShape(value: unknown): value is VideoProject {
+/** Minimum schema for present clip fields, independent of later shape admission. */
+function minimumClipSchemaVersion(value: unknown): number {
+  if (!isRecord(value)) return 2;
+  if (value['transcript'] !== undefined) return 44;
+  if (value['playbackWindow'] !== undefined) return 43;
+  if (value['attachment'] !== undefined || value['sourceRange'] !== undefined) return 38;
+  if (value['rememberedWindowLayout'] !== undefined) return 36;
+  if (value['rememberedWindowHeader'] !== undefined || value['rememberedSourceCrop'] !== undefined)
+    return 35;
+  if (value['cameraTiming'] !== undefined) return 32;
+  if (value['durationMode'] !== undefined) return 30;
+  if (
+    (value['type'] === 'VIDEO' || value['type'] === 'AUDIO') &&
+    typeof value['playbackRate'] === 'number' &&
+    value['playbackRate'] < 0.1
+  )
+    return 27;
+  if (value['windowCornerRadius'] !== undefined) return 15;
+  if (value['sourceCrop'] !== undefined) return 13;
+  if (value['cameraHiddenRanges'] !== undefined) return 12;
+  if (
+    Array.isArray(value['cameraPositions']) &&
+    value['cameraPositions'].some(
+      (position: unknown) => isRecord(position) && position['crop'] !== undefined
+    )
+  )
+    return 11;
+  if (isRecord(value['cameraAppearance']) && value['cameraAppearance']['shape'] === 'circle')
+    return 10;
+  if (value['shadowColor'] !== undefined) return 9;
+  if (value['cameraMirrored'] !== undefined) return 8;
+  if (value['originalAudioMute'] !== undefined) return 6;
+  return 2;
+}
+
+/** Refuse fields that the declared reader version does not support. */
+function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
+  const version = value['version'];
   return (
-    isRecord(value) &&
-    (value['version'] === 4 ||
-      value['version'] === 3 ||
-      (value['version'] === 2 &&
-        value['cursorFocusPath'] === undefined &&
-        value['actionFeedback'] === undefined)) &&
-    (value['cameraFollowDefaults'] === undefined ||
-      parseCameraFollowSettings(value['cameraFollowDefaults']) !== null) &&
-    (value['version'] === 4 ||
+    isBoundedNumber(version, 2, 45) &&
+    Number.isInteger(version) &&
+    (version >= 45 ||
+      !Array.isArray(value['textDocuments']) ||
+      value['textDocuments'].every(
+        (entry: unknown) => !isRecord(entry) || entry['resultEndLimits'] === undefined
+      )) &&
+    (version >= 42 || value['watermarkSource'] === undefined) &&
+    (version >= 41 ||
+      !isRecord(value['bookendPresets']) ||
+      [value['bookendPresets']['intro'], value['bookendPresets']['outro']].every(
+        (slot: unknown) => !isRecord(slot) || slot['edgeControl'] === undefined
+      )) &&
+    (version >= 40 ||
+      !Array.isArray(value['compositionJoins']) ||
+      value['compositionJoins'].every(
+        (join: unknown) => !isRecord(join) || join['sampling'] === undefined
+      )) &&
+    (version >= 39 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) => !isRecord(region) || region['spotlightTarget'] !== 'source-scene'
+      )) &&
+    (version >= 37 ||
+      !isRecord(value['sceneBackground']) ||
+      value['sceneBackground']['zoomBehavior'] === undefined) &&
+    (version >= 36 ||
+      (value['watermarkEnabled'] === undefined &&
+        (!isRecord(value['sceneBackground']) ||
+          (value['sceneBackground']['enabled'] === undefined &&
+            value['sceneBackground']['rememberedBlur'] === undefined)))) &&
+    (version >= 35 || value['rememberedCanvas'] === undefined) &&
+    (version >= 34 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) =>
+          !isRecord(region) ||
+          ((!isRecord(region['focusArea']) || region['focusArea']['axes'] === undefined) &&
+            (!isRecord(region['sourceBinding']) ||
+              (region['sourceBinding']['unresolvedLinkTo'] === undefined &&
+                region['sourceBinding']['dormant'] === undefined &&
+                region['sourceBinding']['phaseProjection'] === undefined &&
+                region['sourceBinding']['coordinateSpace'] === undefined)) &&
+            (!isRecord(region['phaseTransitions']) ||
+              region['phaseTransitions']['link'] === undefined))
+      )) &&
+    (version >= 33 ||
+      !isRecord(value['cursorTrack']) ||
+      value['cursorTrack']['sourceObservations'] === undefined) &&
+    (version >= 31 ||
+      (value['sourceVoiceoverDocuments'] === undefined &&
+        (!Array.isArray(value['sourceAudioDocuments']) ||
+          value['sourceAudioDocuments'].every(
+            (entry: unknown) => !isRecord(entry) || entry['speech'] === undefined
+          )))) &&
+    (version >= 29 ||
+      !Array.isArray(value['textDocuments']) ||
+      value['textDocuments'].every(
+        (entry: unknown) => !isRecord(entry) || entry['durationMode'] === undefined
+      )) &&
+    (version >= 28 || value['sourceAudioDocuments'] === undefined) &&
+    (version >= 26 ||
+      (value['compositionJoins'] === undefined &&
+        (!isRecord(value['bookendPresets']) ||
+          (value['bookendPresets']['introTransition'] === undefined &&
+            value['bookendPresets']['outroTransition'] === undefined)))) &&
+    (version >= 25 || value['bookendPresets'] === undefined) &&
+    (version >= 24 || value['sceneEdges'] === undefined) &&
+    (version >= 23 || value['commentDocuments'] === undefined) &&
+    (version >= 20 || value['watermark'] === undefined) &&
+    (version >= 22 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) =>
+          !isRecord(region) ||
+          (region['spotlight'] === undefined && region['spotlightTarget'] === undefined)
+      )) &&
+    (version >= 21 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) =>
+          !isRecord(region) ||
+          (region['border'] === undefined && region['borderTarget'] === undefined)
+      )) &&
+    (version >= 3 ||
+      (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&
+    (version >= 4 ||
       (value['cameraFollowDefaults'] === undefined &&
         (!Array.isArray(value['motionRegions']) ||
           value['motionRegions'].every(
             (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
           )))) &&
+    (version >= 19 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) =>
+          !isRecord(region) ||
+          (region['perspective'] === undefined &&
+            region['depthOfField'] === undefined &&
+            region['spatialReference'] === undefined)
+      )) &&
+    (version >= 18 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) => !isRecord(region) || region['phaseTransitions'] === undefined
+      )) &&
+    (version >= 17 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) => !isRecord(region) || region['motionBlur'] === undefined
+      )) &&
+    (version >= 16 ||
+      !isRecord(value['sceneBackground']) ||
+      value['sceneBackground']['blur'] === undefined) &&
+    (version >= 14 ||
+      !isRecord(value['sceneBackground']) ||
+      (value['sceneBackground']['remembered'] === undefined &&
+        value['sceneBackground']['imageFit'] === undefined)) &&
+    (version >= 5 || value['textDocuments'] === undefined) &&
+    (version >= 7 ||
+      !Array.isArray(value['tracks']) ||
+      value['tracks'].every(
+        (track: unknown) => !isRecord(track) || track['audioVolume'] === undefined
+      )) &&
+    (!Array.isArray(value['clips']) ||
+      value['clips'].every((clip: unknown) => version >= minimumClipSchemaVersion(clip)))
+  );
+}
+
+function isHydratableProjectShape(value: unknown): value is VideoProject {
+  return (
+    isRecord(value) &&
+    isProjectSchemaCompatible(value) &&
+    (value['cameraFollowDefaults'] === undefined ||
+      parseCameraFollowSettings(value['cameraFollowDefaults']) !== null) &&
     isString(value['id']) &&
+    (value['textDocuments'] === undefined ||
+      parseVideoProjectTextDocuments(value['textDocuments']) !== null) &&
+    (value['commentDocuments'] === undefined ||
+      parseVideoProjectCommentDocuments(value['commentDocuments']) !== null) &&
+    (value['sourceAudioDocuments'] === undefined ||
+      parseVideoProjectSourceAudioDocuments(value['sourceAudioDocuments']) !== null) &&
+    (value['sourceVoiceoverDocuments'] === undefined ||
+      parseVideoProjectSourceVoiceoverDocuments(value['sourceVoiceoverDocuments']) !== null) &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
     isNullable(value['baseRecordingId'], isString) &&
@@ -98,6 +299,12 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     value['width'] <= MAX_VIDEO_PROJECT_DIMENSION &&
     isPositiveNumber(value['height']) &&
     value['height'] <= MAX_VIDEO_PROJECT_DIMENSION &&
+    (value['rememberedCanvas'] === undefined ||
+      (isRecord(value['rememberedCanvas']) &&
+        isPositiveNumber(value['rememberedCanvas']['width']) &&
+        value['rememberedCanvas']['width'] <= MAX_VIDEO_PROJECT_DIMENSION &&
+        isPositiveNumber(value['rememberedCanvas']['height']) &&
+        value['rememberedCanvas']['height'] <= MAX_VIDEO_PROJECT_DIMENSION)) &&
     isPositiveNumber(value['fps']) &&
     value['fps'] <= MAX_VIDEO_PROJECT_FPS &&
     (value['videoEffectsBypassed'] === undefined ||
@@ -115,10 +322,21 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     parseVideoProjectActionFeedback(value['actionFeedback']) !== null &&
     (value['cursorFocusPath'] === undefined ||
       parseCursorFocusPath(value['cursorFocusPath']) !== null) &&
-    isBoundedArray(value['actionEvents'], isActionEvent) &&
+    isActionEventCollection(value['actionEvents']) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
-    (value['sceneBackground'] === undefined || isSceneBackground(value['sceneBackground'])) &&
+    (value['watermarkSource'] === undefined ||
+      parseVideoProjectWatermarkSource(value['watermarkSource']) !== null) &&
+    (value['watermarkEnabled'] === undefined || value['watermarkEnabled'] === false) &&
+    (value['watermark'] === undefined || parseQuickEditWatermark(value['watermark']) !== null) &&
+    (value['bookendPresets'] === undefined ||
+      parseVideoProjectBookendPresets(value['bookendPresets']) !== null) &&
+    (value['compositionJoins'] === undefined ||
+      parseVideoProjectCompositionJoins(value['compositionJoins']) !== null) &&
+    (value['sceneEdges'] === undefined ||
+      parseVideoProjectSceneEdges(value['sceneEdges']) !== null) &&
+    (value['sceneBackground'] === undefined ||
+      parseSceneBackgroundSettings(value['sceneBackground']) !== null) &&
     (value['transitions'] === undefined || isBoundedArray(value['transitions'], isTransition)) &&
     !Object.hasOwn(value, 'templateInstances') &&
     isEffectProjectBranches(value['effectSnapshots'], value['effectInstances']) &&
@@ -137,20 +355,32 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
   return (
     project.clips.every((clip) => hasValidClipReferences(clip, assetIds, trackIds)) &&
     hasValidSceneBackgroundReferences(project, assetIds) &&
+    (!project.watermark?.image || getVideoProjectWatermarkAsset(project) !== undefined) &&
+    hasValidVideoProjectBookendReferences(project) &&
+    hasValidVideoProjectCompositionJoinReferences(project) &&
     (project.transitions ?? []).every(
       (transition) =>
         clipIds.has(transition.leadingClipId) && clipIds.has(transition.trailingClipId)
     ) &&
     (project.motionRegions ?? []).every(
       (region) =>
-        region.targetAction === null ||
-        occurrences.some(
-          (occurrence) =>
-            occurrence.eventId === region.targetAction?.eventId &&
-            occurrence.clipId === region.targetAction.clipId
-        )
+        ((region.borderTarget !== 'window' &&
+          region.spotlightTarget !== 'window' &&
+          region.spotlightTarget !== 'scene' &&
+          region.spotlightTarget !== 'source-scene' &&
+          region.sourceBinding?.coordinateSpace !== 'source-window') ||
+          project.clips.some(
+            (clip) => clip.type === 'VIDEO' && clip.id === region.sourceBinding?.clipId
+          )) &&
+        (region.targetAction === null ||
+          occurrences.some(
+            (occurrence) =>
+              occurrence.eventId === region.targetAction?.eventId &&
+              occurrence.clipId === region.targetAction.clipId
+          ))
     ) &&
-    hasValidInteractionAnchorReferences(project)
+    hasValidInteractionAnchorReferences(project) &&
+    hasValidVideoProjectCursorSourceObservations(project)
   );
 }
 
@@ -207,27 +437,50 @@ function hasValidInteractionAnchorReference(
       (asset.source.kind === 'project-asset' &&
         asset.source.originRecordingId === anchor.recordingId))
   );
+  const projected = clip.playbackWindow ? mapProjectTimeToSourcePoint([clip], time, clip.id) : null;
   return (
     matchesRecording &&
     anchor.sourceTime >= clip.sourceStart &&
     anchor.sourceTime <= clip.sourceStart + clip.sourceDuration &&
-    Math.abs(
-      clip.startTime + (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) - time
-    ) <= 0.000_001
+    (clip.playbackWindow
+      ? projected !== null && Math.abs(projected.sourceTime - anchor.sourceTime) <= 0.000_001
+      : Math.abs(
+          clip.startTime + (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) - time
+        ) <= 0.000_001)
   );
 }
 
 function hasValidReferences(project: VideoProject): boolean {
-  return hasValidVideoProjectBaseReferences(project) && hasValidEffectProjectReferences(project);
+  return (
+    hasValidVideoProjectBaseReferences(project) &&
+    project.clips.every(
+      (clip) =>
+        clip.type !== VideoProjectClipType.AUDIO ||
+        (clip.transcript?.replacements ?? []).every((replacement) => {
+          const asset = project.assets.find((entry) => entry.id === replacement.assetId);
+          return (
+            asset?.type === VideoProjectClipType.AUDIO &&
+            (asset.metadata.duration === null ||
+              replacement.duration <= asset.metadata.duration + 1e-7)
+          );
+        })
+    ) &&
+    hasValidEffectProjectReferences(project) &&
+    hasValidVideoProjectSourceAudioReferences(project) &&
+    hasValidVideoProjectSourceVoiceoverReferences(project) &&
+    hasValidVideoProjectTextReferences(project) &&
+    hasValidVideoProjectCommentReferences(project)
+  );
 }
 
 function hasValidSceneBackgroundReferences(
   project: VideoProject,
   assetIds: ReadonlySet<string>
 ): boolean {
-  return !(
-    project.sceneBackground?.kind === VideoSceneBackgroundKind.IMAGE &&
-    !assetIds.has(project.sceneBackground.assetId)
+  const background = project.sceneBackground;
+  return (
+    (background?.kind !== VideoSceneBackgroundKind.IMAGE || assetIds.has(background.assetId)) &&
+    (!background?.remembered?.image || assetIds.has(background.remembered.image.assetId))
   );
 }
 

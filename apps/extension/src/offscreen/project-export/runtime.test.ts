@@ -1,3 +1,5 @@
+import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
+import { getProjectExportWatermarkRenderer } from './runtime';
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -20,7 +22,23 @@ vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => ({
   sendRuntimeMessage: sendRuntimeMessageMock,
 }));
 
-import { cleanupJob, getSupportedWebmExportMimeType, sendProgress, waitForDelay } from './runtime';
+import {
+  cleanupJob,
+  getProjectExportSpatialRenderer,
+  getSupportedWebmExportMimeType,
+  sendProgress,
+  waitForDelay,
+} from './runtime';
+import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
+import type { ProjectExportRuntimeState } from './types';
+vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({
+  createReviewSpatialRenderer: vi.fn(() => ({
+    validateSizes: vi.fn(),
+    surface: vi.fn(),
+    draw: vi.fn(),
+    dispose: vi.fn(),
+  })),
+}));
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoProjectExportPhase } from '../../features/video/project/types';
 
@@ -64,10 +82,21 @@ function createCleanupDisposers() {
 function createCleanupJob() {
   const disposers = createCleanupDisposers();
   const cleanupNode = document.createElement('div');
+  const captionRenderer = { prepare: vi.fn(), clear: vi.fn() };
+  const cameraSpatialRenderer = {
+    validateSizes: vi.fn(),
+    surface: vi.fn(),
+    draw: vi.fn(),
+    dispose: vi.fn(),
+  };
 
   return {
     ...disposers,
+    captionRenderer,
+    cameraSpatialRenderer,
     job: {
+      captionRenderer,
+      cameraSpatialRenderer,
       mediaRecorder: null,
       clipMediaElements: new Map([
         [
@@ -110,6 +139,10 @@ function createCleanupJob() {
 }
 
 function expectCleanupJobState(cleanup: ReturnType<typeof createCleanupJob>) {
+  expect(cleanup.cameraSpatialRenderer.dispose).toHaveBeenCalledOnce();
+  expect(cleanup.job).not.toHaveProperty('cameraSpatialRenderer');
+  expect(cleanup.captionRenderer.clear).toHaveBeenCalledOnce();
+  expect(cleanup.job.captionRenderer).toBeUndefined();
   expect(cleanup.disconnectSource).toHaveBeenCalledOnce();
   expect(cleanup.disconnectGain).toHaveBeenCalledOnce();
   expect(cleanup.stopAudioTrack).toHaveBeenCalledOnce();
@@ -244,4 +277,115 @@ it('reserves completion until DONE and maps rendering into the overall budget', 
       })
     );
   }
+});
+
+it('creates one spatial GPU owner per export job and replaces a lost instance only on explicit reuse', () => {
+  const job: Pick<ProjectExportRuntimeState, 'cameraSpatialRenderer'> = {};
+  expect(createReviewSpatialRenderer).not.toHaveBeenCalled();
+  const first = getProjectExportSpatialRenderer(job);
+  expect(getProjectExportSpatialRenderer(job)).toBe(first);
+  expect(createReviewSpatialRenderer).toHaveBeenCalledOnce();
+  const lost = vi.mocked(createReviewSpatialRenderer).mock.calls[0]![0]!;
+  lost();
+  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(job).not.toHaveProperty('cameraSpatialRenderer');
+  const next = getProjectExportSpatialRenderer(job);
+  expect(next).not.toBe(first);
+  expect(createReviewSpatialRenderer).toHaveBeenCalledTimes(2);
+  lost();
+  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(next.dispose).not.toHaveBeenCalled();
+  expect(getProjectExportSpatialRenderer(job)).toBe(next);
+});
+
+it('refuses GPU acquisition after cancellation or abort without recreating disposed resources', () => {
+  const job: Pick<ProjectExportRuntimeState, 'cameraSpatialRenderer'> & { cancelled?: boolean } = {
+    cancelled: true,
+  };
+  expect(() => getProjectExportSpatialRenderer(job)).toThrow('PROJECT_EXPORT_CANCELLED');
+  expect(createReviewSpatialRenderer).not.toHaveBeenCalled();
+  job.cancelled = false;
+  const controller = new AbortController();
+  controller.abort();
+  expect(() => getProjectExportSpatialRenderer(job, controller.signal)).toThrow(
+    'PROJECT_EXPORT_CANCELLED'
+  );
+  expect(createReviewSpatialRenderer).not.toHaveBeenCalled();
+  const renderer = getProjectExportSpatialRenderer(job);
+  expect(() => getProjectExportSpatialRenderer(job, controller.signal)).toThrow(
+    'PROJECT_EXPORT_CANCELLED'
+  );
+  expect(createReviewSpatialRenderer).toHaveBeenCalledOnce();
+  expect(job.cameraSpatialRenderer).toBe(renderer);
+});
+
+it('keeps one watermark renderer per export job and releases it on cleanup', () => {
+  const job: ProjectExportRuntimeState = {
+    mediaRecorder: null,
+    clipMediaElements: new Map(),
+    clipAudioNodes: new Map(),
+    audioContext: null,
+    audioDestination: null,
+    exportAudioSettings: null,
+    assetUrls: [],
+    cleanupNode: null,
+    exportAbortController: null,
+    exportStream: null,
+  };
+  const owner = getProjectExportWatermarkRenderer(job);
+  expect(getProjectExportWatermarkRenderer(job)).toBe(owner);
+  const clear = vi.spyOn(owner, 'clear');
+  cleanupJob(job);
+  expect(clear).toHaveBeenCalledTimes(1);
+  expect(job.watermarkRenderer).toBeUndefined();
+  const cancelled = new AbortController();
+  cancelled.abort();
+  expect(() => getProjectExportWatermarkRenderer(job, cancelled.signal)).toThrow(
+    'PROJECT_EXPORT_CANCELLED'
+  );
+  expect(job.watermarkRenderer).toBeUndefined();
+});
+
+it('disposes the composition sampler before revoking its borrowed media URLs and clears ownership', () => {
+  const order: string[] = [];
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {
+    order.push('url');
+  });
+  const project = createEmptyVideoProject();
+  const dispose = vi.fn(() => {
+    order.push('sampler');
+  });
+  const job: ProjectExportRuntimeState = {
+    mediaRecorder: null,
+    clipMediaElements: new Map(),
+    clipAudioNodes: new Map(),
+    audioContext: null,
+    audioDestination: null,
+    exportAudioSettings: null,
+    assetUrls: ['blob:borrowed'],
+    cleanupNode: null,
+    exportAbortController: null,
+    exportStream: null,
+    compositionJoinRenderer: {
+      project,
+      settings: {
+        format: 'MP4',
+        mp4VideoCodec: 'AVC',
+        fps: 30,
+        width: 8,
+        height: 4,
+        quality: 'MEDIUM',
+        resolution: 'SOURCE',
+        downloadAfterExport: false,
+      },
+      clear() {},
+      dispose,
+      async draw() {},
+    },
+  };
+  cleanupJob(job);
+  expect(order).toEqual(['sampler', 'url']);
+  expect(job.compositionJoinRenderer).toBeUndefined();
+  cleanupJob(job);
+  expect(dispose).toHaveBeenCalledOnce();
 });

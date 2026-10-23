@@ -71,6 +71,7 @@ function setup(
       : {}),
     ...(source
       ? {
+          recordingPoint: { x: (time * 100) / 1280, y: (time * 50) / 720 },
           sourceAnchor: {
             kind: 'recording-source' as const,
             recordingId: 'recording',

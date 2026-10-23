@@ -66,6 +66,7 @@ type PersistenceMutationCoverage = {
 };
 
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
+  excluded('system/access-data/permissions/index.tsx', ['mutateVideoSettings'], 'action/status'),
   excluded(
     'system/events-logs/index.tsx',
     ['createEventHistory', 'createMaintenanceLog', 'createRuntimeLog'],

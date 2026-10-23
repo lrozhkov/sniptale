@@ -32,20 +32,28 @@ export function usePresentationPreview(
   });
   const latest = useRef({ input, preferences, pause });
   latest.current = { input, preferences, pause };
-  // Mutable UI objects are excluded; serialized render inputs form the immutable job identity.
+  // Persistence normalization can reorder object keys without changing render inputs.
   const revision = useMemo(
     () =>
       input
-        ? JSON.stringify({
-            index: input.index,
-            advanced: input.advanced,
-            edits: input.edits,
-            comments: input.comments,
-            clickCues: input.clickCues,
-            keyCues: input.keyCues,
-            settings: input.renderSettings,
-            preferences,
-          })
+        ? JSON.stringify(
+            {
+              index: input.index,
+              advanced: input.advanced,
+              edits: input.edits,
+              comments: input.comments,
+              clickCues: input.clickCues,
+              keyCues: input.keyCues,
+              settings: input.renderSettings,
+              preferences,
+            },
+            (_key, value: unknown) =>
+              value !== null && typeof value === 'object' && !Array.isArray(value)
+                ? Object.fromEntries(
+                    Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+                  )
+                : value
+          )
         : '',
     [input, preferences]
   );

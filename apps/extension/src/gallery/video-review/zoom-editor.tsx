@@ -1,6 +1,10 @@
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../features/video/project/scene/focus-appearance';
+
 import { quickEditFocusConflicts } from '../../features/video/review/advanced/focus-layout';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+
 import { useEffect, useState } from 'react';
 import type {
   QuickEditAdvancedState,

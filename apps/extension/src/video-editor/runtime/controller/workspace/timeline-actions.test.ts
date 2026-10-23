@@ -19,6 +19,9 @@ import {
   createWorkspaceTimelineSelectionActions,
 } from './timeline-actions';
 import { createWorkspaceTimelineController } from './timeline';
+import { createSelectedClipActions as createSelectedTimelineClipActions } from '../selected-clip-actions';
+import { pairedSourceVoiceoverPlaybackFixture } from '../../../../features/video/project/source-voiceover-playback.test-support';
+import { isExportReadyVideoProject } from '../../../../features/video/project/validation/root';
 
 function createStore(project = createEmptyVideoProject('Timeline actions')) {
   const store: VideoEditorState & Pick<ClipSelectionPort, 'selectedClipId'> = {
@@ -52,7 +55,18 @@ function createWorkspace(): Pick<
     setAutoProcessingModalOpen: vi.fn(),
     clearPlaybackRange: vi.fn(),
     playbackRange: null,
-    inspector: { mode: 'selection', openSelection: vi.fn() },
+    inspector: {
+      mode: 'selection',
+      openSelection: vi.fn(),
+      sceneEdgesPreview: null,
+      previewSceneEdges: vi.fn(),
+      watermarkPreview: null,
+      previewWatermark: () => undefined,
+      registerWatermarkAbort: () => () => undefined,
+      cancelWatermarkAcquisition: () => undefined,
+      motionPreview: null,
+      previewMotion: vi.fn(),
+    },
     confirm: {
       dialog: null,
       onCancel: vi.fn(),
@@ -140,6 +154,86 @@ it('projects valid selected-clip split eligibility into the timeline controller'
   store.selectedClipId = null;
   expect(createController().state.canSplitSelectedClip).toBe(false);
 });
+
+it.each([
+  'unlocked',
+  'voice-track-locked',
+  'source-track-locked',
+  'paired-audio-track-locked',
+  'missing-document',
+  'absent-document-list',
+  'source-less-dormant',
+] as const)(
+  'projects whole voice toolbar permissions for %s and keeps clip split unavailable',
+  (scenario) => {
+    const { project, clip, document, track, originalTrack } =
+      pairedSourceVoiceoverPlaybackFixture();
+    if (scenario === 'voice-track-locked') track.locked = true;
+    if (scenario === 'source-track-locked')
+      project.tracks.find((entry) => entry.id === clip.trackId)!.locked = true;
+    if (scenario === 'paired-audio-track-locked') originalTrack.locked = true;
+    if (scenario === 'absent-document-list') delete project.sourceVoiceoverDocuments;
+    if (scenario === 'source-less-dormant') {
+      project.clips = [];
+      document.take.dormant = true;
+      delete document.take.sourceAnchor;
+    }
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const before = structuredClone(project);
+    const store = createStore(project);
+    store.currentTime = 3;
+    store.selectedClipId = null;
+    store.selectedTrackId = track.id;
+    store.selection = {
+      kind: VideoEditorSelectionKind.SOURCE_VOICEOVER,
+      documentId: scenario === 'missing-document' ? 'missing-document' : document.id,
+    };
+    store.duplicateSourceVoiceover = vi.fn(() => 'copied-document');
+    store.deleteSourceVoiceover = vi.fn();
+    store.duplicateClip = vi.fn();
+    store.deleteClip = vi.fn();
+    store.splitClipAt = vi.fn();
+    type ControllerArgs = Parameters<typeof createWorkspaceTimelineController>;
+    const runtime = {
+      timelinePreviews: {},
+      setTimelinePreviewSuspended: vi.fn(),
+      setTimelinePreviewViewport: vi.fn(),
+    } as unknown as ControllerArgs[1];
+    const workspace = {
+      ...createWorkspace(),
+      grid: { magnetEnabled: true },
+      playbackRange: null,
+    } as unknown as ControllerArgs[4];
+    const controller = createWorkspaceTimelineController(
+      store as unknown as ControllerArgs[0],
+      runtime,
+      project,
+      {} as ControllerArgs[3],
+      workspace,
+      {} as ControllerArgs[5],
+      createSelectedTimelineClipActions(store)
+    );
+    const editable = scenario === 'unlocked' || scenario === 'source-less-dormant';
+    expect(controller.state.canDuplicateSelection).toBe(editable);
+    expect(controller.state.canDeleteSelectedClip).toBe(editable);
+    expect(controller.state.canEditSelectedClip).toBe(false);
+    expect(controller.state.canSplitSelectedClip).toBe(false);
+    controller.actions.onSplitSelectedClip();
+    expect(store.splitClipAt).not.toHaveBeenCalled();
+    if (editable) {
+      controller.actions.onDuplicateSelectedClip();
+      controller.actions.onDeleteSelectedTimelineObject();
+      expect(store.duplicateSourceVoiceover).toHaveBeenCalledExactlyOnceWith(document.id);
+      expect(store.deleteSourceVoiceover).toHaveBeenCalledExactlyOnceWith(document.id);
+    } else {
+      expect(store.duplicateSourceVoiceover).not.toHaveBeenCalled();
+      expect(store.deleteSourceVoiceover).not.toHaveBeenCalled();
+    }
+    expect(store.duplicateClip).not.toHaveBeenCalled();
+    expect(store.deleteClip).not.toHaveBeenCalled();
+    expect(project).toEqual(before);
+  }
+);
 
 it('deletes the selected object track from timeline delete actions', () => {
   const store = createStore();
@@ -253,6 +347,83 @@ it('preserves captured facts while cursor moves remain explicit', () => {
   );
 });
 
+it('moves a retained source cursor key through the windowed timeline clock', () => {
+  const clip = createVideoClip({
+    startTime: 2,
+    duration: 2,
+    sourceStart: 2,
+    sourceDuration: 6,
+    sourceInstanceId: 'instance-video',
+    playbackWindow: { offset: 2, extent: 2 },
+  });
+  const project = createProject([clip]);
+  project.baseRecordingId = 'rec-asset-video';
+  project.source = { kind: 'recording', recordingId: 'rec-asset-video' };
+  project.cursorTrack = {
+    captureMode: 'separate',
+    samples: [],
+    skin: {
+      animationPreset: 'NONE',
+      color: '#fff',
+      hidden: false,
+      preset: 'ARROW',
+      scale: 1,
+      shadow: false,
+    },
+  };
+  const binding = {
+    kind: 'recording-source' as const,
+    recordingId: 'rec-asset-video',
+    sourceInstanceId: 'instance-video',
+  };
+  project.cursorFocusPath = {
+    version: 1,
+    smoothing: 0,
+    sensitivity: 1,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'source-segment',
+        binding,
+        start: 2,
+        end: 8,
+        keys: [
+          {
+            id: 'retained-key',
+            time: 4.25,
+            x: 0.4,
+            y: 0.5,
+            anchor: 'manual',
+            interpolation: 'smooth',
+          },
+        ],
+      },
+    ],
+  };
+  const capturedTrack = structuredClone(project.cursorTrack);
+  expect(projectCursorFocusTimelineKeys(project)).toContainEqual(
+    expect.objectContaining({ id: 'retained-key', sourceTime: 4.25, time: 2.25 })
+  );
+  const store = createStore(project);
+  createWorkspaceTimelineEditingActions(
+    store,
+    createWorkspace(),
+    createSelectedClipActions()
+  ).onMoveCursorSegment('retained-key', null, 2.5, null);
+
+  expect(store.project?.cursorFocusPath?.segments[0]?.binding).toEqual(binding);
+  expect(store.project?.cursorTrack).toEqual(capturedTrack);
+  expect(store.project?.cursorFocusPath?.segments[0]?.keys[0]).toMatchObject({
+    id: 'retained-key',
+    time: 4.5,
+    authored: true,
+  });
+  expect(projectCursorFocusTimelineKeys(store.project!)).toContainEqual(
+    expect.objectContaining({ id: 'retained-key', sourceTime: 4.5, time: 2.5 })
+  );
+});
+
 it('clears the playback interval only for seeks outside its inclusive boundaries', () => {
   const workspace = { ...createWorkspace(), playbackRange: { start: 2, end: 5 } };
   const seekTo = vi.fn();
@@ -309,3 +480,63 @@ it('commits timeline framing gestures through the real project state', () => {
     useVideoEditorStore.setState(originalState, true);
   }
 });
+
+it('opens note selection in the inspector and routes Delete to the accepted note command', () => {
+  const store = createStore();
+  const project = store.project!;
+  const selectComment = vi.fn();
+  const editCommentDocument = vi.fn();
+  store.selectComment = selectComment;
+  store.editCommentDocument = editCommentDocument;
+  store.selection = { kind: 'comment', documentId: 'doc', commentId: 'note' };
+  const workspace = createWorkspace();
+  const runtime = {
+    seekTo: vi.fn(),
+    togglePlayback: vi.fn(),
+  } as unknown as VideoEditorRuntimeController;
+  const selection = createWorkspaceTimelineSelectionActions(store, runtime, workspace);
+  selection.onSelectComment('doc', 'note', 10);
+  expect(selectComment).toHaveBeenCalledExactlyOnceWith('doc', 'note', 10);
+  expect(workspace.inspector.openSelection).toHaveBeenCalledTimes(1);
+  const clipActions = createSelectedClipActions();
+  const editing = createWorkspaceTimelineEditingActions(store, workspace, clipActions);
+  editing.onDeleteSelectedTimelineObject();
+  expect(editCommentDocument).toHaveBeenCalledExactlyOnceWith(project, 'doc', {
+    kind: 'remove-note',
+    id: 'note',
+  });
+  expect(clipActions.deleteSelectedClip).not.toHaveBeenCalled();
+});
+
+it.each(['LINEAR', 'EASE_OUT', 'EASE_IN_OUT', 'INSTANT'] as const)(
+  'reconnects with remembered %s from the source',
+  (link) => {
+    const project = createEmptyVideoProject();
+    project.duration = 8;
+    const source = {
+      ...createVideoProjectMotionRegion(project, 0),
+      id: 'source',
+      duration: 1,
+      phaseTransitions: { link },
+    };
+    const destination = {
+      ...createVideoProjectMotionRegion(project, 3),
+      id: 'destination',
+      duration: 1,
+    };
+    project.motionRegions = [source, destination];
+    const store = createStore(project);
+    store.updateMotionRegion = vi.fn();
+    store.selectMotionRegion = vi.fn();
+    const runtime = { seekTo: vi.fn() } as unknown as VideoEditorRuntimeController;
+    const workspace = createWorkspace();
+    createWorkspaceTimelineSelectionActions(store, runtime, workspace).onConnectMotionRegions(
+      source.id,
+      destination.id
+    );
+    expect(store.updateMotionRegion).toHaveBeenCalledWith(destination.id, {
+      incomingConnection: { fromRegionId: source.id, easing: link },
+    });
+    expect(store.selectMotionRegion).toHaveBeenCalledWith(destination.id, 'connection');
+  }
+);

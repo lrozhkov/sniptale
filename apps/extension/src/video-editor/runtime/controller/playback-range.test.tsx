@@ -4,11 +4,14 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import type { VideoEditorSelection } from '../../contracts/selection';
 import type { VideoProject } from '../../../features/video/project/types';
 import type { VideoEditorPlaybackRange } from '../../interaction/playback/range';
 import { usePlaybackRangeSanity } from './playback-range';
 
 interface HarnessProps {
+  selection?: VideoEditorSelection | undefined;
+  currentTime?: number | undefined;
   clearPlaybackRange: () => void;
   playbackRange: VideoEditorPlaybackRange | null;
   project: VideoProject | null;
@@ -101,5 +104,34 @@ it('clamps the local playback range when the current project duration shrinks', 
   });
 
   expect(setPlaybackRange).toHaveBeenCalledWith({ start: 2, end: 4 });
+  expect(clearPlaybackRange).not.toHaveBeenCalled();
+});
+
+it('clears an old loop only when a new note selection seeks outside it', () => {
+  const clearPlaybackRange = vi.fn();
+  const props: HarnessProps = {
+    project: createProject('notes', 12),
+    playbackRange: { start: 6, end: 8 },
+    clearPlaybackRange,
+    setPlaybackRange: vi.fn(),
+    selection: { kind: 'scene' },
+    currentTime: 7,
+  };
+  renderHarness(root, props);
+  const note = { kind: 'comment' as const, documentId: 'doc', commentId: 'note' };
+  renderHarness(root, { ...props, selection: note });
+  expect(clearPlaybackRange).not.toHaveBeenCalled();
+  renderHarness(root, { ...props, selection: note, currentTime: 2 });
+  expect(clearPlaybackRange).not.toHaveBeenCalled();
+  renderHarness(root, { ...props, selection: { ...note }, currentTime: 2 });
+  expect(clearPlaybackRange).toHaveBeenCalledTimes(1);
+  // An ordinary note edit or a newly authored loop does not count as selecting the note again.
+  clearPlaybackRange.mockClear();
+  renderHarness(root, {
+    ...props,
+    selection: note,
+    playbackRange: { start: 1, end: 4 },
+    currentTime: 2,
+  });
   expect(clearPlaybackRange).not.toHaveBeenCalled();
 });

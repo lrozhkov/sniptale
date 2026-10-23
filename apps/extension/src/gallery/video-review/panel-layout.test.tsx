@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewPanelResizeHandle, useReviewPanelLayout } from './panel-layout';
 
-function setup() {
+function setup(initialReady = true) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const frame = { width: 1254, height: 536 };
   let measure!: () => void;
@@ -27,8 +27,9 @@ function setup() {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  function Harness({ enabled }: { enabled: boolean }) {
-    const layout = useReviewPanelLayout(enabled);
+  function Harness({ enabled, ready }: { enabled: boolean; ready: boolean }) {
+    const layout = useReviewPanelLayout(enabled, ready);
+    if (!ready) return null;
     return (
       <div
         ref={layout.container}
@@ -45,8 +46,9 @@ function setup() {
       </div>
     );
   }
-  const render = (enabled = true) => act(() => root.render(<Harness enabled={enabled} />));
-  render();
+  const render = (enabled = true, ready = true) =>
+    act(() => root.render(<Harness enabled={enabled} ready={ready} />));
+  render(true, initialReady);
   const handle = (panel: string) =>
     host.querySelector<HTMLDivElement>(`[data-review-panel-resize="${panel}"]`)!;
   const key = (panel: string, value: string) =>
@@ -81,7 +83,9 @@ function setup() {
     pointer,
     render,
     measure: () => act(() => measure()),
-    container: host.querySelector<HTMLDivElement>('[data-container]')!,
+    get container() {
+      return host.querySelector<HTMLDivElement>('[data-container]')!;
+    },
     cleanup: () => {
       act(() => root.unmount());
       expect(disconnect).toHaveBeenCalled();
@@ -91,6 +95,39 @@ function setup() {
     },
   };
 }
+
+it.each([false, true])(
+  'attaches measurement and blur recovery after choice with Advanced=%s',
+  (advanced) => {
+    const fixture = setup(false);
+    try {
+      fixture.frame.width = 1920;
+      fixture.frame.height = 900;
+      fixture.render(advanced);
+      if (!advanced) {
+        expect(fixture.container.style.gridTemplateColumns).toBe('1fr 320px');
+        fixture.render(true);
+      }
+      fixture.key('inspector', 'End');
+      fixture.key('timeline', 'End');
+      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 800px');
+      expect(fixture.container.style.gridTemplateRows).toBe('1fr 680px');
+      fixture.key('inspector', 'Home');
+      fixture.pointer('inspector', 'pointerdown', 900);
+      fixture.pointer('inspector', 'pointermove', 700);
+      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 520px');
+      act(() => window.dispatchEvent(new Event('blur')));
+      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 320px');
+      fixture.frame.width = 1254;
+      fixture.frame.height = 560;
+      fixture.measure();
+      expect(fixture.handle('inspector').getAttribute('aria-valuemax')).toBe('742');
+      expect(fixture.handle('timeline').getAttribute('aria-valuemax')).toBe('340');
+    } finally {
+      fixture.cleanup();
+    }
+  }
+);
 
 it('clamps effective sizes, restores preferred dimensions, and leaves Basic fixed', () => {
   const fixture = setup();

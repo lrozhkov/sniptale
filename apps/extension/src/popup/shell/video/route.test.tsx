@@ -4,6 +4,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { VideoRoute } from './route';
 
 const mocks = vi.hoisted(() => ({
   loadVideo: vi.fn(),
@@ -95,6 +96,22 @@ function renderRoute(node: ReactNode) {
   act(() => root.render(node));
   return { root, rerender: (next: ReactNode) => act(() => root.render(next)) };
 }
+
+it('preserves an explicit launch preset instead of loading the saved preset', async () => {
+  const view = renderRoute(
+    <VideoRoute
+      startup={{
+        page: 'video',
+        videoMode: CaptureMode.TAB_CROP,
+        videoLaunch: { tabId: 21, viewportPresetId: 'launch-preset' },
+      }}
+    />
+  );
+  await vi.waitFor(() => expect(mocks.setIsReady).toHaveBeenCalledWith(true));
+  expect(mocks.setSelectedPresetId).toHaveBeenCalledWith('launch-preset');
+  expect(mocks.setSelectedPresetId).not.toHaveBeenCalledWith('preset');
+  act(() => view.root.unmount());
+});
 
 it('hydrates only Video state and applies a fixed mode before readiness', async () => {
   const { VideoRoute } = await import('./route');

@@ -52,8 +52,16 @@ it('pauses native playback before playing state is published, blocks busy playba
     },
   };
   session.mockReturnValue(controller);
-  function Subject({ open, disabled }: { open: boolean; disabled: boolean }) {
-    useAudioRecordingController(open, disabled);
+  function Subject({
+    open,
+    disabled,
+    suspended = false,
+  }: {
+    open: boolean;
+    disabled: boolean;
+    suspended?: boolean;
+  }) {
+    useAudioRecordingController(open, disabled, '', undefined, undefined, suspended);
     return <button>Save</button>;
   }
   const space = () => {
@@ -73,6 +81,9 @@ it('pauses native playback before playing state is published, blocks busy playba
     expect(pause).toHaveBeenCalledOnce();
     act(() => root.render(<Subject open disabled />));
     expect(space().defaultPrevented).toBe(true);
+    expect(play).toHaveBeenCalledOnce();
+    act(() => root.render(<Subject open disabled={false} suspended />));
+    expect(space().defaultPrevented).toBe(false);
     expect(play).toHaveBeenCalledOnce();
     act(() => root.render(<Subject open={false} disabled={false} />));
     expect(space().defaultPrevented).toBe(false);

@@ -1,9 +1,7 @@
-import { createReviewSpotlightMasks } from '../../../../apps/extension/src/workflows/video-review/render-spotlight';
-import { drawReviewBorders } from '../../../../apps/extension/src/workflows/video-review/render-border';
-import {
-  createQuickEditBorder,
-  evaluateQuickEditBordersAtTime,
-} from '../../../../apps/extension/src/features/video/review/advanced/border';
+import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
+import { createSceneSpotlightMasks } from '../../../../apps/extension/src/features/video/composition/draw/spotlight';
+import { drawSceneBorders } from '../../../../apps/extension/src/features/video/composition/draw/border';
+import { evaluateQuickEditBordersAtTime } from '../../../../apps/extension/src/features/video/review/advanced/border';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 
 export function probe() {
@@ -22,7 +20,7 @@ export function probe() {
     blur: 0,
     presence: 1,
   };
-  const masks = createReviewSpotlightMasks(output, [first, second]);
+  const masks = createSceneSpotlightMasks(output, [first, second]);
   const alpha = (x: number, y: number) =>
     masks.dim.getContext('2d')!.getImageData(x, y, 1, 1).data[3];
   const canvas = document.createElement('canvas');
@@ -46,13 +44,13 @@ export function probe() {
     video: { x: 0, y: 0, width: 100, height: 100 },
     scale: 1,
   });
-  drawReviewBorders(context, output, frames);
+  drawSceneBorders(context, output, frames);
   const stroke = (x: number, y: number) => context.getImageData(x, y, 1, 1).data[3];
   const edges = { top: stroke(75, 11), bottom: stroke(50, 88), right: stroke(88, 70) };
   const patterned = (['solid', 'dashed', 'dotted'] as const).map((style) => {
     const counts = [0.25, 1.5].map((time) => {
       context.clearRect(0, 0, 100, 100);
-      drawReviewBorders(
+      drawSceneBorders(
         context,
         output,
         evaluateQuickEditBordersAtTime({
@@ -101,7 +99,7 @@ function probeBorderMotion() {
   };
   const render = (border: typeof region.border, time: number) => {
     context.clearRect(0, 0, 100, 100);
-    drawReviewBorders(
+    drawSceneBorders(
       context,
       output,
       evaluateQuickEditBordersAtTime({
@@ -193,7 +191,7 @@ function probeBorderStart() {
         },
         enter: { type: 'linear' as const, duration: 1 },
       };
-      drawReviewBorders(
+      drawSceneBorders(
         context,
         output,
         evaluateQuickEditBordersAtTime({
@@ -263,7 +261,7 @@ export function probeRipple() {
       video: { x: 0, y: 0, ...output },
       scale: 1,
     });
-    drawReviewBorders(context, output, frames);
+    drawSceneBorders(context, output, frames);
     display.drawImage(canvas, index * 160, 0);
     const alpha = (y: number) => context.getImageData(80, y, 1, 1).data[3]!;
     let outermost = 160;

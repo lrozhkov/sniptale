@@ -1,3 +1,4 @@
+import { REVIEW_KEY_VIEWPORT_WIDTH } from '../../features/video/project/action-feedback/key-animation';
 import { drawKeystroke } from '../../features/video/composition/draw/effects/keystrokes';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 
@@ -23,7 +24,7 @@ export function drawReviewKeys(
           keyStyle: cue.settings.style,
           progress: (time - cue.start) / (cue.end - cue.start),
         },
-        output.width / 1920,
+        output.width / REVIEW_KEY_VIEWPORT_WIDTH,
         { x: 0, y: 0, width: output.width, height: output.height }
       );
 }

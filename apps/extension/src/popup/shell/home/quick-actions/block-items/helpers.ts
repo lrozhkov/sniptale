@@ -12,13 +12,13 @@ interface QuickActionItemState {
 
 export const disabledQuickActionListItemClassName = [
   'cursor-not-allowed',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_72%,transparent)]',
+  'bg-transparent',
   'text-[var(--sniptale-color-text-dim)]',
   'opacity-55',
 ].join(' ');
 
 export const enabledQuickActionListItemClassName = [
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_88%,transparent)]',
+  'bg-transparent',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
@@ -33,13 +33,13 @@ function shouldShowQuickActionMeta(density: QuickActionListDensity) {
 function getQuickActionListButtonClassName(density: QuickActionListDensity) {
   switch (density) {
     case 'regular':
-      return 'flex min-h-[58px] w-full items-center gap-3 rounded-[12px] px-3 text-left';
+      return 'flex min-h-[58px] w-full items-center gap-3 rounded-[6px] px-3 text-left';
     case 'compact':
-      return 'flex min-h-[48px] w-full items-center gap-3 rounded-[12px] px-3 text-left';
+      return 'flex min-h-[48px] w-full items-center gap-3 rounded-[6px] px-3 text-left';
     case 'dense':
-      return 'flex min-h-[40px] w-full items-center gap-2.5 rounded-[12px] px-3 text-left';
+      return 'flex min-h-[40px] w-full items-center gap-2.5 rounded-[6px] px-3 text-left';
     case 'tight':
-      return 'flex min-h-[28px] w-full items-center gap-2 rounded-[12px] px-2.5 text-left';
+      return 'flex min-h-[28px] w-full items-center gap-2 rounded-[6px] px-2.5 text-left';
   }
 }
 

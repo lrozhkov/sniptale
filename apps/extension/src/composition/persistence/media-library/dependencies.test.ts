@@ -25,13 +25,13 @@ const targets = {
   'web-snapshot': { id: 'web', source: { kind: 'web-snapshot', snapshotId: 'snapshot' } },
 } satisfies Record<MediaAssetSource['kind'], MediaDependencyTarget>;
 
-it.each([3, 4] as const)(
+it.each([3, 4, 5] as const)(
   'admits v%s relationships and refuses invalid or future locators',
   (version) => {
     const entry = createVideoProjectEntryWithMediaClip({
       version,
       actionFeedback: [],
-      ...(version === 4 ? { cameraFollowDefaults: createCameraFollowSettings() } : {}),
+      ...(version >= 4 ? { cameraFollowDefaults: createCameraFollowSettings() } : {}),
     });
     expect(parseVideoDependencyEnvelope(entry)).not.toBeNull();
     expect(videoEntryIsUnrelated(entry, targets.screenshot, new Set())).toBe(true);
@@ -46,7 +46,7 @@ it.each([3, 4] as const)(
     };
     expect(videoEntryIsUnrelated(related, targets.recording, new Set())).toBe(false);
     expect(
-      parseVideoDependencyEnvelope({ ...entry, project: { ...entry.project, version: 5 } })
+      parseVideoDependencyEnvelope({ ...entry, project: { ...entry.project, version: 6 } })
     ).toBeNull();
     expect(
       videoEntryIsUnrelated(
@@ -125,5 +125,28 @@ it('retains canonical scenario identity after its published root bytes are repla
       { id: 'captured', assetId: 'frozen-old', galleryAssetId: null },
       { id: 'scenario-asset:captured', source: { kind: 'stored-asset', assetId: 'published-new' } }
     )
+  ).toBe(true);
+});
+
+it('retains dormant background sources and refuses schema fourteen deletion shortcuts', () => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  const retained = {
+    ...entry,
+    project: {
+      ...entry.project,
+      version: 14,
+      sceneBackground: {
+        kind: 'solid',
+        color: '#123456',
+        remembered: {
+          image: { kind: 'image', assetId: entry.project.assets[0]!.id, imageFit: 'contain' },
+        },
+      },
+    },
+  };
+  expect(videoEntryIsUnrelated(retained, targets.recording, new Set())).toBe(false);
+  expect(videoEntryIsUnrelated(retained, targets.screenshot, new Set())).toBe(false);
+  expect(
+    videoSourceUsesMedia({ kind: 'recording', recordingId: 'record' }, targets.recording, new Set())
   ).toBe(true);
 });

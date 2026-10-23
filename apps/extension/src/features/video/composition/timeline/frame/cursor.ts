@@ -1,5 +1,15 @@
+import { resolveProjectSourceCursorObservation } from '../../../project/cursor-focus-path/projection';
+import {
+  hasCameraMediaAt,
+  resolveCameraClip,
+  cameraSourceTime,
+} from '../../../project/camera/animation';
+import { isCameraHiddenAt } from '../../../project/camera/visibility';
 import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
-import { getFittedMediaContentFrame } from '../../draw/fitted-media';
+import {
+  mapSourceNormalizedPointToVisualLayer,
+  getFittedMediaContentFrame,
+} from '../../draw/fitted-media';
 import type { VisualLayerSourcePointMapping } from '../../draw/fitted-media';
 import { normalizeVideoProjectCursorSkin } from '../../../project/cursor';
 import { resolveVideoProjectActionOccurrences } from '../../../project/action-occurrences';
@@ -35,13 +45,26 @@ export function interpolateCursorSample(
     visible: previousSample.visible,
     x: previousSample.x + (nextSample.x - previousSample.x) * progress,
     y: previousSample.y + (nextSample.y - previousSample.y) * progress,
+    ...(previousSample.recordingPoint && nextSample.recordingPoint
+      ? {
+          recordingPoint: {
+            x:
+              previousSample.recordingPoint.x +
+              (nextSample.recordingPoint.x - previousSample.recordingPoint.x) * progress,
+            y:
+              previousSample.recordingPoint.y +
+              (nextSample.recordingPoint.y - previousSample.recordingPoint.y) * progress,
+          },
+        }
+      : {}),
   };
 }
 
 export function resolveCursorSample(
   project: VideoProject,
   currentTime: number,
-  sourceClipId?: string
+  sourceClipId?: string,
+  options?: { includeSourceEnd?: boolean }
 ): VideoProjectCursorSample | null {
   const samples = project.cursorTrack?.samples ?? [];
   if (samples.length === 0) {
@@ -55,7 +78,12 @@ export function resolveCursorSample(
   }
   if (previousSample.sourceAnchor) {
     const owner = project.clips.find(({ id }) => id === previousSample.sourceAnchor?.sourceClipId);
-    if (!owner || currentTime < owner.startTime || currentTime >= owner.startTime + owner.duration)
+    if (
+      !owner ||
+      currentTime < owner.startTime ||
+      currentTime > owner.startTime + owner.duration ||
+      (currentTime === owner.startTime + owner.duration && !options?.includeSourceEnd)
+    )
       return null;
   }
 
@@ -138,6 +166,34 @@ export function resolveVideoCompositionCursor(
     return null;
   }
 
+  let point = { x: sample.x, y: sample.y };
+  if (sample.sourceAnchor && cursorTrack.captureMode === VideoCursorCaptureMode.SEPARATE) {
+    const owner = project.clips.find((clip) => clip.id === sample.sourceAnchor?.sourceClipId);
+    if (
+      owner?.type === 'VIDEO' &&
+      project.tracks.some((track) => track.id === owner.trackId && track.role === 'CAMERA') &&
+      isCameraHiddenAt(owner.cameraHiddenRanges ?? [], cameraSourceTime(owner, currentTime))
+    )
+      return null;
+    const mapping = resolveCursorSourcePointMapping(
+      project,
+      sample.sourceAnchor.sourceClipId,
+      currentTime
+    );
+    if (
+      !sample.recordingPoint ||
+      (sample.observation && sample.observation !== 'observed') ||
+      !mapping
+    )
+      return null;
+    const projected = mapSourceNormalizedPointToVisualLayer({
+      ...mapping,
+      point: sample.recordingPoint,
+    });
+    if (!projected) return null;
+    point = projected;
+  }
+
   return {
     animationPreset: skin.animationPreset,
     captureMode: cursorTrack.captureMode,
@@ -149,8 +205,8 @@ export function resolveVideoCompositionCursor(
     shadow: skin.shadow,
     time: currentTime,
     visible: true,
-    x: sample.x,
-    y: sample.y,
+    x: point.x,
+    y: point.y,
   };
 }
 
@@ -171,16 +227,26 @@ export function resolveCursorSourcePointMapping(
 ): Omit<VisualLayerSourcePointMapping, 'point'> | null {
   if (!sourceClipId) return null;
   const clip = project.clips.find((item) => item.id === sourceClipId);
-  if (clip?.type !== 'VIDEO') return null;
+  if (clip?.type !== 'VIDEO' || !hasCameraMediaAt(project, clip, time)) return null;
   const asset = project.assets.find((item) => item.id === clip.assetId);
   if (!asset) return null;
+  const camera = project.tracks.some(
+    (track) => track.id === clip.trackId && track.role === 'CAMERA'
+  );
+  const visual = camera ? resolveCameraClip(clip, time) : clip;
   return {
-    frame: clip.transform,
-    fitMode: clip.fitMode,
+    frame: visual.transform,
+    fitMode: visual.fitMode,
+    mirrored: camera && clip.cameraMirrored === true,
+    ...(camera && visual.cameraAppearance ? { cameraAppearance: visual.cameraAppearance } : {}),
+    ...(clip.sourceCrop ? { sourceCrop: clip.sourceCrop } : {}),
+    ...(!camera && clip.windowCornerRadius !== undefined
+      ? { windowCornerRadius: clip.windowCornerRadius }
+      : {}),
     sourceWidth: asset.metadata.width,
     sourceHeight: asset.metadata.height,
-    ...(clip.windowHeader ? { windowHeader: clip.windowHeader } : {}),
-    renderState: resolveClipTransitionVisualState(project, clip, time),
+    ...(clip.windowHeader && !camera ? { windowHeader: clip.windowHeader } : {}),
+    renderState: resolveClipTransitionVisualState(project, visual, time),
   };
 }
 
@@ -221,11 +287,20 @@ export function mapCursorFocusControlPoint(
     const x = (point.x - center.x - mapping.renderState.translateX) / mapping.renderState.scaleX;
     const y = (point.y - center.y - mapping.renderState.translateY) / mapping.renderState.scaleY;
     return {
-      x: (center.x + x * Math.cos(angle) + y * Math.sin(angle) - content.x) / content.width,
+      x:
+        ((mapping.mirrored
+          ? 2 * mapping.frame.x +
+            mapping.frame.width -
+            (center.x + x * Math.cos(angle) + y * Math.sin(angle))
+          : center.x + x * Math.cos(angle) + y * Math.sin(angle)) -
+          content.x) /
+        content.width,
       y: (center.y - x * Math.sin(angle) + y * Math.cos(angle) - content.y) / content.height,
     };
   }
-  const x = content.x + point.x * content.width - center.x;
+  const sourceX = content.x + point.x * content.width;
+  const x =
+    (mapping.mirrored ? 2 * mapping.frame.x + mapping.frame.width - sourceX : sourceX) - center.x;
   const y = content.y + point.y * content.height - center.y;
   return {
     x:
@@ -269,6 +344,13 @@ export function resolveObservedCursorPosition(
             clip.id === sourceClipId && clip.duration > 0 && time === clip.startTime + clip.duration
         )
       : undefined;
+  const sourceObservation = resolveProjectSourceCursorObservation(
+    project,
+    time,
+    sourceClipId,
+    options
+  );
+  if (sourceObservation !== undefined) return sourceObservation;
   // A closing proof owns the left source at its exact endpoint. Playback keeps its ordinary half-open dispatch.
   const sample = owner
     ? cursorSamplesAtTime(project, time, sourceClipId).previousSample

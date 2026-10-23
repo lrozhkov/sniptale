@@ -1,3 +1,5 @@
+import { MotionBehaviorFields, MotionCameraFields } from './content';
+import { createVideoProjectMotionRegion } from '../../../../../features/video/project/motion';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
@@ -5,11 +7,8 @@ import {
   VideoEditorSelectionKind,
   type VideoEditorSelection,
 } from '../../../../contracts/selection';
-import {
-  VideoMotionOverlayZoomMode,
-  VideoTemporalEasing,
-} from '../../../../../features/video/project/types';
-import { MotionBlurField, MotionEasingField, MotionOverlayZoomField } from './fields';
+import { VideoMotionOverlayZoomMode } from '../../../../../features/video/project/types';
+import { MotionBlurField, MotionTransitionTypeField, MotionOverlayZoomField } from './fields';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -84,25 +83,34 @@ function createPanelProps(): WorkspaceSidebarSelectionPanelProps {
 }
 
 describe('workspace-sidebar/selection/motion-fields', () => {
-  it('renders motion easing through canonical temporal easing options', () => {
+  it('renders each phase through the canonical mode choices', () => {
     const markup = renderToStaticMarkup(
-      <MotionEasingField
-        motionRegionId="motion-1"
+      <MotionTransitionTypeField
+        motionRegion={createVideoProjectMotionRegion(createPanelProps().project, 0)}
+        phase="enter"
         panel={createPanelProps()}
-        value={VideoTemporalEasing.EASE_IN_OUT}
       />
     );
 
-    expect(markup).toContain('videoEditor.sidebar.motionEasingLabel');
-    expect(markup).toContain('videoEditor.sidebar.temporalEasingEaseInOut');
+    expect(markup).toContain('gallery.videoReview.zoomTransitionType');
+    expect(markup).toContain('gallery.videoReview.transitionSmooth');
+    expect(markup).toContain('gallery.videoReview.transitionNone');
+    expect(markup).toContain('videoEditor.sidebar.temporalEasingInstant');
   });
 
   it('renders motion blur through canonical slider controls', () => {
     const markup = renderToStaticMarkup(
-      <MotionBlurField motionRegionId="motion-1" panel={createPanelProps()} value={0.45} />
+      <MotionBlurField
+        phase="enter"
+        panel={createPanelProps()}
+        motionRegion={{
+          ...createVideoProjectMotionRegion(createPanelProps().project, 0),
+          motionBlurAmount: 0.45,
+        }}
+      />
     );
 
-    expect(markup).toContain('videoEditor.sidebar.motionBlurLabel');
+    expect(markup).toContain('gallery.videoReview.motionBlur');
     expect(markup).toContain('type="range"');
     expect(markup).toContain('45%');
   });
@@ -121,4 +129,25 @@ describe('workspace-sidebar/selection/motion-fields', () => {
     expect(markup).toContain('videoEditor.sidebar.motionOverlayZoomFollowCamera');
     expect(markup).toContain('aria-pressed="true"');
   });
+});
+
+it('shows explicit camera coverage and omits ineffective overlay controls for source windows', () => {
+  const panel = createPanelProps();
+  const region = {
+    ...createVideoProjectMotionRegion(panel.project, 0),
+    sourceBinding: {
+      clipId: 'source',
+      coordinateSpace: 'source-window' as const,
+      sourceStart: 0,
+      sourceEnd: 2,
+      animation: { start: 0, end: 2, duration: 2 },
+    },
+  };
+  const camera = renderToStaticMarkup(<MotionCameraFields panel={panel} motionRegion={region} />);
+  expect(camera).toContain('videoEditor.sidebar.motionCoverage');
+  expect(camera).toContain('videoEditor.sidebar.spotlightCoverageWindow');
+  const behavior = renderToStaticMarkup(
+    <MotionBehaviorFields panel={panel} motionRegion={region} />
+  );
+  expect(behavior).not.toContain('videoEditor.sidebar.motionOverlayZoomLabel');
 });

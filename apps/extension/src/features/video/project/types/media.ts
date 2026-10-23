@@ -1,4 +1,5 @@
-import type { WindowHeader } from '../../../browser-frame/header';
+import type { MediaSourceCrop } from '../media-crop';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 
 /** Bounded, source-time amplitude envelope stored with each media asset. */
 export const MAX_VIDEO_PROJECT_AUDIO_PEAKS = 30_000;
@@ -22,12 +23,27 @@ export const VideoMediaShadowMode = {
 export type VideoMediaShadowMode = (typeof VideoMediaShadowMode)[keyof typeof VideoMediaShadowMode];
 
 export interface VideoProjectMediaShadowFields {
+  /** Authored window color remains available when shadow intensity is zero. */
+  shadowColor?: string;
   shadowIntensity?: number;
   shadowMode?: VideoMediaShadowMode;
 }
 
 export interface VideoProjectMediaVisualFields extends VideoProjectMediaShadowFields {
+  /** Original-source crop; clip placement and source timing remain independent. */
+  sourceCrop?: MediaSourceCrop;
+  /** Last accepted source area retained while the complete source is visible. */
+  rememberedSourceCrop?: MediaSourceCrop;
+  /** Logical project pixels; camera tracks retain this setting without applying it. */
+  windowCornerRadius?: number;
   windowHeader?: WindowHeader;
+  /** Last accepted header retained while the decoration is disabled. */
+  rememberedWindowHeader?: WindowHeader;
+  /** Inactive authored framing restored by one explicit media command. */
+  rememberedWindowLayout?: VideoProjectMediaShadowFields & {
+    padding: number;
+    windowCornerRadius: number;
+  };
   fitMode: VideoMediaFitMode;
   fitScalePercent?: number;
 }

@@ -109,7 +109,7 @@ describe('renderDataTypeSummaryItems', () => {
     });
 
     expect(toggleProps.setIncludeJson).toHaveBeenCalledWith(false);
-    expect(container?.querySelector('button')?.getAttribute('title')).toBe(
+    expect(container?.querySelector('button')?.getAttribute('data-popup-hint')).toBe(
       't:popup.export.removeFromSelectionAction'
     );
   });

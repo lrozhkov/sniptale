@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { drawReviewKeys } from './render-key-animation';
-import { REVIEW_KEY_DEFAULT } from '../../features/video/review/advanced/key-animation';
+import { REVIEW_KEY_DEFAULT } from '../../features/video/project/action-feedback/key-animation';
 
 it('keeps output placement stable and does not resurrect an older command after replacement', () => {
   const context = {

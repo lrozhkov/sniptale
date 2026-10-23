@@ -16,7 +16,10 @@ export function createSelectionChangeHandler(
   return (_event?: SelectionChangeEvent) => {
     const activeObject = bindings.getCanvas()?.getActiveObject();
     if (activeObject instanceof ActiveSelection) {
+      activeObject.controls = ActiveSelection.createControls().controls;
+      activeObject.set({ lockScalingX: false, lockScalingY: false });
       applyEditorActiveSelectionInteractionControls(activeObject);
+      activeObject.setCoords();
     }
     applyEditorDrawingActiveSelectionChrome(activeObject);
     bindings.syncRuntimeState();

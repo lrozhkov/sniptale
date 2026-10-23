@@ -20,9 +20,9 @@
     {
       "packageName": "canvas",
       "resolvedVersion": "3.2.3",
-      "dependencyScope": "transitive-runtime",
-      "artifactInclusion": "source-runtime-candidate",
-      "reason": "Pinned renderer dependency may install its native binding from the locked package source.",
+      "dependencyScope": "direct-development",
+      "artifactInclusion": "development-only",
+      "reason": "The existing Crop raster test imports this pinned dependency. Its native binding uses the unchanged locked package source.",
       "approvalOwner": "repository-owner",
       "expiresOn": "2027-07-12"
     },

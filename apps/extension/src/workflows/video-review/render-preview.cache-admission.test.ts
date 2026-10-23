@@ -1,4 +1,4 @@
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
@@ -16,12 +16,12 @@ vi.mock('./window-header', async (original) => ({
 }));
 vi.mock('./scene-frame', () => ({ drawReviewSceneFrame: vi.fn() }));
 vi.mock('./render-scene-overlays', () => ({ drawReviewSceneOverlays: vi.fn() }));
-vi.mock('./render-watermark', () => ({
-  createReviewWatermarkRenderer: io.watermark,
-  measureReviewWatermark: async () => ({ cache: null, source: null, paint: vi.fn() }),
+vi.mock('../../features/video/composition/canvas/watermark', () => ({
+  createWatermarkRenderer: io.watermark,
+  measureWatermark: async () => ({ cache: null, source: null, paint: vi.fn() }),
 }));
 vi.mock('./scene-background', () => ({ createReviewBackgroundPainter: io.background }));
-vi.mock('./spatial-renderer', () => ({
+vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({
   createReviewSpatialRenderer: () => ({ dispose: vi.fn() }),
 }));
 vi.mock('./cut-transition-frames', async (original) => ({

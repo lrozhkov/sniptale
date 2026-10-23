@@ -2,7 +2,7 @@ import { ActiveSelection, Group, Path, type FabricObject } from 'fabric';
 import { isEditorDrawingSelection, readEditorDrawingObject } from '../metadata';
 import { createDrawingArrowControls, syncDrawingArrowControlAnchors } from './arrow';
 import { createDrawingBoxControls, createDrawingTextControls } from './box';
-import { applyDrawingSelectionChrome } from './chrome';
+import { applyDrawingSelectionChrome, createDrawingRotationControl } from './chrome';
 
 export function applyEditorDrawingInteractionControls(object: FabricObject): void {
   if (object instanceof Group && object.sniptaleType === 'group') {
@@ -13,7 +13,7 @@ export function applyEditorDrawingInteractionControls(object: FabricObject): voi
   if (!drawing) return;
   applyDrawingSelectionChrome(object);
   if (drawing.kind === 'arrow' && object instanceof Path) {
-    object.controls = createDrawingArrowControls();
+    object.controls = createDrawingArrowControls(drawing);
     syncDrawingArrowControlAnchors(object, drawing);
     object.set({ hasBorders: false, lockRotation: true, perPixelTargetFind: true });
     object.setCoords();
@@ -27,5 +27,16 @@ export function applyEditorDrawingInteractionControls(object: FabricObject): voi
 export function applyEditorDrawingActiveSelectionChrome(object: FabricObject | undefined): void {
   if (!(object instanceof ActiveSelection)) return;
   if (!isEditorDrawingSelection(object)) return;
-  applyDrawingSelectionChrome(object, { controls: false });
+  const locked = object.getObjects().some((member) => member.sniptaleLocked);
+  applyDrawingSelectionChrome(object, { controls: !locked });
+  const rotation = createDrawingRotationControl();
+  const rotate = rotation.actionHandler;
+  rotation.actionHandler = (event, transform, sceneX, sceneY) => {
+    transform.originX = 'center';
+    transform.originY = 'center';
+    return rotate(event, transform, sceneX, sceneY);
+  };
+  object.controls = { mtr: rotation };
+  object.set({ lockRotation: locked, lockScalingX: true, lockScalingY: true });
+  object.setCoords();
 }

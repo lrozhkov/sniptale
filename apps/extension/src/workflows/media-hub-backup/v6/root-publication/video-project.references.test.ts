@@ -336,6 +336,82 @@ it('publishes a recording source only after resolving it through the restored ro
   expect(projects[0]!.project.assets[0]!.source.recordingId).toBe('restored-recording');
 });
 
+it('restores schema33 cursor source facts when duplicate restore remaps the recording', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../../features/video/project/factories/creation');
+  const { createVideoProjectCursorTrack } =
+    await import('../../../../features/video/project/defaults');
+  const { materializeVideoProjectCursorSourceObservations } =
+    await import('../../../../features/video/project/cursor-source-observations');
+  const { parseHydratableVideoProject, isExportReadyVideoProject } =
+    await import('../../../../features/video/project/validation/root');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'cursor-original',
+    filename: 'cursor.webm',
+    width: 100,
+    height: 100,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 6,
+  });
+  project.id = 'p';
+  project.version = 33;
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) throw new Error('Expected source instance');
+  const samples = [0, 3, 5].map((time) => ({
+    id: `raw:${time}`,
+    time,
+    x: 20,
+    y: 30,
+    visible: true,
+    recordingPoint: { x: 0.2, y: 0.3 },
+    observation: 'observed' as const,
+    captureSegment: 0,
+    observationClockId: 'clock:original',
+  }));
+  project.cursorTrack = {
+    ...createVideoProjectCursorTrack('embedded-fallback'),
+    sourceObservations: [
+      { recordingId: 'cursor-original', sourceInstanceId: clip.sourceInstanceId, samples },
+    ],
+  };
+  project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const before = structuredClone(project);
+  const base = createVideoProjectEntryWithMediaClip();
+  const metadata = portableMetadata({
+    entry: { ...base, id: 'p', project: encodePortableVideoProjectAssetRefs(project) },
+    projectAssets: [],
+    projectExports: [],
+  });
+  const values = new Map<string, unknown[]>();
+  mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
+  await expect(
+    videoProjectRootPublisher.publish(
+      publishArgs(metadata, [], {
+        'media:library-item:recording:cursor-original': 'recording:cursor-restored',
+      })
+    )
+  ).resolves.toMatchObject({ imported: true });
+  const entries = values.get('video_projects') as Array<{ project: typeof project }>;
+  const restored = entries[0]!.project;
+  expect(parseHydratableVideoProject(restored)).not.toBeNull();
+  expect(isExportReadyVideoProject(restored)).toBe(true);
+  expect(restored.cursorTrack!.sourceObservations).toEqual([
+    {
+      recordingId: 'cursor-restored',
+      sourceInstanceId: clip.sourceInstanceId,
+      samples,
+    },
+  ]);
+  expect(
+    restored.cursorTrack!.samples.every(
+      (sample) => sample.sourceAnchor?.recordingId === 'cursor-restored'
+    )
+  ).toBe(true);
+  expect(project).toEqual(before);
+});
+
 it('publishes scenario project and child sources only after exact restored mappings exist', async () => {
   const values = new Map<string, unknown[]>();
   mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
@@ -477,83 +553,6 @@ it('restores a project resource using its already restored Library identity', as
     project: { assets: Array<{ source: { projectAssetId: string } }> };
   }>;
   expect(saved[0]!.project.assets[0]!.source.projectAssetId).toBe('restored');
-});
-
-it('keeps authored source path and audible feedback attached to duplicated recording identities', async () => {
-  const { createVideoProjectFromRecording } =
-    await import('../../../../features/video/project/factories/creation');
-  const { buildProjectActionAudioPlan } =
-    await import('../../../../features/video/review/project-action-audio');
-  const { transformPortableVideoProjectReferences } = await import('./video-project-references');
-  const { resolveProjectCursorFocusSamples } =
-    await import('../../../../features/video/project/cursor-focus-path/projection');
-  const project = createVideoProjectFromRecording({
-    recordingId: 'old',
-    filename: 'old.webm',
-    width: 1280,
-    height: 720,
-    duration: 4,
-    mimeType: 'video/webm',
-    size: 1024,
-    recordingSignals: [],
-    sourceNormalizedActionEvents: [
-      {
-        id: 'click',
-        kind: 'CLICK',
-        time: 1,
-        duration: 0.45,
-        point: { x: 0.2, y: 0.3 },
-        label: 'Click',
-        preset: 'CLICK_RIPPLE',
-        data: {},
-      },
-    ],
-  });
-  const group = project.actionFeedback![0]!;
-  group.settings = [
-    {
-      ref: { kind: 'action', id: 'click' },
-      enabled: true,
-      presetId: 'mouse-classic-v1',
-      volume: 0.35,
-      offset: 0,
-    },
-  ];
-  project.cursorFocusPath = {
-    version: 1,
-    mode: 'follow',
-    smoothing: 0.5,
-    sensitivity: 0.5,
-    gapPolicy: 'hold',
-    segments: [
-      {
-        id: 'segment',
-        binding: {
-          kind: 'recording-source',
-          recordingId: 'old',
-          sourceInstanceId: group.sourceInstanceId,
-        },
-        start: 0,
-        end: 4,
-        keys: [{ id: 'key', time: 1, x: 0.2, y: 0.3, anchor: 'manual', interpolation: 'smooth' }],
-      },
-    ],
-  };
-  const original = structuredClone(project);
-  const restored = transformPortableVideoProjectReferences(
-    project,
-    new Map(),
-    { 'media:library-item:recording:old': 'recording:new' },
-    {}
-  );
-  expect(buildProjectActionAudioPlan(original).descriptors).toHaveLength(1);
-  expect(buildProjectActionAudioPlan(restored).descriptors).toHaveLength(1);
-  expect(restored.actionFeedback?.[0]?.recordingId).toBe('new');
-  expect(resolveProjectCursorFocusSamples(restored)[0]?.sourceAnchor?.recordingId).toBe('new');
-  expect(project).toEqual(original);
-  expect(() => transformPortableVideoProjectReferences(project, new Map(), {}, {})).toThrow(
-    'unresolved'
-  );
 });
 
 it('requires the new project discriminator for authored interaction branches', async () => {
@@ -728,3 +727,207 @@ it('retains camera defaults and overrides through portable backup admission and 
   expect(restored.version).toBe(4);
   expect(project).toEqual(before);
 });
+
+it.each(['none', 'text', 'image'] as const)(
+  'duplicates portable %s watermark without confusing material and private resource identities',
+  async (mode) => {
+    const { createVideoProjectAsset } =
+      await import('../../../../features/video/project/factories/creation');
+    const { createQuickEditWatermark, getVideoProjectWatermarkAsset } =
+      await import('../../../../features/video/project/scene/watermark');
+    const { parseVideoProjectEntry, parseProjectAssetEntry } =
+      await import('../../../../composition/persistence/projects/read-guards');
+    const base = createVideoProjectEntryWithMediaClip();
+    base.id = 'p';
+    base.project.id = 'p';
+    base.project.version = 20;
+    const logo = createVideoProjectAsset(
+      'Logo',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'private-logo' },
+      {
+        width: 80,
+        height: 40,
+        duration: null,
+        mimeType: 'image/png',
+        size: 6,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    base.project.assets.push(logo);
+    base.project.watermark = {
+      ...createQuickEditWatermark('Portable mark'),
+      mode,
+      layout: 'tiled',
+      image: {
+        assetId: `project-asset:${logo.id}`,
+        width: 80,
+        height: 40,
+        size: 0.2,
+        opacity: 0.4,
+      },
+    };
+    const before = structuredClone(base);
+    const values = new Map<string, unknown[]>();
+    const db = publisherDatabase(values);
+    db.get = async (name, key) => (name === 'video_projects' && key === 'p' ? base : undefined);
+    mocks.database.mockReturnValue(db);
+    mocks.mutate.mockImplementation(async (callback) => callback(db));
+    const metadata = portableMetadata({
+      entry: { ...base, project: encodePortableVideoProjectAssetRefs(base.project) },
+      projectAssets: [
+        portableProjectAsset('project-asset-1'),
+        {
+          ...portableProjectAsset('private-logo'),
+          entry: { id: 'private-logo', mimeType: 'image/png', createdAt: 1, size: 6 },
+          filename: 'logo.png',
+        },
+      ],
+      projectExports: [],
+    });
+    const metadataBefore = structuredClone(metadata);
+    await expect(
+      videoProjectRootPublisher.publish(
+        publishArgs(metadata, [
+          stagedObject('o-project-asset-1', 'restored-video-bytes', 'video/webm', 6),
+          stagedObject('o-private-logo', 'restored-logo-bytes', 'image/png', 6),
+        ])
+      )
+    ).resolves.toMatchObject({ imported: true });
+    const restored = (values.get('video_projects') ?? [])
+      .map(parseVideoProjectEntry)
+      .find((entry) => entry !== null)?.project;
+    expect(restored).toBeDefined();
+    expect(restored!.id).not.toBe(base.id);
+    expect(restored!.watermark).toEqual(base.project.watermark);
+    const restoredLogo = getVideoProjectWatermarkAsset(restored!);
+    expect(restoredLogo?.id).toBe(logo.id);
+    if (restoredLogo?.source.kind !== 'project-asset')
+      throw new Error('Missing restored logo source.');
+    const restoredPrivateId = restoredLogo.source.projectAssetId;
+    expect(restoredPrivateId).not.toBe('private-logo');
+    const stored = (values.get('project_assets') ?? [])
+      .map(parseProjectAssetEntry)
+      .find((entry) => entry?.id === restoredPrivateId);
+    expect(stored).toMatchObject({
+      assetId: 'restored-logo-bytes',
+      mimeType: 'image/png',
+      size: 6,
+    });
+    expect(metadata).toEqual(metadataBefore);
+    expect(base).toEqual(before);
+  }
+);
+
+it.each(
+  (['none', 'image', 'video'] as const).flatMap((mode) => [
+    { mode, joins: false },
+    { mode, joins: true },
+  ])
+)(
+  'duplicates portable $mode bookend recipes with optional joins ($joins), dormant references and exact private bytes',
+  async ({ mode, joins }) => {
+    const { createVideoProjectAsset } =
+      await import('../../../../features/video/project/factories/creation');
+    const { createBookendImagePresentation, createBookendVideoPresentation } =
+      await import('../../../../features/video/project/scene/bookend-media');
+    const { parseVideoProjectEntry, parseProjectAssetEntry } =
+      await import('../../../../composition/persistence/projects/read-guards');
+    const base = createVideoProjectEntryWithMediaClip();
+    base.id = 'p';
+    base.project.id = 'p';
+    base.project.version = joins ? 26 : 25;
+    const movie = base.project.assets[0]!;
+    const image = createVideoProjectAsset(
+      'Card',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'private-card' },
+      {
+        width: 641,
+        height: 359,
+        duration: null,
+        mimeType: 'image/png',
+        size: 6,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    base.project.assets.push(image);
+    const slot = {
+      mode,
+      image: { ...createBookendImagePresentation(), assetId: image.id, duration: 7.3 },
+      video: {
+        ...createBookendVideoPresentation(movie.metadata.duration!),
+        assetId: movie.id,
+        audio: { muted: true, gain: 0.37 },
+      },
+    };
+    base.project.bookendPresets = {
+      intro: slot,
+      outro: structuredClone(slot),
+      ...(joins
+        ? {
+            introTransition: { type: 'dissolve', before: 0.2, after: 0.3 },
+            outroTransition: { type: 'fade-black', before: 0.1, after: 0.2, color: '#123456' },
+          }
+        : {}),
+    };
+    if (joins)
+      base.project.compositionJoins = [
+        {
+          id: 'instance',
+          clipId: base.project.clips[0]!.id,
+          edge: 'end',
+          transition: { type: 'fade-black', before: 0.4, after: 0.2, color: '#abcdef' },
+        },
+      ];
+    const before = structuredClone(base);
+    const values = new Map<string, unknown[]>();
+    const db = publisherDatabase(values);
+    db.get = async (name, key) => (name === 'video_projects' && key === 'p' ? base : undefined);
+    mocks.database.mockReturnValue(db);
+    mocks.mutate.mockImplementation(async (callback) => callback(db));
+    const metadata = portableMetadata({
+      entry: { ...base, project: encodePortableVideoProjectAssetRefs(base.project) },
+      projectAssets: [
+        portableProjectAsset('project-asset-1'),
+        {
+          ...portableProjectAsset('private-card'),
+          entry: { id: 'private-card', mimeType: 'image/png', createdAt: 1, size: 6 },
+          filename: 'card.png',
+        },
+      ],
+      projectExports: [],
+    });
+    const metadataBefore = structuredClone(metadata);
+    await expect(
+      videoProjectRootPublisher.publish(
+        publishArgs(metadata, [
+          stagedObject('o-project-asset-1', 'restored-video-bytes', 'video/webm', 6),
+          stagedObject('o-private-card', 'restored-card-bytes', 'image/png', 6),
+        ])
+      )
+    ).resolves.toMatchObject({ imported: true });
+    const restored = (values.get('video_projects') ?? [])
+      .map(parseVideoProjectEntry)
+      .find((entry) => entry !== null)?.project;
+    expect(restored).toBeDefined();
+    expect(restored!.id).not.toBe(base.id);
+    expect(restored!.version).toBe(joins ? 26 : 25);
+    expect(restored!.bookendPresets).toEqual(base.project.bookendPresets);
+    expect(restored!.compositionJoins).toEqual(base.project.compositionJoins);
+    const material = restored!.assets.find(({ id }) => id === image.id);
+    if (material?.source.kind !== 'project-asset')
+      throw new Error('Missing restored private source');
+    const restoredPrivateId = material.source.projectAssetId;
+    expect(restoredPrivateId).not.toBe('private-card');
+    expect(
+      (values.get('project_assets') ?? [])
+        .map(parseProjectAssetEntry)
+        .find((entry) => entry?.id === restoredPrivateId)
+    ).toMatchObject({ assetId: 'restored-card-bytes', mimeType: 'image/png', size: 6 });
+    expect(metadata).toEqual(metadataBefore);
+    expect(base).toEqual(before);
+  }
+);

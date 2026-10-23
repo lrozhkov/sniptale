@@ -626,8 +626,8 @@ it('renders a text background behind each visual line instead of the full text b
   const root = createRoot(host);
   act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
 
-  expect(context.roundRect).not.toHaveBeenCalled();
-  expect(host.querySelectorAll('[data-ui="content.drawing.text-background"]')).toHaveLength(2);
+  const path = host.querySelector('path[data-ui="content.drawing.text-background"]');
+  expect(path?.getAttribute('d')?.match(/A /g)).toHaveLength(6);
   act(() => root.unmount());
 });
 

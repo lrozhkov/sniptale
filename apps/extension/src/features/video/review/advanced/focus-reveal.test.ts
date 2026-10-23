@@ -1,5 +1,6 @@
+import { createQuickEditSpotlight } from '../../project/scene/focus-appearance';
 import { expect, it } from 'vitest';
-import { createQuickEditSpotlight, evaluateQuickEditSpotlightsAtTime } from './focus';
+import { evaluateQuickEditSpotlightsAtTime } from './focus';
 import { createQuickEditZoomRegion } from './zoom';
 
 it.each(['dim', 'blur'] as const)(

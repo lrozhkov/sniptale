@@ -31,6 +31,17 @@ export const galleryRecordingRecoveryMessages = defineMessageSource({
     en: 'The download was interrupted or could not be confirmed. Original data is retained. Retry the download.',
   },
   busy: { ru: 'Обрабатываем сохранённые данные…', en: 'Processing saved data…' },
+  preparing: { ru: 'Подготавливаем исходные данные…', en: 'Preparing original data…' },
+  remuxing: { ru: 'Собираем доступное видео…', en: 'Assembling available video…' },
+  validatingVideo: { ru: 'Проверяем воспроизведение видео…', en: 'Checking video playback…' },
+  validatingAudio: { ru: 'Проверяем воспроизведение звука…', en: 'Checking audio playback…' },
+  publishing: { ru: 'Сохраняем видео в библиотеку…', en: 'Saving video to the library…' },
+  remuxingCount: { ru: 'Обработано фрагментов: {count}', en: 'Packets processed: {count}' },
+  validatingVideoCount: { ru: 'Проверено кадров: {count}', en: 'Frames checked: {count}' },
+  validatingAudioCount: {
+    ru: 'Проверено аудиоблоков: {count}',
+    en: 'Audio buffers checked: {count}',
+  },
   loading: { ru: 'Проверяем сохранённые записи…', en: 'Checking saved recordings…' },
   retry: { ru: 'Проверить снова', en: 'Check again' },
 });

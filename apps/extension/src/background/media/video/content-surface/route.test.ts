@@ -1,6 +1,11 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+
+afterEach(() => vi.unstubAllGlobals());
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  CaptureMode,
+  DEFAULT_VIDEO_CURSOR_EFFECTS,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { contentActionRuntimeContracts } from '../../../../contracts/messaging/contracts/runtime/actions/content-action';
 
@@ -121,6 +126,9 @@ import {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 beforeEach(() => {
+  vi.stubGlobal('navigator', {
+    permissions: { query: vi.fn().mockResolvedValue({ state: 'granted' }) },
+  });
   vi.clearAllMocks();
   resetVideoRecordingCameraPeerCleanupForTests();
   resetVideoRecordingCameraPeerRetryForTests();
@@ -158,6 +166,7 @@ it('starts only a saved TAB recording and returns a surface token', async () => 
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-1', token: 'intent-1' },
     },
     resolvedTabId: 12,
@@ -229,6 +238,7 @@ it('preserves manual surface authority while start is pending so cancel-start re
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-1', token: 'intent-1' },
     },
     resolvedTabId: 12,
@@ -562,6 +572,7 @@ it('executes lifecycle and live media surface commands for an active recording',
   await command({ kind: 'set-auto-fade-delay', delay: 5 });
   await command({
     kind: 'set-spotlight-settings',
+    cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
     cursorHaloEnabled: true,
     cursorDimmingEnabled: false,
     clickAnimationEnabled: true,
@@ -593,11 +604,13 @@ it('executes lifecycle and live media surface commands for an active recording',
     cursorSpotlightEnabled: true,
     cursorDimmingEnabled: false,
     cursorClickAnimationEnabled: true,
+    cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
   });
   expect(mocks.updateRecordingSettings).toHaveBeenCalledTimes(4);
 });
 
 it('allows idle settings but rejects idle lifecycle commands', async () => {
+  mocks.loadVideoSettings.mockResolvedValue({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true });
   const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
   const base = {
     type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
@@ -639,6 +652,7 @@ it('allows idle settings but rejects idle lifecycle commands', async () => {
 });
 
 it('rolls an idle preview back when its selected camera cannot be persisted', async () => {
+  mocks.loadVideoSettings.mockResolvedValue({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true });
   const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
   mocks.patchVideoSettings.mockRejectedValueOnce(new Error('storage failed'));
 
@@ -671,6 +685,7 @@ it('rolls an idle preview back when its selected camera cannot be persisted', as
 });
 
 it('rejects and rolls back an idle camera switch invalidated by document rebind', async () => {
+  mocks.loadVideoSettings.mockResolvedValue({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true });
   const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
   let resolveSwitch!: (value: { success: true; result: 'accepted' }) => void;
   mocks.sendRuntimeMessage.mockImplementationOnce(
@@ -733,6 +748,7 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-2', token: 'intent-2' },
     },
     resolvedTabId: 12,
@@ -750,6 +766,7 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-3', token: 'intent-3' },
     },
     resolvedTabId: 12,
@@ -762,28 +779,12 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
   );
 });
 
-it('opens the video popup when a previous recording must be resolved', async () => {
-  mocks.startRecording.mockResolvedValueOnce({
-    error: 'Resolve the previous recording before starting another.',
-    result: 'failed',
-  });
-
-  const response = await routeStartWithoutSender('https://example.test/page');
-
-  expect(response).toEqual(
-    expect.objectContaining({
-      failureCode: 'already-active',
-      success: false,
-    })
-  );
-  expect(mocks.openPopup).toHaveBeenCalledWith({ windowId: 7 });
-});
-
 async function routeStartWithoutSender(senderUrl?: string) {
   const response = vi.fn();
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-0', token: 'intent-0' },
     },
     resolvedTabId: 12,

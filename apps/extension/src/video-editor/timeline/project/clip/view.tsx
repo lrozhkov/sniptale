@@ -3,7 +3,11 @@ import { Link2 } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
 import { normalizeClipPlaybackRate } from '../../../../features/video/project/timeline/basics';
-import { buildClipLabel, getLinkedClipIds } from '../../../../features/video/project/timeline';
+import {
+  buildClipLabel,
+  getLinkedClipIds,
+  getMediaClipSourceTime,
+} from '../../../../features/video/project/timeline';
 import { VideoProjectClipType } from '../../../../features/video/project/types';
 import type { VideoProjectClip } from '../../../../features/video/project/types';
 import { AudioClipWaveform } from './waveform';
@@ -203,7 +207,9 @@ function ProjectTimelineVisualClipPreview({
     clip.type === VideoProjectClipType.VIDEO
       ? normalizeClipPlaybackRate(clip.playbackRate ?? 1)
       : 1;
-  const sourceStart = clip.type === VideoProjectClipType.VIDEO ? clip.sourceStart : 0;
+  const sourceStart =
+    clip.type === VideoProjectClipType.VIDEO ? getMediaClipSourceTime(clip, clip.startTime) : 0;
+  const boundedCamera = clip.type === VideoProjectClipType.VIDEO && !!clip.cameraTiming;
   const scale = visibleDuration > 0 ? width / visibleDuration : 0;
   const offsetPixels = offsetSeconds * scale;
   const frames =
@@ -221,8 +227,14 @@ function ProjectTimelineVisualClipPreview({
         const end = Math.min(clip.duration, (frame.sourceEnd - sourceStart) / rate);
         const firstCell = Math.ceil((start * scale) / tileWidth);
         const lastCell = Math.ceil((end * scale) / tileWidth);
-        const left = Math.max(0, firstCell * tileWidth - offsetPixels);
-        const right = Math.min(width, lastCell * tileWidth - offsetPixels);
+        const left = Math.max(
+          0,
+          (boundedCamera ? start * scale : firstCell * tileWidth) - offsetPixels
+        );
+        const right = Math.min(
+          width,
+          (boundedCamera ? end * scale : lastCell * tileWidth) - offsetPixels
+        );
         if (right <= left) return null;
         return (
           <div

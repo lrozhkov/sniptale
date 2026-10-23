@@ -1,3 +1,12 @@
+import {
+  createVideoProjectWatermarkRenderer,
+  type VideoProjectWatermarkRenderer,
+} from '../../features/video/composition/canvas/project-watermark';
+import { loadBlobForAsset } from './media-loading/blob';
+import {
+  createReviewSpatialRenderer,
+  type ReviewSpatialRenderer,
+} from '../../features/video/composition/canvas/spatial-renderer';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoProjectExportPhase } from '../../features/video/project/types';
@@ -66,7 +75,43 @@ export async function sendProgress(
   });
 }
 
+/** The existing export job owns the camera context until cleanup or context loss. */
+export function getProjectExportSpatialRenderer(
+  job: Pick<ProjectExportRuntimeState, 'cameraSpatialRenderer'> & { cancelled?: boolean },
+  signal?: AbortSignal
+): ReviewSpatialRenderer {
+  if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
+  if (job.cameraSpatialRenderer) return job.cameraSpatialRenderer;
+  const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+    if (job.cameraSpatialRenderer !== renderer) return;
+    delete job.cameraSpatialRenderer;
+    renderer.dispose();
+  });
+  job.cameraSpatialRenderer = renderer;
+  return renderer;
+}
+
+/** The export job owns prepared final-canvas watermark resources. */
+export function getProjectExportWatermarkRenderer(
+  job: Pick<ProjectExportRuntimeState, 'watermarkRenderer'> & { cancelled?: boolean },
+  signal?: AbortSignal
+): VideoProjectWatermarkRenderer {
+  if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
+  job.watermarkRenderer ??= createVideoProjectWatermarkRenderer(loadBlobForAsset);
+  return job.watermarkRenderer;
+}
+
 export function cleanupJob(job: ProjectExportRuntimeState): void {
+  const joins = job.compositionJoinRenderer;
+  delete job.compositionJoinRenderer;
+  joins?.dispose();
+  const spatialRenderer = job.cameraSpatialRenderer;
+  delete job.cameraSpatialRenderer;
+  spatialRenderer?.dispose();
+  job.watermarkRenderer?.clear();
+  delete job.watermarkRenderer;
+  job.captionRenderer?.clear();
+  delete job.captionRenderer;
   for (const audioNode of job.clipAudioNodes.values()) {
     audioNode.source.disconnect();
     audioNode.gain.disconnect();

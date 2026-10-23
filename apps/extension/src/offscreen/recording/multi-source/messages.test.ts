@@ -32,6 +32,7 @@ vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
 
 import {
   notifyMultiSourceSaved,
+  notifyMultiSourceSourceReady,
   notifyMultiSourceStarted,
   notifyMultiSourceStopped,
 } from './messages';
@@ -49,6 +50,43 @@ beforeEach(() => {
 
 afterEach(() => {
   discardPendingPostRecordResult('rec-base');
+});
+
+it('requests source admission with the binding and positive primary dimensions only', async () => {
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'ALLOW' });
+  await notifyMultiSourceSourceReady(
+    { generation: 3, recordingId: 'rec-base', streamInstanceId: 'stream-1' },
+    { width: 1280, height: 720, frameRate: 30, deviceId: 'private-device' },
+    { sendRuntimeMessage: sendRuntimeMessageMock }
+  );
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: VideoMessageType.OFFSCREEN_SOURCE_READY,
+    generation: 3,
+    recordingId: 'rec-base',
+    streamInstanceId: 'stream-1',
+    videoWidth: 1280,
+    videoHeight: 720,
+    trackSettings: { width: 1280, height: 720, frameRate: 30 },
+  });
+});
+
+it('refuses missing dimensions and negative source admission', async () => {
+  const binding = { generation: 3, recordingId: 'rec-base', streamInstanceId: 'stream-1' };
+  await expect(
+    notifyMultiSourceSourceReady(
+      binding,
+      { width: 0, height: 720 },
+      { sendRuntimeMessage: sendRuntimeMessageMock }
+    )
+  ).rejects.toThrow('dimensions are unavailable');
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+  await expect(
+    notifyMultiSourceSourceReady(
+      binding,
+      { width: 1280, height: 720 },
+      { sendRuntimeMessage: sendRuntimeMessageMock }
+    )
+  ).rejects.toThrow('source-dimensions-mismatch');
 });
 
 it('sends multi-source lifecycle and grouped save runtime messages', async () => {

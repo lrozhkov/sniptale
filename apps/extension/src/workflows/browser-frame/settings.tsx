@@ -1,6 +1,6 @@
 import { SegmentedRow, TextField } from '../../ui/compact-inspector-controls';
 import { useEffect, useState, type ReactNode } from 'react';
-import { type WindowHeader } from '../../features/browser-frame/header';
+import { type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { useWindowHeaderEditing, type WindowHeaderSettingsProps } from './editing';
 import { WindowHeaderIconControls } from './icon-controls';
@@ -9,13 +9,14 @@ import { useInspectorLayout } from '../../ui/compact-inspector-controls/layout';
 /** Shared controls for explicit window-header edits in image and video editors. */
 export function WindowHeaderSettings({
   header,
+  rememberedHeader,
   onChange,
   disabled = false,
   allowNone = true,
 }: WindowHeaderSettingsProps) {
   useAppLocale();
   const inspector = useInspectorLayout();
-  const editing = useWindowHeaderEditing({ header, onChange, disabled });
+  const editing = useWindowHeaderEditing({ header, rememberedHeader, onChange, disabled });
   const iconControls =
     header?.kind === 'browser' ? (
       <WindowHeaderIconControls

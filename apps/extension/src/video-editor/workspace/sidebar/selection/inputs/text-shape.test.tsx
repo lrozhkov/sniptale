@@ -158,7 +158,9 @@ function registerTextConversionTests() {
   it('offers text clips a template conversion action with a default lower-third preset', async () => {
     const { clip, onConvertTextClipToAnnotation } = await renderFields();
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.textTemplateUpgradeLabel');
+    expect(
+      container?.querySelector('[data-ui="shared.information-disclosure"]')?.hasAttribute('open')
+    ).toBe(false);
     expect(container?.textContent).toContain('videoEditor.sidebar.textTemplateUpgradeDescription');
     expect(findButton('videoEditor.sidebar.textTemplateUpgradeAction')?.className).toContain(
       'hover:text-[var(--sniptale-color-accent-emphasis)]'

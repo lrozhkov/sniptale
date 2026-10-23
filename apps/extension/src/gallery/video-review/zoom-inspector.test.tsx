@@ -1,11 +1,11 @@
+import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { act, useContext } from 'react';
 import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
-import { ReviewSpotlightInspector } from './spotlight-inspector';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 
@@ -107,15 +107,17 @@ function renderInspector(
   };
 }
 
-it('keeps intermediate typed drafts local and clamps a blank commit to the row minimum', async () => {
+it('keeps invalid and blank drafts local and clamps a numeric zero to the row minimum', async () => {
   const change = vi.fn((_patch: QuickEditZoomRegionPatch) => undefined);
   const inspector = renderInspector(change);
   const scale = inspector.field('gallery.videoReview.zoomScale');
   await inspector.type(scale, 'not-a-number');
   await inspector.commit(scale);
   expect(change).not.toHaveBeenCalled();
-  // The shared field treats a blank draft as zero and clamps into the row range.
   await inspector.type(scale, '');
+  await inspector.commit(scale);
+  expect(change).not.toHaveBeenCalled();
+  await inspector.type(scale, '0');
   await inspector.commit(scale);
   expect(change).toHaveBeenLastCalledWith({ scale: 1 });
   await inspector.type(scale, '2');
@@ -217,7 +219,8 @@ it('edits link easing, shows the derived gap duration, and removes explicitly', 
 });
 
 it('keeps spotlight settings when the active type is selected again', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   const change = vi.fn();
   await act(async () =>
     root.render(
@@ -241,7 +244,8 @@ it('keeps spotlight settings when the active type is selected again', async () =
 });
 
 it('edits spotlight strength, area, reveal, rounding and blur through shared controls', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   let spotlight = createQuickEditSpotlight();
   const change = vi.fn((patch: QuickEditZoomRegionPatch) => {
     if (patch.spotlight) spotlight = patch.spotlight;
@@ -277,10 +281,11 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
     const section = phase
       ? host.querySelector(`fieldset[aria-label="gallery.videoReview.${phase}"]`)!
       : host;
-    if (label === 'focusReveal') {
-      await act(async () =>
-        section.querySelector<HTMLButtonElement>(`[title="gallery.videoReview.${option}"]`)!.click()
-      );
+    const direct = section.querySelector<HTMLButtonElement>(
+      `button[title="gallery.videoReview.${option}"]`
+    );
+    if (direct) {
+      await act(async () => direct.click());
       return;
     }
     await act(async () =>
@@ -449,7 +454,8 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
 });
 
 it('preserves the source area when switching Spotlight to Border and blocks conflicting Zoom', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   const spotlight = {
     ...createQuickEditSpotlight(),
     roundness: 0.21,
@@ -489,13 +495,17 @@ it('preserves the source area when switching Spotlight to Border and blocks conf
 });
 
 it('previews Border width without history writes, commits once, and cancels with Escape', async () => {
-  const { ReviewBorderInspector } = await import('./border-inspector');
-  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const { BorderAppearanceFields } = await import('../../ui/focus-appearance/border');
+  const { ReviewDetails } = await import('./controls');
+  const { createQuickEditBorder } =
+    await import('../../features/video/project/scene/focus-appearance');
   const onChange = vi.fn();
   const onPreview = vi.fn();
   act(() =>
     root.render(
-      <ReviewBorderInspector
+      <BorderAppearanceFields
+        Details={ReviewDetails}
+        preferenceId="gallery.videoReview.borderPreciseArea"
         value={createQuickEditBorder()}
         onChange={onChange}
         onPreview={onPreview}
@@ -507,9 +517,7 @@ it('previews Border width without history writes, commits once, and cancels with
   await type(range, '5');
   await type(range, '8');
   expect(onChange).not.toHaveBeenCalled();
-  expect(onPreview).toHaveBeenLastCalledWith(
-    expect.objectContaining({ border: expect.objectContaining({ width: 8 }) })
-  );
+  expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ width: 8 }));
   act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
   expect(onChange).toHaveBeenCalledTimes(1);
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ width: 8 }));
@@ -618,7 +626,8 @@ it('edits only outgoing link exposure in the selected transition inspector', asy
 });
 
 it('orders spotlight roundness before precise area and makes both animation phases disclosures', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   await act(async () =>
     root.render(
       <ReviewZoomInspector
@@ -660,7 +669,15 @@ it.each([
     const preview = vi.fn();
     const change = vi.fn();
     await act(async () =>
-      root.render(<ReviewSpotlightInspector value={value} onPreview={preview} onChange={change} />)
+      root.render(
+        <ReviewZoomInspector
+          region={{ ...region, spotlight: value }}
+          onPreview={preview}
+          onChange={change}
+          onReset={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
     );
     const range = host.querySelector<HTMLInputElement>(
       `input[type="range"][aria-label^="gallery.videoReview.${label}"]`
@@ -677,7 +694,7 @@ it.each([
     key('keydown', 'ArrowRight');
     key('keyup', 'ArrowRight');
     expect(change).toHaveBeenCalledOnce();
-    expect(change.mock.lastCall![0][target]).not.toEqual(value[target]);
+    expect(change.mock.lastCall![0].spotlight[target]).not.toEqual(value[target]);
   }
 );
 

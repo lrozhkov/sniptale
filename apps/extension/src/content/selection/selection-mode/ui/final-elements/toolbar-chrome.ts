@@ -12,6 +12,7 @@ const SURFACE_INLINE_CHROME_PROPERTIES = [
   'border-radius',
   'box-shadow',
   'gap',
+  'min-height',
   'padding',
 ] as const;
 
@@ -25,16 +26,55 @@ const BUTTON_INLINE_CHROME_PROPERTIES = [
   'transition',
 ] as const;
 
+const pointerFocusRoots = new WeakSet<HTMLElement>();
+
+function getPointerButton(event: MouseEvent, root: HTMLElement): HTMLButtonElement | null {
+  if (event.button !== 0 || !(event.target instanceof Element)) return null;
+  const button = event.target.closest<HTMLButtonElement>('button');
+  return button && root.contains(button) && !button.disabled ? button : null;
+}
+
+function installPointerFocusPolicy(root: HTMLElement): void {
+  if (pointerFocusRoots.has(root)) return;
+  pointerFocusRoots.add(root);
+  root.addEventListener(
+    'pointerdown',
+    (event) => {
+      const button = getPointerButton(event, root);
+      if (button?.matches(':focus')) button.blur();
+    },
+    true
+  );
+  root.addEventListener(
+    'mousedown',
+    (event) => {
+      if (!getPointerButton(event, root)) return;
+      const tree = root.getRootNode();
+      const focused = tree instanceof ShadowRoot ? tree.activeElement : document.activeElement;
+      if (
+        focused instanceof HTMLElement &&
+        root.contains(focused) &&
+        focused.matches('input, textarea, [contenteditable="true"]')
+      )
+        focused.blur();
+      event.preventDefault();
+    },
+    true
+  );
+}
+
 /** Adapts the imperative selection surface to the shared content-toolbar visual contract. */
 export function applySelectionToolbarSurfaceChrome(root: HTMLElement): void {
   root.classList.add(
     'sniptale-glass-toolbar',
     'sniptale-toolbar-root',
+    'sniptale-content-toolbar-adopted',
     'sniptale-selection-toolbar'
   );
   SURFACE_INLINE_CHROME_PROPERTIES.forEach((property) => root.style.removeProperty(property));
   root.style.width = 'max-content';
   root.style.minWidth = '0';
+  installPointerFocusPolicy(root);
 }
 
 /** Removes legacy inline chrome so shared glass-button states remain the visual authority. */
@@ -62,11 +102,11 @@ export function applySelectionToolbarButtonChrome(
   if (options.split === 'start') {
     button.classList.add('sniptale-split-action-start');
   } else if (options.split === 'end') {
-    button.style.width = '28px';
-    button.style.minWidth = '28px';
+    button.style.width = '18px';
+    button.style.minWidth = '18px';
     button.classList.add('sniptale-split-action-end');
   } else {
-    button.style.borderRadius = 'var(--sniptale-radius-md)';
+    button.style.borderRadius = 'var(--sniptale-radius)';
   }
 }
 
@@ -77,6 +117,10 @@ export function applySelectionToolbarCompactButtonChrome(button: HTMLButtonEleme
 }
 
 export function syncSelectionToolbarCompactControlsChrome(tooltip: ContentSizeTooltipDom): void {
+  [tooltip.widthInput, tooltip.heightInput].forEach((input) => {
+    input.style.removeProperty('padding');
+    input.parentElement?.style.removeProperty('width');
+  });
   applySelectionToolbarCompactButtonChrome(tooltip.aspectRatioButton);
   [
     tooltip.widthDecreaseButton,

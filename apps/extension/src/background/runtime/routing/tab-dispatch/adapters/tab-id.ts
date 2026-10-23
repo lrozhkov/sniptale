@@ -1,4 +1,5 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { isOwnedSnapshotViewerPage } from '../../../../../features/tab-capabilities/url';
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
 import { isPopupExportViewerMessage, isTabModeMessage } from '../../message-guards/guards/tab';
@@ -33,6 +34,16 @@ export async function resolveTabIdPromise(
 ): Promise<number | undefined> {
   const tabId = readTabId(message);
   const isPopupSender = isPopupTabRouteSenderUrl(sender.url);
+
+  if (
+    tabId !== undefined &&
+    isPopupSender &&
+    typeof message === 'object' &&
+    message !== null &&
+    readMessageType(message) === VideoMessageType.START_RECORDING
+  ) {
+    return tabId;
+  }
 
   if (
     tabId !== undefined &&

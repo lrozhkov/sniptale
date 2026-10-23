@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import type { VideoEditorLibrariesState } from '../app-model/types';
-import { loadInitialProjectFromLocation } from '../../project/operations/ops';
+import {
+  loadInitialProjectFromLocation,
+  ReviewProjectTransferError,
+} from '../../project/operations/ops';
+import { translate } from '../../../platform/i18n';
+import type { TranslationKey } from '../../../platform/i18n/types';
 import type { ApplyLoadedProject } from './types';
 import type { VideoEditorSessionActions } from '../../contracts/commands/session';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
@@ -41,11 +46,13 @@ export function useVideoEditorBootstrap(
       } catch (bootstrapError) {
         if (!cancelled) {
           setError(
-            createUserFacingErrorMessage({
-              cause: bootstrapError,
-              detail: 'storage',
-              summaryKey: 'videoEditor.app.openFailed',
-            })
+            bootstrapError instanceof ReviewProjectTransferError
+              ? translate(transferRefusalKeys[bootstrapError.reason])
+              : createUserFacingErrorMessage({
+                  cause: bootstrapError,
+                  detail: 'storage',
+                  summaryKey: 'videoEditor.app.openFailed',
+                })
           );
           setReady(true);
         }
@@ -65,3 +72,12 @@ export function useVideoEditorBootstrap(
     setReady,
   ]);
 }
+
+/** Only operation-owned categories can select specific UI copy. */
+const transferRefusalKeys: Record<ReviewProjectTransferError['reason'], TranslationKey> = {
+  timing: 'videoEditor.app.transferTimingUnsupported',
+  joins: 'videoEditor.app.transferJoinsUnsupported',
+  overlays: 'videoEditor.app.transferOverlaysUnsupported',
+  resources: 'videoEditor.app.transferResourcesUnavailable',
+  settings: 'videoEditor.app.transferSettingsUnsupported',
+};

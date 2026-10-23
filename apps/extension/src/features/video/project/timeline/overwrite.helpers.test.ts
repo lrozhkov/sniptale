@@ -1,3 +1,4 @@
+import { getProjectOriginalAudioRanges } from './original-audio';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyOverwritePlacement } from './overwrite.helpers.ts';
 import {
@@ -265,3 +266,72 @@ function verifyLinkedAudioSegments(linkedAudioSegments: VideoProject['clips']): 
 function createUuid(index: number): `${string}-${string}-${string}-${string}-${string}` {
   return `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
 }
+
+it('retains targeted legacy source identity on both overwrite tails without text', () => {
+  const source = createVideoClip({ id: 'original' });
+  const take = createAudioClip({
+    id: 'voice',
+    originalAudioMute: {
+      volume: 0.25,
+      targets: [{ assetId: source.assetId, sourceInstanceId: source.id }],
+    },
+  });
+  const anchor = createVideoClip({
+    id: 'anchor',
+    assetId: 'replacement',
+    startTime: 4,
+    duration: 2,
+    sourceDuration: 2,
+  });
+  const project = { ...createProject([source, take, anchor]), version: 6 as const };
+  const before = structuredClone(project);
+  const result = applyOverwritePlacement(project, [anchor.id]);
+  const tails = result.clips.filter(
+    (item) => item.type === 'VIDEO' && item.assetId === source.assetId
+  );
+  expect(tails.map((item) => ('sourceInstanceId' in item ? item.sourceInstanceId : null))).toEqual([
+    source.id,
+    source.id,
+  ]);
+  expect(tails.map((item) => getProjectOriginalAudioRanges(result, item))).toEqual([
+    [{ start: 0, end: 4, volume: 0.25 }],
+    [{ start: 6, end: 10, volume: 0.25 }],
+  ]);
+  expect(getProjectOriginalAudioRanges(result, anchor)).toEqual([]);
+  expect(project).toEqual(before);
+});
+
+it('retains legacy source audio identity across both overwrite tails and keeps hidden intent', async () => {
+  const { getProjectSourceAudioRanges } = await import('../source-audio');
+  const source = createVideoClip({ id: 'original' });
+  const anchor = createVideoClip({
+    id: 'anchor',
+    assetId: 'replacement',
+    startTime: 4,
+    duration: 2,
+    sourceDuration: 2,
+  });
+  const project = {
+    ...createProject([source, anchor]),
+    version: 28 as const,
+    sourceAudioDocuments: [
+      {
+        id: 'envelope',
+        binding: { kind: 'source' as const, assetId: source.assetId, sourceInstanceId: source.id },
+        ranges: [{ id: 'all', start: 0, end: 10, volume: 2 }],
+        mutes: [{ id: 'hidden', start: 4, end: 6, volume: 0.25 }],
+      },
+    ],
+  };
+  const before = structuredClone(project);
+  const result = applyOverwritePlacement(project, [anchor.id]);
+  const tails = result.clips.filter(
+    (clip) => clip.type === 'VIDEO' && clip.assetId === source.assetId
+  );
+  expect(tails.map((clip) => getProjectSourceAudioRanges(result, clip))).toEqual([
+    [{ start: 0, end: 4, volume: 2 }],
+    [{ start: 6, end: 10, volume: 2 }],
+  ]);
+  expect(result.sourceAudioDocuments).toEqual(before.sourceAudioDocuments);
+  expect(project).toEqual(before);
+});

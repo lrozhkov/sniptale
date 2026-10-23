@@ -1,3 +1,12 @@
+import type { ReviewOriginalSpeech } from '../../../features/video/review/original-speech';
+import { reviewSpeechTextSignature } from '../../../features/video/review/speech-transcript';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../features/video/project/scene/focus-appearance';
+import { bindMotionRegionToClip } from '../../../features/video/project/motion/source-binding';
+import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { createVideoProjectRestoreTransaction } from './index.test-support';
 import { expect, it, vi } from 'vitest';
 import {
@@ -563,4 +572,514 @@ it('publishes an accepted canonical project asset as permanent', async () => {
   expect(media.get('project-asset:project-asset-1')).toMatchObject({
     lifecycle: { storageClass: 'library' },
   });
+});
+
+it('restores schema17 camera phases and disabled strengths through the existing project writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntry({ id: 'phase-restore' }, { id: 'phase-restore' });
+  entry.project.duration = 4;
+  const region = {
+    ...createVideoProjectMotionRegion(entry.project, 1),
+    duration: 2,
+    motionBlur: {
+      enter: { enabled: false, strength: 0.731 },
+      exit: { enabled: true, strength: 0.8 },
+      link: { enabled: true, strength: 0.4 },
+    },
+  };
+  entry.project = applyVideoProjectMutationPatch(entry.project, { motionRegions: [region] });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 17, motionRegions: [region] }),
+    })
+  );
+});
+
+it('restores schema18 independent entrance and exit modes through the existing project writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntry({ id: 'phase-restore' }, { id: 'phase-restore' });
+  entry.project.duration = 4;
+  const region = {
+    ...createVideoProjectMotionRegion(entry.project, 1, { enter: 'none', exit: 'ease-in-out' }),
+    duration: 2,
+    motionBlur: {
+      enter: { enabled: false, strength: 0.731 },
+      exit: { enabled: true, strength: 0.8 },
+      link: { enabled: true, strength: 0.4 },
+    },
+  };
+  entry.project = applyVideoProjectMutationPatch(entry.project, { motionRegions: [region] });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 18, motionRegions: [region] }),
+    })
+  );
+});
+
+it('restores schema19 spatial settings and independent reference through the existing project writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntry({ id: 'spatial-restore' }, { id: 'spatial-restore' });
+  entry.project.duration = 4;
+  const region = {
+    ...createVideoProjectMotionRegion(entry.project, 1),
+    duration: 2,
+    perspective: { enabled: false, rotateX: 20, rotateY: -30, rotateZ: 40, strength: 0.7 },
+    depthOfField: {
+      enabled: true,
+      mode: 'depth' as const,
+      x: 0.4,
+      y: 0.6,
+      width: 0.2,
+      softness: 0.3,
+      strength: 0.8,
+    },
+    spatialReference: { x: 0.1, y: 0.2, width: 0.8, height: 0.6 },
+  };
+  entry.project = applyVideoProjectMutationPatch(entry.project, { motionRegions: [region] });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 19, motionRegions: [region] }),
+    })
+  );
+});
+
+it('restores schema21 border targets, appearance and retained clocks through the existing writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'border-restore' });
+  const clip = entry.project.clips.find((item) => item.type === 'VIDEO')!;
+  const bound = bindMotionRegionToClip(
+    {
+      ...createVideoProjectMotionRegion(entry.project, 1),
+      id: 'bound-border',
+      duration: 2,
+      border: {
+        ...createQuickEditBorder(),
+        style: 'dotted',
+        reveal: 'draw-ccw',
+        exitReveal: 'erase-ccw',
+        loop: true,
+        motion: 'ripple',
+        period: 0.5,
+        segmentPercent: 23,
+      },
+      borderTarget: 'window',
+    },
+    clip
+  );
+  const viewport = { ...bound, id: 'viewport-border', borderTarget: 'viewport' as const };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    motionRegions: [bound, viewport],
+  });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 21, motionRegions: [bound, viewport] }),
+    })
+  );
+});
+
+it('restores schema22 spotlight coverage, appearance and retained clocks through the existing writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'spotlight-restore' });
+  const clip = entry.project.clips.find((item) => item.type === 'VIDEO')!;
+  const bound = bindMotionRegionToClip(
+    {
+      ...createVideoProjectMotionRegion(entry.project, 1),
+      id: 'window-spotlight',
+      duration: 2,
+      spotlight: {
+        ...createQuickEditSpotlight(),
+        effect: 'blur',
+        reveal: 'contract',
+        exitReveal: 'fade',
+      },
+      spotlightTarget: 'window',
+    },
+    clip
+  );
+  const scene = { ...bound, id: 'scene-spotlight', spotlightTarget: 'scene' as const };
+  const viewport = { ...bound, id: 'viewport-spotlight', spotlightTarget: 'viewport' as const };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    motionRegions: [bound, scene, viewport],
+  });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 22, motionRegions: [bound, scene, viewport] }),
+    })
+  );
+});
+
+it.each([23, 24])(
+  'restores schema%i notes and optional scene edges without changing the project graph',
+  async (version) => {
+    const { createCanvasComment } = await import('../../../features/video/review/comments');
+    const target = stores();
+    const entry = createVideoProjectEntryWithMediaClip({ id: 'comments-restore' });
+    const clip = entry.project.clips.find((item) => item.type === 'VIDEO')!;
+    if (clip.type !== 'VIDEO') throw new Error('Missing video');
+    const comments = [
+      {
+        id: 'source-comments',
+        binding: {
+          kind: 'source' as const,
+          assetId: clip.assetId,
+          sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+        },
+        annotations: [
+          { id: 'note', text: 'Retained linked text', anchor: { kind: 'point' as const, time: 0 } },
+        ],
+        canvasComments: [
+          {
+            ...createCanvasComment({ id: 'bubble', annotationId: 'note' }),
+            visible: false,
+            renderToVideo: false,
+          },
+        ],
+      },
+    ];
+    const sceneEdges =
+      version === 24
+        ? {
+            intro: { enabled: true, duration: 0.123456, color: '#ff0000ff', audioFade: true },
+            outro: { enabled: false, duration: 3, color: '#0000ffff', audioFade: false },
+          }
+        : undefined;
+    entry.project = applyVideoProjectMutationPatch(entry.project, {
+      commentDocuments: comments,
+      ...(sceneEdges ? { sceneEdges } : {}),
+    });
+    const original = structuredClone(entry.project);
+    await putVideoProjectBackupRestore({
+      operation: operation(),
+      root: { assets: [], entry, exports: [] },
+      stores: target,
+      tx: createVideoProjectRestoreTransaction(target),
+      strategy: 'replace',
+    });
+    expect(target.projects.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project: original,
+      })
+    );
+    expect(original.version).toBe(version);
+    expect(entry.project).toEqual(original);
+  }
+);
+
+it.each([false, true])(
+  'restores remembered bookend settings and optional joins (%s) through the existing root writer',
+  async (joins) => {
+    const { createBookendVideoPresentation } =
+      await import('../../../features/video/project/scene/bookend-media');
+    const target = stores();
+    const entry = createVideoProjectEntryWithMediaClip({ id: 'bookend-restore' });
+    const asset = entry.project.assets[0]!;
+    const slot = {
+      mode: 'none' as const,
+      video: {
+        ...createBookendVideoPresentation(asset.metadata.duration!),
+        assetId: asset.id,
+        trim: { start: 0.123456, end: asset.metadata.duration! },
+        audio: { muted: true, gain: 0.37 },
+      },
+    };
+    entry.project = applyVideoProjectMutationPatch(entry.project, {
+      bookendPresets: {
+        intro: slot,
+        outro: structuredClone(slot),
+        ...(joins ? { introTransition: { type: 'dissolve', before: 0.2, after: 0.3 } } : {}),
+      },
+      ...(joins
+        ? {
+            compositionJoins: [
+              {
+                id: 'saved-join',
+                clipId: entry.project.clips[0]!.id,
+                edge: 'end',
+                transition: { type: 'fade-black', before: 0.1, after: 0.3, color: '#123456' },
+              },
+            ],
+          }
+        : {}),
+    });
+    const original = structuredClone(entry);
+    await putVideoProjectBackupRestore({
+      operation: operation(),
+      root: { assets: [], entry, exports: [] },
+      stores: target,
+      tx: createVideoProjectRestoreTransaction(target),
+      strategy: 'replace',
+    });
+    expect(target.projects.put).toHaveBeenCalledWith(
+      expect.objectContaining({ project: original.project })
+    );
+    expect(original.project.version).toBe(joins ? 26 : 25);
+    expect(entry).toEqual(original);
+  }
+);
+
+it('restores dormant source audio documents with exact source intent through the existing root writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'source-audio-restore' });
+  const asset = entry.project.assets[0]!;
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    clips: [],
+    sourceAudioDocuments: [
+      {
+        id: 'envelope',
+        binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+        ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+        mutes: [],
+      },
+    ],
+  });
+  const before = structuredClone(entry.project);
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(expect.objectContaining({ project: before }));
+  expect(entry.project).toEqual(before);
+  expect(before.version).toBe(28);
+});
+
+it('restores whole source voice takes and accepted replacement references without rewriting their clocks', async () => {
+  const { createVideoProjectTrack } =
+    await import('../../../features/video/project/factories/creation');
+  const { isExportReadyVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const { reviewSpeechTextSignature } =
+    await import('../../../features/video/review/speech-transcript');
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'source-voice-restore' });
+  const source = entry.project.assets[0]!;
+  const audio = {
+    ...source,
+    id: 'native-take',
+    type: 'AUDIO' as const,
+    source: { kind: 'project-asset' as const, projectAssetId: 'voice-private' },
+  };
+  const replacement = {
+    ...audio,
+    id: 'project-asset:replacement',
+    source: { kind: 'project-asset' as const, projectAssetId: 'replacement-private' },
+  };
+  const track = createVideoProjectTrack('Voice', 1, 'AUDIO');
+  const profile = { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' as const };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    assets: [source, audio, replacement],
+    tracks: [...entry.project.tracks, track],
+    clips: [],
+    sourceVoiceoverDocuments: [
+      {
+        id: 'voice',
+        trackId: track.id,
+        enabled: false,
+        binding: { kind: 'source', assetId: source.id, sourceInstanceId: 'dormant-source' },
+        originalAudioSourceInstanceId: 'dormant-original-audio',
+        reference: [
+          { kind: 'speed', rate: 2, sourceStart: 0, sourceEnd: 4, resultStart: 0, resultEnd: 2 },
+          { kind: 'cut', rate: 1, sourceStart: 4, sourceEnd: 6, resultStart: 2, resultEnd: 2 },
+          { kind: 'keep', rate: 1, sourceStart: 6, sourceEnd: 10, resultStart: 2, resultEnd: 6 },
+        ],
+        take: {
+          id: 'take',
+          assetId: audio.id,
+          timelineStart: 0,
+          sourceOffset: 0.5,
+          duration: 4,
+          volume: 1,
+          muted: true,
+          dormant: true,
+          fadeIn: 0.25,
+          fadeOut: 0.5,
+          tempo: 0.5,
+          sourceAnchor: [{ start: 0, end: 8, offset: 0, duration: 4 }],
+          transcript: {
+            version: 1,
+            phrases: [],
+            replacements: [
+              {
+                id: 'replacement',
+                assetId: replacement.id,
+                start: 0,
+                end: 1,
+                duration: 1,
+                phraseId: 'phrase',
+                revision: 1,
+                text: 'Accepted',
+                textSignature: reviewSpeechTextSignature('Accepted', profile),
+                profile,
+              },
+            ],
+          },
+        },
+      },
+    ],
+  });
+  expect(isExportReadyVideoProject(entry.project)).toBe(true);
+  const before = structuredClone(entry.project);
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(expect.objectContaining({ project: before }));
+  expect(entry.project).toEqual(before);
+  expect(before.version).toBe(31);
+});
+
+function passiveSourceSpeech(assetId: string): ReviewOriginalSpeech {
+  const profile = { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' as const };
+  return {
+    enabled: false,
+    transcript: {
+      version: 1,
+      profile,
+      transcriptionModelId: 'recognition-model',
+      phrases: [
+        {
+          id: 'phrase',
+          start: 1,
+          end: 3,
+          originalText: 'Original',
+          text: 'Draft',
+          revision: 2,
+          alignment: 'word',
+          words: [{ text: 'Original', start: 1, end: 3 }],
+        },
+      ],
+      replacements: [
+        {
+          id: 'historical',
+          phraseId: 'removed-phrase',
+          start: 1,
+          end: 3,
+          duration: 1,
+          assetId,
+          revision: 1,
+          text: 'Accepted',
+          profile,
+          textSignature: reviewSpeechTextSignature('Accepted', profile),
+          enabled: true,
+          originalVolume: 0.25,
+        },
+      ],
+    },
+  };
+}
+
+it('restores passive source speech without scheduling replacement audio', async () => {
+  const { isExportReadyVideoProject, parseHydratableVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const { getProjectAssetUses } = await import('../../../features/video/project/media-usage');
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'passive-speech-restore' });
+  const source = entry.project.assets[0]!;
+  const replacement = {
+    ...structuredClone(source),
+    id: 'project-asset:passive-history',
+    type: 'AUDIO' as const,
+    source: { kind: 'project-asset' as const, projectAssetId: 'passive-history-private' },
+    metadata: { ...source.metadata, width: 0, height: 0, mimeType: 'audio/wav', hasAudio: true },
+  };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    assets: [source, replacement],
+    clips: [],
+    sourceAudioDocuments: [
+      {
+        id: 'source-speech',
+        binding: { kind: 'source', assetId: source.id, sourceInstanceId: 'missing-original' },
+        ranges: [],
+        mutes: [],
+        speech: passiveSourceSpeech(replacement.id),
+      },
+    ],
+  });
+  expect(isExportReadyVideoProject(entry.project)).toBe(true);
+  expect(entry.project.version).toBe(31);
+  expect(getProjectAssetUses(entry.project)).toEqual([
+    { kind: 'source-audio', documentId: 'source-speech', assetId: source.id },
+    { kind: 'source-audio', documentId: 'source-speech', assetId: replacement.id },
+  ]);
+  const before = structuredClone(entry.project);
+  const assets = entry.project.assets.map((asset) => {
+    if (asset.source.kind !== 'project-asset') throw new Error('Expected private asset');
+    return {
+      entry: {
+        id: asset.source.projectAssetId,
+        assetId: `${asset.id}-body`,
+        mimeType: asset.metadata.mimeType,
+        size: asset.metadata.size,
+        createdAt: 1,
+      },
+      filename: asset.name,
+      ref: {
+        ...ref,
+        location: { kind: 'opfs' as const, objectKey: `objects/${asset.id}` },
+        assetId: `${asset.id}-body`,
+        mimeType: asset.metadata.mimeType,
+        size: asset.metadata.size,
+      },
+      publishToLibrary: false,
+    };
+  });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets, entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(expect.objectContaining({ project: before }));
+  for (const asset of assets) {
+    expect(target.refs.put).toHaveBeenCalledWith(asset.ref);
+    expect(target.assets.put).toHaveBeenCalledWith(asset.entry);
+    expect(target.owners.put).toHaveBeenCalledWith(
+      expect.objectContaining({ assetId: asset.ref.assetId, ownerId: asset.entry.id })
+    );
+  }
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(entry.project)))?.sourceAudioDocuments
+  ).toEqual(before.sourceAudioDocuments);
+  expect(entry.project).toEqual(before);
 });

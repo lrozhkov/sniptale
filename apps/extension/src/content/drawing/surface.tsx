@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { RefObject } from 'react';
 import {
   getDrawingObjectRotation,
+  getDrawingSelectionBounds,
   hitTestDrawingDocument,
   resolveDrawingToolCursor,
   type DrawingObject,
@@ -14,10 +15,11 @@ import { useDrawingSessionSnapshot } from './controller';
 import { translate } from '../../platform/i18n';
 import { drawDrawingFrame } from './frame';
 import { useDrawingFrameRedraw } from './frame-redraw';
-import { resolveDrawingFrameRenderables } from './frame-renderables';
+import { resolveDrawingVisualLayers } from './frame-renderables';
 import { handleDrawingKeyDown, useDrawingEscapeOwnership } from './keyboard';
 import {
   getDrawingViewportProjection,
+  isDrawingMultiRotationHandle,
   resolveDrawingResizeHandle,
   resolveDrawingRotationHandle,
   toDrawingScenePoint,
@@ -25,7 +27,7 @@ import {
 } from './interaction';
 import { TEXT_DRAG_THRESHOLD, useDrawingPointerRuntime } from './pointer-runtime';
 import { DrawingTextEditor, useDrawingTextEditor, type DrawingTextDraft } from './text-editor';
-import { DrawingBlurLayer, DrawingTextLayer } from './surface-visual-layers';
+import { DrawingVisualLayers } from './surface-visual-layers';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import { toggleContentHostClass } from '../platform/dom-host';
 import { isTrustedKeyboardEvent } from '../platform/trusted-events';
@@ -124,7 +126,8 @@ function resolveDrawingCanvasHoverCursor(args: {
   const baseCursor = resolveDrawingCanvasCursor(args.active, args.snapshot);
   if (!args.active) return baseCursor;
   const draft = args.pointer.draftRef.current;
-  if (draft?.kind === 'rotate') return 'grabbing';
+  if (draft?.kind === 'bend') return 'none';
+  if (draft?.kind === 'rotate' || draft?.kind === 'rotate-selection') return 'grabbing';
   if (draft?.kind === 'resize')
     return resolveDrawingResizeCursor(draft.handle, true, getDrawingObjectRotation(draft.original));
   const selected =
@@ -135,9 +138,18 @@ function resolveDrawingCanvasHoverCursor(args: {
       : null;
   const rotationHandle = selected ? resolveDrawingRotationHandle(selected, args.point) : null;
   if (rotationHandle) return 'grab';
+  if (args.snapshot.selectedObjectIds.length > 1) {
+    const bounds = getDrawingSelectionBounds(
+      args.snapshot.document.objects.filter((object) =>
+        args.snapshot.selectedObjectIds.includes(object.id)
+      )
+    );
+    if (bounds && isDrawingMultiRotationHandle(bounds, args.point)) return 'grab';
+  }
   const handle = selected ? resolveDrawingResizeHandle(selected, args.point) : null;
   if (handle && selected)
     return resolveDrawingResizeCursor(handle, false, getDrawingObjectRotation(selected));
+  if (args.pointer.hoverBendRef.current) return 'grab';
   return baseCursor;
 }
 
@@ -164,7 +176,7 @@ function resolveDrawingResizeCursor(
 
 function isNonTextSelectionDrag(draft: PointerDraft | null): boolean {
   if (!draft) return false;
-  if (draft.kind === 'move-selection')
+  if (draft.kind === 'move-selection' || draft.kind === 'rotate-selection')
     return draft.originals.every((object) => object.kind !== 'text');
   return (
     (draft.kind === 'move' || draft.kind === 'resize' || draft.kind === 'rotate') &&
@@ -207,9 +219,11 @@ function createDrawingPointerHandlers(args: {
       const draft = pointer.draftRef.current;
       setSelectionDragHidden(isNonTextSelectionDrag(draft));
       textGestureRef.current =
-        (draft?.kind === 'move' || draft?.kind === 'resize') && draft.original.kind === 'text'
-          ? { dragged: false, start: toDrawingScenePoint(event, root) }
-          : null;
+        draft?.kind === 'rotate' || draft?.kind === 'rotate-selection' || draft?.kind === 'bend'
+          ? { dragged: true, start: toDrawingScenePoint(event, root) }
+          : (draft?.kind === 'move' || draft?.kind === 'resize') && draft.original.kind === 'text'
+            ? { dragged: false, start: toDrawingScenePoint(event, root) }
+            : null;
       event.currentTarget.style.cursor = selectionDragHiddenRef.current
         ? 'none'
         : resolveDrawingCanvasHoverCursor({
@@ -325,10 +339,18 @@ function DrawingCanvasLayer(props: {
           touchAction: props.active ? 'none' : 'auto',
           pointerEvents: props.active ? 'auto' : 'none',
           cursor: resolveDrawingCanvasCursor(props.active, props.snapshot),
+          zIndex: 0,
         }}
         {...pointerHandlers}
         onMouseDown={stopDrawingHostEvent}
         onMouseUp={stopDrawingHostEvent}
+        onPointerLeave={() => {
+          props.pointer.hoverBendRef.current = null;
+          props.pointer.changed();
+        }}
+        onLostPointerCapture={(event) => {
+          if (props.pointer.draftRef.current?.kind === 'bend') props.pointer.cancelPointer(event);
+        }}
         onClick={(event) =>
           handleDrawingCanvasClick({
             controller: props.controller,
@@ -386,6 +408,7 @@ function DrawingCanvasLayer(props: {
           inset: 0,
           pointerEvents: 'none',
           opacity: selectionDragHidden ? 0 : 1,
+          zIndex: 'var(--sniptale-drawing-chrome-layer)',
           transition: reducedMotion
             ? 'none'
             : `opacity ${selectionDragHidden ? 150 : 50}ms ease-out`,
@@ -472,6 +495,7 @@ export function DrawingSurface(props: {
     controller,
     draftRef,
     draftRevision,
+    hoverBendRef: pointer.hoverBendRef,
     objects: frameObjects,
     selectedIds: snapshot.selectedObjectIds,
     showSelectionChrome: props.showSelectionChrome ?? true,
@@ -486,14 +510,17 @@ export function DrawingSurface(props: {
     const canvas = canvasRef.current;
     if (canvas) {
       const finalSnapshot = controller.session.getSnapshot();
+      const layers = resolveDrawingVisualLayers(finalSnapshot.document.objects, null);
+      const initial = layers[0];
       drawDrawingFrame({
         canvas,
-        objects: finalSnapshot.document.objects,
+        objects: initial?.kind === 'ink' ? initial.objects : [],
         draft: null,
         selectedIds: [],
         root: controller.getScrollRoot(),
         showChrome: false,
         suppressText: true,
+        pixelBudget: 16_777_216 / layers.filter((layer) => layer.kind === 'ink').length,
         ...(getObjectOpacity ? { getObjectOpacity } : {}),
       });
       const chromeCanvas = chromeCanvasRef.current;
@@ -511,16 +538,11 @@ export function DrawingSurface(props: {
   }, [canvasRef, chromeCanvasRef, controller, finalizeDraft, finalizeText, getObjectOpacity]);
   useDrawingInteractionLifecycle({ active, controller, finalizeInteraction });
 
-  const frameRenderables = resolveDrawingFrameRenderables(frameObjects, draftRef.current);
-  const blurObjects = frameRenderables.flatMap(({ object }) =>
-    object.kind === 'blur' ? [object] : []
-  );
   const projection = getDrawingViewportProjection(root);
   void viewportRevision;
   return (
     <DrawingSurfaceContent
       active={active}
-      blurObjects={blurObjects}
       canvasRef={canvasRef}
       chromeCanvasRef={chromeCanvasRef}
       controller={controller}
@@ -541,7 +563,6 @@ export function DrawingSurface(props: {
 
 function DrawingSurfaceContent(props: {
   active: boolean;
-  blurObjects: DrawingObject[];
   canvasRef: RefObject<HTMLCanvasElement | null>;
   chromeCanvasRef: RefObject<HTMLCanvasElement | null>;
   controller: ContentDrawingController;
@@ -557,25 +578,24 @@ function DrawingSurfaceContent(props: {
   textEditor: DrawingTextEditorRuntime;
   viewportRevision: number;
 }) {
-  const textObjects = resolveDrawingFrameRenderables(
-    props.frameObjects,
-    props.pointer.draftRef.current
-  ).flatMap(({ object }) => (object.kind === 'text' ? [object] : []));
+  const layers = resolveDrawingVisualLayers(props.frameObjects, props.pointer.draftRef.current);
   return (
     <div
       aria-hidden={!props.active}
       data-ui="content.drawing.surface"
-      style={{ position: 'fixed', inset: 0, pointerEvents: props.active ? 'auto' : 'none' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        pointerEvents: props.active ? 'auto' : 'none',
+        ...{
+          '--sniptale-drawing-chrome-layer': layers.length,
+          '--sniptale-drawing-editor-layer': layers.length + 1,
+        },
+      }}
       {...DRAWING_SURFACE_EVENT_SHIELD}
     >
-      <DrawingBlurLayer
-        objects={props.blurObjects}
-        projection={props.projection}
-        root={props.root}
-        {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}
-      />
-      <DrawingTextLayer
-        objects={textObjects}
+      <DrawingVisualLayers
+        layers={layers}
         projection={props.projection}
         root={props.root}
         {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}

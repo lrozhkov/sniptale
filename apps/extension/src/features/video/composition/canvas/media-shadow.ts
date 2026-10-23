@@ -16,7 +16,7 @@ export function normalizeVideoMediaShadowIntensity(value: number | undefined): n
     return 0;
   }
 
-  return Math.max(0, Math.min(100, Math.round(value)));
+  return Math.max(0, Math.min(100, value));
 }
 
 export function normalizeVideoMediaShadowMode(
@@ -67,8 +67,8 @@ export function resolveVideoMediaShadowParams(
   }
 
   return {
-    blur: Math.round((10 + strength * 28) * scale * 100) / 100,
-    color: `rgba(0, 0, 0, ${Math.min(0.42, 0.16 + strength * 0.24).toFixed(2)})`,
+    blur: normalizedIntensity * 0.75 * Math.max(0, displayScale),
+    color: `rgba(0, 0, 0, ${strength})`,
     offsetX: 0,
     offsetY: 0,
     paint: { color: 'rgba(0, 0, 0, 1)', kind: 'outer-shadow' },

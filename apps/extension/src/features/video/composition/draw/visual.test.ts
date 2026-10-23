@@ -1,3 +1,5 @@
+import { drawCompositionBorders } from './border';
+import { createQuickEditBorder } from '../../project/scene/focus-appearance';
 import { createEmptyVideoProject, createVideoProjectAsset } from '../../project/factories/creation';
 import { createVideoClipFromAsset } from '../../project/factories/clip';
 import { resolveVideoCompositionFrame } from '../timeline/frame';
@@ -13,6 +15,8 @@ import {
   FakeHTMLMediaElement,
   FakeHTMLVideoElement,
 } from './visual.test-support';
+
+vi.mock('./border', () => ({ drawCompositionBorders: vi.fn() }));
 
 const createContext = createVisualTestContext;
 
@@ -120,9 +124,9 @@ it('draws media shadows before fitted video frames', () => {
   );
 
   expect(context.fillRect).not.toHaveBeenCalled();
-  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(50, 50, 160, 100);
+  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(77, 77, 160, 100);
   expect(context.__maskContext.globalCompositeOperation).toBe('destination-out');
-  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.28)');
+  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.5)');
   expect(context.__maskContext.shadowOffsetY).toBe(0);
   expect(context.shadowBlur).toBe(0);
   expect(context.drawImage).toHaveBeenCalledTimes(2);
@@ -186,9 +190,9 @@ it('draws media shadows before fitted image frames', () => {
   );
 
   expect(context.fillRect).not.toHaveBeenCalled();
-  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(50, 50, 120, 80);
+  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(77, 77, 120, 80);
   expect(context.__maskContext.globalCompositeOperation).toBe('destination-out');
-  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.28)');
+  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.5)');
   expect(context.__maskContext.shadowOffsetY).toBe(0);
   expect(context.shadowBlur).toBe(0);
   expect(context.drawImage).toHaveBeenCalledTimes(2);
@@ -352,3 +356,138 @@ function createCapturedVideoLayer(): Extract<
   if (layer?.kind !== 'video') throw new Error('Expected video layer');
   return layer;
 }
+
+it.each([false, true])(
+  'paints borders before source actions and excludes them from effect actions; camera=%s',
+  (camera) => {
+    const context = createContext();
+    context.arc = vi.fn();
+    const layer = createCapturedVideoLayer();
+    if (camera) {
+      layer.trackRole = 'CAMERA';
+      layer.clip.cameraAppearance = { shape: 'circle', roundness: 50, zoom: 1, panX: 0, panY: 0 };
+    }
+    layer.borders = [
+      {
+        id: 'border',
+        border: createQuickEditBorder(),
+        clock: {
+          time: 1,
+          duration: 3,
+          enter: { type: 'none', duration: 0 },
+          exit: { type: 'none', duration: 0 },
+        },
+      },
+    ];
+    vi.mocked(drawCompositionBorders).mockClear();
+    const sources = new Map([
+      [layer.clipId, new FakeHTMLVideoElement() as unknown as HTMLVideoElement],
+    ]);
+    drawCompositionVisualLayer(context, layer, 1, 1, {}, sources);
+    expect(drawCompositionBorders).toHaveBeenCalledOnce();
+    const borderOrder = vi.mocked(drawCompositionBorders).mock.invocationCallOrder[0]!;
+    expect(vi.mocked(context.drawImage).mock.invocationCallOrder[0]).toBeLessThan(borderOrder);
+    expect(vi.mocked(context.arc).mock.invocationCallOrder.at(-1)).toBeGreaterThan(borderOrder);
+    expect(drawCompositionBorders).toHaveBeenCalledWith(
+      context,
+      layer.borders,
+      camera ? { x: 10, y: 20, width: 100, height: 100 } : { x: 10, y: 40, width: 100, height: 60 },
+      1,
+      0
+    );
+    vi.mocked(drawCompositionBorders).mockClear();
+    vi.mocked(context.drawImage).mockClear();
+    vi.mocked(context.arc).mockClear();
+    drawCompositionVisualLayer(context, { ...layer, effectActionsOnly: true }, 1, 1, {}, sources);
+    expect(drawCompositionBorders).not.toHaveBeenCalled();
+    expect(context.drawImage).not.toHaveBeenCalled();
+    expect(context.arc).toHaveBeenCalled();
+    vi.mocked(drawCompositionBorders).mockClear();
+    vi.mocked(context.drawImage).mockClear();
+    vi.mocked(context.arc).mockClear();
+    drawCompositionVisualLayer(
+      context,
+      { ...layer, effectActionsOnly: true, deferSourceBorders: true },
+      1,
+      1,
+      {},
+      sources
+    );
+    expect(drawCompositionBorders).toHaveBeenCalledOnce();
+    expect(context.drawImage).not.toHaveBeenCalled();
+    expect(vi.mocked(context.arc).mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      vi.mocked(drawCompositionBorders).mock.invocationCallOrder[0]!
+    );
+  }
+);
+
+it('paints original-window border coordinates while clipping to the retained visible crop', () => {
+  const context = createContext();
+  const layer = createCapturedVideoLayer();
+  layer.actions = [];
+  layer.clip.fitMode = 'STRETCH';
+  layer.clip.sourceCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+  layer.borders = [
+    {
+      id: 'source-border',
+      coordinateSpace: 'source-window',
+      border: createQuickEditBorder(),
+      clock: {
+        time: 1,
+        duration: 3,
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+      },
+    },
+  ];
+  vi.mocked(drawCompositionBorders).mockClear();
+  drawCompositionVisualLayer(
+    context,
+    layer,
+    1,
+    1,
+    {},
+    new Map([[layer.clipId, new FakeHTMLVideoElement() as unknown as HTMLVideoElement]])
+  );
+  expect(drawCompositionBorders).toHaveBeenCalledExactlyOnceWith(
+    context,
+    layer.borders,
+    { x: 10, y: 20, width: 100, height: 100 },
+    1,
+    0,
+    { x: -2.5, y: 7.5, width: 125, height: 125 },
+    undefined
+  );
+});
+
+it('clips a source-attached effect before inner motion and retains its independent bitmap', () => {
+  const context = createContext();
+  context.transform = vi.fn();
+  const layer = createEffectVisualLayer();
+  const owner = createCapturedVideoLayer();
+  owner.opacity = 0.6;
+  layer.sourceAttachment = {
+    owner,
+    mapping: {
+      frame: { x: 10, y: 20, width: 100, height: 100, rotation: 0 },
+      sourceWidth: 200,
+      sourceHeight: 120,
+      fitMode: 'CONTAIN',
+      windowCornerRadius: 8,
+      renderState: { translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 },
+    },
+    innerTransform: [2, 0, -10, 0, 2, -20, 0, 0, 1],
+  };
+  const bitmap = new FakeBitmap(40, 20);
+  drawCompositionVisualLayerBitmap(context, layer, bitmap, 2, 2, 0.5);
+  expect(context.roundRect).toHaveBeenCalledWith(20, 80, 200, 120, 16);
+  expect(context.transform).toHaveBeenCalledWith(2, 0, 0, 2, -20, -40);
+  expect(context.translate).toHaveBeenCalledWith(20, 80);
+  expect(context.scale).toHaveBeenCalledWith(0.5, 0.5);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  expect(vi.mocked(context.clip).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(context.transform).mock.invocationCallOrder[0]!
+  );
+  expect(context.globalAlpha).toBe(1);
+  expect(bitmap.close).not.toHaveBeenCalled();
+});

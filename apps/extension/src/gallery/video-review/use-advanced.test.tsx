@@ -2,7 +2,7 @@
 import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import { patchReviewClicks } from '../../features/video/review/advanced/click-animation';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 import {
   createQuickEditZoomRegion,
@@ -20,7 +20,7 @@ import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -101,6 +101,39 @@ beforeEach(() => {
   vi.useFakeTimers();
   host = document.createElement('div');
   root = createRoot(host);
+});
+
+it.each(['basic', 'advanced'] as const)(
+  'saves an initial %s choice through the existing UI buffer',
+  async (mode) => {
+    const initial = createQuickEditAdvancedState();
+    initial.ui.modeSelectionPending = true;
+    const { session } = setup(initial);
+    act(() => advanced.setMode(mode));
+    expect(advanced.advanced.ui).toMatchObject({ mode, modeSelectionPending: false });
+    await act(async () => advanced.flush());
+    expect(session.getSnapshot().snapshot.workspace.advanced.ui).toMatchObject({
+      mode,
+      modeSelectionPending: false,
+    });
+  }
+);
+
+it('retains an initial choice after a failed save and retries it', async () => {
+  const initial = createQuickEditAdvancedState();
+  initial.ui.modeSelectionPending = true;
+  const { session, deps } = setup(initial);
+  deps.saveVideoWorkspaceAdvanced.mockRejectedValueOnce(new Error('Storage unavailable'));
+  act(() => advanced.setMode('basic'));
+  await act(async () => {
+    await expect(advanced.flush()).rejects.toThrow('Storage unavailable');
+  });
+  expect(advanced.saveFailed).toBe(true);
+  expect(advanced.advanced.ui.modeSelectionPending).toBe(false);
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.modeSelectionPending).toBe(true);
+  await act(async () => advanced.retry());
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.modeSelectionPending).toBe(false);
+  expect(advanced.saveFailed).toBe(false);
 });
 
 afterEach(async () => {

@@ -55,7 +55,7 @@ export function SurfaceStylePresetsSettings() {
           const to = intent.beforeItemId === null ? ids.length : ids.indexOf(intent.beforeItemId);
           if (to < 0) return;
           ids.splice(to, 0, intent.itemId);
-          void resources.actions.onReorderAll(ids);
+          return resources.actions.onReorderAll(ids);
         }}
         state={catalog ? 'ready' : 'loading'}
       />

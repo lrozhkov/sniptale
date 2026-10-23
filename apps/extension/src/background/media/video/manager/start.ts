@@ -35,6 +35,8 @@ import {
   type RecordingSourceBinding,
 } from '../offscreen-recording-stop';
 import { readStoredVideoPostRecordResult } from '../../../storage/video/post-record-result';
+import { acknowledgePendingVideoPostRecordResult } from '../../../storage/video/post-record-acknowledgement';
+import { forgetCameraRecorderControlGrant } from '../runtime/camera-recorder-control';
 import {
   classifyCaptureSurfaceStartFailure,
   ensureCurrentRecordingDocument,
@@ -91,6 +93,35 @@ export async function startRecording(
   }
 }
 
+function getExistingRecordingStart(): RecordingStartResult | null {
+  if (isVideoRecordingPreparationInProgress()) {
+    logger.warn('Ignoring duplicate start while recording initialization is already in progress');
+    return { result: 'duplicate-preparing' };
+  }
+  if (hasActiveVideoRecordingSession()) {
+    logger.warn('Ignoring duplicate start while a recording is already active');
+    return { result: 'already-active' };
+  }
+  return null;
+}
+
+async function resolvePreviousRecordingResult(): Promise<boolean> {
+  const previous = await readStoredVideoPostRecordResult();
+  if (previous?.status === 'staged') return false;
+  if (previous?.status !== 'ready') return true;
+  const acknowledgement = await acknowledgePendingVideoPostRecordResult(
+    previous.result.recordingId
+  );
+  if (
+    acknowledgement === 'acknowledged' &&
+    !isVideoRecordingPreparationInProgress() &&
+    !hasActiveVideoRecordingSession()
+  )
+    forgetCameraRecorderControlGrant(previous.result.recordingId);
+  const current = await readStoredVideoPostRecordResult();
+  return current?.status !== 'ready' && current?.status !== 'staged';
+}
+
 async function startRecordingWithPermit(
   tabId: number | undefined,
   settings: VideoRecordingSettings,
@@ -108,9 +139,11 @@ async function startRecordingWithPermit(
     };
   }
 
+  const existingStart = getExistingRecordingStart();
+  if (existingStart) return existingStart;
+
   try {
-    const postRecordState = await readStoredVideoPostRecordResult();
-    if (postRecordState?.status === 'staged' || postRecordState?.status === 'ready') {
+    if (!(await resolvePreviousRecordingResult())) {
       return {
         error: 'Resolve the previous recording before starting another.',
         result: 'failed',
@@ -123,14 +156,8 @@ async function startRecordingWithPermit(
     };
   }
 
-  if (isVideoRecordingPreparationInProgress()) {
-    logger.warn('Ignoring duplicate start while recording initialization is already in progress');
-    return { result: 'duplicate-preparing' };
-  }
-  if (hasActiveVideoRecordingSession()) {
-    logger.warn('Ignoring duplicate start while a recording is already active');
-    return { result: 'already-active' };
-  }
+  const overlappingStart = getExistingRecordingStart();
+  if (overlappingStart) return overlappingStart;
 
   const sanitizedSettings = sanitizeRecordingSettings(settings, captureMode);
 

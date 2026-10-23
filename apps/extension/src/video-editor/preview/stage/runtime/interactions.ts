@@ -9,6 +9,7 @@ import type {
 } from '../../../../features/video/project/types/index';
 import {
   getPreviewStageInteractionScale,
+  mapClientPointToCompositionPoint,
   shouldLockPreviewClipToViewport,
 } from '../canvas/geometry';
 import {
@@ -39,6 +40,10 @@ export interface InteractionState extends PreviewTransformGestureState {
   camera: VideoCompositionCameraState;
   clip: VideoProjectClip;
   mode: ResizeHandle;
+  projectivePointer?: {
+    origin: { x: number; y: number };
+    map(point: PreviewTransformClientPoint): { x: number; y: number } | null;
+  };
   scaleX: number;
   scaleY: number;
 }
@@ -46,11 +51,12 @@ export interface InteractionState extends PreviewTransformGestureState {
 function createPreviewStageInteractionState(params: {
   clip: VideoProjectClip;
   camera: VideoCompositionCameraState;
+  currentTime?: number;
   event: React.PointerEvent;
   mode: ResizeHandle;
   project: VideoProject;
   stage: HTMLDivElement;
-}): InteractionState {
+}): InteractionState | null {
   const { clip, camera, event, mode, project, stage } = params;
   const interactionScale = getPreviewStageInteractionScale(
     stage,
@@ -58,6 +64,27 @@ function createPreviewStageInteractionState(params: {
     camera,
     shouldLockPreviewClipToViewport(clip, camera, project)
   );
+  let projectivePointer: InteractionState['projectivePointer'];
+  if (
+    (clip.type === 'EFFECT' && clip.attachment?.kind === 'source') ||
+    (camera.spatial && !shouldLockPreviewClipToViewport(clip, camera, project))
+  ) {
+    const map = (point: PreviewTransformClientPoint) =>
+      mapClientPointToCompositionPoint({
+        camera,
+        clip,
+        currentTime: params.currentTime ?? 0,
+        lockToViewport: shouldLockPreviewClipToViewport(clip, camera, project),
+        project,
+        stage,
+        clientX: point.clientX,
+        clientY: point.clientY,
+        clampToViewport: false,
+      });
+    const origin = map(event);
+    if (!origin) return null;
+    projectivePointer = { origin, map };
+  }
   const gestureState = createPreviewTransformGestureState({
     clipId: clip.id,
     origin: { clientX: event.clientX, clientY: event.clientY },
@@ -66,6 +93,7 @@ function createPreviewStageInteractionState(params: {
   const layout = getEffectClipObjectLayout(project, clip);
   return {
     ...gestureState,
+    ...(projectivePointer ? { projectivePointer } : {}),
     aspectRatio: layout?.resize === 'scale' ? layout.width / layout.height : undefined,
     camera,
     clip,
@@ -78,6 +106,7 @@ function createPreviewStageInteractionState(params: {
 export function beginPreviewStageInteraction(params: {
   clip: VideoProjectClip;
   camera: VideoCompositionCameraState;
+  currentTime?: number;
   cleanupRef: React.MutableRefObject<(() => void) | null>;
   event: React.PointerEvent;
   gestureHooks?: PreviewTransformGestureHooks;
@@ -101,11 +130,13 @@ export function beginPreviewStageInteraction(params: {
   const state = createPreviewStageInteractionState({
     clip: params.clip,
     camera: params.camera,
+    currentTime: params.currentTime ?? 0,
     event: params.event,
     mode: params.mode,
     project: params.project,
     stage,
   });
+  if (!state) return;
   params.interactionRef.current = state;
   startPreviewStageTransform(params, state);
 }
@@ -141,12 +172,25 @@ function resolvePreviewStageTransform(params: {
   project: VideoProject;
   settings: PreviewStageSnapSettings;
   state: InteractionState;
-}): VideoProjectTransform {
-  const delta = {
-    x: (params.point.clientX - params.state.origin.clientX) / params.state.scaleX,
-    y: (params.point.clientY - params.state.origin.clientY) / params.state.scaleY,
-  };
+}): VideoProjectTransform | null {
+  const pointer = params.state.projectivePointer;
+  const point = pointer?.map(params.point);
+  if (pointer && !point) return null;
+  const delta =
+    pointer && point
+      ? {
+          x: point.x - pointer.origin.x,
+          y: point.y - pointer.origin.y,
+        }
+      : {
+          x: (params.point.clientX - params.state.origin.clientX) / params.state.scaleX,
+          y: (params.point.clientY - params.state.origin.clientY) / params.state.scaleY,
+        };
   const transform = resolveUnsnappedTransform(params.state, delta);
+  if (params.state.clip.type === 'EFFECT' && params.state.clip.attachment?.kind === 'source') {
+    params.onGuideChange([]);
+    return transform;
+  }
   const snapped = snapClipTransform({
     clip: params.state.clip,
     mode: params.state.mode === 'move' || params.state.aspectRatio ? 'move' : 'resize',

@@ -12,19 +12,20 @@ export function MicrophoneGainControl({
 }) {
   const gain = resolveMicrophoneGain(settings);
   return (
-    <label className="grid gap-1.5">
+    <label className="grid grid-cols-[minmax(0,1fr)_3.5rem] items-center gap-x-3">
       <span
         className={[
-          'flex items-center justify-between gap-2 text-[10px] font-medium',
-          'text-[var(--sniptale-color-text-muted-strong)]',
+          'col-span-2 text-xs font-normal leading-4',
+          'text-[var(--sniptale-color-text-secondary)]',
         ].join(' ')}
       >
-        <span>{translate('popup.video.microphoneGainLabel')}</span>
-        <span className="tabular-nums text-[var(--sniptale-color-text-primary)]">
-          {Math.round(gain * 100)}%
-        </span>
+        {translate('popup.video.microphoneGainLabel')}
       </span>
       <ProductRange
+        className={[
+          '[--sniptale-range-shell-height:28px]! [--sniptale-range-track-height:3px]!',
+          '[--sniptale-range-thumb-size:14px]!',
+        ].join(' ')}
         min="0"
         max="200"
         step="5"
@@ -34,6 +35,9 @@ export function MicrophoneGainControl({
           onSettingsChange({ microphoneGain: Number(event.currentTarget.value) / 100 })
         }
       />
+      <span className="text-right text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
+        {Math.round(gain * 100)}%
+      </span>
     </label>
   );
 }

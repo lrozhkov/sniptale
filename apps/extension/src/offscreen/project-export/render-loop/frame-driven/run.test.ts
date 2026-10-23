@@ -313,3 +313,36 @@ it('does not create a zero-duration tail when the rounded end equals a lattice t
   );
   expect(add.mock.calls).toEqual([[0, 16667]]);
 });
+
+it('keeps fixed-rate span timestamps on the rounded clock and clips the final packet duration', async () => {
+  getFrameDrivenRenderTimingMock.mockReturnValue({
+    duration: 0.041,
+    fps: 60,
+    frameDurationUs: 16667,
+    keyframeInterval: 120,
+    totalFrames: 3,
+  });
+  await runFrameDrivenCompositeRenderLoop(
+    { cancelled: false } as never,
+    { duration: 5 } as never,
+    { fps: 60, rangeStartSeconds: 1.123, rangeEndSeconds: 1.164 } as never,
+    {} as HTMLCanvasElement,
+    {} as CanvasRenderingContext2D,
+    {} as never,
+    {} as VideoEncoder,
+    vi.fn(),
+    undefined,
+    123456
+  );
+  expect(getFrameDrivenRenderTimingMock).toHaveBeenCalledWith(expect.closeTo(0.041, 12), 60);
+  expect(
+    renderFrameDrivenCompositeFrameMock.mock.calls.map(([args]) => [
+      args.frameTimestampUs,
+      args.frameDurationUs,
+    ])
+  ).toEqual([
+    [123456, 16667],
+    [140123, 16666],
+    [156789, 7667],
+  ]);
+});

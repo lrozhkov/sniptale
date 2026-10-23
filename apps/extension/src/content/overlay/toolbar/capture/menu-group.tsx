@@ -2,6 +2,8 @@ import { ToolbarCaptureActionMenu, ToolbarTimerMenu, ToolbarViewportMenu } from 
 import type { ToolbarCaptureActionsProps } from '../types';
 import { getCaptureActionIcon, getCaptureActionOptions, getTimerOptions } from './options';
 import type { useToolbarCaptureMenus } from './use-menus';
+import { PageControlVisibility } from '../controls/control-visibility';
+import { translate } from '../../../../platform/i18n';
 
 function CaptureActionMenuNode(props: {
   menus: ReturnType<typeof useToolbarCaptureMenus>;
@@ -89,23 +91,38 @@ export function ToolbarCaptureMenuGroup(
 
   return (
     <>
-      <CaptureActionMenuNode
-        menus={menus}
-        captureAction={captureProps.captureAction}
-        compactMenus={captureProps.compactMenus}
-        displayMode={captureProps.displayMode}
-        onSelectCaptureAction={onSelectCaptureAction}
-        viewportRightInset={viewportRightInset}
-      />
-      <TimerMenuNode
-        menus={menus}
-        compactMenus={captureProps.compactMenus}
-        displayMode={captureProps.displayMode}
-        timerDelay={captureProps.timerDelay}
-        onTimerDelayChange={captureProps.onTimerDelayChange}
-        viewportRightInset={viewportRightInset}
-      />
-      {viewportMenu}
+      <PageControlVisibility
+        control="after-capture"
+        label={translate('content.toolbar.afterCaptureTitle')}
+      >
+        <CaptureActionMenuNode
+          menus={menus}
+          captureAction={captureProps.captureAction}
+          compactMenus={captureProps.compactMenus}
+          displayMode={captureProps.displayMode}
+          onSelectCaptureAction={onSelectCaptureAction}
+          viewportRightInset={viewportRightInset}
+        />
+      </PageControlVisibility>
+      <PageControlVisibility
+        control="capture-delay"
+        label={translate('content.toolbar.screenshotDelayTooltip')}
+      >
+        <TimerMenuNode
+          menus={menus}
+          compactMenus={captureProps.compactMenus}
+          displayMode={captureProps.displayMode}
+          timerDelay={captureProps.timerDelay}
+          onTimerDelayChange={captureProps.onTimerDelayChange}
+          viewportRightInset={viewportRightInset}
+        />
+      </PageControlVisibility>
+      <PageControlVisibility
+        control="capture-size"
+        label={translate('content.toolbar.viewportButton')}
+      >
+        {viewportMenu}
+      </PageControlVisibility>
     </>
   );
 }

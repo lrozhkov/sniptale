@@ -1,3 +1,4 @@
+import { translate } from '../../../../../platform/i18n';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -14,10 +15,11 @@ import {
   VideoMediaShadowMode,
   VideoProjectClipType,
   type VideoProjectVideoClip,
+  type VideoProjectImageClip,
 } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { MediaFrameControls } from './media-frame';
-import { DEFAULT_WINDOW_HEADER } from '../../../../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { acquireWindowHeaderFavicon } from '../../../../../workflows/browser-frame/favicon';
 
 vi.mock('../../../../../workflows/browser-frame/favicon', () => ({
@@ -66,7 +68,7 @@ function setInputValue(input: HTMLInputElement, value: string) {
 async function renderHarness(
   handlers: Partial<WorkspaceSidebarSelectionPanelProps> = {},
   locked = false,
-  clip = createClip()
+  clip: VideoProjectVideoClip | VideoProjectImageClip = createClip()
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -98,6 +100,7 @@ async function renderHarness(
     root?.render(
       <MediaFrameControls
         project={project}
+        onEditMediaClip={handlers.onEditMediaClip}
         clip={clip}
         locked={locked}
         onApplyMediaClipVisualsToTrack={handlers.onApplyMediaClipVisualsToTrack ?? vi.fn()}
@@ -105,6 +108,11 @@ async function renderHarness(
         onUpdateMediaClipFitScalePercent={handlers.onUpdateMediaClipFitScalePercent ?? vi.fn()}
         onUpdateMediaClipShadowIntensity={handlers.onUpdateMediaClipShadowIntensity ?? vi.fn()}
         onUpdateMediaClipShadowMode={handlers.onUpdateMediaClipShadowMode ?? vi.fn()}
+        onUpdateMediaClipShadowColor={handlers.onUpdateMediaClipShadowColor ?? vi.fn()}
+        {...(handlers.recentColors ? { recentColors: handlers.recentColors } : {})}
+        {...(handlers.onRememberRecentColor
+          ? { onRememberRecentColor: handlers.onRememberRecentColor }
+          : {})}
         onUpdateMediaClipWindowHeader={handlers.onUpdateMediaClipWindowHeader ?? vi.fn()}
       />
     );
@@ -132,7 +140,9 @@ describe('workspace-sidebar/selection/media-frame', () => {
     await renderHarness({ onApplyMediaClipVisualsToTrack });
 
     const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
-      (button) => button.closest('[data-ui="video-editor.inspector.actions"]') !== null
+      (button) =>
+        button.closest('[data-ui="video-editor.inspector.actions"]') !== null &&
+        button.textContent?.includes('Применить к дорожке')
     );
 
     expect(container?.textContent).toContain('Вписывание');
@@ -167,13 +177,11 @@ describe('workspace-sidebar/selection/media-frame', () => {
     expect(onUpdateMediaClipShadowIntensity).toHaveBeenCalledWith('clip-1', 42);
 
     await act(async () => {
-      container?.querySelector<HTMLButtonElement>('button[aria-label="Режим тени"]')?.click();
-    });
-
-    await act(async () => {
-      const glow = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
-        (option) => option.textContent?.includes('Свечение')
-      );
+      const glow = Array.from(
+        container?.querySelectorAll<HTMLButtonElement>(
+          '[role="group"][aria-label="Режим тени"] button'
+        ) ?? []
+      ).find((option) => option.textContent?.includes('Свечение'));
       expect(glow).toBeDefined();
       glow?.click();
     });
@@ -189,9 +197,13 @@ describe('workspace-sidebar/selection/media-frame disabled state', () => {
   it('keeps media shadow mode controls disabled for locked tracks', async () => {
     await renderHarness({}, true);
 
-    expect(
-      container?.querySelector<HTMLButtonElement>('button[aria-label="Режим тени"]')?.disabled
-    ).toBe(true);
+    const choices = [
+      ...container!.querySelectorAll<HTMLButtonElement>(
+        '[role="group"][aria-label="Режим тени"] button'
+      ),
+    ];
+    expect(choices).toHaveLength(2);
+    expect(choices.every((button) => button.disabled)).toBe(true);
   });
 });
 
@@ -239,3 +251,126 @@ it('cancels a pending favicon when selection changes to another clip with the sa
   });
   expect(onUpdateMediaClipWindowHeader).toHaveBeenCalledTimes(1);
 });
+
+it.each(['VIDEO', 'IMAGE'] as const)(
+  'edits dormant %s shadow color through the shared field and cancels without a command',
+  async (type) => {
+    const clip = type === 'IMAGE' ? { ...createClip(), type: 'IMAGE' as const } : createClip();
+    const onUpdateMediaClipShadowColor = vi.fn();
+    const onRememberRecentColor = vi.fn(async () => {});
+    await renderHarness(
+      {
+        onUpdateMediaClipShadowColor,
+        onRememberRecentColor,
+        recentColors: ['#abcdef'],
+      },
+      false,
+      clip
+    );
+    const trigger = () =>
+      container!.querySelector<HTMLButtonElement>(
+        '[data-ui="video-editor.media-shadow"] [data-ui="shared.ui.color-selector.value-trigger"]'
+      )!;
+    await act(async () => trigger().click());
+    let input = container!.querySelector<HTMLInputElement>('input[aria-label="Цвет тени"]')!;
+    await act(async () => {
+      setInputValue(input, '#00ff00');
+    });
+    await act(async () =>
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(onUpdateMediaClipShadowColor).not.toHaveBeenCalled();
+    expect(onRememberRecentColor).not.toHaveBeenCalled();
+    await act(async () => trigger().click());
+    input = container!.querySelector<HTMLInputElement>('input[aria-label="Цвет тени"]')!;
+    await act(async () => {
+      setInputValue(input, '#12abef');
+    });
+    await act(async () =>
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    );
+    expect(onUpdateMediaClipShadowColor).toHaveBeenCalledExactlyOnceWith('clip-1', '#12abef');
+    expect(onRememberRecentColor).toHaveBeenCalledExactlyOnceWith('#12abef');
+    await renderHarness({ onUpdateMediaClipShadowColor }, true, clip);
+    expect(
+      container!.querySelector(
+        '[data-ui="video-editor.media-shadow"] [data-ui="shared.ui.color-selector.value-trigger"]'
+      )
+    ).toBeNull();
+  }
+);
+
+it('commits the shared radius row and preserves fine authored values on unchanged Enter', async () => {
+  const onEditMediaClip = vi.fn();
+  await renderHarness({ onEditMediaClip }, false, { ...createClip(), windowCornerRadius: 12.345 });
+  const label = Array.from(container!.querySelectorAll('input')).find(
+    (input) => input.getAttribute('aria-label') === 'Скругление углов'
+  );
+  expect(label).toBeDefined();
+  await act(async () => {
+    label!.focus();
+    label!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(onEditMediaClip.mock.calls.every(([, edit]) => edit.radius === 12.345)).toBe(true);
+  onEditMediaClip.mockClear();
+  await act(async () => {
+    setInputValue(label!, '24');
+    label!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(onEditMediaClip).toHaveBeenCalledWith('clip-1', {
+    kind: 'window-corner-radius',
+    radius: 24,
+  });
+  await renderHarness({ onEditMediaClip }, true);
+  const locked = Array.from(container!.querySelectorAll('input')).find(
+    (input) => input.getAttribute('aria-label') === 'Скругление углов'
+  );
+  expect(locked?.disabled).toBe(true);
+});
+
+it('offers scalar padding and preserves unchanged rounded geometry', async () => {
+  const clip = createClip();
+  const onEditMediaClip = vi.fn();
+  await renderHarness({ onEditMediaClip }, false, clip);
+  const input =
+    container!.querySelector<HTMLInputElement>('input[aria-label="Отступ"]') ??
+    container!.querySelector<HTMLInputElement>('input[aria-label="Padding"]');
+  expect(input).toBeTruthy();
+  await act(async () => {
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(onEditMediaClip).not.toHaveBeenCalled();
+  await act(async () => {
+    setInputValue(input!, '40');
+  });
+  await act(async () => {
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(onEditMediaClip).toHaveBeenLastCalledWith(clip.id, { kind: 'padding', padding: 40 });
+});
+
+it.each([
+  { locked: false, padding: 40 },
+  { locked: true, padding: 40 },
+  { locked: false, padding: 4096 },
+])(
+  'exposes a quiet explicit restore action for retained framing %j',
+  async ({ locked, padding }) => {
+    const onEditMediaClip = vi.fn();
+    const clip = { ...createClip(), rememberedWindowLayout: { padding, windowCornerRadius: 18 } };
+    await renderHarness({ onEditMediaClip }, locked, clip);
+    const restore = [...container!.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes(translate('gallery.videoReview.windowLayoutRestore'))
+    )!;
+    expect(restore).toBeDefined();
+    expect(restore.disabled).toBe(locked);
+    await act(async () => restore.click());
+    if (restore.disabled) expect(onEditMediaClip).not.toHaveBeenCalled();
+    else
+      expect(onEditMediaClip).toHaveBeenCalledExactlyOnceWith(clip.id, {
+        kind: 'window-layout-restore',
+      });
+    if (padding === 4096)
+      expect(restore.title).toBe(translate('gallery.videoReview.windowLayoutFitCanvas'));
+  }
+);

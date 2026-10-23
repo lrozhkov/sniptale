@@ -159,7 +159,7 @@ async function clickRenderedSidebarButton() {
 async function verifySidebarHideStates(props: ReturnType<typeof createProps>) {
   props.scenario.state.sidebarVisible = false;
   await renderSidebar(props);
-  expect(container?.querySelector('[data-ui="content.scenario.sidebar.restore"]')).not.toBeNull();
+  expect(container?.textContent).toBe('');
 
   props.scenario.state.sidebarVisible = true;
   props.isToolbarVisible = false;

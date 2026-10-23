@@ -1,3 +1,4 @@
+import { betaV34Fixture } from './beta-v34';
 import { betaV33Fixture } from './beta-v33';
 import { betaV32Fixture } from './beta-v32';
 import { betaV31Fixture } from './beta-v31';
@@ -80,4 +81,5 @@ export const SUPPORTED_BETA_DATABASE_FIXTURES: readonly BetaDatabaseFixtureContr
   betaV31Fixture,
   betaV32Fixture,
   betaV33Fixture,
+  betaV34Fixture,
 ];

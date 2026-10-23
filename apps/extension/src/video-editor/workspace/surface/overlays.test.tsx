@@ -12,7 +12,6 @@ import {
 import { VideoEditorWorkspaceOverlays } from './overlays';
 
 const confirmSpy = vi.fn();
-const exportDialogSpy = vi.fn();
 const exportProgressSpy = vi.fn();
 
 vi.mock('@sniptale/ui/product-feedback/confirm-dialog', async (importOriginal) => ({
@@ -20,13 +19,6 @@ vi.mock('@sniptale/ui/product-feedback/confirm-dialog', async (importOriginal) =
   ProductConfirmDialog: (props: unknown) => {
     confirmSpy(props);
     return <div data-testid="confirm-dialog" />;
-  },
-}));
-
-vi.mock('../../export/dialog', () => ({
-  ExportDialog: (props: unknown) => {
-    exportDialogSpy(props);
-    return <div data-testid="export-dialog" />;
   },
 }));
 
@@ -90,7 +82,7 @@ function verifyOverlaySlices() {
     isOpen: true,
     title: 'Discard changes?',
   });
-  expect(exportDialogSpy).toHaveBeenCalledTimes(1);
+  expect(markup).not.toContain('video-editor.export.inspector');
   expect(exportProgressSpy.mock.calls[0]?.[0]).toMatchObject({
     status: expect.objectContaining({
       phase: VideoProjectExportPhase.TRANSCODING,
@@ -102,12 +94,11 @@ function verifyOverlaySlices() {
 describe('VideoEditorWorkspaceOverlays', () => {
   afterEach(() => {
     confirmSpy.mockReset();
-    exportDialogSpy.mockReset();
     exportProgressSpy.mockReset();
   });
 
   it(
-    'renders confirm, export dialog, and export progress from explicit overlay slices',
+    'renders blocking confirmations and export progress without a settings modal',
     verifyOverlaySlices
   );
 });

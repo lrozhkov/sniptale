@@ -26,9 +26,16 @@ it('narrows clip kinds and resolves active/source time', () => {
   expect(getMediaClipSourceTime(videoClip, 100)).toBe(8);
   expect(getMediaClipSourceTime(audioClip, 1)).toBe(1);
   expect(getVideoClipSourceTime(videoClip, 7)).toBe(7);
-  expect(clampClipPlaybackRate(8)).toBe(4);
+  expect(clampClipPlaybackRate(8)).toBe(8);
   expect(getSourceTimedClipProjectDuration({ playbackRate: 2, sourceDuration: 6 })).toBe(3);
   expect(getSourceTimedClipProjectOffset({ playbackRate: 2, sourceDuration: 6 }, 4)).toBe(2);
   expect(getSourceTimedClipSourceOffset({ duration: 3, playbackRate: 2 }, 2.5)).toBe(5);
   expect(getSourceTimedClipSourceOffset({ duration: 3, playbackRate: 2 }, -1)).toBe(-2);
 });
+
+it.each([0.0625, 0.125, 0.5, 8, 16])(
+  'preserves admitted media rate %s for export instead of clamping it to 1..4',
+  (rate) => {
+    expect(clampClipPlaybackRate(rate)).toBe(rate);
+  }
+);

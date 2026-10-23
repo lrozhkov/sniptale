@@ -1,3 +1,4 @@
+import { buildTourPlaybackPlan } from '../../../features/scenario/project/tour-playback-plan';
 import type {
   TourDocument,
   TourNavigationSlide,
@@ -61,24 +62,6 @@ export function TourNavigationSettings({
           t={t}
           onChange={(action) => changeButton({ action })}
         />
-        <div className="tour-object-destructive-actions">
-          <ScenarioInspectorActionButton
-            tone="danger"
-            disabled={disabled}
-            onClick={() => {
-              if (
-                onChange({
-                  ...slide,
-                  buttons: slide.buttons.filter((entry) => entry.id !== button.id),
-                })
-              )
-                onSelect(null);
-            }}
-          >
-            <Trash2 size={15} />
-            {t('common.actions.delete')}
-          </ScenarioInspectorActionButton>
-        </div>
       </GuideInspectorGroup>
     );
   return (
@@ -215,11 +198,11 @@ function TourNavigationButtons({
 }) {
   const linked = new Set(
     slide.buttons.flatMap((button) =>
-      button.action.kind === 'slide' ? [button.action.slideId] : []
+      button.action.kind === 'action' ? [button.action.actionId] : []
     )
   );
-  const destinations = tour.slides.filter(
-    (entry) => entry.kind === 'image' && !linked.has(entry.id)
+  const destinations = buildTourPlaybackPlan(tour).entries.filter(
+    (entry) => entry.actionId && !linked.has(entry.actionId)
   );
   const move = (index: number, offset: number) => {
     const buttons = [...slide.buttons];
@@ -255,8 +238,8 @@ function TourNavigationButtons({
                 ...slide.buttons,
                 ...destinations.map((entry) => ({
                   id: crypto.randomUUID(),
-                  label: entry.title || t('scenario.editor.tourUntitled'),
-                  action: { kind: 'slide' as const, slideId: entry.id },
+                  label: `${entry.ordinal}. ${entry.slide.title || t('scenario.editor.tourHotspot')}`,
+                  action: { kind: 'action' as const, actionId: entry.key },
                 })),
               ],
             })

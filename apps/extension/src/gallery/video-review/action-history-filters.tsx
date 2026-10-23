@@ -16,7 +16,7 @@ export function historySelectableKey(marker: ReviewTelemetryMarker): string | nu
   return target ? reviewActionAudioRefKey(target.ref) : null;
 }
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
-import type { ReviewKeyAnimation } from '../../features/video/review/advanced/key-animation';
+import type { ReviewKeyAnimation } from '../../features/video/project/action-feedback/key-animation';
 import { reviewEventLabel, reviewMouseButtonLabel, reviewSelectFieldClassName } from './controls';
 
 export interface HistoryFilterValues {

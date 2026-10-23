@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { ReviewKeyFields } from './key-animation-fields';
-import { REVIEW_KEY_DEFAULT } from '../../features/video/review/advanced/key-animation';
+import { REVIEW_KEY_DEFAULT } from '../../features/video/project/action-feedback/key-animation';
 
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -42,6 +42,27 @@ vi.mock('../../ui/compact-inspector-controls', async (original) => ({
   ),
   ColorField: (p: { label: string; value: string; onChange(value: string): void }) => (
     <input aria-label={p.label} value={p.value} onChange={(e) => p.onChange(e.target.value)} />
+  ),
+}));
+vi.mock('../../ui/compact-inspector-controls/control-renderers', () => ({
+  CompactSegmentedSelector: (p: {
+    ariaLabel: string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange(value: string): void;
+  }) => (
+    <select
+      aria-label={p.ariaLabel}
+      value={p.value}
+      onChange={(event) => p.onChange(event.target.value)}
+    >
+      <option value="" />
+      {p.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   ),
 }));
 it('provides local slider drafts, larger typed values, and per-property batch patches', () => {

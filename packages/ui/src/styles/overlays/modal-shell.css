@@ -49,3 +49,8 @@
   background: transparent;
   color: var(--sniptale-color-text-primary-strong);
 }
+
+.sniptale-auto-blur-modal,
+.sniptale-auto-blur-modal :is(.sniptale-modal-header-sm, .sniptale-modal-footer-sm) {
+  background: rgb(from var(--sniptale-color-surface-panel) r g b / 1);
+}

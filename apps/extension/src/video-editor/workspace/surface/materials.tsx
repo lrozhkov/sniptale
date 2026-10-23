@@ -357,7 +357,16 @@ function MaterialRow(props: {
         )}
       </div>
       <MaterialName {...props} />
-      {props.uses.some((use) => use.kind !== 'analysis') && (
+      {props.uses.some(
+        (use) =>
+          use.kind === 'clip' ||
+          use.kind === 'scene' ||
+          use.kind === 'watermark' ||
+          use.kind === 'bookend-preset' ||
+          use.kind === 'composition-join' ||
+          use.kind === 'source-audio' ||
+          use.kind === 'source-voiceover'
+      ) && (
         <div className="group/show-use relative size-8 shrink-0">
           <CompactSelect
             menuAnchorRef={rowRef}
@@ -372,15 +381,75 @@ function MaterialRow(props: {
             placeholder={translate('videoEditor.sidebar.materialsShowUses')}
             onChange={(value) => {
               const use = props.uses[Number(value)];
-              if (use && use.kind !== 'analysis') props.onShowUse(use);
+              if (
+                use &&
+                (use.kind === 'clip' ||
+                  use.kind === 'scene' ||
+                  use.kind === 'watermark' ||
+                  use.kind === 'bookend-preset' ||
+                  use.kind === 'composition-join' ||
+                  use.kind === 'source-audio' ||
+                  use.kind === 'source-voiceover')
+              )
+                props.onShowUse(use);
             }}
             options={props.uses.flatMap((use, index) => {
-              if (use.kind === 'analysis') return [];
-              if (use.kind === 'scene')
+              if (
+                use.kind !== 'clip' &&
+                use.kind !== 'scene' &&
+                use.kind !== 'watermark' &&
+                use.kind !== 'bookend-preset' &&
+                use.kind !== 'composition-join' &&
+                use.kind !== 'source-audio' &&
+                use.kind !== 'source-voiceover'
+              )
+                return [];
+              if (use.kind === 'composition-join') {
+                const range = props.project.compositionJoins?.find(
+                  (join) => join.id === use.joinId
+                )?.sourceRange;
+                const interval = range
+                  ? ` · ${formatPreciseTime(range.start)} – ${formatPreciseTime(range.end)}`
+                  : '';
                 return [
                   {
                     value: String(index),
-                    label: translate('videoEditor.sidebar.materialsSceneUse'),
+                    label: `${translate('videoEditor.sidebar.compositionJoins')}${interval}`,
+                  },
+                ];
+              }
+              if (use.kind === 'source-voiceover')
+                return [
+                  { value: String(index), label: translate('gallery.videoReview.audioVoiceover') },
+                ];
+              if (use.kind === 'source-audio')
+                return [
+                  { value: String(index), label: translate('videoEditor.sidebar.sourceAudio') },
+                ];
+              if (use.kind === 'bookend-preset')
+                return [
+                  {
+                    value: String(index),
+                    label: translate(
+                      use.side === 'intro'
+                        ? use.variant === 'image'
+                          ? 'videoEditor.sidebar.bookendIntroImageUse'
+                          : 'videoEditor.sidebar.bookendIntroVideoUse'
+                        : use.variant === 'image'
+                          ? 'videoEditor.sidebar.bookendOutroImageUse'
+                          : 'videoEditor.sidebar.bookendOutroVideoUse'
+                    ),
+                  },
+                ];
+              if (use.kind === 'scene' || use.kind === 'watermark')
+                return [
+                  {
+                    value: String(index),
+                    label: translate(
+                      use.kind === 'watermark'
+                        ? 'gallery.videoReview.watermark'
+                        : 'videoEditor.sidebar.materialsSceneUse'
+                    ),
                   },
                 ];
               const clip = props.project.clips.find((clip) => clip.id === use.clipId);

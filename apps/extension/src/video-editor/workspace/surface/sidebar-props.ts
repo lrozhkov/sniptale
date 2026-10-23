@@ -138,6 +138,7 @@ function getWorkspaceSidebarProjectEffectProps(
     | 'onClearCursorSampleSkinOverride'
     | 'onUpdateCursorSkin'
     | 'onClearPlacementMode'
+    | 'onPreviewMotion'
     | 'onUpdateMotionRegion'
     | 'onUpdateTransitionDuration'
     | 'onUpdateTransitionEasing'
@@ -157,6 +158,7 @@ function getWorkspaceSidebarProjectEffectProps(
     onUpdateCursorSampleSkinOverride: controller.projectActions.onUpdateCursorSampleSkinOverride,
     onUpdateCursorSampleVisibility: controller.projectActions.onUpdateCursorSampleVisibility,
     onUpdateCursorSkin: controller.projectActions.onUpdateCursorSkin,
+    onPreviewMotion: controller.projectActions.onPreviewMotion,
     onUpdateMotionRegion: controller.projectActions.onUpdateMotionRegion,
     onUpdateTransitionDuration: controller.projectActions.onUpdateTransitionDuration,
     onUpdateTransitionEasing: controller.projectActions.onUpdateTransitionEasing,
@@ -205,6 +207,8 @@ type WorkspaceSidebarClipActionProps = Pick<
   | 'onUpdateMediaClipFitScalePercent'
   | 'onUpdateMediaClipShadowIntensity'
   | 'onUpdateMediaClipShadowMode'
+  | 'onUpdateMediaClipShadowColor'
+  | 'onEditMediaClip'
   | 'onUpdateMediaClipWindowHeader'
   | 'onUpdateShapeStyle'
   | 'onUpdateSubtitleTrackStyle'
@@ -239,6 +243,8 @@ function getWorkspaceSidebarClipActionProps(
     onUpdateMediaClipFitScalePercent: actions.onUpdateMediaClipFitScalePercent,
     onUpdateMediaClipShadowIntensity: actions.onUpdateMediaClipShadowIntensity,
     onUpdateMediaClipShadowMode: actions.onUpdateMediaClipShadowMode,
+    onUpdateMediaClipShadowColor: actions.onUpdateMediaClipShadowColor,
+    onEditMediaClip: actions.onEditMediaClip,
     onUpdateMediaClipWindowHeader: actions.onUpdateMediaClipWindowHeader,
     onUpdateShapeStyle: actions.onUpdateShapeStyle,
     onUpdateSubtitleTrackStyle: (trackId, patch) =>
@@ -252,6 +258,8 @@ function getWorkspaceSidebarSelectionProps(
   controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
+  | 'watermark'
+  | 'sceneEdges'
   | 'typingProject'
   | 'recordingTelemetry'
   | 'currentTime'
@@ -268,6 +276,8 @@ function getWorkspaceSidebarSelectionProps(
     ...(controller.state.currentTime === undefined
       ? {}
       : { currentTime: controller.state.currentTime }),
+    ...(controller.state.watermark ? { watermark: controller.state.watermark } : {}),
+    ...(controller.state.sceneEdges ? { sceneEdges: controller.state.sceneEdges } : {}),
     ...(controller.state.typingProject ? { typingProject: controller.state.typingProject } : {}),
     ...(controller.state.recordingTelemetry
       ? { recordingTelemetry: controller.state.recordingTelemetry }

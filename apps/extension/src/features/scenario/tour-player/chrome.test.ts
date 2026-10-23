@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml } from './document';
+import { createTourDocument } from '../project/factories';
+import { createTourActionSlide as createTourImageSlide } from './test-support';
+import { buildTourPlayerTestHtml as buildTourPlayerHtml } from './test-support';
 import { createTourPlayer } from './controller';
 
 const mounted: { player: ReturnType<typeof createTourPlayer>; root: HTMLElement }[] = [];
@@ -41,28 +42,7 @@ const labels = {
 async function mount() {
   const tour = createTourDocument('tour');
   const timing = createTourImageSlide('unused').timing;
-  tour.slides = [
-    {
-      kind: 'navigation',
-      id: 'first',
-      title: 'First',
-      description: '',
-      background: { color: '#111827', image: null },
-      buttons: [{ id: 'begin', label: 'Begin', action: { kind: 'end' } }],
-      narration: null,
-      timing,
-    },
-    {
-      kind: 'navigation',
-      id: 'second',
-      title: 'Second',
-      description: '',
-      background: { color: '#111827', image: null },
-      buttons: [],
-      narration: null,
-      timing,
-    },
-  ];
+  tour.slides = ['first', 'second'].map((id) => ({ ...createTourImageSlide(id), timing }));
   const html = await buildTourPlayerHtml({ tour, title: 'Tour', labels, assets: [] });
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const root = parsed.getElementById('tour-player');
@@ -113,3 +93,21 @@ it('auto-hides overlay chrome during playback and restores it on activity and pa
   expect(root.dataset['tourChromeHidden']).toBe('false');
   await tick(0);
 });
+
+it.each([false, true])(
+  'keeps focused toolbar controls visible with shadow root %s',
+  async (shadow) => {
+    vi.useFakeTimers();
+    const { root } = await mount();
+    if (shadow) {
+      const host = document.createElement('div');
+      document.body.append(host);
+      host.attachShadow({ mode: 'open' }).append(root);
+    }
+    await Promise.resolve();
+    root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
+    root.querySelector<HTMLButtonElement>('[data-tour-next]')!.focus();
+    vi.advanceTimersByTime(2500);
+    expect(root.dataset['tourChromeHidden']).toBe('false');
+  }
+);

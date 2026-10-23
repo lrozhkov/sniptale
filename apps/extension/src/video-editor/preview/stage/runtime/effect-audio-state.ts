@@ -25,6 +25,7 @@ interface PreviewEffectAudioState {
   closed: boolean;
   decodedBuffers: EffectAudioBufferCache<PreviewEffectAudioBuffer>;
   desiredPlaying: boolean;
+  desiredGain: number;
   desiredTime: number;
   failedAssets: Set<string>;
   generation: number;
@@ -38,6 +39,7 @@ export function createPreviewEffectAudioState(): PreviewEffectAudioState {
     closed: false,
     decodedBuffers: createEffectAudioBufferCache(),
     desiredPlaying: false,
+    desiredGain: 1,
     desiredTime: 0,
     failedAssets: new Set(),
     generation: 0,
@@ -48,6 +50,7 @@ export function createPreviewEffectAudioState(): PreviewEffectAudioState {
 export async function syncPreviewEffectAudio(args: {
   currentTime: number;
   isPlaying: boolean;
+  outputGain?: number;
   plans: readonly EffectRuntimeAudioPlan[];
   state: PreviewEffectAudioState;
 }): Promise<void> {
@@ -55,6 +58,7 @@ export async function syncPreviewEffectAudio(args: {
   if (state.closed) return;
   state.desiredPlaying = args.isPlaying;
   state.desiredTime = args.currentTime;
+  state.desiredGain = args.outputGain ?? 1;
   resetChangedPreviewEffectAudioPlan(state, args.plans);
   if (!args.isPlaying || args.plans.length === 0) {
     state.generation += 1;
@@ -91,7 +95,7 @@ function syncActiveEffectAudioNodes(
       state.active.delete(id);
       continue;
     }
-    node.graphNode.setVolume(plan.volume);
+    node.graphNode.setVolume(plan.volume * state.desiredGain);
   }
 }
 
@@ -182,6 +186,7 @@ function startEffectAudioNode(
     projectTime,
   });
   if (!graphNode) return;
+  graphNode.setVolume(plan.volume * state.desiredGain);
   node = {
     contextStartTime: graph.currentTime,
     graphNode,

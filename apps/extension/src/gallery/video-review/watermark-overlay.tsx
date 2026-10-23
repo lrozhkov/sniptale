@@ -1,3 +1,4 @@
+import { reviewWatermarkAssets } from '../../workflows/video-review/asset-bytes';
 import {
   useCallback,
   useEffect,
@@ -10,15 +11,15 @@ import {
 import {
   resolveQuickEditWatermarkBounds,
   type QuickEditWatermarkSettings,
-} from '../../features/video/review/advanced/watermark';
+} from '../../features/video/project/scene/watermark';
 import {
-  createReviewWatermarkRenderer,
-  type ReviewWatermarkRenderer,
-} from '../../workflows/video-review/render-watermark';
+  createWatermarkRenderer,
+  type WatermarkRenderer,
+} from '../../features/video/composition/canvas/watermark';
 import { translate, useAppLocale } from '../../platform/i18n';
 
 type Settings = QuickEditWatermarkSettings;
-type Bounds = ReviewWatermarkRenderer['bounds'];
+type Bounds = WatermarkRenderer['bounds'];
 type Gesture = {
   pointerId: number;
   node: HTMLButtonElement;
@@ -128,16 +129,17 @@ function useWatermarkResource(props: OverlayProps, resourceKey: string | undefin
   latest.current = props;
   const { width, height } = props.output;
   const manual = !!props.manual;
-  const [resource, setResource] = useState<ReviewWatermarkRenderer | null>(null);
+  const [resource, setResource] = useState<WatermarkRenderer | null>(null);
   useEffect(() => {
     if (manual) return;
     let active = true;
-    let prepared: ReviewWatermarkRenderer | null = null;
+    let prepared: WatermarkRenderer | null = null;
     const controller = new AbortController();
     setResource(null);
-    void createReviewWatermarkRenderer(
+    void createWatermarkRenderer(
       latest.current.settings,
       { width, height },
+      reviewWatermarkAssets(),
       controller.signal
     ).then(
       (renderer) => {
@@ -165,7 +167,7 @@ function useWatermarkResource(props: OverlayProps, resourceKey: string | undefin
 
 function useWatermarkPaint(
   canvas: RefObject<HTMLCanvasElement | null>,
-  resource: ReviewWatermarkRenderer | null,
+  resource: WatermarkRenderer | null,
   bounds: Bounds | null,
   { width, height }: OverlayProps['output'],
   layout: Settings['layout'] | undefined

@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  restoreSourceTiming: { en: 'Restore source interval', ru: 'Восстановить исходный интервал' },
   presetUnavailable: { en: 'Unavailable for this version', ru: 'Недоступен для этой версии' },
   builtinPack: { en: 'Built-in', ru: 'Встроенный' },
 

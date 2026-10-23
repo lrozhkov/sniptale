@@ -42,6 +42,10 @@ function isQuickActionOverlay(
     typeof value['imageQuality'] === 'number' &&
     Number.isFinite(value['imageQuality']) &&
     typeof value['exitAfterCapture'] === 'boolean' &&
+    (value['transactionId'] === undefined ||
+      (typeof value['transactionId'] === 'string' &&
+        value['transactionId'].length > 0 &&
+        value['transactionId'].length <= 160)) &&
     (value['delaySeconds'] === undefined ||
       (typeof value['delaySeconds'] === 'number' && Number.isFinite(value['delaySeconds'])))
   );

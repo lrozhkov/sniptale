@@ -1,3 +1,4 @@
+import type { VideoEditorAnnotationActions } from '../../contracts/commands/annotation';
 import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type {
   VideoProject,
@@ -28,11 +29,13 @@ export interface UseVideoEditorRuntimeParams {
     selectedActionOccurrence: VideoProjectActionOccurrence | null;
     selectedClipId: string | null;
     selectedMotionRegion: VideoProjectMotionRegion | null;
+    editCommentDocument: VideoEditorAnnotationActions['editCommentDocument'];
     deleteSelection: {
       actionEvent: VideoEditorProjectActions['deleteActionEvent'];
       clip: VideoEditorProjectActions['deleteClip'];
       cursorSample: VideoEditorProjectActions['deleteCursorSample'];
       effectInstance: VideoEditorProjectActions['deleteEffectInstance'];
+      sourceVoiceover: VideoEditorProjectActions['deleteSourceVoiceover'];
       motionRegion: VideoEditorProjectActions['deleteMotionRegion'];
       objectTrack: VideoEditorProjectActions['deleteObjectTrack'];
     };
@@ -40,6 +43,7 @@ export interface UseVideoEditorRuntimeParams {
     setCurrentTime: VideoEditorSessionActions['setCurrentTime'];
     setPlaying: VideoEditorSessionActions['setPlaying'];
     duplicateClip: VideoEditorProjectActions['duplicateClip'];
+    duplicateSourceVoiceover: VideoEditorProjectActions['duplicateSourceVoiceover'];
     splitClipAt: VideoEditorProjectActions['splitClipAt'];
     updateActionEventDetails: VideoEditorProjectActions['updateActionEventDetails'];
     updateClipTransform: VideoEditorProjectActions['updateClipTransform'];

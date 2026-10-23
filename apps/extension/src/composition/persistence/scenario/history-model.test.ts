@@ -255,7 +255,12 @@ function unicodeEntry(guide: boolean, tour: boolean, emptySlides: boolean) {
     previous.project.tour.slides = Array.from({ length: emptySlides ? 0 : 3 }, (_, index) => ({
       ...createTourImageSlide(`slide-${index}`),
       title: text,
-      annotations: [{ id: `annotation-${index}`, text, anchor: null, appearance: null }],
+      actions: [
+        {
+          type: 'annotation' as const,
+          object: { id: `annotation-${index}`, text, anchor: null, appearance: null },
+        },
+      ],
     }));
   }
   return previous;

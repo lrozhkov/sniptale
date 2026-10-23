@@ -40,7 +40,10 @@ interface CreateWorkspaceHeaderArgs {
 
 type PreviewStore = AnnotationEditingPort &
   Pick<EffectEditingPort, 'updateEffectInstance'> &
-  Pick<ClipSelectionPort, 'selectClip' | 'selectScene' | 'selectedClipId' | 'selection'> &
+  Pick<
+    ClipSelectionPort,
+    'selectClip' | 'selectScene' | 'selectSourceVoiceover' | 'selectedClipId' | 'selection'
+  > &
   Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
   RuntimeSessionPort &
   Pick<
@@ -206,7 +209,8 @@ export function createWorkspacePreviewController(
     addActionEvent: (preset: VideoProjectActionPreset) => void;
     addMotionRegion: () => void;
     enableCursorTrack: () => void;
-  }
+  },
+  motionProject: NonNullable<ProjectLifecyclePort['project']> = project
 ) {
   return {
     assetUrls: runtime.assetUrls,
@@ -226,6 +230,8 @@ export function createWorkspacePreviewController(
       onUpdateEffectInstance: args.store.updateEffectInstance,
     },
     pointAuthoring: {
+      motionProject,
+      onPreviewMotion: args.workspace.inspector.previewMotion,
       onClearPlacementMode: args.store.clearPlacementMode,
       onUpdateActionEventDetails: args.store.updateActionEventDetails,
       onUpdateMotionRegion: args.store.updateMotionRegion,
@@ -240,6 +246,10 @@ export function createWorkspacePreviewController(
     selection: {
       ...createWorkspacePreviewSelection(args),
       onSelectClip: (clipId: string | null) => selectPreviewClip(args, clipId),
+      onSelectSourceVoiceover: (documentId: string) => {
+        args.store.selectSourceVoiceover(documentId);
+        args.workspace.inspector.openSelection();
+      },
       onSelectScene: () => selectPreviewScene(args),
     },
   };

@@ -50,8 +50,8 @@ function expectCaptureHiddenSelector(selector: string): void {
 it('hides transient app UI during screenshot capture without hiding captured annotations', () => {
   [
     '.sniptale-app',
+    "[data-ui='shared.toast.host']",
     '.sniptale-toolbar',
-    '.sniptale-show-toolbar-button',
     '.sniptale-action-toolbar',
     '.sniptale-toolbar-portal-wrapper',
     '.sniptale-frame-toolbar-trigger',
@@ -117,7 +117,6 @@ it('compensates extension chrome and fixed-metric annotations while page geometr
     '.sniptale-annotation-marker-chrome',
     "[data-ui='content.design-review.popover']",
     "[data-ui='content.design-review.feedback-panel']",
-    "[data-ui='shared.toast.host']",
   ]);
 
   scaleCompensatedSelectors.forEach((selector) => {

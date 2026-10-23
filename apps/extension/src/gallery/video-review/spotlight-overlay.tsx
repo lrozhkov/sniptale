@@ -1,23 +1,23 @@
-import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
+import {
+  sceneSpotlightPath,
+  sceneSpotlightOpeningPath,
+  type SceneSpotlightFrame,
+} from '../../features/video/composition/scene-spotlight';
+import type { QuickEditHomography } from '../../features/video/composition/motion/spatial-geometry';
 import { useEffect, useRef, useState } from 'react';
 import {
-  createReviewSpotlightMasks,
-  reviewSpotlightNeedsClip,
-  reviewSpotlightOpeningClip,
-  type ReviewSpotlightClip,
-} from '../../workflows/video-review/render-spotlight';
-import {
-  quickEditSpotlightPath,
-  quickEditSpotlightOpeningPath,
-  type QuickEditSpotlightFrame,
-} from '../../features/video/review/advanced/focus';
+  createSceneSpotlightMasks,
+  sceneSpotlightNeedsClip,
+  sceneSpotlightOpeningClip,
+  type SceneSpotlightClip,
+} from '../../features/video/composition/draw/spotlight';
 
 /** Pixel clipping keeps the backdrop filter outside the opening, including in resized previews. */
 function SingleSpotlightOverlay(props: {
   projection?: QuickEditHomography | undefined;
   output: { width: number; height: number };
-  frame: QuickEditSpotlightFrame | null;
-  clip?: ReviewSpotlightClip | undefined;
+  frame: SceneSpotlightFrame | null;
+  clip?: SceneSpotlightClip | undefined;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(props.output.width);
@@ -36,8 +36,8 @@ function SingleSpotlightOverlay(props: {
     },
   };
   const output = { width, height: props.output.height * scale };
-  const bounds = reviewSpotlightNeedsClip(props.frame, props.clip)
-    ? reviewSpotlightOpeningClip(props.frame, props.clip)
+  const bounds = sceneSpotlightNeedsClip(props.frame, props.clip)
+    ? sceneSpotlightOpeningClip(props.frame, props.clip)
     : undefined;
   const svg = singleSpotlightSvg(output, frame, bounds, scale);
   return (
@@ -59,15 +59,15 @@ function SingleSpotlightOverlay(props: {
 /** A clipped vector hole avoids a full-canvas readback and PNG encode on every animation tick. */
 function singleSpotlightSvg(
   output: { width: number; height: number },
-  frame: QuickEditSpotlightFrame,
-  bounds: ReviewSpotlightClip | undefined,
+  frame: SceneSpotlightFrame,
+  bounds: SceneSpotlightClip | undefined,
   scale: number
 ) {
   const root = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${output.width} ${output.height}">`;
   if (!bounds)
     return (
       root +
-      `<path fill="white" fill-rule="evenodd" d="${quickEditSpotlightPath(output, frame)}"/></svg>`
+      `<path fill="white" fill-rule="evenodd" d="${sceneSpotlightPath(output, frame)}"/></svg>`
     );
   const rect = bounds.rect;
   return (
@@ -76,7 +76,7 @@ function singleSpotlightSvg(
     `width="${rect.width * scale}" height="${rect.height * scale}" rx="${bounds.radius * scale}"/></clipPath>` +
     `<mask id="outside" maskUnits="userSpaceOnUse" x="0" y="0" width="${output.width}" height="${output.height}">` +
     `<rect width="100%" height="100%" fill="white"/>` +
-    `<path fill="black" d="${quickEditSpotlightOpeningPath(frame)}" clip-path="url(#window)"/>` +
+    `<path fill="black" d="${sceneSpotlightOpeningPath(frame)}" clip-path="url(#window)"/>` +
     `</mask></defs><rect width="100%" height="100%" fill="white" mask="url(#outside)"/></svg>`
   );
 }
@@ -85,9 +85,9 @@ function singleSpotlightSvg(
 export function ReviewSpotlightOverlay(props: {
   projection?: QuickEditHomography | undefined;
   output: { width: number; height: number };
-  frame?: QuickEditSpotlightFrame | null;
-  frames?: readonly QuickEditSpotlightFrame[];
-  clip?: ReviewSpotlightClip | undefined;
+  frame?: SceneSpotlightFrame | null;
+  frames?: readonly SceneSpotlightFrame[];
+  clip?: SceneSpotlightClip | undefined;
 }) {
   const frames = props.frames ?? (props.frame ? [props.frame] : []);
   if (!frames.length) return null;
@@ -108,8 +108,8 @@ export function ReviewSpotlightOverlay(props: {
 function CombinedSpotlightOverlay(props: {
   projection?: QuickEditHomography | undefined;
   output: { width: number; height: number };
-  frames: readonly QuickEditSpotlightFrame[];
-  clip?: ReviewSpotlightClip | undefined;
+  frames: readonly SceneSpotlightFrame[];
+  clip?: SceneSpotlightClip | undefined;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(props.output.width);
@@ -127,11 +127,9 @@ function CombinedSpotlightOverlay(props: {
     masks: { dim: string; blur: string; radius: number };
   } | null>(null);
   if (cache.current?.key !== key) {
-    const result = createReviewSpotlightMasks(
+    const result = createSceneSpotlightMasks(
       props.output,
-      props.frames,
-      props.clip,
-      props.projection
+      props.frames.map((frame) => ({ ...frame, clip: props.clip, projection: props.projection }))
     );
     try {
       cache.current = {

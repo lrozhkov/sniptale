@@ -7,6 +7,7 @@ import { createRecommendedContextMenuSettings } from '../../../../../contracts/s
 import { ContextMenuEditor } from './context-menu-editor';
 import { installPersistenceLockManagerForTests } from '../../../../../composition/persistence/infrastructure/mutation-barrier';
 import { CONTEXT_MENU_PENDING_DRAFT_KEY } from './context-menu-draft-recovery';
+import { createSystemViewportPresetCatalog } from '../../../../../features/viewport-presets/catalog';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -91,11 +92,131 @@ it('automatically saves a valid edited tree and exposes a committed result', asy
 });
 
 it('restores the recommended hierarchy without changing the master switch', async () => {
+  editorState = {
+    ...editorState,
+    contextMenu: { ...editorState.contextMenu, enabled: false },
+    contextMenuViewportPresets: createSystemViewportPresetCatalog(),
+  };
+  await renderEditor();
   await click('Restore recommended configuration');
   await settleDebounce();
   const layout = update.mock.calls[0]?.[0].layout;
   expect(layout.nodes[0]).toMatchObject({ type: 'section', id: 'recommended-screenshots' });
   expect(update.mock.calls[0]?.[0]).not.toHaveProperty('enabled');
+  expect(
+    layout.nodes.find((node: { id?: string }) => node.id === 'recommended-window')
+  ).toMatchObject({
+    enabled: true,
+    children: expect.arrayContaining([expect.objectContaining({ type: 'command', enabled: true })]),
+  });
+});
+
+it('offers legacy hidden window commands in the catalog without section switches', async () => {
+  editorState = {
+    ...editorState,
+    contextMenu: { ...editorState.contextMenu, showWindowResize: false },
+    contextMenuViewportPresets: createSystemViewportPresetCatalog(),
+  };
+  await renderEditor();
+  expect(container.querySelector('[data-tree-key="section:recommended-window"]')).toBeNull();
+  expect(container.querySelector('[role="tree"] [role="switch"]')).toBeNull();
+  for (const preset of editorState.contextMenuViewportPresets) {
+    expect(
+      container.querySelector(
+        `[data-command-key="command:sniptale.window-resize.preset.${encodeURIComponent(preset.id)}"]`
+      )
+    ).not.toBeNull();
+  }
+});
+
+it('explains an existing empty window section and restores only the explicitly selected catalog command', async () => {
+  const presets = createSystemViewportPresetCatalog();
+  const children = presets.map((preset) => ({
+    type: 'command' as const,
+    command: `sniptale.window-resize.preset.${encodeURIComponent(preset.id)}`,
+    enabled: false,
+  }));
+  editorState = {
+    ...editorState,
+    contextMenuViewportPresets: presets,
+    contextMenu: {
+      ...editorState.contextMenu,
+      layout: {
+        version: 2,
+        nodes: [{ type: 'section', id: 'window', title: 'Window size', enabled: true, children }],
+      },
+    },
+  };
+  await renderEditor();
+  const section = container.querySelector<HTMLElement>('[data-tree-key="section:window"]')!;
+  await act(async () =>
+    section.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(button('Add window sizes')).toBeTruthy();
+  expect(
+    container.querySelectorAll(
+      '[data-context-menu-catalog] button[data-command-key^="command:sniptale.window-resize.preset."]'
+    )
+  ).toHaveLength(4);
+  await settleDebounce();
+  expect(update).not.toHaveBeenCalled();
+  const command = children[0]!.command;
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>(
+        `[data-context-menu-catalog] [data-command-key="command:${command}"]`
+      )!
+      .click()
+  );
+  expect(container.querySelector(`[data-tree-key="command:${command}"]`)).not.toBeNull();
+  expect(container.textContent).not.toContain('No commands in this section.');
+  expect(
+    container.querySelectorAll(
+      '[data-context-menu-catalog] button[data-command-key^="command:sniptale.window-resize.preset."]'
+    )
+  ).toHaveLength(3);
+  await settleDebounce();
+  expect(update).toHaveBeenCalledTimes(1);
+  expect(update.mock.calls[0]?.[0].layout.nodes[0]).toMatchObject({
+    id: 'window',
+    children: children.map((child, index) => ({ ...child, enabled: index === 0 })),
+  });
+});
+
+it('fills an empty window section from real presets without resetting unrelated customization', async () => {
+  const presets = createSystemViewportPresetCatalog();
+  editorState = {
+    ...editorState,
+    contextMenuViewportPresets: presets,
+    contextMenu: {
+      ...editorState.contextMenu,
+      layout: {
+        version: 2,
+        nodes: [
+          {
+            type: 'section',
+            id: 'recommended-window',
+            title: 'Window size',
+            enabled: true,
+            children: [],
+          },
+          { type: 'command', command: 'sniptale.gallery', enabled: true, title: 'My library' },
+        ],
+      },
+    },
+  };
+  await renderEditor();
+  await click('Expand: Window size');
+  await click('Add window sizes');
+  for (const preset of presets)
+    expect(
+      container.querySelector(
+        `[data-tree-key="command:sniptale.window-resize.preset.${encodeURIComponent(preset.id)}"]`
+      )
+    ).not.toBeNull();
+  expect(container.textContent).toContain('My library');
+  await settleDebounce();
+  expect(update).toHaveBeenCalledTimes(1);
 });
 
 it('retains failed edits and retries the current draft', async () => {

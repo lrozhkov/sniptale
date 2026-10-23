@@ -1,3 +1,4 @@
+import { hasCameraMediaAt } from '../../../../features/video/project/camera/animation';
 import { prepareDecodedVideoSample } from '../../../../features/video/composition/draw/decoded-sample';
 import { BlobSource, Input, VideoSampleSink, MP4, WEBM, type VideoSample } from 'mediabunny';
 
@@ -172,10 +173,14 @@ function getVisibleVideoClips(project: VideoProject) {
   return clips;
 }
 
-function createClipFrameRequests(clip: VideoProjectVideoClip, projectTimes: number[]) {
+function createClipFrameRequests(
+  project: VideoProject,
+  clip: VideoProjectVideoClip,
+  projectTimes: number[]
+) {
   const requests: FrameRequest[] = [];
   for (const [frameIndex, projectTime] of projectTimes.entries()) {
-    if (isClipActiveAtTime(clip, projectTime)) {
+    if (isClipActiveAtTime(clip, projectTime) && hasCameraMediaAt(project, clip, projectTime)) {
       requests.push({ frameIndex, sourceTime: getMediaClipSourceTime(clip, projectTime) });
     }
   }
@@ -197,7 +202,7 @@ export async function createWebmFrameProviders(
   try {
     for (const clip of getVisibleVideoClips(project)) {
       signal.throwIfAborted();
-      const requests = createClipFrameRequests(clip, projectTimes);
+      const requests = createClipFrameRequests(project, clip, projectTimes);
       if (requests.length === 0) {
         continue;
       }
@@ -219,7 +224,10 @@ export async function createWebmFrameProviders(
           clipId: clip.id,
           requests,
           signal,
-          sourceEnd: getMediaClipSourceTime(clip, clip.startTime + clip.duration),
+          sourceEnd: Math.min(
+            getMediaClipSourceTime(clip, clip.startTime + clip.duration),
+            clip.cameraTiming ? (asset.metadata.duration ?? Infinity) : Infinity
+          ),
           ...source,
         })
       );

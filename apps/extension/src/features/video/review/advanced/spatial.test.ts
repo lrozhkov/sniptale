@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { evaluateQuickEditCameraAtTime } from './scene';
 import { createQuickEditZoomRegion, updateQuickEditZoomRegion } from './zoom';
+import { quickEditSpatialSpan, quickEditSpatialTargetCamera } from './spatial';
 import {
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-  DEFAULT_QUICK_EDIT_DEPTH,
-  parseQuickEditPerspective,
-  parseQuickEditDepth,
-  quickEditSpatialSpan,
-  quickEditSpatialTargetCamera,
-  interpolateQuickEditSpatial,
-} from './spatial';
+  DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+  parseCameraPerspective as parseQuickEditPerspective,
+  parseCameraDepth as parseQuickEditDepth,
+  interpolateCameraSpatial as interpolateQuickEditSpatial,
+} from '../../project/motion/spatial';
 import { loadQuickEditAdvancedState } from './validation';
 import { createQuickEditAdvancedState } from './defaults';
 
@@ -132,7 +131,7 @@ it('keeps a mixed three-zoom chain fixed and interpolates ordinary to perspectiv
 
 it('preserves the visual anchor when switching a projected comment between content and viewport', async () => {
   const { createCanvasComment, switchCanvasCommentAttachment } = await import('../comments');
-  const { quickEditPlaneProjection } = await import('./spatial-geometry');
+  const { quickEditPlaneProjection } = await import('../../composition/motion/spatial-geometry');
   const { quickEditSpatialTargetCamera } = await import('./spatial');
   const window = { x: 100, y: 70, width: 600, height: 360 };
   const geometry = {

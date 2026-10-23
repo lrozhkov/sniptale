@@ -8,19 +8,24 @@ import {
 import { usePalettesController } from './controller';
 import { EDITOR_PALETTE_KEYS, getEditorPaletteLabel } from './families';
 import { CompactColorSelector } from '../../../../../ui/color-selector';
+import { usePalettePresentation } from './presentation';
 
 export function PalettesSettings() {
   const state = usePalettesController();
+  const presentation = usePalettePresentation(state.key, state.colors);
   const paletteLabel = getEditorPaletteLabel(state.key);
   const items: readonly SettingsCollectionItem[] = state.colors.map((color, index) => {
     const colorLabel = `${paletteLabel}, ${String(index + 1)}`;
     return {
-      id: `${state.key}:${index}`,
+      id: presentation.ids[index]!,
       title: (
         <CompactColorSelector
           className="max-w-56"
           label={colorLabel}
-          onChange={(value) => void state.changeColor(index, value)}
+          onChange={(value) => {
+            presentation.clearPlan();
+            void state.changeColor(index, value);
+          }}
           pickerOnly
           title={colorLabel}
           value={color}
@@ -31,13 +36,15 @@ export function PalettesSettings() {
   });
   const parseIndex = (id: string | null) => {
     if (id === null) return null;
-    const value = Number(id.slice(id.lastIndexOf(':') + 1));
-    return Number.isInteger(value) ? value : null;
+    const value = presentation.ids.indexOf(id);
+    return value >= 0 ? value : null;
   };
   const onMove = (intent: SettingsCollectionMoveIntent) => {
     const itemIndex = parseIndex(intent.itemId);
     if (itemIndex === null) return;
-    void state.moveColor(itemIndex, parseIndex(intent.beforeItemId));
+    const beforeIndex = parseIndex(intent.beforeItemId);
+    presentation.prepareMove(itemIndex, beforeIndex);
+    return state.moveColor(itemIndex, beforeIndex);
   };
 
   return (
@@ -67,6 +74,7 @@ export function PalettesSettings() {
           </p>
         ) : null}
         <SettingsCollection
+          layout="tiles"
           ariaLabel={translate('settings.editor.paletteTitle')}
           items={items}
           onAction={() => undefined}

@@ -19,27 +19,34 @@ it('restores presentation blobs in the established thumbnail-then-preview order'
   mocks.readAssetFile.mockResolvedValueOnce(thumbnailBlob).mockResolvedValueOnce(previewBlob);
   const getObjectRef = vi.fn((objectId: string) => ({ assetId: objectId }));
 
-  await expect(
-    preparePortableAggregatePresentation({
-      getObjectRef: getObjectRef as never,
-      invalidMessage: 'invalid presentation',
-      metadata: {
-        entry: {
-          aggregateId: 'source-id',
-          aggregateKind: 'scenario',
-          presentationRevision: 2,
-          updatedAt: 3,
-        },
-        previewObjectId: 'preview-object',
-        thumbnailObjectId: 'thumbnail-object',
+  const restored = await preparePortableAggregatePresentation({
+    getObjectRef: getObjectRef as never,
+    invalidMessage: 'invalid presentation',
+    metadata: {
+      entry: {
+        aggregateId: 'source-id',
+        aggregateKind: 'scenario',
+        presentationRevision: 2,
+        updatedAt: 3,
       },
-      targetId: 'target-id',
-    })
-  ).resolves.toMatchObject({
-    aggregateId: 'target-id',
-    previewBlob,
-    thumbnailBlob,
+      previewObjectId: 'preview-object',
+      thumbnailObjectId: 'thumbnail-object',
+    },
+    targetId: 'target-id',
   });
+  expect(restored).toMatchObject({ aggregateId: 'target-id' });
+  const thumbnailBytes = await thumbnailBlob.arrayBuffer();
+  const previewBytes = await previewBlob.arrayBuffer();
+  vi.spyOn(thumbnailBlob, 'arrayBuffer').mockRejectedValue(
+    new DOMException('Staging file removed', 'NotFoundError')
+  );
+  vi.spyOn(previewBlob, 'arrayBuffer').mockRejectedValue(
+    new DOMException('Staging file removed', 'NotFoundError')
+  );
+  expect(await restored!.thumbnailBlob.arrayBuffer()).toEqual(thumbnailBytes);
+  expect(await restored!.previewBlob!.arrayBuffer()).toEqual(previewBytes);
+  expect(restored!.thumbnailBlob.type).toBe(thumbnailBlob.type);
+  expect(restored!.previewBlob!.type).toBe(previewBlob.type);
   expect(getObjectRef.mock.calls.map(([objectId]) => objectId)).toEqual([
     'thumbnail-object',
     'preview-object',

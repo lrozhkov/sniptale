@@ -322,3 +322,104 @@ describe('preview-stage-audio-runtime', () => {
     verifiesSlowPlaybackRateAudioSync
   );
 });
+
+it.each([1, 1.5, 2])(
+  'preserves %sx clip gain through actual audio and video preview sync',
+  async (volume) => {
+    const graph = installPreviewAudioContextHarness();
+    const project = createEmptyVideoProject('Amplified preview');
+    const video = createVideoClip(project.tracks[0]!.id, { id: 'video', volume });
+    const audioClip = createAudioClip(project.tracks[0]!.id, { id: 'audio', volume });
+    const clips = [video, audioClip];
+    const elements = Object.fromEntries(clips.map((clip) => [clip.id, createAudioElement()]));
+    await renderHarness({
+      audioRefs: { current: elements },
+      currentTime: 6,
+      isPlaying: true,
+      project: createProject(clips, [video.assetId]),
+      syncedClips: clips,
+    });
+    expect(graph.latestContext.gains.map((gain) => gain.gain.value)).toEqual([volume, volume]);
+    for (const element of Object.values(elements)) {
+      expect(element.volume).toBe(1);
+      expect(element.play).toHaveBeenCalledOnce();
+    }
+  }
+);
+
+it('applies a live AUDIO track master without changing the media element or clip gain', async () => {
+  const graph = installPreviewAudioContextHarness();
+  const project = createEmptyVideoProject('Audio master');
+  const track = createVideoProjectTrack('Music', 1, 'AUDIO');
+  track.audioVolume = 2;
+  project.tracks.push(track);
+  const clip = createAudioClip(track.id, { volume: 1.5 });
+  const current = createProject([clip]);
+  current.tracks = project.tracks;
+  const audio = createAudioElement();
+  await renderHarness({
+    audioRefs: { current: { [clip.id]: audio } },
+    currentTime: 6,
+    isPlaying: true,
+    project: current,
+    syncedClips: [clip],
+  });
+  expect(graph.latestContext.gains[0]!.gain.value).toBe(3);
+  expect(clip.volume).toBe(1.5);
+  expect(audio.volume).toBe(1);
+});
+
+it('multiplies the final scene envelope with clip and track gain once', async () => {
+  const graph = installPreviewAudioContextHarness();
+  const seed = createEmptyVideoProject('Scene edge');
+  const clip = createAudioClip(seed.tracks[0]!.id, { volume: 1.5 });
+  const project = createProject([clip]);
+  project.duration = 10;
+  project.sceneEdges = {
+    intro: { enabled: true, duration: 8, audioFade: true },
+    outro: { enabled: false, duration: 1 },
+  };
+  const audio = createAudioElement();
+  await renderHarness({
+    audioRefs: { current: { [clip.id]: audio } },
+    currentTime: 6,
+    isPlaying: true,
+    project,
+    syncedClips: [clip],
+  });
+  expect(graph.latestContext.gains[0]!.gain.value).toBe(1.125);
+  expect(clip.volume).toBe(1.5);
+  expect(audio.volume).toBe(1);
+});
+
+it('pauses unmuted transferred camera audio without seeking outside actual coverage', async () => {
+  const graph = installPreviewAudioContextHarness();
+  const base = createEmptyVideoProject('Camera');
+  const clip = createVideoClip(base.tracks[0]!.id, {
+    startTime: 0,
+    sourceStart: 0,
+    duration: 12,
+    sourceDuration: 12,
+    cameraTiming: { offsetSeconds: 3, transitions: 'bounded' },
+  });
+  const project = createProject([clip], [clip.assetId]);
+  const audio = createAudioElement({ currentTime: 17 });
+  const props = {
+    audioRefs: { current: { [clip.id]: audio } },
+    isPlaying: true,
+    project,
+    syncedClips: [clip],
+  };
+  await renderHarness({ ...props, currentTime: 0 });
+  expect(audio.currentTime).toBe(17);
+  expect(audio.play).not.toHaveBeenCalled();
+  await renderHarness({ ...props, currentTime: 4 });
+  expect(audio.currentTime).toBe(1);
+  expect(audio.play).toHaveBeenCalledOnce();
+  Object.defineProperty(audio, 'paused', { value: false, configurable: true });
+  await renderHarness({ ...props, currentTime: 9 });
+  expect(audio.currentTime).toBe(1);
+  expect(audio.play).toHaveBeenCalledOnce();
+  expect(audio.pause).toHaveBeenCalled();
+  expect(graph.latestContext.gains.every((node) => node.gain.value === 0)).toBe(true);
+});

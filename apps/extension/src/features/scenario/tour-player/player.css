@@ -46,33 +46,37 @@ a:focus-visible {
   color: var(--tour-text);
   background: transparent;
 }
-/* One bottom toolbar owns every chrome control; it stays in flow so it can never
-   cover the content frame, and auto-hide only changes paint, not geometry. */
+/* Floating chrome has no effect on scene geometry. */
 .tour-toolbar {
+  position: absolute;
+  z-index: 5;
+  inset-inline-start: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
   font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
   user-select: none;
-  flex: none;
-  width: var(--tour-frame-width, 100%);
-  max-width: 100%;
+  width: max-content;
+  max-width: calc(100% - 24px);
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--tour-text) 16%, transparent);
-  border-radius: 0 0 12px 12px;
+  border-radius: 10px;
   background: var(--tour-surface);
-  transition:
-    opacity 0.25s ease,
-    transform 0.25s ease;
+  box-shadow: 0 4px 20px #0003;
+  transition: opacity 0.25s ease;
 }
-/* Reserve feedback height so loading and choice states do not resize the fitted scene. */
 .tour-feedback {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 4px 12px;
   min-width: 0;
-  min-height: 17px;
+}
+.tour-feedback:not(:has(:not([hidden]):not(.tour-title))) {
+  display: none;
 }
 .tour-title {
   display: none;
@@ -87,10 +91,8 @@ a:focus-visible {
 .tour-playback-status {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 70%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-size: 12px;
   line-height: 16px;
   font-weight: 400;
@@ -103,10 +105,10 @@ a:focus-visible {
   flex-wrap: wrap;
   min-width: 0;
 }
-/* No min-width override: the automatic min-content floor keeps play, time and the
-   scrub inside their box; insufficient room wraps .tour-nav instead of overlapping. */
+/* Playback controls wrap inside the compact toolbar when its host is narrow. */
 .tour-playback {
-  flex: 1 1 180px;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -146,7 +148,7 @@ a:focus-visible {
   gap: 6px;
   margin-inline-start: auto;
 }
-[data-tour-chrome-hidden='true'] .tour-controls {
+[data-tour-chrome-hidden='true'] .tour-toolbar {
   opacity: 0;
   pointer-events: none;
 }
@@ -175,7 +177,7 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  margin: 10px 10px 0;
+  margin: 10px;
 }
 .tour-stage {
   position: relative;
@@ -183,8 +185,7 @@ a:focus-visible {
   overflow: hidden;
   isolation: isolate;
   border: 1px solid color-mix(in srgb, var(--tour-text) 16%, transparent);
-  border-bottom: 0;
-  border-radius: 12px 12px 0 0;
+  border-radius: 12px;
 }
 .tour-scene {
   position: absolute;
@@ -416,7 +417,7 @@ a:focus-visible {
 @media (max-width: 480px) {
   .tour-toolbar {
     gap: 6px;
-    padding: 4px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 4px 6px;
   }
   .tour-button {
     padding: 6px 8px;
@@ -519,7 +520,7 @@ a:focus-visible {
 .tour-scrub {
   flex: 1 1 auto;
   min-width: 64px;
-  width: auto;
+  width: clamp(64px, 14vw, 180px);
   height: 28px;
   margin: 0;
   padding: 0;
@@ -735,10 +736,11 @@ a:focus-visible {
 }
 .tour-hint-controls button {
   flex: none;
-  width: auto;
-  min-width: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
   min-height: 32px;
-  padding: 6px 10px;
+  padding: 7px;
   border-radius: 4px;
 }
 .tour-hint-controls [data-tour-hint-next] {
@@ -769,7 +771,10 @@ a:focus-visible {
   display: none;
 }
 .tour-hint[data-presentation^='caption-'] .tour-hint-header {
-  display: contents;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  justify-content: flex-end;
 }
 .tour-hint-controls [data-tour-hint-point-count] {
   order: 0;
@@ -795,19 +800,12 @@ a:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tour-caption-title::after {
-  content: '';
+.tour-caption-title svg {
   flex: none;
-  width: 5px;
-  height: 5px;
-  border-right: 1px solid;
-  border-bottom: 1px solid;
-  transform: rotate(45deg);
-  margin: 0 4px 3px;
+  transition: transform 100ms ease;
 }
-.tour-caption-title[aria-expanded='true']::after {
-  transform: rotate(225deg);
-  margin-top: 4px;
+.tour-caption-title[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 .tour-hint[data-presentation^='caption-'] .tour-hint-controls {
   grid-column: 1 / -1;
@@ -825,15 +823,6 @@ a:focus-visible {
 .tour-hint[data-collapsed='true'] {
   row-gap: 0;
 }
-.tour-hint[data-presentation='caption-bottom'] .tour-caption-title::after {
-  transform: rotate(225deg);
-  margin-top: 4px;
-}
-.tour-hint[data-presentation='caption-bottom'] .tour-caption-title[aria-expanded='true']::after {
-  transform: rotate(45deg);
-  margin-top: 0;
-}
-
 .tour-mask-effect {
   position: absolute;
   inset: 0;
@@ -946,13 +935,13 @@ a:focus-visible {
 }
 
 .tour-hint[data-presentation^='caption-'][data-caption-long='false'] .tour-hint-text {
-  grid-row: 1;
-}
-.tour-hint[data-presentation^='caption-'][data-caption-long='false'] .tour-hint-controls {
   grid-row: 2;
 }
+.tour-hint[data-presentation^='caption-'][data-caption-long='false'] .tour-hint-controls {
+  grid-row: 3;
+}
 
-.tour-controls [data-tour-manual][aria-pressed='true'],
+.tour-controls [data-tour-hints][aria-pressed='true'],
 .tour-controls [data-tour-full-view][aria-pressed='true'] {
   background: transparent;
   border-color: color-mix(in srgb, var(--tour-accent) 35%, transparent);
@@ -998,6 +987,9 @@ a:focus-visible {
   height: 32px;
   padding: 7px;
 }
+.tour-toolbar .tour-icon-button[hidden] {
+  display: none;
+}
 .tour-toolbar .tour-button svg,
 .tour-hint-controls button svg {
   flex: none;
@@ -1007,7 +999,7 @@ a:focus-visible {
 .tour-toolbar .tour-button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--tour-text) 28%, transparent);
 }
-.tour-toolbar [data-tour-manual][aria-pressed='true']:hover:not(:disabled),
+.tour-toolbar [data-tour-hints][aria-pressed='true']:hover:not(:disabled),
 .tour-toolbar [data-tour-full-view][aria-pressed='true']:hover:not(:disabled) {
   background: transparent;
   border-color: color-mix(in srgb, var(--tour-accent) 55%, transparent);
@@ -1029,5 +1021,54 @@ a:focus-visible {
   .tour-hint [data-tour-hint-close] {
     width: 44px;
     height: 44px;
+  }
+}
+
+.tour-focus-frame {
+  animation: tour-focus-frame 1.6s ease-in-out infinite;
+  box-sizing: border-box;
+  border-radius: 6px;
+}
+@keyframes tour-focus-frame {
+  50% {
+    border-color: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-focus-frame {
+    animation: none;
+  }
+}
+.tour-hint-text {
+  overflow-y: auto;
+}
+
+.tour-image-viewport {
+  position: absolute;
+  inset: 0;
+}
+.tour-window-header {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  border-radius: 4px 4px 0 0;
+}
+
+@media (max-width: 480px) {
+  .tour-controls {
+    justify-content: center;
+  }
+  .tour-playback {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+  }
+  .tour-nav {
+    margin-inline-start: 0;
+  }
+  [data-tour-volume] {
+    width: 48px;
+  }
+  .tour-scrub {
+    width: 64px;
   }
 }

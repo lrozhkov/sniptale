@@ -1,8 +1,28 @@
 @layer theme, base, components, utilities;
 
-[data-ui='video-editor.inspector.content'] {
+[data-ui='video-editor.inspector.body'] {
   container: inspector-surface / inline-size;
 }
+
+/* Only categorized panels transfer scrolling from the body to their two columns. */
+[data-ui='video-editor.inspector.body']:has([data-ui='video-editor.inspector.categories']),
+[data-ui='video-editor.inspector.body']
+  > section:has([data-ui='video-editor.inspector.categories']),
+[data-ui='video-editor.inspector.sections']:has(> [data-ui='video-editor.inspector.categories']) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Keep the category rail inside every clipping ancestor, including selection sections. */
+[data-ui='video-editor.inspector.body']:has([data-ui='video-editor.inspector.categories']) {
+  padding-inline: 0;
+}
+[data-ui='video-editor.inspector.sections']:has(> [data-ui='video-editor.inspector.categories']) {
+  margin-inline: 0;
+}
+
 .video-editor-inspector-select-menu .truncate {
   overflow: visible;
   white-space: normal;
@@ -112,6 +132,10 @@
   [data-ui='video-editor.inspector.disclosure'] > summary > svg:last-child {
     transition: none;
   }
+}
+
+[data-ui='video-editor.inspector.disclosure'][data-level='section'] > summary {
+  font-weight: 500;
 }
 
 [data-ui='video-editor.inspector.disclosure'][data-level='group'] > summary {

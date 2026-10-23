@@ -136,6 +136,18 @@ describe('VideoActivePage views', () => {
 
     expect(buttons).toHaveLength(2);
 
+    for (const button of buttons) {
+      expect(button.className).toContain('rounded-[6px]');
+      expect(button.className).toContain('font-normal');
+      expect(button.className).toContain('focus-visible:');
+      expect(button.className).not.toContain('color-accent');
+    }
+    const preset = Array.from(container?.querySelectorAll('span') ?? []).find(
+      (element) => element.textContent === '1280x720'
+    );
+    expect(preset?.className).toContain('rounded-[6px]');
+    expect(preset?.className).not.toContain('color-accent');
+
     act(() => {
       buttons[0]?.click();
       buttons[1]?.click();

@@ -1,3 +1,5 @@
+import { publishLibraryProjectBindingInTransaction } from './known-library-source';
+import { assertVideoWorkspaceUnchanged } from '../review-workspaces/store';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
   parseProjectAssetSpeechClaim,
@@ -92,6 +94,10 @@ export async function saveVideoProject(
   project: VideoProject,
   options: SaveVideoProjectOptions = {}
 ): Promise<VideoProjectEntry> {
+  const expectedReviewWorkspace = options.expectedReviewWorkspace
+    ? structuredClone(options.expectedReviewWorkspace)
+    : undefined;
+  const libraryBindings = structuredClone(options.libraryBindings ?? []);
   const candidate = await prepareVideoProjectSave(project);
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const saved = await runWithIndexedDbMutation(async (db) => {
@@ -99,11 +105,26 @@ export async function saveVideoProject(
     const { assetOperationStore, mediaLibraryStore, projectStore, recordingStore, tx } = stores;
     try {
       const existing = parseVideoProjectEntry(await projectStore.get(project.id));
+      if (expectedReviewWorkspace) await assertVideoWorkspaceUnchanged(tx, expectedReviewWorkspace);
       const guardedSave = guardStaleVideoProjectSave({
         existing: existing ?? undefined,
         options,
         project: candidate,
       });
+      for (const binding of libraryBindings) {
+        if (
+          existing ||
+          !expectedReviewWorkspace ||
+          binding.claim.mediaId !== expectedReviewWorkspace.aggregateId ||
+          !guardedSave.project.assets.some(
+            (asset) =>
+              asset.source.kind === 'project-asset' &&
+              asset.source.projectAssetId === binding.entry.id
+          )
+        )
+          throw new Error('Invalid review destination source binding.');
+        await publishLibraryProjectBindingInTransaction(tx, binding);
+      }
       await assertNewProjectSources(guardedSave.project, existing?.project, stores);
       const existingProjectAssetIds = collectProjectOwnedAssetIds(existing?.project);
       const nextProjectAssetIds = new Set(collectProjectOwnedAssetIds(guardedSave.project));

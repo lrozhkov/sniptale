@@ -9,8 +9,10 @@ import {
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { startHostServer } from '../support/host-server';
+import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import {
   openRealPopup,
+  evaluateInTarget,
   sendRuntimeMessage,
   sendRuntimeMessageInTarget,
   triggerExtensionAction,
@@ -81,6 +83,178 @@ async function readAssetObjects(page: Page) {
   });
 }
 
+async function fingerprintAssets(page: Page, paths: string[]) {
+  return page.evaluate(async (paths) => {
+    const root = await navigator.storage.getDirectory();
+    return Promise.all(
+      paths.map(async (path) => {
+        const segments = path.split('/');
+        const filename = segments.pop()!;
+        let directory = root;
+        for (const segment of segments) directory = await directory.getDirectoryHandle(segment);
+        const file = await (await directory.getFileHandle(filename)).getFile();
+        const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+        return {
+          path,
+          size: file.size,
+          digest: Array.from(new Uint8Array(digest), (byte) =>
+            byte.toString(16).padStart(2, '0')
+          ).join(''),
+        };
+      })
+    );
+  }, paths);
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`native toolbar starts after an unresolved saved result ${name}`, async ({}, info) => {
+    test.setTimeout(120000);
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size });
+    try {
+      const { page, popup } = await openDesignReview(
+        launched.context,
+        launched.extensionId,
+        host.origin,
+        size
+      );
+      const settings = {
+        ...DEFAULT_VIDEO_SETTINGS,
+        countdownSeconds: 0,
+        microphoneEnabled: false,
+        webcamEnabled: false,
+        systemAudioEnabled: false,
+        warnWithoutMicrophone: false,
+        qualityProfileId: null,
+        outputProfile: {
+          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+          resolution: VideoResolutionPreset.P240,
+        },
+      };
+      await popup.evaluate(
+        async ({ settings, theme }) => {
+          await chrome.storage.local.set({
+            sniptale_video_settings: settings,
+            'sniptale-theme-preference': theme,
+            'sniptale-locale-preference': 'en',
+          });
+        },
+        { settings, theme: size.width === 1920 ? 'dark' : 'light' }
+      );
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+      const action = await triggerExtensionAction(launched.context, launched.extensionId, page);
+      await evaluateInTarget(launched.context, action, 'window.close()').catch(() => undefined);
+      await page.bringToFront();
+      const start = page.locator('[data-ui="content.toolbar.video-recording.start"]');
+      const stop = page.locator('[data-ui="content.toolbar.video-recording.stop"]');
+      await start.click();
+      await expect
+        .poll(async () => (await readState(popup)).state.status, { timeout: 30000 })
+        .toBe(VideoRecordingStatus.RECORDING);
+      await expect.poll(async () => (await readState(popup)).state.duration).toBeGreaterThan(0);
+      const readActiveId = () =>
+        popup.evaluate(
+          async (key) => (await chrome.storage.session.get(key))[key]?.recordingId,
+          LEASE
+        );
+      const firstId = await readActiveId();
+      expect(firstId).toEqual(expect.any(String));
+      await stop.click();
+      await expect
+        .poll(async () => (await readState(popup)).postRecordResult?.recordingId, {
+          timeout: 30000,
+        })
+        .toBe(firstId);
+      await expect
+        .poll(
+          async () => {
+            const state = await readState(popup);
+            return { status: state.state.status, result: state.postRecordResult?.recordingId };
+          },
+          { timeout: 30000 }
+        )
+        .toEqual({ status: VideoRecordingStatus.IDLE, result: firstId });
+      await popup.reload();
+      await info.attach('first-result-state.json', {
+        body: JSON.stringify(await readState(popup)),
+        contentType: 'application/json',
+      });
+      await expect(popup.getByText('Recording saved', { exact: true })).toBeVisible();
+      await popup.screenshot({
+        path: info.outputPath('first-recording-saved.png'),
+        fullPage: false,
+      });
+      const prior = await readLibrary(popup);
+      const paths = await readAssetObjects(popup);
+      const bytes = await fingerprintAssets(popup, paths);
+      expect(prior.recordings).toContain(firstId);
+      expect(bytes.some((file) => file.size > 0)).toBe(true);
+      await page.bringToFront();
+      await start.click();
+      await expect
+        .poll(async () => (await readState(popup)).state.status, { timeout: 30000 })
+        .toBe(VideoRecordingStatus.RECORDING);
+      const secondId = await readActiveId();
+      expect(secondId).toEqual(expect.any(String));
+      expect(secondId).not.toBe(firstId);
+      await popup.reload();
+      await expect(popup.getByText('Recording saved', { exact: true })).toHaveCount(0);
+      const stored = await popup.evaluate((key) => chrome.storage.session.get(key), RESULT);
+      expect(stored[RESULT]).toMatchObject({ recordingId: firstId, status: 'acknowledged' });
+      const tabId = await popup.evaluate(
+        async (origin) =>
+          (await chrome.tabs.query({})).find((tab) => tab.url === `${origin}/`)!.id!,
+        host.origin
+      );
+      const duplicate = await sendRuntimeMessage(
+        popup,
+        {
+          type: 'START_RECORDING',
+          captureMode: CaptureMode.TAB,
+          tabId,
+          viewportPresetId: null,
+          settings,
+        },
+        false
+      );
+      expect(duplicate).toMatchObject({ success: true, result: 'already-active' });
+      expect(await readActiveId()).toBe(secondId);
+      expect((await readState(popup)).state.status).toBe(VideoRecordingStatus.RECORDING);
+      await page.screenshot({
+        path: info.outputPath('second-recording-active.png'),
+        fullPage: false,
+      });
+      await expect.poll(async () => (await readState(popup)).state.duration).toBeGreaterThan(0);
+      await stop.click();
+      await expect
+        .poll(async () => (await readState(popup)).postRecordResult?.recordingId, {
+          timeout: 30000,
+        })
+        .toBe(secondId);
+      expect((await readLibrary(popup)).recordings).toEqual(
+        expect.arrayContaining([firstId, secondId])
+      );
+      expect(await fingerprintAssets(popup, paths)).toEqual(bytes);
+      await popup.reload();
+      await expect(popup.getByText('Recording saved', { exact: true })).toBeVisible();
+      await popup.screenshot({
+        path: info.outputPath('second-recording-saved.png'),
+        fullPage: false,
+      });
+      await info.attach('successive-recordings.json', {
+        body: JSON.stringify({ firstId, secondId, preservedAssets: bytes }),
+        contentType: 'application/json',
+      });
+    } finally {
+      await closeExtensionBrowser(launched);
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
+
 for (const [index, scenario] of [
   { mode: CaptureMode.TAB, name: 'TAB' },
   { mode: CaptureMode.TAB_CROP, name: 'TAB_CROP' },
@@ -136,6 +310,21 @@ for (const [index, scenario] of [
           (id) => chrome.windows.create({ tabId: id, type: 'normal', width: 800, height: 600 }),
           tabId
         );
+      }
+      if (scenario.name === 'WINDOW') {
+        await target.evaluate(() => {
+          const counter = document.createElement('div');
+          counter.style.cssText =
+            'position:fixed;right:8px;bottom:8px;background:white;color:black;font:16px monospace;z-index:1';
+          document.body.append(counter);
+          let frame = 0;
+          const repaint = () => {
+            counter.textContent = `Native window frame ${++frame}`;
+            requestAnimationFrame(repaint);
+          };
+          // X11 can stop producing frames for a static window before recording activation.
+          requestAnimationFrame(repaint);
+        });
       }
       let secondWindow: Page | undefined;
       if (isMulti) {
@@ -259,6 +448,63 @@ for (const [index, scenario] of [
       expect(prior.recordings?.length).toBeGreaterThan(0);
       if (isMulti) expect(prior.video_projects?.length).toBeGreaterThan(0);
       const discardedId = await begin();
+      if (scenario.name === 'WINDOW') {
+        await popup.close();
+        await target.bringToFront();
+        const action = await triggerExtensionAction(context, extensionId, target);
+        await expect
+          .poll(async () =>
+            evaluateInTarget(
+              context,
+              action,
+              `Boolean(document.querySelector('[data-ui="popup.video-active.stop-button"]'))`
+            )
+          )
+          .toBe(true);
+        await evaluateInTarget(
+          context,
+          action,
+          `document.querySelector('[data-page="menu"]').click()`
+        );
+        await expect
+          .poll(async () =>
+            evaluateInTarget(
+              context,
+              action,
+              `Boolean(document.querySelector('[data-ui="popup.menu.tool-action.drawing"]'))`
+            )
+          )
+          .toBe(true);
+        await evaluateInTarget(
+          context,
+          action,
+          `document.querySelector('[data-ui="popup.menu.tool-action.drawing"]').click()`
+        );
+        const diagnostics = await context.browser()!.newBrowserCDPSession();
+        try {
+          await expect
+            .poll(async () => {
+              const targets = await diagnostics.send('Target.getTargets');
+              return targets.targetInfos.some((candidate) => candidate.targetId === action);
+            })
+            .toBe(false);
+        } finally {
+          await diagnostics.detach();
+        }
+        await expect(target.locator('[data-ui="content.toolbar.root"]')).toBeVisible();
+        await expect(target.locator('[data-ui="content.toolbar.drawing.pencil"]')).toBeVisible();
+        await target.screenshot({
+          path: info.outputPath(`window-recording-drawing-${viewport.name}.png`),
+          fullPage: false,
+        });
+        popup = await openRealPopup(context, extensionId);
+        const continued = await readState(popup);
+        expect(continued.state.status).toBe(VideoRecordingStatus.RECORDING);
+        expect(continued.recordingId).toBe(discardedId);
+        await expect
+          .poll(async () => (await readState(popup)).state.duration)
+          .toBeGreaterThan(continued.state.duration);
+      }
       if (scenario.name === 'BACKGROUND_REFUSAL') await refuseNextLeaseRemoval(context);
       if (scenario.name === 'OFFSCREEN_REFUSAL') {
         const activeAssets = (await readAssetObjects(popup)).filter(
@@ -298,6 +544,7 @@ for (const [index, scenario] of [
       });
       await popup.close();
       popup = await openRealPopup(context, extensionId);
+      if (scenario.name === 'WINDOW') await popup.locator('[data-page="video"]').click();
       await expect(popup.locator(START)).toBeVisible();
       expect(await readState(popup)).toMatchObject({
         success: true,

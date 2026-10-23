@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from '../../../project/cursor-source-observations';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../../project/factories/creation';
 import { normalizeVideoProjectCursorSkin } from '../../../project/cursor';
@@ -10,7 +11,7 @@ import {
   mapCursorFocusControlPoint,
 } from './cursor';
 import { createVideoProjectFromRecording } from '../../../project/factories/creation';
-import { DEFAULT_WINDOW_HEADER } from '../../../../browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 
 it.each([VideoCursorCaptureMode.SEPARATE, VideoCursorCaptureMode.EMBEDDED_FALLBACK])(
   'switches cursor visibility at its key time in %s mode',
@@ -180,4 +181,205 @@ it('retains source-owned closing observations without changing half-open playbac
     },
   };
   expect(resolveObservedCursorPosition(lost, 1, clip.id, { includeSourceEnd: true })).toBeNull();
+});
+
+it('projects a separate recorded cursor through its source instance without changing capture facts', () => {
+  const project = observedProject();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  clip.transform = { x: 10, y: 20, width: 80, height: 40, rotation: 0, opacity: 1 };
+  clip.fitMode = 'STRETCH';
+  const before = structuredClone(project);
+  // Original source point (.4,.5), projected into the authored clip rectangle.
+  expect(resolveVideoCompositionCursor(project, 0.5, [])).toMatchObject({ x: 42, y: 40 });
+  expect(project).toEqual(before);
+  const manual = {
+    ...project,
+    cursorTrack: {
+      ...project.cursorTrack!,
+      samples: [{ id: 'manual', time: 0, x: 7, y: 9, visible: true }],
+    },
+  };
+  expect(resolveVideoCompositionCursor(manual, 0.5, [])).toMatchObject({ x: 7, y: 9 });
+});
+
+it('hides a cropped-out source cursor without rewriting its raw samples or focus overrides', () => {
+  const project = observedProject();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  clip.sourceCrop = { x: 0.5, y: 0, width: 0.5, height: 1 };
+  const before = structuredClone(project);
+  expect(resolveVideoCompositionCursor(project, 0, [])).toBeNull();
+  expect(resolveVideoCompositionCursor(project, 1, [])).not.toBeNull();
+  expect(project).toEqual(before);
+});
+
+it('hides a rounded-corner source cursor while retaining capture facts and interior visibility', () => {
+  const project = observedProject();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample, index) => ({
+    ...sample,
+    recordingPoint: index === 0 ? { x: 0.01, y: 0.01 } : { x: 0.5, y: 0.5 },
+  }));
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  clip.windowCornerRadius = 50;
+  clip.fitMode = 'STRETCH';
+  const before = structuredClone(project);
+  expect(resolveCursorSourcePointMapping(project, clip.id, 0)?.windowCornerRadius).toBe(50);
+  expect(resolveVideoCompositionCursor(project, 0, [])).toBeNull();
+  expect(resolveVideoCompositionCursor(project, 1, [])).not.toBeNull();
+  expect(project).toEqual(before);
+});
+
+function sourceObservationProject() {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'captured',
+    filename: 'Captured.webm',
+    duration: 3,
+    width: 100,
+    height: 100,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  clip.startTime = 4;
+  clip.sourceStart = 0.25;
+  clip.sourceDuration = 2.75;
+  clip.playbackRate = 2;
+  clip.duration = 2.75 / 2;
+  project.duration = clip.startTime + clip.duration;
+  project.version = 33;
+  project.cursorTrack = {
+    captureMode: 'embedded-fallback',
+    skin: { ...normalizeVideoProjectCursorSkin(undefined), hidden: true },
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'captured',
+        sourceInstanceId: clip.sourceInstanceId!,
+        samples: [
+          {
+            id: 'first',
+            time: 0,
+            x: 10,
+            y: 50,
+            visible: true,
+            captureSegment: 0,
+            recordingPoint: { x: 0.1, y: 0.5 },
+            observation: 'observed',
+          },
+          {
+            id: 'last-before-gap',
+            time: 1,
+            x: 50,
+            y: 50,
+            visible: true,
+            captureSegment: 0,
+            recordingPoint: { x: 0.5, y: 0.5 },
+            observation: 'observed',
+          },
+          {
+            id: 'outside',
+            time: 1.5,
+            x: 50,
+            y: 50,
+            visible: false,
+            captureSegment: 0,
+            recordingPoint: null,
+            observation: 'outside',
+          },
+          {
+            id: 'return',
+            time: 2,
+            x: 80,
+            y: 50,
+            visible: true,
+            captureSegment: 1,
+            recordingPoint: { x: 0.8, y: 0.5 },
+            observation: 'observed',
+          },
+          {
+            id: 'end',
+            time: 3,
+            x: 90,
+            y: 50,
+            visible: true,
+            captureSegment: 1,
+            recordingPoint: { x: 0.9, y: 0.5 },
+            observation: 'observed',
+          },
+        ],
+      },
+    ],
+  };
+  project.actionEvents = [
+    {
+      id: 'click',
+      kind: 'CLICK',
+      label: '',
+      data: {},
+      point: { x: 0.9, y: 0.5 },
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'captured',
+        sourceInstanceId: clip.sourceInstanceId!,
+        sourceEventId: 'capture-click',
+        sourceTime: 0.5,
+      },
+    },
+  ];
+  project.actionFeedback = [
+    {
+      recordingId: 'captured',
+      sourceInstanceId: clip.sourceInstanceId!,
+      settings: [],
+      signals: [
+        {
+          id: 'dwell',
+          kind: 'cursor-idle',
+          startTime: 0.6,
+          endTime: 0.8,
+          point: { x: 70, y: 50 },
+          recordingPoint: { x: 0.7, y: 0.5 },
+          data: {},
+        },
+      ],
+    },
+  ];
+  project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+  return {
+    project,
+    clip,
+    at: (sourceTime: number) => clip.startTime + (sourceTime - clip.sourceStart) / 2,
+  };
+}
+
+it('uses complete captured click and dwell geometry for source observations after cut and rate', () => {
+  const { project, clip, at } = sourceObservationProject();
+  expect(resolveObservedCursorPosition(project, at(0.5), clip.id)?.recordingPoint?.x).toBeCloseTo(
+    0.9,
+    9
+  );
+  expect(resolveObservedCursorPosition(project, at(0.7), clip.id)?.recordingPoint?.x).toBeCloseTo(
+    0.7,
+    9
+  );
+  expect(resolveVideoCompositionCursor(project, at(0.5), [])).toBeNull();
+});
+
+it('closes captured observation at the last observed sample before an outside marker', () => {
+  const { project, clip, at } = sourceObservationProject();
+  expect(resolveObservedCursorPosition(project, at(1.25), clip.id)).toBeNull();
+  expect(resolveObservedCursorPosition(project, at(2.5), clip.id)?.recordingPoint?.x).toBeCloseTo(
+    0.85,
+    9
+  );
+  expect(
+    resolveObservedCursorPosition(project, clip.startTime + clip.duration, clip.id)
+  ).toBeNull();
+  expect(
+    resolveObservedCursorPosition(project, clip.startTime + clip.duration, clip.id, {
+      includeSourceEnd: true,
+    })?.recordingPoint?.x
+  ).toBeCloseTo(0.9, 9);
 });

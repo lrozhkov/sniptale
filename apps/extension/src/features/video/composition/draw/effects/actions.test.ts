@@ -1,6 +1,11 @@
+import { getActionKeyStyle } from '../../../project/action-style';
 import type { VideoCompositionActionState } from '../../types';
 import { expect, it, vi } from 'vitest';
-import { drawActionCompositionState, drawSceneActionCompositionStates } from './actions';
+import {
+  resolveActionCompositionPaintBounds,
+  drawActionCompositionState,
+  drawSceneActionCompositionStates,
+} from './actions';
 
 it('smooths retained gesture corners while preserving factual endpoints', () => {
   const context = createContext();
@@ -356,4 +361,174 @@ it('removes small alternating capture jitter without shifting the start or curre
   expect(context.lineTo).toHaveBeenCalledExactlyOnceWith(50, 0);
   expect(context.quadraticCurveTo).not.toHaveBeenCalled();
   expect(path).toEqual(original);
+});
+
+it('paints an authored ripple as a ring rather than a filled observed-gesture halo', () => {
+  const context = createContext();
+  drawActionCompositionState(
+    context,
+    {
+      ...createActionState(),
+      point: { x: 40, y: 50 },
+      gestureFeedback: {
+        effect: 'ripple',
+        point: { x: 40, y: 50 },
+        radius: 20,
+        stroke: 3,
+        color: '#ff0000ff',
+        opacity: 0.75,
+      },
+    },
+    null,
+    2
+  );
+  expect(context.stroke).toHaveBeenCalledOnce();
+  expect(context.fill).not.toHaveBeenCalled();
+  expect(context.arc).toHaveBeenCalledWith(40, 50, 40, 0, Math.PI * 2);
+  expect(context.lineWidth).toBe(6);
+});
+
+it('paints authored glow with radial falloff rather than a solid disk', () => {
+  const context = createContext();
+  drawActionCompositionState(
+    context,
+    {
+      ...createActionState(),
+      point: { x: 40, y: 50 },
+      gestureFeedback: {
+        effect: 'glow',
+        point: { x: 40, y: 50 },
+        radius: 20,
+        stroke: 3,
+        color: '#ff0000ff',
+        opacity: 0.75,
+      },
+    },
+    null,
+    2
+  );
+  expect(context.createRadialGradient).toHaveBeenCalledWith(40, 50, 0, 40, 50, 40);
+  expect(context.fill).toHaveBeenCalledOnce();
+});
+
+it('samples the original source for an authored lens instead of painting an opaque marker', () => {
+  const context = createContext();
+  context.rect = vi.fn();
+  context.clip = vi.fn();
+  const source = { rect: { x: 0, y: 0, width: 100, height: 100 }, draw: vi.fn() };
+  drawActionCompositionState(
+    context,
+    {
+      ...createActionState(),
+      point: { x: 40, y: 50 },
+      gestureFeedback: {
+        effect: 'magnify',
+        point: { x: 40, y: 50 },
+        radius: 20,
+        stroke: 3,
+        color: '#ff0000ff',
+        opacity: 0.75,
+        lens: { scale: 2, shape: 'circle', shadow: 0 },
+      },
+    },
+    null,
+    1,
+    undefined,
+    source
+  );
+  expect(source.draw).toHaveBeenCalledExactlyOnceWith(context, -40, -50, 200, 200);
+  expect(context.stroke).toHaveBeenCalledOnce();
+});
+
+it('keeps the painted halo, observed path and authored area inside raster bounds', () => {
+  const context = createContext();
+  context.strokeRect = vi.fn();
+  const action: VideoCompositionActionState = {
+    ...createActionState(),
+    point: { x: 10, y: 20 },
+    gestureFeedback: {
+      effect: 'press',
+      point: { x: 10, y: 20 },
+      radius: 8,
+      stroke: 4,
+      opacity: 1,
+      color: '#fff',
+      path: [
+        { x: -30, y: 40 },
+        { x: 20, y: 60 },
+      ],
+      area: { x: -50, y: -20, width: 100, height: 80 },
+    },
+  };
+  drawActionCompositionState(context, action, null);
+  expect(context.strokeRect).toHaveBeenCalledWith(-50, -20, 100, 80);
+  expect(context.arc).toHaveBeenCalledWith(10, 20, 8, 0, Math.PI * 2);
+  expect(resolveActionCompositionPaintBounds(action)).toEqual({
+    x: -54,
+    y: -24,
+    width: 108,
+    height: 88,
+  });
+  const legacy = {
+    ...createActionState(),
+    point: { x: 40, y: 50 },
+    clickStyle: { size: 10, strokeWidth: 4, color: '#fff', opacity: 1 },
+  };
+  expect(resolveActionCompositionPaintBounds(legacy)).toEqual({
+    x: 26,
+    y: 36,
+    width: 28,
+    height: 28,
+  });
+});
+
+it('does not allocate action raster bounds for missing points or unsupported presentations', () => {
+  const state = { ...createActionState(), point: { x: 40, y: 50 } };
+  const refused: VideoCompositionActionState[] = [
+    { ...state, point: null },
+    { ...state, renderKind: null },
+    { ...state, preset: 'NONE' },
+    { ...state, preset: 'SCROLL_EMPHASIS' },
+  ];
+  for (const action of refused) expect(resolveActionCompositionPaintBounds(action)).toBeNull();
+});
+
+it('scales captured viewport caption fonts and margins while preserving legacy key project pixels', () => {
+  for (const zoom of [1, 2]) {
+    const context = createContext();
+    context.measureText = vi.fn(() => ({ width: 80 }) as TextMetrics);
+    context.fillText = vi.fn();
+    const action = {
+      ...createActionState(),
+      event: { ...createActionState().event, kind: 'KEY' as const, label: 'Ctrl+K' },
+      renderKind: 'keystroke' as const,
+      preset: 'NONE' as const,
+      keyStyle: {
+        ...getActionKeyStyle(),
+        fontSize: 60,
+        fontFamily: 'monospace' as const,
+        position: 'bottom-left' as const,
+        entrance: 'none' as const,
+      },
+      keyStyleViewportWidth: 1920,
+    };
+    const camera = {
+      focusPoint: { x: 100, y: 50 },
+      motionBlurAmount: 0,
+      overlayZoomMode: 'LOCK_OVERLAYS' as const,
+      regionId: 'zoom',
+      scale: zoom,
+      viewportWidth: 640 / zoom,
+      viewportHeight: 360 / zoom,
+      viewportX: 0,
+      viewportY: 0,
+    };
+    const viewport = { offsetX: 40, offsetY: 20, scaleX: 1, scaleY: 1 };
+    drawSceneActionCompositionStates(context, [action], camera, viewport);
+    expect(context.font).toBe('500 20px monospace');
+    expect(context.roundRect).toHaveBeenLastCalledWith(48, 336, 102, 36, expect.any(Number));
+    const { keyStyleViewportWidth: _basis, ...legacy } = action;
+    drawSceneActionCompositionStates(context, [legacy], camera, viewport);
+    expect(context.font).toBe('500 60px monospace');
+  }
 });

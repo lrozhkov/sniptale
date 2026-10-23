@@ -170,7 +170,7 @@ function expectComposeHandlers(state: ReturnType<typeof createSectionState>) {
     expect.objectContaining({ id: 'user-action' })
   );
   expect(state.handleToggleStatus).toHaveBeenCalledWith('user-action');
-  expect(state.updateFormField).toHaveBeenCalledWith('status', false);
+  expect(state.updateFormField).not.toHaveBeenCalledWith('status', false);
   expect(state.updateFormField).toHaveBeenCalledWith('exitAfterCapture', true);
   expect(state.handleCancelEdit).toHaveBeenCalled();
   expect(state.handleAdd).toHaveBeenCalled();

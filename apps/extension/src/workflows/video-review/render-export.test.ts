@@ -1,10 +1,11 @@
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { drawReviewSceneFrame } from './scene-frame';
 import { state, contextFixture, argsFixture } from './render-export.test-support';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
-import { drawReviewSpotlights } from './render-spotlight';
+
+import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
@@ -622,7 +623,7 @@ it('passes constant quality with the calibrated VBR fallback to the actual encod
 });
 
 it('scales spotlight blur with export resolution, preserving the scene effect', async () => {
-  vi.mocked(drawReviewSpotlights).mockClear();
+  vi.mocked(drawSceneSpotlights).mockClear();
   const args = argsFixture({ frameRate: 30 });
   args.advanced.canvas = { width: 1920, height: 1080 };
   args.advanced.zoom.enabled = true;
@@ -636,7 +637,7 @@ it('scales spotlight blur with export resolution, preserving the scene effect', 
     ...args,
     renderSettings: { quality: 'HIGH', frameRate: 30, resolution: '720P' },
   });
-  const frames = vi.mocked(drawReviewSpotlights).mock.calls.flatMap((call) => call[3]);
+  const frames = vi.mocked(drawSceneSpotlights).mock.calls.flatMap((call) => call[3]);
   expect(frames.length).toBeGreaterThan(0);
   for (const frame of frames) expect(frame.blur).toBe(8);
 });

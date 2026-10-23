@@ -1,7 +1,15 @@
+import { RotateCcw } from 'lucide-react';
+import { getFittedMediaWindowFrame } from '../../../../../features/video/composition/draw/fitted-media';
+import { mediaWindowPadding } from '../../../../../features/video/project/window-geometry';
+import { NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { MediaCropControls } from './media-crop';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
 import type { ReactNode } from 'react';
 import { WindowHeaderSettings } from '../../../../../workflows/browser-frame/settings';
-import { getMediaFramingPresets } from '../../../../../features/video/project/factories/framing-presets';
+import {
+  maximumMediaPadding,
+  getMediaFramingPresets,
+} from '../../../../../features/video/project/factories/framing-presets';
 import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
@@ -15,23 +23,32 @@ import type {
   VideoMediaShadowMode as VideoMediaShadowModeValue,
 } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import { SelectInput } from '../shared/controls';
+import { ColorField, SelectInput } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { SliderField } from '../shared/sliders';
 import { getMediaFitModeOptions } from './media-fit-options';
 
 type MediaFrameControlsProps = Pick<
   WorkspaceSidebarSelectionPanelProps,
   | 'project'
+  | 'onEditMediaClip'
   | 'onApplyMediaClipVisualsToTrack'
   | 'onUpdateMediaClipFitMode'
   | 'onUpdateMediaClipFitScalePercent'
   | 'onUpdateMediaClipShadowIntensity'
   | 'onUpdateMediaClipShadowMode'
+  | 'onUpdateMediaClipShadowColor'
   | 'onUpdateMediaClipWindowHeader'
-> & {
-  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>;
-  locked: boolean;
-};
+> &
+  Partial<
+    Pick<
+      WorkspaceSidebarSelectionPanelProps,
+      'recentColors' | 'onRememberRecentColor' | 'currentTime'
+    >
+  > & {
+    clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>;
+    locked: boolean;
+  };
 
 type MediaFrameClip = Extract<
   NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
@@ -39,11 +56,14 @@ type MediaFrameClip = Extract<
 >;
 
 type MediaFrameFieldProps = {
+  recentColors?: readonly string[] | undefined;
+  onRememberRecentColor?: WorkspaceSidebarSelectionPanelProps['onRememberRecentColor'] | undefined;
   clip: MediaFrameClip;
   clipId: string;
   disabled: boolean;
   fitMode: VideoMediaFitMode;
   fitScalePercent: number;
+  shadowColor?: string;
   shadowIntensity: number;
   shadowMode: VideoMediaShadowModeValue;
   onApplyMediaClipVisualsToTrack?: WorkspaceSidebarSelectionPanelProps['onApplyMediaClipVisualsToTrack'];
@@ -51,6 +71,7 @@ type MediaFrameFieldProps = {
   onUpdateMediaClipFitScalePercent?: WorkspaceSidebarSelectionPanelProps['onUpdateMediaClipFitScalePercent'];
   onUpdateMediaClipShadowIntensity?: WorkspaceSidebarSelectionPanelProps['onUpdateMediaClipShadowIntensity'];
   onUpdateMediaClipShadowMode?: WorkspaceSidebarSelectionPanelProps['onUpdateMediaClipShadowMode'];
+  onUpdateMediaClipShadowColor?: WorkspaceSidebarSelectionPanelProps['onUpdateMediaClipShadowColor'];
 };
 
 export function MediaFrameControls(props: MediaFrameControlsProps) {
@@ -58,9 +79,23 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
     return null;
   }
 
+  const windowCornerRadius = props.clip.windowCornerRadius ?? 0;
+  const retainedLayout = props.clip.rememberedWindowLayout;
+  const layoutFits =
+    !retainedLayout ||
+    retainedLayout.padding <= maximumMediaPadding(props.project.width, props.project.height);
   return (
     <div className="sniptale-parameter-stack space-y-1">
       <MediaFramingPresets {...props} />
+      <MediaPaddingControl {...props} />
+      <MediaCropControls
+        key={`crop:${props.clip.id}`}
+        project={props.project}
+        clip={props.clip}
+        currentTime={props.currentTime ?? props.clip.startTime}
+        disabled={props.locked}
+        onEdit={props.onEditMediaClip}
+      />
       <InspectorDetails
         preferenceId="media-frame:videoEditor.sidebar.framingFineTune"
         label={translate('videoEditor.sidebar.framingFineTune')}
@@ -72,6 +107,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
           onUpdateMediaClipFitMode={props.onUpdateMediaClipFitMode}
         />
         <MediaFitScaleControls
+          min={1}
           clipId={props.clip.id}
           disabled={props.locked}
           fitScalePercent={props.clip.fitScalePercent ?? 100}
@@ -82,18 +118,54 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
         preferenceId="media-frame:videoEditor.sidebar.inspectorGroupAppearance"
         label={translate('videoEditor.sidebar.inspectorGroupAppearance')}
       >
+        <NumericRow
+          label={translate('gallery.videoReview.backgroundCornerRadius')}
+          value={windowCornerRadius}
+          min={0}
+          max={4096}
+          step={1}
+          precision={2}
+          unit="px"
+          scrub={{ min: 0, max: 100, step: 1 }}
+          disabled={props.locked || !props.onEditMediaClip}
+          normalizeValue={(value) =>
+            value === Number(windowCornerRadius.toFixed(2)) ? windowCornerRadius : value
+          }
+          onPreviewValue={() => undefined}
+          onCommitValue={(radius) =>
+            props.onEditMediaClip?.(props.clip.id, { kind: 'window-corner-radius', radius })
+          }
+        />
         <MediaShadowControls
           clipId={props.clip.id}
           disabled={props.locked}
           shadowIntensity={props.clip.shadowIntensity ?? 0}
           shadowMode={props.clip.shadowMode ?? VideoMediaShadowMode.BACKDROP}
+          {...(props.clip.shadowColor === undefined ? {} : { shadowColor: props.clip.shadowColor })}
+          onUpdateMediaClipShadowColor={props.onUpdateMediaClipShadowColor}
+          recentColors={props.recentColors}
+          onRememberRecentColor={props.onRememberRecentColor}
           onUpdateMediaClipShadowIntensity={props.onUpdateMediaClipShadowIntensity}
           onUpdateMediaClipShadowMode={props.onUpdateMediaClipShadowMode}
         />
+        {retainedLayout && (
+          <InspectorActionButton
+            separated
+            disabled={props.locked || !props.onEditMediaClip}
+            title={!layoutFits ? translate('gallery.videoReview.windowLayoutFitCanvas') : undefined}
+            onClick={() =>
+              props.onEditMediaClip?.(props.clip.id, { kind: 'window-layout-restore' })
+            }
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            {translate('gallery.videoReview.windowLayoutRestore')}
+          </InspectorActionButton>
+        )}
       </InspectorDetails>
       <WindowHeaderSettings
         key={props.clip.id}
         header={props.clip.windowHeader}
+        rememberedHeader={props.clip.rememberedWindowHeader}
         disabled={props.locked || !props.onUpdateMediaClipWindowHeader}
         onChange={(header) => props.onUpdateMediaClipWindowHeader?.(props.clip.id, header)}
       />
@@ -124,13 +196,13 @@ export function MediaFitScaleControls(
   props: Pick<
     MediaFrameFieldProps,
     'clipId' | 'disabled' | 'fitScalePercent' | 'onUpdateMediaClipFitScalePercent'
-  >
+  > & { min?: number }
 ) {
   return (
     <SliderField
       label={translate('videoEditor.sidebar.fitScalePercentLabel')}
       value={props.fitScalePercent}
-      min={10}
+      min={props.min ?? 10}
       max={300}
       step={1}
       disabled={props.disabled}
@@ -147,13 +219,17 @@ export function MediaShadowControls(
     | 'disabled'
     | 'shadowIntensity'
     | 'shadowMode'
+    | 'shadowColor'
+    | 'recentColors'
+    | 'onRememberRecentColor'
     | 'onUpdateMediaClipShadowIntensity'
     | 'onUpdateMediaClipShadowMode'
+    | 'onUpdateMediaClipShadowColor'
   >
 ) {
   return (
-    <div className="sniptale-parameter-stack space-y-1">
-      <SelectInput
+    <div className="sniptale-parameter-stack space-y-1" data-ui="video-editor.media-shadow">
+      <OptionButtonsField
         disabled={props.disabled}
         label={translate('videoEditor.sidebar.mediaShadowModeLabel')}
         value={props.shadowMode}
@@ -169,6 +245,17 @@ export function MediaShadowControls(
         disabled={props.disabled}
         formatValue={(value) => `${Math.round(value)}%`}
         onChange={(value) => props.onUpdateMediaClipShadowIntensity?.(props.clipId, value)}
+      />
+      <ColorField
+        label={translate('gallery.videoReview.webcamShadowColor')}
+        value={
+          props.shadowColor ??
+          (props.shadowMode === VideoMediaShadowMode.GLOW ? '#ffffff' : '#000000')
+        }
+        disabled={props.disabled || !props.onUpdateMediaClipShadowColor}
+        onChange={(value) => props.onUpdateMediaClipShadowColor?.(props.clipId, value)}
+        recentColors={props.recentColors}
+        onRememberRecentColor={props.onRememberRecentColor}
       />
     </div>
   );
@@ -211,10 +298,12 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
     'assetId' in clip ? props.project.assets.find(({ id }) => id === clip.assetId) : undefined;
   if (!asset || !('fitMode' in clip)) return null;
   const presets = getMediaFramingPresets(
-    asset.metadata.width,
-    asset.metadata.height,
+    asset.metadata.width * (clip.sourceCrop?.width ?? 1),
+    asset.metadata.height * (clip.sourceCrop?.height ?? 1),
     props.project.width,
-    props.project.height
+    props.project.height,
+    clip.windowHeader,
+    { width: asset.metadata.width, height: asset.metadata.height }
   );
   const labels = [
     translate('videoEditor.sidebar.framingWhole'),
@@ -312,5 +401,46 @@ function FramingPresetButton(props: {
         {props.children}
       </span>
     </button>
+  );
+}
+
+function MediaPaddingControl(props: MediaFrameControlsProps) {
+  const clip = props.clip;
+  if (!('assetId' in clip) || !('fitMode' in clip)) return null;
+  const asset = props.project.assets.find((asset) => asset.id === clip.assetId);
+  if (!asset || asset.metadata.width <= 0 || asset.metadata.height <= 0) return null;
+  const frame = getFittedMediaWindowFrame({
+    frame: clip.transform,
+    fitMode: clip.fitMode,
+    sourceWidth: asset.metadata.width,
+    sourceHeight: asset.metadata.height,
+    ...(clip.sourceCrop ? { sourceCrop: clip.sourceCrop } : {}),
+    ...(clip.windowHeader ? { windowHeader: clip.windowHeader } : {}),
+  });
+  const max = maximumMediaPadding(props.project.width, props.project.height);
+  const padding = Math.min(
+    max,
+    mediaWindowPadding(props.project, frame, clip.transform.rotation, {
+      x: clip.transform.x + clip.transform.width / 2,
+      y: clip.transform.y + clip.transform.height / 2,
+    })
+  );
+  return (
+    <NumericRow
+      label={translate('gallery.videoReview.backgroundPadding')}
+      value={padding}
+      min={0}
+      max={max}
+      step={1}
+      precision={2}
+      unit="px"
+      disabled={props.locked || !props.onEditMediaClip}
+      normalizeValue={(value) => (value === Number(padding.toFixed(2)) ? padding : value)}
+      onPreviewValue={() => undefined}
+      onCommitValue={(value) => {
+        if (value !== padding)
+          props.onEditMediaClip?.(clip.id, { kind: 'padding', padding: value });
+      }}
+    />
   );
 }

@@ -1,7 +1,7 @@
 import type { FabricObject } from 'fabric';
 import type { BrowserFrameState } from '../../../../../features/editor/document/types';
 import { resolveEditorSceneLayout } from '../../../../browser-frame/layout';
-import { windowHeaderGeometry } from '../../../../../features/browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { resolveEditorWindowHeader } from '../../../../../features/editor/document/constants';
 
 import type { SourceState } from '../../../../document/model/source-state';

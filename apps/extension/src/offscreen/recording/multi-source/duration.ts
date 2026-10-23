@@ -7,12 +7,16 @@ const logger = createLogger({ namespace: 'OffscreenMultiSourceDuration' });
 const DURATION_PUBLISH_INTERVAL_MS = 1000;
 
 export function initializeDurationPublishing(session: MultiSourceSession): void {
+  session.audioRecorder?.microphoneActivity?.setPhase('recording');
   session.durationTimer = setInterval(() => {
     const duration = Math.max(0, Math.floor((Date.now() - session.startedAt) / 1000));
     void sendRuntimeMessage({
       type: VideoMessageType.RECORDING_DURATION_UPDATED,
       duration,
       recordingId: session.recordingId,
+      ...(session.audioRecorder?.microphoneActivity
+        ? { microphoneActivity: session.audioRecorder.microphoneActivity.current }
+        : {}),
     }).catch((error) => logger.debug('Failed to publish multi-source duration', error));
   }, DURATION_PUBLISH_INTERVAL_MS);
 }

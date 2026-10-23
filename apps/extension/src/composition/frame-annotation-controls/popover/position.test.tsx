@@ -3,12 +3,80 @@ import { act, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { useFrameAnnotationSettingsPopoverPosition } from './position';
+import {
+  FrameAnnotationPopoverMeasurementContext,
+  resolveFrameAnnotationSettingsPopoverDirection,
+  useFrameAnnotationSettingsPopoverPosition,
+} from './position';
 import { useFrameAnnotationPopoverPresentation } from './presentation';
 
 afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+it('recomputes the predicted side from measured height and current toolbar geometry', () => {
+  vi.stubGlobal('innerWidth', 1280);
+  vi.stubGlobal('innerHeight', 900);
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar';
+  const anchor = document.createElement('button');
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  let toolbarTop = 450;
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockImplementation(() =>
+    createRect({ left: 50, top: toolbarTop, width: 500, height: 50 })
+  );
+  vi.spyOn(anchor, 'getBoundingClientRect').mockImplementation(() =>
+    createRect({ left: 100, top: toolbarTop + 5, width: 40, height: 35 })
+  );
+  const args = { anchorEl: anchor, width: 400, height: 600 };
+  expect(resolveFrameAnnotationSettingsPopoverDirection(args)).toBe('right');
+  const popover = document.createElement('div');
+  Object.defineProperty(popover, 'offsetHeight', { value: 200 });
+  const popoverRef = { current: popover };
+  const onMeasured = vi.fn();
+  function Harness() {
+    useFrameAnnotationSettingsPopoverPosition({
+      ...args,
+      isOpen: true,
+      popoverRef,
+    });
+    return null;
+  }
+  const root = createRoot(document.createElement('div'));
+  act(() =>
+    root.render(
+      <FrameAnnotationPopoverMeasurementContext value={onMeasured}>
+        <Harness />
+      </FrameAnnotationPopoverMeasurementContext>
+    )
+  );
+  expect(onMeasured).toHaveBeenCalledOnce();
+  expect(resolveFrameAnnotationSettingsPopoverDirection(args)).toBe('down');
+  toolbarTop = 800;
+  expect(resolveFrameAnnotationSettingsPopoverDirection(args)).toBe('up');
+  act(() => root.unmount());
+});
+
+it('keeps the generic indicator when the cold fallback has no visible placement', () => {
+  vi.stubGlobal('innerWidth', 1280);
+  vi.stubGlobal('innerHeight', 560);
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar';
+  const anchor = document.createElement('button');
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(
+    createRect({ left: 50, top: 500, width: 500, height: 50 })
+  );
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(
+    createRect({ left: 100, top: 505, width: 40, height: 35 })
+  );
+  expect(
+    resolveFrameAnnotationSettingsPopoverDirection({ anchorEl: anchor, width: 400, height: 600 })
+  ).toBeUndefined();
 });
 
 it('positions a compensated toolbar menu using its visual dimensions', () => {

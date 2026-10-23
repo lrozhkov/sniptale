@@ -183,3 +183,37 @@ it('clamps authored audio volume to the supported unit interval', () => {
 
   expect(resolveEffectRuntimeAudioPlans(project)[0]!.volume).toBe(1);
 });
+
+it('keeps a retained dormant Native host silent without disabling its authored instance', () => {
+  const project = createAudioProject();
+  const host = project.clips[0]!;
+  if (host.type !== 'EFFECT') throw new Error('Expected effect host');
+  expect(resolveEffectRuntimeAudioPlans(project).length).toBeGreaterThan(0);
+  host.attachment = { kind: 'viewport' };
+  host.sourceRange = {
+    assetId: 'retained-origin',
+    sourceInstanceId: 'origin-placement',
+    start: 0,
+    end: 3,
+    dormant: true,
+  };
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
+  expect(project.effectInstances![0]!.enabled).toBe(true);
+});
+
+it('advances EffectV1 audio by the placement offset without holding its tail', () => {
+  const project = createAudioProject();
+  const host = project.clips[0]!;
+  host.duration = 1.8;
+  host.playbackWindow = { offset: 0.5, holdAt: 1.4 };
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([
+    expect.objectContaining({
+      startTime: 2,
+      duration: 0.25,
+      sourceStart: 0.75,
+      sourceDuration: 0.5,
+    }),
+  ]);
+  host.playbackWindow = { offset: 1.6, holdAt: 1.4 };
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
+});

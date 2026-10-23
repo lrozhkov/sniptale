@@ -18,7 +18,9 @@ it('uses the shared popup value typography for selection summaries', () => {
   );
 
   expect(markup).toContain('text-[11px] font-medium leading-4');
-  expect(markup).toContain('title="Full current page title"');
+  expect(markup).toContain('min-w-0 rounded-[6px]');
+  expect(markup).toContain('justify-center rounded-[6px]');
+  expect(markup).toContain('data-popup-hint="Full current page title"');
 });
 
 it('uses the visible label as the title fallback', () => {
@@ -26,7 +28,7 @@ it('uses the visible label as the title fallback', () => {
     <SelectionSummaryRow icon={<svg />} label="Images" onRemove={() => undefined} />
   );
 
-  expect(markup).toContain('title="Images"');
+  expect(markup).toContain('data-popup-hint="Images"');
 });
 
 it('does not expose a remove action for required summary values', () => {

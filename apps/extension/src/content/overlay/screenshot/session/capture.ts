@@ -12,7 +12,12 @@ export function createHandleTakeScreenshot(args: CreateScreenshotControllerActio
     contentIntentSource?: ContentPrivilegedActionIntentSource,
     startContext?: ScreenshotStartContext
   ) => {
-    await syncCaptureAction(args.params);
+    if (
+      startContext?.runGeneration !== undefined &&
+      startContext.runGeneration !== args.session.runGeneration
+    )
+      return;
+    syncCaptureAction(args.params);
     prepareScreenshotMode(args.params, args.session, type, startContext);
     const runToken = beginScreenshotRun(args.runtime);
 

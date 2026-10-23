@@ -82,3 +82,23 @@ describe('bookend framing', () => {
     expect(ctx.restore).toHaveBeenCalledOnce();
   });
 });
+
+it('draws fractional odd-size cover framing over its own fill without Native rounding', () => {
+  const ctx = context();
+  const draw = vi.fn();
+  drawReviewPresentationFrame(
+    ctx,
+    { width: 641, height: 359 },
+    { width: 321, height: 181 },
+    { fit: 'cover', fillColor: '#12ab34ff', crop: { panX: 0.75, panY: -0.6 } },
+    draw
+  );
+  const [, x, y, width, height] = draw.mock.calls[0]!;
+  expect(x).toBeCloseTo(-1.9059888579387188, 9);
+  expect(y).toBeCloseTo(0, 9);
+  expect(width).toBeCloseTo(323.1782729805014, 9);
+  expect(height).toBeCloseTo(181, 9);
+  expect(ctx.fillStyle).toBe('#12ab34ff');
+  expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 321, 181);
+  expect(ctx.restore).toHaveBeenCalledOnce();
+});

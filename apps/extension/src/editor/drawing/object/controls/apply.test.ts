@@ -1,12 +1,71 @@
 // @vitest-environment jsdom
 
-import { ActiveSelection, Canvas, Group, Point, Rect } from 'fabric';
+import { ActiveSelection, Canvas, Group, Point, Rect, util, type Transform } from 'fabric';
 import { expect, it } from 'vitest';
 import { createEditorDrawingFabricObject } from '../vector';
 import {
   applyEditorDrawingActiveSelectionChrome,
   applyEditorDrawingInteractionControls,
 } from './apply';
+
+it('keeps the shared rotation center when Ctrl starts a transform with corner origins', () => {
+  const canvas = new Canvas(document.createElement('canvas'), { centeredKey: 'ctrlKey' });
+  const members = [20, 140].map((x, index) =>
+    createEditorDrawingFabricObject(
+      {
+        bounds: { x, y: 40, width: 60, height: 40 },
+        color: '#111111',
+        fillColor: null,
+        id: `rotation-pivot-${index}`,
+        kind: 'rectangle',
+        width: 4,
+      },
+      index + 1
+    )
+  );
+  canvas.add(...members);
+  const selection = new ActiveSelection(members, { canvas });
+  canvas.setActiveObject(selection);
+  applyEditorDrawingActiveSelectionChrome(selection);
+  const center = selection.getCenterPoint();
+  const transform: Transform = {
+    actionPerformed: false,
+    altKey: false,
+    corner: 'mtr',
+    ex: center.x + 100,
+    ey: center.y,
+    height: selection.height,
+    lastX: center.x + 100,
+    lastY: center.y,
+    offsetX: 0,
+    offsetY: 0,
+    originX: 'left',
+    originY: 'top',
+    original: { ...util.saveObjectTransform(selection), originX: 'left', originY: 'top' },
+    scaleX: selection.scaleX,
+    scaleY: selection.scaleY,
+    shiftKey: false,
+    skewX: selection.skewX,
+    skewY: selection.skewY,
+    target: selection,
+    theta: 0,
+    width: selection.width,
+  };
+  const event = new MouseEvent('mousemove', { ctrlKey: true });
+  const control = selection.controls['mtr']!;
+  const changed = control.getActionHandler(event, selection, control)?.(
+    event,
+    transform,
+    center.x + 100 * Math.cos(Math.PI / 6),
+    center.y + 100 * Math.sin(Math.PI / 6)
+  );
+
+  expect(changed).toBe(true);
+  expect(selection.angle).toBeCloseTo(30, 3);
+  expect(selection.getCenterPoint().x).toBeCloseTo(center.x, 3);
+  expect(selection.getCenterPoint().y).toBeCloseTo(center.y, 3);
+  canvas.dispose();
+});
 
 it('routes arrow drawings to endpoint controls without a bounding box', () => {
   const object = createEditorDrawingFabricObject(
@@ -140,7 +199,16 @@ it('applies drawing chrome without box controls to drawing multi-selection', () 
 
   expect(selection.borderColor).toBe('#2563eb');
   expect(selection.borderDashArray).toEqual([4, 3]);
+  expect(selection.hasControls).toBe(true);
+  expect(Object.keys(selection.controls)).toEqual(['mtr']);
+  expect(selection.controls['mtr']?.actionName).toBe('rotate');
+  expect(selection.lockScalingX).toBe(true);
+  expect(selection.lockScalingY).toBe(true);
+  expect(selection.lockRotation).toBe(false);
+  first.sniptaleLocked = true;
+  applyEditorDrawingActiveSelectionChrome(selection);
   expect(selection.hasControls).toBe(false);
+  expect(selection.lockRotation).toBe(true);
   canvas.dispose();
 });
 

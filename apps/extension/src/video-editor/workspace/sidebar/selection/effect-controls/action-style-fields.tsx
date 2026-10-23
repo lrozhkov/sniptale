@@ -3,6 +3,7 @@ import type {
   VideoActionClickStyle,
   VideoActionKeyStyle,
 } from '../../../../../features/video/project/types';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { ColorField, SelectInput } from '../shared/controls';
 import { InspectorDetails } from '../shared/details';
 import { SliderField } from '../shared/sliders';
@@ -53,6 +54,7 @@ export function ActionClickStyleFields(
       />
       <SliderField
         label={translate('videoEditor.sidebar.actionSize')}
+        formatValue={(value) => `${value} px`}
         value={props.value.size}
         min={8}
         max={160}
@@ -65,20 +67,16 @@ export function ActionClickStyleFields(
         disabled={props.disabled}
         onChange={(opacity) => change({ opacity })}
       />
-      <InspectorDetails
-        preferenceId="action-click:more"
-        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
-      >
-        <SliderField
-          label={translate('videoEditor.sidebar.actionStroke')}
-          value={props.value.strokeWidth}
-          min={1}
-          max={12}
-          step={0.5}
-          disabled={props.disabled}
-          onChange={(strokeWidth) => change({ strokeWidth })}
-        />
-      </InspectorDetails>
+      <SliderField
+        label={translate('videoEditor.sidebar.actionStroke')}
+        formatValue={(value) => `${value} px`}
+        value={props.value.strokeWidth}
+        min={1}
+        max={12}
+        step={0.5}
+        disabled={props.disabled}
+        onChange={(strokeWidth) => change({ strokeWidth })}
+      />
     </div>
   );
 }
@@ -107,7 +105,7 @@ export function ActionKeyStyleFields(
           { value: 'top-right', label: translate('videoEditor.sidebar.keyTopRight') },
         ]}
       />
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.keyFont')}
         value={props.value.fontFamily}
         disabled={props.disabled}
@@ -120,6 +118,7 @@ export function ActionKeyStyleFields(
       />
       <SliderField
         label={translate('videoEditor.sidebar.keyFontSize')}
+        formatValue={(value) => `${value} px`}
         value={props.value.fontSize}
         min={12}
         max={96}
@@ -145,7 +144,7 @@ export function ActionKeyStyleFields(
         onRememberRecentColor={props.onRememberRecentColor}
         onChange={(background) => change({ background })}
       />
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.keyEntrance')}
         value={props.value.entrance}
         disabled={props.disabled}
@@ -167,6 +166,7 @@ export function ActionKeyStyleFields(
         />
         <SliderField
           label={translate('videoEditor.sidebar.keyRadius')}
+          formatValue={(value) => `${value} px`}
           value={props.value.cornerRadius}
           min={0}
           max={32}
@@ -176,6 +176,7 @@ export function ActionKeyStyleFields(
         />
         <SliderField
           label={translate('videoEditor.sidebar.keyMargin')}
+          formatValue={(value) => `${value} px`}
           value={props.value.margin}
           min={0}
           max={160}

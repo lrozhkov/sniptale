@@ -1,3 +1,4 @@
+import { resolveVideoProjectCompositionJoinPlans } from '../../../../features/video/project/scene/joins';
 import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 import { type VideoProjectExportSettings } from '../../../../features/video/project/types/export';
 import { type VideoProject } from '../../../../features/video/project/types/model';
@@ -46,6 +47,11 @@ export function collectTimelineBoundaries(
     if (end > range.start && end < range.end) {
       boundaries.add(end);
     }
+  }
+
+  for (const plan of resolveVideoProjectCompositionJoinPlans(project)) {
+    for (const edge of [plan.seam - plan.before, plan.seam + plan.after])
+      if (edge > range.start && edge < range.end) boundaries.add(edge);
   }
 
   const sortedBoundaries: number[] = [];

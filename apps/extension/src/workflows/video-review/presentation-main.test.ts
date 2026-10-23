@@ -48,6 +48,7 @@ vi.mock('mediabunny', () => ({
         ? null
         : {
             codec: 'avc',
+            getDecoderConfig: async () => ({ codec: 'avc1.42001e' }),
             canDecode: async () => io.decode,
             getDisplayWidth: async () => 64,
             getDisplayHeight: async () => 36,

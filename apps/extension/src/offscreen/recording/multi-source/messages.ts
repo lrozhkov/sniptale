@@ -1,10 +1,39 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { sendRuntimeMessage } from '../../../platform/runtime-messaging';
+import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { WebcamActualSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { stageAndPublishPostRecordResult } from '../post-record-publication';
 
 const logger = createLogger({ namespace: 'OffscreenMultiSourceMessages' });
+
+export async function notifyMultiSourceSourceReady(
+  binding: { generation: number; recordingId: string; streamInstanceId: string },
+  trackSettings: MediaTrackSettings,
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>
+): Promise<void> {
+  const { width, height, frameRate } = trackSettings;
+  if (
+    !width ||
+    !height ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    throw new Error('Recording source dimensions are unavailable.');
+  }
+  const response = await messaging.sendRuntimeMessage({
+    type: VideoMessageType.OFFSCREEN_SOURCE_READY,
+    ...binding,
+    videoWidth: width,
+    videoHeight: height,
+    trackSettings: { width, height, ...(frameRate === undefined ? {} : { frameRate }) },
+  });
+  if (response?.success !== true || response.result !== 'ALLOW') {
+    throw new Error('source-dimensions-mismatch');
+  }
+}
 
 export function notifyMultiSourceStarted(
   recordingId: string,

@@ -2,13 +2,15 @@ import type { RecordingFrameClockAnchor } from '../../video/recording-frame-cloc
 import type { VideoCursorCaptureMode } from '../../../features/video/project/types';
 import type {
   VideoDisplaySurface,
+  VideoMicrophoneActivity,
   WebcamActualSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 
 export type RuntimeRecordingDurationUpdatedMessage = {
   type: VideoMessageType.RECORDING_DURATION_UPDATED;
-  duration: number;
+  duration?: number;
+  microphoneActivity?: VideoMicrophoneActivity;
   recordingId: string;
 };
 

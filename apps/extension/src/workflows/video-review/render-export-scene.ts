@@ -16,7 +16,7 @@ import {
 import { drawReviewSceneFrame } from './scene-frame';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
 import { reviewWindowRasterBacking } from './window-header';
-import type { ReviewSpatialRenderer } from './spatial-renderer';
+import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ReviewTransitionSample } from './cut-transition-frames';
 
 /** Graphical frame input contains no encoder, media sink, transport or publication authority. */

@@ -1,15 +1,16 @@
+import { resolveVideoProjectCompositionJoinPlans } from '../../../../features/video/project/scene/joins';
+import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import type { VideoProjectExportTimeEstimate } from '../../../../features/video/project/types/export';
 import { getProjectExportFrameOptions } from '../../../../features/video/project/export/encoding-quality';
 import { translate } from '../../../../platform/i18n';
 import { createVideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
 import { VideoProjectExportPhase } from '../../../../features/video/project/types/export';
 import { waitForEncoderQueueCapacity } from '../../codecs';
-import { drawProjectFrame } from '../../renderer';
+import { renderProjectCompositionScene } from '../../composition-scene';
 import {
   createOffscreenProjectEffectRuntime,
   type OffscreenProjectEffectRuntime,
 } from '../../effect-runtime';
-import { disposeEffectRuntimeComposition } from '../../../../features/video/composition/effect-runtime';
 import type { ExportSceneBackgroundCache } from '../../renderer/background';
 import { pauseRenderLoopMediaElements } from '../../render-loop/shared/media';
 import {
@@ -192,33 +193,24 @@ async function drawDecodedCompositeFrame(
   frames: Awaited<ReturnType<typeof prepareWebmProviderFrames>>
 ): Promise<void> {
   const clipMediaElements = new Map(frames.map((frame) => [frame.clipId, frame.source]));
+  const { project } = args.request;
   const ownerDocument = getDecodedCompositeOwnerDocument(args);
-  const effectRuntimeFrames = await args.effectRuntime.renderProjectFrames({
+  await renderProjectCompositionScene({
+    ...args.request,
+    currentTime: args.projectTime,
     clipMediaElements,
     compositionIndex: args.compositionIndex,
-    currentTime: args.projectTime,
-    loadedImages: args.request.loadedImages,
+    effectRuntime: args.effectRuntime,
+    backgroundCache: args.backgroundCache,
     ...(ownerDocument ? { ownerDocument } : {}),
-    project: args.request.project,
   });
-  try {
-    throwIfAborted(args.request.signal);
-    drawProjectFrame(
-      args.request.context,
-      args.request.project,
-      args.request.settings,
-      args.projectTime,
-      args.request.loadedImages,
-      clipMediaElements,
-      {
-        backgroundCache: args.backgroundCache,
-        compositionIndex: args.compositionIndex,
-        ...(effectRuntimeFrames ? { effectRuntimeFrames } : {}),
-      }
-    );
-  } finally {
-    disposeEffectRuntimeComposition(effectRuntimeFrames);
-  }
+  drawVideoProjectSceneEdges(
+    args.request.context,
+    project,
+    args.projectTime,
+    undefined,
+    args.request.settings.fps
+  );
 }
 
 function getDecodedCompositeOwnerDocument(args: DecodedCompositeFrameArgs): Document | undefined {
@@ -231,6 +223,12 @@ function getDecodedCompositeOwnerDocument(args: DecodedCompositeFrameArgs): Docu
 export async function renderAcceleratedCompositeWebmSpan(
   args: AcceleratedCompositeWebmRenderArgs
 ): Promise<boolean> {
+  if (
+    resolveVideoProjectCompositionJoinPlans(args.project).some(
+      (plan) => args.span.start < plan.seam + plan.after && args.span.end > plan.seam - plan.before
+    )
+  )
+    return false;
   if (typeof VideoFrame === 'undefined') {
     return false;
   }

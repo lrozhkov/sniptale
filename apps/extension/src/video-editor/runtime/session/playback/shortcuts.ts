@@ -14,10 +14,21 @@ function handleSelectionDelete(
   handlersRef: MutableRefObject<PlaybackHandlers>
 ): void {
   switch (latestState.selection.kind) {
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER:
+      handlersRef.current.deleteSourceVoiceover(latestState.selection.documentId);
+      return;
     case VideoEditorSelectionKind.MOTION_CONNECTION:
       handlersRef.current.updateMotionRegion(latestState.selection.motionRegionId, {
         incomingConnection: null,
       });
+      return;
+    case VideoEditorSelectionKind.COMMENT:
+      if (latestState.project)
+        handlersRef.current.editCommentDocument(
+          latestState.project,
+          latestState.selection.documentId,
+          { kind: 'remove-note', id: latestState.selection.commentId }
+        );
       return;
     case VideoEditorSelectionKind.HISTORY_SPAN:
     case VideoEditorSelectionKind.HISTORY_LANE:
@@ -141,6 +152,19 @@ function handleSelectedClipShortcut(
   latestState: PlaybackLatestState,
   handlersRef: MutableRefObject<PlaybackHandlers>
 ): boolean {
+  if (latestState.selection.kind === VideoEditorSelectionKind.SOURCE_VOICEOVER) {
+    if (
+      event.code === 'KeyD' &&
+      event.ctrlKey !== event.metaKey &&
+      !event.altKey &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+      handlersRef.current.duplicateSourceVoiceover(latestState.selection.documentId);
+      return true;
+    }
+    return false;
+  }
   if (!latestState.selectedClipId) return false;
 
   if (

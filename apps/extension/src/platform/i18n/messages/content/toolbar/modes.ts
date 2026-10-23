@@ -11,6 +11,116 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
+  pageCustomizeControls: { ru: 'Настроить кнопки панели', en: 'Customize toolbar buttons' },
+  pageCustomizeControlsHint: {
+    ru: 'Выберите, какие кнопки показывать.',
+    en: 'Choose which buttons to show.',
+  },
+  pageControlOverride: {
+    ru: 'Своя настройка для этого режима.',
+    en: 'Custom visibility for this mode.',
+  },
+  pageInheritControls: { ru: 'Кнопки как в навигации', en: 'Use navigation visibility' },
+  pageInheritControlsHint: {
+    ru: 'Убрать свои настройки кнопок этого режима.',
+    en: 'Remove this mode’s visibility overrides.',
+  },
+  pageControlVisible: { ru: 'Показывать «{tool}» на панели', en: 'Show {tool} on the toolbar' },
+  pageShowHidden: { ru: 'Показать скрытые кнопки', en: 'Show hidden buttons' },
+  pageShowHiddenHint: {
+    ru: 'До закрытия панели. Сохранённые настройки не изменятся.',
+    en: 'Until the toolbar closes. Saved preferences stay unchanged.',
+  },
+  recordingFadeToolbar: {
+    ru: 'Приглушать панель при записи',
+    en: 'Fade toolbar while recording',
+  },
+  recordingFadeToolbarHint: {
+    ru: 'Полная видимость при наведении и работе с панелью.',
+    en: 'Fully visible while you use the toolbar.',
+  },
+  recordingCustomizeControls: {
+    ru: 'Настроить кнопки во время записи',
+    en: 'Customize controls during recording',
+  },
+  recordingCustomizeDone: {
+    ru: 'Завершить настройку кнопок',
+    en: 'Finish customizing controls',
+  },
+  recordingShowHiddenControls: {
+    ru: 'Показать скрытые кнопки',
+    en: 'Show hidden buttons',
+  },
+  recordingHideHiddenControls: {
+    ru: 'Свернуть дополнительные кнопки',
+    en: 'Collapse additional buttons',
+  },
+  recordingControlVisible: {
+    ru: 'Показывать «{tool}» во время записи',
+    en: 'Show {tool} during recording',
+  },
+  videoRecordingPermissionTitle: {
+    ru: 'Доступ к устройствам',
+    en: 'Device access',
+  },
+  videoRecordingMicrophonePermissionTitle: {
+    ru: 'Доступ к микрофону',
+    en: 'Microphone access',
+  },
+  videoRecordingCameraPermissionTitle: {
+    ru: 'Доступ к камере',
+    en: 'Camera access',
+  },
+  videoRecordingMediaPermissionDescription: {
+    ru: 'Подтвердите доступ в запросе Chrome. Запись не начнётся.',
+    en: 'Confirm access in the Chrome prompt. Recording will not start.',
+  },
+  videoRecordingPermissionCancelled: {
+    ru: 'Запрос доступа отменён.',
+    en: 'The access request was cancelled.',
+  },
+  videoRecordingPermissionFailed: {
+    ru: 'Не удалось открыть устройство. Проверьте подключение и попробуйте снова.',
+    en: 'The device could not be opened. Check its connection and try again.',
+  },
+  videoRecordingPermissionDenied: {
+    ru: 'Chrome не предоставил доступ к устройству.',
+    en: 'Chrome did not allow access to the device.',
+  },
+  videoRecordingPermissionBlocked: {
+    ru: 'Доступ заблокирован в Chrome.',
+    en: 'Access is blocked in Chrome.',
+  },
+  videoRecordingPermissionSettings: {
+    ru: 'Открыть разрешения',
+    en: 'Open permissions',
+  },
+  videoRecordingPermissionSettingsFailed: {
+    ru: 'Не удалось открыть настройки.',
+    en: 'Chrome settings could not be opened.',
+  },
+  videoRecordingPermissionPolicy: {
+    ru: 'Этот сайт не разрешает встроенный запрос доступа к устройству.',
+    en: 'This site does not allow an embedded device access request.',
+  },
+  videoRecordingPermissionUnauthorized: {
+    ru: 'Панель записи больше не активна. Откройте её снова.',
+    en: 'The recording toolbar is no longer active. Open it again.',
+  },
+  videoRecordingWithoutMicrophone: {
+    ru: 'Продолжить запись без микрофона?',
+    en: 'Continue recording without a microphone?',
+  },
+  videoRecordingWithoutMicrophoneRemember: {
+    ru: 'Больше не спрашивать',
+    en: "Don't ask me again",
+  },
+  videoRecordingWithoutMicrophoneContinue: {
+    ru: 'Продолжить',
+    en: 'Continue',
+  },
+  cropResizeMode: { ru: 'Изменить область', en: 'Resize crop' },
+  cropDrawingMode: { ru: 'Рисовать', en: 'Draw' },
   unknownError: {
     ru: 'Неизвестная ошибка',
     en: 'Unknown error',
@@ -81,11 +191,11 @@ export const contentToolbarModesMessages = defineMessageSource({
   },
   cursorLabel: {
     ru: 'Навигация',
-    en: 'Navigate',
+    en: 'Navigation',
   },
   cursorDescription: {
-    ru: 'Переходите по ссылкам, прокручивайте страницу и взаимодействуйте с её элементами',
-    en: 'Interact with the page normally',
+    ru: 'Пользуйтесь страницей как обычно: переходите по ссылкам, нажимайте кнопки и прокручивайте',
+    en: 'Use the page normally: follow links, click buttons, and scroll',
   },
   cursorEnable: {
     ru: 'Вернуться к обычной работе со страницей',
@@ -93,13 +203,13 @@ export const contentToolbarModesMessages = defineMessageSource({
   },
   drawingLabel: { ru: 'Рисование', en: 'Drawing' },
   drawingEnable: {
-    ru: 'Рисуйте и добавляйте быстрые пометки поверх страницы',
-    en: 'Draw and add quick markup over the page',
+    ru: 'Рисуйте в любом месте поверх страницы: добавляйте линии, фигуры, стрелки и текст',
+    en: 'Draw anywhere over the page with lines, shapes, arrows, and text',
   },
-  videoRecordingLabel: { ru: 'Запись видео', en: 'Video recording' },
+  videoRecordingLabel: { ru: 'Запись вкладки', en: 'Tab recording' },
   videoRecordingEnable: {
-    ru: 'Записывайте вкладку, рисуйте и управляйте камерой прямо на странице',
-    en: 'Record the tab, draw, and control the camera directly on the page',
+    ru: 'Записывайте вкладку или её область со звуком, камерой и пометками',
+    en: 'Record the tab or a selected area with audio, camera, and markup',
   },
   videoRecordingPinned: {
     ru: 'Панель закреплена, пока выбран режим записи видео',
@@ -117,6 +227,7 @@ export const contentToolbarModesMessages = defineMessageSource({
   videoRecordingStopping: { ru: 'Завершение записи', en: 'Finishing recording' },
   videoRecordingMicrophone: { ru: 'Микрофон', en: 'Microphone' },
   videoRecordingCamera: { ru: 'Камера', en: 'Camera' },
+  videoRecordingCameraResize: { ru: 'Изменить размер камеры', en: 'Resize camera' },
   videoRecordingCameraPreviewUnavailable: {
     ru: 'Предпросмотр камеры недоступен',
     en: 'Camera preview is unavailable',
@@ -124,7 +235,24 @@ export const contentToolbarModesMessages = defineMessageSource({
   videoRecordingDevicesLoading: { ru: 'Загрузка устройств…', en: 'Loading devices…' },
   videoRecordingDevicesEmpty: { ru: 'Устройства не найдены', en: 'No devices found' },
   videoRecordingMedia: { ru: 'Микрофон и камера', en: 'Microphone and camera' },
-  videoRecordingSpotlight: { ru: 'Подсветка курсора', en: 'Cursor spotlight' },
+  videoRecordingSpotlight: { ru: 'Эффекты курсора', en: 'Cursor effects' },
+  cursorSettings: { ru: 'Настройки курсора', en: 'Cursor settings' },
+  cursorNative: { ru: 'Системный курсор', en: 'System cursor' },
+  cursorNativeDescription: {
+    ru: 'Используется системный курсор: стрелка, рука, ввод текста и изменение размера. Его оформление остаётся под управлением браузера и системы.',
+    en: 'The browser and operating system control the pointer, hand, text and resize cursors. Their appearance is unchanged.',
+  },
+  cursorEffectEnabled: { ru: 'Включено', en: 'Enabled' },
+  cursorEffectColor: { ru: 'Цвет', en: 'Color' },
+  cursorEffectSize: { ru: 'Размер', en: 'Size' },
+  cursorEffectOpacity: { ru: 'Непрозрачность', en: 'Opacity' },
+  cursorEffectRadius: { ru: 'Радиус подсветки', en: 'Spotlight radius' },
+  cursorEffectDimming: { ru: 'Затемнение', en: 'Dimming' },
+  cursorEffectDuration: { ru: 'Длительность', en: 'Duration' },
+  cursorEffectSaveFailed: {
+    ru: 'Не удалось сохранить настройку. Попробуйте ещё раз.',
+    en: 'Could not save this setting. Try again.',
+  },
   videoRecordingCursorHalo: { ru: 'Контур курсора', en: 'Cursor halo' },
   videoRecordingCursorDimming: { ru: 'Затемнение страницы', en: 'Dim page' },
   videoRecordingClickAnimation: { ru: 'Анимация клика', en: 'Click animation' },
@@ -222,16 +350,16 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Select a page element and describe the change',
   },
   quickEditLabel: {
-    ru: 'Редактирование контента',
-    en: 'Content editing',
+    ru: 'Правка текста',
+    en: 'Text editing',
   },
   quickEditDisable: {
     ru: 'Отключить редактирование контента',
     en: 'Disable content editing',
   },
   quickEditEnable: {
-    ru: 'Выбирайте блоки, редактируйте текст напрямую или используйте ИИ',
-    en: 'Select blocks, edit text directly, or use AI',
+    ru: 'Меняйте текст прямо на странице — вручную или с помощью ИИ',
+    en: 'Change text directly on the page, manually or with AI',
   },
   quickEditBlockSelectionLabel: {
     ru: 'Выбор блоков',
@@ -246,8 +374,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Design review',
   },
   designReviewEnable: {
-    ru: 'Выбирайте любые элементы, оставляйте замечания и проверяйте стили',
-    en: 'Select any element, leave feedback, and inspect its styles',
+    ru: 'Проверяйте размеры и отступы, меняйте оформление элементов и оставляйте замечания',
+    en: 'Check dimensions and spacing, adjust element styles, and leave feedback',
   },
   quickEditDocumentModeLabel: {
     ru: 'Редактирование текста',
@@ -270,12 +398,28 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Disable annotations',
   },
   highlighterEnable: {
-    ru: 'Добавляйте рамки, маски, размытие и комментарии',
-    en: 'Add frames, masks, blur, and comments',
+    ru: 'Выбирайте элементы страницы и добавляйте к ним рамки, выноски и номера',
+    en: 'Select page elements and add frames, callouts, and numbers to them',
   },
   clearPagePreparation: {
     ru: 'Сбросить всё',
     en: 'Reset all',
+  },
+  clearDrawings: {
+    ru: 'Очистить рисунки',
+    en: 'Clear drawings',
+  },
+  clearAnnotations: {
+    ru: 'Очистить аннотации',
+    en: 'Clear annotations',
+  },
+  restorePageContent: {
+    ru: 'Восстановить содержимое',
+    en: 'Restore page content',
+  },
+  clearReviewChanges: {
+    ru: 'Сбросить правки и замечания',
+    en: 'Clear edits and feedback',
   },
   resetPagePreparationMessage: {
     ru: 'Сбросить все изменения Sniptale на этой странице за текущую сессию?',
@@ -286,20 +430,20 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Changes in the current mode reset',
   },
   resetDrawingMessage: {
-    ru: 'Сбросить все рисунки в Drawing? Изменения остальных режимов сохранятся.',
-    en: 'Reset all drawings in Drawing? Changes from other modes will be kept.',
+    ru: 'Удалить все рисунки с этой страницы? Изменения в других режимах останутся.',
+    en: 'Remove all drawings from this page? Changes in other modes will be kept.',
   },
   resetAnnotationMessage: {
-    ru: 'Сбросить все рамки, эффекты и комментарии Annotation? Изменения остальных режимов сохранятся.',
-    en: 'Reset all frames, effects and comments in Annotation? Changes from other modes will be kept.',
+    ru: 'Удалить все рамки, эффекты и аннотации? Изменения в других режимах останутся.',
+    en: 'Remove all frames, effects and annotations? Changes in other modes will be kept.',
   },
   resetContentEditingMessage: {
-    ru: 'Сбросить все изменения Content Editing? Изменения остальных режимов сохранятся.',
-    en: 'Reset all Content Editing changes? Changes from other modes will be kept.',
+    ru: 'Восстановить исходное содержимое страницы? Изменения в других режимах останутся.',
+    en: 'Restore the original page content? Changes in other modes will be kept.',
   },
   resetDesignReviewMessage: {
-    ru: 'Сбросить все свойства и комментарии Design Review? Изменения остальных режимов сохранятся.',
-    en: 'Reset all Design Review properties and comments? Changes from other modes will be kept.',
+    ru: 'Отменить правки текста и свойств, удалить все замечания? Изменения в других режимах останутся.',
+    en: 'Undo text and property edits and remove all feedback? Changes in other modes will be kept.',
   },
   autoBlur: {
     ru: 'Размытие данных',
@@ -374,8 +518,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Collapse',
   },
   screenshotDisable: {
-    ru: 'Закрыть',
-    en: 'Close',
+    ru: 'Очистить и закрыть',
+    en: 'Clear and close',
   },
   screenshotDisableError: {
     ru: 'Не удалось закрыть панель. Повторите попытку.',

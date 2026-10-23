@@ -1,3 +1,6 @@
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { VideoProjectTrackRole, VideoTrackKind } from '../../../features/video/project/types';
@@ -89,4 +92,24 @@ it('uses the selected track name as its inspector identity', () => {
       selectedTrack
     )
   ).toMatchObject({ label: 'Callouts', title: 'Callouts' });
+});
+
+it('identifies a border interval by its own label and frame icon', () => {
+  const project = createEmptyVideoProject('Border');
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      id: 'border',
+      border: createQuickEditBorder(),
+      borderTarget: 'viewport',
+    },
+  ];
+  const meta = getSelectionMeta(
+    { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: 'border' },
+    null,
+    null,
+    project
+  );
+  expect(meta.title).toBe('gallery.videoReview.focusBorder');
+  expect(renderToStaticMarkup(<>{meta.icon}</>)).toContain('lucide-frame');
 });

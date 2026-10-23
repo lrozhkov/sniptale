@@ -1,3 +1,8 @@
+import {
+  motionFocusAreaPoint,
+  resizeOrientedMotionArea,
+} from '../../../../features/video/project/motion/focus-area';
+import { motionWindowFocusToComposition } from '../../../../features/video/composition/motion/source-window';
 import { buildDraggedArea } from '../../../interaction/placement-geometry';
 import { updateMotionArea } from '../../../interaction/motion-area';
 import { resolveAreaPointFromPointer } from './geometry';
@@ -24,7 +29,9 @@ export function beginAreaDrag({ area, event, mode, params }: AreaDragParams) {
     event.clientY,
     stage,
     params.project,
-    params.camera
+    params.camera,
+    params.selectedMotionRegion ?? undefined,
+    params.currentTime ?? 0
   );
   if (!startPoint) {
     return;
@@ -65,7 +72,9 @@ function createAreaDragMoveHandler(args: {
       moveEvent.clientY,
       args.stage,
       args.params.project,
-      args.params.camera
+      args.params.camera,
+      args.params.selectedMotionRegion ?? undefined,
+      args.params.currentTime ?? 0
     );
     if (!nextPoint) {
       return;
@@ -78,8 +87,12 @@ function createAreaDragMoveHandler(args: {
       args.mode
     );
     const snapPoint = args.mode === 'move' ? draggedArea : getAreaResizeSnapPoint(draggedArea);
+    const region = args.params.selectedMotionRegion;
+    const time = args.params.currentTime ?? 0;
     const snapped = snapStagePoint({
-      point: snapPoint,
+      point: region
+        ? motionWindowFocusToComposition(args.params.project, region, snapPoint, time)
+        : snapPoint,
       project: args.params.project,
       settings: args.params.grid
         ? {
@@ -93,17 +106,20 @@ function createAreaDragMoveHandler(args: {
     args.params.onGuideChange?.(snapped.guides);
     updateMotionArea(
       args.motionRegionId,
-      applyAreaSnap(draggedArea, snapped.point, args.mode),
+      applyAreaSnap(
+        draggedArea,
+        region
+          ? motionWindowFocusToComposition(args.params.project, region, snapped.point, time, true)
+          : snapped.point,
+        args.mode
+      ),
       args.params.onUpdateMotionRegion
     );
   };
 }
 
 function getAreaResizeSnapPoint(area: ReturnType<typeof buildDraggedArea>) {
-  return {
-    x: area.x + area.width,
-    y: area.y + area.height,
-  };
+  return motionFocusAreaPoint(area, 1, 1);
 }
 
 function applyAreaSnap(
@@ -115,6 +131,10 @@ function applyAreaSnap(
     return { ...area, x: point.x, y: point.y };
   }
 
+  if (area.axes) {
+    const corner = motionFocusAreaPoint(area, 1, 1);
+    return resizeOrientedMotionArea(area, 'se', { x: point.x - corner.x, y: point.y - corner.y });
+  }
   return {
     ...area,
     height: Math.max(48, point.y - area.y),

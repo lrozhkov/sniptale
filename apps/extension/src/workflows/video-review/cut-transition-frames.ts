@@ -40,6 +40,50 @@ function beforeEndpoint(value: number) {
   return view.getFloat64(0);
 }
 
+/** Reads only actual retained timestamps. The caller owns the returned sample. */
+export async function readRetainedTransitionSample<T extends ReviewTransitionSample>(
+  sink: {
+    getSample(time: number): Promise<T | null>;
+    samples(start: number, end: number): AsyncIterable<T>;
+  },
+  range: { start: number; end: number },
+  requestedTime: number | undefined,
+  fallback: 'first' | 'last',
+  check: () => void
+): Promise<T | null> {
+  let retained: T | null = null;
+  try {
+    check();
+    if (requestedTime !== undefined) {
+      retained = await sink.getSample(requestedTime);
+      check();
+      if (retained && isReviewTransitionFrame(retained.timestamp, range)) return retained;
+      retained?.close();
+      retained = null;
+    }
+    for await (const sample of sink.samples(range.start, range.end)) {
+      try {
+        check();
+      } catch (error) {
+        sample.close();
+        throw error;
+      }
+      if (!isReviewTransitionFrame(sample.timestamp, range)) {
+        sample.close();
+        continue;
+      }
+      retained?.close();
+      retained = sample;
+      if (fallback === 'first') break;
+    }
+    check();
+    return retained;
+  } catch (error) {
+    retained?.close();
+    throw error;
+  }
+}
+
 /** Owns at most one endpoint pair; the caller owns the sink's Input and cancels it on teardown. */
 export function createReviewTransitionFrames(sink: FrameSink, signal: AbortSignal) {
   let generation = 0;
@@ -64,42 +108,25 @@ export function createReviewTransitionFrames(sink: FrameSink, signal: AbortSigna
       };
       try {
         current();
-        let left = await sink.getSample(beforeEndpoint(plan.left.end));
-        if (left) owned.push(left);
-        current();
-        if (!left || !isReviewTransitionFrame(left.timestamp, plan.left)) {
-          left?.close();
-          owned.length = 0;
-          left = null;
-          // Packet lookup may round an almost-endpoint request onto the excluded boundary.
-          // Range iteration and actual timestamps remain authoritative, including VFR sources.
-          for await (const sample of sink.samples(plan.left.start, plan.left.end)) {
-            owned.push(sample);
-            current();
-            if (!isReviewTransitionFrame(sample.timestamp, plan.left)) {
-              sample.close();
-              owned.pop();
-              continue;
-            }
-            left?.close();
-            left = sample;
-            owned.splice(0, owned.length - 1);
-          }
-          if (!left) return null;
-        }
-        let right: ReviewTransitionSample | null = null;
-        for await (const sample of sink.samples(plan.right.start, plan.right.end)) {
-          owned.push(sample);
-          current();
-          if (isReviewTransitionFrame(sample.timestamp, plan.right)) {
-            right = sample;
-            break;
-          }
-          sample.close();
-          owned.pop();
-        }
-        current();
+        const left = await readRetainedTransitionSample(
+          sink,
+          plan.left,
+          beforeEndpoint(plan.left.end),
+          'last',
+          current
+        );
+        if (!left) return null;
+        owned.push(left);
+        const right = await readRetainedTransitionSample(
+          sink,
+          plan.right,
+          undefined,
+          'first',
+          current
+        );
         if (!right) return null;
+        owned.push(right);
+        current();
         retained = { left, right };
         owned.length = 0;
         return retained;

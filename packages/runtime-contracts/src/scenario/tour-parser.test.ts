@@ -1,3 +1,8 @@
+import { DEFAULT_WINDOW_HEADER } from '../window-header';
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { parseTourDocument, tourDocumentSchema } from './tour-parser';
@@ -34,56 +39,71 @@ function imageSlide(): TourImageSlide {
     origin: null,
     fit: 'contain',
     camera: { mode: 'auto', center: { x: 0.5, y: 0.5 }, zoom: 2 },
-    hotspots: [
-      {
-        id: 'point',
-        point: { x: 0.2, y: 0.3 },
-        targetRect: { x: 0.1, y: 0.2, width: 0.2, height: 0.2 },
-        label: 'Open settings',
-        text: 'Нажмите сюда',
-        action: { kind: 'next' },
-        appearance: null,
-        pulse: true,
-      },
-    ],
-    annotations: [
-      {
-        id: 'hint',
-        text: 'Подсказка',
-        anchor: null,
-        appearance: { presentation: 'caption-bottom', alignment: 'start', placement: 'auto' },
-      },
-    ],
     masks: [
       {
         id: 'mask',
         rect: { x: 0, y: 0, width: 0.1, height: 0.1 },
-        kind: 'highlight',
+        kind: 'blur',
         color: '#ff9900',
         opacity: 0.5,
       },
     ],
-    narration: {
-      assetId: 'audio',
-      duration: 12,
-      trimStart: 1,
-      trimEnd: 10,
-      gain: 1,
-      transcript: 'Настройки',
-    },
-    timing: { mode: 'auto', holdSeconds: 4, truncateNarration: false, autoplayTarget: null },
+    narration: null,
+    timing: { mode: 'auto', holdSeconds: 4, truncateNarration: false },
+    actions: [
+      {
+        type: 'hotspot' as const,
+        object: {
+          id: 'point',
+          narration: {
+            ...{
+              assetId: 'audio',
+              duration: 12,
+              trimStart: 1,
+              trimEnd: 10,
+              gain: 1,
+              transcript: 'Настройки',
+            },
+            trigger: 'enter',
+          },
+          point: { x: 0.2, y: 0.3 },
+          targetRect: { x: 0.1, y: 0.2, width: 0.2, height: 0.2 },
+          label: 'Open settings',
+          text: 'Нажмите сюда',
+          appearance: null,
+          visual: { kind: 'point' as const, pulse: true },
+        },
+      },
+      {
+        type: 'annotation' as const,
+        object: {
+          id: 'hint',
+          text: 'Подсказка',
+          anchor: null,
+          appearance: {
+            presentation: 'caption-bottom' as const,
+            alignment: 'start' as const,
+            placement: 'auto' as const,
+          },
+        },
+      },
+    ],
   };
 }
 function document(): TourDocument {
   return {
-    version: 1,
+    version: 2,
     id: 'tour',
     stage: { aspect: '16:9', background: '#101820' },
     style: {
       accent: '#ff9900',
       text: '#ffffff',
       surface: '#202830',
-      textAppearance: { presentation: 'callout', alignment: 'start', placement: 'auto' },
+      textAppearance: {
+        presentation: 'callout' as const,
+        alignment: 'start' as const,
+        placement: 'auto' as const,
+      },
     },
     playback: { autoplay: false, loop: false, minimumHoldSeconds: 4, autoZoom: true },
     transition: { kind: 'fade', durationMs: 250, hotspotTravelMs: 300 },
@@ -97,7 +117,7 @@ function document(): TourDocument {
         background: { color: '#202830', image: null },
         buttons: [{ id: 'button', label: 'В начало', action: { kind: 'slide', slideId: 'slide' } }],
         narration: null,
-        timing: { mode: 'manual', holdSeconds: 4, truncateNarration: false, autoplayTarget: null },
+        timing: { mode: 'manual', holdSeconds: 4, truncateNarration: false },
       },
     ],
     endScreen: {
@@ -151,9 +171,9 @@ describe('interactive tour boundary', () => {
     expect(parseTourDocument(value).status).toBe('ok');
   });
   it('distinguishes unsupported version from malformed input', () => {
-    expect(parseTourDocument({ ...document(), version: 2 })).toEqual({
+    expect(parseTourDocument({ ...document(), version: 1 })).toEqual({
       status: 'unsupported',
-      version: 2,
+      version: 1,
     });
     expect(parseTourDocument({ ...document(), version: '1' })).toEqual({ status: 'invalid' });
   });
@@ -161,7 +181,7 @@ describe('interactive tour boundary', () => {
     expect(
       parseTourDocument(
         mutateSlide((slide) => {
-          slide.hotspots[0]!.point.x = x;
+          getTourHotspots(slide)[0]!.point.x = x;
         })
       ).status
     ).toBe('invalid');
@@ -170,7 +190,7 @@ describe('interactive tour boundary', () => {
     expect(
       parseTourDocument(
         mutateSlide((slide) => {
-          slide.hotspots[0]!.targetRect = { x: 0.9, y: 0, width: 0.2, height: 0.2 };
+          getTourHotspots(slide)[0]!.targetRect = { x: 0.9, y: 0, width: 0.2, height: 0.2 };
         })
       ).status
     ).toBe('invalid');
@@ -191,33 +211,33 @@ describe('interactive tour boundary', () => {
     expect(
       parseTourDocument(
         mutateSlide((slide) => {
-          slide.hotspots[0]!.action = { kind: 'slide', slideId: 'missing' };
+          Object.assign(getTourHotspots(slide)[0]!, {
+            action: { kind: 'slide', slideId: 'missing' },
+          });
         })
       ).status
     ).toBe('invalid');
     expect(
       parseTourDocument(
         mutateSlide((slide) => {
-          slide.timing.autoplayTarget = 'missing';
+          Object.assign(slide.timing, { autoplayTarget: 'missing' });
         })
       ).status
     ).toBe('invalid');
   });
-  it('allows authored cycles; playback chooses its finite autoplay route separately', () => {
-    expect(
-      parseTourDocument(
-        mutateSlide((slide) => {
-          slide.hotspots[0]!.action = { kind: 'slide', slideId: slide.id };
-        })
-      ).status
-    ).toBe('ok');
+  it('allows contents to target a stable action identity', () => {
+    const value = document();
+    const menu = value.slides[1]!;
+    if (menu.kind !== 'navigation') throw new Error('Expected contents.');
+    menu.buttons[0]!.action = { kind: 'action', actionId: 'point' };
+    expect(parseTourDocument(value).status).toBe('ok');
   });
   it('rejects identity collisions across nested objects and slides', () => {
     for (const id of ['tour', 'slide', 'menu', 'hint', 'mask', 'button'])
       expect(
         parseTourDocument(
           mutateSlide((slide) => {
-            slide.hotspots[0]!.id = id;
+            getTourHotspots(slide)[0]!.id = id;
           })
         ).status
       ).toBe('invalid');
@@ -226,14 +246,14 @@ describe('interactive tour boundary', () => {
     expect(
       parseTourDocument(
         mutateSlide((slide) => {
-          slide.narration!.trimEnd = 1;
+          getTourHotspots(slide)[0]!.narration!.trimEnd = 1;
         })
       ).status
     ).toBe('invalid');
     expect(
       parseTourDocument(
         mutateSlide((slide) => {
-          slide.narration!.trimEnd = 13;
+          getTourHotspots(slide)[0]!.narration!.trimEnd = 13;
         })
       ).status
     ).toBe('invalid');
@@ -246,7 +266,7 @@ describe('interactive tour boundary', () => {
     expect(
       parseTourDocument(
         mutateSlide((slide) => {
-          slide.annotations[0]!.text = 'a'.repeat(4001);
+          getTourAnnotations(slide)[0]!.text = 'a'.repeat(4001);
         })
       ).status
     ).toBe('invalid');
@@ -296,7 +316,7 @@ describe('interactive tour boundary', () => {
     const schema = z.toJSONSchema(tourDocumentSchema);
     const serialized = JSON.stringify(schema);
     expect(serialized).toContain('hotspotTravelMs');
-    expect(serialized).toContain('autoplayTarget');
+    expect(serialized).not.toContain('autoplayTarget');
     expect(serialized).toContain('caption-top');
   });
 });
@@ -318,11 +338,20 @@ it('preserves explicit target-review state and rejects non-boolean values', () =
 it('admits independent audio materials and preserves per-object activation semantics', () => {
   const tour = document();
   const slide = imageSlide();
-  const voice = { ...slide.narration!, trigger: 'activation' };
+  const voice = { ...getTourHotspots(slide)[0]!.narration!, trigger: 'activation' as const };
   const value = {
     ...tour,
     audioResources: [{ assetId: 'audio', duration: 12, name: 'Voice.wav' }],
-    slides: [{ ...slide, hotspots: slide.hotspots.map((h) => ({ ...h, narration: voice })) }],
+    slides: [
+      {
+        ...slide,
+        actions: [
+          ...getTourHotspots(slide)
+            .map((h) => ({ ...h, narration: voice }))
+            .map((object) => ({ type: 'hotspot' as const, object })),
+        ],
+      },
+    ],
   };
   expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
   expect(
@@ -338,8 +367,13 @@ it('roundtrips narration on all object kinds and rejects conflicting resources o
   const slide = value.slides[0]!;
   const menu = value.slides[1]!;
   if (slide.kind !== 'image' || menu.kind !== 'navigation') throw Error('fixture');
-  const voice = { ...slide.narration!, trigger: 'enter' as const };
-  for (const object of [...slide.hotspots, ...slide.annotations, ...slide.masks, ...menu.buttons])
+  const voice = { ...getTourHotspots(slide)[0]!.narration!, trigger: 'enter' as const };
+  for (const object of [
+    ...getTourHotspots(slide),
+    ...getTourAnnotations(slide),
+    ...slide.masks,
+    ...menu.buttons,
+  ])
     object.narration = voice;
   expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
   expect(
@@ -362,7 +396,12 @@ it('roundtrips narration on all object kinds and rejects conflicting resources o
     slides: [
       {
         ...slide,
-        annotations: [{ ...slide.annotations[0], narration: { ...voice, trigger: 'hover' } }],
+        actions: [
+          {
+            type: 'annotation' as const,
+            object: { ...getTourAnnotations(slide)[0], narration: { ...voice, trigger: 'hover' } },
+          },
+        ],
       },
     ],
   };
@@ -441,72 +480,43 @@ it('bounds the camera entrance duration, delay and explicit automatic zoom', () 
   }
 });
 
-describe('slide object order', () => {
-  const ordered = (change: (slide: TourImageSlide) => void) =>
-    parseTourDocument(mutateSlide(change));
-  it('roundtrips a valid mixed order and derives legacy order without the field', () => {
-    const value = mutateSlide((slide) => {
-      slide.objectOrder = ['mask', 'point', 'hint'];
-    });
+describe('ordered actions', () => {
+  it('stores mixed action order once and keeps permanent effects separate', () => {
+    const value = mutateSlide((slide) => slide.actions.reverse());
     expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
-    const parsed = parseTourDocument(document());
-    expect(parsed.status).toBe('ok');
-    if (parsed.status !== 'ok') throw new Error('Expected document');
-    const slide = parsed.document.slides[0]!;
-    if (slide.kind !== 'image') throw new Error('Expected image slide');
-    expect(slide.objectOrder).toBeUndefined();
+    const slide = value.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image.');
     expect(getTourSlideObjects(slide).map((entry) => entry.object.id)).toEqual([
-      'point',
       'hint',
+      'point',
       'mask',
     ]);
+    expect(
+      parseTourDocument({ ...value, slides: [{ ...slide, objectOrder: ['point', 'hint'] }] }).status
+    ).toBe('invalid');
   });
-  it('orders mixed objects by stored ids and appends unlisted objects deterministically', () => {
+  it('rejects duplicate action identities and unknown action kinds', () => {
     const slide = imageSlide();
-    slide.objectOrder = ['mask', 'point', 'hint'];
-    expect(getTourSlideObjects(slide).map((entry) => entry.object.id)).toEqual([
-      'mask',
-      'point',
-      'hint',
-    ]);
+    slide.actions.push(slide.actions[0]!);
+    expect(parseTourDocument({ ...document(), slides: [slide] }).status).toBe('invalid');
     expect(
-      getTourSlideObjects({ ...slide, objectOrder: ['hint'] }).map((entry) => entry.object.id)
-    ).toEqual(['hint', 'point', 'mask']);
+      tourDocumentSchema.shape.slides.safeParse([
+        { ...imageSlide(), actions: [{ type: 'mask', object: imageSlide().masks[0] }] },
+      ]).success
+    ).toBe(false);
   });
-  it.each([
-    ['duplicate ids', ['point', 'point', 'hint', 'mask']],
-    ['a missing object', ['point', 'hint']],
-    ['an unknown id', ['point', 'hint', 'mask', 'other']],
-    ['an empty list on a populated slide', []],
-  ])('rejects an explicit order with %s', (_name, objectOrder) => {
+  it('rejects oversized action lists and standalone attention effects', () => {
+    const slide = imageSlide();
+    slide.actions = Array.from({ length: TOUR_LIMITS.maxHotspots + 1 }, (_, index) => ({
+      type: 'hotspot' as const,
+      object: { ...getTourHotspots(slide)[0]!, id: `a-${index}` },
+    }));
+    expect(parseTourDocument({ ...document(), slides: [slide] }).status).toBe('invalid');
     expect(
-      ordered((slide) => {
-        slide.objectOrder = objectOrder;
-      }).status
-    ).toBe('invalid');
-  });
-  it('rejects an order above the combined object limit and malformed ids', () => {
-    const limit = TOUR_LIMITS.maxHotspots + TOUR_LIMITS.maxAnnotations + TOUR_LIMITS.maxMasks;
-    expect(
-      ordered((slide) => {
-        slide.objectOrder = Array.from({ length: limit + 1 }, (_value, index) => `o-${index}`);
-      }).status
-    ).toBe('invalid');
-    expect(
-      ordered((slide) => {
-        slide.objectOrder = ['point', 'hint', 'mask', 'bad id!'];
-      }).status
-    ).toBe('invalid');
-  });
-  it('keeps navigation slides free of the field under strict parsing', () => {
-    const value = document();
-    const slide = value.slides[1]!;
-    expect(
-      parseTourDocument({
-        ...value,
-        slides: [value.slides[0]!, { ...slide, objectOrder: ['button'] }],
-      }).status
-    ).toBe('invalid');
+      tourDocumentSchema.shape.slides.safeParse([
+        { ...imageSlide(), masks: [{ ...imageSlide().masks[0], kind: 'highlight' }] },
+      ]).success
+    ).toBe(false);
   });
 });
 
@@ -612,11 +622,11 @@ describe('marker appearance and callout distance', () => {
     value.style.markerAppearance = { color: '#Ab12EF', pulseColor: null, size };
     value.style.hotspotAppearance = { ...value.style.textAppearance, calloutGap };
     const slide = imageSlide();
-    slide.hotspots[0]!.markerAppearance = { color: null, pulseColor: '#abcdef', size };
-    slide.hotspots[0]!.appearance = { ...value.style.textAppearance, calloutGap };
+    getTourHotspots(slide)[0]!.markerAppearance = { color: null, pulseColor: '#abcdef', size };
+    getTourHotspots(slide)[0]!.appearance = { ...value.style.textAppearance, calloutGap };
     value.slides[0] = slide;
     expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
-    slide.hotspots[0]!.markerAppearance = null;
+    getTourHotspots(slide)[0]!.markerAppearance = null;
     expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
   });
   it('rejects malformed marker fields at both global and local boundaries', () => {
@@ -638,7 +648,17 @@ describe('marker appearance and callout distance', () => {
       expect(
         parseTourDocument({
           ...value,
-          slides: [{ ...slide, hotspots: [{ ...slide.hotspots[0], markerAppearance }] }],
+          slides: [
+            {
+              ...slide,
+              actions: [
+                {
+                  type: 'hotspot' as const,
+                  object: { ...getTourHotspots(slide)[0], markerAppearance },
+                },
+              ],
+            },
+          ],
         }).status
       ).toBe('invalid');
     }
@@ -662,7 +682,14 @@ describe('marker appearance and callout distance', () => {
       expect(
         parseTourDocument({
           ...value,
-          slides: [{ ...slide, hotspots: [{ ...slide.hotspots[0], appearance }] }],
+          slides: [
+            {
+              ...slide,
+              actions: [
+                { type: 'hotspot' as const, object: { ...getTourHotspots(slide)[0], appearance } },
+              ],
+            },
+          ],
         }).status
       ).toBe('invalid');
     }
@@ -796,4 +823,37 @@ it('strictly admits complete bounded global and local highlight phase pairs', ()
       }).status
     ).toBe(animation === null ? 'ok' : 'invalid');
   }
+});
+
+it('retains global window headers and independent image placement without changing source coordinates', () => {
+  const value = document();
+  value.stage.windowHeader = { ...DEFAULT_WINDOW_HEADER, kind: 'application', title: 'Window' };
+  const slide = value.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.imagePlacement = { center: { x: 0.3, y: 0.7 }, zoom: 2.5 };
+  const before = structuredClone(value);
+  const parsed = parseTourDocument(value);
+  expect(parsed).toEqual({ status: 'ok', document: before });
+  expect(value).toEqual(before);
+  if (parsed.status !== 'ok') throw new Error('Expected parsed tour');
+  parsed.document.stage.windowHeader!.title = 'Other';
+  expect(value.stage.windowHeader.title).toBe('Window');
+});
+it('rejects remote header icons and nonfinite or out-of-range source placement', () => {
+  const value = document();
+  value.stage.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    faviconEnabled: true,
+    faviconDataUrl: 'https://site.test/icon.png',
+  };
+  expect(parseTourDocument(value).status).toBe('invalid');
+  delete value.stage.windowHeader;
+  const slide = value.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  for (const zoom of [NaN, Infinity, 0, 8.1]) {
+    slide.imagePlacement = { center: { x: 0.5, y: 0.5 }, zoom };
+    expect(parseTourDocument(value).status).toBe('invalid');
+  }
+  slide.imagePlacement = { center: { x: 1.1, y: 0.5 }, zoom: 1 };
+  expect(parseTourDocument(value).status).toBe('invalid');
 });

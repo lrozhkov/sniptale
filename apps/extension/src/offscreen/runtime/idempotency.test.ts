@@ -109,6 +109,25 @@ it('namespaces project export replay by command, job, and authority generation',
   ).toThrow('Missing OFFSCREEN_START_PROJECT_EXPORT job identity');
 });
 
+it('separates countdown generations while retaining duplicate command completion', async () => {
+  const type = VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER;
+  const first = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'countdown-generation',
+    message: { type, peerId: 'countdown:["recording","document",0]' },
+  });
+  const duplicate = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'countdown-generation',
+    message: { type, peerId: 'countdown:["recording","document",0]' },
+  });
+  const next = markOffscreenSideEffectCommand({
+    capabilityGeneration: 'countdown-generation',
+    message: { type, peerId: 'countdown:["recording","document",1]' },
+  });
+  expect(first.duplicate).toBe(false);
+  expect(duplicate.duplicate).toBe(true);
+  expect(next.duplicate).toBe(false);
+});
+
 it('shares one camera negotiation per peer without replaying it across peers', async () => {
   const firstPeer = markOffscreenSideEffectCommand({
     capabilityGeneration: 'camera-generation',

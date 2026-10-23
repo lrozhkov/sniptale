@@ -70,6 +70,7 @@ it('prepares the preview canvas and redraws the scene background', () => {
   expect(prepared).not.toBeNull();
   expect(context.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
   expect(drawSceneBackgroundMock).toHaveBeenCalledWith({
+    projectScale: 1,
     audioEnvelope: 0,
     context,
     currentTime: 0,
@@ -117,4 +118,68 @@ it('caps EffectV1 preview raster to the physical viewport while retaining logica
       stage: null,
     })
   ).toBe(0.25);
+});
+
+it.each([false, true])('converts background pixels before DPR with camera=%s', (moving) => {
+  const project = createEmptyVideoProject('Preview blur');
+  project.width = 640;
+  project.height = 360;
+  project.sceneBackground = { kind: 'solid', color: '#123456', blur: 12 };
+  const context = { setTransform: vi.fn(), clearRect: vi.fn() };
+  const canvas = {
+    clientWidth: 320,
+    clientHeight: 180,
+    width: 640,
+    height: 360,
+    getContext: () => context,
+  } as unknown as HTMLCanvasElement;
+  const camera = { scale: 2, viewportX: 40, viewportY: 30 };
+  const prepared = resolvePreparedPreviewSceneCanvas({
+    ...(moving ? { backgroundCamera: camera } : {}),
+    canvas,
+    project,
+    imageBank: {},
+    stage: null,
+    shouldClearCanvas: true,
+    previewRasterSize: { width: 640, height: 360 },
+  });
+  expect(prepared?.dpr).toBe(2);
+  expect(drawSceneBackgroundMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      width: 320,
+      height: 180,
+      ...(moving ? { camera } : {}),
+      projectScale: 0.5,
+      sceneBackground: { kind: 'solid' },
+    })
+  );
+  expect(context.setTransform).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0);
+});
+
+it('sizes a detached drawing canvas from the presented viewport without resizing the presented canvas', () => {
+  const canvas = document.createElement('canvas');
+  const viewportCanvas = document.createElement('canvas');
+  viewportCanvas.width = 320;
+  viewportCanvas.height = 180;
+  Object.defineProperty(viewportCanvas, 'clientWidth', { get: () => 960 });
+  Object.defineProperty(viewportCanvas, 'clientHeight', { get: () => 540 });
+  const context = createContextMock();
+  Object.defineProperty(canvas, 'getContext', { value: () => context });
+  const args = {
+    canvas,
+    viewportCanvas,
+    imageBank: {},
+    project: createEmptyVideoProject('Detached', 1280, 720),
+    shouldClearCanvas: true,
+    stage: null,
+    previewRasterSize: { width: 480, height: 270 },
+  };
+  const prepared = resolvePreparedPreviewSceneCanvas(args)!;
+  expect(prepared.bounds).toEqual({ width: 960, height: 540 });
+  expect(prepared.viewport.scale).toBe(0.75);
+  expect(prepared.dpr).toBe(0.5);
+  expect(canvas.width).toBe(480);
+  expect(canvas.height).toBe(270);
+  expect(viewportCanvas.width).toBe(320);
+  expect(viewportCanvas.height).toBe(180);
 });

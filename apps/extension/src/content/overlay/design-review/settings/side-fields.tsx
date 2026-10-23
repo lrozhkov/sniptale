@@ -2,7 +2,8 @@ import { Link2, Unlink2 } from 'lucide-react';
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
-import { propertyValue } from '../value-editing/values';
+import { propertyModified, propertyValue } from '../value-editing/values';
+import { FieldResetButton } from './field-shell';
 import { AXIS_SIDE_INDEXES, type SideAxis, useSideFieldLinking } from './side-fields-state';
 import { resolveSideValueKind, SideValueInput } from './side-value-input';
 
@@ -67,7 +68,7 @@ function LinkToggle(props: {
         'hover:brightness-110 disabled:opacity-50 focus:outline-none',
         'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         props.linked
-          ? 'text-[var(--sniptale-color-accent)]'
+          ? 'text-[var(--sniptale-color-text-primary)]'
           : 'text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       data-side-link={props.name}
@@ -219,18 +220,25 @@ export function LinkedSideFields(props: {
       data-ui="content.design-review.side-field"
       data-side-field-label={props.label}
     >
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_1.75rem] items-center gap-x-1.5 gap-y-1">
-        <div className="min-w-0">
-          <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] items-center gap-x-1.5 gap-y-1">
+        <div className={expanded ? 'col-span-2 min-w-0' : 'min-w-0'}>
+          <div className="flex min-w-0 items-center gap-1">
+            <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
+            {linking.model.modifiedCount > 0 && !props.disabled ? (
+              <FieldResetButton
+                label={props.label}
+                onReset={() => {
+                  for (const property of props.properties) {
+                    if (propertyModified(props.state, property))
+                      props.onChange(property, props.state.defaultValues[property] ?? '');
+                  }
+                }}
+              />
+            ) : null}
+          </div>
         </div>
-        <LinkToggle
-          disabled={props.disabled}
-          linked={linking.model.linked}
-          name="all"
-          onClick={linking.toggleAll}
-        />
         {!expanded ? (
-          <div className="col-span-2 min-w-0">
+          <div className="min-w-0">
             <CompactSideValues
               disabled={props.disabled}
               properties={props.properties}
@@ -239,6 +247,12 @@ export function LinkedSideFields(props: {
             />
           </div>
         ) : null}
+        <LinkToggle
+          disabled={props.disabled}
+          linked={linking.model.linked}
+          name="all"
+          onClick={linking.toggleAll}
+        />
       </div>
       {expanded ? (
         <div className="grid w-full gap-1.5" data-ui="content.design-review.side-values-expanded">

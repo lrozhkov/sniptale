@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -688,8 +688,10 @@ it('recomputes the decorated pan plane and top boundary across header and backgr
 it('uses the scene canvas scale for projected comments at rounded window corners', async () => {
   const { createCanvasComment } = await import('../../features/video/review/comments');
   const { createQuickEditZoomRegion } = await import('../../features/video/review/advanced/zoom');
-  const { quickEditSpatialTargetCamera, DEFAULT_QUICK_EDIT_PERSPECTIVE } =
+  const { quickEditSpatialTargetCamera } =
     await import('../../features/video/review/advanced/spatial');
+  const { DEFAULT_CAMERA_PERSPECTIVE: DEFAULT_QUICK_EDIT_PERSPECTIVE } =
+    await import('../../features/video/project/motion/spatial');
   const background = {
     enabled: true as const,
     type: 'solid' as const,

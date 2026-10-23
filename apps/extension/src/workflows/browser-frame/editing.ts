@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_WINDOW_HEADER, type WindowHeader } from '../../features/browser-frame/header';
+import {
+  DEFAULT_WINDOW_HEADER,
+  type WindowHeader,
+} from '@sniptale/runtime-contracts/window-header';
 import { translate } from '../../platform/i18n';
 import { acquireWindowHeaderFavicon } from './favicon';
 import { importWindowHeaderIcon } from './local-icon';
@@ -7,6 +10,7 @@ import { importWindowHeaderIcon } from './local-icon';
 type Source = 'site' | 'file';
 export interface WindowHeaderSettingsProps {
   header: WindowHeader | undefined;
+  rememberedHeader?: WindowHeader | undefined;
   onChange: (header: WindowHeader | undefined) => void | Promise<void>;
   disabled?: boolean;
   allowNone?: boolean;
@@ -65,6 +69,7 @@ function needsWebsiteIcon(header: WindowHeader | undefined): boolean {
 /** Mounting persisted settings is offline; only explicit gestures acquire an icon. */
 export function useWindowHeaderEditing({
   header,
+  rememberedHeader,
   onChange,
   disabled = false,
 }: WindowHeaderSettingsProps) {
@@ -162,7 +167,9 @@ export function useWindowHeaderEditing({
     cancel();
     setError(null);
     void commit(
-      kind === 'none' ? undefined : { ...(latest.current ?? DEFAULT_WINDOW_HEADER), kind }
+      kind === 'none'
+        ? undefined
+        : { ...(latest.current ?? rememberedHeader ?? DEFAULT_WINDOW_HEADER), kind }
     );
   }
   async function changeAddress(url: string) {

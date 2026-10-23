@@ -58,7 +58,9 @@ describe('ProductDropdown contextual attributes', () => {
   it('forwards menu container attributes for contextual editor surfaces', () => {
     const markup = renderToStaticMarkup(
       <ProductDropdownMenu data-ui="layout-menu" role="menu" style={{ width: '18rem' }}>
-        <ProductDropdownItem type="submit">Apply</ProductDropdownItem>
+        <ProductDropdownItem type="submit" role="menuitem" tabIndex={-1}>
+          Apply
+        </ProductDropdownItem>
       </ProductDropdownMenu>
     );
 
@@ -66,5 +68,7 @@ describe('ProductDropdown contextual attributes', () => {
     expect(markup).toContain('role="menu"');
     expect(markup).toContain('width:18rem');
     expect(markup).toContain('type="submit"');
+    expect(markup).toContain('role="menuitem"');
+    expect(markup).toContain('tabindex="-1"');
   });
 });

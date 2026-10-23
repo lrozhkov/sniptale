@@ -84,6 +84,22 @@ it('issues trusted manual activation and saved TAB start intents', async () => {
   expect(sendRuntimeMessage.mock.calls[0]?.[0]).toHaveProperty('contentIntent.token', 'intent-1');
 });
 
+it('issues explicit confirmation from the new trusted Continue event', async () => {
+  sendRuntimeMessage.mockResolvedValue({ success: true });
+  const event = new Event('click');
+  await startSavedTabVideoRecording(event, {
+    confirmedWithoutMicrophone: true,
+    rememberWithoutMicrophone: true,
+  });
+  expect(sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'START_SAVED_TAB_VIDEO_RECORDING',
+      confirmedWithoutMicrophone: true,
+      rememberWithoutMicrophone: true,
+    })
+  );
+});
+
 it('routes camera negotiation, close, and release with surface identity only', async () => {
   sendRuntimeMessage
     .mockResolvedValueOnce({ success: true, sdp: 'answer-sdp' })

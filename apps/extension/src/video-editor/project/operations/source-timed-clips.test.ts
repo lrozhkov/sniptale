@@ -537,3 +537,70 @@ it('freezes the previous occurrence scene point when deleting its source instead
     focusPoint: { x: 120, y: 70 },
   });
 });
+
+it('rebuilds trimmed, rated and moved cursor observations while retaining manual samples', () => {
+  const project = createAnchoredInteractionProject();
+  project.version = 33;
+  if (!project.cursorTrack) throw new Error('Expected cursor');
+  project.cursorTrack.samples = project.cursorTrack.samples.filter(
+    (sample) => !sample.sourceAnchor
+  );
+  project.cursorTrack.sourceObservations = [
+    {
+      recordingId: 'recording-1',
+      sourceInstanceId: 'instance-anchor-clip',
+      samples: [
+        {
+          id: 'raw-a',
+          time: 0,
+          x: 0,
+          y: 0,
+          visible: true,
+          observation: 'observed',
+          recordingPoint: { x: 0, y: 0 },
+          interpolation: 'LINEAR',
+        },
+        {
+          id: 'raw-b',
+          time: 8,
+          x: 1280,
+          y: 720,
+          visible: true,
+          observation: 'observed',
+          recordingPoint: { x: 1, y: 1 },
+          interpolation: 'LINEAR',
+        },
+      ],
+    },
+  ];
+  const facts = structuredClone(project.cursorTrack.sourceObservations);
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected source');
+  const changed = reconcileRecordingInteractionAnchors(project, {
+    ...project,
+    clips: [
+      updateSourceTimedClipTiming(clip, {
+        sourceStart: 2,
+        sourceDuration: 4,
+        playbackRate: 2,
+        startTime: 5,
+      }),
+    ],
+  });
+  const boundary = changed.cursorTrack?.samples.find(
+    (sample) => sample.sourceAnchor?.sourceTime === 2
+  );
+  expect(boundary).toMatchObject({ time: 5, recordingPoint: { x: 0.25, y: 0.25 } });
+  expect(changed.cursorTrack?.samples.find((sample) => sample.id === 'manual-cursor')).toEqual(
+    project.cursorTrack.samples[0]
+  );
+  expect(changed.cursorTrack?.sourceObservations).toEqual(facts);
+  const restored = reconcileRecordingInteractionAnchors(changed, {
+    ...changed,
+    clips: [updateSourceTimedClipTiming(clip, { sourceDuration: 8 })],
+  });
+  expect(
+    restored.cursorTrack?.samples.some((sample) => sample.sourceAnchor?.sourceTime === 8)
+  ).toBe(true);
+  expect(restored.cursorTrack?.sourceObservations).toEqual(facts);
+});

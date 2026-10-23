@@ -229,6 +229,21 @@
   }
 }
 
+@keyframes sniptale-recording-click-press {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  50% {
+    opacity: 0.5;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-ui='content.video-recording.spotlight-click'] {
     animation: none !important;

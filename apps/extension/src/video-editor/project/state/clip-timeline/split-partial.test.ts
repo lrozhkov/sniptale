@@ -385,3 +385,160 @@ it.each(['boundary', 'click', 'dwell'] as const)(
     ).toHaveLength(1);
   }
 );
+
+it('keeps camera appearance through a partial rate-two split and independent duplicate', async () => {
+  const { project, screen, camera, cameraTrack } = setup(1, 4);
+  cameraTrack.role = 'CAMERA';
+  const cameraAppearance = {
+    shape: 'circle' as const,
+    roundness: 61,
+    zoom: 1.5,
+    panX: 0.2,
+    panY: -0.1,
+  };
+  const cameraPositions = [
+    {
+      id: 'crop',
+      sourceTime: 4,
+      transform: { ...camera.transform },
+      fitMode: camera.fitMode,
+      transition: { kind: 'smooth' as const, duration: 2 },
+      crop: { zoom: 3, panX: -0.5, panY: 0.5 },
+    },
+  ];
+  const mirrored = {
+    ...camera,
+    cameraMirrored: true,
+    sourceCrop: { x: 0.25, y: 0.1, width: 0.5, height: 0.8 },
+    shadowColor: '#ff008080',
+    windowCornerRadius: 24,
+    cameraAppearance,
+    cameraPositions,
+    cameraHiddenRanges: [{ id: 'hidden', start: 4, end: 6 }],
+  };
+  const authored = {
+    ...project,
+    version: 15 as const,
+    clips: project.clips.map((clip) => (clip.id === camera.id ? mirrored : clip)),
+  };
+  const split = splitProjectClipsAtTimeWithResult(authored, camera.id, 3);
+  expect(split).not.toBeNull();
+  const cameraClips = split!.project.clips.filter((clip) => clip.trackId === cameraTrack.id);
+  expect(cameraClips).toHaveLength(2);
+  expect(
+    cameraClips.every(
+      (clip) =>
+        clip.type === 'VIDEO' &&
+        clip.cameraMirrored === true &&
+        JSON.stringify(clip.sourceCrop) === JSON.stringify(mirrored.sourceCrop) &&
+        clip.shadowColor === '#ff008080' &&
+        clip.windowCornerRadius === 24 &&
+        clip.cameraAppearance?.shape === 'circle' &&
+        JSON.stringify(clip.cameraPositions) === JSON.stringify(cameraPositions) &&
+        JSON.stringify(clip.cameraHiddenRanges) === JSON.stringify(mirrored.cameraHiddenRanges)
+    )
+  ).toBe(true);
+  expect(
+    cameraClips.map((clip) =>
+      clip.type === 'VIDEO' ? [clip.sourceStart, clip.sourceDuration, clip.playbackRate] : []
+    )
+  ).toEqual([
+    [1, 4, 2],
+    [5, 4, 2],
+  ]);
+  const { resolveCameraClip } = await import('../../../../features/video/project/camera/animation');
+  const right = cameraClips.find((clip) => clip.startTime === 3);
+  if (right?.type !== 'VIDEO') throw new Error('Expected right camera fragment');
+  expect(resolveCameraClip(right, 3.25).cameraAppearance).toEqual(
+    resolveCameraClip(mirrored, 3.25).cameraAppearance
+  );
+  const duplicate = duplicateProjectClipsWithResult(authored, camera.id);
+  expect(duplicate).not.toBeNull();
+  expect(
+    duplicate!.project.clips.find((clip) => clip.id === duplicate!.duplicateClipId)
+  ).toMatchObject({
+    cameraMirrored: true,
+    cameraAppearance,
+    cameraPositions,
+    cameraHiddenRanges: mirrored.cameraHiddenRanges,
+    sourceCrop: mirrored.sourceCrop,
+    windowCornerRadius: 24,
+    shadowColor: '#ff008080',
+    sourceStart: 1,
+    sourceDuration: 8,
+    playbackRate: 2,
+  });
+  expect(project.clips.find((clip) => clip.id === screen.id)).toBe(screen);
+  expect('cameraMirrored' in camera).toBe(false);
+});
+
+it('keeps dormant source framing inactive and independent through public split and duplicate commands', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'dormant',
+    filename: 'Dormant.webm',
+    width: 640,
+    height: 360,
+    duration: 8,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source video');
+  const region = bindMotionRegionToClip(
+    { ...createVideoProjectMotionRegion(project, 1), duration: 6 },
+    clip
+  );
+  region.sourceBinding = { ...region.sourceBinding!, dormant: true };
+  const authored = applyVideoProjectMutationPatch(project, {
+    motionRegions: [projectMotionSourceBinding(project, region)],
+  });
+  expect(authored.version).toBe(34);
+  const before = structuredClone(authored);
+  const createEditor = () =>
+    createStore<VideoEditorProjectState>()((set, get) => ({
+      project: authored,
+      currentTime: 4,
+      placementMode: null,
+      selection: { kind: 'clip', clipId: clip.id },
+      selectedTrackId: clip.trackId,
+      projectHistory: resetVideoEditorProjectHistory(authored.id),
+      ...createVideoEditorProjectActions(set, get),
+    }));
+  const splitEditor = createEditor();
+  splitEditor.getState().splitClipAt(clip.id, 4);
+  const split = splitEditor.getState().project!;
+  const splitVideos = split.clips.filter((clip) => clip.type === 'VIDEO');
+  expect(splitVideos).toHaveLength(2);
+  expect(split.motionRegions).toHaveLength(2);
+  expect(new Set(split.motionRegions!.map((region) => region.sourceBinding?.clipId))).toEqual(
+    new Set(splitVideos.map((clip) => clip.id))
+  );
+  const duplicateEditor = createEditor();
+  duplicateEditor.getState().duplicateClip(clip.id);
+  const duplicated = duplicateEditor.getState().project!;
+  expect(duplicated.motionRegions).toHaveLength(2);
+  const copy = duplicated.motionRegions!.find((retained) => retained.id !== region.id)!;
+  expect(copy.sourceBinding!.clipId).not.toBe(clip.id);
+  expect(copy.sourceBinding?.dormant).toBe(true);
+  for (const candidate of [split, duplicated]) {
+    const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(candidate)));
+    expect(isExportReadyVideoProject(reopened)).toBe(true);
+    for (const retained of reopened.motionRegions!) {
+      expect(retained.duration).toBe(0);
+      expect(retained.sourceBinding).toMatchObject({ dormant: true, sourceStart: 1, sourceEnd: 7 });
+    }
+    for (const time of [0, 2, 4, 6, 9])
+      expect(resolveVideoCompositionFrame(reopened, time).camera.scale).toBe(1);
+  }
+  expect(authored).toEqual(before);
+});
+
+import {
+  bindMotionRegionToClip,
+  projectMotionSourceBinding,
+} from '../../../../features/video/project/motion/source-binding';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
+import { isExportReadyVideoProject } from '../../../../features/video/project/validation/root';
+import { hydrateVideoProject } from '../../../../features/video/project/hydration';
+import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';

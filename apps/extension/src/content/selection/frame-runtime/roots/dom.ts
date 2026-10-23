@@ -34,6 +34,10 @@ export function renderInteractiveFrames({
   }
 
   const framesWithZIndex = getSortedFramesWithZIndex(currentFrames, currentFrameStates);
+  // Isolated frame roots cannot escape their parent stacking context.
+  container.style.zIndex = String(
+    framesWithZIndex.reduce((level, frame) => Math.max(level, frame.zIndex), 0)
+  );
   framesWithZIndex.forEach((frameWithZIndex) => {
     if (!container.isConnected) {
       return;

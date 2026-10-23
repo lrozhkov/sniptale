@@ -27,6 +27,7 @@ import type { ToolbarMenuState } from '../state/menu';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import { PopoverCheckIcon } from '../../icons/icons';
 import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
+import { useToolbarMenuDirection } from '../menu/direction';
 
 type FullPageMenuProps = {
   compactMenus: boolean;
@@ -81,7 +82,6 @@ function FloatingModeItems(props: Pick<FullPageMenuProps, 'onUpdate' | 'preferen
       <ProductToolbarMenuItem
         key={option.value}
         dataUi={`content.toolbar.full-page-floating.${option.value}`}
-        disabled={props.saving}
         selected={selected}
         onClick={(event) => {
           stopMenuEvent(event);
@@ -125,13 +125,10 @@ function BooleanPreferenceItem(props: {
   );
 }
 
-function FullPagePreferencesMenu(
-  props: FullPageMenuProps & {
-    menuRef: React.RefObject<HTMLDivElement | null>;
-    triggerRef: React.RefObject<HTMLButtonElement | null>;
-  }
-) {
-  const adopted = React.useContext(CommandPressScope);
+function resolveFullPageMenuLayout(props: {
+  displayMode: FullPageMenuProps['displayMode'];
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+}) {
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.triggerRef,
     displayMode: props.displayMode,
@@ -146,6 +143,17 @@ function FullPagePreferencesMenu(
     menuHeight: 380,
     menuWidth: 300,
   });
+  return { placement: menuPlacement, style };
+}
+
+function FullPagePreferencesMenu(
+  props: FullPageMenuProps & {
+    menuRef: React.RefObject<HTMLDivElement | null>;
+    triggerRef: React.RefObject<HTMLButtonElement | null>;
+  }
+) {
+  const adopted = React.useContext(CommandPressScope);
+  const { placement: menuPlacement, style } = resolveFullPageMenuLayout(props);
   if (!style) return null;
 
   return (
@@ -161,7 +169,7 @@ function FullPagePreferencesMenu(
         variant="capture"
       >
         <BooleanPreferenceItem
-          disabled={props.saving}
+          disabled={false}
           hint={translate('content.toolbar.fullPageLazyContentHint')}
           icon={<ImageDown aria-hidden="true" className="sniptale-popover-icon" />}
           label={translate('content.toolbar.fullPageLazyContent')}
@@ -171,7 +179,7 @@ function FullPagePreferencesMenu(
           }
         />
         <BooleanPreferenceItem
-          disabled={props.saving}
+          disabled={false}
           hint={translate('content.toolbar.fullPageFreezeMotionHint')}
           icon={<Snowflake aria-hidden="true" className="sniptale-popover-icon" />}
           label={translate('content.toolbar.fullPageFreezeMotion')}
@@ -198,6 +206,9 @@ function FullPagePreferencesMenu(
 
 export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuSide = useToolbarMenuDirection(() =>
+    resolveFullPageMenuLayout({ displayMode: props.displayMode, triggerRef })
+  );
   const menuRef = useRef<HTMLDivElement>(null);
   const open = props.toolbarMenuState.activeMenuType === 'full-page';
   const closeMenu = useCallback(() => {
@@ -238,6 +249,7 @@ export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
         aria-haspopup="menu"
         className="sniptale-split-action-end sniptale-full-page-chevron"
         data-menu-open={open ? 'true' : 'false'}
+        data-menu-side={menuSide}
         dataUi="content.toolbar.capture-full-settings-button"
         disabled={props.disabled}
         onClick={(event) => {

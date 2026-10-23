@@ -15,7 +15,11 @@ type ContentRuntimeListenerDeps = {
   fullPageCaptureAgent?: FullPageCaptureAgent;
   regionSelectorController: Pick<
     RegionSelectorController,
-    'hideRecordingOverlay' | 'hideRegionSelector' | 'showRecordingOverlay' | 'showRegionSelector'
+    | 'hideRecordingOverlay'
+    | 'hideRegionSelector'
+    | 'showRecordingOverlay'
+    | 'showRegionSelector'
+    | 'isRegionSelectorActive'
   >;
 };
 

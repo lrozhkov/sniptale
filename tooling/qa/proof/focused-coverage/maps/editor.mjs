@@ -1,5 +1,510 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'scene-spotlight-sampling',
+    productionFile: 'apps/extension/src/features/video/composition/scene-spotlight.ts',
+    allowCrossOwner: true,
+    reason: 'Both timeline adapters share opening geometry and evaluated interpolation.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/scene-spotlight.test.ts',
+      'apps/extension/src/features/video/review/advanced/focus.test.ts',
+      'apps/extension/src/features/video/review/advanced/focus-layout.test.ts',
+      'apps/extension/src/features/video/review/advanced/focus-reveal.test.ts',
+    ],
+  },
+  {
+    owner: 'scene-spotlight-paint',
+    productionFile: 'apps/extension/src/features/video/composition/draw/spotlight.ts',
+    allowCrossOwner: true,
+    reason: 'Mask projection, union coverage and allocation failure serve both editors.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/render-spotlight.test.ts',
+      'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+      'apps/extension/src/gallery/video-review/spotlight-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-focus-authoring',
+    productionFile: 'apps/extension/src/features/video/project/motion/focus-appearance.ts',
+    allowCrossOwner: true,
+    reason: 'Current commands and disposable previews share strict partial focus edits.',
+    testFiles: [
+      'apps/extension/src/features/video/project/motion/focus-appearance.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/workspace-state.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-spotlight-frame',
+    productionFile: 'apps/extension/src/features/video/composition/timeline/frame/spotlights.ts',
+    allowCrossOwner: true,
+    reason: 'Native clocks, target coverage and compatible morphs enter scene and effect inputs.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/timeline/frame/spotlights.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/layers.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
+    ],
+  },
+  {
+    owner: 'native-spotlight-projection',
+    productionFile: 'apps/extension/src/features/video/composition/draw/project-spotlight.ts',
+    allowCrossOwner: true,
+    reason: 'Native source phases and attachment geometry share mask protection rules.',
+    testFiles: ['apps/extension/src/features/video/composition/draw/project-spotlight.test.ts'],
+  },
+  {
+    owner: 'native-video-window-draw',
+    productionFile: 'apps/extension/src/features/video/composition/draw/video.ts',
+    allowCrossOwner: true,
+    reason: 'Video isolation owns source fit, decorations, sharp feedback and failure cleanup.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/draw/video.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.scaling.test.ts',
+      'apps/extension/src/features/video/composition/draw/camera-appearance.test.ts',
+      'apps/extension/src/features/video/composition/draw/window-header.test.ts',
+      'apps/extension/src/features/video/composition/draw/decoded-sample.test.ts',
+    ],
+  },
+  {
+    owner: 'fitted-media-raster',
+    productionFile: 'apps/extension/src/features/video/composition/draw/fitted-media.ts',
+    allowCrossOwner: true,
+    reason: 'Header raster density must retain authored source coordinates and clip geometry.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/draw/fitted-media.test.ts',
+      'apps/extension/src/features/video/composition/draw/window-header.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.scaling.test.ts',
+      'apps/extension/src/features/video/composition/draw/camera-appearance.test.ts',
+    ],
+  },
+
+  {
+    owner: 'scene-border-sampling',
+    productionFile: 'apps/extension/src/features/video/composition/scene-border.ts',
+    allowCrossOwner: true,
+    reason: 'Both timeline adapters use the same geometry, reveal and retained phase sampling.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/scene-border.test.ts',
+      'apps/extension/src/features/video/review/advanced/border.test.ts',
+    ],
+  },
+  {
+    owner: 'scene-border-paint',
+    productionFile: 'apps/extension/src/features/video/composition/draw/border.ts',
+    allowCrossOwner: true,
+    reason: 'Gallery and Native retain path, opacity, destination transforms and surface cleanup.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/render-border.test.ts',
+      'apps/extension/src/workflows/video-review/render-export-focus.test.ts',
+      'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+    ],
+  },
+  {
+    owner: 'native-border-frame',
+    productionFile: 'apps/extension/src/features/video/composition/timeline/frame/borders.ts',
+    allowCrossOwner: true,
+    reason:
+      'Explicit targets retain source phase through split, rate and duplicate without moving the camera.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/motion/border-isolation.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
+    ],
+  },
+  {
+    owner: 'focus-appearance-fields',
+    productionPrefix: 'apps/extension/src/ui/focus-appearance/',
+    allowCrossOwner: true,
+    reason: 'Shared controlled fields preserve Gallery gestures and Native inspector grouping.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/border-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-inspector.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/motion.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-focus-inspector',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/appearance.tsx',
+    allowCrossOwner: true,
+    reason: 'The inspector uses current commands and the existing disposable preview owner.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/motion.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/workspace-state.test.tsx',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
+    ],
+  },
+  {
+    owner: 'native-focus-area',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/area-overlay/focus.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Window projection and pointer cancellation preserve accepted data until one gesture commits.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/area-overlay/focus.test.tsx',
+      'apps/extension/src/features/video/composition/draw/fitted-media.test.ts',
+    ],
+  },
+  {
+    owner: 'video-focus-appearance',
+    productionFile: 'apps/extension/src/features/video/project/scene/focus-appearance.ts',
+    allowCrossOwner: true,
+    reason:
+      'Spotlight and border admission retain Gallery scene, edit, persistence and backup contracts.',
+    testFiles: [
+      'apps/extension/src/features/video/review/advanced/focus.test.ts',
+      'apps/extension/src/features/video/review/advanced/border.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
+      'apps/extension/src/features/video/review/advanced/migration.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/focus-compatibility.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/backup-restore.test.ts',
+    ],
+  },
+  {
+    owner: 'source-key-feedback',
+    productionPrefix: 'apps/extension/src/features/video/project/action-feedback/',
+    allowCrossOwner: true,
+    reason:
+      'Captured key styles retain source facts through handoff, commands, and portable backup.',
+    testFiles: [
+      'apps/extension/src/features/video/project/action-feedback/key-animation.test.ts',
+      'apps/extension/src/features/video/project/action-feedback/key-projection.test.ts',
+      'apps/extension/src/features/video/project/action-presentation.keys.test.ts',
+      'apps/extension/src/features/video/review/standalone-key-interactions.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/keys.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-key.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/key-feedback-fields.test.tsx',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.action-feedback.test.ts',
+    ],
+  },
+  {
+    owner: 'native-source-feedback-command-adapter',
+    productionFile: 'apps/extension/src/video-editor/project/state/effects.ts',
+    reason: 'Legacy effects and captured click and key commands preserve their edit contracts.',
+    testFiles: [
+      'apps/extension/src/video-editor/project/state/effects.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-click.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-key.test.ts',
+    ],
+  },
+  {
+    owner: 'native-source-click-inspector-adapter',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-fields.tsx',
+    reason:
+      'Sound, captured gestures and ordinary clicks use the same current project update port.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-fields.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-click-fields.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-project-gesture-feedback',
+    productionFile: 'apps/extension/src/features/video/review/project-action-audio.ts',
+    allowCrossOwner: true,
+    reason:
+      'Native composition and portable backup prove retained source gesture appearance and identity.',
+    testFiles: [
+      'apps/extension/src/features/video/review/project-action-audio.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/actions.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.action-feedback.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-authored-speech-queue',
+    productionFile: 'apps/extension/src/gallery/video-review/use-text-voice.ts',
+    allowCrossOwner: true,
+    reason: 'The active form and batch history prove generation policy, retention and publication.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-batch-history.integration.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-speech-queue',
+    productionFile: 'apps/extension/src/workflows/audio-jobs/speech-queue.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both editors prove sequential generation, completed preview retention and cancellation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/speech-queue.test.ts',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-batch.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-batch-history.integration.test.tsx',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-speech-queue',
+    productionFile: 'apps/extension/src/workflows/video-review/speech-queue.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both editors prove sequential generation, completed preview retention and cancellation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/speech-queue.test.ts',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-batch.test.tsx',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'montage-speech-generation',
+    productionFile: 'apps/extension/src/workflows/video/project-text-voice.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both editors prove sequential generation, completed preview retention and cancellation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/speech-queue.test.ts',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-batch.test.tsx',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'montage-recording-preview-playback',
+    productionFile:
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording-playback.ts',
+    allowCrossOwner: true,
+    reason:
+      'Mounted capture and its audio sinks prove range, cancellation and silent playback admission.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio-cleanup.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/effect-audio.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-recording-preview-mute',
+    productionFile: 'apps/extension/src/video-editor/workspace/surface/canvas.tsx',
+    allowCrossOwner: true,
+    reason: 'Canvas consumer and media sync prove recording mute without changing project audio.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/surface/main.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio-cleanup.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/effect-audio.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-recording-level-presentation',
+    productionFile: 'apps/extension/src/composition/audio-recording/dialog/level-meter.tsx',
+    allowCrossOwner: true,
+    reason: 'Compact inspector and existing Gallery consumers preserve complete meter status.',
+    testFiles: [
+      'apps/extension/src/composition/audio-recording/dialog/level-meter.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-recording-discard-placement',
+    productionFile: 'apps/extension/src/composition/audio-recording/dialog/dismissal.tsx',
+    allowCrossOwner: true,
+    reason: 'Inline and portaled consumers preserve recording admission, focus and take recovery.',
+    testFiles: [
+      'apps/extension/src/composition/audio-recording/dialog/dismissal.test.tsx',
+      'apps/extension/src/composition/audio-recording/dialog/index.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/recording/audio-modal/dismissal.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'mounted-microphone-session',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/text-voice-recording.ts',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-microphone-view',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice-recording.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: ['apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx'],
+  },
+  {
+    owner: 'montage-mounted-inspector-voice',
+    productionFile: 'apps/extension/src/video-editor/workspace/floating/inspector-stack.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/floating/inspector-stack.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-recording-suspension',
+    productionFile: 'apps/extension/src/composition/audio-recording/dialog/controller.ts',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/composition/audio-recording/dialog/controller.test.tsx',
+      'apps/extension/src/composition/audio-recording/dialog/controller.playback.test.tsx',
+      'apps/extension/src/composition/audio-recording/dialog/index.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/recording/audio-modal/index.test.tsx',
+      'apps/extension/src/video-editor/recording/audio-modal/dismissal.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-recording-device-controls',
+    productionFile: 'apps/extension/src/composition/audio-recording/dialog/controls.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/composition/audio-recording/dialog/controls.test.tsx',
+      'apps/extension/src/composition/audio-recording/dialog/index.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'workspace-recording-leave-admission',
+    productionFile: 'apps/extension/src/video-editor/runtime/controller/workspace-state.ts',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/controller/workspace-state.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/composition/provider.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'mounted-recording-context',
+    productionFile: 'apps/extension/src/video-editor/runtime/controller/composition/contexts.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/controller/composition/provider.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/composition/hooks.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'recording-provider-admission',
+    productionFile: 'apps/extension/src/video-editor/runtime/controller/composition/provider.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/controller/composition/provider.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'montage-local-voice-preparation',
+    productionFile: 'apps/extension/src/workflows/video/project-voice-take.ts',
+    allowCrossOwner: true,
+    reason:
+      'Local recording bases preserve common acceptance and mounted AI and Library consumers.',
+    testFiles: [
+      'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.batch.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/features/video/project/text/voice-scope.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'montage-text-voice-panel',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice.tsx',
+    allowCrossOwner: true,
+    reason: 'Mounted voice sessions exercise the actual panel and its local and AI controls.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+    ],
+  },
+  {
+    owner: 'media-library-search-typography',
+    productionFile: 'apps/extension/src/ui/media-library-header.tsx',
+    allowCrossOwner: true,
+    reason: 'The shared header and its resource adapters preserve typed queries and filtering.',
+    testFiles: [
+      'apps/extension/src/ui/media-library-header.test.tsx',
+      'apps/extension/src/composition/background-resources/library.test.tsx',
+      'apps/extension/src/gallery/video-review/presentation-library.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-audio-library-selection',
+    productionFile: 'apps/extension/src/composition/audio-library/selection.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Shared selection and the Gallery adapter prove audition identity, cancellation and preparation.',
+    testFiles: [
+      'apps/extension/src/composition/audio-library/selection.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-gallery.test.tsx',
+    ],
+  },
+  {
+    owner: 'montage-text-voice-session',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/text-voice.ts',
+    allowCrossOwner: true,
+    reason: 'Mounted local and AI consumers retain the common take acceptance and Save contracts.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+      'apps/extension/src/video-editor/workspace/floating/inspector-stack.test.tsx',
+      'apps/extension/src/workflows/video/project-voice-take.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.batch.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-voice-text-basis',
+    productionFile: 'apps/extension/src/features/video/project/text/voice-scope.ts',
+    allowCrossOwner: true,
+    reason: 'Canonical authorization and staging consumers prove the shared voice basis contract.',
+    testFiles: [
+      'apps/extension/src/features/video/project/text/voice-scope.test.ts',
+      'apps/extension/src/composition/persistence/projects/text-audio-scope.test.ts',
+      'apps/extension/src/background/ai/audio/authorization.project-text.test.ts',
+      'apps/extension/src/background/ai/audio/service.project-text.test.ts',
+      'apps/extension/src/composition/persistence/assets/audio-staging.project-text.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-text-phrase-inspection',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-phrase.tsx',
+    reason: 'Mounted text consumers prove phrase editing, navigation and rewrite command behavior.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-rewrite.test.tsx',
+    ],
+  },
+  {
     owner: 'gallery-review-opening-and-feedback',
     productionFile: 'apps/extension/src/gallery/video-review/index.tsx',
     reason: 'The modal integration suite exercises opening, retry, feedback and editor navigation.',

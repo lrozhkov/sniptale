@@ -1,24 +1,28 @@
-import { useCallback, useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react';
+import {
+  useCallback,
+  useId,
+  useLayoutEffect,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from 'react';
 import {
   DRAWING_TEXT_HORIZONTAL_PADDING,
   DRAWING_TEXT_LINE_HEIGHT_FACTOR,
   DRAWING_TEXT_VERTICAL_PADDING,
   resolveDrawingTextFontFamily,
+  resolveDrawingTextBackgroundContours,
+  isDrawingTextStencil,
   type DrawingFontFamily,
+  type DrawingTextBackgroundRect,
 } from '../../features/drawing/public';
+import { DrawingTextStencilMask, type DrawingTextStencilSource } from './text-stencil';
 
 export type DrawingTextVisualStyle = {
   backgroundColor: string | null;
   color: string;
   fontFamily: DrawingFontFamily;
   fontSize: number;
-};
-
-type DrawingTextBackgroundRect = {
-  height: number;
-  left: number;
-  top: number;
-  width: number;
 };
 
 export function resolveDrawingTextContentStyle(style: DrawingTextVisualStyle): CSSProperties {
@@ -104,12 +108,20 @@ export function useDrawingTextBackgroundRects(args: {
   const measure = useCallback(() => {
     const element = args.contentRef.current;
     if (!element) return;
-    const measured = readDrawingTextBackgroundRects(
-      element,
-      args.value,
-      args.fontSize * DRAWING_TEXT_LINE_HEIGHT_FACTOR
-    );
-    setRects(measured);
+    const parent = element.parentElement;
+    const transform = parent?.style.transform ?? '';
+    try {
+      if (parent) parent.style.transform = 'none';
+      setRects(
+        readDrawingTextBackgroundRects(
+          element,
+          args.value,
+          args.fontSize * DRAWING_TEXT_LINE_HEIGHT_FACTOR
+        )
+      );
+    } finally {
+      if (parent) parent.style.transform = transform;
+    }
   }, [args.contentRef, args.fontSize, args.value]);
 
   useLayoutEffect(() => {
@@ -130,25 +142,61 @@ export function useDrawingTextBackgroundRects(args: {
 export function DrawingTextBackgrounds(props: {
   color: string | null;
   rects: readonly DrawingTextBackgroundRect[];
+  text?: DrawingTextStencilSource & { color: string };
 }) {
+  const maskId = useId();
   const color = props.color;
   if (!color) return null;
-  return props.rects.map((rect, index) => (
-    <span
-      key={`${index}:${rect.top}:${rect.left}`}
+  const stencil = props.text && isDrawingTextStencil(props.text.color, color) ? props.text : null;
+  const path = resolveDrawingTextBackgroundContours(props.rects)
+    .map((corners) => {
+      return (
+        corners
+          .map((corner, index) => {
+            const previous = corners[(index + corners.length - 1) % corners.length]!;
+            const next = corners[(index + 1) % corners.length]!;
+            const incomingDistance = Math.hypot(previous.x - corner.x, previous.y - corner.y);
+            const outgoingDistance = Math.hypot(next.x - corner.x, next.y - corner.y);
+            const startX = corner.x + ((previous.x - corner.x) * corner.radius) / incomingDistance;
+            const startY = corner.y + ((previous.y - corner.y) * corner.radius) / incomingDistance;
+            const endX = corner.x + ((next.x - corner.x) * corner.radius) / outgoingDistance;
+            const endY = corner.y + ((next.y - corner.y) * corner.radius) / outgoingDistance;
+            return [
+              `${index === 0 ? 'M' : 'L'} ${startX} ${startY}`,
+              `A ${corner.radius} ${corner.radius} 0 0 1 ${endX} ${endY}`,
+            ].join(' ');
+          })
+          .join(' ') + ' Z'
+      );
+    })
+    .join(' ');
+  return (
+    <svg
       aria-hidden="true"
-      data-ui="content.drawing.text-background"
+      data-ui="content.drawing.text-backgrounds"
       style={{
-        backgroundColor: color,
-        borderRadius: 3,
-        height: rect.height,
-        left: rect.left,
+        color,
+        height: '100%',
+        left: 0,
+        overflow: 'visible',
         pointerEvents: 'none',
         position: 'absolute',
-        top: rect.top,
-        width: rect.width,
+        top: 0,
+        width: '100%',
         zIndex: 0,
       }}
-    />
-  ));
+    >
+      {stencil ? (
+        <defs>
+          <DrawingTextStencilMask id={maskId} source={stencil} rects={props.rects} />
+        </defs>
+      ) : null}
+      <path
+        data-ui="content.drawing.text-background"
+        d={path}
+        fill="currentColor"
+        mask={stencil ? `url(#${maskId})` : undefined}
+      />
+    </svg>
+  );
 }

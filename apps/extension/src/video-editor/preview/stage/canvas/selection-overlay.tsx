@@ -5,12 +5,16 @@ import type {
 } from '../../../../features/video/project/types/index';
 import {
   getCompositionRectStageStyle,
+  resolvePreviewEffectSourceProjection,
+  mapPreviewEffectPoint,
+  getCompositionPointStageStyle,
   mapClientPointToCompositionPoint,
   shouldLockPreviewClipToViewport,
 } from './geometry';
 import { resolvePreviewClipTransform } from './clip-layout';
 import {
   getPreviewTransformResizeCursor,
+  getPreviewTransformHandlePoint,
   isPointInsidePreviewTransform,
   type PreviewTransformResizeHandle,
 } from './transform/geometry';
@@ -29,20 +33,34 @@ function getSelectionOverlayStyle(
   project: VideoProject,
   selectedClip: VideoProjectClip,
   camera: PreviewStageCanvasProps['camera'],
-  stage: HTMLDivElement
+  stage: HTMLDivElement,
+  currentTime: number
 ): React.CSSProperties {
   const transform = resolvePreviewClipTransform(project, selectedClip);
+  const sourceProjection = resolvePreviewEffectSourceProjection(
+    project,
+    selectedClip,
+    camera,
+    currentTime
+  );
+  if (
+    selectedClip.type === 'EFFECT' &&
+    selectedClip.attachment?.kind === 'source' &&
+    !sourceProjection
+  )
+    return { display: 'none' };
   const stageStyle = getCompositionRectStageStyle(
     project,
     transform,
     camera,
     shouldLockPreviewClipToViewport(selectedClip, camera, project),
-    stage
+    stage,
+    sourceProjection ?? undefined
   );
   return {
     ...stageStyle,
-    transform: `rotate(${transform.rotation}deg)`,
-    transformOrigin: 'center center',
+    transform: stageStyle.transform ?? `rotate(${transform.rotation}deg)`,
+    transformOrigin: stageStyle.transformOrigin ?? 'center center',
   };
 }
 
@@ -62,7 +80,7 @@ export function handleStagePointerDown(
   params: Pick<
     PreviewStageCanvasProps,
     'activeClips' | 'beginInteraction' | 'camera' | 'onSelectClip' | 'project' | 'stageRef'
-  >
+  > & { currentTime?: number }
 ): void {
   const target = event.target;
   if (
@@ -84,7 +102,8 @@ export function handleStagePointerDown(
     event,
     stage,
     params.project,
-    params.camera
+    params.camera,
+    params.currentTime ?? 0
   );
   if (!clip) {
     params.onSelectClip(null);
@@ -99,7 +118,8 @@ function getTopmostClipAtPointer(
   event: React.PointerEvent<HTMLDivElement>,
   stage: HTMLDivElement,
   project: VideoProject,
-  camera: PreviewStageCanvasProps['camera']
+  camera: PreviewStageCanvasProps['camera'],
+  currentTime: number
 ): VideoProjectClip | null {
   for (const clip of [...activeClips].reverse()) {
     if (!isClipCanvasEditable(project, clip)) {
@@ -107,6 +127,8 @@ function getTopmostClipAtPointer(
     }
     const point = mapClientPointToCompositionPoint({
       camera,
+      clip,
+      currentTime,
       clientX: event.clientX,
       clientY: event.clientY,
       lockToViewport: shouldLockPreviewClipToViewport(clip, camera, project),
@@ -135,44 +157,78 @@ export function PreviewStageSelectionOverlay(
   params: Pick<
     PreviewStageCanvasProps,
     'beginInteraction' | 'camera' | 'project' | 'selectedClip' | 'selectedClipLocked' | 'stageRef'
-  >
+  > & { currentTime?: number }
 ) {
   const stage = params.stageRef.current;
   if (!params.selectedClip || !stage) {
     return null;
   }
   const transform = resolvePreviewClipTransform(params.project, params.selectedClip);
+  const projected =
+    (params.selectedClip.type === 'EFFECT' && params.selectedClip.attachment?.kind === 'source') ||
+    (params.camera.spatial &&
+      !shouldLockPreviewClipToViewport(params.selectedClip, params.camera, params.project));
+  const handles = params.selectedClipLocked
+    ? null
+    : (['nw', 'ne', 'sw', 'se'] as const satisfies PreviewStageInteractionMode[]).map((handle) => (
+        <button
+          key={handle}
+          type="button"
+          data-preview-selection-handle={handle}
+          className={[
+            PREVIEW_SELECTION_HANDLE_CLASS_NAME,
+            PREVIEW_SELECTION_HANDLE_SURFACE_CLASS_NAME,
+            PREVIEW_SELECTION_HANDLE_SHADOW_CLASS_NAME,
+          ].join(' ')}
+          style={
+            projected
+              ? {
+                  ...getCompositionPointStageStyle(
+                    params.project,
+                    mapPreviewEffectPoint(
+                      params.project,
+                      params.selectedClip!,
+                      params.camera,
+                      params.currentTime ?? 0,
+                      getPreviewTransformHandlePoint(transform, handle)
+                    ) ?? { x: NaN, y: NaN },
+                    params.camera,
+                    shouldLockPreviewClipToViewport(
+                      params.selectedClip!,
+                      params.camera,
+                      params.project
+                    ),
+                    stage
+                  ),
+                  cursor: getPreviewTransformResizeCursor(handle, transform.rotation),
+                }
+              : getSelectionHandleStyle(handle, transform.rotation)
+          }
+          onPointerDown={(event) => params.beginInteraction(event, params.selectedClip!, handle)}
+        />
+      ));
 
   return (
-    <div
-      className={[
-        'pointer-events-none absolute border-2',
-        params.selectedClipLocked
-          ? 'border-dotted border-[color:var(--sniptale-color-border-strong)]'
-          : 'border-dashed border-[color:var(--sniptale-color-border-accent-strong)]',
-      ].join(' ')}
-      data-preview-selection-state={params.selectedClipLocked ? 'locked' : 'editable'}
-      style={getSelectionOverlayStyle(params.project, params.selectedClip, params.camera, stage)}
-    >
-      {params.selectedClipLocked
-        ? null
-        : (['nw', 'ne', 'sw', 'se'] as const satisfies PreviewStageInteractionMode[]).map(
-            (handle) => (
-              <button
-                key={handle}
-                type="button"
-                className={[
-                  PREVIEW_SELECTION_HANDLE_CLASS_NAME,
-                  PREVIEW_SELECTION_HANDLE_SURFACE_CLASS_NAME,
-                  PREVIEW_SELECTION_HANDLE_SHADOW_CLASS_NAME,
-                ].join(' ')}
-                style={getSelectionHandleStyle(handle, transform.rotation)}
-                onPointerDown={(event) =>
-                  params.beginInteraction(event, params.selectedClip!, handle)
-                }
-              />
-            )
-          )}
-    </div>
+    <>
+      <div
+        className={[
+          'pointer-events-none absolute border-2',
+          params.selectedClipLocked
+            ? 'border-dotted border-[color:var(--sniptale-color-border-strong)]'
+            : 'border-dashed border-[color:var(--sniptale-color-border-accent-strong)]',
+        ].join(' ')}
+        data-preview-selection-state={params.selectedClipLocked ? 'locked' : 'editable'}
+        style={getSelectionOverlayStyle(
+          params.project,
+          params.selectedClip,
+          params.camera,
+          stage,
+          params.currentTime ?? 0
+        )}
+      >
+        {projected ? null : handles}
+      </div>
+      {projected ? handles : null}
+    </>
   );
 }

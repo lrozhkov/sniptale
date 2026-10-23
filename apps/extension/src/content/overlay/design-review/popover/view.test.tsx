@@ -22,7 +22,9 @@ const actions: DesignReviewActions = {
   },
   copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
+  navigateElement: vi.fn(),
   delete: vi.fn(),
+  text: { edit: vi.fn(), reset: vi.fn() },
   resetValue: vi.fn(),
   selectAction: vi.fn(),
   setSettingsOpen: vi.fn(),
@@ -34,12 +36,14 @@ const actions: DesignReviewActions = {
 
 const element = document.createElement('h1');
 const state: DesignReviewViewState = {
+  treeNavigation: { parent: null, child: null },
   action: 'refine',
   anchor: { x: 40, y: 40 },
   comment: { commitFailed: false, draft: '', marker: 1 },
   defaultValues: {},
   draftPatch: { declarations: [] },
   modifiedProperties: [],
+  text: { editable: true, modified: false, preview: 'Heading', resettable: false },
   selection: {
     domPath: 'html > body > main > h1:nth-of-type(1)',
     element,
@@ -119,13 +123,22 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(copyButton?.className).toContain('active:bg-');
   const deleteButton = root.querySelector('button[aria-label="Удалить замечание"]');
   expect(deleteButton?.className).toContain('text-[var(--sniptale-color-danger)]');
-  expect(deleteButton?.className).toContain('ml-1');
+  expect(deleteButton?.className).not.toContain('ml-1');
   const closeButton = root.querySelector('button[aria-label="Закрыть"]');
   expect(closeButton?.className).toContain('pointer-events-auto');
   expect(closeButton?.className).toContain('cursor-pointer');
   expect(closeButton?.className).toContain('z-50');
   expect(closeButton?.className).toContain('sniptale-dismiss-button');
+  expect(closeButton?.className).not.toContain('-right-3');
+  expect(closeButton?.className).not.toContain('-top-3');
   expect(closeButton?.className).not.toContain('hover:bg-[var(--sniptale-color-surface-input)]');
+  expect(closeButton?.className).toContain('absolute right-1 top-1');
+  expect(root.querySelector('[data-ui="content.design-review.close-backing"]')).toBeNull();
+  expect(closeButton?.querySelector('svg')?.getAttribute('width')).toBe('14');
+  expect(closeButton?.className).toContain('!h-6 !min-h-6 !w-6 !min-w-6');
+  const commentLayer = root.querySelector('[data-ui="content.design-review.comment-layer"]');
+  expect(commentLayer?.className).toContain('pt-8');
+  expect(commentLayer?.className).not.toContain('pt-10');
 });
 
 it('uses native non-layout hints for the element tag and full path', () => {
@@ -146,7 +159,66 @@ it('uses native non-layout hints for the element tag and full path', () => {
   expect(
     root.querySelector('[data-ui="content.design-review.element-tag"]')?.getAttribute('title')
   ).toBe('<h1> — заголовок');
+  expect(
+    root.querySelector(
+      '[data-ui="content.design-review.popover-drag-handle"] [data-ui="content.design-review.element-tag"]'
+    )?.textContent
+  ).toBe('H1');
+  expect(
+    root
+      .querySelector('[data-ui="content.design-review.element-selector"]')
+      ?.closest('button')
+      ?.previousElementSibling?.getAttribute('data-ui')
+  ).toBe('content.design-review.tree-navigation');
+  const preview = root.querySelector('[data-ui="content.design-review.element-text"]');
+  expect(preview?.closest('[data-ui="content.design-review.popover-drag-handle"]')).not.toBeNull();
+  expect(preview?.getAttribute('title')).toBe('Heading');
+  expect(preview?.className).toContain('max-w-[50%]');
+  expect(preview?.hasAttribute('tabindex')).toBe(false);
   expect(root.querySelector('[role="tooltip"]')).toBeNull();
+});
+
+it('keeps the full element text in the bounded header and preserves its reset action', () => {
+  const element = document.createElement('button');
+  const fullText = 'A long selected element label '.repeat(8).trim();
+  element.textContent = fullText;
+  const root = document.createElement('div');
+  root.innerHTML = renderToStaticMarkup(
+    <DesignReviewPopover
+      actions={actions}
+      open
+      state={{
+        ...state,
+        selection: { ...state.selection!, element },
+        text: { ...state.text, modified: true, resettable: true, preview: fullText.slice(0, 80) },
+      }}
+    />
+  );
+  const preview = root.querySelector('[data-ui="content.design-review.element-text"]');
+  expect(preview?.textContent).toBe(fullText);
+  expect(preview?.getAttribute('title')).toContain(fullText);
+  const reset = root.querySelector('[data-ui="content.design-review.reset-text"]');
+  const path = root
+    .querySelector('[data-ui="content.design-review.element-selector"]')
+    ?.closest('button');
+  expect(reset?.previousElementSibling).toBe(path);
+  expect(reset?.closest('[data-ui="content.design-review.popover-drag-handle"]')).toBeNull();
+});
+
+it('does not duplicate the tag as header text when the element has no text', () => {
+  const root = document.createElement('div');
+  root.innerHTML = renderToStaticMarkup(
+    <DesignReviewPopover
+      actions={actions}
+      open
+      state={{
+        ...state,
+        text: { ...state.text, preview: '' },
+      }}
+    />
+  );
+  expect(root.querySelector('[data-ui="content.design-review.element-text"]')).toBeNull();
+  expect(root.querySelector('[data-ui="content.design-review.element-tag"]')).not.toBeNull();
 });
 
 it('does not render without an active click selection', () => {

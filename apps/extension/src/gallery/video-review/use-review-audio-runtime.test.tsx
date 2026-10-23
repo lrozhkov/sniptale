@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ReviewAudioClipBuffer } from './use-review-audio-runtime';
+import type { ReviewAudioClipBuffer } from '../../workflows/video-review/audio-playback-engine';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 import { FakeEngine, renderRuntime } from './review-audio-runtime.test-support';

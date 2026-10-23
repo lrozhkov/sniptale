@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from '../cursor-source-observations';
 import { createVideoProjectSource } from '../defaults';
 import { getDefaultCursorHidden, normalizeVideoProjectCursorSkin } from '../cursor';
 import { normalizeClip } from './clip';
@@ -44,6 +45,11 @@ function getLegacyClipNames(legacyClipNames?: ReadonlyMap<string, string>) {
         ['Ellipse overlay', translate('shared.videoProject.legacyEllipseOverlay')],
         ['Rectangle overlay', translate('shared.videoProject.legacyRectangleOverlay')],
       ]);
+}
+
+/** Captures translated legacy labels for a later projection in the same opened editor session. */
+export function captureVideoProjectHydrationOptions(): VideoProjectHydrationOptions {
+  return { legacyTrackNames: getLegacyTrackNames(), legacyClipNames: getLegacyClipNames() };
 }
 
 function normalizeProjectSource(project: VideoProject): VideoProject['source'] {
@@ -181,7 +187,10 @@ export function hydrateVideoProject(
   } satisfies VideoProject;
 
   const synchronizedProject = syncProjectTransitions(
-    hydrateRecordingInteractionAnchors(hydratedProject)
+    hydrateRecordingInteractionAnchors({
+      ...hydratedProject,
+      cursorTrack: materializeVideoProjectCursorSourceObservations(hydratedProject),
+    })
   );
   return {
     ...synchronizedProject,

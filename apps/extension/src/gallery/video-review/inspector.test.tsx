@@ -702,3 +702,58 @@ it('keeps the recorder mounted in a temporary third tab below the filename', () 
     act(() => root.unmount());
   }
 });
+
+it('offers full editor transfer with the existing export actions and disables it while busy', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const open = vi.fn();
+  const render = (busy: boolean) =>
+    root.render(
+      <ReviewInspector
+        filename="Project"
+        annotations={[]}
+        selectedId={null}
+        busy={busy}
+        message={null}
+        onBack={vi.fn()}
+        onAdd={vi.fn()}
+        onSelect={vi.fn()}
+        onEdit={vi.fn()}
+        onHover={vi.fn()}
+        onDelete={vi.fn()}
+        onReport={vi.fn()}
+        onOpenVideoEditor={open}
+        actions={<div>Export settings</div>}
+        exportRequest={1}
+      >
+        {null}
+      </ReviewInspector>
+    );
+  try {
+    await act(async () => render(false));
+    const button = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.openVideoEditor"]'
+    );
+    expect(button).not.toBeNull();
+    expect(button!.getAttribute('aria-label')).toBe('gallery.videoReview.openVideoEditor');
+    expect(button!.querySelector('svg')).not.toBeNull();
+    act(() => button!.click());
+    expect(open).toHaveBeenCalledOnce();
+    await act(async () => render(true));
+    expect(
+      host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.openVideoEditor"]')!
+        .disabled
+    ).toBe(true);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

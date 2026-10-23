@@ -1,3 +1,7 @@
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import type {
   GuideImageSlotBlock,
   GuideProject,
@@ -57,7 +61,7 @@ function removeFromProject(project: GuideProject, assetIds: ReadonlySet<string>)
     if (removeNarration(slide, assetIds)) changed = true;
     const objects =
       slide.kind === 'image'
-        ? [...slide.hotspots, ...slide.annotations, ...slide.masks]
+        ? [...getTourHotspots(slide), ...getTourAnnotations(slide), ...slide.masks]
         : slide.buttons;
     for (const object of objects) if (removeNarration(object, assetIds)) changed = true;
   }

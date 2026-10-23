@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { releaseLegalArchivePath } from '../policy/oss-release-policy.mjs';
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -50,7 +51,7 @@ function formatInterfaceFontSection(interfaceFont, family = 'Golos UI') {
 - Font version: \`${interfaceFont.version}\`
 - License: \`${interfaceFont.license}\`
 - Copyright: ${interfaceFont.copyright}
-- License text: [\`${interfaceFont.licensePath}\`](${interfaceFont.licensePath})
+- License text: [\`${releaseLegalArchivePath(interfaceFont.licensePath)}\`](${releaseLegalArchivePath(interfaceFont.licensePath)})
 
 | Bundled file | Source file | SHA-256 |
 | --- | --- | --- |
@@ -65,12 +66,11 @@ function formatDependencySection(entry) {
     : '';
   const modificationLines = entry.modifiedSource
     ? [
-        '\n- Supplied modifications (combine with upstream source above):\n',
+        `\n- Modified source archive: [${entry.modifiedSource.archive.file}](${entry.modifiedSource.archive.url})\n`,
+        '- Files inside that source archive (combine with upstream source above):\n',
         String(
           entry.modifiedSource.files
-            .map(
-              (file) => `  - [${file.archivePath}](${file.archivePath}) (SHA-256: ${file.sha256})`
-            )
+            .map((file) => `  - \`${file.archivePath}\` (SHA-256: ${file.sha256})`)
             .join('\n')
         ),
         '\n- Original package integrity: ',

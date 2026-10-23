@@ -4,6 +4,13 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 let surfaceCapabilityToken: string | null = null;
 let surfaceLeaseGeneration: number | null = null;
 let surfaceOperationGeneration = 0;
+let surfaceBindingRevision = 0;
+
+type ScreenshotSurfaceBinding = {
+  leaseGeneration?: number;
+  operationGeneration?: number;
+  token: string | null;
+};
 
 export type ScreenshotSurfaceBindingSnapshot = {
   surfaceCapabilityToken: string;
@@ -12,6 +19,7 @@ export type ScreenshotSurfaceBindingSnapshot = {
 };
 
 export function setScreenshotSurfaceCapabilityToken(token: string | null): void {
+  surfaceBindingRevision += 1;
   if (surfaceCapabilityToken !== token) {
     surfaceLeaseGeneration = null;
     surfaceOperationGeneration = 0;
@@ -19,17 +27,26 @@ export function setScreenshotSurfaceCapabilityToken(token: string | null): void 
   surfaceCapabilityToken = token;
 }
 
-export function setScreenshotSurfaceBinding(args: {
-  leaseGeneration?: number;
-  operationGeneration?: number;
-  token: string | null;
-}): void {
+export function setScreenshotSurfaceBinding(args: ScreenshotSurfaceBinding): void {
   setScreenshotSurfaceCapabilityToken(args.token);
   surfaceOperationGeneration = args.operationGeneration ?? surfaceOperationGeneration;
   surfaceLeaseGeneration = args.leaseGeneration ?? null;
 }
 
+export function createScreenshotSurfaceStatusBindingUpdater() {
+  const revision = surfaceBindingRevision;
+  return (
+    binding: Omit<ScreenshotSurfaceBinding, 'token'> & { token: string | null | undefined }
+  ): boolean => {
+    if (revision !== surfaceBindingRevision) return false;
+    if (binding.token === undefined) return true;
+    setScreenshotSurfaceBinding({ ...binding, token: binding.token });
+    return true;
+  };
+}
+
 export function nextScreenshotSurfaceOperationGeneration(): number {
+  surfaceBindingRevision += 1;
   surfaceOperationGeneration += 1;
   return surfaceOperationGeneration;
 }

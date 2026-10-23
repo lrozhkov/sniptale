@@ -61,6 +61,23 @@ async function select(label: string, optionLabel: string) {
   await act(async () => option!.click());
 }
 
+it('keeps deletion consequences without redundant explanations in the drafts form', () => {
+  render();
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.destinationDescription')
+  );
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.cleanupEnabledDescription')
+  );
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.trashCleanupDescription')
+  );
+  expect(container.textContent).toContain(translate('settings.storageDrafts.retentionConsequence'));
+  expect(container.textContent).toContain(
+    translate('settings.storageDrafts.trashRetentionConsequence')
+  );
+});
+
 it('routes destination, cleanup, and numeric retention selections to their policy fields', async () => {
   render();
   for (const [label, key] of [
@@ -96,6 +113,17 @@ it('routes destination, cleanup, and numeric retention selections to their polic
   expect(props.updatePolicy).toHaveBeenLastCalledWith({ trashCleanupEnabled: false });
 });
 
+it('shows retention and deletion consequences without the repeated Details explanation', () => {
+  render();
+  expect(container.querySelector('details')).toBeNull();
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.newItemsDescription')
+  );
+  for (const message of ['retentionConsequence', 'trashRetentionConsequence'] as const) {
+    expect(container.textContent).toContain(translate(`settings.storageDrafts.${message}`));
+  }
+});
+
 it('reports trash save progress and retries only when the failed policy is editable', () => {
   props.trashPolicyFeedback = 'error';
   props.busy = true;
@@ -122,39 +150,30 @@ it('reports trash save progress and retries only when the failed policy is edita
   ] as const) {
     props.trashPolicyFeedback = feedback;
     render();
-    expect(container.querySelector('[role="status"]')?.textContent).toContain(
-      translate(`settings.storageDrafts.${label}`)
-    );
+    expect(container.textContent).not.toContain(translate(`settings.storageDrafts.${label}`));
     expect(container.textContent).not.toContain(retryLabel);
   }
 });
 
-it('gates deletion requests on policy readiness and keeps draft and privacy navigation distinct', () => {
-  props.policyLoaded = false;
-  render();
-  const expired = translate('settings.storageDrafts.deleteExpired');
-  const all = translate('settings.storageDrafts.deleteAll');
-  expect(button(expired).disabled).toBe(true);
-  expect(button(all).disabled).toBe(true);
-  props.policyLoaded = true;
+it('keeps management in Library and preserves cleanup warnings and privacy navigation', () => {
   props.policy.cleanupEnabled = false;
   props.policy.trashCleanupEnabled = false;
   render();
-  expect(button(expired).disabled).toBe(true);
+  const all = translate('settings.storageDrafts.deleteAll');
+  expect(container.textContent).not.toContain(all);
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.draftActionsTitle')
+  );
   expect(button(translate('settings.storageDrafts.ordinaryRetention')).disabled).toBe(true);
   expect(button(translate('settings.storageDrafts.trashRetention')).disabled).toBe(true);
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.trashCleanupDisabled')
+  );
   expect(container.textContent).toContain(
     translate('settings.storageDrafts.cleanupDisabledWarning')
   );
-  act(() => button(all).click());
-  expect(props.onDeleteAllRequest).toHaveBeenCalledOnce();
+  expect(props.onDeleteAllRequest).not.toHaveBeenCalled();
   expect(props.onDeleteExpiredRequest).not.toHaveBeenCalled();
-  props.policy.cleanupEnabled = true;
-  render();
-  act(() => button(expired).click());
-  expect(props.onDeleteExpiredRequest).toHaveBeenCalledOnce();
-  act(() => button(translate('settings.storageDrafts.openDrafts')).click());
-  expect(navigation.openGalleryPage).toHaveBeenCalledWith({ scope: 'temporary' });
   props.view = 'storage';
   render();
   expect(container.textContent).toContain(translate('settings.storageDrafts.loading'));

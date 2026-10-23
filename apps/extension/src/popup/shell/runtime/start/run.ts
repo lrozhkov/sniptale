@@ -14,6 +14,7 @@ export function useStartRecordingHandler(state: PopupVideoRuntimeStateSlice) {
 
     state.recording.clearStartError();
     await startRecordingHandler({
+      targetTabId: state.environment.activeTabCapabilities.tabId,
       captureMode: state.presets.videoCaptureMode,
       microphoneDevices: state.devices.microphoneDevices,
       setIsStartPending: state.recording.setIsStartPending,

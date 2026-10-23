@@ -388,3 +388,30 @@ it.each(['ctrlKey', 'metaKey', 'shiftKey'] as const)(
     expect(onBeginClipInteraction).not.toHaveBeenCalled();
   }
 );
+
+it('places camera thumbnails only over actual media coverage in authored timeline time', () => {
+  const project = createEmptyVideoProject('Timeline');
+  const clip = createClip(project.tracks[0]!.id);
+  clip.duration = 10;
+  clip.sourceDuration = 10;
+  clip.cameraTiming = { offsetSeconds: 3, transitions: 'bounded' };
+  act(() =>
+    root?.render(
+      <ProjectTimelineClip
+        clip={clip}
+        isHovered={false}
+        isSelected={false}
+        pixelsPerSecond={24}
+        preview={{ kind: 'video', frames: [{ url: 'blob:camera', sourceStart: 0, sourceEnd: 4 }] }}
+        project={project}
+        trackLocked={false}
+        onClipHoverChange={vi.fn()}
+        onSelectClip={vi.fn()}
+        onBeginClipInteraction={vi.fn()}
+      />
+    )
+  );
+  const frame = container?.querySelector<HTMLElement>('[data-timeline-frame-source]');
+  expect(frame?.style.left).toBe('72px');
+  expect(frame?.style.width).toBe('96px');
+});

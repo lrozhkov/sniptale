@@ -1,10 +1,11 @@
+import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
 import { describe, expect, it } from 'vitest';
 import {
   createQuickEditAdvancedContent,
   createQuickEditAdvancedState,
 } from '../../../features/video/review/advanced/defaults';
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
-import { createQuickEditBorder } from '../../../features/video/review/advanced/border';
+
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../../features/video/review/advanced/types';
 import {
   replayReviewHistory,

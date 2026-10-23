@@ -175,3 +175,20 @@ it('disposes an in-flight result returned after cancellation before ownership ha
   expect(ready).not.toHaveBeenCalled();
   expect(mocks.cleanup).toHaveBeenCalledExactlyOnceWith(previews[0]);
 });
+
+it('cleans only a refused handoff and preserves the original error if cleanup fails', async () => {
+  const { session, plan, previews } = fixture();
+  mocks.generate.mockResolvedValueOnce(previews[0]).mockResolvedValueOnce(previews[1]);
+  mocks.cleanup.mockRejectedValueOnce(new Error('storage'));
+  const ready = vi
+    .fn()
+    .mockImplementationOnce(() => undefined)
+    .mockImplementationOnce(() => {
+      throw new Error('unmounted');
+    });
+  await expect(
+    runReviewSpeechQueue(session, plan, new AbortController().signal, { ready, progress: vi.fn() })
+  ).rejects.toThrow('unmounted');
+  expect(mocks.cleanup).toHaveBeenCalledExactlyOnceWith(previews[1]);
+  expect(mocks.generate).toHaveBeenCalledTimes(2);
+});

@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { getColorAlpha } from '@sniptale/foundation/color';
 import { translate } from '../../platform/i18n';
 import {
@@ -53,6 +55,16 @@ export function ColorValue(props: {
   const [draft, setDraft] = useState(props.value);
   const [invalid, setInvalid] = useState(false);
   const completed = useRef(false);
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({
+    disabled: props.disabled,
+    enabled: scoped,
+    onClick: () => {
+      completed.current = false;
+      setDraft(props.value);
+      setEditing(true);
+    },
+  });
   useEffect(() => {
     setEditing(false);
     setInvalid(false);
@@ -87,6 +99,7 @@ export function ColorValue(props: {
     return (
       <span className="flex min-w-0 flex-1 flex-col">
         <span
+          data-ui="shared.ui.color-selector.value-editor"
           className={cx(
             'flex min-w-0 flex-col justify-center',
             COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
@@ -128,23 +141,20 @@ export function ColorValue(props: {
     );
   return (
     <button
+      {...press.props}
       ref={buttonRef}
       type="button"
       disabled={props.disabled}
       aria-label={props.label}
       title={props.displayValue}
       data-ui="shared.ui.color-selector.value-trigger"
+      data-command-press={scoped ? '' : undefined}
       className={[
         COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
         COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
         'min-w-0 flex-1 truncate text-right text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
         'focus-visible:outline focus-visible:outline-1',
       ].join(' ')}
-      onClick={() => {
-        completed.current = false;
-        setDraft(props.value);
-        setEditing(true);
-      }}
     >
       {props.displayValue}
     </button>
@@ -181,6 +191,10 @@ export function ColorSelectorTrigger(props: {
         disabled={props.disabled}
         aria-label={translate('shared.ui.colorSelectorChooseColor')}
         title={displayValue}
+        onMouseDown={(event) => {
+          const input = event.currentTarget.parentElement?.querySelector('input');
+          if (input) flushSync(() => input.blur());
+        }}
         onClick={props.onOpenPicker}
         className={[
           'inline-flex h-[var(--sniptale-compact-control-height,32px)] w-6 shrink-0',

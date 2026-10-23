@@ -73,7 +73,7 @@ export function PresetsList(props: PresetsListProps) {
     if (action.type === 'delete') props.onDelete(preset);
   };
   const onMove = (intent: SettingsCollectionMoveIntent) => {
-    void props.onMoveBefore(intent.itemId, intent.beforeItemId);
+    return props.onMoveBefore(intent.itemId, intent.beforeItemId);
   };
 
   return (

@@ -150,3 +150,84 @@ describe('bounded review text contract', () => {
     ).toBeNull();
   });
 });
+
+it('preserves disjoint nested and repeated projected ranges without treating the envelope as placement', () => {
+  const ranges = [
+    { start: 1, end: 8 },
+    { start: 2, end: 3 },
+    { start: 2, end: 3 },
+  ];
+  const input = { ...context, fragments: [{ ...context.fragments[0]!, start: 1, end: 8, ranges }] };
+  expect(reviewTextContextSchema.parse(input).fragments[0]?.ranges).toEqual(ranges);
+  expect(
+    parseReviewTextProposal({ version: 1, fragments: [proposal.fragments[0]] }, input)
+  ).toEqual({ version: 1, fragments: [proposal.fragments[0]] });
+  for (const invalid of [
+    [],
+    [ranges[0]],
+    [ranges[1], ranges[0]],
+    [
+      { start: 1, end: 8 },
+      { start: 2, end: 9 },
+    ],
+    [
+      { start: 1, end: 8 },
+      { start: 2, end: 2 },
+    ],
+    [
+      { start: 1, end: 8 },
+      { start: 2, end: Infinity },
+    ],
+    [
+      { start: 1, end: 8 },
+      { start: 2, end: 3, clipId: 'private' },
+    ],
+  ])
+    expect(
+      reviewTextContextSchema.safeParse({
+        ...input,
+        fragments: [{ ...input.fragments[0], ranges: invalid }],
+      }).success
+    ).toBe(false);
+  expect(
+    reviewTextContextSchema.safeParse({
+      ...input,
+      fragments: [
+        { ...input.fragments[0], ranges: Array.from({ length: 2_000 }, () => ranges[0]) },
+      ],
+    }).success
+  ).toBe(false);
+});
+
+it('admits a strict montage document scope separately from a Gallery workspace', () => {
+  const scope = {
+    kind: 'project-text',
+    projectId: 'project',
+    projectRevision: 2,
+    projectUpdatedAt: 100,
+    documentId: 'document',
+  };
+  const start = {
+    type: 'start',
+    requestId: 'f204dbf4-fcc2-4d0d-964d-d623d6e00578',
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+    approvedModelCode: 'code',
+    llmSessionToken: 'token',
+    context,
+    scope,
+  };
+  expect(parseReviewTextClientMessage(start)).toEqual(start);
+  for (const patch of [
+    { kind: 'other' },
+    { documentId: '' },
+    { projectRevision: 1.5 },
+    { projectUpdatedAt: NaN },
+    { workspaceId: 'gallery' },
+    { assetId: 'private' },
+  ])
+    expect(parseReviewTextClientMessage({ ...start, scope: { ...scope, ...patch } })).toBeNull();
+  const { documentId: _documentId, ...missing } = scope;
+  expect(parseReviewTextClientMessage({ ...start, scope: missing })).toBeNull();
+});

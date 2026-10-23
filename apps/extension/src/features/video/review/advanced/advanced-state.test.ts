@@ -17,6 +17,27 @@ const gradient: Gradient = {
   ],
 };
 
+it.each([undefined, true, false])(
+  'retains the optional initial-mode choice value %s',
+  (pending) => {
+    const advanced = createQuickEditAdvancedState();
+    if (pending !== undefined) advanced.ui.modeSelectionPending = pending;
+    const loaded = loadQuickEditAdvancedState(advanced);
+    expect(loaded?.ui.modeSelectionPending).toBe(pending);
+    expect(loadQuickEditAdvancedState(loaded)).toEqual(loaded);
+  }
+);
+
+it('rejects malformed initial-mode choice values', () => {
+  const advanced = createQuickEditAdvancedState();
+  expect(
+    loadQuickEditAdvancedState({
+      ...advanced,
+      ui: { ...advanced.ui, modeSelectionPending: 'true' },
+    })
+  ).toBeNull();
+});
+
 const zoomRegion = (id: string, start: number, end: number) => ({
   id,
   start,
@@ -422,7 +443,7 @@ it('loads content snapshots and rejects ui leakage or schema drift', () => {
 });
 
 it('preserves spotlight settings through advanced content parsing and rejects malformed openings', async () => {
-  const { createQuickEditSpotlight } = await import('./focus');
+  const { createQuickEditSpotlight } = await import('../../project/scene/focus-appearance');
   const state = advanced();
   state.zoom.regions[0]!.spotlight = createQuickEditSpotlight();
   expect(loadQuickEditAdvancedState(state)).toEqual(state);

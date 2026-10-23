@@ -47,6 +47,7 @@ function verifyDefaultAction() {
       screenshotMode: 'visible',
       viewportPresetId: null,
       afterCapture: 'download_default',
+      delay: 0,
     })
   );
 }

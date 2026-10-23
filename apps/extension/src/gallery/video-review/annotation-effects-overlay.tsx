@@ -21,7 +21,7 @@ import {
   projectReviewAnnotationEffect,
   sampleReviewAnnotationEffect,
 } from '../../features/video/review/annotation-effects/timing';
-import { projectQuickEditPoint } from '../../features/video/review/advanced/spatial-geometry';
+import { projectQuickEditPoint } from '../../features/video/composition/motion/spatial-geometry';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import {
   reviewAnnotationBodyGeometry,

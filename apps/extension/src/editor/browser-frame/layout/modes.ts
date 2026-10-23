@@ -2,7 +2,7 @@ import type {
   BrowserFrameState,
   EditorFrameSettings,
 } from '../../../features/editor/document/types';
-import { windowHeaderGeometry } from '../../../features/browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
 
 type BrowserFrameActiveStateInput = boolean | Pick<BrowserFrameState, 'enabled'>;

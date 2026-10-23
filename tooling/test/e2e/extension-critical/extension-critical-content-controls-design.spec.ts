@@ -292,7 +292,10 @@ async function inspectModeParity(page: Page, info: TestInfo, suffix: string) {
           button.glyph &&
           !/video-recording\.(start|pause|resume|stop|cancel)$/u.test(button.id ?? '')
         )
-          expect.soft(button.glyph, label).toEqual({ width: 16, height: 16 });
+          expect.soft(button.glyph, label).toEqual({
+            width: observation.targetSize === 24 ? 14 : observation.targetSize === 25 ? 15 : 16,
+            height: observation.targetSize === 24 ? 14 : observation.targetSize === 25 ? 15 : 16,
+          });
       }
     }
   }
@@ -447,6 +450,33 @@ async function inspectDesignReview(page: Page, composition: Composition, info: T
   ).toEqual(before);
 }
 
+async function blurSelectionDrawing(checkbox: Locator) {
+  const drawing = await checkbox.evaluate((node) => {
+    const target = node.getBoundingClientRect();
+    const disc = getComputedStyle(node, '::before');
+    return {
+      appearance: getComputedStyle(node).appearance,
+      target: [target.width, target.height],
+      disc: [disc.width, disc.height, disc.borderRadius],
+    };
+  });
+  expect.soft(drawing.appearance).toBe('none');
+  expect.soft(drawing.target).toEqual([28, 28]);
+  expect.soft(drawing.disc).toEqual(['18px', '18px', '50%']);
+}
+
+async function opaqueBlurSurface(modal: Locator) {
+  const alpha = await modal.evaluate((node) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = getComputedStyle(node).backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+    return context.getImageData(0, 0, 1, 1).data[3];
+  });
+  expect.soft(alpha, 'Blur settings hide underlying page content').toBe(255);
+}
+
 async function inspectAutoBlur(page: Page, composition: Composition, info: TestInfo) {
   await ui(page, 'content.toolbar.mode-selector-button').click();
   await ui(page, 'content.toolbar.mode-option.highlighter').click();
@@ -521,11 +551,26 @@ async function inspectAutoBlur(page: Page, composition: Composition, info: TestI
   await withinViewport(modal);
   const first = modal.getByRole('checkbox', { name: 'first@example.org', exact: true });
   await expect(first).toBeVisible();
+  await opaqueBlurSurface(modal);
+  await blurSelectionDrawing(first);
   await expect(modal).toHaveCSS('width', '780px');
   await expect(modal).toHaveCSS('border-radius', '8px');
   for (const value of ['first@example.org', 'second@example.org', 'third@example.org'])
     await modal.getByRole('checkbox', { name: value, exact: true }).uncheck();
-  await first.check();
+  await first.focus();
+  await first.press('Space');
+  await expect(first).toBeChecked();
+  await expect(first).toBeFocused();
+  const checkedMark = await first.evaluate((node) => getComputedStyle(node, '::after').opacity);
+  expect.soft(checkedMark).toBe('1');
+  await first.press('Space');
+  await expect(first).not.toBeChecked();
+  expect.soft(await first.evaluate((node) => getComputedStyle(node, '::after').opacity)).toBe('0');
+  await first.press('Space');
+  await expect(first).toBeChecked();
+  await first.click({ position: { x: 2, y: 14 } });
+  await expect(first).not.toBeChecked();
+  await first.click({ position: { x: 2, y: 14 } });
   await expect(first).toBeChecked();
   const category = modal
     .getByRole('treegrid')
@@ -537,6 +582,13 @@ async function inspectAutoBlur(page: Page, composition: Composition, info: TestI
       }),
     });
   await expect(category.getByRole('checkbox')).toHaveJSProperty('indeterminate', true);
+  await blurSelectionDrawing(category.getByRole('checkbox'));
+  const mixedMark = await category.getByRole('checkbox').evaluate((node) => {
+    const mark = getComputedStyle(node, '::after');
+    return [mark.width, mark.height, mark.opacity];
+  });
+  expect.soft(mixedMark).toEqual(['8px', '2px', '1']);
+  await capture(page, info, 'auto-blur-mixed-selection');
   expect((await category.boundingBox())!.height).toBeGreaterThanOrEqual(40);
   const child = first.locator('..');
   expect((await child.boundingBox())!.height).toBeGreaterThanOrEqual(36);
@@ -595,6 +647,8 @@ async function inspectAutoBlur(page: Page, composition: Composition, info: TestI
   const categories = ui(page, 'content.auto-blur.auto-apply-categories');
   await expect(categories.getByRole('checkbox')).toHaveCount(6);
   const checkbox = categories.getByRole('checkbox').first();
+  await opaqueBlurSurface(modal);
+  await blurSelectionDrawing(checkbox);
   const checked = await checkbox.isChecked();
   await checkbox.click();
   expect(await checkbox.isChecked()).toBe(!checked);
@@ -741,4 +795,639 @@ for (const composition of compositions) {
       await context.unroute(`${origin}/**`);
     }
   });
+}
+
+for (const width of [1280, 1920]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`video feedback toolbar ${width} ${theme}`, async ({ context, extensionId }, info) => {
+      const origin = 'https://sniptale-toolbar-feedback.test';
+      const composition: Composition = {
+        locale: 'ru',
+        theme,
+        viewport: { width, height: width === 1280 ? 560 : 900 },
+      };
+      await context.route(`${origin}/**`, (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body:
+            '<!doctype html><html><body style="margin:0;background:#808080">' +
+            '<div style="font:32px sans-serif;line-height:40px">' +
+            'HOST BACKDROP '.repeat(200) +
+            '</div></body></html>',
+        })
+      );
+      const { page, popup } = await activateHost(context, extensionId, origin, composition);
+      try {
+        const toolbar = ui(page, 'content.toolbar.root');
+        const trigger = ui(page, 'content.toolbar.mode-selector-button');
+        await ui(page, 'content.toolbar.settings-button').click();
+        const initialFreePlacement = page.getByRole('button', {
+          name: /Free toolbar placement|Свободное размещение панели/u,
+        });
+        if (
+          await initialFreePlacement.evaluate((node) =>
+            node.classList.contains('sniptale-popover-item-selected')
+          )
+        )
+          await initialFreePlacement.click();
+        const compactMenuView = page.getByRole('button', {
+          name: tr(composition, 'content.toolbar.compactMenus'),
+          exact: false,
+        });
+        if (
+          !(await compactMenuView.evaluate((node) =>
+            node.classList.contains('sniptale-popover-item-selected')
+          ))
+        )
+          await compactMenuView.click();
+        await page.keyboard.press('Escape');
+        await trigger.click();
+        const menu = page.locator('.sniptale-content-menu-adopted.sniptale-toolbar-menu');
+        await expect(menu).toHaveClass(/sniptale-toolbar-menu--compact/u);
+        await expect(menu).toBeVisible();
+        const appearance = await menu.evaluate((element) => {
+          const surface = element as HTMLElement;
+          const previousAnimation = surface.style.animation;
+          surface.style.animation = 'none';
+          void surface.offsetWidth;
+          surface.style.animation = previousAnimation;
+          const animation = element.getAnimations()[0];
+          const positions: number[] = [];
+          if (animation) {
+            animation.pause();
+            for (const time of [0, 100, 200]) {
+              animation.currentTime = time;
+              positions.push(
+                element.querySelector('.sniptale-toolbar-menu-title')!.getBoundingClientRect().x
+              );
+            }
+            animation.finish();
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const context = canvas.getContext('2d')!;
+          context.fillStyle = getComputedStyle(element).backgroundColor;
+          context.fillRect(0, 0, 1, 1);
+          return {
+            alpha: context.getImageData(0, 0, 1, 1).data[3],
+            drift: positions.length ? Math.max(...positions) - Math.min(...positions) : 0,
+            weights: Array.from(element.querySelectorAll('.sniptale-toolbar-menu-item')).map(
+              (row) => getComputedStyle(row).fontWeight
+            ),
+            strokes: Array.from(
+              element.querySelectorAll('.sniptale-toolbar-menu-item svg.lucide')
+            ).map((icon) => getComputedStyle(icon).strokeWidth),
+          };
+        });
+        expect.soft(appearance.alpha, 'Page content cannot show through the menu').toBe(255);
+        expect
+          .soft(appearance.drift, 'Menu text keeps its horizontal position while opening')
+          .toBeLessThanOrEqual(0.5);
+        expect.soft(appearance.weights.every((weight) => weight === '400')).toBe(true);
+        expect
+          .soft(appearance.strokes.every((stroke) => Number.parseFloat(stroke) === 1.75))
+          .toBe(true);
+        await capture(page, info, 'feedback-menu');
+        await page.keyboard.press('Escape');
+        await ui(page, 'content.toolbar.capture-full-settings-button').click();
+        const fullPageMenu = ui(page, 'content.toolbar.full-page-menu').locator(
+          '.sniptale-toolbar-menu'
+        );
+        await expect(fullPageMenu).toBeVisible();
+        const retainedMenu = await fullPageMenu.elementHandle();
+        for (const mode of ['hide', 'repeat', 'once']) {
+          const option = ui(page, `content.toolbar.full-page-floating.${mode}`);
+          await option.click();
+          await expect(option).toBeEnabled();
+          await expect(option).toHaveClass(/sniptale-popover-item-selected/u);
+          expect(await retainedMenu!.evaluate((element) => element.isConnected)).toBe(true);
+          await expect(fullPageMenu).toHaveCount(1);
+        }
+        await capture(page, info, 'feedback-full-page-preferences');
+        await page.keyboard.press('Escape');
+        for (const size of [24, 32]) {
+          const overlap = await toolbar.evaluate((element, buttonSize) => {
+            const previous = element.getAttribute('style');
+            (element as HTMLElement).style.setProperty(
+              '--sniptale-toolbar-button-size',
+              `${buttonSize}px`
+            );
+            const intersections = Array.from(
+              element.querySelectorAll<HTMLElement>('[data-menu-indicator="true"]')
+            ).map((button) => {
+              const box = button.getBoundingClientRect();
+              const icon = button.querySelector('svg')?.getBoundingClientRect();
+              if (!icon) return 0;
+              const css = getComputedStyle(button, '::before');
+              const triangleWidth =
+                parseFloat(css.borderLeftWidth) + parseFloat(css.borderRightWidth);
+              const triangleHeight =
+                parseFloat(css.borderTopWidth) + parseFloat(css.borderBottomWidth);
+              const right =
+                box.right -
+                parseFloat(css.right) -
+                parseFloat(getComputedStyle(button).borderRightWidth);
+              const explicitTop = parseFloat(css.top);
+              const bottom = Number.isFinite(explicitTop)
+                ? box.top +
+                  parseFloat(getComputedStyle(button).borderTopWidth) +
+                  explicitTop +
+                  triangleHeight
+                : box.bottom -
+                  parseFloat(css.bottom) -
+                  parseFloat(getComputedStyle(button).borderBottomWidth);
+              return (
+                Math.max(
+                  0,
+                  Math.min(right, icon.right) - Math.max(right - triangleWidth, icon.left)
+                ) *
+                Math.max(
+                  0,
+                  Math.min(bottom, icon.bottom) - Math.max(bottom - triangleHeight, icon.top)
+                )
+              );
+            });
+            if (previous === null) element.removeAttribute('style');
+            else element.setAttribute('style', previous);
+            return Math.max(0, ...intersections);
+          }, size);
+          expect.soft(overlap, `Menu indicators clear icons at ${size}px targets`).toBe(0);
+        }
+        await capture(page, info, 'feedback-fitted-indicators');
+        const handle = ui(page, 'shared.ui.content-toolbar-drag-handle');
+        const box = (await handle.boundingBox())!;
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(width / 2, 90, { steps: 5 });
+        const guides = ui(page, 'content.toolbar.dock-guides');
+        await expect(guides).toBeVisible();
+        const guideAppearance = await ui(page, 'content.toolbar.dock-zone.left').evaluate(
+          (element) => ({
+            opacity: getComputedStyle(element).opacity,
+            border: getComputedStyle(element).borderLeftColor,
+            outline: getComputedStyle(element).outlineWidth,
+          })
+        );
+        expect
+          .soft(guideAppearance.opacity, 'Guide borders are not faded with their fill')
+          .toBe('1');
+        expect
+          .soft(
+            parseFloat(guideAppearance.outline),
+            'A contrasting outer boundary survives gray backdrops'
+          )
+          .toBeGreaterThanOrEqual(1);
+        await capture(page, info, 'feedback-docking-guides');
+        await page.mouse.move(width / 2, 20, { steps: 4 });
+        await expect(ui(page, 'content.toolbar.dock-zone.top')).toHaveAttribute(
+          'data-active',
+          'true'
+        );
+        await capture(page, info, 'feedback-docking-active');
+        await page.mouse.up();
+        await expect(guides).toHaveCount(0);
+        await ui(page, 'content.toolbar.settings-button').click();
+        const free = page.getByRole('button', {
+          name: /Free toolbar placement|Свободное размещение панели/u,
+        });
+        if (
+          !(await free.evaluate((node) =>
+            node.classList.contains('sniptale-popover-item-selected')
+          ))
+        )
+          await free.click();
+        await page.getByRole('button', { name: /Vertical view|Вертикальный вид/u }).click();
+        const direction = await trigger.evaluate((element) => {
+          const css = getComputedStyle(element, '::before');
+          return {
+            top: parseFloat(css.borderTopWidth),
+            right: parseFloat(css.borderRightWidth),
+            left: parseFloat(css.borderLeftWidth),
+            bottom: parseFloat(css.borderBottomWidth),
+          };
+        });
+        expect
+          .soft(direction.left, 'Vertical disclosure points toward the side menu')
+          .toBeGreaterThan(direction.top);
+        expect.soft(direction.left).toBeGreaterThan(direction.bottom);
+        await trigger.click();
+        await capture(page, info, 'feedback-vertical-menu');
+        await page.keyboard.press('Escape');
+        await trigger.focus();
+        await page.keyboard.press('Enter');
+        await expect(menu).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(menu).toHaveCount(0);
+        await trigger.click();
+        await ui(page, 'content.toolbar.mode-option.drawing').click();
+        await ui(page, 'content.toolbar.drawing.shape').click();
+        await page.mouse.move(450, 280);
+        await page.mouse.down();
+        await page.mouse.move(620, 400, { steps: 8 });
+        await page.mouse.up();
+        await ui(page, 'content.toolbar.drawing.select').click();
+        await page.mouse.click(500, 300);
+        const deleteSelection = ui(page, 'drawing.selection.actions.delete');
+        await expect(deleteSelection).toBeEnabled();
+        await deleteSelection.hover();
+        await expect
+          .soft(deleteSelection)
+          .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+        await expect
+          .soft(deleteSelection)
+          .toHaveCSS('border-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+        await expect.soft(deleteSelection).toHaveCSS('box-shadow', 'none', { timeout: 500 });
+        await capture(page, info, 'feedback-drawing-delete-hover');
+        await deleteSelection.focus();
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Shift+Tab');
+        await expect(deleteSelection).toBeFocused();
+        await expect(deleteSelection).toHaveCSS('outline-style', 'solid');
+        await deleteSelection.click();
+        await expect(deleteSelection).toHaveCount(0);
+        if (width === 1280 && theme === 'light') {
+          await page.setViewportSize({ width: 960, height: 560 });
+          await withinViewport(toolbar);
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+          ).toBe(true);
+          await trigger.click();
+          await withinViewport(menu);
+          await capture(page, info, 'feedback-below-minimum-menu');
+          await page.keyboard.press('Escape');
+        }
+      } finally {
+        await page.close();
+        await popup.close();
+        await context.unroute(`${origin}/**`);
+      }
+    });
+  }
+}
+
+for (const width of [1280, 1920]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`toolbar followup frame spacing and neutral docking ${width} ${theme}`, async ({
+      context,
+      extensionId,
+    }, info) => {
+      const origin = 'https://sniptale-toolbar-followup.test';
+      const composition: Composition = {
+        locale: 'ru',
+        theme,
+        viewport: { width, height: width === 1280 ? 560 : 900 },
+      };
+      await context.route(`${origin}/**`, (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body: '<!doctype html><html><body style="margin:0;background:#808080"><p>Toolbar contrast backdrop</p></body></html>',
+        })
+      );
+      const { page, popup } = await activateHost(context, extensionId, origin, composition);
+      const toolbar = ui(page, 'content.toolbar.root');
+      const settings = ui(page, 'content.toolbar.settings-button');
+      const free = page.getByRole('button', {
+        name: /Free toolbar placement|Свободное размещение панели/u,
+      });
+      try {
+        await settings.click();
+        if (
+          await free.evaluate((node) => node.classList.contains('sniptale-popover-item-selected'))
+        )
+          await free.click();
+        await page.keyboard.press('Escape');
+        await ui(page, 'content.toolbar.mode-selector-button').click();
+        await ui(page, 'content.toolbar.mode-option.drawing').click();
+        const pencil = ui(page, 'content.toolbar.drawing.pencil');
+        await pencil.click();
+        await expect(pencil).toHaveAttribute('data-active', 'true');
+        for (const orientation of ['horizontal', 'vertical']) {
+          if (orientation === 'vertical') {
+            await settings.click();
+            await free.click();
+            await page.getByRole('button', { name: /Vertical view|Вертикальный вид/u }).click();
+          }
+          for (const size of [24, 32]) {
+            await toolbar.evaluate((chrome, buttonSize) => {
+              let style = chrome.querySelector<HTMLStyleElement>('style[data-indicator-proof]');
+              if (!style) {
+                style = document.createElement('style');
+                style.dataset['indicatorProof'] = 'true';
+                chrome.append(style);
+              }
+              style.textContent = `.sniptale-content-toolbar-adopted { --sniptale-toolbar-button-size: ${buttonSize}px !important; transition: none !important; }`;
+            }, size);
+            await pencil.hover();
+            await capture(page, info, `inside-indicators-${orientation}-${size}`);
+            const toolbarBounds = (await toolbar.boundingBox())!;
+            const viewport = page.viewportSize()!;
+            const clipX = Math.max(0, toolbarBounds.x);
+            const clipY = Math.max(0, toolbarBounds.y);
+            await page.screenshot({
+              path: info.outputPath(`inside-toolbar-closeup-${orientation}-${size}.png`),
+              clip: {
+                x: clipX,
+                y: clipY,
+                width: Math.min(viewport.width, toolbarBounds.x + toolbarBounds.width) - clipX,
+                height: Math.min(viewport.height, toolbarBounds.y + toolbarBounds.height) - clipY,
+              },
+              fullPage: false,
+              animations: 'disabled',
+            });
+            expect((await pencil.boundingBox())!.width).toBe(size);
+            expect((await pencil.boundingBox())!.height).toBe(size);
+            const measurements = await toolbar.evaluate(async (chrome) => {
+              // Resolve visible SVG ink at 1/8 CSS px; padding also captures the rejected outside position.
+              const scale = 8;
+              const padding = 8;
+              const shell = chrome.getBoundingClientRect();
+              const results = [];
+              for (const button of chrome.querySelectorAll<HTMLElement>(
+                '[data-menu-indicator="true"]'
+              )) {
+                const box = button.getBoundingClientRect();
+                if (box.width === 0 || box.height === 0) continue;
+                const svg = button.querySelector('svg');
+                if (!svg) throw new Error('Disclosure trigger has no glyph');
+                const glyph = svg.getBoundingClientRect();
+                const css = getComputedStyle(button, '::before');
+                const buttonCss = getComputedStyle(button);
+                const width = parseFloat(css.borderLeftWidth) + parseFloat(css.borderRightWidth);
+                const height = parseFloat(css.borderTopWidth) + parseFloat(css.borderBottomWidth);
+                const explicitLeft = parseFloat(css.left);
+                const explicitTop = parseFloat(css.top);
+                const left =
+                  (Number.isFinite(explicitLeft)
+                    ? box.left + parseFloat(buttonCss.borderLeftWidth) + explicitLeft
+                    : box.right -
+                      parseFloat(buttonCss.borderRightWidth) -
+                      parseFloat(css.right) -
+                      width) - box.left;
+                const top =
+                  (Number.isFinite(explicitTop)
+                    ? box.top + parseFloat(buttonCss.borderTopWidth) + explicitTop
+                    : box.bottom -
+                      parseFloat(buttonCss.borderBottomWidth) -
+                      parseFloat(css.bottom) -
+                      height) - box.top;
+                const clone = svg.cloneNode(true);
+                if (!(clone instanceof SVGSVGElement)) throw new Error('Glyph clone is not SVG');
+                clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                clone.setAttribute('width', String(glyph.width));
+                clone.setAttribute('height', String(glyph.height));
+                const originalNodes = [svg, ...svg.querySelectorAll('*')];
+                const clonedNodes = [clone, ...clone.querySelectorAll('*')];
+                const paints = [];
+                for (const [index, original] of originalNodes.entries()) {
+                  const computed = getComputedStyle(original);
+                  paints.push({ stroke: computed.stroke, fill: computed.fill });
+                  const copied = clonedNodes[index]!;
+                  if (!(copied instanceof SVGElement)) throw new Error('Glyph child is not SVG');
+                  for (const property of [
+                    'color',
+                    'stroke',
+                    'stroke-width',
+                    'stroke-linecap',
+                    'stroke-linejoin',
+                    'stroke-miterlimit',
+                    'fill',
+                    'fill-rule',
+                    'fill-opacity',
+                    'stroke-opacity',
+                    'opacity',
+                    'vector-effect',
+                  ]) {
+                    copied.style.setProperty(property, computed.getPropertyValue(property));
+                  }
+                }
+                clone.style.width = `${glyph.width}px`;
+                clone.style.height = `${glyph.height}px`;
+                const image = new Image();
+                const loaded = new Promise<void>((resolve, reject) => {
+                  image.onload = () => resolve();
+                  image.onerror = () => reject(new Error('Native SVG ink mask failed to load'));
+                });
+                image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(clone))}`;
+                await loaded;
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.ceil((box.width + padding * 2) * scale);
+                canvas.height = Math.ceil((box.height + padding * 2) * scale);
+                const context = canvas.getContext('2d')!;
+                context.scale(scale, scale);
+                context.drawImage(
+                  image,
+                  padding + glyph.left - box.left,
+                  padding + glyph.top - box.top,
+                  glyph.width,
+                  glyph.height
+                );
+                const glyphPixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+                context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
+                const side = chrome.getAttribute('data-display-mode') === 'vertical';
+                context.beginPath();
+                context.moveTo(padding + left, padding + top);
+                if (side) {
+                  context.lineTo(padding + left, padding + top + height);
+                  context.lineTo(padding + left + width, padding + top + height / 2);
+                } else {
+                  context.lineTo(padding + left + width, padding + top);
+                  context.lineTo(padding + left + width / 2, padding + top + height);
+                }
+                context.closePath();
+                context.fillStyle = 'white';
+                context.fill();
+                const markerPixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+                const glyphInk = [];
+                const markerInk = [];
+                let overlap = 0;
+                for (let pixel = 0; pixel < canvas.width * canvas.height; pixel++) {
+                  const point = {
+                    x: ((pixel % canvas.width) + 0.5) / scale - padding,
+                    y: (Math.floor(pixel / canvas.width) + 0.5) / scale - padding,
+                  };
+                  if (glyphPixels[pixel * 4 + 3]! > 0) glyphInk.push(point);
+                  if (markerPixels[pixel * 4 + 3]! > 0) markerInk.push(point);
+                  if (glyphPixels[pixel * 4 + 3]! > 0 && markerPixels[pixel * 4 + 3]! > 0)
+                    overlap++;
+                }
+                const border = parseFloat(buttonCss.borderTopWidth);
+                const radius = Math.max(0, parseFloat(buttonCss.borderBottomRightRadius) - border);
+                let frameClearance = Infinity;
+                let glyphDistanceSquared = Infinity;
+                for (const point of markerInk) {
+                  const centerX = Math.max(
+                    border + radius,
+                    Math.min(point.x, box.width - border - radius)
+                  );
+                  const centerY = Math.max(
+                    border + radius,
+                    Math.min(point.y, box.height - border - radius)
+                  );
+                  frameClearance = Math.min(
+                    frameClearance,
+                    radius > 0
+                      ? radius - Math.hypot(point.x - centerX, point.y - centerY)
+                      : Math.min(
+                          point.x - border,
+                          box.width - border - point.x,
+                          point.y - border,
+                          box.height - border - point.y
+                        )
+                  );
+                  for (const ink of glyphInk) {
+                    glyphDistanceSquared = Math.min(
+                      glyphDistanceSquared,
+                      (point.x - ink.x) ** 2 + (point.y - ink.y) ** 2
+                    );
+                  }
+                }
+                const intersects = (other: DOMRect) =>
+                  Math.max(
+                    0,
+                    Math.min(box.left + left + width, other.right) -
+                      Math.max(box.left + left, other.left)
+                  ) *
+                  Math.max(
+                    0,
+                    Math.min(box.top + top + height, other.bottom) -
+                      Math.max(box.top + top, other.top)
+                  );
+                results.push({
+                  id: button.dataset['ui'],
+                  resolvedPaint: paints.every(
+                    (paint) => !/currentcolor|var\(/iu.test(paint.stroke + paint.fill)
+                  ),
+                  glyphInkPixels: glyphInk.length,
+                  markerInkPixels: markerInk.length,
+                  glyphOverlapPixels: overlap,
+                  // Subtract pixel-cell radii so reported distances are conservative lower bounds.
+                  glyphClearance: Math.sqrt(glyphDistanceSquared) - Math.SQRT2 / scale,
+                  frameClearance: frameClearance - Math.SQRT2 / (2 * scale),
+                  insideButton:
+                    left >= 0 &&
+                    top >= 0 &&
+                    left + width <= box.width &&
+                    top + height <= box.height,
+                  withinChrome:
+                    box.left + left >= shell.left &&
+                    box.top + top >= shell.top &&
+                    box.left + left + width <= shell.right &&
+                    box.top + top + height <= shell.bottom,
+                  neighboringOverlap: Math.max(
+                    0,
+                    ...Array.from(chrome.querySelectorAll('button'))
+                      .filter((other) => other !== button)
+                      .map((other) => intersects(other.getBoundingClientRect()))
+                  ),
+                });
+              }
+              return results;
+            });
+            expect(measurements.length).toBeGreaterThan(0);
+            const metricsPath = info.outputPath(`inside-indicators-${orientation}-${size}.json`);
+            await writeFile(metricsPath, JSON.stringify(measurements));
+            await info.attach(`inside-indicators-${orientation}-${size}`, {
+              path: metricsPath,
+              contentType: 'application/json',
+            });
+            for (const geometry of measurements) {
+              const label = `${geometry.id} ${orientation} ${size}px`;
+              expect.soft(geometry.resolvedPaint, `${label} resolves real SVG paint`).toBe(true);
+              expect
+                .soft(geometry.glyphInkPixels, `${label} glyph actually rasterized`)
+                .toBeGreaterThan(0);
+              expect
+                .soft(geometry.markerInkPixels, `${label} marker actually rasterized`)
+                .toBeGreaterThan(0);
+              expect
+                .soft(geometry.insideButton, `${label} indicator stays inside its button`)
+                .toBe(true);
+              expect
+                .soft(geometry.frameClearance, `${label} clears the rounded active frame`)
+                .toBeGreaterThanOrEqual(0.9);
+              expect.soft(geometry.glyphOverlapPixels, `${label} does not cover glyph ink`).toBe(0);
+              expect
+                .soft(geometry.glyphClearance, `${label} has visible glyph clearance`)
+                .toBeGreaterThanOrEqual(0.5);
+              expect.soft(geometry.neighboringOverlap).toBe(0);
+              expect.soft(geometry.withinChrome).toBe(true);
+            }
+            await toolbar.evaluate((chrome) =>
+              chrome.querySelector('style[data-indicator-proof]')?.remove()
+            );
+          }
+          await pencil.hover();
+          await capture(page, info, `followup-active-tool-${orientation}`);
+          const expanded = await pencil.getAttribute('aria-expanded');
+          await pencil.click();
+          await expect(pencil).toHaveAttribute(
+            'aria-expanded',
+            expanded === 'true' ? 'false' : 'true'
+          );
+        }
+        await settings.click();
+        await free.click();
+        await page.keyboard.press('Escape');
+        const backdrops = width === 1280 ? ['#808080', '#f5f5f5', '#181818'] : ['#808080'];
+        for (const [index, backdrop] of backdrops.entries()) {
+          await page.evaluate((background) => {
+            document.body.style.background = background;
+          }, backdrop);
+          await capture(page, info, `followup-backdrop-${index}`);
+          const handle = ui(page, 'shared.ui.content-toolbar-drag-handle');
+          const box = (await handle.boundingBox())!;
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(width / 2, 100, { steps: 5 });
+          const guides = ui(page, 'content.toolbar.dock-guides');
+          await expect(guides).toBeVisible();
+          for (const state of ['inactive', 'active']) {
+            if (state === 'active') await page.mouse.move(width / 2, 20, { steps: 4 });
+            const zone = ui(page, 'content.toolbar.dock-zone.top');
+            const paint = await zone.evaluate((element) => {
+              const canvas = document.createElement('canvas');
+              canvas.width = canvas.height = 1;
+              const context = canvas.getContext('2d')!;
+              const css = getComputedStyle(element);
+              const read = (color: string) => {
+                context.clearRect(0, 0, 1, 1);
+                context.fillStyle = color;
+                context.fillRect(0, 0, 1, 1);
+                return Array.from(context.getImageData(0, 0, 1, 1).data);
+              };
+              return {
+                border: read(css.borderTopColor),
+                outline: read(css.outlineColor),
+                fill: read(css.backgroundColor),
+                opacity: css.opacity,
+              };
+            });
+            expect.soft(paint.opacity).toBe('1');
+            expect
+              .soft(
+                Math.max(...paint.border.slice(0, 3)) - Math.min(...paint.border.slice(0, 3)),
+                'Dock guides use neutral gray in both states'
+              )
+              .toBeLessThanOrEqual(5);
+            expect
+              .soft(Math.max(...paint.border.slice(0, 3)), 'Guide border avoids bright white')
+              .toBeLessThanOrEqual(210);
+            expect
+              .soft(paint.outline[3], 'Outer edge uses a subdued opacity')
+              .toBeLessThanOrEqual(100);
+            expect
+              .soft(Math.max(...paint.fill.slice(0, 3)) - Math.min(...paint.fill.slice(0, 3)))
+              .toBeLessThanOrEqual(5);
+            await capture(page, info, `followup-guide-${index}-${state}`);
+          }
+          await page.mouse.up();
+          await expect(guides).toHaveCount(0);
+        }
+      } finally {
+        await page.close();
+        await popup.close();
+        await context.unroute(`${origin}/**`);
+      }
+    });
+  }
 }

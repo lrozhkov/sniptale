@@ -92,3 +92,15 @@ it('does not release another session cursor when an older session is cleaned up'
   second();
   expect(document.querySelector('style[data-video-editor-pointer-cursor]')).toBeNull();
 });
+
+it('forwards the final pointer event and retains cancellation fallback without an event', () => {
+  const onEnd = vi.fn();
+  startWindowPointerSession({ onEnd, onMove: vi.fn() });
+  const release = new MouseEvent('pointerup', { clientX: 40, clientY: 30 });
+  window.dispatchEvent(release);
+  expect(onEnd).toHaveBeenCalledExactlyOnceWith(release);
+  onEnd.mockClear();
+  startWindowPointerSession({ onEnd, onMove: vi.fn() });
+  window.dispatchEvent(new Event('pointercancel'));
+  expect(onEnd).toHaveBeenCalledExactlyOnceWith();
+});

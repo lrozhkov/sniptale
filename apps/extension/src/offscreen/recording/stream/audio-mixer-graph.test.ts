@@ -62,6 +62,22 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+it('updates microphone gain on the existing graph without affecting tab audio', async () => {
+  const harness = createAudioContextHarness();
+  const graph = new AudioMixerGraph();
+  graph.setMicrophoneGain(0);
+  await graph.initialize();
+  graph.connectTabStream(createAudioStream());
+  graph.connectMicrophoneStream(createAudioStream());
+  graph.setMicrophoneGain(0);
+  graph.setMicrophoneGain(2);
+  expect(harness.gainNode.gain.value).toBe(2);
+  expect(harness.createMediaStreamSource).toHaveBeenCalledTimes(2);
+  expect(harness.connectedNodes[0]!.disconnect).not.toHaveBeenCalled();
+  expect(harness.connectedNodes[1]!.disconnect).toHaveBeenCalledOnce();
+  expect(harness.gainNode.connect).toHaveBeenCalledExactlyOnceWith(harness.destination);
+});
+
 async function verifiesInitialization(): Promise<void> {
   const harness = createAudioContextHarness();
   const graph = new AudioMixerGraph();

@@ -57,9 +57,8 @@ function fixtureProject() {
       targetRect: null,
       label: 'Go next',
       text: 'Next slide',
-      action: { kind: 'next' },
       appearance: null,
-      pulse: true,
+      visual: { kind: 'point' as const, pulse: true },
     },
   ];
   const second = {

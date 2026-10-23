@@ -9,13 +9,14 @@ export { isBoolean, isString };
 export const isRecord = isPlainRecord;
 export const isFiniteNumber = isNumber;
 
-const MAX_VIDEO_PROJECT_ITEMS = 5_000;
+export const MAX_VIDEO_PROJECT_ITEMS = 5_000;
 export const MAX_VIDEO_PROJECT_DIMENSION = 16_384;
 export const MAX_VIDEO_PROJECT_DURATION_SECONDS = 86_400;
 export const MAX_VIDEO_PROJECT_FPS = 240;
 const MAX_VIDEO_PROJECT_COORDINATE = MAX_VIDEO_PROJECT_DIMENSION * 4;
 export const MAX_VIDEO_PROJECT_MEDIA_BYTES = 2 * 1024 * 1024 * 1024;
-const MAX_VIDEO_PROJECT_PLAYBACK_RATE = 16;
+export const MIN_VIDEO_PROJECT_PLAYBACK_RATE = 0.0625;
+export const MAX_VIDEO_PROJECT_PLAYBACK_RATE = 16;
 const MAX_VIDEO_PROJECT_SCALE = 4;
 const MAX_VIDEO_PROJECT_VOLUME = 4;
 const MAX_VIDEO_PROJECT_STYLE_SIZE = 2_048;
@@ -77,7 +78,7 @@ export function isScale(value: unknown): value is number {
 }
 
 export function isPlaybackRate(value: unknown): value is number {
-  return isBoundedNumber(value, 0.1, MAX_VIDEO_PROJECT_PLAYBACK_RATE);
+  return isBoundedNumber(value, MIN_VIDEO_PROJECT_PLAYBACK_RATE, MAX_VIDEO_PROJECT_PLAYBACK_RATE);
 }
 
 export function isVolume(value: unknown): value is number {

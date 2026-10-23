@@ -1,3 +1,4 @@
+import { MAX_AUDIO_FADE_SECONDS } from '../../audio/fades';
 import { retimeReviewVoiceover } from '../voiceover-timing';
 import {
   anchorReviewVoiceover,
@@ -10,7 +11,7 @@ import type { ReviewTimeSegment } from '../timeline';
 /** Renderer-consistent clip bounds, matching the persisted validation. */
 const MIN_CLIP_SECONDS = 0.001;
 const MAX_CLIP_VOLUME = 2;
-const MAX_CLIP_FADE = 60;
+
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 /** One clip reference; assetId resolves through the shared media library. */
 export function createQuickEditAudioClip(args: {
@@ -47,8 +48,8 @@ export function updateQuickEditAudioClip(
     sourceOffset: Math.max(0, next.sourceOffset),
     ...(next.tempo === undefined ? {} : { tempo: clamp(next.tempo, 0.25, 4) }),
     volume: clamp(next.volume, 0, MAX_CLIP_VOLUME),
-    fadeIn: clamp(next.fadeIn, 0, MAX_CLIP_FADE),
-    fadeOut: clamp(next.fadeOut, 0, MAX_CLIP_FADE),
+    fadeIn: clamp(next.fadeIn, 0, MAX_AUDIO_FADE_SECONDS),
+    fadeOut: clamp(next.fadeOut, 0, MAX_AUDIO_FADE_SECONDS),
   };
 }
 

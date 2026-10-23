@@ -1,3 +1,5 @@
+import type { CameraPerspective, CameraDepthOfField, CameraSpatialRect } from '../motion/spatial';
+import type { MotionBlurPhases } from '../motion/blur';
 export const VideoProjectSourceKind = {
   MANUAL: 'manual',
   RECORDING: 'recording',
@@ -44,6 +46,15 @@ export const VideoTemporalEasing = {
 } as const;
 
 export type VideoTemporalEasing = (typeof VideoTemporalEasing)[keyof typeof VideoTemporalEasing];
+
+export type CameraTransitionType = 'none' | 'linear' | 'ease-in-out' | 'ease-out' | 'instant';
+export type CameraTransitionPhase = 'enter' | 'exit';
+export type MotionPhaseTransitions = Partial<
+  Record<CameraTransitionPhase, CameraTransitionType>
+> & {
+  /** Source-owned preference remains after its outgoing connection is removed. */
+  link?: VideoTemporalEasing;
+};
 
 export const VideoMotionFocusMode = {
   MANUAL: 'MANUAL',
@@ -145,7 +156,15 @@ export interface VideoProjectCursorSkin {
   shadow: boolean;
 }
 
+/** Full captured source observations survive cuts; authored focus remains separate. */
+export interface VideoProjectCursorSourceObservations {
+  recordingId: string;
+  sourceInstanceId: string;
+  samples: VideoProjectCursorSample[];
+}
+
 export interface VideoProjectCursorTrack {
+  sourceObservations?: VideoProjectCursorSourceObservations[];
   captureMode: VideoCursorCaptureMode;
   samples: VideoProjectCursorSample[];
   skin: VideoProjectCursorSkin;
@@ -354,6 +373,8 @@ export interface VideoProjectMotionPoint {
 }
 
 export interface VideoProjectMotionArea {
+  /** Unit edge directions retain a converted area without replacing it by an axis-aligned box. */
+  axes?: { x: VideoProjectMotionPoint; y: VideoProjectMotionPoint };
   height: number;
   width: number;
   x: number;
@@ -361,11 +382,27 @@ export interface VideoProjectMotionArea {
 }
 
 export interface VideoProjectMotionRegion {
+  /** Active border mode retains the dormant camera configuration in this interval. */
+  border?: import('../scene/focus-appearance').QuickEditBorder;
+  /** Window geometry belongs to the bound clip, while viewport geometry ignores the camera. */
+  borderTarget?: 'viewport' | 'window';
+  /** Active spotlight mode retains dormant camera settings and the same interval clock. */
+  spotlight?: import('../scene/focus-appearance').QuickEditSpotlight;
+  /** Bound openings can affect their own window or the composed scene explicitly. */
+  spotlightTarget?: 'viewport' | 'window' | 'scene' | 'source-scene';
   /** Absent settings inherit the project policy or the retained legacy path coefficients. */
   cameraFollow?: import('../camera/cursor-policy').CameraFollowSettings;
   /** Authored interval tied to one source clip, retained while its visible part is trimmed. */
   sourceBinding?: {
     animationGroupId?: string;
+    /** Retained inactive authoring never gains a visible span during clip reprojection. */
+    dormant?: boolean;
+    /** Unresolved Gallery edge is retained as passive provenance, never a runtime connection. */
+    unresolvedLinkTo?: string;
+    /** Recompute Gallery phases from retained clips while preserving authored source clocks. */
+    phaseProjection?: 'retained-result';
+    /** Project-sized focus coordinates refer to the original decorated source window. */
+    coordinateSpace?: 'source-window';
     clipId: string;
     sourceStart: number;
     sourceEnd: number;
@@ -383,6 +420,13 @@ export interface VideoProjectMotionRegion {
   focusPoint: VideoProjectMotionPoint | null;
   id: string;
   motionBlurAmount?: number;
+  /** Explicit phase settings override the retained legacy scalar. */
+  motionBlur?: MotionBlurPhases;
+  phaseTransitions?: MotionPhaseTransitions;
+  perspective?: CameraPerspective;
+  depthOfField?: CameraDepthOfField;
+  /** Independent normalized scene plane; omission uses the whole project canvas. */
+  spatialReference?: CameraSpatialRect;
   overlayZoomMode?: VideoMotionOverlayZoomMode;
 
   scale: number;

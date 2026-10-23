@@ -4,7 +4,6 @@ import type { WorkspaceSidebarProps } from '../../contracts/props';
 import { ColorField } from '../shared/controls';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { SliderField } from '../shared/sliders';
-import { TextTemplateUpgradeFields } from './text-upgrade';
 
 function TextStyleFields(props: {
   clipId: string;
@@ -147,8 +146,7 @@ export function renderTextStyleFields(
   selectedTrackLocked: boolean,
   onUpdateTextStyle: WorkspaceSidebarProps['onUpdateTextStyle'],
   recentColors?: WorkspaceSidebarProps['recentColors'],
-  onRememberRecentColor?: WorkspaceSidebarProps['onRememberRecentColor'],
-  onConvertTextClipToAnnotation?: WorkspaceSidebarProps['onConvertTextClipToAnnotation']
+  onRememberRecentColor?: WorkspaceSidebarProps['onRememberRecentColor']
 ) {
   if (!selectedClip || !isTextClip(selectedClip)) {
     return null;
@@ -164,13 +162,6 @@ export function renderTextStyleFields(
         onRememberRecentColor={onRememberRecentColor}
         onUpdateTextStyle={onUpdateTextStyle}
       />
-      {onConvertTextClipToAnnotation ? (
-        <TextTemplateUpgradeFields
-          clipId={selectedClip.id}
-          disabled={selectedTrackLocked}
-          onConvertTextClipToAnnotation={onConvertTextClipToAnnotation}
-        />
-      ) : null}
     </div>
   );
 }

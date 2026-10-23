@@ -1,5 +1,5 @@
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
-import type { ReviewSpatialRenderer } from './spatial-renderer';
+import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import { withReviewWindowRaster, type ReviewWindowRaster } from './window-header';
 import { createVideoCompositionPassBuffer } from '../../features/video/composition/canvas/pass-buffer';
 import {

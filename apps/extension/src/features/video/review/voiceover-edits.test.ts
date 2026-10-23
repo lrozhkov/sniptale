@@ -1,12 +1,16 @@
 import { expect, it } from 'vitest';
 import {
+  areReviewVoiceoverSlicesContinuous,
   anchorReviewVoiceover,
   anchorReviewVoiceoverAtSource,
   normalizeReviewVoiceoverTempo,
   reviewVoiceoverPlaybackDuration,
   projectReviewVoiceover,
+  projectReviewVoiceoverAnchors,
   moveReviewVoiceover,
   trimReviewVoiceover,
+  trimReviewVoiceoverNative,
+  reviewVoiceoverOffset,
   reviewVoiceoverRange,
   reviewVoiceoverNativeIntervals,
   reviewVoiceoverNativeTime,
@@ -405,3 +409,49 @@ it('moves a retained take to the endpoint when the final source segment is cut',
   expect(moved.duration).toBe(20);
   expect(projectReviewVoiceover([moved], map)).toEqual([]);
 });
+
+it('projects already normalized anchors through the same Gallery slice owner', () => {
+  const take = anchorReviewVoiceoverAtSource({ ...clip, timelineStart: 1 }, original);
+  const before = structuredClone(take);
+  expect(projectReviewVoiceoverAnchors(take, take.sourceAnchor!, original)).toEqual(
+    projectReviewVoiceover([take], original)
+  );
+  expect(take).toEqual(before);
+});
+
+it('joins derived voice slices only within the established clock and rate tolerance', () => {
+  const first = { ...clip, timelineStart: 0, sourceOffset: 0.5, duration: 1, playbackRate: 2 };
+  const second = { ...first, timelineStart: 1, sourceOffset: 2.5 };
+  expect(areReviewVoiceoverSlicesContinuous(first, second)).toBe(true);
+  for (const delta of [0.5e-7, -0.5e-7]) {
+    expect(
+      areReviewVoiceoverSlicesContinuous(first, {
+        ...second,
+        timelineStart: second.timelineStart + delta,
+        sourceOffset: second.sourceOffset + delta,
+      })
+    ).toBe(true);
+  }
+  for (const property of ['timelineStart', 'sourceOffset', 'playbackRate'] as const) {
+    expect(
+      areReviewVoiceoverSlicesContinuous(first, { ...second, [property]: second[property] + 2e-7 })
+    ).toBe(false);
+  }
+});
+
+it.each(['start', 'end'] as const)(
+  'shares native %s trim geometry with Gallery source-time trim',
+  (edge) => {
+    const map = buildReviewTimeMap(20, [
+      { ...cut(2, 6), kind: 'speed', rate: 2, audio: 'speed' },
+      cut(9, 11),
+    ]);
+    const recording = anchorReviewVoiceoverAtSource({ ...clip, timelineStart: 3, tempo: 1.5 }, map);
+    for (const time of [0, 2, 3, 4, 6, 8, 10, 12, 20]) {
+      const offset = reviewVoiceoverOffset(recording, time, map);
+      expect(trimReviewVoiceoverNative(recording, edge, offset, 12, map)).toEqual(
+        trimReviewVoiceover(recording, edge, time, 20, 12, map)
+      );
+    }
+  }
+);

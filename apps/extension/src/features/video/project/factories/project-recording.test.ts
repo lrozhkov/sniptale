@@ -3,6 +3,7 @@ import {
   getVideoProjectActionPresentation,
   resolveVideoProjectActionPresentations,
 } from '../action-presentation';
+import { patchReviewKeys } from '../action-feedback/key-animation';
 import { isExportReadyVideoProject } from '../validation/root';
 import { resolveVideoCompositionFrame } from '../../composition/timeline/frame';
 
@@ -253,7 +254,7 @@ it('omits optional motion regions when recording metadata has none', () => {
   expect(project.duration).toBe(0.1);
 });
 
-it('keeps source-normalized points, retains unavailable facts, and lets captured keys inherit track defaults', () => {
+it('retains source facts and keeps captured keys disabled until explicitly enabled', () => {
   const project = createVideoProjectFromRecording({
     recordingId: 'r',
     filename: 'capture.webm',
@@ -301,6 +302,13 @@ it('keeps source-normalized points, retains unavailable facts, and lets captured
     ...getVideoProjectActionPresentation(project),
     showKeystrokes: true,
   };
+  expect(
+    resolveVideoProjectActionPresentations(project).find(({ event }) => event.kind === 'KEY')
+  ).toMatchObject({ enabled: false, renderKind: null });
+  const feedback = project.actionFeedback![0]!;
+  project.actionFeedback = [
+    { ...feedback, keyStyles: patchReviewKeys([], ['key'], { enabled: true }) },
+  ];
   expect(
     resolveVideoProjectActionPresentations(project).find(({ event }) => event.kind === 'KEY')
   ).toMatchObject({ enabled: true, renderKind: 'keystroke' });

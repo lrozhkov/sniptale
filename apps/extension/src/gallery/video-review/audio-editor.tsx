@@ -1,3 +1,4 @@
+import { AudioTakeLevelFields, AudioTakeFadeFields } from '../../ui/audio/take-fields';
 import {
   reviewInspectorActions,
   ReviewInspectorSections,
@@ -10,7 +11,6 @@ import {
   reviewVoiceoverPlaybackDuration,
   reviewVoiceoverRange,
 } from '../../features/video/review/voiceover-edits';
-import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { Trash2, AudioLines, Waves } from 'lucide-react';
@@ -36,28 +36,11 @@ export function ReviewAudioClipEditor(props: {
       content: (
         <>
           <ReviewInspectorColumns>
-            {props.lane === 'voiceover' ? (
-              <ReviewNumberRow
-                label={translate('gallery.videoReview.voiceoverTempo')}
-                unit="x"
-                min={0.25}
-                max={4}
-                step={0.05}
-                precision={2}
-                value={props.clip.tempo ?? 1}
-                disabled={props.busy}
-                onChange={(tempo) => props.onPatch({ tempo })}
-              />
-            ) : null}
-            <ReviewNumberRow
-              label={translate('gallery.videoReview.audioClipVolume')}
-              unit="%"
-              min={0}
-              max={200}
-              step={1}
-              value={props.clip.volume * 100}
+            <AudioTakeLevelFields
+              clip={props.clip}
               disabled={props.busy}
-              onChange={(value) => props.onPatch({ volume: value / 100 })}
+              showTempo={props.lane === 'voiceover'}
+              onPatch={props.onPatch}
             />
           </ReviewInspectorColumns>
         </>
@@ -69,25 +52,7 @@ export function ReviewAudioClipEditor(props: {
       icon: Waves,
       content: (
         <ReviewInspectorColumns>
-          {(['fadeIn', 'fadeOut'] as const).map((key) => (
-            <ReviewNumberRow
-              key={key}
-              label={translate(
-                key === 'fadeIn'
-                  ? 'gallery.videoReview.audioFadeIn'
-                  : 'gallery.videoReview.audioFadeOut'
-              )}
-              unit="s"
-              min={0}
-              max={Math.min(60, props.clip.duration)}
-              scrubMax={Math.min(5, props.clip.duration)}
-              step={0.1}
-              precision={2}
-              value={props.clip[key]}
-              disabled={props.busy}
-              onChange={(value) => props.onPatch({ [key]: value })}
-            />
-          ))}
+          <AudioTakeFadeFields clip={props.clip} disabled={props.busy} onPatch={props.onPatch} />
         </ReviewInspectorColumns>
       ),
     },

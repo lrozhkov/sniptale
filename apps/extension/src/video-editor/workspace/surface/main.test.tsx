@@ -1,3 +1,6 @@
+import * as canvasSurface from './canvas';
+import { InspectorGroupedPanel } from '../sidebar/selection/grouped-inspector';
+import type { ComponentProps } from 'react';
 // @vitest-environment jsdom
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { act } from 'react';
@@ -7,7 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceMain } from './main';
 import type { VideoEditorLibraryPanelProps } from '../../library/contracts/panel';
 import { createHeaderController, createPreviewController } from './main.test-support';
-import { RuntimePlaybackContext } from '../../runtime/controller/composition/contexts';
+import {
+  RuntimeProjectContext,
+  RuntimePlaybackContext,
+} from '../../runtime/controller/composition/contexts';
 
 const audioRecordingModalSpy = vi.fn();
 const libraryPanelSpy = vi.fn<(props: VideoEditorLibraryPanelProps) => void>();
@@ -17,6 +23,9 @@ const timelineSpy = vi.fn();
 const hookMocks = vi.hoisted(() => ({
   controller: null as unknown,
   sourceActive: false,
+  watermarkFocusProbe: false,
+  exportOpen: false,
+  closeExport: vi.fn(),
   setSourceActive: vi.fn(),
 }));
 
@@ -41,6 +50,11 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
 
 vi.mock('../../runtime/controller/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/store')>()),
+  useVideoEditorExportPort: (selector: (port: unknown) => unknown) =>
+    selector({
+      exportState: { dialogOpen: hookMocks.exportOpen },
+      closeExportDialog: hookMocks.closeExport,
+    }),
   useVideoEditorEffectEditingPort: (selector: (port: unknown) => unknown) =>
     selector({ applyEffectDocument: vi.fn() }),
 }));
@@ -52,6 +66,32 @@ vi.mock('./effects-library', () => ({
 vi.mock('../floating/inspector-stack', () => ({
   VideoEditorFloatingInspectorStack: (props: unknown) => {
     inspectorSpy(props);
+    if (hookMocks.watermarkFocusProbe)
+      return (
+        <InspectorGroupedPanel
+          groups={[
+            {
+              id: 'canvas',
+              semantic: 'canvas',
+              label: 'Canvas',
+              defaultActive: true,
+              content: 'Canvas controls',
+            },
+            {
+              id: 'scene-edges',
+              semantic: 'transition',
+              label: 'Bookends',
+              content: 'Bookend controls',
+            },
+            {
+              id: 'watermark',
+              semantic: 'watermark',
+              label: 'Watermark',
+              content: 'Watermark controls',
+            },
+          ]}
+        />
+      );
     return <div data-testid="context-inspector" />;
   },
 }));
@@ -566,5 +606,148 @@ it('does not pause a new recording session when an old playback start resolves',
     expect(pausePlayback).toHaveBeenCalledTimes(pauses);
   } finally {
     await act(async () => root.unmount());
+  }
+});
+
+it('opens export from collapsed state and closes it when the inspector collapses', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const controller = createWorkspaceController();
+  hookMocks.controller = controller;
+  hookMocks.exportOpen = false;
+  hookMocks.closeExport.mockClear();
+  const root = createRoot(document.createElement('div'));
+  const render = () => root.render(<VideoEditorWorkspaceMain previewHeightStyle={{}} />);
+  try {
+    await act(async () => render());
+    hookMocks.exportOpen = true;
+    await act(async () => render());
+    expect(controller.header.onToggleSidebar).toHaveBeenCalledOnce();
+    controller.header.leftSidebarCollapsed = false;
+    await act(async () => render());
+    controller.header.leftSidebarCollapsed = true;
+    await act(async () => render());
+    expect(hookMocks.closeExport).toHaveBeenCalledOnce();
+    expect(controller.header.onToggleSidebar).toHaveBeenCalledOnce();
+  } finally {
+    hookMocks.exportOpen = false;
+    hookMocks.closeExport.mockClear();
+    await act(async () => root.unmount());
+  }
+});
+
+it('mutes the Montage preview while the mounted microphone owns playback', () => {
+  hookMocks.controller = createWorkspaceController();
+  const value = {
+    applyLoadedProject: vi.fn(),
+    recordingLeave: {
+      capturing: true,
+      setCapturing: vi.fn(),
+      obscured: false,
+      register: () => () => undefined,
+      request: async () => true,
+    },
+  };
+  renderToStaticMarkup(
+    <RuntimeProjectContext.Provider value={value}>
+      <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+    </RuntimeProjectContext.Provider>
+  );
+  expect(previewSpy.mock.lastCall![0].mutePreviewAudio).toBe(true);
+  value.recordingLeave.capturing = false;
+  renderToStaticMarkup(
+    <RuntimeProjectContext.Provider value={value}>
+      <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+    </RuntimeProjectContext.Provider>
+  );
+  expect(previewSpy.mock.lastCall![0].mutePreviewAudio).toBe(false);
+});
+
+it('reveals the watermark group through the workspace intent and repeats after manual navigation', async () => {
+  hookMocks.controller = createWorkspaceController();
+  hookMocks.watermarkFocusProbe = true;
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const canvas = vi.spyOn(canvasSurface, 'VideoEditorWorkspaceCanvas').mockImplementation(
+    (
+      props: ComponentProps<typeof canvasSurface.VideoEditorWorkspaceCanvas> & {
+        onRevealWatermark?: () => void;
+      }
+    ) => (
+      <>
+        <button data-ui="test.reveal-watermark" onClick={props.onRevealWatermark}>
+          Reveal watermark
+        </button>
+        {props.inspector}
+      </>
+    )
+  );
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<VideoEditorWorkspaceMain previewHeightStyle={{}} />));
+    expect(container.textContent).toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-watermark"]')!.click()
+    );
+    expect(container.textContent).toContain('Watermark controls');
+    expect(container.textContent).not.toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('nav button[aria-label="Canvas"]')!.click()
+    );
+    expect(container.textContent).toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-watermark"]')!.click()
+    );
+    expect(container.textContent).toContain('Watermark controls');
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    canvas.mockRestore();
+    hookMocks.watermarkFocusProbe = false;
+  }
+});
+
+it('reveals the bookend group through the workspace intent and repeats after manual navigation', async () => {
+  hookMocks.controller = createWorkspaceController();
+  hookMocks.watermarkFocusProbe = true;
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const canvas = vi.spyOn(canvasSurface, 'VideoEditorWorkspaceCanvas').mockImplementation(
+    (
+      props: ComponentProps<typeof canvasSurface.VideoEditorWorkspaceCanvas> & {
+        onRevealBookends?: () => void;
+      }
+    ) => (
+      <>
+        <button data-ui="test.reveal-bookends" onClick={props.onRevealBookends}>
+          Reveal bookends
+        </button>
+        {props.inspector}
+      </>
+    )
+  );
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<VideoEditorWorkspaceMain previewHeightStyle={{}} />));
+    expect(container.textContent).toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-bookends"]')!.click()
+    );
+    expect(container.textContent).toContain('Bookend controls');
+    expect(container.textContent).not.toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('nav button[aria-label="Canvas"]')!.click()
+    );
+    expect(container.textContent).toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-bookends"]')!.click()
+    );
+    expect(container.textContent).toContain('Bookend controls');
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    canvas.mockRestore();
+    hookMocks.watermarkFocusProbe = false;
   }
 });

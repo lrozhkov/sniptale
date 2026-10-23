@@ -1,3 +1,4 @@
+import type { VideoProject } from '../../../../../features/video/project/types/model';
 // @vitest-environment jsdom
 import { WorkspaceSidebarSelectionBody } from './body';
 
@@ -18,6 +19,12 @@ import {
 import { createSceneSelection } from '../../../../project/selection/model';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { WorkspaceSidebarInspectPanel } from '../inspect';
+
+vi.mock('./watermark', () => ({
+  SceneWatermarkFields: ({ project }: { project: VideoProject }) => (
+    <span data-ui="native-watermark-binding">{project.name}</span>
+  ),
+}));
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -193,10 +200,21 @@ function verifiesSceneBackgroundSelectLabels() {
   expect(container?.textContent).toContain('Scene Background');
   expect(
     container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.select-field"]')
-  ).toHaveLength(2);
+  ).toHaveLength(1);
+  const backgroundType = container?.querySelector(
+    '[role="group"][aria-label="videoEditor.sidebar.sceneBackgroundTypeLabel"]'
+  );
   expect(
-    container?.querySelector('[data-ui="shared.ui.compact-inspector.segmented-field"]')
-  ).toBeNull();
+    Array.from(backgroundType?.querySelectorAll('button') ?? [], (button) => button.textContent)
+  ).toEqual([
+    'gallery.videoReview.backgroundNone',
+    'videoEditor.sidebar.sceneBackgroundSolid',
+    'videoEditor.sidebar.sceneBackgroundGradient',
+    'videoEditor.sidebar.sceneBackgroundImage',
+  ]);
+  expect(backgroundType?.querySelector('[aria-pressed="true"]')?.textContent).toBe(
+    'videoEditor.sidebar.sceneBackgroundImage'
+  );
 }
 
 describe('workspace-sidebar/selection/inspect-scene', () => {
@@ -262,4 +280,72 @@ it('shows grid in its own section through the complete selection body', () => {
   render();
   expect(grid().textContent).toContain('videoEditor.app.gridSizeLabel');
   expect(grid().textContent).toContain('videoEditor.app.gridColorLabel');
+});
+
+it('names the scene document manager by its document scope', () => {
+  renderInspectPanel(createProps());
+  expect(
+    container!.querySelector('nav [aria-label="videoEditor.sidebar.textDocuments"]')
+  ).not.toBeNull();
+  expect(
+    container!.querySelector('nav [aria-label="gallery.videoReview.textTrackDocument"]')
+  ).toBeNull();
+  clickGroup('videoEditor.sidebar.textDocuments');
+  expect(container!.querySelector('[data-ui="video-editor.text.panel"]')).not.toBeNull();
+});
+
+it('opens a dedicated watermark group with the authored project instead of the presented draft', () => {
+  const original = createProps();
+  const authored = { ...original.project, name: 'Authored' };
+  renderInspectPanel({
+    ...original,
+    project: { ...authored, name: 'Presented' },
+    typingProject: authored,
+    watermark: { onPreview: vi.fn(), registerAbort: vi.fn(() => () => undefined) },
+    onImportImage: vi.fn(),
+  });
+  clickGroup('gallery.videoReview.watermark');
+  expect(container!.querySelector('[data-ui="native-watermark-binding"]')!.textContent).toBe(
+    'Authored'
+  );
+});
+
+it('opens notes as a scene category without nesting a selected inspector', () => {
+  renderInspectPanel(createProps());
+  clickGroup('videoEditor.sidebar.comments');
+  expect(container!.querySelector('[data-ui="video-editor.comments.panel"]')).not.toBeNull();
+  expect(container!.querySelector('[data-ui="video-editor.comment.inspector"]')).toBeNull();
+});
+
+it('hides source audio for an unplaced material and exposes retained dormant documents', () => {
+  const props = createProps();
+  const asset = createVideoProjectAsset(
+    'Sound',
+    VideoProjectAssetType.AUDIO,
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      audioPeaks: null,
+      duration: 10,
+      hasAudio: true,
+      height: 0,
+      width: 0,
+      mimeType: 'audio/wav',
+      size: 100,
+    }
+  );
+  props.project.assets = [asset];
+  renderInspectPanel(props);
+  const category = 'nav button[title="videoEditor.sidebar.sourceAudio"]';
+  expect(container?.querySelector(category)).toBeNull();
+  props.project.version = 28;
+  props.project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+      ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+      mutes: [],
+    },
+  ];
+  renderInspectPanel(props);
+  expect(container?.querySelector(category)).not.toBeNull();
 });

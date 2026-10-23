@@ -1,9 +1,9 @@
 import {
-  createReviewSpotlightMasks,
-  type ReviewSpotlightClip,
-} from '../../../../apps/extension/src/workflows/video-review/render-spotlight';
-import type { QuickEditSpotlightFrame } from '../../../../apps/extension/src/features/video/review/advanced/focus';
-import type { QuickEditHomography } from '../../../../apps/extension/src/features/video/review/advanced/spatial-geometry';
+  createSceneSpotlightMasks,
+  type SceneSpotlightClip,
+} from '../../../../apps/extension/src/features/video/composition/draw/spotlight';
+import type { SceneSpotlightFrame } from '../../../../apps/extension/src/features/video/composition/scene-spotlight';
+import type { QuickEditHomography } from '../../../../apps/extension/src/features/video/composition/motion/spatial-geometry';
 import type { RenderResources } from '../../../../apps/extension/src/features/video/composition/canvas/render-resources';
 import { createUntiledSpotlightMasks } from './spotlight-mask-reference';
 
@@ -11,8 +11,8 @@ type Size = { width: number; height: number };
 type Fixture = {
   name: string;
   output: Size;
-  frames: QuickEditSpotlightFrame[];
-  clip?: ReviewSpotlightClip;
+  frames: SceneSpotlightFrame[];
+  clip?: SceneSpotlightClip;
   projection?: QuickEditHomography;
 };
 
@@ -219,13 +219,15 @@ export function probe() {
         entry.clip,
         entry.projection
       );
-      let actual: ReturnType<typeof createReviewSpotlightMasks> | undefined;
+      let actual: ReturnType<typeof createSceneSpotlightMasks> | undefined;
       try {
-        actual = createReviewSpotlightMasks(
+        actual = createSceneSpotlightMasks(
           entry.output,
-          entry.frames,
-          entry.clip,
-          entry.projection,
+          entry.frames.map((frame) => ({
+            ...frame,
+            clip: entry.clip,
+            projection: entry.projection,
+          })),
           managed ? owner.resources : undefined
         );
         const pixels = Math.max(

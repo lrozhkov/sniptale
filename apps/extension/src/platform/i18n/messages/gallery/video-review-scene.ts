@@ -11,6 +11,7 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
   },
   sourceCropSize: { ru: 'Размер области', en: 'Area size' },
   sourceCropReset: { ru: 'Сбросить область', en: 'Reset area' },
+  sourceCropRestore: { ru: 'Восстановить область', en: 'Restore area' },
   sourceCropApply: { ru: 'Применить', en: 'Apply' },
   annotationSourceMissing: {
     ru: 'Исходник аннотации недоступен',
@@ -143,6 +144,11 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
   canvas: { ru: 'Холст', en: 'Canvas' },
   background: { ru: 'Фон', en: 'Background' },
   backgroundNone: { ru: 'Нет', en: 'None' },
+  windowLayoutRestore: { ru: 'Восстановить оформление', en: 'Restore appearance' },
+  windowLayoutFitCanvas: {
+    ru: 'Вписать оформление в текущий холст',
+    en: 'Fit appearance to the current canvas',
+  },
   backgroundSolid: { ru: 'Цвет', en: 'Color' },
   backgroundGradient: { ru: 'Градиент', en: 'Gradient' },
   backgroundColors: { ru: 'Цвета', en: 'Colors' },

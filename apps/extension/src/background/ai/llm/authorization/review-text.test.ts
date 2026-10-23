@@ -16,7 +16,7 @@ const sender = {
   documentId: 'gallery-document',
   url: 'chrome-extension://extension/apps/extension/src/gallery/index.html',
 };
-const request: ReviewTextStart = {
+const request = {
   type: 'start',
   requestId: 'be0e898c-dcdf-4a0c-8e99-83949774b5ab',
   modelId: 'model',
@@ -35,7 +35,7 @@ const request: ReviewTextStart = {
     window: { start: 1, end: 3 },
     fragments: [{ id: 'text', text: 'Current words', start: 1, end: 3 }],
   },
-};
+} satisfies ReviewTextStart;
 function fixture(): VideoWorkspaceSnapshot {
   const advanced = createQuickEditAdvancedState();
   advanced.text = {
@@ -177,4 +177,28 @@ describe('Gallery text editing authorization', () => {
       )
     ).rejects.toThrow('stale');
   });
+});
+
+it('refuses fabricated Gallery ranges while preserving omitted legacy ranges', async () => {
+  const changed: ReviewTextStart = {
+    ...request,
+    context: {
+      ...request.context,
+      fragments: [
+        {
+          ...request.context.fragments[0]!,
+          ranges: [
+            { start: 1, end: 2 },
+            { start: 2, end: 3 },
+          ],
+        },
+      ],
+    },
+  };
+  await expect(assertReviewTextJobScope(changed, new AbortController().signal)).rejects.toThrow(
+    'stale'
+  );
+  await expect(
+    assertReviewTextJobScope(request, new AbortController().signal)
+  ).resolves.toBeUndefined();
 });

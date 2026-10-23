@@ -96,20 +96,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('keeps slow-rate preview video aligned with the timeline speed', async () => {
-  const clip = createVideoClip({ playbackRate: 0.4 });
-  const video = createVideoElement({ currentTime: 0, paused: true });
-  const videoRefs = {
-    current: { [clip.id]: video },
-  };
+it.each([0.0625, 0.4])(
+  'keeps slow-rate %s preview video aligned with the timeline speed',
+  async (rate) => {
+    const clip = createVideoClip({ playbackRate: rate });
+    const video = createVideoElement({ currentTime: 0, paused: true });
+    const videoRefs = {
+      current: { [clip.id]: video },
+    };
 
-  await renderHarness({
-    activeClips: [clip],
-    currentTime: 8,
-    isPlaying: true,
-    videoRefs,
-  });
+    await renderHarness({
+      activeClips: [clip],
+      currentTime: 8,
+      isPlaying: true,
+      videoRefs,
+    });
 
-  expect(video.currentTime).toBeCloseTo(3.6);
-  expect(video.playbackRate).toBeCloseTo(0.4);
-});
+    expect(video.currentTime).toBe(2 + 4 * rate);
+    expect(video.playbackRate).toBe(rate);
+  }
+);

@@ -4,7 +4,7 @@ import type {
 } from '../../features/video/composition/canvas/render-resources';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
-import { drawReviewBlurredScene } from './spotlight-blur';
+import { drawEdgePaddedBlur } from '../../features/video/composition/canvas/edge-padded-blur';
 
 type BackgroundPaint = {
   background: QuickEditBackgroundSettings;
@@ -49,7 +49,7 @@ export function drawReviewBackgroundPaint(
     const target = raster.getContext('2d');
     if (!sourceContext || !target) throw new Error('Background compositor is unavailable.');
     drawPaint(sourceContext, { ...args, width: source.width, height: source.height });
-    drawReviewBlurredScene(target, source, documentRef.createElement('canvas'), blur * scale);
+    drawEdgePaddedBlur(target, source, documentRef.createElement('canvas'), blur * scale);
     cached = { key, image, raster };
     rasters.set(cacheOwner, cached);
   }
@@ -93,7 +93,7 @@ export function createReviewBackgroundPainter(resources: RenderResources) {
         try {
           replacement = resources.canvas('background-cache', size);
           drawPaint(source.context, { ...args, ...size }, resources);
-          drawReviewBlurredScene(replacement.context, source.canvas, null, blur * scale, resources);
+          drawEdgePaddedBlur(replacement.context, source.canvas, null, blur * scale, resources);
           clear();
           cached = { key, image, lease: replacement };
           replacement = undefined;

@@ -9,7 +9,11 @@ import {
 } from '../../../../runtime/controller/workspace-preferences';
 import { InspectorGroupedPanel } from './panel';
 import { InspectorGroupFocusContext, type InspectorGroupFocusIntent } from './focus';
-import { InspectorSectionMemoryProvider, InspectorSelectionFamilyContext } from './presentation';
+import {
+  InspectorSectionMemoryProvider,
+  InspectorSelectionFamilyContext,
+  useInspectorSectionMemory,
+} from './presentation';
 import { DEFAULT_WORKSPACE_PREFERENCES } from '../../../../persistence/workspace-preferences';
 vi.mock('../../../../persistence/workspace-preferences', async (original) => ({
   ...(await original<object>()),
@@ -147,4 +151,98 @@ it('restores collapsed native sections after type and presentation changes', asy
   click('[data-mode]');
   click('[data-mode]');
   expect(main().open).toBe(false);
+});
+
+it('can remember a return category for another selection family without changing the current one', () => {
+  let targetFamily = 'comment';
+  function ReturnCommand() {
+    const scene = useInspectorSectionMemory('scene');
+    return (
+      <button data-return onClick={() => scene.remember('other')}>
+        Back
+      </button>
+    );
+  }
+  const view = () => (
+    <WorkspacePreferencesProvider>
+      <InspectorSectionMemoryProvider>
+        <InspectorSelectionFamilyContext.Provider value={targetFamily}>
+          <ReturnCommand />
+          <InspectorGroupedPanel
+            groups={[
+              {
+                id: 'main',
+                semantic: 'content',
+                label: 'Main',
+                content: <input aria-label="Main field" />,
+              },
+              {
+                id: 'other',
+                semantic: 'timing',
+                label: 'Other',
+                content: <input aria-label="Other field" />,
+              },
+            ]}
+          />
+        </InspectorSelectionFamilyContext.Provider>
+      </InspectorSectionMemoryProvider>
+    </WorkspacePreferencesProvider>
+  );
+  act(() => root.render(view()));
+  click('[data-return]');
+  act(() => root.render(view()));
+  expect(container.querySelector('[aria-label="Main field"]')).not.toBeNull();
+  targetFamily = 'scene';
+  act(() => root.render(view()));
+  expect(container.querySelector('[aria-label="Other field"]')).not.toBeNull();
+});
+
+it('consumes an all-mode return through the existing group focus path once', () => {
+  let targetFamily = 'comment';
+  const originalScroll = HTMLElement.prototype.scrollIntoView;
+  const scroll = vi.fn();
+  HTMLElement.prototype.scrollIntoView = scroll;
+  function ReturnCommand() {
+    const memory = useInspectorSectionMemory('scene');
+    const [, setMode] = useWorkspacePreference('inspectorPresentation');
+    return (
+      <>
+        <button data-return onClick={() => memory.requestReturn('other')}>
+          Back
+        </button>
+        <button data-all onClick={() => setMode('all')}>
+          All
+        </button>
+        <output data-pending>{memory.returnFocusIntent?.groupId ?? ''}</output>
+      </>
+    );
+  }
+  const view = () => (
+    <WorkspacePreferencesProvider>
+      <InspectorSectionMemoryProvider>
+        <InspectorSelectionFamilyContext.Provider value={targetFamily}>
+          <ReturnCommand />
+          <InspectorGroupedPanel
+            groups={[
+              { id: 'main', semantic: 'content', label: 'Main', content: 'Main body' },
+              { id: 'other', semantic: 'timing', label: 'Other', content: 'Other body' },
+            ]}
+          />
+        </InspectorSelectionFamilyContext.Provider>
+      </InspectorSectionMemoryProvider>
+    </WorkspacePreferencesProvider>
+  );
+  try {
+    act(() => root.render(view()));
+    click('[data-all]');
+    click('[data-return]');
+    targetFamily = 'scene';
+    act(() => root.render(view()));
+    expect(scroll).toHaveBeenCalledExactlyOnceWith({ block: 'nearest' });
+    act(() => root.render(view()));
+    expect(container.querySelector('[data-pending]')!.textContent).toBe('');
+    expect(scroll).toHaveBeenCalledTimes(1);
+  } finally {
+    HTMLElement.prototype.scrollIntoView = originalScroll;
+  }
 });

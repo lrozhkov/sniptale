@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 
@@ -50,6 +50,7 @@ function createViewportInfo() {
 
 function createRegionSelectorControllerDeps() {
   return {
+    isRegionSelectorActive: vi.fn(),
     hideRecordingOverlay: vi.fn(),
     hideRegionSelector: vi.fn(),
     showRecordingOverlay: vi.fn(),
@@ -134,6 +135,10 @@ async function expectUiOnlyMessagesAreIgnoredBeforeParsing() {
 }
 
 describe('createContentRuntimeMessageListener', () => {
+  beforeAll(async () => {
+    await import('.');
+  });
+
   beforeEach(() => {
     resetContentRuntimeBridgeMocks();
   });

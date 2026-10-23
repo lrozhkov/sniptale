@@ -147,3 +147,37 @@ describe('timeline source-time helpers', () => {
     });
   });
 });
+
+it('maps only the visible source slice of a split playback window and retains its held caption', () => {
+  const clip = createVideoClip({
+    id: 'held',
+    startTime: 5,
+    duration: 1,
+    sourceStart: 1,
+    sourceDuration: 2,
+    playbackRate: 1,
+    playbackWindow: { offset: 1.2, holdAt: 1.5 },
+  });
+  expect(mapSourceRangeToProjectSpans([clip], 1, 2)).toEqual([]);
+  expect(mapSourceRangeToProjectSpans([clip], 2.3, 2.8)).toEqual([
+    { clipId: 'held', sourceStart: 2.3, sourceEnd: 2.5, startTime: 5.1, endTime: 6 },
+  ]);
+  expect(mapSourceTimeToProjectPoint([clip], 1.4)).toBeNull();
+  expect(mapSourceTimeToProjectPoint([clip], 2.4)?.time).toBeCloseTo(5.2, 12);
+  expect(mapProjectTimeToSourcePoint([clip], 5.9)?.sourceTime).toBeCloseTo(2.5, 12);
+});
+
+it('keeps a windowed visual point inside its retained source interval at the physical tail', () => {
+  const clip = createVideoClip({
+    id: 'bounded',
+    startTime: 2,
+    duration: 1.2,
+    sourceStart: 3,
+    sourceDuration: 2,
+    playbackRate: 2,
+    playbackWindow: { offset: 0.5 },
+  });
+  expect(mapProjectTimeToSourcePoint([clip], 2.25)?.sourceTime).toBe(4.5);
+  expect(mapProjectTimeToSourcePoint([clip], 3.1)?.sourceTime).toBe(5);
+  expect(mapProjectTimeToSourcePoint([clip], 3.21)).toBeNull();
+});

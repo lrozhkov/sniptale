@@ -1,5 +1,7 @@
+import { InspectSourceVoiceoverPanel } from './inspection/source-voiceover';
 import { EffectPresetEditingProvider } from './effect-instance/editing';
 import { InspectorDisclosurePreferences } from '../../../../composition/inspector-disclosures/state';
+import { InspectCommentPanel } from './inspection/comment';
 import { InspectFxPanel } from './inspection/fx';
 import '../../../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
@@ -22,8 +24,6 @@ import { InspectTrackPanel } from './inspection/track';
 import { InspectHistoryLanePanel } from './inspection/history-lane';
 import { InspectMotionLanePanel } from './inspection/motion-lane';
 
-const PANEL_STACK_CLASS_NAME = 'space-y-3';
-
 export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const clipTrack = props.selectedClip
     ? props.project.tracks.find((track) => track.id === props.selectedClip?.trackId)
@@ -39,9 +39,12 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
       <InspectorSelectionFamilyContext.Provider value={family}>
         <div
           data-ui="video-editor.inspector.content"
-          className="sniptale-inspector-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3"
+          className="sniptale-inspector-surface flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className={PANEL_STACK_CLASS_NAME}>
+          <div
+            data-ui="video-editor.inspector.body"
+            className="min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-3 py-3"
+          >
             <EffectPresetEditingProvider key={JSON.stringify(props.selection)}>
               <SelectionBody {...props} />
             </EffectPresetEditingProvider>
@@ -54,6 +57,21 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
 
 function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
   switch (props.selection.kind) {
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER:
+      return (
+        <InspectSourceVoiceoverPanel
+          project={props.project}
+          documentId={props.selection.documentId}
+        />
+      );
+    case VideoEditorSelectionKind.COMMENT:
+      return (
+        <InspectCommentPanel
+          key={JSON.stringify(props.selection)}
+          project={props.typingProject ?? props.project}
+          selection={props.selection}
+        />
+      );
     case VideoEditorSelectionKind.EFFECT_INSTANCE:
       return <InspectFxPanel {...props} instanceId={props.selection.effectInstanceId} />;
     case VideoEditorSelectionKind.HISTORY_SPAN:

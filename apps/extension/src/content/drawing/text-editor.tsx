@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { DEFAULT_COLOR_INFO_STRONG } from '@sniptale/ui/default-colors/constants';
 import {
   clampDrawingTextWidth,
   resolveDrawingTextNaturalWidth,
@@ -173,9 +174,13 @@ function useDrawingTextEditorLayout(props: DrawingTextEditorProps) {
     const synchronizeBounds = () => {
       if (!active) return;
       const mirror = mirrorRef.current;
-      const measuredHeight = mirror ? Math.ceil(mirror.getBoundingClientRect().height) : 0;
+      const measuredHeight = mirror
+        ? Math.ceil(parseFloat(getComputedStyle(mirror).height)) || 0
+        : 0;
       const measurer = measurementRef.current;
-      const measuredWidth = measurer ? Math.ceil(measurer.getBoundingClientRect().width) : 0;
+      const measuredWidth = measurer
+        ? Math.ceil(parseFloat(getComputedStyle(measurer).width)) || 0
+        : 0;
       const nextHeight = measuredHeight > 0 ? measuredHeight : draft.height;
       const nextWidth =
         draft.autoWidth && measuredWidth > 0
@@ -209,7 +214,7 @@ function resolveChangedTextDraft(args: {
   const { draft, fontSize, measurementElement, value } = args;
   if (measurementElement) measurementElement.textContent = value || '\u200b';
   const measuredWidth = measurementElement
-    ? Math.ceil(measurementElement.getBoundingClientRect().width)
+    ? Math.ceil(parseFloat(getComputedStyle(measurementElement).width)) || 0
     : 0;
   return {
     ...draft,
@@ -247,10 +252,20 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
         overflow: 'visible',
         transform: `rotate(${props.draft.rotation ?? 0}deg)`,
         transformOrigin: 'center',
-        zIndex: 2,
+        zIndex: 'var(--sniptale-drawing-editor-layer, 2)',
       }}
     >
-      <DrawingTextBackgrounds color={props.style.backgroundColor} rects={backgroundRects} />
+      <DrawingTextBackgrounds
+        color={props.style.backgroundColor}
+        rects={backgroundRects}
+        text={{
+          contentRef: mirrorRef,
+          value: props.draft.value,
+          color: props.style.color,
+          fontFamily: props.style.fontFamily,
+          fontSize: props.style.fontSize,
+        }}
+      />
       <span
         ref={mirrorRef}
         data-ui="content.drawing.text-mirror"
@@ -297,6 +312,7 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
           ...resolveDrawingTextContentStyle(props.style),
           background: 'transparent',
           border: 0,
+          caretColor: DEFAULT_COLOR_INFO_STRONG,
           height: '100%',
           inset: 0,
           outline: 'none',

@@ -1,3 +1,13 @@
+import { InspectorActionButton } from '../shared/actions';
+import {
+  useVideoEditorEffectEditingPort,
+  useVideoEditorPlaybackPort,
+} from '../../../../runtime/controller/store';
+import {
+  planEffectAttachmentChange,
+  planEffectSourceRangeRestore,
+} from '../../../../project/state/effects.effect-instance';
+import type { VideoProjectEffectClip } from '../../../../../features/video/project/types';
 import { useEffectPresetEditing, useEffectPresetMatchingControls } from './editing';
 import { readEffectPresentationDocument } from '../../../../../features/video/project/effect-bundle/presentation-document';
 import type { InspectorGroupDefinition } from '../grouped-inspector/types';
@@ -10,7 +20,7 @@ import {
   resolveEffectLocaleText,
   type ControlDefinition,
 } from '@sniptale/runtime-contracts/effect-v1';
-import { ArrowUp, ArrowDown, Copy, Trash2, Download } from 'lucide-react';
+import { ArrowUp, ArrowDown, Copy, Trash2, Download, RotateCcw } from 'lucide-react';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 
 import type { VideoProjectEffectTarget } from '../../../../../features/video/project/effect-instance/types';
@@ -20,7 +30,8 @@ import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls
 import { TextField } from '../../../../../ui/compact-inspector-controls';
 import type { VideoProjectEffectInstancePatch } from '../../../../contracts/commands/patches';
 import { NumberInput } from '../inputs/number';
-import { ColorField, ToggleField, SelectInput } from '../shared/controls';
+import { ColorField, ToggleField } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 
 const EFFECT_ACTION_CLASS_NAME = [
   '!h-[var(--sniptale-compact-control-height,32px)]',
@@ -40,6 +51,7 @@ export function createEffectInstanceGroup(
   args: EffectInstanceGroupActions & {
     disabled?: boolean;
     separateParameters?: boolean;
+    includeHostControls?: boolean;
     instanceId?: string;
     project: VideoProject;
     target: VideoProjectEffectTarget;
@@ -87,11 +99,56 @@ export function createEffectInstanceGroups(
   const instances = (args.project.effectInstances ?? []).filter((instance) =>
     args.instanceId ? instance.id === args.instanceId : sameTarget(instance.target, args.target)
   );
+  const host = args.project.clips.find(
+    (clip): clip is VideoProjectEffectClip =>
+      clip.type === 'EFFECT' && clip.effectInstanceId === args.instanceId
+  );
+  if (host?.attachment && args.includeHostControls !== false)
+    groups.push({
+      id: 'effect-attachment',
+      semantic: 'placement',
+      label: translate('videoEditor.sidebar.inspectorGroupTransform'),
+      content: (
+        <EffectAttachmentControls
+          project={args.project}
+          host={host}
+          disabled={args.disabled ?? false}
+        />
+      ),
+    });
+  if (host?.sourceRange && args.includeHostControls !== false)
+    groups.push({
+      id: 'effect-source-timing',
+      semantic: 'timing',
+      label: translate('videoEditor.sidebar.inspectorGroupTiming'),
+      content: (
+        <EffectSourceTimingRestore
+          project={args.project}
+          host={host}
+          disabled={args.disabled ?? false}
+        />
+      ),
+    });
   for (const instance of instances) {
     const snapshot = args.project.effectSnapshots?.find((item) => item.id === instance.snapshotId);
     const validation = snapshot ? readEffectPresentationDocument(snapshot.source) : null;
     if (!validation?.document) continue;
-    for (const section of getEffectControlSections(validation.document)) {
+    const sections = getEffectControlSections(validation.document);
+    if (
+      validation.document.objectLayout?.handles?.some(
+        (handle) => instance.sceneAnchors?.[handle.id]
+      ) &&
+      !sections.some((section) => section.id === 'geometry')
+    ) {
+      sections.push({
+        id: 'geometry',
+        semantic: 'geometry',
+        label: translate('videoEditor.effectsLibrary.objectGeometry'),
+        advanced: false,
+        controls: [],
+      });
+    }
+    for (const section of sections) {
       const id = `effect-controls-${section.id}`;
       const existing = groups.find((group) => group.id === id);
       const content = (
@@ -125,6 +182,8 @@ export function createEffectInstanceGroups(
     'content',
     'typography',
     'appearance',
+    'placement',
+    'timing',
     'geometry',
     'processing',
     'animation',
@@ -216,7 +275,7 @@ function EffectInstanceStartTime(props: EffectInstanceCardProps): React.JSX.Elem
   const owner = props.instance.rangeMode === 'owner';
   return (
     <div className="sniptale-parameter-stack space-y-3">
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.effectsLibrary.fxScope')}
         disabled={props.disabled ?? false}
         value={owner ? 'owner' : 'interval'}
@@ -329,7 +388,7 @@ function EffectInstanceControls(
             </div>
           )
         )}
-      {!props.parameterSection &&
+      {(props.parameterSection === undefined || props.parameterSection === 'geometry') &&
         document.objectLayout?.handles?.map((handle) => {
           const point = props.instance.sceneAnchors?.[handle.id];
           if (!point) return null;
@@ -446,7 +505,7 @@ function EffectControl(props: {
   const sequenceOptions = getEffectSequenceOptions(props.documentId, props.control);
   if (sequenceOptions)
     return (
-      <SelectInput
+      <OptionButtonsField
         label={label}
         value={String(props.value)}
         options={sequenceOptions}
@@ -511,4 +570,109 @@ function sameTarget(left: VideoProjectEffectTarget, right: VideoProjectEffectTar
   return left.kind === 'transition' && right.kind === 'transition'
     ? left.transitionId === right.transitionId
     : false;
+}
+
+/** Uses the current playback clock and existing effect command; source choice is always explicit. */
+export function EffectAttachmentControls(props: {
+  project: VideoProject;
+  host: VideoProjectEffectClip;
+  disabled: boolean;
+}) {
+  const time = useVideoEditorPlaybackPort((port) => port.currentTime);
+  const update = useVideoEditorEffectEditingPort((port) => port.updateEffectAttachment);
+  const binding = props.host.attachment;
+  if (!binding) return null;
+  const key = (value: NonNullable<VideoProjectEffectClip['attachment']>) =>
+    value.kind === 'viewport'
+      ? 'viewport'
+      : JSON.stringify([value.assetId, value.sourceInstanceId]);
+  const selected = key(binding);
+  const sources = new Map<
+    string,
+    { label: string; attachment: NonNullable<VideoProjectEffectClip['attachment']> }
+  >();
+  for (const clip of props.project.clips) {
+    if (
+      clip.type !== 'VIDEO' ||
+      time < clip.startTime ||
+      time >= clip.startTime + clip.duration ||
+      !props.project.tracks.some(
+        (track) => track.id === clip.trackId && track.visible && track.role !== 'CAMERA'
+      )
+    )
+      continue;
+    const attachment = {
+      kind: 'source' as const,
+      assetId: clip.assetId,
+      sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+    };
+    sources.set(key(attachment), { label: clip.name, attachment });
+  }
+  if (binding.kind === 'source' && !sources.has(selected))
+    sources.set(selected, {
+      label:
+        props.project.assets.find((asset) => asset.id === binding.assetId)?.name ??
+        translate('gallery.videoReview.annotationContentAttachment'),
+      attachment: binding,
+    });
+  const entries = [
+    {
+      label: translate('gallery.videoReview.annotationViewportAttachment'),
+      attachment: { kind: 'viewport' as const },
+    },
+    ...[...sources.values()].map((entry) => ({
+      ...entry,
+      label:
+        sources.size === 1
+          ? translate('gallery.videoReview.annotationContentAttachment')
+          : entry.label,
+    })),
+  ];
+  return (
+    <div data-ui="video-editor.inspector.attachment">
+      <OptionButtonsField
+        label={translate('gallery.videoReview.annotationAttachment')}
+        value={selected}
+        disabled={props.disabled}
+        options={entries.map((entry) => ({
+          value: key(entry.attachment),
+          label: entry.label,
+          disabled:
+            key(entry.attachment) !== selected &&
+            !planEffectAttachmentChange(
+              props.project,
+              props.host.effectInstanceId,
+              entry.attachment,
+              time
+            ),
+        }))}
+        onChange={(value) => {
+          const entry = entries.find((entry) => key(entry.attachment) === value);
+          if (entry) update(props.host.effectInstanceId, entry.attachment);
+        }}
+      />
+    </div>
+  );
+}
+
+export function EffectSourceTimingRestore(props: {
+  project: VideoProject;
+  host: VideoProjectEffectClip;
+  disabled: boolean;
+  separated?: boolean;
+}) {
+  const restore = useVideoEditorEffectEditingPort((port) => port.restoreEffectSourceRange);
+  return (
+    <InspectorActionButton
+      separated={props.separated === true}
+      data-ui="video-editor.effect.restore-source-timing"
+      disabled={
+        props.disabled || !planEffectSourceRangeRestore(props.project, props.host.effectInstanceId)
+      }
+      onClick={() => restore(props.host.effectInstanceId)}
+    >
+      <RotateCcw size={14} aria-hidden="true" />
+      {translate('videoEditor.effectsLibrary.restoreSourceTiming')}
+    </InspectorActionButton>
+  );
 }

@@ -74,14 +74,16 @@ export function GuideAppearance({
             </InformationDisclosure>
           )}
           {onSaveTemplate && onApplyTemplate && (
-            <GuideTemplateControls
-              key={item.id}
-              step={item}
-              disabled={disabled}
-              t={t}
-              onSave={(name) => onSaveTemplate(item.id, name)}
-              onApply={(templateId, mode) => onApplyTemplate(item.id, templateId, mode)}
-            />
+            <InspectorCategorizedContent flatten={false}>
+              <GuideTemplateControls
+                key={item.id}
+                step={item}
+                disabled={disabled}
+                t={t}
+                onSave={(name) => onSaveTemplate(item.id, name)}
+                onApply={(templateId, mode) => onApplyTemplate(item.id, templateId, mode)}
+              />
+            </InspectorCategorizedContent>
           )}
         </InspectorCategorizedContent>
       )}

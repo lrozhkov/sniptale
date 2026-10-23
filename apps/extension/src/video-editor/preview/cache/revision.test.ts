@@ -1,3 +1,6 @@
+import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
+import { videoProjectCaptionInput } from '../../../features/video/project/text/captions';
+import { planReviewCaptions } from '../../../features/video/review/caption-plan';
 import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 import { expect, it } from 'vitest';
 
@@ -195,5 +198,321 @@ it('tracks an off-window target occurrence geometry without including another un
   next.transform = { ...next.transform, x: 50 };
   await expect(createVideoPreviewSegmentRevision(project, range)).resolves.toBe(before);
   first.transform = { ...first.transform, x: 60 };
+  await expect(createVideoPreviewSegmentRevision(project, range)).resolves.not.toBe(before);
+});
+
+it('invalidates a segment when an external source placement changes global caption packing', async () => {
+  const project = { ...createEmptyVideoProject('Caption dependency'), duration: 10, fps: 10 };
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'caption-source' },
+    {
+      duration: 1,
+      width: 1920,
+      height: 1080,
+      mimeType: 'video/mp4',
+      hasAudio: false,
+      audioPeaks: null,
+      size: 100,
+    }
+  );
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 1920, 1080, 0);
+  const fragment = {
+    id: 'text',
+    text: 'Caption',
+    originalText: 'Caption',
+    start: 0,
+    end: 1,
+    timeDomain: 'source' as const,
+    alignment: 'manual' as const,
+    revision: 0,
+    timingRevision: 0,
+    showInVideo: true,
+  };
+  const authored: typeof project = {
+    ...project,
+    assets: [asset],
+    clips: [clip],
+    textDocuments: [
+      {
+        id: 'source',
+        binding: { kind: 'source' as const, assetId: asset.id, sourceInstanceId: clip.id },
+        captions: {
+          enabled: true,
+          style: {
+            position: 'bottom' as const,
+            fontSize: 0.04,
+            color: '#ffffff',
+            background: '#000000',
+          },
+        },
+        document: { version: 1 as const, fragments: [fragment] },
+      },
+    ],
+  };
+  authored.textDocuments!.push({
+    ...authored.textDocuments![0]!,
+    id: 'manual',
+    binding: { kind: 'project' },
+    document: {
+      version: 1,
+      fragments: [{ ...fragment, timeDomain: 'result', start: 0.5, end: 5 }],
+    },
+  });
+  const moved = { ...authored, clips: [{ ...clip, startTime: 2 }] };
+  const captionY = (candidate: typeof authored) =>
+    planReviewCaptions({
+      ...videoProjectCaptionInput(candidate),
+      output: { width: 1920, height: 1080 },
+      measure: () => 100,
+    }).cues.find((cue) => cue.fragmentId === JSON.stringify(['manual', 'text']))!.y;
+  expect(captionY(moved)).not.toBe(captionY(authored));
+  const range = { startFrame: 40, endFrame: 60 };
+  const before = await createVideoPreviewSegmentRevision(authored, range);
+  await expect(createVideoPreviewSegmentRevision(moved, range)).resolves.not.toBe(before);
+});
+
+it('invalidates a cached segment when source slip preserves the phrase range but removes a word block', async () => {
+  const project = { ...createEmptyVideoProject('Word slip', 240, 360), duration: 6, fps: 10 };
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'word-source' },
+    {
+      duration: 4,
+      width: 240,
+      height: 360,
+      mimeType: 'video/mp4',
+      hasAudio: false,
+      audioPeaks: null,
+      size: 100,
+    }
+  );
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 240, 360, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected video clip');
+  const words = [
+    { text: 'a'.repeat(60), start: 0, end: 0.2 },
+    { text: 'b'.repeat(60), start: 3, end: 3.2 },
+    { text: 'c'.repeat(60), start: 3.5, end: 4 },
+  ];
+  project.assets = [asset];
+  project.clips = [{ ...clip, duration: 2, sourceDuration: 2 }];
+  const captions = {
+    enabled: true,
+    style: { position: 'bottom' as const, fontSize: 0.04, color: '#ffffff', background: '#000000' },
+  };
+  const fragment = {
+    id: 'text',
+    text: words.map((word) => word.text).join(' '),
+    originalText: '',
+    start: 0,
+    end: 4,
+    timeDomain: 'source' as const,
+    alignment: 'word' as const,
+    revision: 0,
+    timingRevision: 0,
+    showInVideo: true,
+    words,
+  };
+  project.textDocuments = [
+    {
+      id: 'source',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: clip.id },
+      captions,
+      document: { version: 1, fragments: [fragment] },
+    },
+    {
+      id: 'manual',
+      binding: { kind: 'project' },
+      captions,
+      document: {
+        version: 1,
+        fragments: [
+          {
+            ...fragment,
+            text: 'Manual',
+            alignment: 'manual',
+            timeDomain: 'result',
+            start: 0.1,
+            end: 5,
+            words: [],
+          },
+        ],
+      },
+    },
+  ];
+  const slipped = {
+    ...project,
+    clips: [{ ...clip, duration: 2, sourceDuration: 2, sourceStart: 1 }],
+  };
+  const input = videoProjectCaptionInput(project);
+  const changed = videoProjectCaptionInput(slipped);
+  expect(input.project(input.document.fragments[0]!).ranges).toEqual(
+    changed.project(changed.document.fragments[0]!).ranges
+  );
+  const plan = (candidate: typeof project) =>
+    planReviewCaptions({
+      ...videoProjectCaptionInput(candidate),
+      output: { width: 240, height: 360 },
+      measure: (text) => text.length * 6,
+    });
+  const initial = plan(project);
+  const after = plan(slipped);
+  expect(
+    initial.cues.find((cue) => cue.fragmentId === JSON.stringify(['source', 'text']))
+  ).toBeDefined();
+  expect(
+    after.cues.find((cue) => cue.fragmentId === JSON.stringify(['source', 'text']))
+  ).toBeUndefined();
+  const manualY = (value: typeof initial) =>
+    value.cues.find((cue) => cue.fragmentId === JSON.stringify(['manual', 'text']))!.y;
+  expect(manualY(after)).not.toBe(manualY(initial));
+  const range = { startFrame: 40, endFrame: 60 };
+  await expect(createVideoPreviewSegmentRevision(slipped, range)).resolves.not.toBe(
+    await createVideoPreviewSegmentRevision(project, range)
+  );
+});
+
+it('invalidates exact frames and every segment for authored final-canvas watermark changes', async () => {
+  const project = { ...createEmptyVideoProject(), duration: 4 };
+  const before = await createVideoPreviewRenderRevision(project);
+  const segment = await createVideoPreviewSegmentRevision(project, { startFrame: 0, endFrame: 20 });
+  project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  expect(await createVideoPreviewRenderRevision(project)).not.toBe(before);
+  expect(
+    await createVideoPreviewSegmentRevision(project, { startFrame: 0, endFrame: 20 })
+  ).not.toBe(segment);
+});
+
+it('invalidates an active join segment when a held complete endpoint changes outside that segment', async () => {
+  const project = { ...createEmptyVideoProject('Join'), duration: 4, fps: 10 };
+  const trackId = project.tracks[0]!.id;
+  const asset = createVideoProjectAsset(
+    'Intro',
+    'IMAGE',
+    { kind: 'project-asset', projectAssetId: 'intro-bytes' },
+    {
+      duration: null,
+      width: 100,
+      height: 100,
+      mimeType: 'image/png',
+      hasAudio: false,
+      audioPeaks: null,
+      size: 100,
+    }
+  );
+  project.assets = [asset];
+  const first = {
+    ...createVideoClipFromAsset(trackId, asset, project.width, project.height, 0),
+    duration: 1,
+  };
+  const second = { ...createTextClip(trackId, project.width, project.height, 3), duration: 1 };
+  project.clips = [first, second];
+  const joined = {
+    ...project,
+    compositionJoins: [
+      {
+        id: 'join',
+        clipId: first.id,
+        edge: 'end' as const,
+        transition: { type: 'dissolve' as const, before: 0.2, after: 0.2 },
+      },
+    ],
+  };
+  const range = { startFrame: 9, endFrame: 11 };
+  const revision = await createVideoPreviewSegmentRevision(joined, range);
+  await expect(
+    createVideoPreviewSegmentRevision(
+      { ...joined, clips: [first, { ...second, text: 'Changed endpoint overlay' }] },
+      range
+    )
+  ).resolves.not.toBe(revision);
+  await expect(
+    createVideoPreviewSegmentRevision(
+      {
+        ...joined,
+        compositionJoins: [
+          {
+            ...joined.compositionJoins[0]!,
+            transition: { type: 'fade-black', before: 0.2, after: 0.2 },
+          },
+        ],
+      },
+      range
+    )
+  ).resolves.not.toBe(revision);
+});
+
+it('invalidates rendered camera frames when actual media timing changes', async () => {
+  const project = createEmptyVideoProject('Camera');
+  const asset = createVideoProjectAsset(
+    'Camera',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'camera' },
+    {
+      duration: 4,
+      width: 100,
+      height: 100,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 100, 100, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected camera video');
+  clip.cameraTiming = { offsetSeconds: 1, transitions: 'bounded' };
+  project.clips = [clip];
+  project.assets = [asset];
+  const range = { startFrame: 0, endFrame: project.fps * 2 };
+  const before = await createVideoPreviewSegmentRevision(project, range);
+  clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  await expect(createVideoPreviewSegmentRevision(project, range)).resolves.not.toBe(before);
+});
+
+it('invalidates cached frames when full cursor facts outside the segment change', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../features/video/project/factories/creation');
+  const { normalizeVideoProjectCursorSkin } =
+    await import('../../../features/video/project/cursor');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'cursor',
+    filename: 'cursor.webm',
+    width: 1280,
+    height: 720,
+    duration: 8,
+    mimeType: 'video/webm',
+    size: 1,
+  });
+  project.version = 33;
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected source');
+  clip.sourceInstanceId = 'instance';
+  project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'cursor',
+        sourceInstanceId: 'instance',
+        samples: [
+          {
+            id: 'outside',
+            time: 8,
+            x: 1280,
+            y: 720,
+            visible: true,
+            recordingPoint: { x: 1, y: 1 },
+          },
+        ],
+      },
+    ],
+  };
+  const range = { startFrame: 0, endFrame: project.fps * 2 };
+  const before = await createVideoPreviewSegmentRevision(project, range);
+  const group = project.cursorTrack.sourceObservations![0]!;
+  group.samples[0] = { ...group.samples[0]!, recordingPoint: { x: 0.8, y: 1 } };
   await expect(createVideoPreviewSegmentRevision(project, range)).resolves.not.toBe(before);
 });

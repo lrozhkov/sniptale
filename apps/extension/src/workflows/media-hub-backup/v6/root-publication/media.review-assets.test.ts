@@ -22,7 +22,7 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 }));
 
 import { mediaLibraryRootPublisher } from './media';
-import { DEFAULT_WINDOW_HEADER } from '../../../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,
@@ -173,7 +173,7 @@ it.each(['replace', 'duplicate'] as const)(
   'restores private remembered watermark bytes with %s without a Library logo card',
   async (strategy) => {
     const { createQuickEditWatermark } =
-      await import('../../../../features/video/review/advanced/watermark');
+      await import('../../../../features/video/project/scene/watermark');
     const { encodePortableReviewAssetRefs } =
       await import('../../../../composition/persistence/review-workspaces/asset-refs');
     const fixture = reviewFixture();

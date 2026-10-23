@@ -1,3 +1,19 @@
+import { sliceClipPlaybackWindow } from '../../../../features/video/project/timeline/rate';
+import { materializeVideoProjectCursorSourceObservations } from '../../../../features/video/project/cursor-source-observations';
+import {
+  isSourceVoiceoverSourceClip,
+  duplicateProjectSourceVoiceoverDocuments,
+} from '../../../../features/video/project/source-voiceover';
+import { duplicateProjectSourceAudioDocuments } from '../../../../features/video/project/source-audio-authoring';
+import { duplicateVideoProjectCommentDocuments } from '../../../../features/video/project/comments/duplication';
+import { isCommentSourceClip } from '../../../../features/video/project/comments/projection';
+import { projectMotionSourceBinding } from '../../../../features/video/project/motion/source-binding';
+import {
+  isProjectOriginalAudioTarget,
+  remapCopiedOriginalAudioTargets,
+} from '../../../../features/video/project/timeline/original-audio';
+import { duplicateVideoProjectTextDocuments } from '../../../../features/video/project/text/duplication';
+import { isTextSourceClip } from '../../../../features/video/project/text/projection';
 import { cursorFocusOverrideId } from '../../../../features/video/project/cursor-focus-path/authoring';
 import { createClipGroupId } from '../../../../features/video/project/factories/creation';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
@@ -69,7 +85,17 @@ export function splitProjectClipsAtTimeWithResult(
     if (item.startTime + item.duration <= splitTime) return [item];
     if (item.startTime >= splitTime) return [{ ...item, groupId: secondGroupId }];
 
-    const splitClips = splitProjectClip(item, offsets.get(item.id) ?? 0, secondGroupId);
+    const source =
+      isSourceTimedClip(item) &&
+      !item.sourceInstanceId &&
+      (project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
+        project.commentDocuments?.some((entry) => isCommentSourceClip(item, entry.binding)) ||
+        project.motionRegions?.some((region) => region.sourceBinding?.clipId === item.id) ||
+        isProjectOriginalAudioTarget(project, item) ||
+        isSourceVoiceoverSourceClip(project, item))
+        ? { ...item, sourceInstanceId: item.id }
+        : item;
+    const splitClips = splitProjectClip(source, offsets.get(item.id) ?? 0, secondGroupId);
     if (splitClips[1]) trailingClipIdsBySourceId.set(item.id, splitClips[1].id);
     if (item.id === clipId) trailingClipId = splitClips[1]?.id ?? null;
     return splitClips;
@@ -180,13 +206,18 @@ export function duplicateProjectClipsWithResult(
         name: `${item.name} ${translate('shared.projectActions.copySuffix')}`,
       } as VideoProjectClip;
 
-      duplicateCursorSourceInstance(item, duplicate, project, sourceInstances);
+      duplicateSourceInstance(item, duplicate, project, sourceInstances);
       duplicateClipIds.set(item.id, duplicate.id);
       duplicateIds.push(duplicate.id);
       if (item.id === clipId) duplicateClipId = duplicate.id;
       return [item, duplicate];
     }),
   });
+  nextProject.clips = remapCopiedOriginalAudioTargets(
+    nextProject.clips,
+    new Set(duplicateIds),
+    sourceInstances
+  );
   nextProject.actionEvents = [
     ...project.actionEvents,
     ...project.actionEvents.flatMap((event) => {
@@ -209,6 +240,28 @@ export function duplicateProjectClipsWithResult(
     }),
   ];
   duplicateCursorSamples(project, nextProject, duplicateClipIds, duplicateCursorIds);
+  if (project.cursorTrack?.sourceObservations && nextProject.cursorTrack) {
+    nextProject.cursorTrack = {
+      ...nextProject.cursorTrack,
+      sourceObservations: [
+        ...project.cursorTrack.sourceObservations,
+        ...project.cursorTrack.sourceObservations.flatMap((group) => {
+          const sourceInstanceId = sourceInstances.get(group.sourceInstanceId);
+          return sourceInstanceId ? [{ ...structuredClone(group), sourceInstanceId }] : [];
+        }),
+      ],
+    };
+    const inheritedClips = new Map(
+      project.clips.flatMap((clip) => {
+        const copiedId = duplicateClipIds.get(clip.id);
+        return clip.type === 'VIDEO' && copiedId ? [[copiedId, clip] as const] : [];
+      })
+    );
+    nextProject.cursorTrack = materializeVideoProjectCursorSourceObservations(
+      nextProject,
+      inheritedClips
+    );
+  }
   if (project.cursorFocusPath)
     nextProject.cursorFocusPath = {
       ...project.cursorFocusPath,
@@ -251,7 +304,15 @@ export function duplicateProjectClipsWithResult(
         return sourceInstanceId ? [{ ...structuredClone(group), sourceInstanceId }] : [];
       }),
     ];
+  if (!duplicateBoundDocuments(project, nextProject, sourceInstances)) return null;
   const placedProject = applyTimelinePlacementPolicy(nextProject, duplicateIds);
+  const motionRegions = duplicateBoundMotionRegions(
+    project,
+    placedProject,
+    duplicateClipIds,
+    duplicateActionIds
+  );
+  if (motionRegions) placedProject.motionRegions = motionRegions;
   const selectedDuplicate = placedProject.clips.find((clip) => clip.id === duplicateClipId);
   return selectedDuplicate
     ? {
@@ -262,11 +323,60 @@ export function duplicateProjectClipsWithResult(
     : null;
 }
 
+/** Reject the complete clip copy when either bound-document budget cannot admit it. */
+function duplicateBoundDocuments(
+  project: VideoProject,
+  nextProject: VideoProject,
+  sourceInstances: ReadonlyMap<string, string>
+): boolean {
+  if (project.sourceVoiceoverDocuments) {
+    const documents = duplicateProjectSourceVoiceoverDocuments(
+      project.sourceVoiceoverDocuments,
+      sourceInstances,
+      () => crypto.randomUUID()
+    );
+    if (!documents) return false;
+    nextProject.sourceVoiceoverDocuments = documents;
+  }
+  if (project.sourceAudioDocuments) {
+    const documents = duplicateProjectSourceAudioDocuments(
+      project.sourceAudioDocuments,
+      sourceInstances,
+      () => crypto.randomUUID()
+    );
+    if (!documents) return false;
+    nextProject.sourceAudioDocuments = documents;
+  }
+  if (project.textDocuments) {
+    const documents = duplicateVideoProjectTextDocuments(project.textDocuments, sourceInstances);
+    if (!documents) return false;
+    nextProject.textDocuments = documents;
+  }
+  if (project.commentDocuments) {
+    const documents = duplicateVideoProjectCommentDocuments(
+      project.commentDocuments,
+      sourceInstances
+    );
+    if (!documents) return false;
+    nextProject.commentDocuments = documents;
+  }
+  return true;
+}
+
 function splitProjectClip(
   clip: VideoProjectClip,
   localOffset: number,
   secondGroupId: string | null
 ): VideoProjectClip[] {
+  if (clip.playbackWindow) {
+    return [
+      { ...clip, duration: localOffset, playbackWindow: sliceClipPlaybackWindow(clip, 0) },
+      {
+        ...createSplitSecondClipBase(clip, localOffset, secondGroupId),
+        playbackWindow: sliceClipPlaybackWindow(clip, localOffset),
+      },
+    ];
+  }
   if (isSourceTimedClip(clip)) {
     const secondClipBase = createSplitSecondClipBase(clip, localOffset, secondGroupId);
     const sourceOffset = getSourceTimedClipSourceOffset(clip, localOffset);
@@ -337,6 +447,8 @@ function duplicateCapturedFocusKeyId(
   cursorIds: ReadonlyMap<string, string>,
   actionIds: ReadonlyMap<string, string>
 ): string | null {
+  if (keyId.startsWith(`${originalInstance}:`))
+    return `${newInstance}:${keyId.slice(originalInstance.length + 1)}`;
   const cursorId = cursorIds.get(keyId);
   if (cursorId) return cursorId;
   for (const prefix of ['click:', 'release:']) {
@@ -350,22 +462,33 @@ function duplicateCapturedFocusKeyId(
       return `${prefix}${newInstance}:${keyId.slice(prefix.length + originalInstance.length + 1)}`;
   }
   if (keyId.startsWith('end:segment:')) {
-    const id = cursorIds.get(keyId.slice('end:segment:'.length));
+    const endId = keyId.slice('end:segment:'.length);
+    if (endId.startsWith(`${originalInstance}:`))
+      return `end:segment:${newInstance}:${endId.slice(originalInstance.length + 1)}`;
+    const id = cursorIds.get(endId);
     if (id) return `end:segment:${id}`;
   }
   return null;
 }
 
-function duplicateCursorSourceInstance(
+function duplicateSourceInstance(
   item: VideoProjectClip,
   duplicate: VideoProjectClip,
   project: VideoProject,
   sourceInstances: Map<string, string>
 ): void {
   if (
-    item.type === 'VIDEO' &&
-    duplicate.type === 'VIDEO' &&
+    isSourceTimedClip(item) &&
+    isSourceTimedClip(duplicate) &&
+    item.type === duplicate.type &&
     (item.sourceInstanceId ||
+      project.cursorTrack?.sourceObservations?.some(
+        (group) => group.sourceInstanceId === item.id
+      ) ||
+      isProjectOriginalAudioTarget(project, item) ||
+      isSourceVoiceoverSourceClip(project, item) ||
+      project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
+      project.commentDocuments?.some((entry) => isCommentSourceClip(item, entry.binding)) ||
       project.cursorFocusPath?.segments.some(
         (segment) =>
           segment.binding.kind === 'recording-source' &&
@@ -410,4 +533,47 @@ function duplicateCursorSamples(
         }),
       ].sort((a, b) => a.time - b.time),
     };
+}
+
+/** Copied source instances retain authored framing with independent region and connection identities. */
+function duplicateBoundMotionRegions(
+  original: VideoProject,
+  placed: VideoProject,
+  clipIds: ReadonlyMap<string, string>,
+  actionIds: ReadonlyMap<string, string>
+): VideoProject['motionRegions'] {
+  const selected = (original.motionRegions ?? []).filter(
+    (region) => region.sourceBinding && clipIds.has(region.sourceBinding.clipId)
+  );
+  if (selected.length === 0) return placed.motionRegions;
+  const ids = new Map(selected.map((region) => [region.id, crypto.randomUUID()]));
+  const groups = new Map<string, string>();
+  const copies = selected.map((region) => {
+    const copy = structuredClone(region);
+    const binding = copy.sourceBinding!;
+    const group = binding.animationGroupId;
+    if (group && !groups.has(group)) groups.set(group, crypto.randomUUID());
+    copy.id = ids.get(region.id)!;
+    copy.sourceBinding = {
+      ...binding,
+      clipId: clipIds.get(binding.clipId)!,
+      ...(group ? { animationGroupId: groups.get(group)! } : {}),
+    };
+    if (copy.incomingConnection) {
+      const source = ids.get(copy.incomingConnection.fromRegionId);
+      copy.incomingConnection = source
+        ? { ...copy.incomingConnection, fromRegionId: source }
+        : null;
+    }
+    if (copy.targetAction)
+      copy.targetAction = {
+        eventId: actionIds.get(copy.targetAction.eventId) ?? copy.targetAction.eventId,
+        clipId:
+          copy.targetAction.clipId === null
+            ? null
+            : (clipIds.get(copy.targetAction.clipId) ?? copy.targetAction.clipId),
+      };
+    return projectMotionSourceBinding(placed, copy);
+  });
+  return [...(placed.motionRegions ?? []), ...copies];
 }

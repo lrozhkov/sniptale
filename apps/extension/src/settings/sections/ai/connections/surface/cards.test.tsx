@@ -118,6 +118,67 @@ it('maps model reorder intents to the model order owner', async () => {
   expect(state.catalogActions.moveModel).toHaveBeenCalledWith('model-1', null);
 });
 
+it('keeps model handles and focus during a pending pointer move and restores order on rejection', async () => {
+  let rejectMove!: (reason: Error) => void;
+  const state = createState({
+    models: [MODEL, { ...MODEL, id: 'model-2', displayName: 'GPT 4.2' }],
+  });
+  state.catalogActions.moveModel = vi.fn(
+    () =>
+      new Promise<boolean>((_resolve, reject) => {
+        rejectMove = reject;
+      })
+  );
+  const originalBounds = HTMLElement.prototype.getBoundingClientRect;
+  const originalElementFromPoint = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
+  HTMLElement.prototype.getBoundingClientRect = function () {
+    const row = this.closest<HTMLElement>('[data-settings-collection-item]');
+    const rows = [...(container?.querySelectorAll('[data-settings-collection-item]') ?? [])];
+    return { left: 0, top: row ? rows.indexOf(row) * 52 : 0, height: 52 } as DOMRect;
+  };
+  try {
+    await renderUi(<AIProvidersModelsCard state={state} />);
+    const handles = () =>
+      container!.querySelectorAll<HTMLButtonElement>(
+        `[aria-label="${translate('settings.collection.dragHandle')}"]`
+      );
+    const source = handles()[0]!;
+    const second = container!.querySelector('[data-settings-collection-item="model-2"]');
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => second,
+    });
+    const pointer = (type: string, clientY = 0) => {
+      const event = new MouseEvent(type, { bubbles: true, button: 0, clientY });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      source.dispatchEvent(event);
+    };
+    act(() => source.focus());
+    act(() => pointer('pointerdown'));
+    act(() => pointer('pointermove', 100));
+    act(() => pointer('pointerup', 100));
+    expect(state.catalogActions.moveModel).toHaveBeenCalledTimes(1);
+    expect(handles()).toHaveLength(2);
+    expect(source.isConnected).toBe(true);
+    expect(document.activeElement).toBe(source);
+    expect(source.getAttribute('aria-disabled')).toBe('true');
+    await act(async () => rejectMove(new Error('Move failed')));
+    expect(
+      container!
+        .querySelector('[data-settings-collection-item]')
+        ?.getAttribute('data-settings-collection-item')
+    ).toBe('model-1');
+    expect(handles()[0]).toBe(source);
+    expect(document.activeElement).toBe(source);
+    expect(source.getAttribute('aria-disabled')).not.toBe('true');
+  } finally {
+    HTMLElement.prototype.getBoundingClientRect = originalBounds;
+    if (originalElementFromPoint)
+      Object.defineProperty(document, 'elementFromPoint', originalElementFromPoint);
+    else Reflect.deleteProperty(document, 'elementFromPoint');
+  }
+});
+
 afterEach(async () => {
   await act(async () => {
     root?.unmount();

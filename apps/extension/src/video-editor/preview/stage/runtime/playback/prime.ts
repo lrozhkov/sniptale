@@ -5,7 +5,11 @@ import {
   isVideoClip,
 } from '../../../../../features/video/project/timeline';
 import { normalizeClipPlaybackRate } from '../../../../../features/video/project/timeline/rate';
-import type { VideoProjectClip } from '../../../../../features/video/project/types/index';
+import { hasCameraMediaAt } from '../../../../../features/video/project/camera/animation';
+import type {
+  VideoProject,
+  VideoProjectClip,
+} from '../../../../../features/video/project/types/index';
 import type {
   PreviewStageAudioBankClip,
   PreviewStageAudioRefs,
@@ -17,6 +21,7 @@ const MEDIA_READY_FOR_CURRENT_FRAME = 2;
 const PREVIEW_STAGE_PRIMING_TIMEOUT_MS = 180;
 
 export interface PreviewStagePlaybackPrepareState {
+  project?: VideoProject;
   audioBankClips: PreviewStageAudioBankClip[];
   audioRefs: PreviewStageAudioRefs;
   videoBankClips: VideoProjectClip[];
@@ -35,14 +40,21 @@ function setPreparedMediaTime(media: HTMLMediaElement, time: number): void {
 function prepareAudioDrivers(
   clips: PreviewStageAudioBankClip[],
   refs: PreviewStageAudioRefs,
-  time: number
+  time: number,
+  project?: VideoProject
 ): void {
   for (const clip of clips) {
     const audio = refs.current[clip.id];
     if (!audio) continue;
     applyPreviewPitchPreservation(audio);
     audio.playbackRate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
-    setPreparedMediaTime(audio, getMediaClipSourceTime(clip, time));
+    const sourceTime = getMediaClipSourceTime(clip, time);
+    const covered = project
+      ? hasCameraMediaAt(project, clip, time)
+      : !isVideoClip(clip) ||
+        !clip.cameraTiming ||
+        (sourceTime >= 0 && sourceTime < audio.duration);
+    if (covered) setPreparedMediaTime(audio, sourceTime);
     audio.pause();
   }
 }
@@ -50,7 +62,8 @@ function prepareAudioDrivers(
 function prepareVideoDrivers(
   clips: VideoProjectClip[],
   refs: PreviewStageVideoRefs,
-  time: number
+  time: number,
+  project?: VideoProject
 ): void {
   for (const clip of clips) {
     if (!isVideoClip(clip)) continue;
@@ -60,7 +73,14 @@ function prepareVideoDrivers(
     video.muted = true;
     video.volume = 0;
     video.playbackRate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
-    setPreparedMediaTime(video, getVideoClipSourceTime(clip, time));
+    const sourceTime = getVideoClipSourceTime(clip, time);
+    if (
+      project
+        ? hasCameraMediaAt(project, clip, time)
+        : !clip.cameraTiming || (sourceTime >= 0 && sourceTime < video.duration)
+    ) {
+      setPreparedMediaTime(video, sourceTime);
+    }
     video.pause();
   }
 }
@@ -111,11 +131,20 @@ function resolveRequiredPreparedMedia(
   time: number
 ): HTMLMediaElement[] {
   const requiredAudio = state.audioBankClips
-    .filter((clip) => isClipActiveAtTime(clip, time))
+    .filter(
+      (clip) =>
+        isClipActiveAtTime(clip, time) &&
+        (!state.project || hasCameraMediaAt(state.project, clip, time))
+    )
     .map((clip) => state.audioRefs.current[clip.id])
     .filter(isPreparedMediaElement);
   const requiredVideo = state.videoBankClips
-    .filter((clip) => isVideoClip(clip) && isClipActiveAtTime(clip, time))
+    .filter(
+      (clip) =>
+        isVideoClip(clip) &&
+        isClipActiveAtTime(clip, time) &&
+        (!state.project || hasCameraMediaAt(state.project, clip, time))
+    )
     .map((clip) => state.videoRefs.current[clip.id])
     .filter(isPreparedMediaElement);
   return [...requiredAudio, ...requiredVideo];
@@ -126,7 +155,7 @@ export async function preparePreviewStagePlayback(
   time: number
 ): Promise<void> {
   await waitForPreviewStageFrame();
-  prepareAudioDrivers(state.audioBankClips, state.audioRefs, time);
-  prepareVideoDrivers(state.videoBankClips, state.videoRefs, time);
+  prepareAudioDrivers(state.audioBankClips, state.audioRefs, time, state.project);
+  prepareVideoDrivers(state.videoBankClips, state.videoRefs, time, state.project);
   await waitForPreparedMedia(resolveRequiredPreparedMedia(state, time));
 }

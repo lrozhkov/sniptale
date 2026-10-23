@@ -289,18 +289,30 @@ it('ducks and restores from real narration playback, pause, trim end and blocked
     paused = false;
   });
   const slide = createTourImageSlide('spoken');
-  slide.narration = {
-    assetId: 'voice',
-    duration: 4,
-    trimStart: 1,
-    trimEnd: 3,
-    gain: 0.5,
-    transcript: '',
-  };
+  slide.actions.unshift({
+    type: 'annotation',
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'voice',
+          duration: 4,
+          trimStart: 1,
+          trimEnd: 3,
+          gain: 0.5,
+          transcript: '',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   narration.show(slide, [{ id: 'voice', src: 'data:audio/wav;base64,AQ==' }]);
   s.player.play();
   await settle();
-  narration.replay(null);
+  narration.replay('spoken-voice');
   await settle();
   expect(narration.snapshot.audible).toBe(true);
   expect(s.graph.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.25, 10.15);
@@ -314,7 +326,7 @@ it('ducks and restores from real narration playback, pause, trim end and blocked
   expect(narration.snapshot.status).toBe('ended');
   expect(s.graph.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 10.25);
   vi.mocked(voice.play).mockRejectedValueOnce(new DOMException('gesture', 'NotAllowedError'));
-  narration.replay(null);
+  narration.replay('spoken-voice');
   await settle();
   expect(narration.snapshot.status).toBe('blocked');
   expect(s.graph.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 10.25);

@@ -33,6 +33,10 @@ export function createSelectionPanelOptionalUpdateProps(
     ...(props.onUpdateMediaClipShadowMode
       ? { onUpdateMediaClipShadowMode: props.onUpdateMediaClipShadowMode }
       : {}),
+    ...(props.onUpdateMediaClipShadowColor
+      ? { onUpdateMediaClipShadowColor: props.onUpdateMediaClipShadowColor }
+      : {}),
+    ...(props.onEditMediaClip ? { onEditMediaClip: props.onEditMediaClip } : {}),
     ...(props.onUpdateMediaClipWindowHeader
       ? { onUpdateMediaClipWindowHeader: props.onUpdateMediaClipWindowHeader }
       : {}),
@@ -100,7 +104,12 @@ export function createSelectionPanelOptionalProps(
   | 'onUpdateTransitionEasing'
   | 'onUpsertObjectTrackCorrectionAnchor'
 > &
-  Partial<Pick<WorkspaceSidebarSelectionPanelProps, 'onDeleteTrack'>> {
+  Partial<
+    Pick<
+      WorkspaceSidebarSelectionPanelProps,
+      'onDeleteTrack' | 'onDeleteObjectTrack' | 'onSelectObjectTrack'
+    >
+  > {
   return {
     ...(props.onApplyTypingCompression
       ? { onApplyTypingCompression: props.onApplyTypingCompression }
@@ -125,5 +134,7 @@ export function createSelectionPanelOptionalProps(
     onUpsertObjectTrackCorrectionAnchor:
       props.onUpsertObjectTrackCorrectionAnchor ?? (() => undefined),
     ...(props.onDeleteTrack ? { onDeleteTrack: props.onDeleteTrack } : {}),
+    ...(props.onDeleteObjectTrack ? { onDeleteObjectTrack: props.onDeleteObjectTrack } : {}),
+    ...(props.onSelectObjectTrack ? { onSelectObjectTrack: props.onSelectObjectTrack } : {}),
   };
 }

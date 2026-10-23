@@ -136,7 +136,7 @@ it('updates the selector UI while dragging and resizing', async () => {
   document.dispatchEvent(new MouseEvent('mousemove', { clientX: 18, clientY: 22 }));
   document.dispatchEvent(new MouseEvent('mouseup'));
 
-  expect(mocks.updateRegionSelectorUiMock).toHaveBeenCalledOnce();
+  expect(mocks.updateRegionSelectorUiMock).toHaveBeenCalledTimes(2);
   expect(mocks.surfaceArgs.state.isDragging).toBe(false);
 
   mocks.surfaceMode = 'resize';
@@ -145,7 +145,7 @@ it('updates the selector UI while dragging and resizing', async () => {
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
   await Promise.resolve();
 
-  expect(mocks.updateRegionSelectorUiMock).toHaveBeenCalledTimes(2);
+  expect(mocks.updateRegionSelectorUiMock).toHaveBeenCalledTimes(3);
   expect(mocks.sendRuntimeMessageMock).toHaveBeenLastCalledWith({
     type: VideoMessageType.REGION_SELECTION_CANCELLED,
     ...requestBinding,

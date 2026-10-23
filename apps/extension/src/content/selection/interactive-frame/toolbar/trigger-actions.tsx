@@ -1,6 +1,7 @@
 import React from 'react';
-import { Eye, EyeOff, ListOrdered, Pencil } from 'lucide-react';
+import { Eye, EyeOff, ListOrdered, Scaling } from 'lucide-react';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import { FrameAnnotationEffectIcon } from '../../../../features/highlighter/frame-annotation/effect-icon';
 import { FrameCommentIcon } from '../../../../features/highlighter/frame-annotation/icons';
 import { translate } from '../../../../platform/i18n';
 import {
@@ -10,7 +11,6 @@ import {
 } from './actions';
 import { canAppendFrameCallout } from '../../../../features/highlighter/frame-annotation/callout/collection';
 import { FRAME_TRIGGER_CONTROL_SIZE } from './trigger-position';
-import { FrameAnnotationEffectIcon as FrameEffectIcon } from '../../../../features/highlighter/frame-annotation/effect-icon';
 import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
 import {
   isFrameHiddenDuringCapture,
@@ -71,7 +71,7 @@ export function createFrameQuickActions(
   return [
     {
       id: 'settings',
-      icon: <FrameEffectIcon mode={props.frame.effectMode ?? 'border'} size={14} />,
+      icon: <FrameAnnotationEffectIcon mode={props.frame.effectMode ?? 'border'} size={16} />,
       label: translate('content.interactiveFrame.frameSettings'),
       onClick: (button) => {
         props.popoverAnchorRef.current = button;
@@ -82,7 +82,7 @@ export function createFrameQuickActions(
       ? [
           {
             id: 'add-callout' as const,
-            icon: <FrameCommentIcon size={15} aria-hidden="true" style={frameTriggerIconStyle} />,
+            icon: <FrameCommentIcon size={16} aria-hidden="true" style={frameTriggerIconStyle} />,
             label: translate('content.interactiveFrame.calloutAddAnother'),
             onClick: () => addAdditionalFrameCallout(props),
             activateOnPointerDown: true,
@@ -93,7 +93,7 @@ export function createFrameQuickActions(
         : [
             {
               id: 'callout' as const,
-              icon: <FrameCommentIcon size={15} aria-hidden="true" style={frameTriggerIconStyle} />,
+              icon: <FrameCommentIcon size={16} aria-hidden="true" style={frameTriggerIconStyle} />,
               label: translate('content.interactiveFrame.calloutAdd'),
               onClick: () =>
                 startFrameCalloutEditing({
@@ -109,7 +109,7 @@ export function createFrameQuickActions(
       : [
           {
             id: 'step-badge' as const,
-            icon: <ListOrdered size={15} aria-hidden="true" style={frameTriggerIconStyle} />,
+            icon: <ListOrdered size={16} aria-hidden="true" style={frameTriggerIconStyle} />,
             label: translate('content.interactiveFrame.stepBadgeEnable'),
             onClick: () =>
               enableFrameStepBadge({ closePopover: props.closePopover, frameId: props.frame.id }),
@@ -117,7 +117,7 @@ export function createFrameQuickActions(
         ]),
     {
       id: 'edit',
-      icon: <Pencil size={15} aria-hidden="true" style={frameTriggerIconStyle} />,
+      icon: <Scaling size={16} aria-hidden="true" style={frameTriggerIconStyle} />,
       label: translate('content.interactiveFrame.editButton'),
       onClick: props.handleStartEditing,
     },
@@ -125,9 +125,9 @@ export function createFrameQuickActions(
       id: 'capture-visibility',
       active: hiddenDuringCapture,
       icon: hiddenDuringCapture ? (
-        <EyeOff size={15} aria-hidden="true" style={frameTriggerIconStyle} />
+        <EyeOff size={16} aria-hidden="true" style={frameTriggerIconStyle} />
       ) : (
-        <Eye size={15} aria-hidden="true" style={frameTriggerIconStyle} />
+        <Eye size={16} aria-hidden="true" style={frameTriggerIconStyle} />
       ),
       label: translate(
         hiddenDuringCapture

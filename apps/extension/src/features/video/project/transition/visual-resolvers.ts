@@ -212,3 +212,21 @@ export function resolveTransitionVisualStateForRole(
       return resolveCardFlip(clip, direction, intensity, role, progress);
   }
 }
+
+/** Progress knots where the rendered affine changes its linear rule. */
+export function transitionVisualAffineBreaks(
+  segment: VideoProjectTransitionSegment
+): readonly number[] {
+  const knots = [0, 0.5, 1];
+  if (segment.transition.kind === 'CARD_FLIP_REVEAL') {
+    const definition = getVideoTransitionTemplateDefinition(
+      segment.transition.templateKind ?? segment.transition.kind
+    );
+    const amount = getTransitionIntensityMultiplier(
+      segment.transition.intensity ?? definition.defaultIntensity
+    );
+    const clamp = 0.82 / (0.72 * amount);
+    if (clamp > 0 && clamp < 1) knots.push(clamp);
+  }
+  return knots.sort((a, b) => a - b);
+}

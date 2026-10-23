@@ -3,6 +3,7 @@ import { getEffectClipObjectLayout } from '../../../../features/video/project/ef
 import { getCurrentLocale } from '../../../../platform/i18n';
 import {
   getCompositionRectStageStyle,
+  mapPreviewEffectPoint,
   mapClientPointToCompositionPoint,
   shouldLockPreviewClipToViewport,
 } from './geometry';
@@ -10,6 +11,7 @@ import type { PreviewStageCanvasProps } from '../types';
 
 type Props = Pick<
   PreviewStageCanvasProps,
+  | 'currentTime'
   | 'project'
   | 'selectedClip'
   | 'selectedClipLocked'
@@ -41,9 +43,17 @@ export function PreviewEffectHandles(props: Props) {
       {layout.handles.map((handle) => {
         const anchor = instance.sceneAnchors?.[handle.id];
         if (!anchor) return null;
+        const mapped = mapPreviewEffectPoint(
+          props.project,
+          clip,
+          props.camera,
+          props.currentTime,
+          anchor
+        );
+        if (!mapped) return null;
         const style = getCompositionRectStageStyle(
           props.project,
-          { ...clip.transform, ...anchor, width: 0, height: 0 },
+          { ...clip.transform, ...mapped, width: 0, height: 0 },
           props.camera,
           lockToViewport,
           stage
@@ -63,7 +73,7 @@ export function PreviewEffectHandles(props: Props) {
               'cursor-move rounded-full border-2 border-[var(--sniptale-color-accent-emphasis)]',
               'bg-[var(--sniptale-color-surface-panel)]',
             ].join(' ')}
-            style={{ left: style.left, top: style.top }}
+            style={{ left: style.left, top: style.top, display: style.display }}
             onPointerDown={(event) => {
               cleanup.current?.();
               cleanup.current = beginHandleDrag(
@@ -91,8 +101,14 @@ export function PreviewEffectHandles(props: Props) {
                 sceneAnchors: {
                   ...instance.sceneAnchors,
                   [handle.id]: {
-                    x: Math.max(0, Math.min(props.project.width, anchor.x + delta[0]! * step)),
-                    y: Math.max(0, Math.min(props.project.height, anchor.y + delta[1]! * step)),
+                    x:
+                      clip.attachment?.kind === 'source'
+                        ? anchor.x + delta[0]! * step
+                        : Math.max(0, Math.min(props.project.width, anchor.x + delta[0]! * step)),
+                    y:
+                      clip.attachment?.kind === 'source'
+                        ? anchor.y + delta[1]! * step
+                        : Math.max(0, Math.min(props.project.height, anchor.y + delta[1]! * step)),
                   },
                 },
               });
@@ -124,6 +140,8 @@ function beginHandleDrag(
     if (pointer.pointerId !== pointerId || !props.stageRef.current) return;
     const point = mapClientPointToCompositionPoint({
       camera: props.camera,
+      ...(props.selectedClip ? { clip: props.selectedClip } : {}),
+      currentTime: props.currentTime,
       clientX: pointer.clientX,
       clientY: pointer.clientY,
       lockToViewport,
@@ -134,8 +152,14 @@ function beginHandleDrag(
     next = {
       ...anchors,
       [handleId]: {
-        x: Math.max(0, Math.min(props.project.width, point.x)),
-        y: Math.max(0, Math.min(props.project.height, point.y)),
+        x:
+          props.selectedClip?.type === 'EFFECT' && props.selectedClip.attachment?.kind === 'source'
+            ? point.x
+            : Math.max(0, Math.min(props.project.width, point.x)),
+        y:
+          props.selectedClip?.type === 'EFFECT' && props.selectedClip.attachment?.kind === 'source'
+            ? point.y
+            : Math.max(0, Math.min(props.project.height, point.y)),
       },
     };
     changed = true;

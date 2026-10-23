@@ -20,7 +20,9 @@ function isOwnerNoTabControlMessage(message: unknown): boolean {
     type !== VideoMessageType.PAUSE_RECORDING &&
     type !== VideoMessageType.RESUME_RECORDING &&
     type !== VideoMessageType.STOP_RECORDING &&
-    type !== VideoMessageType.UPDATE_SETTINGS
+    type !== VideoMessageType.UPDATE_SETTINGS &&
+    type !== VideoMessageType.COUNTDOWN_CAMERA_OFFER &&
+    type !== VideoMessageType.COUNTDOWN_CAMERA_CLOSE
   ) {
     return false;
   }

@@ -40,6 +40,9 @@ type TimelineTrackAction =
 type TimelineClipAction =
   | 'placeMaterial'
   | 'appendMaterial'
+  | 'placeBookendMaterial'
+  | 'updateBookendPresets'
+  | 'updateCompositionJoins'
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'renameAsset'
@@ -53,6 +56,9 @@ type TimelineClipAction =
   | 'trimClipStart'
   | 'trimClipEnd'
   | 'splitClipAt'
+  | 'editSourceVoiceover'
+  | 'deleteSourceVoiceover'
+  | 'duplicateSourceVoiceover'
   | 'deleteClip'
   | 'duplicateClip'
   | 'detachClipGroup'
@@ -68,6 +74,8 @@ type TimelineClipAction =
   | 'updateMediaClipFitScalePercent'
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
+  | 'updateMediaClipShadowColor'
+  | 'editMediaClip'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack';
 
@@ -90,7 +98,9 @@ export interface TimelineEditingPort
 }
 
 type SelectionAction =
+  | 'selectSourceVoiceover'
   | 'selectScene'
+  | 'selectComment'
   | 'selectTrack'
   | 'selectClip'
   | 'selectTransition'

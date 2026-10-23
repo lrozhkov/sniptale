@@ -3,6 +3,482 @@ import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/ty
 import { expect, test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
+
+async function arrowShaftY(canvas: Locator, point: { x: number; y: number }) {
+  return canvas.evaluate((node, point) => {
+    if (!(node instanceof HTMLCanvasElement)) throw new Error('Drawing canvas unavailable');
+    const rect = node.getBoundingClientRect();
+    const scaleX = node.width / rect.width;
+    const scaleY = node.height / rect.height;
+    const column = Math.round((point.x - rect.x) * scaleX);
+    const firstRow = Math.round((point.y - rect.y - 24) * scaleY);
+    const data = node.getContext('2d')!.getImageData(column, firstRow, 1, Math.round(48 * scaleY));
+    let weight = 0;
+    let weightedY = 0;
+    for (let row = 0; row < data.height; row++) {
+      const offset = row * 4;
+      const red = data.data[offset]!;
+      const green = data.data[offset + 1]!;
+      const blue = data.data[offset + 2]!;
+      const alpha = data.data[offset + 3]!;
+      if (red > green + 40 && red > blue + 40 && alpha > 0) {
+        weight += alpha;
+        weightedY += (rect.y + (firstRow + row + 0.5) / scaleY) * alpha;
+      }
+    }
+    return weight ? weightedY / weight : null;
+  }, point);
+}
+
+async function checkFreeArrowEndpoints(
+  page: Page,
+  canvas: Locator,
+  start: { x: number; y: number },
+  screenshotPath: string,
+  undo?: () => Promise<void>
+) {
+  const end = { x: start.x + 300, y: start.y + 12 };
+  const middle = { x: start.x + 150, y: start.y };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 4 });
+  await page.mouse.up();
+  await page.screenshot({ path: screenshotPath.replace('.png', '-created.png'), fullPage: false });
+  const expectShaft = async (expected: number) => {
+    await expect
+      .poll(async () => {
+        const actual = await arrowShaftY(canvas, middle);
+        return actual === null ? Infinity : Math.abs(actual - expected);
+      })
+      .toBeLessThanOrEqual(1.5);
+  };
+  await expectShaft(start.y + 6);
+  await page.mouse.move(end.x, end.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, start.y + 8, { steps: 4 });
+  await expectShaft(start.y + 4);
+  await page.keyboard.down('Shift');
+  await page.mouse.move(end.x + 1, start.y + 8);
+  await expectShaft(start.y);
+  await page.keyboard.up('Shift');
+  await page.mouse.move(end.x, start.y + 8);
+  await expectShaft(start.y + 4);
+  await page.mouse.up();
+  await expectShaft(start.y + 4);
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  if (undo) {
+    await undo();
+    await expectShaft(start.y + 6);
+    await undo();
+  }
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`free arrow creation and endpoint angles across all surfaces ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      for (const mode of ['drawing', 'video-recording', 'crop']) {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page
+          .locator(`[data-ui="content.toolbar.mode-option.${mode === 'crop' ? 'drawing' : mode}"]`)
+          .click();
+        if (mode === 'crop') {
+          await page.locator('[data-ui="content.toolbar.timer-button"]').click();
+          await page
+            .locator('[data-ui="content.toolbar.timer-menu"]')
+            .getByText('No delay', { exact: true })
+            .click();
+          await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
+          await page.mouse.move(200, 180);
+          await page.mouse.down();
+          await page.mouse.move(950, 440, { steps: 4 });
+          await page.mouse.up();
+          await page.locator('[data-ui="content.crop.mode.drawing"]').click();
+        }
+        const scope =
+          mode === 'crop'
+            ? page.locator('[data-ui="content.crop.drawing-slot"]')
+            : page.locator('[data-ui="content.toolbar.root"]');
+        await scope.locator('[data-ui="content.toolbar.drawing.arrow"]').click();
+        const canvas = page.locator(
+          mode === 'crop'
+            ? '[data-ui="content.crop.drawing-layer"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+            : '[data-ui="content.drawing.surface"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+        );
+        await expect(canvas).toHaveCSS('pointer-events', 'auto');
+        const cropBounds =
+          mode === 'crop'
+            ? (await page.locator('.sniptale-selection-final-frame').boundingBox())!
+            : null;
+        await checkFreeArrowEndpoints(
+          page,
+          canvas,
+          cropBounds
+            ? {
+                x: Math.round(cropBounds.x + 80),
+                y: Math.round(cropBounds.y + cropBounds.height / 2),
+              }
+            : { x: 300, y: mode === 'drawing' ? 230 : 280 },
+          info.outputPath(`${mode}-free-arrow.png`),
+          mode === 'video-recording'
+            ? undefined
+            : mode === 'crop'
+              ? () => page.locator('[data-ui="content.crop.undo"]').click()
+              : () => page.keyboard.press('Control+z')
+        );
+        if (mode === 'crop') await page.keyboard.press('Escape');
+      }
+      const editor = await context.newPage();
+      try {
+        await editor.setViewportSize(size);
+        await applyHarnessBootstrap(editor, {});
+        await editor.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+        await editor.locator('[data-ui="editor.floating.tool-rail.arrow"]').click();
+        const upper = (await editor
+          .locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas')
+          .boundingBox())!;
+        const canvas = editor.locator('[data-ui="editor.canvas.layer"] canvas.lower-canvas');
+        await checkFreeArrowEndpoints(
+          editor,
+          canvas,
+          {
+            x: Math.round(upper.x + upper.width * 0.3),
+            y: Math.round(upper.y + upper.height * 0.5),
+          },
+          info.outputPath('editor-free-arrow.png')
+        );
+      } finally {
+        await editor.close();
+      }
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+async function checkDrawingPlacement(page: Page, editor: boolean) {
+  const toolbar = page.locator(
+    `[data-ui="${editor ? 'editor.floating.tool-rail' : 'content.toolbar.root'}"]`
+  );
+  const surfaces = page.locator(
+    editor
+      ? '[data-ui="editor.floating.tool-properties"], [data-ui="editor.floating.selection-actions"]'
+      : '.sniptale-drawing-options-popover:visible'
+  );
+  await expect(surfaces.first()).toBeVisible();
+  await toolbar.evaluate(async (node) => {
+    const positioner = node.closest('.sniptale-toolbar-positioner') ?? node;
+    const active = () =>
+      [...node.getAnimations(), ...positioner.getAnimations()].filter(
+        (animation) =>
+          animation.playState === 'running' &&
+          animation.effect?.getComputedTiming().iterations !== Infinity
+      );
+    await new Promise(requestAnimationFrame);
+    let animations = active();
+    while (animations.length) {
+      await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+      await new Promise(requestAnimationFrame);
+      animations = active();
+    }
+  });
+  await surfaces.first().evaluate(async (node) => {
+    await Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished));
+  });
+  const geometry = await surfaces.evaluateAll((nodes, editor) => {
+    const first = nodes[0]!;
+    const toolbar = editor
+      ? first.ownerDocument.querySelector('[data-ui="editor.floating.tool-rail"]')!
+      : first.closest('[data-ui="content.toolbar.root"]')!;
+    const rect = (element: Element) => {
+      const box = element.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    };
+    const boxes = nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { left: rect.left, right: rect.right };
+    });
+    const active = toolbar.querySelector(
+      editor
+        ? 'button[aria-pressed="true"]'
+        : '[data-ui^="content.toolbar.drawing."][aria-pressed="true"]'
+    )!;
+    const pair = first.closest('[data-ui="content.toolbar.drawing-options.pair"]');
+    return {
+      shell: rect(toolbar),
+      bounds: rect(first),
+      anchor: rect(active),
+      vertical: !editor && toolbar.getAttribute('data-display-mode') === 'vertical',
+      visibleWidth:
+        Math.max(...boxes.map((box) => box.right)) - Math.min(...boxes.map((box) => box.left)),
+      wrapper: pair
+        ? {
+            rect: rect(pair),
+            style: pair.getAttribute('style'),
+            width: (pair as HTMLElement).offsetWidth,
+          }
+        : null,
+    };
+  }, editor);
+  const { shell, bounds, vertical, anchor, visibleWidth } = geometry;
+  if (!vertical) {
+    expect(bounds.x, JSON.stringify(geometry)).toBeCloseTo(
+      Math.min(Math.max(anchor.x, 8), page.viewportSize()!.width - visibleWidth - 8),
+      0
+    );
+  }
+  if (!editor) {
+    const disclosure = toolbar
+      .locator('[data-ui^="content.toolbar.drawing."][aria-expanded="true"]')
+      .first();
+    const trigger = (await disclosure.count())
+      ? disclosure
+      : toolbar.locator('[data-ui^="content.toolbar.drawing."][aria-pressed="true"]').first();
+    await expect(trigger).toHaveAttribute(
+      'data-menu-side',
+      vertical ? (bounds.x < shell.x ? 'left' : 'right') : bounds.y < shell.y ? 'up' : 'down'
+    );
+  }
+  expect(
+    Math.max(
+      vertical ? shell.x - bounds.x - bounds.width : shell.y - bounds.y - bounds.height,
+      vertical ? bounds.x - shell.x - shell.width : bounds.y - shell.y - shell.height
+    )
+  ).toBeCloseTo(1, 0);
+  for (const surface of await surfaces.all()) {
+    const box = (await surface.boundingBox())!;
+    expect(vertical ? box.x : box.y).toBeCloseTo(vertical ? bounds.x : bounds.y, 0);
+  }
+  return bounds;
+}
+
+for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`shared drawing surface placement ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120_000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    page.setDefaultTimeout(10_000);
+    const theme = viewport.width === 1920 ? 'dark' : 'light';
+    await popup.evaluate(
+      async (theme) => chrome.storage.local.set({ 'sniptale-theme-preference': theme }),
+      theme
+    );
+    try {
+      for (const mode of ['drawing', 'video-recording']) {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+        if (mode === 'video-recording') {
+          await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveAttribute(
+            'data-video-recording',
+            'true'
+          );
+        }
+        for (const [edge, x, y] of [
+          ['top', viewport.width / 2, 20],
+          ['bottom', viewport.width / 2, viewport.height - 20],
+          ['left', 20, viewport.height / 2],
+          ['right', viewport.width - 20, viewport.height / 2],
+        ] as const) {
+          await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+          await page.mouse.click(viewport.width * 0.6, viewport.height * 0.6);
+          const handle = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
+          const grip = (await handle.boundingBox())!;
+          await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(x, y, { steps: 5 });
+          await page.mouse.up();
+          const arrow = page.locator('[data-ui="content.toolbar.drawing.arrow"]');
+          await arrow.click();
+          if ((await arrow.getAttribute('aria-expanded')) !== 'true') await arrow.click();
+          const unselected = await checkDrawingPlacement(page, false);
+          await page.mouse.move(300, 160);
+          await page.mouse.down();
+          await page.mouse.move(420, 210, { steps: 4 });
+          await page.mouse.up();
+          await expect(
+            page.locator('[data-ui="content.toolbar.drawing-options.pair"]')
+          ).toBeVisible();
+          const selected = await checkDrawingPlacement(page, false);
+          expect(selected.height).toBeCloseTo(unselected.height, 0);
+          if (edge === 'top' || edge === 'bottom') {
+            expect(selected.height).toBeLessThanOrEqual(42);
+            for (const panel of await page
+              .locator('.sniptale-drawing-options-popover:visible')
+              .all())
+              expect((await panel.boundingBox())!.height).toBeCloseTo(unselected.height, 0);
+          }
+          await page.screenshot({
+            path: info.outputPath(`${mode}-${edge}-pair.png`),
+            fullPage: false,
+          });
+        }
+      }
+      const editor = await context.newPage();
+      try {
+        await editor.setViewportSize(viewport);
+        await applyHarnessBootstrap(editor, { storage: { 'sniptale-theme-preference': theme } });
+        await editor.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+        await editor.locator('[data-ui="editor.floating.tool-rail.arrow"]').click();
+        const unselected = await checkDrawingPlacement(editor, true);
+        const canvas = editor.locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas');
+        const box = (await canvas.boundingBox())!;
+        await editor.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+        await editor.mouse.down();
+        await editor.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.65, { steps: 4 });
+        await editor.mouse.up();
+        await expect(editor.locator('[data-ui="editor.floating.selection-actions"]')).toBeVisible();
+        const selected = await checkDrawingPlacement(editor, true);
+        expect(selected.height).toBeCloseTo(unselected.height, 0);
+        expect(selected.height).toBeLessThanOrEqual(42);
+        expect(
+          (await editor.locator('[data-ui="editor.floating.selection-actions"]').boundingBox())!
+            .height
+        ).toBeCloseTo(unselected.height, 0);
+        for (const width of [viewport.width, 960, 719, 720, 721]) {
+          await editor.setViewportSize({ width, height: viewport.height });
+          await checkDrawingPlacement(editor, true);
+          await editor.screenshot({
+            path: info.outputPath(`editor-pair-${width}.png`),
+            fullPage: false,
+          });
+          const overflow = await editor.evaluate(() => ({
+            width: innerWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            minimumWidth: Number.parseFloat(
+              getComputedStyle(document.querySelector('[data-ui="editor.page.root"]')!).minWidth
+            ),
+          }));
+          expect(overflow.scrollWidth).toBeLessThanOrEqual(Math.max(width, overflow.minimumWidth));
+        }
+      } finally {
+        await editor.close();
+      }
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`recording cursor shows selection chrome ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await popup.evaluate(
+        async (theme) => {
+          await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+        },
+        size.width === 1920 ? 'dark' : 'light'
+      );
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+      const surface = page.locator('[data-ui="content.drawing.surface"]').first();
+      const ink = surface.locator('canvas.sniptale-drawing-canvas');
+      await expect(ink).toHaveCSS('pointer-events', 'auto');
+      const chrome = surface.locator('[data-ui="content.drawing.selection-chrome"]');
+      const visiblePixels = () =>
+        chrome.evaluate((canvas) => {
+          if (!(canvas instanceof HTMLCanvasElement))
+            throw new Error('Selection canvas unavailable');
+          const data = canvas
+            .getContext('2d')!
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+          let count = 0;
+          for (let offset = 3; offset < data.length; offset += 4) if (data[offset]! > 0) count++;
+          return count;
+        });
+      await page.mouse.move(500, 260);
+      await page.mouse.down();
+      await page.mouse.move(660, 320, { steps: 8 });
+      await page.mouse.up();
+      await expect.poll(visiblePixels).toBe(0);
+      await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+      for (const kind of ['rectangle', 'ellipse']) {
+        await page
+          .locator(`[data-ui="content.toolbar.drawing-options.shape.kind-${kind}"]`)
+          .click();
+        const beforeShape = await pixels(ink);
+        await page.mouse.move(900, 260);
+        await page.mouse.down();
+        await page.mouse.move(1080, 360, { steps: 8 });
+        await page.mouse.up();
+        await expect.poll(() => pixels(ink)).not.toBe(beforeShape);
+        await expect.poll(visiblePixels).toBe(0);
+        await page.screenshot({
+          path: info.outputPath(`recording-${kind}-without-handles.png`),
+          fullPage: false,
+        });
+      }
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(990, 260);
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+      const beforeResize = await pixels(ink);
+      await page.mouse.move(1080, 360);
+      await page.mouse.down();
+      await page.mouse.move(1120, 400, { steps: 8 });
+      await page.mouse.up();
+      await expect.poll(() => pixels(ink)).not.toBe(beforeResize);
+      await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+      await expect.poll(visiblePixels).toBe(0);
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(900, 440);
+      await expect.poll(visiblePixels).toBe(0);
+      await page.mouse.move(450, 190);
+      await page.mouse.down();
+      try {
+        await page.mouse.move(720, 380, { steps: 6 });
+        await expect.poll(visiblePixels).toBeGreaterThan(0);
+        await page.screenshot({
+          path: info.outputPath('recording-selection-marquee.png'),
+          fullPage: false,
+        });
+      } finally {
+        await page.mouse.up();
+      }
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+      await expect(page.locator('[data-ui="drawing.selection.actions"]')).toBeVisible();
+      await page.mouse.click(900, 440);
+      await expect.poll(visiblePixels).toBe(0);
+      await page.mouse.click(580, 290);
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+      await page.screenshot({
+        path: info.outputPath('recording-selected-object.png'),
+        fullPage: false,
+      });
+      const beforeMove = await pixels(ink);
+      await page.mouse.move(580, 290);
+      await page.mouse.down();
+      await page.mouse.move(620, 330, { steps: 5 });
+      await page.mouse.up();
+      await expect.poll(() => pixels(ink)).not.toBe(beforeMove);
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+      await page.locator('[data-ui="content.toolbar.video-recording.navigation"]').click();
+      await expect(ink).toHaveCSS('pointer-events', 'none');
+      await expect.poll(visiblePixels).toBe(0);
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(620, 330);
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}
 
 async function pixels(canvas: Locator): Promise<string> {
   return canvas.evaluate(async (element) => {
@@ -65,6 +541,10 @@ for (const locale of ['en', 'ru'] as const) {
         }
         await page.bringToFront();
         await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
+        await page
+          .getByRole('alertdialog')
+          .getByRole('button', { name: /^(Continue|Продолжить)$/u })
+          .click();
         await expect(page.locator('[data-ui="content.toolbar.video-recording.pause"]')).toBeVisible(
           { timeout: 30_000 }
         );
@@ -378,12 +858,14 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     await expect(freePlacement).toHaveClass(/sniptale-popover-item-selected/u);
     await page.getByRole('button', { name: /Vertical view|Вертикальный вид/ }).click();
     await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
-    await page.mouse.move(450, 280);
+    const toolbarBox = (await page.locator('[data-ui="content.toolbar.root"]').boundingBox())!;
+    const drawingX = toolbarBox.x + toolbarBox.width / 2 < 640 ? 900 : 100;
+    await page.mouse.move(drawingX, 280);
     await page.mouse.down();
-    await page.mouse.move(620, 400, { steps: 8 });
+    await page.mouse.move(drawingX + 170, 400, { steps: 8 });
     await page.mouse.up();
     await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
-    await page.mouse.click(500, 300);
+    await page.mouse.click(drawingX + 50, 300);
     const actions = page.locator('[data-ui="drawing.selection.actions"]');
     await expect(actions).toBeVisible();
     const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
@@ -458,10 +940,23 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     await page.locator('[data-ui="content.toolbar.settings-button"]').click();
     await page.getByRole('button', { name: /Horizontal view|Горизонтальный вид/ }).click();
     await expect(actions).toBeVisible();
-    const horizontalFirst = (await first.boundingBox())!;
-    const horizontalSecond = (await second.boundingBox())!;
-    expect(Math.abs(horizontalFirst.y - horizontalSecond.y)).toBeLessThanOrEqual(1);
-    expect(horizontalSecond.x).toBeGreaterThan(horizontalFirst.x + horizontalFirst.width);
+    await expect(actions).toHaveCSS('flex-direction', 'row');
+    await checkDrawingPlacement(page, false);
+    const horizontal = await actions.evaluate((node) => {
+      const first = node
+        .querySelector('[data-ui="drawing.selection.actions.front"]')!
+        .getBoundingClientRect();
+      const second = node
+        .querySelector('[data-ui="drawing.selection.actions.forward"]')!
+        .getBoundingClientRect();
+      return { yOffset: second.y - first.y, gap: second.x - first.right };
+    });
+    expect(Math.abs(horizontal.yOffset)).toBeLessThanOrEqual(1);
+    expect(horizontal.gap).toBeGreaterThan(0);
+    await page.screenshot({
+      path: info.outputPath('horizontal-layer-actions.png'),
+      fullPage: false,
+    });
     await popup.close();
     await page.close();
   });

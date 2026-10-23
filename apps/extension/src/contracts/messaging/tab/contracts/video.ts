@@ -11,6 +11,7 @@ import { tabVideoControlledCursorContracts } from './controlled';
 import {
   createMessageGuard,
   createRuntimeResponseGuard,
+  isBoolean,
   isNumber,
   isString,
   isVideoRecordingRuntimeState,
@@ -101,11 +102,27 @@ export const tabVideoMessageContracts = {
   [VideoMessageType.HIDE_REGION_SELECTOR]: {
     parseRequest: createGuardParser(
       'tab HIDE_REGION_SELECTOR message',
-      createMessageGuard({ type: VideoMessageType.HIDE_REGION_SELECTOR })
+      createMessageGuard({
+        type: VideoMessageType.HIDE_REGION_SELECTOR,
+        optional: { regionSelectionRequestId: isString },
+      })
     ),
     parseResponse: createGuardParser(
       'tab HIDE_REGION_SELECTOR response',
       createRuntimeResponseGuard()
+    ),
+  },
+  [VideoMessageType.GET_REGION_SELECTOR_STATE]: {
+    parseRequest: createGuardParser(
+      'tab GET_REGION_SELECTOR_STATE message',
+      createMessageGuard({
+        type: VideoMessageType.GET_REGION_SELECTOR_STATE,
+        required: regionSelectionBindingGuard,
+      })
+    ),
+    parseResponse: createGuardParser(
+      'tab GET_REGION_SELECTOR_STATE response',
+      createRuntimeResponseGuard({ required: { active: isBoolean } })
     ),
   },
   [VideoMessageType.REGION_SELECTED]: {

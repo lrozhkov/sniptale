@@ -1,3 +1,10 @@
+import { KeyFeedbackFields } from '../key-feedback-fields';
+import {
+  getVideoProjectClickStyle,
+  getVideoProjectKeyStyle,
+  isCapturedVideoProjectGesture,
+} from '../../../../../../features/video/project/action-feedback/projection';
+import { getProjectGestureFeedbackDefaults } from '../../../../../../features/video/review/project-action-audio';
 import { ActionFeedbackFields } from '../action-feedback-fields';
 import { ActionClickStyleFields, ActionKeyStyleFields } from '../action-style-fields';
 import { InspectorDetails } from '../../shared/details';
@@ -10,8 +17,8 @@ import { getVideoProjectUtilityLanes } from '../../../../../../features/video/pr
 import type { VideoProjectActionPresentationOverride } from '../../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../../contracts/selection-panel';
 import { ActionPointButtons, ActionPointFields, ActionPrimaryFields } from '../fields';
-import { InspectorGroupedPanel } from '../../grouped-inspector';
-import { SelectInput } from '../../shared/controls';
+import { InspectorGroupedPanel, type InspectorGroupDefinition } from '../../grouped-inspector';
+import { OptionButtonsField } from '../../shared/option-buttons';
 import { SelectionEmptyState } from '../../inspection/helpers';
 import { DetailItem, DetailList, PANEL_SECTION_CLASS_NAME } from '../../shared/panel';
 
@@ -38,6 +45,23 @@ export function InspectActionPanel(props: ActionProps) {
       row.occurrence.eventId === occurrence.eventId && row.occurrence.clipId === occurrence.clipId
   );
   if (!resolved) return <SelectionEmptyState />;
+  const source = event.anchor.kind === 'recording-source' ? event.anchor : null;
+  const feedback = source
+    ? props.project.actionFeedback?.find(
+        (group) =>
+          group.recordingId === source.recordingId &&
+          group.sourceInstanceId === source.sourceInstanceId
+      )
+    : undefined;
+  const gesture = Boolean(feedback && isCapturedVideoProjectGesture(event));
+  const clickStyle = getVideoProjectClickStyle(props.project, event);
+  const click = clickStyle !== null;
+  const keyStyle = getVideoProjectKeyStyle(props.project, event);
+  const authoredGesture = feedback?.gestureStyles?.find(
+    (style) => style.id === source?.sourceEventId
+  );
+  const gestureStyle =
+    authoredGesture ?? clickStyle ?? getProjectGestureFeedbackDefaults(props.project);
   const disabled = getVideoProjectUtilityLanes(props.project).actions.locked;
   const update = (patch: VideoProjectActionPresentationOverride) => {
     if (!disabled)
@@ -54,97 +78,291 @@ export function InspectActionPanel(props: ActionProps) {
         </p>
       ) : null}
       <InspectorGroupedPanel
-        groups={[
-          {
-            id: 'info',
-            semantic: 'info' as const,
-            label: translate('videoEditor.sidebar.inspectorGroupInfo'),
-            content: <ActionOverview resolved={resolved} />,
-          },
-          {
-            id: 'appearance',
-            semantic: event.kind === 'KEY' ? ('content' as const) : ('effects' as const),
-            label: translate(
-              event.kind === 'KEY'
-                ? 'videoEditor.sidebar.historyKeyboard'
-                : 'videoEditor.sidebar.historyClickEffects'
-            ),
-            defaultActive: true,
-            content: (
-              <ActionAppearanceFields
-                props={props}
-                resolved={resolved}
-                disabled={disabled}
-                update={update}
-              />
-            ),
-          },
-          {
-            id: 'animation',
-            semantic: 'animation',
-            label: translate('videoEditor.sidebar.historyTransitions'),
-            content: (
-              <ActionPrimaryFields
-                part="animation"
-                easing={resolved.easing}
-                showEasing={event.kind !== 'KEY'}
-                duration={resolved.duration}
-                offset={resolved.offset}
-                preset={resolved.preset}
-                disabled={disabled}
-                onChange={update}
-              />
-            ),
-          },
-          ...(event.anchor.kind === 'recording-source' &&
-          (event.kind === 'CLICK' || event.kind === 'KEY')
-            ? [
+        groups={
+          keyStyle && source
+            ? sourceKeyGroups(props, resolved, disabled, keyStyle.enabled)
+            : [
                 {
-                  id: 'action-sound',
-                  semantic: 'effects' as const,
-                  label: translate('gallery.videoReview.actionAudio'),
+                  id: 'info',
+                  semantic: 'info' as const,
+                  label: translate('videoEditor.sidebar.inspectorGroupInfo'),
                   content: (
-                    <ActionFeedbackFields
-                      project={props.project}
-                      recordingId={event.anchor.recordingId}
-                      sourceInstanceId={event.anchor.sourceInstanceId}
-                      target={{
-                        ref: { kind: 'action', id: event.anchor.sourceEventId },
-                        family: event.kind === 'KEY' ? 'keyboard' : 'mouse',
-                      }}
-                      disabled={disabled}
-                      gesture={
-                        event.kind === 'CLICK' &&
-                        typeof event.data['gestureType'] === 'string' &&
-                        (event.data['gestureType'] !== 'click' ||
-                          event.data['completion'] !== 'released')
-                      }
+                    <ActionOverview
+                      resolved={resolved}
+                      gesture={gesture}
+                      feedbackOverridden={Boolean(authoredGesture)}
                     />
                   ),
                 },
-              ]
-            : []),
-          ...(event.kind === 'KEY'
-            ? []
-            : [
                 {
-                  id: 'placement',
-                  semantic: 'placement' as const,
-                  label: translate('videoEditor.sidebar.inspectorGroupPlacement'),
+                  id: 'appearance',
+                  semantic: event.kind === 'KEY' ? ('content' as const) : ('effects' as const),
+                  label: translate(
+                    event.kind === 'KEY'
+                      ? 'videoEditor.sidebar.historyKeyboard'
+                      : 'videoEditor.sidebar.historyClickEffects'
+                  ),
+                  defaultActive: true,
                   content: (
-                    <ActionPlacementFields
+                    <ActionAppearanceFields
                       props={props}
                       resolved={resolved}
                       disabled={disabled}
                       update={update}
+                      gesture={gesture}
+                      click={click}
                     />
                   ),
                 },
-              ]),
-        ]}
+                ...actionVisualGroups({
+                  props,
+                  resolved,
+                  disabled,
+                  update,
+                  gesture,
+                  click,
+                  appearanceVisible: gestureStyle.effect !== 'off',
+                }),
+                ...(event.anchor.kind === 'recording-source' &&
+                (event.kind === 'CLICK' || event.kind === 'KEY')
+                  ? [
+                      {
+                        id: 'action-sound',
+                        semantic: 'audio' as const,
+                        label: translate('gallery.videoReview.actionAudio'),
+                        content: (
+                          <ActionFeedbackFields
+                            project={props.project}
+                            recordingId={event.anchor.recordingId}
+                            sourceInstanceId={event.anchor.sourceInstanceId}
+                            target={{
+                              ref: { kind: 'action', id: event.anchor.sourceEventId },
+                              family: event.kind === 'KEY' ? 'keyboard' : 'mouse',
+                            }}
+                            disabled={disabled}
+                            part="sound"
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
+                ...(event.kind === 'KEY' || gesture || click
+                  ? []
+                  : [
+                      {
+                        id: 'placement',
+                        semantic: 'placement' as const,
+                        label: translate('videoEditor.sidebar.inspectorGroupPlacement'),
+                        content: (
+                          <ActionPlacementFields
+                            props={props}
+                            resolved={resolved}
+                            disabled={disabled}
+                            update={update}
+                          />
+                        ),
+                      },
+                    ]),
+              ]
+        }
       />
     </section>
   );
+}
+
+/** Recorded keyboard captions compose the same parameter groups as Gallery. */
+function sourceKeyGroups(
+  props: ActionProps,
+  resolved: ActionPresentation,
+  disabled: boolean,
+  enabled: boolean
+): InspectorGroupDefinition<string>[] {
+  const anchor = resolved.event.anchor;
+  if (anchor.kind !== 'recording-source') return [];
+  const fields = (part: 'display' | 'appearance' | 'timing' | 'position') => (
+    <KeyFeedbackFields
+      project={props.project}
+      recordingId={anchor.recordingId}
+      sourceInstanceId={anchor.sourceInstanceId}
+      sourceEventId={anchor.sourceEventId}
+      part={part}
+      disabled={disabled}
+    />
+  );
+  return [
+    {
+      id: 'info',
+      semantic: 'info',
+      label: translate('videoEditor.sidebar.inspectorGroupInfo'),
+      content: (
+        <ActionOverview
+          resolved={resolved}
+          gesture={false}
+          feedbackOverridden={resolved.overridden}
+        />
+      ),
+    },
+    {
+      id: 'key-display',
+      semantic: 'keyboard',
+      label: translate('gallery.videoReview.keyDisplay'),
+      defaultActive: true,
+      content: fields('display'),
+    },
+    ...(enabled
+      ? [
+          {
+            id: 'key-appearance',
+            semantic: 'appearance' as const,
+            label: translate('gallery.videoReview.clickAppearance'),
+            content: fields('appearance'),
+          },
+          {
+            id: 'key-timing',
+            semantic: 'animation' as const,
+            label: translate('gallery.videoReview.clickTiming'),
+            content: fields('timing'),
+          },
+          {
+            id: 'key-position',
+            semantic: 'placement' as const,
+            label: translate('gallery.videoReview.clickPosition'),
+            content: fields('position'),
+          },
+        ]
+      : []),
+    {
+      id: 'action-sound',
+      semantic: 'audio',
+      label: translate('gallery.videoReview.actionAudio'),
+      content: (
+        <ActionFeedbackFields
+          project={props.project}
+          recordingId={anchor.recordingId}
+          sourceInstanceId={anchor.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: anchor.sourceEventId }, family: 'keyboard' }}
+          disabled={disabled}
+          part="sound"
+        />
+      ),
+    },
+  ];
+}
+
+/** Captured gestures use source appearance. Ordinary actions retain authored animation controls. */
+function actionVisualGroups({
+  props,
+  resolved,
+  disabled,
+  update,
+  gesture,
+  click,
+  appearanceVisible,
+}: {
+  props: ActionProps;
+  resolved: ActionPresentation;
+  disabled: boolean;
+  update(patch: VideoProjectActionPresentationOverride): void;
+  gesture: boolean;
+  click: boolean;
+  appearanceVisible: boolean;
+}): InspectorGroupDefinition<string>[] {
+  const event = resolved.event;
+  if (click && event.anchor.kind === 'recording-source') {
+    if (!appearanceVisible) return [];
+    const anchor = event.anchor;
+    return [
+      {
+        id: 'click-style',
+        semantic: 'appearance',
+        label: translate('gallery.videoReview.clickAppearance'),
+        content: (
+          <ActionFeedbackFields
+            project={props.project}
+            recordingId={anchor.recordingId}
+            sourceInstanceId={anchor.sourceInstanceId}
+            target={{ ref: { kind: 'action', id: anchor.sourceEventId }, family: 'mouse' }}
+            disabled={disabled}
+            visual="click"
+            part="visual"
+            visualPart="appearance"
+          />
+        ),
+      },
+      {
+        id: 'click-timing',
+        semantic: 'animation',
+        label: translate('gallery.videoReview.clickTiming'),
+        content: (
+          <ActionFeedbackFields
+            project={props.project}
+            recordingId={anchor.recordingId}
+            sourceInstanceId={anchor.sourceInstanceId}
+            target={{ ref: { kind: 'action', id: anchor.sourceEventId }, family: 'mouse' }}
+            disabled={disabled}
+            visual="click"
+            part="visual"
+            visualPart="timing"
+          />
+        ),
+      },
+      {
+        id: 'placement',
+        semantic: 'placement',
+        label: translate('gallery.videoReview.clickPosition'),
+        content: (
+          <ActionPlacementFields
+            props={props}
+            resolved={resolved}
+            disabled={disabled}
+            update={update}
+            sharedClick
+          />
+        ),
+      },
+    ];
+  }
+  if (gesture) {
+    if (event.anchor.kind !== 'recording-source' || !appearanceVisible) return [];
+    return [
+      {
+        id: 'gesture-style',
+        semantic: 'appearance',
+        label: translate('gallery.videoReview.clickAppearance'),
+        content: (
+          <ActionFeedbackFields
+            project={props.project}
+            recordingId={event.anchor.recordingId}
+            sourceInstanceId={event.anchor.sourceInstanceId}
+            target={{ ref: { kind: 'action', id: event.anchor.sourceEventId }, family: 'mouse' }}
+            disabled={disabled}
+            visual="gesture"
+            part="visual"
+            visualPart="appearance"
+          />
+        ),
+      },
+    ];
+  }
+  return [
+    {
+      id: 'animation',
+      semantic: 'animation',
+      label: translate('videoEditor.sidebar.historyTransitions'),
+      content: (
+        <ActionPrimaryFields
+          part="animation"
+          easing={resolved.easing}
+          showEasing={event.kind !== 'KEY'}
+          duration={resolved.duration}
+          offset={resolved.offset}
+          preset={resolved.preset}
+          disabled={disabled}
+          onChange={update}
+        />
+      ),
+    },
+  ];
 }
 
 function ActionPlacementFields({
@@ -152,10 +370,12 @@ function ActionPlacementFields({
   resolved,
   disabled,
   update,
+  sharedClick = false,
 }: {
   props: ActionProps;
   resolved: ActionPresentation;
   disabled: boolean;
+  sharedClick?: boolean;
   update: (patch: VideoProjectActionPresentationOverride) => void;
 }) {
   const occurrence = resolved.occurrence;
@@ -172,7 +392,9 @@ function ActionPlacementFields({
         ? { point: { x: patch.point.x / 100, y: patch.point.y / 100 } }
         : {}),
     });
+  const positionDisabled = disabled || (sharedClick && !event.point);
   const canPlace =
+    !positionDisabled &&
     props.currentTime !== undefined &&
     canEditActionOccurrenceOnCanvas(props.project, occurrence, props.currentTime);
   return (
@@ -182,7 +404,7 @@ function ActionPlacementFields({
         placementModeKind={props.placementMode?.kind ?? null}
         projectHeight={normalized ? 100 : props.project.height}
         projectWidth={normalized ? 100 : props.project.width}
-        disabled={disabled}
+        disabled={positionDisabled}
         onClearPlacementMode={props.onClearPlacementMode}
         onStartActionPointPlacement={() =>
           props.onStartActionPointPlacement(occurrence.eventId, occurrence.clipId)
@@ -190,23 +412,44 @@ function ActionPlacementFields({
         canvasDisabled={!canPlace}
         onChange={updatePoint}
       />
-      <InspectorDetails
-        preferenceId="action-panel:videoEditor.sidebar.inspectorExactPlacement"
-        label={translate('videoEditor.sidebar.inspectorExactPlacement')}
-      >
-        <ActionPointFields
-          point={normalized ? { x: point.x * 100, y: point.y * 100 } : point}
-          projectHeight={normalized ? 100 : props.project.height}
-          projectWidth={normalized ? 100 : props.project.width}
-          disabled={disabled}
-          onChange={updatePoint}
+      {sharedClick && event.anchor.kind === 'recording-source' ? (
+        <ActionFeedbackFields
+          project={props.project}
+          recordingId={event.anchor.recordingId}
+          sourceInstanceId={event.anchor.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: event.anchor.sourceEventId }, family: 'mouse' }}
+          disabled={positionDisabled}
+          visual="click"
+          part="visual"
+          visualPart="position"
         />
-      </InspectorDetails>
+      ) : (
+        <InspectorDetails
+          preferenceId="action-panel:videoEditor.sidebar.inspectorExactPlacement"
+          label={translate('videoEditor.sidebar.inspectorExactPlacement')}
+        >
+          <ActionPointFields
+            point={normalized ? { x: point.x * 100, y: point.y * 100 } : point}
+            projectHeight={normalized ? 100 : props.project.height}
+            projectWidth={normalized ? 100 : props.project.width}
+            disabled={positionDisabled}
+            onChange={updatePoint}
+          />
+        </InspectorDetails>
+      )}
     </>
   );
 }
 
-function ActionOverview({ resolved }: { resolved: ActionPresentation }) {
+function ActionOverview({
+  resolved,
+  gesture,
+  feedbackOverridden,
+}: {
+  resolved: ActionPresentation;
+  gesture: boolean;
+  feedbackOverridden: boolean;
+}) {
   const event = resolved.event;
   return (
     <DetailList>
@@ -232,14 +475,16 @@ function ActionOverview({ resolved }: { resolved: ActionPresentation }) {
             : '—'
         }
       />
-      <DetailItem
-        label={translate('videoEditor.sidebar.inspectorGroupStatus')}
-        value={resolveStatusLabel(resolved.reason)}
-      />
+      {!gesture ? (
+        <DetailItem
+          label={translate('videoEditor.sidebar.inspectorGroupStatus')}
+          value={resolveStatusLabel(resolved.reason)}
+        />
+      ) : null}
       <DetailItem
         label={translate('videoEditor.sidebar.historySettings')}
         value={translate(
-          resolved.overridden
+          resolved.overridden || feedbackOverridden
             ? 'videoEditor.sidebar.historyOverridden'
             : 'videoEditor.sidebar.historyInherit'
         )}
@@ -308,16 +553,20 @@ function ActionAppearanceFields({
   resolved,
   disabled,
   update,
+  gesture,
+  click,
 }: {
   props: ActionProps;
   resolved: ActionPresentation;
   disabled: boolean;
+  gesture: boolean;
+  click: boolean;
   update(patch: VideoProjectActionPresentationOverride): void;
 }) {
   const { event, occurrence } = resolved;
   return (
     <>
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.historyEventMode')}
         value={
           event.presentation?.enabled === undefined
@@ -341,35 +590,55 @@ function ActionAppearanceFields({
           });
         }}
       />
-      {resolved.reason ? (
+      {resolved.reason &&
+      (!(gesture || click) ||
+        resolved.reason === 'track-disabled' ||
+        resolved.reason === 'event-disabled') ? (
         <p className="mt-2 text-xs text-[var(--sniptale-color-text-muted)]" role="status">
           {resolveStatusLabel(resolved.reason)}
         </p>
       ) : null}
-      <ActionPrimaryFields
-        part="appearance"
-        duration={resolved.duration}
-        offset={resolved.offset}
-        preset={resolved.preset}
-        showPreset={event.kind !== 'KEY' && event.kind !== 'SCROLL'}
-        disabled={disabled}
-        onChange={update}
-      />
-      <EventStyleFields props={props} resolved={resolved} disabled={disabled} update={update} />
-      <InspectorActionButton
-        compact
-        tone="secondary"
-        separated
-        disabled={disabled || !resolved.overridden}
-        onClick={() =>
-          props.onUpdateActionEventDetails(event.id, {
-            clipId: occurrence.clipId,
-            presentation: null,
-          })
-        }
-      >
-        {translate('videoEditor.sidebar.historyReset')}
-      </InspectorActionButton>
+      {(gesture || click) && event.anchor.kind === 'recording-source' ? (
+        <ActionFeedbackFields
+          project={props.project}
+          recordingId={event.anchor.recordingId}
+          sourceInstanceId={event.anchor.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: event.anchor.sourceEventId }, family: 'mouse' }}
+          disabled={disabled}
+          visual={gesture ? 'gesture' : 'click'}
+          part="visual"
+          visualPart="animation"
+        />
+      ) : (
+        <>
+          <ActionPrimaryFields
+            part="appearance"
+            duration={resolved.duration}
+            offset={resolved.offset}
+            preset={resolved.preset}
+            showPreset={event.kind !== 'KEY' && event.kind !== 'SCROLL'}
+            disabled={disabled}
+            onChange={update}
+          />
+          <EventStyleFields props={props} resolved={resolved} disabled={disabled} update={update} />
+        </>
+      )}
+      {!gesture && !click ? (
+        <InspectorActionButton
+          compact
+          tone="secondary"
+          separated
+          disabled={disabled || !resolved.overridden}
+          onClick={() =>
+            props.onUpdateActionEventDetails(event.id, {
+              clipId: occurrence.clipId,
+              presentation: null,
+            })
+          }
+        >
+          {translate('videoEditor.sidebar.historyReset')}
+        </InspectorActionButton>
+      ) : null}
     </>
   );
 }

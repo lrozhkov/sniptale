@@ -139,7 +139,9 @@ describe('callout settings views', () => {
     );
 
     expect(markup).toContain('aria-label="Параметры комментария"');
-    expect(markup.match(/aria-pressed=/g)).toHaveLength(9);
+    const surface = document.createElement('div');
+    surface.innerHTML = markup;
+    expect(surface.querySelectorAll('nav button[aria-pressed]')).toHaveLength(9);
     expect(markup).toContain('data-field-label="Цвет текста"');
     expect(markup).toContain('shared.ui.color-selector');
     expect(markup).toContain('aria-label="Курсив"');
@@ -180,7 +182,13 @@ describe('callout settings views', () => {
       />
     );
 
-    expect(markup.match(/aria-pressed=/g)).toHaveLength(10);
+    const surface = document.createElement('div');
+    surface.innerHTML = markup;
+    const navigation = surface.querySelector('nav');
+    expect(navigation?.querySelectorAll('button[aria-pressed]')).toHaveLength(10);
+    expect(
+      navigation?.querySelector('button:last-of-type[aria-label="Сохранение"]')
+    ).not.toBeNull();
     expect(markup).toContain('aria-label="Сохранение"');
     expect(markup.lastIndexOf('aria-label="Сохранение"')).toBeGreaterThan(
       markup.lastIndexOf('aria-label="Стили"')

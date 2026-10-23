@@ -2,10 +2,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { createReviewBackgroundPainter, drawReviewBackgroundPaint } from './scene-background';
-import { drawReviewBlurredScene } from './spotlight-blur';
+import { drawEdgePaddedBlur } from '../../features/video/composition/canvas/edge-padded-blur';
 import { resolveReviewSceneOutput } from './render-settings';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
-vi.mock('./spotlight-blur', () => ({ drawReviewBlurredScene: vi.fn() }));
+vi.mock('../../features/video/composition/canvas/edge-padded-blur', () => ({
+  drawEdgePaddedBlur: vi.fn(),
+}));
 vi.mock('../../features/video/project/scene/background-gradient-canvas', () => ({
   drawSceneGradient: vi.fn(),
 }));
@@ -36,8 +38,8 @@ it('filters once per owner and invalidates paint/image/geometry without filterin
   const args = { background, image, width: 400, height: 200 };
   drawReviewBackgroundPaint(owner, args);
   drawReviewBackgroundPaint(context(), args, owner);
-  expect(drawReviewBlurredScene).toHaveBeenCalledTimes(1);
-  expect(drawReviewBlurredScene).toHaveBeenLastCalledWith(
+  expect(drawEdgePaddedBlur).toHaveBeenCalledTimes(1);
+  expect(drawEdgePaddedBlur).toHaveBeenLastCalledWith(
     expect.anything(),
     expect.anything(),
     expect.anything(),
@@ -45,16 +47,16 @@ it('filters once per owner and invalidates paint/image/geometry without filterin
   );
   drawReviewBackgroundPaint(owner, { ...args, width: 800 });
   drawReviewBackgroundPaint(owner, { ...args, image: null });
-  expect(drawReviewBlurredScene).toHaveBeenCalledTimes(3);
+  expect(drawEdgePaddedBlur).toHaveBeenCalledTimes(3);
   drawReviewBackgroundPaint(owner, {
     ...args,
     background: { ...background, layout: { ...background.layout, blur: 0 } },
   });
-  expect(drawReviewBlurredScene).toHaveBeenCalledTimes(3);
+  expect(drawEdgePaddedBlur).toHaveBeenCalledTimes(3);
 });
 it('bounds raster memory and scales the blur into its raster pixels', () => {
   drawReviewBackgroundPaint(context(), { background, image: null, width: 4096, height: 2160 });
-  const call = vi.mocked(drawReviewBlurredScene).mock.calls[0]!;
+  const call = vi.mocked(drawEdgePaddedBlur).mock.calls[0]!;
   expect(call[1].width).toBe(2048);
   expect(call[1].height).toBe(1080);
   expect(call[3]).toBe(6);
@@ -85,14 +87,14 @@ it('keeps disabled and solid paint sharp and applies contain fit before filterin
     width: 100,
     height: 50,
   });
-  expect(drawReviewBlurredScene).not.toHaveBeenCalled();
+  expect(drawEdgePaddedBlur).not.toHaveBeenCalled();
   drawReviewBackgroundPaint(target, {
     background: { ...background, imageFit: 'contain' },
     image,
     width: 100,
     height: 50,
   });
-  expect(drawReviewBlurredScene).toHaveBeenCalledOnce();
+  expect(drawEdgePaddedBlur).toHaveBeenCalledOnce();
 });
 
 it('fails explicitly when an offscreen paint surface cannot acquire a context', () => {
@@ -129,7 +131,7 @@ it('retains one managed cache, replaces it only after preparation and releases i
   expect(leases.map((lease) => lease.role)).toEqual(['background-source', 'background-cache']);
   expect(leases[0]!.release).toHaveBeenCalledOnce();
   expect(leases[1]!.release).not.toHaveBeenCalled();
-  expect(drawReviewBlurredScene).toHaveBeenLastCalledWith(
+  expect(drawEdgePaddedBlur).toHaveBeenLastCalledWith(
     expect.anything(),
     leases[0]!.canvas,
     null,
@@ -151,7 +153,7 @@ it('keeps the last cache when replacement filtering fails and releases temporary
   const target = context();
   const args = { background, image: null, width: 400, height: 200 };
   painter.draw(target, args);
-  vi.mocked(drawReviewBlurredScene).mockImplementationOnce(() => {
+  vi.mocked(drawEdgePaddedBlur).mockImplementationOnce(() => {
     throw new Error('filter failure');
   });
   expect(() => painter.draw(target, { ...args, width: 800 })).toThrow('filter failure');
@@ -187,7 +189,7 @@ it('reports only defensive geometry of the retained lease through success, failu
   const size = painter.retainedCacheSize!;
   size.width = 1;
   expect(painter.retainedCacheSize).toEqual({ width: 400, height: 200 });
-  vi.mocked(drawReviewBlurredScene).mockImplementationOnce(() => {
+  vi.mocked(drawEdgePaddedBlur).mockImplementationOnce(() => {
     throw new Error('filter failure');
   });
   expect(() => painter.draw(context(), { ...args, width: 800 })).toThrow('filter failure');

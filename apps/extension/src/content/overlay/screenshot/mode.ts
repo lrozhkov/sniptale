@@ -16,7 +16,11 @@ import type {
 import type { ScreenshotControllerSession } from './session/state';
 import { getContentRuntimeServices } from '../../application/runtime-services/services';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { createDisableScreenshotModeRequest } from '../viewport-selector/capability';
+import {
+  createDisableScreenshotModeRequest,
+  createScreenshotSurfaceStatusBindingUpdater,
+} from '../viewport-selector/capability';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 
 const STALE_SCREENSHOT_RUN_ERROR_NAME = 'StaleScreenshotRunError';
 const logger = createLogger({ namespace: 'ContentScreenshotMode' });
@@ -39,6 +43,7 @@ type ScreenshotEditingModeControls = {
   disableQuickEditMode: () => void;
   highlighterMode: boolean;
   quickEditMode: boolean;
+  quickEditDocumentMode?: boolean;
   restoreEditingMode: (mode: ScreenshotEditingMode) => void;
   setAiPickMode: (enabled: boolean) => void;
   setDesignReviewMode: (enabled: boolean) => void;
@@ -65,6 +70,7 @@ export interface ScreenshotControllerParams {
   setQuickActionOverlay: (overlay: QuickActionOverlay | null) => void;
   setScreenshotMode: (enabled: boolean) => void;
   setTimerDelay: (delay: number) => void;
+  setCurrentViewport?: (viewport: { width: number; height: number } | null) => void;
   timerDelay: number;
 }
 
@@ -145,6 +151,11 @@ export async function closeQuickActionCapture(
 
   const navigationLockEnabledBeforeScreenshot = runtime.session.navigationLockBaseline;
 
+  if (runtime.session.preparationBaseline) {
+    await restoreBorrowedPreparation(params, runtime, runToken);
+    return;
+  }
+
   clearQuickActionOverlay(params);
   params.setScreenshotMode(false);
   params.setTimerDelay(0);
@@ -168,27 +179,112 @@ export async function closeQuickActionCapture(
   }
 }
 
+async function refreshScreenshotSurfaceStatus(
+  params: ScreenshotControllerParams,
+  runtime: ScreenshotControllerRuntime,
+  runToken: number | undefined
+): Promise<void> {
+  const updateBinding = createScreenshotSurfaceStatusBindingUpdater();
+  const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
+    type: MessageType.SCREENSHOT_MODE_STATUS,
+  });
+  assertCurrentScreenshotRun(runtime, runToken);
+  if (!response?.success || !response.enabled || !response.surfaceCapabilityToken) {
+    throw new Error('Screenshot surface status is unavailable');
+  }
+  if (
+    !updateBinding({
+      token: response.surfaceCapabilityToken,
+      ...(response.surfaceLeaseGeneration === undefined
+        ? {}
+        : { leaseGeneration: response.surfaceLeaseGeneration }),
+      ...(response.surfaceOperationGeneration === undefined
+        ? {}
+        : { operationGeneration: response.surfaceOperationGeneration }),
+    })
+  ) {
+    throw new StaleScreenshotRunError();
+  }
+  params.setCurrentViewport?.(response.viewport ?? null);
+}
+
+async function restoreBorrowedPreparation(
+  params: ScreenshotControllerParams,
+  runtime: ScreenshotControllerRuntime,
+  runToken: number | undefined
+): Promise<void> {
+  const baseline = runtime.session.preparationBaseline;
+  const transactionId = params.quickActionOverlayRef.current?.transactionId;
+  if (!baseline) return;
+  let released = false;
+  try {
+    if (!transactionId) throw new Error('Screenshot transaction is unavailable');
+    const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
+      ...createDisableScreenshotModeRequest(),
+      quickActionTransactionId: transactionId,
+    });
+    assertCurrentScreenshotRun(runtime, runToken);
+    if (response?.success === false || response?.error)
+      throw new Error(response.error || 'Screenshot surface cleanup failed');
+    released = true;
+    runtime.session.preparationBaseline = null;
+    await refreshScreenshotSurfaceStatus(params, runtime, runToken);
+  } finally {
+    if (isCurrentScreenshotRun(runtime, runToken)) {
+      if (released) clearQuickActionOverlay(params);
+      params.setCaptureAction(baseline.captureAction);
+      params.setTimerDelay(baseline.timerDelay);
+      params.setScreenshotMode(true);
+      setUIHidden(false);
+      runtime.setIsCompletelyHidden(false);
+      params.setIsToolbarVisible(baseline.isToolbarVisible);
+      const suspendedEditingMode = runtime.session.editingModeBaseline;
+      runtime.session.editingModeBaseline = null;
+      if (suspendedEditingMode && baseline.editingMode)
+        runtime.restoreEditingMode(baseline.editingMode);
+      restoreNavigationLockState(baseline.navigationLockEnabled, runtime.setNavigationLockEnabled);
+    }
+  }
+}
+
 export function cancelQuickActionCountdown(
   params: ScreenshotControllerParams,
   runtime: ScreenshotControllerRuntime,
   session: Pick<ScreenshotControllerSession, 'countdownLock'>
 ): void {
   session.countdownLock = null;
-  void closeQuickActionCapture(params, runtime).catch((error) => {
+  void closeQuickActionCapture(params, runtime, runtime.session.runGeneration).catch((error) => {
     logger.error('Failed to close cancelled quick-action capture', error);
   });
 }
 
 export function prepareScreenshotMode(
   params: ScreenshotControllerParams,
-  session: Pick<ScreenshotControllerSession, 'editingModeBaseline' | 'navigationLockBaseline'>,
+  session: Pick<
+    ScreenshotControllerSession,
+    'editingModeBaseline' | 'navigationLockBaseline' | 'preparationBaseline'
+  >,
   type: ScreenshotType,
   startContext: ScreenshotStartContext = {}
 ): void {
+  session.preparationBaseline =
+    startContext.preparationBaseline ?? session.preparationBaseline ?? null;
+  if (session.preparationBaseline && !startContext.preparationBaseline) {
+    session.preparationBaseline = {
+      ...session.preparationBaseline,
+      editingMode: resolveEditingModeBaseline(params.editingModes),
+      navigationLockEnabled: params.navigationLockEnabled,
+    };
+  }
   session.editingModeBaseline =
-    type === 'selection' ? resolveEditingModeBaseline(params.editingModes) : null;
-  session.navigationLockBaseline = resolveNavigationLockBaseline(params, startContext);
-  disableEditingModes(params);
+    type === 'selection'
+      ? (session.preparationBaseline?.editingMode ??
+        resolveEditingModeBaseline(params.editingModes))
+      : null;
+  session.navigationLockBaseline =
+    session.preparationBaseline?.navigationLockEnabled ??
+    resolveNavigationLockBaseline(params, startContext);
+  if (!session.preparationBaseline || type === 'selection') disableEditingModes(params);
   params.setNavigationLockEnabled(isLockEnabled());
 }
 
@@ -199,6 +295,7 @@ function resolveEditingModeBaseline(
   if (editingModes.designReviewMode) return 'design-review';
   if (editingModes.drawingMode) return 'drawing';
   if (editingModes.highlighterMode) return 'highlighter';
+  if (editingModes.quickEditDocumentMode) return 'quick-edit-document';
   if (editingModes.quickEditMode) return 'quick-edit';
   return null;
 }

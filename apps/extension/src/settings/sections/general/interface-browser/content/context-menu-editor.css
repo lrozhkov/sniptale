@@ -32,11 +32,11 @@
   position: fixed;
   z-index: 1000;
   pointer-events: none;
-  opacity: 0.95;
+  opacity: 0.6;
   overflow: hidden;
   background: var(--sniptale-color-surface-panel);
   border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: var(--sniptale-radius-md);
+  border-radius: 4px;
   box-shadow: var(--sniptale-shadow-floating-strong);
   will-change: transform;
 }

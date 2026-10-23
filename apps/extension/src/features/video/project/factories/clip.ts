@@ -1,3 +1,9 @@
+import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
+import {
+  decoratedMediaSourceSize,
+  resolveDecoratedMediaFrame,
+  resolveMediaFitFrame,
+} from '../window-geometry';
 import {
   DEFAULT_CLIP_FADE_MS,
   DEFAULT_CLIP_VOLUME,
@@ -106,9 +112,6 @@ function resolveMediaClipBaseScale(
   projectHeight: number,
   fitMode: VideoMediaFitMode
 ) {
-  const widthRatio = projectWidth / sourceWidth;
-  const heightRatio = projectHeight / sourceHeight;
-
   switch (fitMode) {
     case VideoMediaFitMode.SOURCE_100:
       return 1;
@@ -116,9 +119,17 @@ function resolveMediaClipBaseScale(
       return Math.max(projectWidth, projectHeight) / Math.max(sourceWidth, sourceHeight);
     case VideoMediaFitMode.FIT_SHORT_SIDE:
     case VideoMediaFitMode.COVER:
-      return Math.max(widthRatio, heightRatio);
+      return resolveMediaFitFrame({
+        source: { width: sourceWidth, height: sourceHeight },
+        output: { width: projectWidth, height: projectHeight },
+        fit: 'cover',
+      }).scale;
     case VideoMediaFitMode.CONTAIN:
-      return Math.min(widthRatio, heightRatio);
+      return resolveMediaFitFrame({
+        source: { width: sourceWidth, height: sourceHeight },
+        output: { width: projectWidth, height: projectHeight },
+        fit: 'contain',
+      }).scale;
     case VideoMediaFitMode.STRETCH:
       return 1;
   }
@@ -144,8 +155,61 @@ export function resolveMediaClipTransformForFitMode(
   projectWidth: number,
   projectHeight: number,
   fitMode: VideoMediaFitMode,
-  fitScalePercent = 100
+  fitScalePercent = 100,
+  windowHeader?: WindowHeader,
+  originalSource = { width: sourceWidth, height: sourceHeight }
 ): VideoProjectTransform {
+  if (
+    windowHeader &&
+    (fitMode === VideoMediaFitMode.CONTAIN ||
+      fitMode === VideoMediaFitMode.COVER ||
+      fitMode === VideoMediaFitMode.FIT_SHORT_SIDE)
+  ) {
+    const scale = Math.max(0.01, fitScalePercent / 100);
+    const { headerHeight: _headerHeight, ...frame } = resolveDecoratedMediaFrame({
+      sourceWidth: originalSource.width,
+      sourceHeight: originalSource.height,
+      contentWidth: sourceWidth,
+      contentHeight: sourceHeight,
+      windowHeader,
+      frame: {
+        x: (projectWidth * (1 - scale)) / 2,
+        y: (projectHeight * (1 - scale)) / 2,
+        width: projectWidth * scale,
+        height: projectHeight * scale,
+      },
+      fit: fitMode === VideoMediaFitMode.CONTAIN ? 'contain' : 'cover',
+    });
+    return { ...frame, rotation: 0, opacity: 1 };
+  }
+  if (
+    windowHeader &&
+    (fitMode === VideoMediaFitMode.SOURCE_100 || fitMode === VideoMediaFitMode.FIT_LONG_SIDE)
+  ) {
+    const headerRatio =
+      windowHeaderGeometry(windowHeader, originalSource).height / originalSource.width;
+    const scale =
+      resolveMediaClipBaseScale(
+        sourceWidth,
+        sourceHeight + sourceWidth * headerRatio,
+        projectWidth,
+        projectHeight,
+        fitMode
+      ) * Math.max(0.01, fitScalePercent / 100);
+    const width = sourceWidth * scale;
+    const height = sourceHeight * scale + Math.ceil((headerRatio * width) / 2) * 2;
+    return {
+      x: (projectWidth - width) / 2,
+      y: (projectHeight - height) / 2,
+      width,
+      height,
+      rotation: 0,
+      opacity: 1,
+    };
+  }
+  const decorated = decoratedMediaSourceSize(sourceWidth, sourceHeight, windowHeader);
+  sourceWidth = decorated.width;
+  sourceHeight = decorated.height;
   const scaleMultiplier = Math.max(0.01, fitScalePercent / 100);
 
   if (fitMode === VideoMediaFitMode.STRETCH) {

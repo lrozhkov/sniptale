@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
@@ -294,4 +295,164 @@ it('requires full composition for adaptive MP4 even with a clean source', () => 
   expect(canUseHybridMp4VideoPipeline({ ...settings, frameRateMode: 'constant' } as never)).toBe(
     true
   );
+});
+
+it('composites authored captions independently of the legacy subtitle toggle', () => {
+  const project = createProject();
+  project.textDocuments = [
+    {
+      id: 'doc',
+      binding: { kind: 'project' },
+      captions: {
+        enabled: true,
+        style: { position: 'bottom', fontSize: 0.04, color: '#ffffff', background: '#000000' },
+      },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text',
+            text: 'Authored',
+            originalText: '',
+            start: 1,
+            end: 2,
+            timeDomain: 'result',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const spans = planMp4VideoRenderSpans(project, createSettings({ burnInSubtitles: false }));
+  expect(spans.some((span) => span.kind !== 'clean-source')).toBe(true);
+  expect(spans.some((span) => span.kind === 'clean-source' && span.start < 2 && span.end > 1)).toBe(
+    false
+  );
+  project.textDocuments[0]!.captions!.enabled = false;
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind === 'clean-source')
+  ).toBe(true);
+});
+
+it.each(['text', 'image'] as const)(
+  'composites a same-size clean MP4 when the %s watermark is active',
+  (mode) => {
+    const watermark = { ...createQuickEditWatermark('Mark'), mode };
+    const spans = planMp4VideoRenderSpans(createProject({ watermark }), createSettings());
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.kind).not.toBe('clean-source');
+  }
+);
+
+it('retains clean-source eligibility with dormant watermark settings', () => {
+  const watermark = createQuickEditWatermark('Retained');
+  watermark.image = { assetId: 'project-asset:logo', width: 20, height: 10, size: 0.2, opacity: 1 };
+  expect(planMp4VideoRenderSpans(createProject({ watermark }), createSettings())[0]?.kind).toBe(
+    'clean-source'
+  );
+});
+
+it('composites scene edge fades while retaining clean-source eligibility for dormant settings', () => {
+  const sceneEdges = {
+    intro: { enabled: true, duration: 1, color: '#ff0000ff' },
+    outro: { enabled: false, duration: 2, color: '#0000ffff' },
+  };
+  const project = createProject({ sceneEdges });
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind !== 'clean-source')
+  ).toBe(true);
+  sceneEdges.intro.enabled = false;
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind === 'clean-source')
+  ).toBe(true);
+  sceneEdges.intro.enabled = true;
+  sceneEdges.intro.duration = 0;
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind === 'clean-source')
+  ).toBe(true);
+});
+
+it('routes only the active join window through faithful composition and retains fast paths outside', () => {
+  const project = createProject();
+  const video = project.clips[0]!;
+  if (video.type !== 'VIDEO') throw new Error('Expected video');
+  const first = { ...video, duration: 2, sourceDuration: 2 };
+  project.clips = [first, { ...first, id: 'second', startTime: 2, sourceStart: 2 }];
+  project.compositionJoins = [
+    {
+      id: 'join',
+      clipId: first.id,
+      edge: 'end',
+      transition: { type: 'dissolve', before: 0.2, after: 0.3 },
+    },
+  ];
+  const spans = planMp4VideoRenderSpans(project, createSettings());
+  expect(spans.map(({ start, end, kind }) => ({ start, end, kind }))).toEqual([
+    { start: 0, end: 1.8, kind: 'clean-source' },
+    { start: 1.8, end: 2.3, kind: 'composite' },
+    { start: 2.3, end: 4, kind: 'accelerated-composite' },
+  ]);
+  expect(spans[1]).toMatchObject({ reason: 'transition' });
+  project.compositionJoins = [{ id: 'join', clipId: first.id, edge: 'end' }];
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every(({ kind }) => kind !== 'composite')
+  ).toBe(true);
+});
+
+it('routes a timed camera through decoded composition instead of copying uncovered source pixels', () => {
+  const project = createProject();
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.cameraTiming = { offsetSeconds: 3, transitions: 'bounded' };
+  expect(planMp4VideoRenderSpans(project, createSettings())).toEqual([
+    { kind: 'accelerated-composite', reason: 'decoded-frame-provider', start: 0, end: 4 },
+  ]);
+});
+
+it('uses export fps when a single project frame becomes multiple encoded frames', () => {
+  const project = createProject({
+    fps: 1,
+    duration: 0.5,
+    sceneEdges: {
+      intro: { enabled: true, duration: 0.1 },
+      outro: { enabled: false, duration: 0.4 },
+    },
+  });
+  const spans = planMp4VideoRenderSpans(project, createSettings({ fps: 30 }));
+  expect(spans).toHaveLength(1);
+  expect(spans[0]).toMatchObject({ start: 0, end: 0.5 });
+  expect(spans.every((span) => span.kind !== 'clean-source')).toBe(true);
+  expect(
+    planMp4VideoRenderSpans(project, createSettings({ fps: 1 })).every(
+      (span) => span.kind === 'clean-source'
+    )
+  ).toBe(true);
+});
+
+it('keeps hybrid span boundaries on the shared output lattice after a fractional bookend', () => {
+  const project = createProject();
+  const main = project.clips[0]!;
+  if (main.type !== 'VIDEO') throw new Error('Missing source video');
+  project.clips = [
+    {
+      ...main,
+      id: 'intro',
+      duration: 5 / 30,
+      sourceDuration: 0.15,
+      playbackWindow: { offset: 0, holdAt: 0.15 },
+    },
+    { ...main, startTime: 5 / 30, duration: 1, sourceDuration: 1 },
+  ];
+  project.duration = 1 + 5 / 30;
+  const spans = planMp4VideoRenderSpans(project, createSettings({ fps: 40 }));
+  expect(spans[0]).toMatchObject({ kind: 'composite', start: 0, end: 7 / 40 });
+  expect(spans[1]).toMatchObject({
+    kind: 'clean-source',
+    start: 7 / 40,
+    sourceStart: expect.closeTo(7 / 40 - 5 / 30, 12),
+  });
+  expect(spans.at(-1)?.end).toBe(project.duration);
 });

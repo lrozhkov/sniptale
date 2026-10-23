@@ -24,36 +24,43 @@ function duplicatePackId(packId: string, createId: () => string): string {
   return `${prefix}-${suffix}`;
 }
 
-export async function putEffectBundleBackupRestore(args: {
+/** Validate and detach catalog bytes before opening the caller's publication transaction. */
+export async function prepareEffectBundleBackupRestore(args: {
   assets: PortableEffectBundleRestoreAsset[];
-  createId?: () => string;
   entry: Omit<EffectBundleCatalogEntry, 'assets'>;
-  store: EffectBundleRestoreStore;
-  strategy: ArchiveRestoreStrategy;
-}): Promise<{ conflicted: boolean; imported: boolean; packId: string }> {
-  const existing = parseEffectBundleCatalogEntry(await args.store.get(args.entry.packId));
-  if (existing && args.strategy === 'skip') {
-    return { conflicted: true, imported: false, packId: existing.packId };
-  }
-  const createId =
-    args.createId ??
-    (() => {
-      if (typeof crypto.randomUUID !== 'function') {
-        throw new Error('Secure effect bundle restore IDs are unavailable.');
-      }
-      return crypto.randomUUID();
-    });
-  const packId =
-    existing && args.strategy === 'duplicate'
-      ? duplicatePackId(args.entry.packId, createId)
-      : args.entry.packId;
-  const candidate = parseEffectBundleCatalogEntry({
-    ...args.entry,
-    assets: args.assets,
-    packId,
-  });
-  if (!candidate) throw new Error('Restored effect bundle catalog is invalid.');
+}) {
+  const parsed = parseEffectBundleCatalogEntry({ ...args.entry, assets: args.assets });
+  if (!parsed) throw new Error('Restored effect bundle catalog is invalid.');
+  const candidate = structuredClone(parsed);
+  candidate.assets = await Promise.all(
+    candidate.assets.map(async (asset) => ({
+      ...asset,
+      blob: new Blob([await asset.blob.arrayBuffer()], { type: asset.blob.type }),
+    }))
+  );
   await assertEffectBundleCatalogIntegrity(candidate);
-  await args.store.put(candidate);
-  return { conflicted: existing !== null, imported: true, packId };
+
+  return async function publishEffectBundleBackupRestore(args: {
+    createId?: () => string;
+    store: EffectBundleRestoreStore;
+    strategy: ArchiveRestoreStrategy;
+  }): Promise<{ conflicted: boolean; imported: boolean; packId: string }> {
+    const existing = parseEffectBundleCatalogEntry(await args.store.get(candidate.packId));
+    if (existing && args.strategy === 'skip') {
+      return { conflicted: true, imported: false, packId: existing.packId };
+    }
+    const createId =
+      args.createId ??
+      (() => {
+        if (typeof crypto.randomUUID !== 'function')
+          throw new Error('Secure effect bundle restore IDs are unavailable.');
+        return crypto.randomUUID();
+      });
+    const packId =
+      existing && args.strategy === 'duplicate'
+        ? duplicatePackId(candidate.packId, createId)
+        : candidate.packId;
+    await args.store.put({ ...candidate, packId });
+    return { conflicted: existing !== null, imported: true, packId };
+  };
 }

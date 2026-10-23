@@ -141,10 +141,10 @@ function createVideoPreviewPlan(
   const sourceSlots = buildVideoPreviewSourceSlots(clip, viewport, assetDuration);
   const visibleStart = viewport
     ? getMediaClipSourceTime(clip, viewport.startTime)
-    : clip.sourceStart;
+    : getMediaClipSourceTime(clip, clip.startTime);
   const visibleEnd = viewport
     ? getMediaClipSourceTime(clip, viewport.endTime)
-    : clip.sourceStart + clip.sourceDuration;
+    : getMediaClipSourceTime(clip, clip.startTime) + clip.sourceDuration;
   const isVisible = (slot: (typeof sourceSlots)[number]) =>
     slot.sourceEnd > visibleStart && slot.sourceStart < visibleEnd;
   const prioritizedSlots = [...sourceSlots].sort(
@@ -158,7 +158,12 @@ function createVideoPreviewPlan(
     kind: 'video',
     slots: prioritizedSlots.map((slot) => ({
       ...slot,
-      cacheKey: createTimelinePreviewFrameCacheKey(clip.assetId, assetUrl, slot.sourceStart),
+      cacheKey: clip.cameraTiming
+        ? JSON.stringify([
+            createTimelinePreviewFrameCacheKey(clip.assetId, assetUrl, slot.sourceStart),
+            clip.cameraTiming,
+          ])
+        : createTimelinePreviewFrameCacheKey(clip.assetId, assetUrl, slot.sourceStart),
     })),
   };
 }
@@ -198,7 +203,7 @@ function buildVideoPreviewSourceSlots(
     slot <= lastSlot && slots.length < MAX_ASSET_STORYBOARD_FRAMES;
     slot += stride
   ) {
-    slots.push(Math.max(clip.sourceStart, slot * step));
+    slots.push(Math.max(getMediaClipSourceTime(clip, clip.startTime), 0, slot * step));
   }
 
   slots.sort((left, right) => left - right);
@@ -214,7 +219,10 @@ function resolvePreviewSourceRange(
   }
 
   if (!viewport) {
-    return { end: clip.sourceStart + clip.sourceDuration, start: clip.sourceStart };
+    return {
+      end: getMediaClipSourceTime(clip, clip.startTime) + clip.sourceDuration,
+      start: getMediaClipSourceTime(clip, clip.startTime),
+    };
   }
 
   const buffer = Math.min(

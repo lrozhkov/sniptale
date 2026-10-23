@@ -9,6 +9,7 @@ it('exposes SDK parameter groups with their semantic icons and independent conte
   document.body.append(host);
   const root = createRoot(host);
   const semantics = [
+    'watermark',
     'content',
     'typography',
     'appearance',
@@ -25,7 +26,7 @@ it('exposes SDK parameter groups with their semantic icons and independent conte
   }));
   try {
     act(() => root.render(<InspectorGroupedPanel groups={groups} />));
-    expect(host.querySelectorAll('nav button')).toHaveLength(7);
+    expect(host.querySelectorAll('nav button')).toHaveLength(8);
     for (const semantic of semantics) {
       const button = host.querySelector<HTMLButtonElement>(`nav button[aria-label="${semantic}"]`)!;
       expect(button.querySelector('svg')).not.toBeNull();

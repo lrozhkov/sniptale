@@ -1,3 +1,4 @@
+import { hasCameraMediaAt } from '../../../features/video/project/camera/animation';
 import {
   clampClipPlaybackRate,
   getClipCompositeAudioGain,
@@ -82,7 +83,8 @@ export function syncClipPlayback(
     }
 
     const audioNode = job.clipAudioNodes.get(clip.id);
-    const isActive = isClipActiveAtTime(clip, currentTime);
+    const isActive =
+      isClipActiveAtTime(clip, currentTime) && hasCameraMediaAt(project, clip, currentTime);
     syncClipAudioGain({ audioNode, clip, currentTime, isActive, project });
 
     if (!isActive) {

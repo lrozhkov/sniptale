@@ -9,7 +9,11 @@ const rowClassName = [
   'flex items-start gap-2.5 border-b px-0.5 py-2.5',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_68%,transparent)] last:border-b-0',
 ].join(' ');
-const checkboxClassName = 'mt-0.5 h-3.5 w-3.5 shrink-0 accent-[var(--sniptale-color-accent)]';
+const checkboxClassName = [
+  'sniptale-checkbox rounded-full! mt-0.5 focus:outline-none',
+  'focus-visible:outline focus-visible:outline-2',
+  'focus-visible:outline-[var(--sniptale-color-accent)]',
+].join(' ');
 
 function ExportPagesFilterInput(props: {
   filterQuery: string;
@@ -29,10 +33,10 @@ function ExportPagesFilterInput(props: {
         onChange={(event) => props.setFilterQuery(event.currentTarget.value)}
         placeholder={translate('popup.export.tabsFilterPlaceholder')}
         className={[
-          'h-8 w-full rounded-[9px] border bg-transparent pl-7 pr-2.5 text-[11px]',
+          'h-8 w-full rounded-[6px] border bg-transparent pl-7 pr-2.5 text-[11px]',
           'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
           'text-[var(--sniptale-color-text-primary)] placeholder:text-[var(--sniptale-color-text-dim)]',
-          'outline-none focus:border-[var(--sniptale-color-accent)]',
+          'outline-none focus:border-[var(--sniptale-color-text-secondary)]',
         ].join(' ')}
       />
     </div>
@@ -56,7 +60,7 @@ export function ExportPagesHeader(props: {
         type="button"
         onClick={props.toggleSelectAllTabs}
         className={[
-          'shrink-0 rounded-[9px] px-1.5 py-1 text-[10px] font-medium',
+          'shrink-0 rounded-[6px] px-1.5 py-1 text-[10px] font-medium',
           'text-[var(--sniptale-color-text-primary)] transition-colors',
           'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
           'outline-none focus-visible:outline-none',
@@ -84,8 +88,9 @@ function ExportPagesDrawerRow(props: {
   return (
     <label
       ref={props.currentRowRef}
-      title={props.tab.disabledReason ?? props.tab.url ?? props.tab.title}
+      data-popup-hint={props.tab.disabledReason ?? props.tab.url ?? props.tab.title}
       className={cx(
+        'sniptale-ai-modal-adopted bg-transparent! font-normal!',
         rowClassName,
         isDisabled && 'cursor-not-allowed opacity-60',
         props.isSelected && 'text-[var(--sniptale-color-text-primary)]'

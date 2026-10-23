@@ -1,3 +1,10 @@
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+  createVideoProjectAsset,
+} from '../../../features/video/project/factories/creation';
+import { createAudioClipFromAsset } from '../../../features/video/project/factories/clip';
+import { assertExportReadyVideoProject } from '../../../features/video/project/validation/root';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createLargeEffectProject } from './index.test-support';
 
@@ -188,3 +195,43 @@ function expectArray(value: unknown): unknown[] {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+it('hands off admitted legacy audio gain without rewriting source fields', async () => {
+  const project = createEmptyVideoProject('Legacy gain');
+  const track = createVideoProjectTrack('Audio', 1, 'AUDIO');
+  const asset = createVideoProjectAsset(
+    'Audio',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 2,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(track.id, asset);
+  delete clip.audioGainStart;
+  delete clip.audioGainEnd;
+  clip.volume = 4;
+  clip.volumeEnvelopeStart = clip.volumeEnvelopeEnd = 0.5;
+  project.tracks.push(track);
+  project.assets = [asset];
+  project.clips = [clip];
+  project.duration = 2;
+  assertExportReadyVideoProject(project);
+  const before = JSON.stringify(project);
+  const reference = await stageProjectExportInput('legacy-gain', project, 100);
+  const consumed = await consumeProjectExportInput(reference, 100);
+  expect(JSON.stringify(consumed)).toBe(before);
+  expect(consumed.clips[0]).toMatchObject({
+    volume: 4,
+    volumeEnvelopeStart: 0.5,
+    volumeEnvelopeEnd: 0.5,
+  });
+  expect(consumed.clips[0]?.audioGainStart).toBeUndefined();
+  expect(JSON.stringify(project)).toBe(before);
+});

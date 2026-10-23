@@ -26,6 +26,7 @@ type ProjectTimelineBodyProps = Pick<
   | 'onCloseTrackGap'
   | 'onDropEffectDocument'
   | 'onClearUtilityLane'
+  | 'onSelectComment'
   | 'onSelectHistorySpan'
   | 'onSelectActionOccurrence'
   | 'onSelectClip'
@@ -171,6 +172,7 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     onSeekTime: props.onSeek,
     onStepToNextFrame: props.onStepToNextFrame,
     onStepToPreviousFrame: props.onStepToPreviousFrame,
+    ...(props.onSelectComment ? { onSelectComment: props.onSelectComment } : {}),
     ...(props.onSelectHistorySpan ? { onSelectHistorySpan: props.onSelectHistorySpan } : {}),
     onSelectActionOccurrence: props.onSelectActionOccurrence,
     onSelectClip: props.onSelectClip,

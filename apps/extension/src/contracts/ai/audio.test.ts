@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import {
+  AUDIO_INPUT_MAX_SECONDS,
   parseAudioJobClientMessage,
   parseAudioJobServerMessage,
   parseAudioJobScope,
@@ -272,4 +273,146 @@ it('admits source and returned timings longer than five minutes within the uploa
       result: { text: 'Last.', segments: [{ text: 'Last.', start: 329, end: 330 }] },
     })
   ).not.toBeNull();
+});
+
+it('admits disclosed project transcription without admitting project speech or mixed owner scopes', () => {
+  const projectScope = {
+    projectId: 'project',
+    projectRevision: 4,
+    projectUpdatedAt: 10,
+    target: { kind: 'project-clip' as const, clipId: 'clip' },
+    assetId: 'asset',
+    nativeStart: 2,
+    nativeEnd: 4,
+  };
+  const request = {
+    type: 'start',
+    requestId: 'project-request',
+    operation: 'transcription',
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    scope: projectScope,
+  };
+  expect(parseAudioJobClientMessage(request)).toEqual(request);
+  expect(parseAudioJobScope(projectScope)).toEqual(projectScope);
+  expect(parseAudioJobClientMessage({ ...request, approvedProviderId: undefined })).toBeNull();
+  expect(
+    parseAudioJobClientMessage({
+      ...request,
+      operation: 'speech',
+      phraseId: 'phrase',
+      textRevision: 0,
+      text: 'Text',
+      profile: { voiceId: 'voice', responseFormat: 'mp3' },
+    })
+  ).toBeNull();
+  for (const patch of [
+    { projectId: '' },
+    { projectRevision: -1 },
+    { projectRevision: 0.5 },
+    { projectUpdatedAt: NaN },
+    { projectUpdatedAt: -1 },
+    { assetId: '' },
+    { nativeStart: -1 },
+    { nativeEnd: Infinity },
+    { nativeEnd: 2 },
+    { nativeEnd: 100000 },
+    { target: { kind: 'project-clip', clipId: '' } },
+    { target: { kind: 'project-clip', clipId: 'clip', extra: 'mixed' } },
+    { workspaceId: 'workspace' },
+    { extra: true },
+  ])
+    expect(parseAudioJobScope({ ...projectScope, ...patch })).toBeNull();
+  expect(parseAudioJobScope({ ...scope, projectId: 'project' })).toBeNull();
+  expect(sameAudioJobScope(projectScope, structuredClone(projectScope))).toBe(true);
+  for (const changed of [
+    { ...projectScope, projectId: 'other' },
+    { ...projectScope, projectRevision: 5 },
+    { ...projectScope, projectUpdatedAt: 11 },
+    { ...projectScope, target: { kind: 'project-clip' as const, clipId: 'other' } },
+    { ...projectScope, assetId: 'other' },
+    { ...projectScope, nativeStart: 3 },
+    { ...projectScope, nativeEnd: 5 },
+    scope,
+  ]) {
+    expect(sameAudioJobScope(projectScope, changed)).toBe(false);
+    expect(sameAudioJobScope(changed, projectScope)).toBe(false);
+  }
+  const authorized = {
+    type: 'authorized',
+    requestId: 'project-request',
+    ticket: '12345678-1234-4234-8234-123456789abc',
+    scope: projectScope,
+  };
+  expect(parseAudioJobServerMessage(authorized)).toEqual(authorized);
+});
+
+it('admits maximum native chunks at late offsets without admitting one extra PCM sample', () => {
+  const nativeStart = 10000;
+  const nativeEnd = nativeStart + AUDIO_INPUT_MAX_SECONDS;
+  const scopes = [
+    { ...scope, nativeStart, nativeEnd },
+    {
+      projectId: 'project',
+      projectRevision: 1,
+      projectUpdatedAt: 1,
+      target: { kind: 'project-clip', clipId: 'clip' },
+      assetId: 'asset',
+      nativeStart,
+      nativeEnd,
+    },
+  ];
+  expect(nativeEnd - nativeStart).toBeGreaterThan(AUDIO_INPUT_MAX_SECONDS);
+  for (const candidate of scopes) {
+    expect(parseAudioJobScope(candidate)).toEqual(candidate);
+    expect(parseAudioJobScope({ ...candidate, nativeEnd: nativeEnd + 1 / 16000 })).toBeNull();
+  }
+});
+
+it('admits exact Scenario speech scopes without video fields and compares every binding', () => {
+  const scope = {
+    workspaceId: 'scenario',
+    workspaceRevision: 3,
+    target: { kind: 'scenario-text', slideId: 'slide', objectId: 'action' },
+    sourceTextHash: 'a'.repeat(64),
+  };
+  const start = {
+    type: 'start',
+    requestId: 'r',
+    modelId: 'm',
+    approvedProviderId: 'provider',
+    operation: 'speech',
+    scope,
+    text: '  Exact text  ',
+    profile: { voiceId: 'alloy', responseFormat: 'mp3' },
+  };
+  expect(parseAudioJobScope(scope)).toEqual(scope);
+  expect(parseAudioJobClientMessage(start)).toEqual(start);
+  for (const patch of [
+    { approvedProviderId: undefined },
+    { operation: 'transcription' },
+    { phraseId: 'fake' },
+    { textRevision: 0 },
+    { recognition: {} },
+    { extra: true },
+  ])
+    expect(parseAudioJobClientMessage({ ...start, ...patch })).toBeNull();
+  for (const patch of [
+    { sourceTextHash: 'x' },
+    { workspaceRevision: -1 },
+    { assetId: 'fake' },
+    { timingRevision: 0 },
+    { target: { ...scope.target, extra: true } },
+  ])
+    expect(parseAudioJobScope({ ...scope, ...patch })).toBeNull();
+  const parsed = parseAudioJobScope(scope)!;
+  expect(sameAudioJobScope(parsed, parsed)).toBe(true);
+  for (const patch of [
+    { workspaceId: 'other' },
+    { workspaceRevision: 4 },
+    { sourceTextHash: 'b'.repeat(64) },
+    { target: { ...scope.target, slideId: 'other' } },
+    { target: { ...scope.target, objectId: 'other' } },
+  ])
+    expect(sameAudioJobScope(parsed, parseAudioJobScope({ ...scope, ...patch })!)).toBe(false);
 });

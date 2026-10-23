@@ -1,3 +1,4 @@
+import { sliceClipPlaybackWindow } from '../../../../features/video/project/timeline/rate';
 import { mapScopedEffectIntervals } from '../../../../features/video/project/effect-instance/time-map';
 import { getReachableClipTimingBounds } from './reachable-placement';
 import { clampNumber } from '../../../../features/video/project/timeline/basics';
@@ -192,6 +193,14 @@ export function trimProjectClipStart(
   if (delta === 0) return project;
 
   const nextProject = updateOperationClips(project, operation, (item) => {
+    if (item.playbackWindow) {
+      return {
+        ...item,
+        startTime: item.startTime + delta,
+        duration: item.duration - delta,
+        playbackWindow: sliceClipPlaybackWindow(item, delta),
+      };
+    }
     if (!isSourceTimedClip(item)) {
       return { ...item, startTime: item.startTime + delta, duration: item.duration - delta };
     }
@@ -242,12 +251,22 @@ function clampClipTrimDelta(
   for (const clip of clips) {
     const sourceTimed = isSourceTimedClip(clip);
     const rate = sourceTimed ? normalizeClipPlaybackRate(clip.playbackRate ?? 1) : 1;
-    const minimumDuration = 1 / project.fps;
+    const minimumDuration = Math.min(1 / project.fps, clip.playbackWindow?.extent ?? Infinity);
     if (edge === 'start') {
       minimum = Math.max(minimum, -clip.startTime);
       maximum = Math.min(maximum, clip.duration - minimumDuration);
     } else {
       minimum = Math.max(minimum, minimumDuration - clip.duration);
+    }
+    if (clip.playbackWindow) {
+      const window = clip.playbackWindow;
+      if (edge === 'start') minimum = Math.max(minimum, -window.offset);
+      else
+        maximum = Math.min(
+          maximum,
+          (window.extent ?? window.offset + clip.duration) - window.offset - clip.duration
+        );
+      continue;
     }
     if (!sourceTimed) continue;
     if (edge === 'start') {
@@ -256,7 +275,14 @@ function clampClipTrimDelta(
       const assetDuration =
         getAssetById(project, clip.assetId)?.metadata.duration ??
         clip.sourceStart + clip.sourceDuration;
-      maximum = Math.min(maximum, (assetDuration - clip.sourceStart - clip.sourceDuration) / rate);
+      const authoredEnd =
+        clip.type === 'VIDEO' && clip.cameraTiming
+          ? Math.max(
+              assetDuration + clip.cameraTiming.offsetSeconds,
+              clip.sourceStart + clip.sourceDuration
+            )
+          : assetDuration;
+      maximum = Math.min(maximum, (authoredEnd - clip.sourceStart - clip.sourceDuration) / rate);
     }
   }
   if (minimum > maximum) return 0;
@@ -285,6 +311,13 @@ export function trimProjectClipEnd(
   if (deltaDuration === 0) return project;
 
   const nextProject = updateOperationClips(project, operation, (item) => {
+    if (item.playbackWindow) {
+      return {
+        ...item,
+        duration: item.duration + deltaDuration,
+        playbackWindow: sliceClipPlaybackWindow(item, 0),
+      };
+    }
     if (!isSourceTimedClip(item)) {
       return { ...item, duration: item.duration + deltaDuration };
     }

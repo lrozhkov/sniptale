@@ -60,6 +60,33 @@ const requestBinding = {
 };
 
 describe('region selector controller', () => {
+  it('reports active only for the connected selector and complete current binding', () => {
+    const controller = createRegionSelectorController();
+    expect(controller.isRegionSelectorActive(requestBinding)).toBe(false);
+    controller.showRegionSelector(requestBinding);
+    expect(controller.isRegionSelectorActive(requestBinding)).toBe(true);
+    for (const key of [
+      'regionSelectionCapabilityToken',
+      'regionSelectionRequestGeneration',
+      'regionSelectionRequestId',
+    ] as const) {
+      expect(controller.isRegionSelectorActive({ ...requestBinding, [key]: 'stale' })).toBe(false);
+    }
+    document.body.querySelector('div')!.remove();
+    expect(controller.isRegionSelectorActive(requestBinding)).toBe(false);
+    controller.dispose();
+  });
+
+  it('does not let late cleanup for an old request close the current selection', () => {
+    const controller = createRegionSelectorController();
+    controller.showRegionSelector(requestBinding);
+    controller.hideRegionSelector('old-request');
+    expect(document.body.querySelector('div')).not.toBeNull();
+    controller.hideRegionSelector(requestBinding.regionSelectionRequestId);
+    expect(document.body.querySelector('div')).toBeNull();
+    controller.dispose();
+  });
+
   it('shows, cancels, and disposes the region selector overlay', () => {
     installContentRuntimeMessagingMock(mocks.sendRuntimeMessageMock);
     const controller = createRegionSelectorController();

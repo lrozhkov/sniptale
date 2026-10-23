@@ -26,6 +26,7 @@ import {
   readEditorDrawingPointerId,
 } from './drawing-pointer-session';
 import { endEditorCanvasTransform } from '../input/canvas-actions';
+import { updateEditorDrawingArrowHover } from '../../drawing/object/controls/arrow';
 
 function clearSelection(canvas: Canvas, bindings: EditorControllerEventBindings): void {
   if (canvas.getActiveObjects().length === 0) return;
@@ -156,9 +157,14 @@ function startDrawing(
   return true;
 }
 
-export function createEditorDrawingEventHandlers(
-  bindings: EditorControllerEventBindings
-): Pick<
+function updateArrowHoverFromEvent(canvas: Canvas, event: TPointerEvent): void {
+  updateEditorDrawingArrowHover(
+    canvas,
+    event.altKey || event.ctrlKey || event.shiftKey ? null : canvas.getScenePoint(event)
+  );
+}
+
+type EditorDrawingEventHandlers = Pick<
   EditorControllerEventHandlers,
   | 'handlePathCreated'
   | 'handleMouseDownBefore'
@@ -169,7 +175,11 @@ export function createEditorDrawingEventHandlers(
   | 'handlePointerCancel'
   | 'handleWindowPointerMove'
   | 'handleWindowPointerUp'
-> {
+>;
+
+export function createEditorDrawingEventHandlers(
+  bindings: EditorControllerEventBindings
+): EditorDrawingEventHandlers {
   let textTargetCandidate: {
     point: import('fabric').Point;
     target: FabricObject;
@@ -217,6 +227,10 @@ export function createEditorDrawingEventHandlers(
       }
       if ('button' in event.e && event.e.button !== 0) return;
       if (!canvas || !bindings.getSource()) return;
+      if (event.transform?.target.__corner) {
+        textTargetCandidate = null;
+        return;
+      }
       if (bindings.getActiveTool() === 'text' && isTextTarget(event.target)) {
         const point = canvas.getScenePoint(event.e);
         canvas.setActiveObject(event.target, event.e);
@@ -231,6 +245,7 @@ export function createEditorDrawingEventHandlers(
     },
     handleMouseMove: (event) => {
       const canvas = bindings.getCanvas();
+      if (canvas) updateArrowHoverFromEvent(canvas, event.e);
       if (canvas && textTargetCandidate) {
         const point = canvas.getScenePoint(event.e);
         if (
@@ -269,7 +284,10 @@ export function createEditorDrawingEventHandlers(
       completeDrawWorkflowFromBindings(bindings);
     },
     handleWindowPointerMove: (event) => {
-      if (!bindings.getCanvas()) return;
+      const canvas = bindings.getCanvas();
+      if (!canvas) return;
+      if (!event.composedPath().includes(canvas.upperCanvasEl))
+        updateEditorDrawingArrowHover(canvas, null);
       updateDraftOnce(event);
     },
     handleWindowPointerUp: (event) => {

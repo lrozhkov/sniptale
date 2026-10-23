@@ -1,8 +1,12 @@
+import { reviewWatermarkAssets } from './asset-bytes';
 import type { EncodedPacket } from 'mediabunny';
 import type { ReviewFrameExportInput } from './render-export-input';
 import { reviewFrameDecorations } from './render-export-input';
 import { createReviewPresentationMain } from './presentation-main';
-import { createReviewWatermarkRenderer, type ReviewWatermarkRenderer } from './render-watermark';
+import {
+  createWatermarkRenderer,
+  type WatermarkRenderer,
+} from '../../features/video/composition/canvas/watermark';
 import { createReviewWebcamRenderer } from './render-webcam';
 import { prepareReviewFinalCaptions } from './render-captions';
 import { createReviewMediaOutput } from './media-output';
@@ -22,7 +26,7 @@ export async function prepareReviewFrameDecorations(
   source: { dimensions: Dimensions; sourceSize: { width: number; height: number } }
 ) {
   let main: Awaited<ReturnType<typeof createReviewPresentationMain>> | null = null;
-  let watermark: ReviewWatermarkRenderer | null = null;
+  let watermark: WatermarkRenderer | null = null;
   let webcam: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null = null;
   try {
     if (preparation.effective.annotationEffects)
@@ -41,11 +45,11 @@ export async function prepareReviewFrameDecorations(
         signal: args.signal,
       });
     if (!main) {
-      watermark = await createReviewWatermarkRenderer(
+      watermark = await createWatermarkRenderer(
         preparation.effective.watermark,
         source.dimensions.backing,
-        args.signal,
-        args.readProjectAsset
+        reviewWatermarkAssets(args.readProjectAsset),
+        args.signal
       );
       if (preparation.effective.captions && args.fragmentOffset > 0 && !args.captionTimeMap)
         throw new Error('Fragment captions require the full document time map.');

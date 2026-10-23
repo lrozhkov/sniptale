@@ -17,8 +17,16 @@ export function getPreviewStageSelection(params: {
   activeClips: VideoProjectClip[];
   project: VideoProject;
   selectedClipId: string | null;
+  selectedEffectInstanceId?: string | null | undefined;
 }) {
-  const selectedClip = params.activeClips.find((clip) => clip.id === params.selectedClipId) ?? null;
+  const selectedClip =
+    params.activeClips.find(
+      (clip) =>
+        clip.id === params.selectedClipId ||
+        (!params.selectedClipId &&
+          clip.type === 'EFFECT' &&
+          clip.effectInstanceId === params.selectedEffectInstanceId)
+    ) ?? null;
   const selectedClipTrack = selectedClip
     ? (params.project.tracks.find((track) => track.id === selectedClip.trackId) ?? null)
     : null;
@@ -34,6 +42,7 @@ export function getPreviewStageSizeStyle(
 
 export function createPreviewStageInteraction(params: {
   camera: ReturnType<typeof resolveVideoCompositionFrame>['camera'];
+  currentTime?: number;
   gestureHooks?: PreviewTransformGestureHooks;
   grid?: PreviewStageGridSettings;
   interactionCleanupRef: React.MutableRefObject<(() => void) | null>;
@@ -48,6 +57,7 @@ export function createPreviewStageInteraction(params: {
     beginPreviewStageInteraction({
       clip,
       camera: params.camera,
+      currentTime: params.currentTime ?? 0,
       cleanupRef: params.interactionCleanupRef,
       event,
       ...(params.gestureHooks ? { gestureHooks: params.gestureHooks } : {}),

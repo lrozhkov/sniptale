@@ -1,3 +1,4 @@
+import { MAX_MOTION_AREA_COORDINATE } from '../../../../../features/video/project/motion/focus-area';
 import { translate, type TranslationKey } from '../../../../../platform/i18n';
 import type { VideoProjectMotionArea } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
@@ -23,7 +24,7 @@ function MotionAreaNumberField(props: {
 }
 
 type MotionAreaBoundField = {
-  key: keyof VideoProjectMotionArea;
+  key: 'x' | 'y' | 'width' | 'height';
   labelKey: TranslationKey;
   max: number;
   min: number;
@@ -39,29 +40,29 @@ function createMotionAreaBoundFields(
       key: 'x',
       labelKey: 'videoEditor.sidebar.motionAreaXLabel',
       value: area.x,
-      min: 0,
-      max: Math.max(0, panel.project.width - area.width),
+      min: area.axes ? -MAX_MOTION_AREA_COORDINATE : 0,
+      max: area.axes ? MAX_MOTION_AREA_COORDINATE : Math.max(0, panel.project.width - area.width),
     },
     {
       key: 'y',
       labelKey: 'videoEditor.sidebar.motionAreaYLabel',
       value: area.y,
-      min: 0,
-      max: Math.max(0, panel.project.height - area.height),
+      min: area.axes ? -MAX_MOTION_AREA_COORDINATE : 0,
+      max: area.axes ? MAX_MOTION_AREA_COORDINATE : Math.max(0, panel.project.height - area.height),
     },
     {
       key: 'width',
       labelKey: 'videoEditor.sidebar.motionAreaWidthLabel',
       value: area.width,
-      min: 48,
-      max: panel.project.width,
+      min: area.axes ? Math.min(1, area.width) : 48,
+      max: area.axes ? MAX_MOTION_AREA_COORDINATE : panel.project.width,
     },
     {
       key: 'height',
       labelKey: 'videoEditor.sidebar.motionAreaHeightLabel',
       value: area.height,
-      min: 48,
-      max: panel.project.height,
+      min: area.axes ? Math.min(1, area.height) : 48,
+      max: area.axes ? MAX_MOTION_AREA_COORDINATE : panel.project.height,
     },
   ];
 }

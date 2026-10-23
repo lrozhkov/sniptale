@@ -162,7 +162,7 @@ function ManageSizePresetsButton() {
     <button
       type="button"
       className={[
-        'min-h-8 w-full rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-2',
+        'min-h-8 w-full rounded-[6px] border border-[var(--sniptale-color-border-soft)] px-2',
         'text-xs font-medium text-[var(--sniptale-color-text-secondary)] transition-colors',
         'hover:bg-[var(--sniptale-color-surface-hover)]',
         'hover:text-[var(--sniptale-color-text-primary)]',
@@ -181,8 +181,8 @@ const imageFormats = [
   { value: 'webp', labelKey: 'imageSettings.section.formatWebpLabel' },
 ] as const;
 const imageFormatOptionActiveClassName = [
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
-  'text-[var(--sniptale-color-accent)]',
+  'bg-[var(--sniptale-color-surface-hover)]',
+  'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const imageFormatOptionIdleClassName = [
   'text-[var(--sniptale-color-text-secondary)]',
@@ -202,15 +202,16 @@ function ImageQualityPanel(props: {
         <div className="px-0.5 text-[10px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
           {translate('popup.home.captureFormatLabel')}
         </div>
-        <div className="grid gap-1">
+        <div className="flex flex-wrap gap-1">
           {imageFormats.map((format) => {
             const active = (props.config.imageFormat ?? '') === format.value;
             return (
               <button
                 key={format.value}
                 type="button"
+                aria-pressed={active}
                 className={[
-                  'min-h-7 rounded-[7px] px-2 text-left text-xs font-medium transition-colors',
+                  'min-h-8 rounded-[6px] px-2 text-left text-xs font-normal transition-colors',
                   active ? imageFormatOptionActiveClassName : imageFormatOptionIdleClassName,
                 ].join(' ')}
                 onClick={() =>

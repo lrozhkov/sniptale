@@ -15,7 +15,7 @@ export function getBorderPresetPreviewStyle(preset: BorderPreset): CSSProperties
     borderStyle: visual.strokeStyle,
     borderColor: visual.strokeColor,
     borderRadius: `${Math.min(visual.radius, 4)}px`,
-    background: visual.fillCss,
+    background: 'transparent',
     opacity: 1,
     boxSizing: 'border-box',
   };

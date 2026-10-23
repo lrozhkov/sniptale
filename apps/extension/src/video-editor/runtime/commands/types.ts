@@ -67,6 +67,7 @@ export interface ExportHandlerPort {
 }
 
 export interface ProjectHandlerPort extends VideoEditorCommandErrorPort {
+  beforeLeave?: (() => Promise<boolean>) | undefined;
   getCurrentProject: () => VideoProject | null;
   projects: ProjectListItem[];
   libraries: Pick<VideoEditorLibrariesState, 'refreshProjectExports' | 'refreshProjects'>;

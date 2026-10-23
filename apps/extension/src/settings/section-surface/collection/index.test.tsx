@@ -11,6 +11,17 @@ import type { SettingsCollectionItem } from './types';
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 
+it('leaves vertical scrolling to the settings section instead of nesting a list scrollbar', () => {
+  act(() =>
+    root.render(
+      <SettingsCollection ariaLabel="One scroll owner" items={items} onAction={vi.fn()} />
+    )
+  );
+  const list = container.querySelector<HTMLElement>('[data-settings-collection-root]')!;
+  expect(list.className).not.toContain('overflow-y-auto');
+  expect(list.style.maxHeight).toBe('');
+});
+
 const items: readonly SettingsCollectionItem[] = [
   {
     id: 'first',
@@ -36,6 +47,30 @@ function getMenuTrigger(itemId: string): HTMLButtonElement | null {
     `[data-settings-collection-item="${itemId}"] [aria-label="Действия"][aria-expanded]`
   );
 }
+
+it('keeps busy controls visually stable while retaining native mutation locks', () => {
+  const onAction = vi.fn();
+  act(() =>
+    root.render(
+      <SettingsCollection
+        ariaLabel="Pending"
+        items={[{ ...items[0]!, busy: true }]}
+        onAction={onAction}
+        onMove={vi.fn()}
+      />
+    )
+  );
+  const handle = container.querySelector<HTMLButtonElement>('[aria-describedby]')!;
+  const toggle = container.querySelector<HTMLButtonElement>('[role=switch]')!;
+  const edit = container.querySelector<HTMLButtonElement>('button[title="Редактировать"]')!;
+  expect(handle.className).not.toContain('aria-disabled:opacity-55');
+  for (const control of [toggle, edit]) {
+    expect(control.disabled).toBe(true);
+    expect(control.className).toContain('disabled:!opacity-100');
+    control.click();
+  }
+  expect(onAction).not.toHaveBeenCalled();
+});
 
 function dispatchPointer(
   target: Element | null,
@@ -172,8 +207,8 @@ describe('SettingsCollection', () => {
     );
     expect(directAction?.title).toBe('Сделать по умолчанию');
     expect(directAction?.className).toContain('opacity-0');
-    expect(directAction?.className).toContain('group-hover:opacity-100');
-    expect(directAction?.className).toContain('group-focus-within:opacity-100');
+    expect(directAction?.className).toContain('group-hover:!opacity-100');
+    expect(directAction?.className).toContain('group-focus-within:!opacity-100');
     expect(directAction?.tabIndex).toBe(0);
     act(() => directAction?.click());
     expect(onAction).toHaveBeenCalledWith({ type: 'set-default', itemId: 'profile' });
@@ -227,9 +262,12 @@ describe('SettingsCollection', () => {
     expect(container.querySelector('[aria-label="Изменить позицию"]')).toBeNull();
     expect(container.textContent).not.toContain('Переместить вверх');
   });
+});
 
+describe('SettingsCollection pending and drag controls', () => {
   it('keeps disabled reasons and busy state in the presentation contract', () => {
     const onAction = vi.fn();
+    const onMove = vi.fn();
     act(() =>
       root.render(
         <SettingsCollection
@@ -240,9 +278,10 @@ describe('SettingsCollection', () => {
               busy: true,
               disabledActions: { toggle: 'Keep one enabled', delete: 'System item' },
             },
+            items[1]!,
           ]}
           onAction={onAction}
-          onMove={vi.fn()}
+          onMove={onMove}
         />
       )
     );
@@ -254,8 +293,20 @@ describe('SettingsCollection', () => {
       true
     );
     expect(
-      container.querySelector<HTMLButtonElement>('[aria-label="Изменить позицию"]')?.disabled
-    ).toBe(true);
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Изменить позицию"]')
+        ?.getAttribute('aria-disabled')
+    ).toBe('true');
+    const handle = container.querySelector<HTMLButtonElement>('[aria-label="Изменить позицию"]')!;
+    act(() => {
+      handle.focus();
+      for (const key of ['Enter', 'ArrowDown', 'Enter'])
+        handle.dispatchEvent(
+          new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        );
+    });
+    expect(document.activeElement).toBe(handle);
+    expect(onMove).not.toHaveBeenCalled();
     expect(onAction).not.toHaveBeenCalled();
   });
 

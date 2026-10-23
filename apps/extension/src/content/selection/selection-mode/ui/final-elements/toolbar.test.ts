@@ -26,6 +26,8 @@ vi.mock('../../../../../features/quick-actions-presets/catalog', async (importOr
 
 import { enhanceSelectionModeToolbar, syncSelectionToolbarPaddingState } from './toolbar';
 import { closeSelectionCaptureActionMenu } from './capture-menu';
+import { applySelectionToolbarSurfaceChrome } from './toolbar-chrome';
+import { bindSelectionWidthInput } from '../size-panel/inputs';
 import { handleSelectionModeClick, handleSelectionModeKeyDown } from '../../events/commands';
 import { isSelectionModeExtensionUiElement } from '../../runtime/extension-ui';
 import { createSelectionModeSession } from '../../session';
@@ -47,6 +49,15 @@ beforeEach(() => {
   document.body.replaceChildren();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 720 });
+});
+
+it('lets the capture label inherit quiet command weight for hover changes', () => {
+  const { tooltip } = createToolbar();
+  const label = tooltip.confirmButton.querySelector<HTMLElement>(
+    '.sniptale-selection-capture-action-label'
+  );
+  expect(label?.textContent).toBe('Download');
+  expect(label?.style.fontWeight).toBe('inherit');
 });
 
 function createToolbar(
@@ -100,6 +111,98 @@ function createCaptureGuardOptions(): SelectionModeEventOptions {
 }
 
 describe('selection-mode confirmed toolbar', () => {
+  it.each([false, true])(
+    'commits an under-min dimension draft before pointer commands in shadow=%s',
+    (shadow) => {
+      const host = document.createElement('div');
+      document.body.append(host);
+      const mountInto = shadow ? host.attachShadow({ mode: 'open' }) : host;
+      const { tooltip } = createToolbar(undefined, mountInto);
+      let selection = { x: 20, y: 20, width: 100, height: 80 };
+      bindSelectionWidthInput(
+        tooltip.widthInput,
+        tooltip.heightInput,
+        (next) => {
+          selection = next;
+        },
+        {
+          minSelectionSize: 10,
+          maxWidth: 1280,
+          maxHeight: 720,
+          getCurrentSelection: () => selection,
+          getMaintainAspectRatio: () => false,
+          getAspectRatio: () => null,
+        }
+      );
+      tooltip.widthInput.focus();
+      tooltip.widthInput.value = '5';
+      tooltip.widthInput.dispatchEvent(new Event('input', { bubbles: true }));
+      expect(selection.width).toBe(100);
+      tooltip.confirmButton.dispatchEvent(
+        new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        })
+      );
+      expect(tooltip.widthInput.value).toBe('10');
+      expect(selection.width).toBe(10);
+      expect(tooltip.widthInput.matches(':focus')).toBe(false);
+    }
+  );
+
+  it('releases the legacy inline minimum height to the adopted shell geometry', () => {
+    const overlayContainer = document.createElement('div');
+    document.body.append(overlayContainer);
+    const tooltip = createContentSizeTooltipDom({
+      copy,
+      heightMax: 720,
+      heightMin: 10,
+      maintainAspectRatio: false,
+      mountInto: overlayContainer,
+      variant: 'frame-edit',
+      widthMax: 1280,
+      widthMin: 10,
+    });
+    expect(tooltip.root.style.minHeight).toBe('44px');
+    applySelectionToolbarSurfaceChrome(tooltip.root);
+    expect(tooltip.root.style.minHeight).toBe('');
+  });
+
+  it('cancels enabled pointer button focus without changing inputs or keyboard activation', () => {
+    const { tooltip } = createToolbar();
+    applySelectionToolbarSurfaceChrome(tooltip.root);
+    const button = document.createElement('button');
+    tooltip.root.append(button);
+    button.focus();
+    button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+    expect(document.activeElement).not.toBe(button);
+    const mouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+    const preventDefault = vi.spyOn(mouseDown, 'preventDefault');
+    button.dispatchEvent(mouseDown);
+    expect(mouseDown.defaultPrevented).toBe(true);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    const secondaryMouseDown = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+    });
+    button.dispatchEvent(secondaryMouseDown);
+    expect(secondaryMouseDown.defaultPrevented).toBe(false);
+    const inputMouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    tooltip.widthInput.dispatchEvent(inputMouseDown);
+    expect(inputMouseDown.defaultPrevented).toBe(false);
+    button.focus();
+    const enter = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' });
+    button.dispatchEvent(enter);
+    expect(document.activeElement).toBe(button);
+    expect(enter.defaultPrevented).toBe(false);
+    button.disabled = true;
+    const disabledMouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    button.dispatchEvent(disabledMouseDown);
+    expect(disabledMouseDown.defaultPrevented).toBe(false);
+  });
+
   it('uses the compact frame toolbar and groups symmetric padding controls between dividers', () => {
     const { onAdjustPadding, tooltip } = createToolbar();
 
@@ -107,7 +210,10 @@ describe('selection-mode confirmed toolbar', () => {
     expect(tooltip.root.classList).toContain('sniptale-glass-toolbar');
     expect(tooltip.root.classList).toContain('sniptale-toolbar-root');
     expect(tooltip.root.style.width).toBe('max-content');
-    expect(tooltip.root.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(2);
+    expect(tooltip.root.querySelectorAll('.sniptale-glass-toolbar-divider')).toHaveLength(3);
+    expect(tooltip.cancelButton.previousElementSibling?.classList).toContain(
+      'sniptale-glass-toolbar-divider'
+    );
 
     const decrease = tooltip.root.querySelector<HTMLButtonElement>(
       '.sniptale-selection-padding-decrease'
@@ -140,9 +246,9 @@ describe('selection-mode confirmed toolbar', () => {
       'M9 17H7A5 5 0 0 1 7 7h2'
     );
     expect(tooltip.aspectRatioButton.querySelector('svg line')?.getAttribute('x1')).toBe('8');
-    expect(tooltip.actions.firstElementChild).toBe(tooltip.cancelButton);
-    expect(tooltip.actions.lastElementChild?.contains(tooltip.confirmButton)).toBe(true);
-    expect(tooltip.cancelButton.previousElementSibling).toBeNull();
+    expect(tooltip.actions.firstElementChild?.contains(tooltip.confirmButton)).toBe(true);
+    expect(tooltip.actions.lastElementChild).toBe(tooltip.cancelButton);
+    expect(tooltip.cancelButton.nextElementSibling).toBeNull();
 
     decrease?.click();
     increase?.click();
@@ -178,7 +284,7 @@ describe('selection-mode confirmed toolbar', () => {
     expect(
       scenario.tooltip.root.querySelector('.sniptale-selection-capture-menu-trigger')
     ).toBeNull();
-    expect(scenario.tooltip.confirmButton.style.borderRadius).toBe('var(--sniptale-radius-md)');
+    expect(scenario.tooltip.confirmButton.style.borderRadius).toBe('var(--sniptale-radius)');
   });
 
   it('disables the full shrink step when either dimension would cross the minimum', () => {
@@ -228,6 +334,59 @@ describe('selection-mode confirmed toolbar', () => {
       })
     ).not.toThrow();
   });
+});
+
+describe('selection-mode capture menu placement and density', () => {
+  it.each([100, 600])('matches the main mode-menu shell gap at y=%s', (top) => {
+    const { tooltip, overlayContainer } = createToolbar();
+    const trigger = tooltip.root.querySelector<HTMLButtonElement>(
+      '.sniptale-selection-capture-menu-trigger'
+    );
+    if (!trigger) throw new Error('Expected capture-menu trigger');
+    vi.spyOn(tooltip.root, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, top, 400, 46));
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(new DOMRect(450, top + 7, 18, 32));
+    trigger.click();
+    const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
+    const below = top === 100;
+    expect(menu?.classList).toContain('sniptale-content-menu-adopted');
+    expect(Number.parseFloat(menu?.style.top ?? '')).toBe(below ? top + 46 + 1 : top - 1 - 284);
+    expect(trigger.dataset['menuSide']).toBe(below ? 'down' : 'up');
+    expect(trigger.style.width).toBe('18px');
+  });
+
+  it.each([220, 300])(
+    'compacts before limiting the capture list height (%s px)',
+    (compactHeight) => {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 560 });
+      const { tooltip, overlayContainer } = createToolbar();
+      const trigger = tooltip.root.querySelector<HTMLButtonElement>(
+        '.sniptale-selection-capture-menu-trigger'
+      )!;
+      const measure = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function (this: HTMLElement) {
+          if (this === tooltip.root) return new DOMRect(100, 220, 400, 46);
+          if (this === trigger) return new DOMRect(450, 227, 18, 32);
+          const height = this.classList.contains('sniptale-toolbar-menu--compact')
+            ? compactHeight
+            : 400;
+          return new DOMRect(0, 0, 280, height);
+        });
+      try {
+        trigger.click();
+        const menu = overlayContainer.querySelector<HTMLElement>(
+          '.sniptale-selection-capture-menu'
+        )!;
+        expect(trigger.dataset['menuSide']).toBe('down');
+        expect(menu.classList).toContain('sniptale-toolbar-menu--compact');
+        expect(menu.style.top).toBe('267px');
+        expect(menu.style.maxHeight).toBe('285px');
+        expect(menu.style.overflowY).toBe('auto');
+      } finally {
+        measure.mockRestore();
+      }
+    }
+  );
 });
 
 describe('selection-mode capture action menu', () => {
@@ -280,6 +439,26 @@ describe('selection-mode capture action menu', () => {
     trigger?.click();
     expect(closeSelectionCaptureActionMenu(overlayContainer, true)).toBe(true);
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it('dismisses Capture on Escape without the crop keyboard handler and restores trigger focus', () => {
+    const { overlayContainer, tooltip, onConfirm } = createToolbar();
+    const trigger = tooltip.root.querySelector<HTMLButtonElement>(
+      '.sniptale-selection-capture-menu-trigger'
+    )!;
+    trigger.click();
+    const firstItem = overlayContainer.querySelector<HTMLButtonElement>('[role="menuitem"]')!;
+    const escape = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    firstItem.dispatchEvent(escape);
+    expect(overlayContainer.querySelector('.sniptale-selection-capture-menu')).toBeNull();
+    expect(escape.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('keeps pointer interaction inside a shadow-root menu through mousedown and click', () => {

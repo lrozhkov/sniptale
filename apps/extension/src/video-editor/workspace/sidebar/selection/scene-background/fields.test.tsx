@@ -94,6 +94,7 @@ function createProps(): SceneBackgroundFieldProps {
 
 it('builds canonical background kind options for the shared select surface', () => {
   expect(getSceneBackgroundKindOptions(createProps().imageAssets)).toEqual([
+    { value: 'none', label: 'gallery.videoReview.backgroundNone' },
     {
       value: VideoSceneBackgroundKind.SOLID,
       label: 'videoEditor.sidebar.sceneBackgroundSolid',
@@ -119,11 +120,12 @@ it('builds image asset options from project assets for the shared select surface
   ]);
 });
 
-it('renders selected scene background labels through canonical inspector selects', () => {
+it('uses measured choices for background kind and keeps image resources in a dropdown', () => {
   const markup = renderToStaticMarkup(<SceneBackgroundFields {...createProps()} />);
 
   expect(markup).toContain('videoEditor.sidebar.sceneBackgroundTypeLabel');
   expect(markup).toContain('shared.ui.compact-inspector.select-field');
+  expect(markup).toContain('shared.ui.compact-inspector.segmented-field');
   expect(markup).toContain('videoEditor.sidebar.sceneBackgroundImage');
   expect(markup).toContain('videoEditor.sidebar.sceneBackgroundImageAssetLabel');
   expect(markup).toContain('Background Two');
@@ -146,9 +148,9 @@ it('keeps image kind selected after clicking image when image assets exist', asy
     kind: VideoSceneBackgroundKind.IMAGE,
     assetId: 'asset-1',
   });
-  expect(getSelectTrigger('videoEditor.sidebar.sceneBackgroundTypeLabel')?.textContent).toContain(
-    'videoEditor.sidebar.sceneBackgroundImage'
-  );
+  expect(
+    getKindOption('videoEditor.sidebar.sceneBackgroundImage')?.getAttribute('aria-pressed')
+  ).toBe('true');
 });
 
 it('offers image upload without persisting an invalid background when no assets exist', async () => {
@@ -161,27 +163,13 @@ it('offers image upload without persisting an invalid background when no assets 
     },
   });
 
-  openSelect('videoEditor.sidebar.sceneBackgroundTypeLabel');
-
-  expect(getOption('videoEditor.sidebar.sceneBackgroundImage')?.disabled).toBe(false);
-  await act(async () => getOption('videoEditor.sidebar.sceneBackgroundImage')?.click());
+  expect(getKindOption('videoEditor.sidebar.sceneBackgroundImage')?.disabled).toBe(false);
+  await act(async () => getKindOption('videoEditor.sidebar.sceneBackgroundImage')?.click());
   expect(container?.textContent).toContain('videoEditor.sidebar.sceneBackgroundImageEmpty');
 });
 
-function getSelectTrigger(label: string) {
-  return container?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
-}
-
-function openSelect(label: string) {
-  const trigger = getSelectTrigger(label);
-  expect(trigger).not.toBeNull();
-  act(() => {
-    trigger?.click();
-  });
-}
-
-function getOption(label: string) {
-  return Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+function getKindOption(label: string) {
+  return Array.from(container?.querySelectorAll<HTMLButtonElement>('[aria-pressed]') ?? []).find(
     (button) => button.textContent?.trim() === label
   );
 }
@@ -195,7 +183,9 @@ function SceneBackgroundHarness(props: SceneBackgroundFieldProps) {
       sceneBackground={sceneBackground}
       onSetSceneBackground={(nextBackground) => {
         props.onSetSceneBackground(nextBackground);
-        setSceneBackground(nextBackground);
+        setSceneBackground((current) =>
+          'kind' in nextBackground ? nextBackground : { ...current, ...nextBackground }
+        );
       }}
     />
   );
@@ -208,11 +198,131 @@ function renderBackgroundHarness(props: SceneBackgroundFieldProps) {
 }
 
 async function clickBackgroundKind(label: string) {
-  openSelect('videoEditor.sidebar.sceneBackgroundTypeLabel');
-  const option = getOption(label);
+  const option = getKindOption(label);
   expect(option).not.toBeNull();
   await act(async () => {
     option?.click();
     await Promise.resolve();
   });
 }
+
+it('restores the retained image instead of choosing the first library asset', async () => {
+  const props = createProps();
+  renderBackgroundHarness({
+    ...props,
+    sceneBackground: {
+      kind: 'solid',
+      color: '#123456',
+      remembered: { image: { kind: 'image', assetId: 'asset-2', imageFit: 'contain' } },
+    },
+  });
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundImage');
+  expect(props.onSetSceneBackground).toHaveBeenCalledWith({
+    kind: 'image',
+    assetId: 'asset-2',
+    imageFit: 'contain',
+  });
+  expect(
+    getKindOption('videoEditor.sidebar.sceneBackgroundImageContain')?.getAttribute('aria-pressed')
+  ).toBe('true');
+});
+
+it('edits image fit through measured choices and preserves the asset and remembered variants', async () => {
+  const props = createProps();
+  const remembered = { solid: { kind: 'solid' as const, color: '#123456' } };
+  renderBackgroundHarness({
+    ...props,
+    sceneBackground: { kind: 'image', assetId: 'asset-2', remembered },
+  });
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundImageContain');
+  expect(props.onSetSceneBackground).toHaveBeenCalledWith({
+    kind: 'image',
+    assetId: 'asset-2',
+    imageFit: 'contain',
+    remembered,
+  });
+  expect(
+    getKindOption('videoEditor.sidebar.sceneBackgroundImageContain')?.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(props.onResetSceneBackgroundPreview).toHaveBeenCalled();
+});
+
+it('shows the shared blur control for image and gradient, hides it on solid and commits only the scalar', async () => {
+  const props = createProps();
+  renderBackgroundHarness({
+    ...props,
+    sceneBackground: { kind: 'image', assetId: 'asset-2', blur: 0.000123 },
+  });
+  const input = container?.querySelector<HTMLInputElement>(
+    'input[aria-label="editor.scene.backgroundBlurAmount"]'
+  );
+  expect(input).toBeTruthy();
+  await act(async () => {
+    input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(input?.value).toBe('0');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '18');
+    input?.dispatchEvent(new Event('input', { bubbles: true }));
+    input?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await act(async () => {
+    input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith({ blur: 18 });
+  expect(props.onResetSceneBackgroundPreview).toHaveBeenCalled();
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundSolid');
+  expect(
+    container?.querySelector('input[aria-label="editor.scene.backgroundBlurAmount"]')
+  ).toBeNull();
+});
+
+it('keeps disabled paint hidden until explicit activation and preserves its settings on None', async () => {
+  const props = createProps();
+  const retained = {
+    kind: 'solid' as const,
+    color: '#123456ff',
+    blur: 3,
+    enabled: false as const,
+    remembered: {
+      image: { kind: 'image' as const, assetId: 'asset-2', imageFit: 'contain' as const },
+    },
+  };
+  renderBackgroundHarness({ ...props, sceneBackground: retained });
+  expect(getKindOption('gallery.videoReview.backgroundNone')?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+  expect(container?.querySelector('input')).toBeNull();
+  expect(props.onSetSceneBackground).not.toHaveBeenCalled();
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundSolid');
+  const { enabled: _disabled, ...active } = retained;
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith(active);
+  await clickBackgroundKind('gallery.videoReview.backgroundNone');
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith(retained);
+  expect(container?.querySelector('input')).toBeNull();
+});
+
+it.each(['fixed', 'follow-video'] as const)(
+  'keeps saved %s visible until an explicit current zoom mode is selected',
+  async (zoomBehavior) => {
+    const onSetSceneBackground = vi.fn();
+    renderBackgroundHarness({
+      ...createProps(),
+      onSetSceneBackground,
+      sceneBackground: { kind: 'solid', color: '#123456', enabled: false, zoomBehavior },
+    });
+    expect(container?.textContent).toContain(
+      zoomBehavior === 'fixed'
+        ? 'gallery.videoReview.backgroundZoomLegacyFixed'
+        : 'gallery.videoReview.backgroundZoomLegacyFollow'
+    );
+    await clickBackgroundKind('gallery.videoReview.backgroundZoomWindow');
+    expect(onSetSceneBackground).toHaveBeenLastCalledWith({ zoomBehavior: 'window' });
+    expect(container?.textContent).not.toContain('gallery.videoReview.backgroundZoomLegacy');
+    await clickBackgroundKind('gallery.videoReview.backgroundZoomContent');
+    expect(onSetSceneBackground).toHaveBeenLastCalledWith({ zoomBehavior: 'content' });
+    expect(getKindOption('gallery.videoReview.backgroundNone')?.getAttribute('aria-pressed')).toBe(
+      'true'
+    );
+  }
+);

@@ -65,17 +65,19 @@ function input() {
     alt: 'Image',
     source: { kind: 'import', filename: 'original.png' },
   };
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: '',
-      text: 'Keep text',
-      appearance: null,
-      action: { kind: 'next' },
-      pulse: true,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: '',
+        text: 'Keep text',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   project.tour.slides = [slide];
   return {
@@ -115,7 +117,9 @@ it('applies one immutable image version with revision binding and unchanged sour
   const slide = result.project.tour!.slides[0]!;
   expect(slide).toMatchObject({
     image: { assetId: 'new-image', source: { kind: 'import', filename: 'original.png' } },
-    hotspots: [{ point: { x: 0.5, y: 0.5 }, text: 'Keep text' }],
+    actions: [
+      { type: 'hotspot' as const, object: { point: { x: 0.5, y: 0.5 }, text: 'Keep text' } },
+    ],
   });
   expect(io.commit).toHaveBeenCalledWith(
     result.project,

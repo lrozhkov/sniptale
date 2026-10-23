@@ -1,7 +1,13 @@
+import { isClipActiveAtTime } from '../../../project/timeline/basics';
+import { resolveEffectSourceClip } from '../../../project/effect-instance/placement';
 import { resolveEffectOwner, isVideoEffectTrack } from '../../../project/effect-instance/owner';
 import type { VideoProjectEffectInstance } from '../../../project/effect-instance/types';
-import { isEffectInstanceTimingEqual } from '../../../project/effect-instance/timing';
-import type { VideoProject, VideoProjectTransitionSegment } from '../../../project/types/index';
+import { isEffectHostTimingValid } from '../../../project/effect-instance/timing';
+import type {
+  VideoProject,
+  VideoProjectEffectClip,
+  VideoProjectTransitionSegment,
+} from '../../../project/types/index';
 import type { EffectRuntimeFramePlacement } from '../runtime/types';
 import { resolveEffectTargetTrackAvailability } from './target-availability';
 
@@ -27,15 +33,13 @@ export function resolveEffectRuntimeFrameTarget(
   if (kind === 'standalone') {
     if (target.kind !== 'scene') return undefined;
     const host = project.clips.find(
-      (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
+      (clip): clip is VideoProjectEffectClip =>
+        clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
     );
-    if (
-      !host ||
-      !isEffectInstanceTimingEqual(host.startTime, instance.startTime) ||
-      !isEffectInstanceTimingEqual(host.duration, instance.duration)
-    )
-      return undefined;
-    if (projectTime < host.startTime || projectTime >= host.startTime + host.duration) return null;
+    if (!host || !isEffectHostTimingValid(host, instance)) return undefined;
+    if (!isClipActiveAtTime(host, projectTime)) return null;
+    if (host.attachment?.kind === 'source' && !resolveEffectSourceClip(project, host, projectTime))
+      return null;
     const track = project.tracks.find(({ id }) => id === host.trackId);
     return track?.visible === true
       ? { clipId: host.id, kind: 'scene', placement: resolveClipPlacement(host.transform) }
@@ -57,12 +61,7 @@ export function resolveEffectRuntimeFrameTarget(
           .map((track) => track.id)
       );
       const clipIds = project.clips
-        .filter(
-          (clip) =>
-            ids.has(clip.trackId) &&
-            projectTime >= clip.startTime &&
-            projectTime < clip.startTime + clip.duration
-        )
+        .filter((clip) => ids.has(clip.trackId) && isClipActiveAtTime(clip, projectTime))
         .map((clip) => clip.id);
       if (!clipIds.length) return null;
       return { ...target, clipIds };
@@ -71,7 +70,7 @@ export function resolveEffectRuntimeFrameTarget(
     const clip = project.clips.find(({ id }) => id === target.clipId);
     if (!clip) return undefined;
     if (clip.effectsBypassed) return null;
-    if (projectTime < clip.startTime || projectTime >= clip.startTime + clip.duration) return null;
+    if (!isClipActiveAtTime(clip, projectTime)) return null;
     const track = project.tracks.find(({ id }) => id === clip.trackId);
     return track?.visible === true
       ? { clipId: clip.id, kind: 'clip', placement: resolveClipPlacement(clip.transform) }

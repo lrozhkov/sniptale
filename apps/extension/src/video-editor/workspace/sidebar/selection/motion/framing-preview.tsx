@@ -1,9 +1,10 @@
+import { OptionButtonsField } from '../shared/option-buttons';
+import { InspectorActionButton } from '../shared/actions';
 import { useContext, useRef, useState } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import {
   VideoMotionFocusMode,
   type VideoProjectMotionRegion,
-  type VideoProjectMotionArea,
 } from '../../../../../features/video/project/types';
 import type { resolveCameraViewportFrame } from '../../../../../features/video/composition/motion/viewport';
 import { RuntimePreviewContext } from '../../../../runtime/controller/composition/contexts';
@@ -23,7 +24,10 @@ export function MotionFramingPreview(props: {
     <FramingPreviewSurface
       key={props.motionRegion.id}
       project={props.panel.project}
-      region={props.motionRegion}
+      region={
+        props.panel.project.motionRegions?.find((region) => region.id === props.motionRegion.id) ??
+        props.motionRegion
+      }
       assetUrls={runtime.assetUrls}
       onCommitArea={(focusArea) => {
         props.panel.onClearPlacementMode();
@@ -51,7 +55,7 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
       : null;
   const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { areaMode, area, camera, viewport, left, top, width, height, handlers } =
+  const { areaPoints, camera, viewport, left, top, width, height, handlers } =
     useFramingInteraction(props, overview);
   const { ready, failed, reload } = useFramingFrame(props, canvasRef, camera);
 
@@ -66,26 +70,15 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
           {translate('videoEditor.sidebar.cameraExpansionApplied')}
         </p>
       ) : null}
-      <div className="flex gap-1" aria-label={translate('videoEditor.sidebar.framingPreviewLabel')}>
-        {[true, false].map((mode) => (
-          <button
-            key={String(mode)}
-            type="button"
-            aria-pressed={overview === mode}
-            onClick={() => setOverview(mode)}
-            className={[
-              'rounded-md px-2 py-1 text-xs cursor-pointer',
-              overview === mode
-                ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
-                : 'text-[var(--sniptale-color-text-secondary)]',
-            ].join(' ')}
-          >
-            {translate(
-              mode ? 'videoEditor.sidebar.framingAreaView' : 'videoEditor.sidebar.framingResultView'
-            )}
-          </button>
-        ))}
-      </div>
+      <OptionButtonsField
+        label={translate('videoEditor.sidebar.framingPreviewLabel')}
+        value={overview ? 'area' : 'result'}
+        options={[
+          { value: 'area', label: translate('videoEditor.sidebar.framingAreaView') },
+          { value: 'result', label: translate('videoEditor.sidebar.framingResultView') },
+        ]}
+        onChange={(value) => setOverview(value === 'area')}
+      />
       <button
         type="button"
         data-video-editor-local-navigation="true"
@@ -101,28 +94,16 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
           canvasRef={canvasRef}
           ready={ready}
           failed={failed}
-          area={overview ? area : null}
+          areaPoints={overview ? areaPoints : null}
           showOutline={overview}
           viewport={viewport}
           world={{ left, top, width, height }}
         />
       </button>
       {failed ? (
-        <button
-          type="button"
-          className="text-xs text-[var(--sniptale-color-text-secondary)] underline"
-          onClick={reload}
-        >
+        <InspectorActionButton compact onClick={reload}>
           {translate('common.actions.retry')}
-        </button>
-      ) : overview && !following ? (
-        <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate(
-            areaMode
-              ? 'videoEditor.sidebar.framingAreaPreviewHint'
-              : 'videoEditor.sidebar.framingPreviewHint'
-          )}
-        </p>
+        </InspectorActionButton>
       ) : null}
     </div>
   );
@@ -132,7 +113,7 @@ function FramingOverlays({
   canvasRef,
   ready,
   failed,
-  area,
+  areaPoints,
   viewport,
   world,
   showOutline,
@@ -140,7 +121,7 @@ function FramingOverlays({
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   ready: boolean;
   failed: boolean;
-  area: VideoProjectMotionArea | null;
+  areaPoints: ReturnType<typeof useFramingInteraction>['areaPoints'];
   viewport: ReturnType<typeof resolveCameraViewportFrame>;
   world: { left: number; top: number; width: number; height: number };
   showOutline: boolean;
@@ -159,34 +140,45 @@ function FramingOverlays({
           height: '100%',
         }}
       />
-      {ready && area ? (
-        <span
-          aria-hidden="true"
-          className={`absolute border border-dashed border-[color:var(--sniptale-color-border-accent-strong)]
-pointer-events-none`}
-          style={{
-            left: `${((area.x - left) / width) * 100}%`,
-            top: `${((area.y - top) / height) * 100}%`,
-            width: `${(area.width / width) * 100}%`,
-            height: `${(area.height / height) * 100}%`,
-          }}
-        >
+      {ready && areaPoints ? (
+        <>
+          <svg
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full pointer-events-none"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+          >
+            <polygon
+              data-framing-area-outline="true"
+              points={Object.values(areaPoints)
+                .map(
+                  (point) =>
+                    `${((point.x - left) / width) * 100},${((point.y - top) / height) * 100}`
+                )
+                .join(' ')}
+              fill="none"
+              className="stroke-[var(--sniptale-color-border-accent-strong)]"
+              strokeDasharray="4 3"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
           {(['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
             <span
               key={corner}
+              aria-hidden="true"
               data-framing-corner={corner}
               className={`absolute z-10 h-3 w-3 rounded-sm border
 border-[color:var(--sniptale-color-border-accent-strong)]
 bg-[var(--sniptale-color-surface-panel)] pointer-events-auto`}
               style={{
-                left: corner.endsWith('w') ? 0 : '100%',
-                top: corner.startsWith('n') ? 0 : '100%',
+                left: `${((areaPoints[corner].x - left) / width) * 100}%`,
+                top: `${((areaPoints[corner].y - top) / height) * 100}%`,
                 transform: 'translate(-50%, -50%)',
                 cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize',
               }}
             />
           ))}
-        </span>
+        </>
       ) : null}
       {ready && showOutline ? (
         <span

@@ -2,7 +2,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
 import { CheckboxField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
 import { ReviewInspectorSections, type ReviewInspectorSection } from './inspector-sections';
-import { ReviewPreviewNumberRow } from './number-row';
+import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { SpeechTranscriptionModelField } from './speech-profile';
 import { ReviewTextPhrase } from './speech-phrase';
 import { useReviewText } from './use-review-text';

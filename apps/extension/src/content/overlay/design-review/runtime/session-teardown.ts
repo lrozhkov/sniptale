@@ -1,5 +1,6 @@
 // policyStateIds: [] - this document-local promise only coalesces one teardown and grants no authority.
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
+import { restorePagePreparationHistory } from '../../../application/page-preparation-reset';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { isPageStyleRestorationElement } from '../../../selection/design-review/style/element';
 import {
@@ -117,6 +118,10 @@ export function teardownDesignReviewSessionAfterUiTransition(
     pendingTeardown = Promise.resolve()
       .then(() => {
         finalizeDesignReviewCommentDraft();
+        flushPendingPageStyleHistory();
+        if (!restorePagePreparationHistory(pagePreparationHistory)) {
+          throw new Error('Page changes could not be restored before closing toolbar');
+        }
         restoreDesignReviewStyles();
         transitionUi();
       })

@@ -11,7 +11,13 @@ const SOURCE_POINT_EPSILON = 0.000_001;
 
 type SourceTimedPointClip = Pick<
   VideoProjectVideoClip | VideoProjectAudioClip,
-  'duration' | 'id' | 'playbackRate' | 'sourceDuration' | 'sourceStart' | 'startTime'
+  | 'duration'
+  | 'id'
+  | 'playbackRate'
+  | 'playbackWindow'
+  | 'sourceDuration'
+  | 'sourceStart'
+  | 'startTime'
 >;
 
 interface SourceTimedProjectPoint {
@@ -31,7 +37,13 @@ export interface SourceTimedProjectSpan {
 export function mapSourceRangeToProjectSpans(
   clips: readonly Pick<
     VideoProjectVideoClip | VideoProjectAudioClip,
-    'duration' | 'id' | 'playbackRate' | 'sourceDuration' | 'sourceStart' | 'startTime'
+    | 'duration'
+    | 'id'
+    | 'playbackRate'
+    | 'playbackWindow'
+    | 'sourceDuration'
+    | 'sourceStart'
+    | 'startTime'
   >[],
   sourceStart: number,
   sourceEnd: number
@@ -41,16 +53,34 @@ export function mapSourceRangeToProjectSpans(
 
   return clips
     .flatMap((clip) => {
-      const clipSourceStart = clip.sourceStart;
-      const clipSourceEnd = clip.sourceStart + clip.sourceDuration;
+      const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+      const offset = clip.playbackWindow?.offset ?? 0;
+      const hold = clip.playbackWindow?.holdAt ?? Infinity;
+      const clipSourceStart = clip.sourceStart + Math.min(offset, hold) * rate;
+      const clipSourceEnd =
+        clip.sourceStart +
+        Math.min(clip.sourceDuration, Math.min(offset + clip.duration, hold) * rate);
       const spanSourceStart = Math.max(normalizedSourceStart, clipSourceStart);
       const spanSourceEnd = Math.min(normalizedSourceEnd, clipSourceEnd);
-      if (spanSourceEnd <= spanSourceStart) {
+      const heldSource = clip.sourceStart + hold * rate;
+      const includesHold =
+        hold <= offset + clip.duration &&
+        heldSource >= normalizedSourceStart &&
+        heldSource < normalizedSourceEnd &&
+        heldSource <= clip.sourceStart + clip.sourceDuration;
+      if (spanSourceEnd < spanSourceStart || (spanSourceEnd === spanSourceStart && !includesHold))
         return [];
-      }
-
-      const startOffset = getSourceTimedClipProjectOffset(clip, spanSourceStart - clipSourceStart);
-      const endOffset = getSourceTimedClipProjectOffset(clip, spanSourceEnd - clipSourceStart);
+      const startOffset = Math.max(
+        0,
+        getSourceTimedClipProjectOffset(clip, spanSourceStart - clip.sourceStart)
+      );
+      const endOffset = includesHold
+        ? clip.duration
+        : Math.min(
+            clip.duration,
+            getSourceTimedClipProjectOffset(clip, spanSourceEnd - clip.sourceStart)
+          );
+      if (endOffset <= startOffset) return [];
 
       return [
         {
@@ -87,7 +117,14 @@ export function mapProjectTimeToSourcePoint(
   return {
     clipId: clip.id,
     sourceTime:
-      clip.sourceStart + projectOffset * normalizeClipPlaybackRate(clip.playbackRate ?? 1),
+      clip.sourceStart +
+      Math.min(
+        clip.playbackWindow ? clip.sourceDuration : Infinity,
+        Math.min(
+          (clip.playbackWindow?.offset ?? 0) + projectOffset,
+          clip.playbackWindow?.holdAt ?? Infinity
+        ) * normalizeClipPlaybackRate(clip.playbackRate ?? 1)
+      ),
     time: projectTime,
   };
 }
@@ -98,11 +135,20 @@ export function mapSourceTimeToProjectPoint(
   preferredClipId?: string
 ): SourceTimedProjectPoint | null {
   const clip = resolvePreferredPointClip(
-    clips.filter(
-      (item) =>
+    clips.filter((item) => {
+      const offset = getSourceTimedClipProjectOffset(item, sourceTime - item.sourceStart);
+      return (
         sourceTime >= item.sourceStart - SOURCE_POINT_EPSILON &&
-        sourceTime <= item.sourceStart + item.sourceDuration + SOURCE_POINT_EPSILON
-    ),
+        sourceTime <= item.sourceStart + item.sourceDuration + SOURCE_POINT_EPSILON &&
+        offset >= -SOURCE_POINT_EPSILON &&
+        offset <= item.duration + SOURCE_POINT_EPSILON &&
+        (item.playbackWindow?.holdAt === undefined ||
+          sourceTime <=
+            item.sourceStart +
+              item.playbackWindow.holdAt * normalizeClipPlaybackRate(item.playbackRate ?? 1) +
+              SOURCE_POINT_EPSILON)
+      );
+    }),
     preferredClipId,
     (left, right) => right.sourceStart - left.sourceStart || left.startTime - right.startTime
   );

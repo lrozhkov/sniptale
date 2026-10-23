@@ -78,6 +78,51 @@ function verifyRegionSelectionContracts() {
 }
 
 describe('tab-contracts/video tab runtime contracts', () => {
+  it('requires the complete binding and boolean state for a selector probe', () => {
+    const contract = tabVideoMessageContracts[VideoMessageType.GET_REGION_SELECTOR_STATE]!;
+    const binding = {
+      regionSelectionCapabilityToken: 'token',
+      regionSelectionRequestGeneration: 'generation',
+      regionSelectionRequestId: 'request',
+    };
+    expect(
+      contract.parseRequest({ type: VideoMessageType.GET_REGION_SELECTOR_STATE, ...binding })
+    ).toMatchObject(binding);
+    expect(() =>
+      contract.parseRequest({
+        type: VideoMessageType.GET_REGION_SELECTOR_STATE,
+        regionSelectionRequestId: 'request',
+      })
+    ).toThrow(MessageContractError);
+    expect(contract.parseResponse({ success: true, active: true })).toMatchObject({ active: true });
+    expect(contract.parseResponse({ success: true, active: false })).toMatchObject({
+      active: false,
+    });
+    expect(() => contract.parseResponse({ success: true })).toThrow(MessageContractError);
+    expect(() => contract.parseResponse({ success: true, active: 'true' })).toThrow(
+      MessageContractError
+    );
+  });
+
+  it('validates scoped selector cleanup without changing unscoped cleanup', () => {
+    const contract = tabVideoMessageContracts[VideoMessageType.HIDE_REGION_SELECTOR]!;
+    expect(contract.parseRequest({ type: VideoMessageType.HIDE_REGION_SELECTOR })).toEqual({
+      type: VideoMessageType.HIDE_REGION_SELECTOR,
+    });
+    expect(
+      contract.parseRequest({
+        type: VideoMessageType.HIDE_REGION_SELECTOR,
+        regionSelectionRequestId: 'request-1',
+      })
+    ).toMatchObject({ regionSelectionRequestId: 'request-1' });
+    expect(() =>
+      contract.parseRequest({
+        type: VideoMessageType.HIDE_REGION_SELECTOR,
+        regionSelectionRequestId: 123,
+      })
+    ).toThrow(MessageContractError);
+  });
+
   it(
     'validates controlled cursor capture pause and resume contracts',
     verifyControlledCursorCaptureLifecycleContracts

@@ -2,33 +2,32 @@ import type { PopupActionButtonTone } from './types';
 
 const POPUP_ACTION_BUTTON_DISABLED_CLASS_NAME = [
   'cursor-not-allowed',
-  'border-none bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_46%,transparent)]',
+  'border-none bg-transparent',
   'text-[var(--sniptale-color-text-dim)] opacity-60',
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_PRIMARY_CLASS_NAME = [
-  'border-none bg-transparent',
-  'text-[var(--sniptale-color-text-primary-strong)] shadow-none',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_48%,transparent)]',
-  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_52%,transparent)]',
+  'border-none bg-[var(--sniptale-color-surface-input)]',
+  'text-[var(--sniptale-color-text-primary)] shadow-none',
+  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_12%,transparent)]',
+  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_12%,transparent)]',
   'hover:text-[var(--sniptale-color-text-primary-strong)]',
-  'focus-visible:text-[var(--sniptale-color-text-primary-strong)] active:translate-y-px',
+  'focus-visible:text-[var(--sniptale-color-text-primary-strong)]',
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_SECONDARY_CLASS_NAME = [
   'border-none bg-transparent',
-  'text-[var(--sniptale-color-text-primary)] shadow-none',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_48%,transparent)]',
-  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_52%,transparent)]',
-  'hover:text-[var(--sniptale-color-text-primary)] active:translate-y-px',
+  'text-[var(--sniptale-color-text-secondary)] shadow-none',
+  'hover:bg-transparent focus-visible:bg-transparent',
+  'hover:text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_DANGER_CLASS_NAME = [
+  '[--sniptale-interface-label-ink-strength:100%]',
   'border-none bg-transparent text-[var(--sniptale-color-text-primary)] shadow-none',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger)_14%,transparent)]',
   'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger)_18%,transparent)]',
   'hover:text-[var(--sniptale-color-danger)] focus-visible:text-[var(--sniptale-color-danger)]',
-  'active:translate-y-px',
 ].join(' ');
 
 export function getPopupActionButtonRootClassName(tone: PopupActionButtonTone, disabled: boolean) {

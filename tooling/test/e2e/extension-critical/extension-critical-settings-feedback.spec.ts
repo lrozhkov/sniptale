@@ -2,9 +2,221 @@ import type { Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { test, expect } from '../support/extension-fixture';
+import { createSystemViewportPresetCatalog } from '../../../../apps/extension/src/features/viewport-presets/catalog';
 
 const text = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
 const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`settings eight follow-ups ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport.size);
+      const base = await configure(page, extensionId, theme);
+      await page.evaluate(async (presets) => {
+        await chrome.storage.sync.set({
+          sniptale_settings: {
+            viewportPresets: presets,
+            contextMenu: {
+              enabled: true,
+              layout: {
+                version: 2,
+                nodes: [
+                  {
+                    type: 'section',
+                    id: 'recommended-window',
+                    title: 'Window size',
+                    enabled: true,
+                    children: [],
+                  },
+                  {
+                    type: 'command',
+                    command: 'sniptale.gallery',
+                    title: 'My library',
+                    enabled: true,
+                  },
+                ],
+              },
+            },
+          },
+        });
+      }, createSystemViewportPresetCatalog());
+      const open = async (section: string, view?: string) => {
+        await page.goto(`${base}?section=${section}${view ? `&view=${view}` : ''}`);
+        await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+        await page.evaluate(() => document.fonts.ready);
+        await page.evaluate(async () => {
+          await Promise.all(
+            document
+              .getAnimations()
+              .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+              .map((animation) => animation.finished.catch(() => undefined))
+          );
+        });
+      };
+      await open('interface-browser', 'context-menu');
+      const windowSection = page.locator('[data-tree-key="section:recommended-window"]');
+      await expect(windowSection).toBeVisible();
+      await expect(windowSection.getByRole('switch')).toHaveCount(0);
+      await page.locator('[data-tree-key="command:sniptale.gallery"]').click();
+      await page
+        .getByRole('button', {
+          name: text('settings.appearance.contextMenuCreateSection'),
+          exact: true,
+        })
+        .click();
+      const sectionName = page.getByRole('textbox', {
+        name: text('settings.appearance.contextMenuSectionName'),
+        exact: true,
+      });
+      await expect(sectionName).toBeVisible();
+      await expect(sectionName).toBeFocused();
+      await expect(sectionName.locator('xpath=ancestor::*[@role="treeitem"]')).toHaveAttribute(
+        'aria-level',
+        '1'
+      );
+      await sectionName.press('Escape');
+      await expect(windowSection.getByRole('switch')).toHaveCount(0);
+      await windowSection.press('ArrowRight');
+      await page
+        .getByRole('button', {
+          name: text('settings.appearance.contextMenuAddWindowSizes'),
+          exact: true,
+        })
+        .click();
+      await expect(
+        page.locator('[data-tree-key^="command:sniptale.window-resize.preset."]')
+      ).toHaveCount(4);
+      await expect(page.locator('[data-tree-key="command:sniptale.gallery"]')).toContainText(
+        'My library'
+      );
+      await page.screenshot({
+        path: info.outputPath('window-sizes-restored.png'),
+        fullPage: false,
+      });
+      await page.waitForFunction(
+        () => document.querySelector('.context-menu-editor')?.getAttribute('aria-busy') === 'false'
+      );
+      await page.reload();
+      await expect(windowSection).toBeVisible();
+      await expect(windowSection.getByRole('switch')).toHaveCount(0);
+      await page
+        .getByRole('button', {
+          name: `${text('settings.appearance.contextMenuExpand')}: ${text('settings.appearance.contextMenuGroupWindow')}`,
+          exact: true,
+        })
+        .click();
+      await expect(
+        page.locator('[data-tree-key^="command:sniptale.window-resize.preset."]')
+      ).toHaveCount(4);
+
+      await open('media-quality', 'video');
+      await page
+        .getByRole('button', { name: text('settings.videoQuality.addProfile'), exact: true })
+        .click();
+      const dialog = page.getByRole('dialog');
+      const codec = dialog.getByRole('button', {
+        name: text('settings.videoQuality.codecLabel'),
+        exact: true,
+      });
+      await codec.scrollIntoViewIfNeeded();
+      await expect(codec).toBeVisible();
+      await codec.click();
+      await expect(page.getByRole('option').first()).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.screenshot({
+        path: info.outputPath('profile-codec-visible.png'),
+        fullPage: false,
+      });
+      await dialog
+        .getByRole('button', { name: text('settings.videoQuality.cancel'), exact: true })
+        .click();
+
+      await open('storage-drafts', 'drafts');
+      await expect(
+        page.getByRole('button', {
+          name: text('settings.storageDrafts.destinationLabel'),
+          exact: true,
+        })
+      ).toBeVisible();
+      for (const key of [
+        'destinationDescription',
+        'cleanupEnabledDescription',
+        'trashCleanupDescription',
+      ] as const)
+        await expect(
+          page.getByText(text(`settings.storageDrafts.${key}`), { exact: true })
+        ).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath('drafts-compact.png'), fullPage: false });
+
+      for (const view of ['borders', 'numbering']) {
+        await open('annotations', view);
+        const list = page.locator('[data-settings-collection-root]');
+        await expect(list).toBeVisible();
+        await expect(list).toHaveCSS('overflow-y', 'visible');
+        await list.locator('[data-settings-collection-item]').last().scrollIntoViewIfNeeded();
+        expect(await list.evaluate((element) => element.scrollTop)).toBe(0);
+        const filter = page.getByRole('button', {
+          name: text('highlighter.templateTags.filterLabel'),
+          exact: true,
+        });
+        await filter.click();
+        const options = page.getByRole('menuitemcheckbox');
+        await options.nth(0).click();
+        await options.nth(1).click();
+        const gap = await options.evaluateAll((elements) => {
+          const first = elements[0]!.getBoundingClientRect();
+          const second = elements[1]!.getBoundingClientRect();
+          return second.top - first.bottom;
+        });
+        expect(gap).toBeGreaterThanOrEqual(2);
+        await page.screenshot({ path: info.outputPath(`${view}-filter-gap.png`), fullPage: false });
+        await page.keyboard.press('Escape');
+      }
+
+      await open('video-effects');
+      const categories = page.locator('.effect-catalog-category');
+      await categories.nth(1).click();
+      await expect(categories.nth(1)).toHaveAttribute('aria-pressed', 'true');
+      const selected = categories.nth(1);
+      await expect
+        .poll(() =>
+          selected.evaluate((element) => {
+            const probe = document.createElement('span');
+            probe.style.color = 'var(--sniptale-color-text-primary)';
+            element.append(probe);
+            const same = getComputedStyle(element).color === getComputedStyle(probe).color;
+            probe.remove();
+            return same;
+          })
+        )
+        .toBe(true);
+      await page.screenshot({ path: info.outputPath('effects-neutral.png'), fullPage: false });
+
+      await open('voice-input');
+      const start = page.getByRole('button', {
+        name: text('settings.voiceInput.start'),
+        exact: true,
+      });
+      await expect(start).toBeVisible();
+      await expect(start).toHaveAttribute('data-command-tone', 'primary');
+      await expect(start).toHaveCSS('height', '32px');
+      await expect(start.locator('.sniptale-command-content')).toHaveCSS('align-items', 'center');
+      await page.screenshot({ path: info.outputPath('voice-start-command.png'), fullPage: false });
+      if (viewport.size.width === 1280) {
+        await page.setViewportSize({ width: 960, height: 560 });
+        expect(
+          await page.evaluate(
+            () => document.querySelector('.sniptale-settings-viewport')!.scrollWidth
+          )
+        ).toBeGreaterThanOrEqual(1280);
+      }
+    });
+  }
+}
 
 async function configure(page: Page, extensionId: string, theme: 'light' | 'dark') {
   const base = `chrome-extension://${extensionId}/apps/extension/src/settings/index.html`;

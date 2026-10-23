@@ -46,9 +46,12 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     owner: 'effect-v1-project-duration-reconciliation',
     productionFile: 'apps/extension/src/features/video/project/timeline/basics.ts',
     reason:
-      'Project duration synchronization reconciles EffectV1 host placement before applying duration.',
+      'Direct timeline suites prove predicates, linked clips, transitions, duration and EffectV1 reconciliation.',
     testFiles: [
       'apps/extension/src/features/video/project/timeline/basics.test.ts',
+      'apps/extension/src/features/video/project/timeline/basics.predicates.test.ts',
+      'apps/extension/src/features/video/project/timeline/basics.transitions.test.ts',
+      'apps/extension/src/features/video/project/timeline/basics.waveforms.test.ts',
       'apps/extension/src/features/video/project/effect-instance/reconcile.test.ts',
     ],
   },
@@ -126,6 +129,9 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/preview/stage/scene/overlay-scale.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/render-visual.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/render-preview.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/render-scheduler.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/locked-overlays-motion-blur.test.tsx',
     ],
   },
   {
@@ -203,9 +209,15 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     owner: 'effect-v1-editor-project-state',
     productionFile: 'apps/extension/src/video-editor/project/state/effects.ts',
     reason:
-      'EffectV1 project actions, cursor preservation, instance authority, and utility lanes have direct state proof.',
+      'EffectV1, captured actions, camera phases, spatial edits and borders share the current project command owner.',
     testFiles: [
       'apps/extension/src/video-editor/project/state/effects.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-click.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-key.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.camera-phases.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.motion-blur.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.spatial.test.ts',
       'apps/extension/src/video-editor/project/state/effects.cursor.test.ts',
       'apps/extension/src/video-editor/project/state/effects.effect-instance.test.ts',
       'apps/extension/src/video-editor/project/state/effects.utility-lanes.test.ts',

@@ -1,4 +1,10 @@
+import { getVideoProjectWatermarkAsset } from '../../../../features/video/project/scene/watermark';
 import { useContext, useMemo, type Context } from 'react';
+import {
+  presentWorkspaceWatermarkPreview,
+  presentWorkspaceSceneEdgesPreview,
+  presentWorkspaceMotionPreview,
+} from '../workspace-state';
 import { syncProjectSceneBackground } from '../../../../features/video/project/scene/background';
 import { getSaveStateMeta } from '../../app-model/utils';
 import type { VideoEditorActionHandlers } from '../../commands';
@@ -156,7 +162,19 @@ export function useVideoEditorCommandPaletteController() {
   }));
   const selection = useVideoEditorClipSelectionPort(({ selectedClipId }) => ({ selectedClipId }));
   const timeline = useVideoEditorTimelineEditingPort(
-    ({ deleteClip, duplicateClip, splitClipAt }) => ({ deleteClip, duplicateClip, splitClipAt })
+    ({
+      deleteClip,
+      duplicateClip,
+      splitClipAt,
+      deleteSourceVoiceover,
+      duplicateSourceVoiceover,
+    }) => ({
+      deleteClip,
+      duplicateClip,
+      splitClipAt,
+      deleteSourceVoiceover,
+      duplicateSourceVoiceover,
+    })
   );
   const annotation = useVideoEditorAnnotationEditingPort(({ addShapeOverlay, addTextOverlay }) => ({
     addShapeOverlay,
@@ -235,13 +253,31 @@ export function useVideoEditorHeaderController() {
 function usePresentedProject() {
   const project = useVideoEditorProjectLifecyclePort((port) => port.project);
   const sceneBackground = useWorkspaceSceneBackgroundContext();
+  const { motionPreview, watermarkPreview, sceneEdgesPreview } = useWorkspaceInspectorContext();
+  const selection = useVideoEditorClipSelectionPort((port) => port.selection);
   return useMemo(() => {
-    if (!project || !sceneBackground.preview) return project;
-    return {
-      ...project,
-      ...syncProjectSceneBackground(project, sceneBackground.preview),
-    };
-  }, [project, sceneBackground.preview]);
+    if (!project) return project;
+    let presented = presentWorkspaceMotionPreview(project, selection, motionPreview);
+    presented = presentWorkspaceWatermarkPreview(
+      presented,
+      selection,
+      watermarkPreview?.project === project ? { ...watermarkPreview, project: presented } : null
+    );
+    presented = presentWorkspaceSceneEdgesPreview(
+      presented,
+      selection,
+      sceneEdgesPreview?.project === project ? { ...sceneEdgesPreview, project: presented } : null
+    );
+    if (!sceneBackground.preview) return presented;
+    return { ...presented, ...syncProjectSceneBackground(presented, sceneBackground.preview) };
+  }, [
+    project,
+    selection,
+    motionPreview,
+    watermarkPreview,
+    sceneEdgesPreview,
+    sceneBackground.preview,
+  ]);
 }
 
 export function useVideoEditorPreviewController() {
@@ -294,11 +330,13 @@ export function useVideoEditorPreviewController() {
     },
     runtime,
     project,
-    projectUpdaters
+    projectUpdaters,
+    lifecycleProject
   );
 }
 
 export function useVideoEditorSidebarController() {
+  const { assetUrls } = useRuntimePreviewContext();
   const project = usePresentedProject();
   const playback = useVideoEditorPlaybackPort(({ currentTime, setCurrentTime, setPlaying }) => ({
     currentTime,
@@ -343,7 +381,15 @@ export function useVideoEditorSidebarController() {
     getCurrentTime: getCurrentVideoEditorCurrentTime,
   });
   return createWorkspaceSidebarController(
-    { actions, libraries, selections, store, workspace },
+    {
+      actions,
+      libraries,
+      selections,
+      store,
+      workspace,
+      watermarkImagePreviewUrl:
+        assetUrls[getVideoProjectWatermarkAsset(lifecycle.project)?.id ?? ''],
+    },
     project,
     projectUpdaters
   );

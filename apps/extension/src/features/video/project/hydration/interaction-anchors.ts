@@ -1,4 +1,4 @@
-import { mapSourceTimeToProjectPoint } from '../timeline/source-time';
+import { mapProjectTimeToSourcePoint, mapSourceTimeToProjectPoint } from '../timeline/source-time';
 import type { VideoProject, VideoProjectSourceTimeAnchor } from '../types/index';
 import { VideoProjectClipType, VideoProjectInteractionTimeBasis } from '../types/index';
 
@@ -13,7 +13,8 @@ function isRecordingAsset(project: VideoProject, assetId: string, recordingId: s
 
 function resolveSourceAnchorTime(
   anchor: VideoProjectSourceTimeAnchor,
-  project: VideoProject
+  project: VideoProject,
+  currentTime: number
 ): number | null {
   const clip = project.clips.find((item) => item.id === anchor.sourceClipId);
   if (
@@ -22,6 +23,11 @@ function resolveSourceAnchorTime(
     !isRecordingAsset(project, clip.assetId, anchor.recordingId)
   )
     return null;
+  if (clip.playbackWindow) {
+    const point = mapProjectTimeToSourcePoint([clip], currentTime, clip.id);
+    // A held source frame can have several valid physical key positions.
+    if (point && Math.abs(point.sourceTime - anchor.sourceTime) <= 0.000_001) return currentTime;
+  }
   return mapSourceTimeToProjectPoint([clip], anchor.sourceTime, anchor.sourceClipId)?.time ?? null;
 }
 
@@ -47,7 +53,7 @@ export function hydrateRecordingInteractionAnchors(project: VideoProject): Video
               return sample.sourceAnchor ? withoutSourceAnchor(sample) : sample;
             }
             if (sample.sourceAnchor) {
-              const time = resolveSourceAnchorTime(sample.sourceAnchor, project);
+              const time = resolveSourceAnchorTime(sample.sourceAnchor, project, sample.time);
               return time === null ? withoutSourceAnchor(sample) : { ...sample, time };
             }
             return sample;

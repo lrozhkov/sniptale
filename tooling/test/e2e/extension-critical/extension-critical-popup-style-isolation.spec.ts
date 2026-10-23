@@ -1,10 +1,11 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import {
   translate,
   type AppLocale,
   type TranslationKey,
 } from '../../../../apps/extension/src/platform/i18n';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
+import { startHostServer } from '../support/host-server';
 
 const viewport = { width: 392, height: 560 };
 const routes = ['menu', 'screenshots', 'video', 'tools', 'export'] as const;
@@ -52,10 +53,19 @@ async function inspectPopupTypography(
     for (const element of root.querySelectorAll<HTMLElement>('*')) {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
+      const ancestors: HTMLElement[] = [];
+      for (
+        let ancestor: HTMLElement | null = element;
+        ancestor;
+        ancestor = ancestor.parentElement
+      ) {
+        ancestors.unshift(ancestor);
+      }
       if (
         !rect.width ||
         !rect.height ||
         style.visibility === 'hidden' ||
+        ancestors.some((ancestor) => Number(getComputedStyle(ancestor).opacity) === 0) ||
         element.closest('.sr-only')
       )
         continue;
@@ -67,14 +77,6 @@ async function inspectPopupTypography(
       if (/\p{L}/u.test(text)) {
         element.dataset['popupFontProof'] = String(index++);
         if (!element.closest(':disabled, [aria-disabled="true"]')) {
-          const ancestors: HTMLElement[] = [];
-          for (
-            let ancestor: HTMLElement | null = element;
-            ancestor;
-            ancestor = ancestor.parentElement
-          ) {
-            ancestors.unshift(ancestor);
-          }
           let background = [255, 255, 255, 1];
           for (const ancestor of ancestors) {
             background = composite(parse(getComputedStyle(ancestor).backgroundColor), background);
@@ -162,6 +164,189 @@ async function inspectPopupTypography(
   }
 }
 
+async function inspectNeutralOptions(panel: Locator) {
+  const options = panel.locator(
+    '[role="option"][aria-selected="true"], button[aria-pressed="true"]'
+  );
+  for (const option of await options.all()) {
+    const state = await option.evaluate((node) => {
+      const style = getComputedStyle(node);
+      const reference = document.createElement('span');
+      node.append(reference);
+      reference.style.color = 'var(--sniptale-color-text-primary)';
+      reference.style.backgroundColor = 'var(--sniptale-color-surface-hover)';
+      const neutral = getComputedStyle(reference);
+      const backgroundLayer = node.parentElement?.querySelector(
+        ':scope > span[aria-hidden="true"]'
+      );
+      const result = {
+        color: style.color,
+        background: backgroundLayer
+          ? getComputedStyle(backgroundLayer).backgroundColor
+          : style.backgroundColor,
+        expectedColor: neutral.color,
+        expectedBackground: neutral.backgroundColor,
+        fontSize: style.fontSize,
+      };
+      reference.remove();
+      return result;
+    });
+    expect(state.color).toBe(state.expectedColor);
+    expect(state.background).toBe(state.expectedBackground);
+    expect(state.fontSize).toBe('12px');
+  }
+}
+
+async function inspectMicrophone(page: Page, panel: Locator, locale: AppLocale, info: TestInfo) {
+  const record = panel.getByRole('button', {
+    name: translate('popup.video.microphoneTestRecord', locale),
+    exact: true,
+  });
+  await expect(record).toBeEnabled();
+  const processing = panel.getByRole('button', {
+    name: new RegExp(translate('popup.video.microphoneEchoCancellation', locale), 'u'),
+  });
+  await expect(processing).toBeEnabled();
+  await processing.scrollIntoViewIfNeeded();
+  const before = await processing.boundingBox();
+  const accepted = await processing.getAttribute('aria-pressed');
+  await processing.click();
+  await expect(processing).toHaveAttribute('aria-pressed', accepted === 'true' ? 'false' : 'true');
+  const updating = await processing.boundingBox();
+  expect(Math.abs(updating!.y - before!.y)).toBeLessThanOrEqual(1);
+  await expect(record).toBeEnabled();
+  const ready = await processing.boundingBox();
+  expect(Math.abs(ready!.y - before!.y)).toBeLessThanOrEqual(1);
+  await processing.click();
+  await expect(processing).toHaveAttribute('aria-pressed', accepted!);
+  await expect(record).toBeEnabled();
+  await record.click();
+  const stop = panel.getByRole('button', {
+    name: translate('popup.video.microphoneTestStop', locale),
+    exact: true,
+  });
+  await expect(stop).toBeEnabled();
+  await page.waitForTimeout(1_000);
+  await stop.click();
+  const play = panel.getByRole('button', {
+    name: translate('popup.video.microphoneTestPlay', locale),
+    exact: true,
+  });
+  await expect(play).toBeEnabled();
+  await play.click();
+  const pause = panel.getByRole('button', {
+    name: translate('popup.video.microphoneTestPause', locale),
+    exact: true,
+  });
+  await expect(pause).toBeVisible();
+  await expect(pause.locator('svg')).toHaveClass(/lucide-pause/u);
+  await pause.click();
+  await expect(play).toBeVisible();
+  await expect(play.locator('svg')).toHaveClass(/lucide-play/u);
+  await page.screenshot({
+    path: info.outputPath('microphone-playback-paused.png'),
+    fullPage: false,
+  });
+}
+
+async function inspectModeTextAnimation(page: Page, locale: AppLocale, info: TestInfo) {
+  for (const key of [
+    'popup.video.modeScreenLabel',
+    'popup.video.modeCameraLabel',
+    'popup.video.modeTabLabel',
+  ] as const) {
+    const mode = page
+      .getByRole('button', { name: translate(key, locale), exact: true })
+      .and(page.locator('button:not([data-ui="popup.icon-state-button"])'));
+    await mode.click();
+    const samples = await mode.evaluate((node) => {
+      const container = node.parentElement;
+      if (!container) throw new Error('Mode switch container is unavailable');
+      const animations = container.getAnimations({ subtree: true });
+      if (
+        !animations.some(
+          (animation) =>
+            animation instanceof CSSTransition && animation.transitionProperty === 'flex-grow'
+        )
+      ) {
+        throw new Error('Expected an actual mode width transition');
+      }
+      animations.forEach((animation) => animation.pause());
+      const snapshot = (time: number) => {
+        animations.forEach((animation) => {
+          animation.currentTime = time;
+        });
+        return [...container.querySelectorAll('button')].map((button) => ({
+          label: button.getAttribute('aria-label'),
+          width: button.getBoundingClientRect().width,
+          active: button.getAttribute('aria-pressed') === 'true',
+          layers: [...button.querySelectorAll(':scope > span[aria-hidden="true"]')].map(
+            (layer) => ({
+              opacity: Number(getComputedStyle(layer).opacity),
+              text: layer.textContent,
+              textWidth: layer.firstElementChild?.getBoundingClientRect().width,
+            })
+          ),
+        }));
+      };
+      const result = { start: snapshot(0), middle: snapshot(75), end: snapshot(1_000) };
+      snapshot(75);
+      return result;
+    });
+    await page.screenshot({ path: info.outputPath(`${key}-transition.png`), fullPage: false });
+    await mode.evaluate((node) =>
+      node.parentElement
+        ?.getAnimations({ subtree: true })
+        .forEach((animation) => animation.finish())
+    );
+    for (let index = 0; index < samples.start.length; index += 1) {
+      const start = samples.start[index]!;
+      const middle = samples.middle[index]!;
+      const end = samples.end[index]!;
+      if (Math.abs(start.width - end.width) <= 1) continue;
+      expect(middle.width).toBeGreaterThan(Math.min(start.width, end.width));
+      expect(middle.width).toBeLessThan(Math.max(start.width, end.width));
+      expect(
+        middle.layers.some((layer) => layer.opacity > 0 && layer.opacity < 1),
+        `${key}: copy crossfades while width changes`
+      ).toBe(true);
+      for (let layer = 0; layer < end.layers.length; layer += 1) {
+        expect(middle.layers[layer]!.textWidth).toBeCloseTo(end.layers[layer]!.textWidth!, 1);
+      }
+      expect(end.layers.map((layer) => layer.opacity)).toEqual(end.active ? [0, 1] : [1, 0]);
+    }
+    await info.attach(`${key}-animation`, {
+      body: JSON.stringify(samples),
+      contentType: 'application/json',
+    });
+    await page.screenshot({ path: info.outputPath(`${key}-settled.png`), fullPage: false });
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const camera = page
+    .getByRole('button', {
+      name: translate('popup.video.modeCameraLabel', locale),
+      exact: true,
+    })
+    .and(page.locator('button:not([data-ui="popup.icon-state-button"])'));
+  await camera.click();
+  await expect(camera).toHaveAttribute('aria-pressed', 'true');
+  await expect(camera.locator(':scope > span[aria-hidden="true"]').last()).toHaveCSS(
+    'opacity',
+    '1'
+  );
+  expect(
+    await camera.evaluate((node) =>
+      node.parentElement
+        ?.getAnimations({ subtree: true })
+        .some((animation) => animation instanceof CSSTransition)
+    )
+  ).toBe(false);
+  await page
+    .getByRole('button', { name: translate('popup.video.modeTabLabel', locale), exact: true })
+    .click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+}
+
 async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, info: TestInfo) {
   async function inspect(key: TranslationKey) {
     const trigger = page.getByRole('button', { name: translate(key, locale), exact: true });
@@ -178,6 +363,28 @@ async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, 
           .map((animation) => animation.finished)
       );
     });
+    await inspectNeutralOptions(panel);
+    if (key === 'popup.video.microphoneSettingsActionAria') {
+      await inspectMicrophone(page, panel, locale, info);
+    }
+    if (key === 'popup.video.webcamSettingsActionAria') {
+      await page.screenshot({
+        path: info.outputPath('webcam-settings-default.png'),
+        fullPage: false,
+      });
+      const embedded = panel.getByRole('button', {
+        name: translate('popup.video.webcamPresentationEmbedded', locale),
+        exact: true,
+      });
+      if ((await embedded.getAttribute('aria-pressed')) !== 'true') await embedded.click();
+      await expect(embedded).toHaveAttribute('aria-pressed', 'true');
+      await expect(
+        panel.getByRole('slider', {
+          name: translate('popup.video.webcamPresentationSize', locale),
+          exact: true,
+        })
+      ).toBeVisible();
+    }
     const layout = await inspectPopupTypography(page, 'scrolling-panel');
     const geometry = await panel.evaluate((node) => ({
       width: node.clientWidth,
@@ -210,8 +417,36 @@ async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, 
     await header.getByRole('button').click();
     await expect(header).toHaveCount(0);
     await expect(trigger).toBeFocused();
+    expect(await trigger.evaluate((node) => node.matches(':focus-visible'))).toBe(false);
+    await page.keyboard.press('Tab');
+    expect(await page.locator(':focus').evaluate((node) => node.matches(':focus-visible'))).toBe(
+      true
+    );
+  }
+  if (route === 'screenshots') {
+    await page
+      .getByRole('button', {
+        name: translate('popup.home.captureTabLabel', locale),
+        exact: true,
+      })
+      .click();
+    for (const key of [
+      'popup.home.captureAreaLabel',
+      'settings.quickActions.afterCaptureLabel',
+      'popup.home.captureSizeLabel',
+      'popup.home.captureQualityAria',
+      'popup.home.captureCountdownLabel',
+    ] as const)
+      await inspect(key);
   }
   if (route === 'video') {
+    await page
+      .getByRole('button', {
+        name: translate('popup.video.modeTabLabel', locale),
+        exact: true,
+      })
+      .click();
+    await inspectModeTextAnimation(page, locale, info);
     for (const key of [
       'popup.video.presetRowAria',
       'popup.video.qualityAria',
@@ -238,66 +473,165 @@ async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, 
       await inspect(key);
   }
   if (route === 'export') {
-    for (const label of ['Настройки снимка', 'Настройки захвата страниц']) {
-      const trigger = page.getByRole('button', { name: label, exact: true });
-      await trigger.click();
-      const header = page.locator('[data-ui="popup.inline-curtain.header"]');
-      await expect(header).toBeVisible();
-      await inspectPopupTypography(page, 'scrolling-panel');
-      const checkbox = header.locator('..').getByRole('checkbox').first();
-      if (await checkbox.count()) {
-        const accepted = await checkbox.isChecked();
-        await checkbox.click();
-        await expect(checkbox).toBeChecked({ checked: !accepted });
-        await expect(checkbox).toBeFocused();
-        await checkbox.click();
-        await expect(checkbox).toBeChecked({ checked: accepted });
-        await expect(checkbox).toBeFocused();
-      }
-      const selects = header.locator('..').locator('[aria-haspopup="listbox"]');
-      for (let index = 0; index < (await selects.count()); index += 1) {
-        const select = selects.nth(index);
-        const accepted = await select.innerText();
-        await select.click();
-        const menu = page.getByRole('listbox');
-        await expect(menu).toBeVisible();
-        await inspectPopupTypography(page, 'floating-menu');
-        const bounds = (await menu.boundingBox())!;
-        expect(bounds.x).toBeGreaterThanOrEqual(-1);
-        expect(bounds.y).toBeGreaterThanOrEqual(-1);
-        expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width + 1);
-        expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height + 1);
-        await page.screenshot({
-          path: info.outputPath(`${label}-menu-${index}.png`),
-          fullPage: false,
-          animations: 'disabled',
-        });
-        await page.keyboard.press('Escape');
-        await expect(menu).toHaveCount(0);
+    for (const destination of [
+      {
+        key: 'popup.export.packageDestinationDownload',
+        action: 'popup.export.packageDestinationDownload',
+      },
+      { key: 'popup.export.packageDestinationLibrary', action: 'popup.export.saveToLibraryButton' },
+      { key: 'popup.export.packageDestinationHtml', action: 'popup.export.packageDestinationHtml' },
+    ] as const) {
+      await page
+        .getByRole('button', { name: translate(destination.key, locale), exact: true })
+        .and(page.locator('[aria-pressed]'))
+        .click();
+      const action = page.locator('[data-ui="popup.export.export-button"]');
+      await expect(action).toHaveText(translate(destination.action, locale));
+      const selections = page.locator('[data-ui="popup.export.selection-trigger"]');
+      for (
+        let selectionIndex = 0;
+        selectionIndex < (await selections.count());
+        selectionIndex += 1
+      ) {
+        const selection = selections.nth(selectionIndex);
+        await selection.click();
+        const header = page.locator('[data-ui="popup.inline-curtain.header"]');
         await expect(header).toBeVisible();
-        await expect(select).toBeFocused();
-        await expect(select).toHaveText(accepted);
-        if (index === 0) {
+        const sourceSwitch = header.locator('..').getByRole('group', {
+          name: translate('popup.export.pageSourceModeLabel', locale),
+          exact: true,
+        });
+        if (await sourceSwitch.count()) {
+          await inspectNeutralOptions(sourceSwitch);
+          await sourceSwitch
+            .getByRole('button', {
+              name: translate('popup.export.pageSourceUrls', locale),
+              exact: true,
+            })
+            .click();
+          await expect(
+            page.getByRole('textbox', {
+              name: translate('popup.export.urlInputLabel', locale),
+              exact: true,
+            })
+          ).toBeVisible();
+          await inspectNeutralOptions(sourceSwitch);
+          await page.screenshot({
+            path: info.outputPath('export-addresses.png'),
+            fullPage: false,
+            animations: 'disabled',
+          });
+          await sourceSwitch
+            .getByRole('button', {
+              name: translate('popup.export.pageSourceTabs', locale),
+              exact: true,
+            })
+            .click();
+        }
+        const checkboxes = header.locator('..').getByRole('checkbox');
+        for (const checkbox of await checkboxes.all()) {
+          await expect(checkbox).toHaveClass(/sniptale-checkbox/u);
+        }
+        const checkbox = checkboxes.first();
+        if ((await checkbox.count()) && (await checkbox.isEnabled())) {
+          const accepted = await checkbox.isChecked();
+          await checkbox.click();
+          await expect(checkbox).toBeChecked({ checked: !accepted });
+          await checkbox.click();
+          await expect(checkbox).toBeChecked({ checked: accepted });
+        }
+        await header.getByRole('button').click();
+        await expect(header).toHaveCount(0);
+      }
+      const settingsKeys =
+        destination.key === 'popup.export.packageDestinationHtml'
+          ? (['popup.export.htmlResourceSettingsTitle', 'popup.export.pageSettingsTitle'] as const)
+          : ([
+              'popup.export.packageCaptureSettingsTitle',
+              'popup.export.pageSettingsTitle',
+            ] as const);
+      for (const key of settingsKeys) {
+        const label = translate(key, locale);
+        const trigger = page.getByRole('button', { name: label, exact: true });
+        await trigger.click();
+        const header = page.locator('[data-ui="popup.inline-curtain.header"]');
+        await expect(header).toBeVisible();
+        await inspectPopupTypography(page, 'scrolling-panel');
+        const checkbox = header.locator('..').getByRole('checkbox').first();
+        if (await checkbox.count()) {
+          await expect(checkbox).toHaveClass(/sniptale-checkbox/u);
+          const accepted = await checkbox.isChecked();
+          await checkbox.click();
+          await expect(checkbox).toBeChecked({ checked: !accepted });
+          if (key === 'popup.export.htmlResourceSettingsTitle') {
+            await expect(checkbox).toBeEnabled();
+          } else {
+            await expect(checkbox).toBeFocused();
+          }
+          await checkbox.click();
+          await expect(checkbox).toBeChecked({ checked: accepted });
+          if (key === 'popup.export.htmlResourceSettingsTitle') {
+            await expect(checkbox).toBeEnabled();
+            const focusableCount = await header
+              .locator('..')
+              .locator('button:enabled, input:enabled')
+              .count();
+            for (let step = 0; step < focusableCount; step += 1) {
+              await page.keyboard.press('Tab');
+              if (await checkbox.evaluate((node) => node === document.activeElement)) break;
+            }
+            await expect(checkbox).toBeFocused();
+            expect(await checkbox.evaluate((node) => node.matches(':focus-visible'))).toBe(true);
+          } else {
+            await expect(checkbox).toBeFocused();
+          }
+        }
+        const selects = header.locator('..').locator('[aria-haspopup="listbox"]');
+        for (let index = 0; index < (await selects.count()); index += 1) {
+          const select = selects.nth(index);
+          const accepted = await select.innerText();
           await select.click();
-          const next = menu
-            .locator('[role="option"][aria-selected="false"]:not(:disabled)')
-            .first();
-          const nextLabel = await next.locator('.sniptale-select-value-label-menu').innerText();
-          await next.click();
+          const menu = page.getByRole('listbox');
+          await expect(menu).toBeVisible();
+          await inspectPopupTypography(page, 'floating-menu');
+          const bounds = (await menu.boundingBox())!;
+          expect(bounds.x).toBeGreaterThanOrEqual(-1);
+          expect(bounds.y).toBeGreaterThanOrEqual(-1);
+          expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width + 1);
+          expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height + 1);
+          await page.screenshot({
+            path: info.outputPath(`${destination.key}-${key}-menu-${index}.png`),
+            fullPage: false,
+            animations: 'disabled',
+          });
+          await page.keyboard.press('Escape');
           await expect(menu).toHaveCount(0);
           await expect(header).toBeVisible();
           await expect(select).toBeFocused();
-          await expect(select).toContainText(nextLabel);
+          await expect(select).toHaveText(accepted);
+          if (index === 0) {
+            await select.click();
+            const next = menu
+              .locator('[role="option"][aria-selected="false"]:not(:disabled)')
+              .first();
+            const nextLabel = await next.locator('.sniptale-select-value-label-menu').innerText();
+            await next.click();
+            await expect(menu).toHaveCount(0);
+            await expect(header).toBeVisible();
+            await expect(select).toBeFocused();
+            await expect(select).toContainText(nextLabel);
+          }
         }
+        await page.screenshot({
+          path: info.outputPath(`${destination.key}-${key}.png`),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await header.getByRole('button').click();
+        await expect(header).toHaveCount(0);
+        await expect(trigger).toBeFocused();
+        expect(await trigger.evaluate((node) => node.matches(':focus-visible'))).toBe(false);
       }
-      await page.screenshot({
-        path: info.outputPath(`${label}.png`),
-        fullPage: false,
-        animations: 'disabled',
-      });
-      await header.getByRole('button').click();
-      await expect(header).toHaveCount(0);
-      await expect(trigger).toBeFocused();
     }
   }
 }
@@ -305,8 +639,9 @@ async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, 
 for (const locale of ['ru', 'en'] as const) {
   for (const theme of ['light', 'dark'] as const) {
     test(`popup stylesheet isolation ${locale} ${theme}`, async ({}, info) => {
-      test.setTimeout(60_000);
+      test.setTimeout(120_000);
       const launched = await launchExtensionBrowser({ viewport, fakeMediaDevices: true });
+      const host = await startHostServer();
       try {
         const settings = await launched.context.newPage();
         await settings.setViewportSize({ width: 1280, height: 560 });
@@ -337,14 +672,26 @@ for (const locale of ['ru', 'en'] as const) {
           await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
         }, theme);
         await settings.close();
+        const source = await launched.context.newPage();
+        await source.goto(host.origin);
         const page = await launched.context.newPage();
         await page.setViewportSize(viewport);
+        await source.bringToFront();
         await page.goto(
           `chrome-extension://${launched.extensionId}/apps/extension/src/popup/index.html`
         );
         const root = page.locator('[data-ui="popup.app.root"]');
         await expect(root).toBeVisible();
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+        await expect(page.locator('html')).toHaveAttribute('data-locale', locale);
+        await expect
+          .poll(() =>
+            page.evaluate(async () => {
+              const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+              return tab?.url;
+            })
+          )
+          .toBe(`${host.origin}/`);
         for (const route of routes) {
           const navigation = page.locator(
             `[data-ui="popup.app.tabs"] button[data-page="${route}"]`
@@ -368,6 +715,44 @@ for (const locale of ['ru', 'en'] as const) {
           });
           await expect(root).toHaveCSS('width', '392px');
           await expect(root).toHaveCSS('height', '560px');
+          await expect(page.locator('[data-ui="popup.app.tabs"]')).toHaveCSS(
+            'border-radius',
+            '6px'
+          );
+          if (route === 'menu') {
+            await expect(page.locator('[data-ui="shared.ui.popup-footer"]')).toHaveCSS(
+              'border-radius',
+              '6px'
+            );
+          }
+          const primary = root.locator(
+            [
+              '[data-ui="popup.video-setup.start-recording-button"]',
+              '[data-ui="popup.export.export-button"]',
+            ].join(', ')
+          );
+          if (await primary.count()) {
+            await expect(primary).toHaveCSS('height', '40px');
+            await expect(primary).toHaveCSS('border-radius', '6px');
+            await expect(primary).toHaveCSS('justify-content', 'center');
+          }
+          if (route === 'screenshots' || route === 'video') {
+            await expect(
+              root.getByRole('button', {
+                name: translate(
+                  route === 'video' ? 'popup.video.galleryTitle' : 'popup.home.libraryTitle',
+                  locale
+                ),
+                exact: true,
+              })
+            ).toHaveCount(0);
+          }
+          if (route === 'export') {
+            await expect(root.locator('[data-ui="popup.export.copy-json-button"]')).toHaveCount(0);
+            await expect(root.locator('[data-ui="popup.export.copy-markdown-button"]')).toHaveCount(
+              0
+            );
+          }
           await expect(root.locator('[class~="p-3"]').first()).toHaveCSS('padding', '12px');
           await expect(root.locator('button[data-command-press]')).toHaveCount(0);
           if (route === 'menu') {
@@ -392,6 +777,7 @@ for (const locale of ['ru', 'en'] as const) {
             await expect(capture.locator('span')).toHaveCSS('font-weight', '450');
             await expect(capture.locator('svg')).toHaveCSS('width', '24px');
             await expect(capture.locator('svg')).toHaveCSS('stroke-width', '1.75px');
+            await expect(capture).toHaveCSS('border-radius', '6px');
             const tool = root.locator('[data-ui="popup.menu.tool-action.drawing"]');
             await expect(tool.locator('span')).toHaveCSS('font-size', '10px');
             await expect(tool.locator('span')).toHaveCSS('line-height', '12px');
@@ -408,10 +794,13 @@ for (const locale of ['ru', 'en'] as const) {
             fullPage: false,
             animations: 'disabled',
           });
-          if (locale === 'ru') await inspectPopupPanels(page, locale, route, info);
+          await inspectPopupPanels(page, locale, route, info);
         }
       } finally {
         await closeExtensionBrowser(launched, { removeUserDataDir: true });
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
       }
     });
   }

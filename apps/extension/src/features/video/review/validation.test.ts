@@ -1,5 +1,11 @@
 import { expect, it } from 'vitest';
-import { parseReviewAnnotation, parseReviewOperation, parseReviewSource } from './validation';
+import {
+  parseReviewAnnotation,
+  parseReviewDocumentBaseline,
+  parseReviewOperation,
+  parseReviewSource,
+} from './validation';
+import { createQuickEditAdvancedContent } from './advanced/defaults';
 import { createCanvasComment } from './comments';
 
 const source = { duration: 10, width: 100, height: 50, mimeType: 'video/webm', size: 1000 };
@@ -331,4 +337,47 @@ it('admits bounded source master gain operations without retaining extension fie
     expect(parseReviewOperation({ ...value, after: { muted: true, volume } }, 10)).toMatchObject({
       after: { muted: true, volume },
     });
+});
+
+it('retains admitted composition transitions on cut operations and refuses malformed settings', () => {
+  const cut = { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 };
+  const operation = { id: 'operation', at: 1, target: 'edit', before: null, after: cut };
+  expect(parseReviewOperation(operation, 10)).toMatchObject({ after: cut });
+  for (const type of ['dissolve', 'fade-black']) {
+    const transition = { type, before: 0.2, after: 0.3, color: '#123456' };
+    expect(parseReviewOperation({ ...operation, after: { ...cut, transition } }, 10)).toMatchObject(
+      { after: { ...cut, transition } }
+    );
+  }
+  for (const transition of [
+    null,
+    { type: 'dissolve', before: 0, after: 0 },
+    { type: 'fade-black', before: 0.2, after: 0.3, color: '#12345680' },
+  ]) {
+    expect(parseReviewOperation({ ...operation, after: { ...cut, transition } }, 10)).toBeNull();
+  }
+});
+
+it('retains baseline cut joins and refuses a malformed join without dropping valid edits', () => {
+  const cut = { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 };
+  const transition = { type: 'dissolve', before: 0.2, after: 0.3 };
+  const baseline = {
+    annotations: [annotation],
+    edits: [{ ...cut, transition }],
+    canvasComments: [],
+    advancedContent: createQuickEditAdvancedContent(),
+  };
+  const retained = structuredClone(baseline);
+  expect(parseReviewDocumentBaseline(baseline, 10)).toEqual(baseline);
+  const malformed = {
+    ...cut,
+    id: 'broken',
+    start: 6,
+    end: 7,
+    transition: { ...transition, before: -1 },
+  };
+  expect(
+    parseReviewDocumentBaseline({ ...baseline, edits: [...baseline.edits, malformed] }, 10)
+  ).toBeNull();
+  expect(baseline).toEqual(retained);
 });

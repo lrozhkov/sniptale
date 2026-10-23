@@ -1,3 +1,4 @@
+import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
 import { ReviewTextPhrase } from './speech-phrase';
 import { ReviewTextVoiceForm } from './text-voice-panel';
@@ -14,7 +15,7 @@ import { resolveQuickEditEffectiveState } from '../../features/video/review/adva
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { ColorField, NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { planReviewCutTransitions } from '../../features/video/review/cuts';
-import type { ReviewCutTransition, ReviewEdit } from '../../features/video/review/types';
+import type { ReviewEdit } from '../../features/video/review/types';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
 import { formatNumber, useAppLocale } from '../../platform/i18n';
 import { ReviewOriginalAudioInspector } from './original-audio-inspector';
@@ -68,7 +69,9 @@ type SelectedPropertiesProps = {
   onStopActionAudioAudition?: (() => void) | undefined;
   onKeyAnimation?(
     ids: readonly string[],
-    patch: import('../../features/video/review/advanced/key-animation').ReviewKeyPatch | null
+    patch:
+      | import('../../features/video/project/action-feedback/key-animation').ReviewKeyPatch
+      | null
   ): void;
   onClickAnimation?(
     ids: readonly string[],
@@ -367,14 +370,14 @@ function CutTransitionFields(props: {
   edit: Extract<ReviewEdit, { kind: 'cut' }>;
   edits: readonly ReviewEdit[];
   duration: number;
-  onChange(value: ReviewCutTransition | null): Promise<boolean> | undefined;
+  onChange(value: CompositionJoinSettings | null): Promise<boolean> | undefined;
 }) {
   const locale = useAppLocale();
   const [draft, setDraft] = useState(props.edit.transition ?? null);
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   useEffect(() => setDraft(props.edit.transition ?? null), [props.edit]);
-  const commit = async (value: ReviewCutTransition | null) => {
+  const commit = async (value: CompositionJoinSettings | null) => {
     if (pending.current) return;
     const next = value && value.before + value.after > 0 ? value : null;
     if (JSON.stringify(next) === JSON.stringify(props.edit.transition ?? null)) return;
@@ -415,7 +418,7 @@ function CutTransitionFields(props: {
         className="min-w-0 sniptale-parameter-stack"
         data-ui="gallery.videoReview.cutTransition"
       >
-        <SelectField<ReviewCutTransition['type'] | 'none'>
+        <SelectField<CompositionJoinSettings['type'] | 'none'>
           className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.zoomTransitionType')}
           value={draft?.type ?? 'none'}

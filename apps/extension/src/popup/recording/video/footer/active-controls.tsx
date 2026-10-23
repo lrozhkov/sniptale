@@ -86,7 +86,8 @@ function CancelConfirmActions(props: { onCancel: () => void; onContinue: () => v
         icon={Play}
         label={translate('popup.video.cancelContinueRecording')}
         iconClassName="text-[var(--sniptale-color-text-primary)]"
-        tone="secondary"
+        tone="primary"
+        centered
         dataUi="popup.video-active.cancel-continue-button"
         title={translate('popup.video.cancelContinueRecording')}
         onClick={props.onContinue}
@@ -96,6 +97,7 @@ function CancelConfirmActions(props: { onCancel: () => void; onContinue: () => v
         label={translate('popup.video.cancelDeleteRecording')}
         iconClassName="text-[var(--sniptale-color-danger)]"
         tone="secondary"
+        centered
         dataUi="popup.video-active.cancel-delete-button"
         title={translate('popup.video.cancelDeleteRecording')}
         onClick={props.onCancel}

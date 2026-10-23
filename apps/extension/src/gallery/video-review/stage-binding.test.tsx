@@ -1,3 +1,7 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
@@ -7,10 +11,9 @@ import { expect, it, vi } from 'vitest';
 import { ReviewStageBinding } from './stage-binding';
 import type { ReviewStage } from './stage';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
+
 import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 
 let outerFadePlan: Parameters<typeof ReviewStage>[0]['outerFadePlan'];
 let watermark: Parameters<typeof ReviewStage>[0]['watermark'];

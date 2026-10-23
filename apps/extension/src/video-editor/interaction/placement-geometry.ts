@@ -1,3 +1,4 @@
+import { resizeOrientedMotionArea } from '../../features/video/project/motion/focus-area';
 import type {
   VideoProject,
   VideoProjectMotionArea,
@@ -46,6 +47,8 @@ export function buildDraggedArea(
   deltaY: number,
   mode: 'move' | 'resize'
 ): VideoProjectMotionArea {
+  if (area.axes && mode === 'resize')
+    return resizeOrientedMotionArea(area, 'se', { x: deltaX, y: deltaY });
   return mode === 'move'
     ? { ...area, x: area.x + deltaX, y: area.y + deltaY }
     : { ...area, width: area.width + deltaX, height: area.height + deltaY };

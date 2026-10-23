@@ -1,5 +1,8 @@
 import type { VideoCompositionCursorState } from '../../types';
 
+const ARROW_STROKE_WIDTH = 1.5;
+const ARROW_MITER_LIMIT = 10;
+
 export function drawCursorCompositionState(
   context: CanvasRenderingContext2D,
   cursor: VideoCompositionCursorState
@@ -40,6 +43,34 @@ export function drawCursorCompositionState(
   context.restore();
 }
 
+/** Bounds use the painter's raster coordinates, including its unscaled shadow and float offset. */
+export function resolveCursorCompositionPaintBounds(cursor: VideoCompositionCursorState) {
+  if (!cursor.visible) return null;
+  const scale = cursor.scale * resolveCursorAnimationScale(cursor);
+  // Acute arrow corners extend beyond half the stroke: include the painter's miter limit.
+  const glyph =
+    cursor.preset === 'ARROW'
+      ? {
+          x: (-ARROW_STROKE_WIDTH * ARROW_MITER_LIMIT) / 2,
+          y: (-ARROW_STROKE_WIDTH * ARROW_MITER_LIMIT) / 2,
+          width: 24 + ARROW_STROKE_WIDTH * ARROW_MITER_LIMIT,
+          height: 34 + ARROW_STROKE_WIDTH * ARROW_MITER_LIMIT,
+        }
+      : cursor.preset === 'DOT'
+        ? { x: -9, y: -9, width: 18, height: 18 }
+        : cursor.preset === 'RING'
+          ? { x: -11.5, y: -11.5, width: 23, height: 23 }
+          : { x: -15, y: -15, width: 30, height: 30 };
+  // Three blur radii preserve the existing canvas-shadow capture support.
+  const blur = cursor.shadow ? 48 : 0;
+  return {
+    x: cursor.x + glyph.x * scale - blur - 2,
+    y: cursor.y + resolveCursorAnimationOffsetY(cursor) + glyph.y * scale - blur - 2,
+    width: glyph.width * scale + blur * 2 + 4,
+    height: glyph.height * scale + blur * 2 + (cursor.shadow ? 6 : 0) + 4,
+  };
+}
+
 function resolveCursorAnimationScale(cursor: VideoCompositionCursorState): number {
   const phase = cursor.time * Math.PI * 2;
 
@@ -75,7 +106,9 @@ function drawArrowCursor(context: CanvasRenderingContext2D, color: string): void
   context.closePath();
   context.fillStyle = color;
   context.fill();
-  context.lineWidth = 1.5;
+  context.lineWidth = ARROW_STROKE_WIDTH;
+  context.lineJoin = 'miter';
+  context.miterLimit = ARROW_MITER_LIMIT;
   context.strokeStyle = 'rgba(255, 255, 255, 0.88)';
   context.stroke();
 }

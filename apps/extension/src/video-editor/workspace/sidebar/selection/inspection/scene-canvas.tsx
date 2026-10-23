@@ -24,6 +24,7 @@ function dimensions(x: number, y: number, shortEdge: number) {
 export function SceneCanvasFields(props: {
   width: number;
   height: number;
+  rememberedCanvas?: { width: number; height: number } | undefined;
   onResizeProject: WorkspaceSidebarSelectionPanelProps['onResizeProject'];
 }) {
   const { width, height, onResizeProject } = props;
@@ -33,6 +34,20 @@ export function SceneCanvasFields(props: {
     const size = dimensions(format?.x ?? width, format?.y ?? height, edge);
     return { value: String(edge), label: `${size.width} × ${size.height}`, ...size };
   });
+  if (
+    props.rememberedCanvas &&
+    !resolutions.some(
+      (item) =>
+        item.width === props.rememberedCanvas!.width &&
+        item.height === props.rememberedCanvas!.height
+    )
+  ) {
+    resolutions.push({
+      value: 'remembered',
+      label: `${props.rememberedCanvas.width} × ${props.rememberedCanvas.height}`,
+      ...props.rememberedCanvas,
+    });
+  }
   const uniqueResolutions = resolutions.filter(
     (item, index) =>
       resolutions.findIndex(

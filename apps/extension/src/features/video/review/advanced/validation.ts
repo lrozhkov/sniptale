@@ -1,26 +1,30 @@
+import { parseReviewAudioClip } from '../audio-clip-validation';
+import {
+  parseQuickEditBorder,
+  parseQuickEditSpotlight,
+} from '../../project/scene/focus-appearance';
+import { parseMotionBlurPhases } from '../../project/motion/blur';
 import { parseCameraFollowSettings } from '../../project/camera/cursor-policy';
 import { parseCursorFocusPath } from '../../project/cursor-focus-path/validation';
 import { parseReviewActionAudio } from './action-audio';
 import { parseQuickEditShadow } from './shadow-validation';
 import { parseReviewAnnotationEffects } from '../annotation-effects/validation';
 import { parseReviewOriginalSpeech } from '../original-speech';
-import {
-  parseReviewCaptionSettings,
-  parseReviewTextDocument,
-  parseReviewVoiceTextSnapshot,
-} from '../text-validation';
+import { parseReviewCaptionSettings, parseReviewTextDocument } from '../text-validation';
 import { parseQuickEditPresentationSettings } from './presentation';
-import { parseQuickEditWatermark } from './watermark';
-import { parseReviewSpeechTranscript } from '../speech-validation';
-import { parseReviewKeyAnimations } from './key-animation';
-import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
+import { parseQuickEditWatermark } from '../../project/scene/watermark';
+import { parseReviewKeyAnimations } from '../../project/action-feedback/key-animation';
+import {
+  parseCameraPerspective as parseQuickEditPerspective,
+  parseCameraDepth as parseQuickEditDepth,
+} from '../../project/motion/spatial';
 import { parseReviewClickAnimations } from './click-animation';
-import { parseQuickEditBorder } from './border';
+
 import { quickEditFocusConflicts } from './focus-layout';
-import { parseOriginalAudioRanges } from './original-audio';
+import { parseSourceAudioGainRanges } from '../../audio/source-envelope';
 import { parseOriginalAudioMutes, validOriginalAudioMuteBindings } from './original-audio-mutes';
-import { parseVoiceoverAnchors, parseVoiceoverSegments } from '../voiceover-validation';
-import { parseQuickEditSpotlight } from './focus';
+import { parseVoiceoverSegments } from '../voiceover-validation';
+
 import { parsePaint, normalizePaintColor } from '@sniptale/foundation/paint';
 import { isBoundedNumber, isUnitInterval } from '../../project/validation/primitives';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -42,7 +46,7 @@ import {
   type QuickEditZoomTransition,
 } from './types';
 import { parseQuickEditCanvas } from './canvas';
-import { parseWindowHeader } from '../../../browser-frame/header';
+import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { parseQuickEditWebcam } from './webcam';
 import { createQuickEditAdvancedState } from './defaults';
 import { migrateQuickEditAdvancedV1 } from './migration';
@@ -171,6 +175,8 @@ function parseUiState(value: unknown): QuickEditUiState | null {
   if (!lockedTracks) return null;
   const initialized = value['advancedTracksInitialized'];
   if (initialized !== undefined && typeof initialized !== 'boolean') return null;
+  const modeSelectionPending = value['modeSelectionPending'];
+  if (modeSelectionPending !== undefined && typeof modeSelectionPending !== 'boolean') return null;
   const workspaceColors = parseWorkspaceColors(value['workspaceColors']);
   if (!workspaceColors) return null;
   const tracks = parseTrackVisibility(value['tracks']);
@@ -180,6 +186,7 @@ function parseUiState(value: unknown): QuickEditUiState | null {
     ...(value['workspaceColors'] === undefined ? {} : { workspaceColors }),
     ...(value['lockedTracks'] === undefined ? {} : { lockedTracks }),
     mode: value['mode'],
+    ...(modeSelectionPending === undefined ? {} : { modeSelectionPending }),
     ...(initialized === undefined ? {} : { advancedTracksInitialized: initialized }),
     tracks,
     overlaysVisible: value['overlaysVisible'] === false ? false : true,
@@ -207,24 +214,6 @@ function parseCameraTransform(value: unknown): QuickEditCameraTransform | null {
   return { scale: value['scale'], centerX: value['centerX'], centerY: value['centerY'] };
 }
 
-function parseMotionBlur(value: unknown): QuickEditZoomRegion['motionBlur'] | null {
-  if (value === undefined) return undefined;
-  if (!isRecord(value)) return null;
-  const result: NonNullable<QuickEditZoomRegion['motionBlur']> = {};
-  for (const phase of ['enter', 'exit', 'link'] as const) {
-    const setting = value[phase];
-    if (setting === undefined) continue;
-    if (
-      !isRecord(setting) ||
-      typeof setting['enabled'] !== 'boolean' ||
-      !isBoundedNumber(setting['strength'], 0, 1)
-    )
-      return null;
-    result[phase] = { enabled: setting['enabled'], strength: setting['strength'] };
-  }
-  return result;
-}
-
 function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   if (
     !isRecord(value) ||
@@ -244,7 +233,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   const perspective = parseQuickEditPerspective(value['perspective']);
   const depthOfField = parseQuickEditDepth(value['depthOfField']);
   if (perspective === null || depthOfField === null) return null;
-  const motionBlur = parseMotionBlur(value['motionBlur']);
+  const motionBlur = parseMotionBlurPhases(value['motionBlur']);
   if (motionBlur === null) return null;
   const spotlight =
     value['spotlight'] === undefined ? undefined : parseQuickEditSpotlight(value['spotlight']);
@@ -414,54 +403,8 @@ function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | 
   return null;
 }
 
-function parseAudioClip(value: unknown): QuickEditAudioClip | null {
-  if (
-    !isRecord(value) ||
-    !identity(value['id']) ||
-    !identity(value['assetId']) ||
-    (value['tempo'] !== undefined && !isBoundedNumber(value['tempo'], 0.25, 4)) ||
-    !isBoundedNumber(value['timelineStart'], 0, MAX_QUICK_EDIT_TIME) ||
-    !isBoundedNumber(value['sourceOffset'], 0, MAX_QUICK_EDIT_TIME) ||
-    !isBoundedNumber(value['duration'], 0.001, MAX_QUICK_EDIT_TIME) ||
-    !isBoundedNumber(value['volume'], 0, MAX_QUICK_EDIT_CLIP_VOLUME) ||
-    typeof value['muted'] !== 'boolean' ||
-    !isBoundedNumber(value['fadeIn'], 0, MAX_QUICK_EDIT_TRANSITION) ||
-    !isBoundedNumber(value['fadeOut'], 0, MAX_QUICK_EDIT_TRANSITION)
-  )
-    return null;
-  const sourceAnchor =
-    value['sourceAnchor'] === undefined
-      ? undefined
-      : parseVoiceoverAnchors(value['sourceAnchor'], value['timelineStart'], value['duration']);
-  const transcript =
-    value['transcript'] === undefined
-      ? undefined
-      : parseReviewSpeechTranscript(value['transcript']);
-  const textSnapshot =
-    value['textSnapshot'] === undefined
-      ? undefined
-      : parseReviewVoiceTextSnapshot(value['textSnapshot']);
-  if (sourceAnchor === null || transcript === null || textSnapshot === null) return null;
-  return {
-    ...(textSnapshot ? { textSnapshot } : {}),
-    ...(sourceAnchor ? { sourceAnchor } : {}),
-    ...(transcript ? { transcript } : {}),
-    ...(typeof value['tempo'] === 'number' ? { tempo: value['tempo'] } : {}),
-    id: value['id'],
-    assetId: value['assetId'],
-    timelineStart: value['timelineStart'],
-    sourceOffset: value['sourceOffset'],
-    duration: value['duration'],
-    volume: value['volume'],
-    muted: value['muted'],
-    fadeIn: value['fadeIn'],
-    fadeOut: value['fadeOut'],
-    ...(typeof value['dormant'] === 'boolean' ? { dormant: value['dormant'] } : {}),
-  };
-}
-
 function parseAudioClips(value: unknown): QuickEditAudioClip[] | null {
-  const clips = parseBoundedArray(value, MAX_QUICK_EDIT_AUDIO_CLIPS, parseAudioClip);
+  const clips = parseBoundedArray(value, MAX_QUICK_EDIT_AUDIO_CLIPS, parseReviewAudioClip);
   if (!clips) return null;
   const ids = new Set<string>();
   for (const clip of clips) {
@@ -479,7 +422,7 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
   )
     return null;
   const ranges =
-    value['ranges'] === undefined ? undefined : parseOriginalAudioRanges(value['ranges']);
+    value['ranges'] === undefined ? undefined : parseSourceAudioGainRanges(value['ranges']);
   const mutes = value['mutes'] === undefined ? undefined : parseOriginalAudioMutes(value['mutes']);
   if (ranges === null || mutes === null) return null;
   return {

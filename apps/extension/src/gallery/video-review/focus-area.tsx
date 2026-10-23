@@ -1,10 +1,13 @@
+import {
+  type QuickEditSpotlight,
+  clampQuickEditSpotlightArea,
+} from '../../features/video/project/scene/focus-appearance';
 import { captureReviewSpatialPointer } from './spatial-pointer';
-import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
+import type { QuickEditHomography } from '../../features/video/composition/motion/spatial-geometry';
 import { useRef, type PointerEvent, type KeyboardEvent } from 'react';
 import { useCapturedPreview } from './captured-preview';
 import { translate } from '../../platform/i18n';
-import { clampQuickEditSpotlightArea } from '../../features/video/review/advanced/focus';
-import type { QuickEditSpotlight } from '../../features/video/review/advanced/types';
+
 import {
   ReviewFocusFrame,
   focusCorner,

@@ -28,7 +28,7 @@ export function PaintModeSelector(props: {
   return (
     <div
       aria-label={translate('highlighter.paintPicker.mode')}
-      className="flex min-w-0 items-center gap-1"
+      className="paint-selector-modes flex min-w-0 items-center gap-1"
       role="toolbar"
     >
       {MODES.filter(({ mode }) => props.allowedModes?.includes(mode) ?? true).map(
@@ -38,6 +38,7 @@ export function PaintModeSelector(props: {
             <Fragment key={mode}>
               <ProductGlassIconButton
                 active={props.activeSection === 'paint' && props.mode === mode}
+                aria-pressed={props.activeSection === 'paint' && props.mode === mode}
                 aria-label={label}
                 className="!h-8 !w-8 shrink-0"
                 onClick={() => props.onChange(mode)}
@@ -48,6 +49,7 @@ export function PaintModeSelector(props: {
               {index === 0 ? (
                 <ProductGlassIconButton
                   active={props.activeSection === 'templates'}
+                  aria-pressed={props.activeSection === 'templates'}
                   aria-label={translate('highlighter.paintPicker.presets')}
                   className="!h-8 !w-8 shrink-0"
                   onClick={props.onShowTemplates}

@@ -16,7 +16,71 @@ import {
   resolveDrawingResizeHandle,
   resizeDrawingObject,
   rotateDrawingObject,
+  rotateDrawingSelection,
+  getDrawingMultiRotationHandlePoint,
 } from './interaction';
+import {
+  getDrawingSelectionBounds,
+  getDrawingBoundsCenter,
+  rotateDrawingPoint,
+} from '../../features/drawing/public';
+
+it('rotates a multi-selection from fixed original geometry with one commit and no empty gesture', () => {
+  const onDocumentCommit = vi.fn(() => true);
+  const session = createDrawingSession({ onDocumentCommit });
+  session.commitObject({
+    id: 'one',
+    kind: 'rectangle',
+    bounds: { x: 20, y: 20, width: 80, height: 40 },
+    color: '#000',
+    width: 4,
+    rotation: 20,
+  });
+  session.commitObject({
+    id: 'two',
+    kind: 'arrow',
+    start: { x: 160, y: 40 },
+    end: { x: 240, y: 80 },
+    color: '#000',
+    width: 6,
+    dynamicWidth: false,
+  });
+  session.setActiveTool('select');
+  session.setSelection(['one', 'two']);
+  const original = session.getSnapshot().document.objects;
+  const bounds = getDrawingSelectionBounds(original)!;
+  const center = getDrawingBoundsCenter(bounds);
+  const start = getDrawingMultiRotationHandlePoint(bounds);
+  const result = beginDrawingPointer({
+    point: start,
+    snapshot: session.getSnapshot(),
+    timestamp: 0,
+  });
+  if (result.draft?.kind !== 'rotate-selection') throw new Error('Expected multi rotation');
+  onDocumentCommit.mockClear();
+  commitDrawingPointerDraft(session, result.draft);
+  expect(onDocumentCommit).not.toHaveBeenCalled();
+  const shifted = rotateDrawingSelection(result.draft, rotateDrawingPoint(start, center, 31), {
+    shiftKey: true,
+    ctrlKey: false,
+  });
+  expect(shifted.angle).toBe(30);
+  const free = rotateDrawingSelection(shifted, rotateDrawingPoint(start, center, 47), {
+    shiftKey: false,
+    ctrlKey: true,
+  });
+  expect(free.angle).toBeCloseTo(47);
+  const magnetic = rotateDrawingSelection(result.draft, rotateDrawingPoint(start, center, 47), {
+    shiftKey: false,
+    ctrlKey: false,
+  });
+  expect(magnetic.angle).toBe(45);
+  expect(session.getSnapshot().document.objects).toEqual(original);
+  commitDrawingPointerDraft(session, shifted);
+  expect(onDocumentCommit).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['one', 'two']);
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ rotation: 50 });
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -183,7 +247,7 @@ it('starts a group move from an already selected object and commits every object
   ).toEqual([20, 70]);
 });
 
-it('uses soft angle magnetism for linear tools and lets Ctrl bypass it', () => {
+it('keeps linear tools free without Shift, including near horizontal', () => {
   const start = { x: 10, y: 20 };
   const point = { x: 110, y: 25 };
 
@@ -193,7 +257,7 @@ it('uses soft angle magnetism for linear tools and lets Ctrl bypass it', () => {
       point,
       start,
     })
-  ).toEqual({ x: 110.12492197250393, y: 20 });
+  ).toEqual(point);
   expect(
     resolveDrawingLinearPoint({
       modifiers: { ctrlKey: true, shiftKey: false },
@@ -202,6 +266,39 @@ it('uses soft angle magnetism for linear tools and lets Ctrl bypass it', () => {
     })
   ).toEqual(point);
 });
+
+it.each(['start', 'end'] as const)(
+  'keeps the %s arrow endpoint free and restores it after Shift release',
+  (handle) => {
+    const original = {
+      id: 'arrow',
+      kind: 'arrow' as const,
+      color: '#ef4444',
+      width: 4,
+      design: 'standard' as const,
+      dynamicWidth: false,
+      start: { x: 100, y: 80 },
+      end: { x: 300, y: 80 },
+    };
+    const draft = {
+      kind: 'resize' as const,
+      handle,
+      object: original,
+      original,
+      start: original[handle],
+    };
+    const point = { ...original[handle], y: 84 };
+    const free = resizeDrawingObject(draft, point, { ctrlKey: false, shiftKey: false });
+    expect(free).toMatchObject({
+      [handle]: point,
+      [handle === 'start' ? 'end' : 'start']: original[handle === 'start' ? 'end' : 'start'],
+    });
+    expect(resizeDrawingObject(draft, point, { ctrlKey: false, shiftKey: true })).toMatchObject({
+      [handle]: { y: expect.closeTo(80, 8) },
+    });
+    expect(resizeDrawingObject(draft, point, { ctrlKey: false, shiftKey: false })).toEqual(free);
+  }
+);
 
 it('uses strict 15 degree steps for linear tools while Shift is held', () => {
   const start = { x: 10, y: 20 };

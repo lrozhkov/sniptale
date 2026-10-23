@@ -13,8 +13,13 @@ const context = {
   restore: vi.fn(),
   beginPath: vi.fn(),
   roundRect: vi.fn(),
+  moveTo: vi.fn(),
+  lineTo: vi.fn(),
+  closePath: vi.fn(),
   clip: vi.fn(),
   drawImage: draw,
+  translate: vi.fn(),
+  scale: vi.fn(),
 };
 beforeEach(() => {
   container = document.createElement('div');
@@ -152,4 +157,69 @@ it('keeps failed media recoverable and releases its source when unmounted', () =
   expect(button().disabled).toBe(false);
   act(() => root.render(null));
   expect(video.hasAttribute('src')).toBe(false);
+});
+
+it('keeps mirrored crop dragging and keyboard movement in the visible direction', () => {
+  const p = props();
+  act(() => root.render(<CameraCropPreview {...p} mirrored />));
+  ready();
+  expect(context.scale).toHaveBeenCalledWith(-1, 1);
+  pointer('pointerdown', 100, 75);
+  pointer('pointermove', 120, 65);
+  pointer('pointerup', 120, 65);
+  expect(p.onChange).toHaveBeenCalledWith({ ...p.appearance, panX: 0.2, panY: 2 / 15 });
+  p.onChange.mockClear();
+  act(() =>
+    button().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }))
+  );
+  expect(p.onChange).toHaveBeenCalledWith({ ...p.appearance, panX: -0.1 });
+});
+
+it('uses a square circle preview and retains mirrored pan semantics', () => {
+  const p = {
+    ...props(),
+    mirrored: true,
+    appearance: { ...DEFAULT_CAMERA_APPEARANCE, shape: 'circle' as const, zoom: 2 },
+  };
+  act(() => root.render(<CameraCropPreview {...p} />));
+  ready();
+  expect(button().style.aspectRatio).toBe('150 / 150');
+  expect(button().style.maxWidth).toBe('176px');
+  const bounds = button().getBoundingClientRect();
+  vi.spyOn(button(), 'getBoundingClientRect').mockReturnValue({
+    ...bounds,
+    width: 150,
+    height: 150,
+    right: 150,
+    bottom: 150,
+  });
+  pointer('pointerdown', 10, 10);
+  pointer('pointermove', 25, 10);
+  pointer('pointerup', 25, 10);
+  expect(p.onChange).toHaveBeenCalledExactlyOnceWith({ ...p.appearance, panX: 0.12 });
+});
+
+it('seeks the latest source time without reloading the same camera source', () => {
+  const p = props();
+  act(() => root.render(<CameraCropPreview {...p} />));
+  const video = ready();
+  Object.defineProperty(video, 'readyState', { value: 2, configurable: true });
+  const count = load.mock.calls.length;
+  act(() => root.render(<CameraCropPreview {...p} sourceTime={3} />));
+  expect(load).toHaveBeenCalledTimes(count);
+  expect(video.currentTime).toBe(3);
+  act(() => root.render(<CameraCropPreview {...p} sourceTime={4} />));
+  expect(load).toHaveBeenCalledTimes(count);
+  expect(video.currentTime).toBe(4);
+});
+
+it('uses the latest requested time when camera metadata arrives late', () => {
+  const p = props();
+  act(() => root.render(<CameraCropPreview {...p} />));
+  const video = container.querySelector('video')!;
+  const count = load.mock.calls.length;
+  act(() => root.render(<CameraCropPreview {...p} sourceTime={3} />));
+  expect(load).toHaveBeenCalledTimes(count);
+  act(() => video.dispatchEvent(new Event('loadedmetadata')));
+  expect(video.currentTime).toBe(3);
 });

@@ -1,3 +1,4 @@
+import { InformationDisclosure } from '../../../../../ui/compact-inspector-controls/disclosure';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
 import {
@@ -43,13 +44,11 @@ function AnnotationTemplateCard(
     definition: ReturnType<typeof getVideoOverlayTemplateDefinition>;
   }
 ) {
-  const motionPreset = getAnnotationMotionPreset(props.clip.templateKind);
   const compatibleTemplateKinds = getCompatibleAnnotationTemplateKinds(props.clip.templateKind);
   const swapStyleActions = compatibleTemplateKinds.map(
     (templateKind: SelectedAnnotationClip['templateKind']) =>
       createSwapStyleAction(props, templateKind)
   );
-  const recommendedActions = createRecommendedActions(props, motionPreset);
 
   return (
     <div className={PANEL_SECTION_CLASS_NAME}>
@@ -64,7 +63,9 @@ function AnnotationTemplateCard(
         }
         options={getAnnotationTemplateOptions()}
       />
-      <AnnotationTemplateMetadata definition={props.definition} />
+      <InformationDisclosure label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+        <AnnotationTemplateMetadata definition={props.definition} />
+      </InformationDisclosure>
       {swapStyleActions.length > 0 ? (
         <QuickActionGroup
           disabled={props.disabled}
@@ -72,12 +73,16 @@ function AnnotationTemplateCard(
           actions={swapStyleActions}
         />
       ) : null}
-      <QuickActionGroup
-        disabled={props.disabled}
-        label={translate('videoEditor.sidebar.annotationRecommendedDefaultsLabel')}
-        actions={recommendedActions}
-      />
     </div>
+  );
+}
+
+export function AnnotationResetActions(props: Parameters<typeof AnnotationSummarySection>[0]) {
+  return (
+    <QuickActionGroup
+      disabled={props.disabled}
+      actions={createRecommendedActions(props, getAnnotationMotionPreset(props.clip.templateKind))}
+    />
   );
 }
 
@@ -118,7 +123,7 @@ function createSwapStyleAction(
 }
 
 function createRecommendedActions(
-  props: Parameters<typeof AnnotationTemplateCard>[0],
+  props: Parameters<typeof AnnotationSummarySection>[0],
   motionPreset: ReturnType<typeof getAnnotationMotionPreset>
 ) {
   return [
@@ -157,11 +162,11 @@ function createRecommendedActions(
 function QuickActionGroup(props: {
   actions: Array<{ key: string; label: string; onClick: () => void }>;
   disabled?: boolean;
-  label: string;
+  label?: string;
 }) {
   return (
     <div className="space-y-1.5">
-      <p className={PANEL_META_CLASS_NAME}>{props.label}</p>
+      {props.label ? <p className={PANEL_META_CLASS_NAME}>{props.label}</p> : null}
       <div className="flex flex-wrap gap-2">
         {props.actions.map((action) => (
           <InspectorActionButton

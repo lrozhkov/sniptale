@@ -34,12 +34,16 @@ it('restores generic chrome when an all-drawing ActiveSelection becomes mixed', 
 
   handleSelectionChange();
   expect(selection.borderColor).toBe('#2563eb');
-  expect(selection.hasControls).toBe(false);
+  expect(selection.hasControls).toBe(true);
+  expect(Object.keys(selection.controls)).toEqual(['mtr']);
 
   selection.add(ordinary);
   handleSelectionChange();
   expect(selection.borderColor).toBe('#f97316');
   expect(selection.borderDashArray).toBeNull();
   expect(selection.hasControls).toBe(true);
+  expect(selection.controls['tl']).toBeDefined();
+  expect(selection.lockScalingX).toBe(false);
+  expect(selection.lockScalingY).toBe(false);
   canvas.dispose();
 });

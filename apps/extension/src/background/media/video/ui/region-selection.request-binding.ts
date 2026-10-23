@@ -19,7 +19,7 @@ export type RegionSelectionRequestBinding = Pick<
   tabId: number;
 };
 
-const REGION_SELECTION_REQUEST_TTL_MS = 60000;
+export const REGION_SELECTION_REQUEST_TTL_MS = 60000;
 const TOP_LEVEL_FRAME_ID = 0;
 
 function createRegionSelectionRequestToken(): string {

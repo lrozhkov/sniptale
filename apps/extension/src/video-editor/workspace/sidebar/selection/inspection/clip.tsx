@@ -1,3 +1,5 @@
+import { CameraVisibilityControls } from '../inputs/camera-visibility';
+import { InspectProjectRecognition } from './recognition';
 import { CameraAppearanceControls } from '../inputs/camera-appearance';
 import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
 import type React from 'react';
@@ -5,6 +7,7 @@ import { translate } from '../../../../../platform/i18n';
 import {
   isAnnotationClip,
   isSubtitleClip,
+  isTextClip,
   isVideoClip,
 } from '../../../../../features/video/project/timeline';
 import type { VideoProjectAnnotationClip } from '../../../../../features/video/project/types/index';
@@ -31,7 +34,8 @@ import {
   renderTextStyleFields,
 } from '../inputs/text-shape';
 import { renderTransformFields } from '../inputs/transform-fields';
-import { createEffectInstanceGroups } from '../effect-instance/groups';
+import { createEffectInstanceGroups, EffectAttachmentControls } from '../effect-instance/groups';
+import { TextTemplateUpgradeFields } from '../inputs/text-upgrade';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
 import { CameraLayoutControls, CameraFitControls } from '../inputs/camera-layout';
@@ -137,12 +141,25 @@ function createStandardClipGroups(
   const cameraPosition = isCameraRoleVideoClip(props.project, clip)
     ? activeCameraPosition(clip, props.currentTime ?? clip.startTime)
     : undefined;
-  const transformContent = renderTransformFields(
+  const transformFields = renderTransformFields(
     cameraPosition ? { ...clip, transform: cameraPosition.transform } : clip,
     runtime.selectedTrackLocked,
     props.onUpdateClipTransform,
     isCameraRoleVideoClip(props.project, clip)
   );
+  const transformContent =
+    clip.type === 'EFFECT' && clip.attachment ? (
+      <>
+        <EffectAttachmentControls
+          project={props.project}
+          host={clip}
+          disabled={runtime.selectedTrackLocked}
+        />
+        {transformFields}
+      </>
+    ) : (
+      transformFields
+    );
   const audioContent = renderAudioFields(props);
   const contentFields = renderClipContentFields(props, clip, runtime);
   const styleFields = renderClipStyleFields(props, clip, runtime);
@@ -169,6 +186,7 @@ function createStandardClipGroups(
             <ClipFadeFields
               audio
               clipId={clip.id}
+              duration={clip.duration}
               fadeInMs={clip.fadeInMs}
               fadeOutMs={clip.fadeOutMs}
               locked={runtime.selectedTrackLocked}
@@ -194,6 +212,7 @@ function createStandardClipGroups(
       content: (
         <ClipFadeFields
           clipId={clip.id}
+          duration={clip.duration}
           fadeInMs={clip.fadeInMs}
           fadeOutMs={clip.fadeOutMs}
           locked={runtime.selectedTrackLocked}
@@ -201,7 +220,36 @@ function createStandardClipGroups(
         />
       ),
     },
+    {
+      id: 'recognition',
+      semantic: 'processing' as const,
+      label: translate('gallery.videoReview.recognitionTitle'),
+      visible: !!props.recognition && (clip.type === 'VIDEO' || clip.type === 'AUDIO'),
+      content: props.recognition ? (
+        <InspectProjectRecognition
+          key={`${props.project.id}:${clip.id}`}
+          project={props.project}
+          clipId={clip.id}
+          controller={props.recognition}
+        />
+      ) : null,
+    },
     ...createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
+    {
+      id: 'conversion',
+      semantic: 'processing' as const,
+      label: translate('videoEditor.sidebar.textTemplateUpgradeLabel'),
+      visible: isTextClip(clip) && !!props.onConvertTextClipToAnnotation,
+      content:
+        isTextClip(clip) && props.onConvertTextClipToAnnotation ? (
+          <TextTemplateUpgradeFields
+            key={clip.id}
+            clipId={clip.id}
+            disabled={runtime.selectedTrackLocked}
+            onConvertTextClipToAnnotation={props.onConvertTextClipToAnnotation}
+          />
+        ) : null,
+    },
   ] as const;
 }
 
@@ -236,6 +284,17 @@ function createCameraPlacementGroup(
             : { canAddCameraPosition: props.canAddCameraPosition })}
         />
         {transformContent}
+        <CameraVisibilityControls
+          key={clip.id}
+          clip={clip}
+          currentTime={props.currentTime ?? clip.startTime}
+          sourceDuration={
+            props.project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
+            clip.sourceStart + clip.sourceDuration
+          }
+          disabled={locked}
+          {...(props.onEditCameraPosition ? { onEdit: props.onEditCameraPosition } : {})}
+        />
       </>
     ) : null,
     visible: isCameraClip,
@@ -268,6 +327,12 @@ function createCameraAppearanceGroup(
           disabled={locked}
           shadowIntensity={clip.shadowIntensity ?? 0}
           shadowMode={clip.shadowMode ?? 'BACKDROP'}
+          recentColors={props.recentColors}
+          onRememberRecentColor={props.onRememberRecentColor}
+          {...(clip.shadowColor === undefined ? {} : { shadowColor: clip.shadowColor })}
+          {...(props.onUpdateMediaClipShadowColor
+            ? { onUpdateMediaClipShadowColor: props.onUpdateMediaClipShadowColor }
+            : {})}
           {...(props.onUpdateMediaClipShadowIntensity
             ? { onUpdateMediaClipShadowIntensity: props.onUpdateMediaClipShadowIntensity }
             : {})}
@@ -338,6 +403,7 @@ function createClipEffectGroup(
     clip.type === VideoProjectClipType.EFFECT ? clip.effectInstanceId : undefined;
   return createEffectInstanceGroups({
     disabled: locked,
+    includeHostControls: false,
     onDeleteEffectInstance: props.onDeleteEffectInstance ?? (() => undefined),
     onDuplicateEffectInstance: props.onDuplicateEffectInstance ?? (() => null),
     onMoveEffectInstance: props.onMoveEffectInstance ?? (() => undefined),
@@ -399,8 +465,7 @@ function renderClipStyleFields(
       runtime.selectedTrackLocked,
       props.onUpdateTextStyle,
       props.recentColors,
-      props.onRememberRecentColor,
-      props.onConvertTextClipToAnnotation
+      props.onRememberRecentColor
     ) ??
     renderShapeStyleFields(
       clip,

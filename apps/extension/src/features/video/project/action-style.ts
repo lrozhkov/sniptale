@@ -1,4 +1,4 @@
-import type { VideoActionClickStyle, VideoActionKeyStyle } from './types';
+import type { VideoActionClickStyle, VideoActionKeyStyle } from './types/interaction';
 
 /** Authored sizes are logical source pixels, independent of preview DPR. */
 export function getActionClickStyle(style?: VideoActionClickStyle): VideoActionClickStyle {

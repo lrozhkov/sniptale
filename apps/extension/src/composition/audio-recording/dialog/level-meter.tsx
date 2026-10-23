@@ -5,9 +5,11 @@ import { translate } from '../../../platform/i18n';
 export function RecordingLevelMeter({
   meter,
   preparing,
+  compact = false,
 }: {
   meter: AudioRecordingMeter;
   preparing: boolean;
+  compact?: boolean;
 }) {
   const status = preparing ? 'preparing' : meter.status;
   if (status === 'idle') return null;
@@ -17,12 +19,18 @@ export function RecordingLevelMeter({
   return (
     <div
       className={[
-        'flex min-w-0 items-center gap-2 rounded-md border px-2 py-1.5 text-xs',
+        'min-w-0 rounded-md border px-2 py-1.5 text-xs',
+        compact ? 'grid grid-cols-2 gap-x-2 gap-y-1.5' : 'flex items-center gap-2',
         'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]',
       ].join(' ')}
       data-ui="audio-recording.level"
     >
-      <span className="shrink-0 text-[var(--sniptale-color-text-muted)]">
+      <span
+        className={[
+          'text-[var(--sniptale-color-text-muted)]',
+          compact ? 'col-start-1 row-start-1 min-w-0' : 'shrink-0',
+        ].join(' ')}
+      >
         {translate('videoEditor.app.recordAudioMicrophone')}
       </span>
       <div
@@ -32,7 +40,10 @@ export function RecordingLevelMeter({
         aria-valuemax={100}
         aria-valuenow={percent}
         aria-valuetext={label}
-        className="flex h-6 min-w-24 items-center justify-center rounded bg-[var(--sniptale-color-surface-hover)] px-2"
+        className={[
+          'flex h-6 items-center justify-center rounded bg-[var(--sniptale-color-surface-hover)] px-2',
+          compact ? 'col-span-2 row-start-2 min-w-0' : 'min-w-24',
+        ].join(' ')}
       >
         <AudioAmplitudeBars
           active={active}
@@ -41,7 +52,14 @@ export function RecordingLevelMeter({
           className="h-4"
         />
       </div>
-      <span className="min-w-0 text-[var(--sniptale-color-text-muted)]">{label}</span>
+      <span
+        className={[
+          'min-w-0 text-[var(--sniptale-color-text-muted)]',
+          compact ? 'col-start-2 row-start-1 text-right' : '',
+        ].join(' ')}
+      >
+        {label}
+      </span>
     </div>
   );
 }

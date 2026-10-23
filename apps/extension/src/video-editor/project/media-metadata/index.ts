@@ -45,7 +45,50 @@ export async function loadVideoMetadata(blob: Blob): Promise<LoadedVideoMetadata
   return { ...source, hasAudio, audioPeaks };
 }
 
-export function loadAudioMetadata(blob: Blob): Promise<LoadedAudioMetadata> {
+async function resolveWaveDuration(blob: Blob, fallbackDuration: number): Promise<number> {
+  const { Input, BlobSource, WAVE } = await import('mediabunny');
+  const input = new Input({ source: new BlobSource(blob), formats: [WAVE] });
+  try {
+    const track = await input.getPrimaryAudioTrack();
+    const duration = await track?.computeDuration();
+    // Element metadata rounds WAV frame durations; retained takes use sample precision.
+    return duration !== undefined && Number.isFinite(duration) && duration > 0
+      ? duration
+      : fallbackDuration;
+  } catch {
+    return fallbackDuration;
+  } finally {
+    input.dispose();
+  }
+}
+
+async function reconcileReviewAudioDuration(
+  blob: Blob,
+  duration: number,
+  requiredSourceEnd: number | undefined
+): Promise<number> {
+  if (
+    typeof requiredSourceEnd !== 'number' ||
+    !Number.isFinite(requiredSourceEnd) ||
+    requiredSourceEnd <= duration
+  )
+    return duration;
+  try {
+    const { inspectReviewAudio } = await import('../../../workflows/video-review/audio-import');
+    // Gallery admission measures decoded samples; element metadata can round that end down.
+    const decodedDuration = await inspectReviewAudio(blob, new AbortController().signal);
+    return Math.max(duration, decodedDuration);
+  } catch {
+    // Failed admission cannot extend the source; transfer validation retains its refusal.
+    return duration;
+  }
+}
+
+/** Reconciles a retained source end through Gallery admission only when metadata is shorter. */
+export function loadAudioMetadata(
+  blob: Blob,
+  options?: { requiredSourceEnd: number }
+): Promise<LoadedAudioMetadata> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const audio = document.createElement('audio');
@@ -59,7 +102,12 @@ export function loadAudioMetadata(blob: Blob): Promise<LoadedAudioMetadata> {
 
     resolveMediaDuration(audio, 1)
       .then(async (durationResult) => {
-        const { duration } = durationResult;
+        const sourceDuration = durationResult.isAuthoritative
+          ? await resolveWaveDuration(blob, durationResult.duration)
+          : durationResult.duration;
+        const duration = durationResult.isAuthoritative
+          ? await reconcileReviewAudioDuration(blob, sourceDuration, options?.requiredSourceEnd)
+          : sourceDuration;
         const audioPeaks = durationResult.isAuthoritative
           ? await loadAudioPeaks(blob, duration)
           : null;

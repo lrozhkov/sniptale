@@ -1,3 +1,4 @@
+import { drawPointerFeedbackFrame, type PointerFeedbackSource } from '../pointer-feedback';
 import { getActionClickStyle } from '../../../project/action-style';
 import { applyTemporalEasing } from '../../motion';
 import type { VideoCompositionActionState, VideoCompositionCameraState } from '../../types';
@@ -8,7 +9,8 @@ export function drawActionCompositionState(
   action: VideoCompositionActionState,
   fallbackPoint: { x: number; y: number } | null,
   sizeScale = 1,
-  bounds?: { x: number; y: number; width: number; height: number }
+  bounds?: { x: number; y: number; width: number; height: number },
+  source?: PointerFeedbackSource
 ): void {
   if (action.renderKind === null) return;
   if (action.renderKind === 'keystroke') {
@@ -19,6 +21,19 @@ export function drawActionCompositionState(
   if (!point || action.preset === 'NONE' || action.preset === 'SCROLL_EMPHASIS') return;
   if (action.gestureFeedback) {
     const frame = action.gestureFeedback;
+    if (!frame.path?.length) {
+      drawPointerFeedbackFrame(
+        context,
+        {
+          ...frame,
+          point,
+          radius: frame.radius * sizeScale,
+          stroke: frame.stroke * Math.max(0.2, sizeScale),
+        },
+        source
+      );
+      return;
+    }
     context.save();
     context.globalAlpha *= frame.opacity;
     context.strokeStyle = frame.color;
@@ -154,6 +169,49 @@ function traceGesturePath(
   if (points.length > 1) context.lineTo(last.x, last.y);
 }
 
+/** Source bounds precede camera projection; callers supply the same raster state as the painter. */
+export function resolveActionCompositionPaintBounds(
+  action: VideoCompositionActionState,
+  sizeScale = 1
+) {
+  const point = action.point;
+  if (
+    !point ||
+    action.renderKind !== 'accent' ||
+    action.preset === 'NONE' ||
+    action.preset === 'SCROLL_EMPHASIS'
+  )
+    return null;
+  const style = getActionClickStyle(action.clickStyle);
+  const feedback = action.gestureFeedback;
+  const radius = feedback
+    ? Math.max(0.01, feedback.radius * sizeScale)
+    : style.size * Math.max(0.2, sizeScale);
+  const stroke = ((feedback?.stroke ?? style.strokeWidth) * Math.max(0.2, sizeScale)) / 2 + 2;
+  let x = point.x - radius,
+    y = point.y - radius;
+  let right = point.x + radius,
+    bottom = point.y + radius;
+  for (const item of feedback?.path ?? []) {
+    x = Math.min(x, item.x);
+    y = Math.min(y, item.y);
+    right = Math.max(right, item.x);
+    bottom = Math.max(bottom, item.y);
+  }
+  if (feedback?.area) {
+    x = Math.min(x, feedback.area.x);
+    y = Math.min(y, feedback.area.y);
+    right = Math.max(right, feedback.area.x + feedback.area.width);
+    bottom = Math.max(bottom, feedback.area.y + feedback.area.height);
+  }
+  return {
+    x: x - stroke,
+    y: y - stroke,
+    width: right - x + stroke * 2,
+    height: bottom - y + stroke * 2,
+  };
+}
+
 /** Shared manual-action overlay mapping for preview and exported output. */
 export function drawSceneActionCompositionStates(
   context: CanvasRenderingContext2D,
@@ -162,9 +220,17 @@ export function drawSceneActionCompositionStates(
   viewport: { offsetX: number; offsetY: number; scaleX: number; scaleY: number }
 ): void {
   const viewportScale = (viewport.scaleX + viewport.scaleY) / 2;
+  const bounds = {
+    x: viewport.offsetX,
+    y: viewport.offsetY,
+    width: camera.viewportWidth * camera.scale * viewport.scaleX,
+    height: camera.viewportHeight * camera.scale * viewport.scaleY,
+  };
   for (const action of actions) {
     const sizeScale =
-      viewportScale * (action.renderKind !== 'keystroke' && action.point ? camera.scale : 1);
+      action.renderKind === 'keystroke' && action.keyStyleViewportWidth
+        ? bounds.width / action.keyStyleViewportWidth
+        : viewportScale * (action.renderKind !== 'keystroke' && action.point ? camera.scale : 1);
     const point = action.point
       ? {
           x:
@@ -178,11 +244,6 @@ export function drawSceneActionCompositionStates(
             y: viewport.offsetY + 48 * viewport.scaleY,
           }
         : null;
-    drawActionCompositionState(context, { ...action, point }, null, sizeScale, {
-      x: viewport.offsetX,
-      y: viewport.offsetY,
-      width: camera.viewportWidth * camera.scale * viewport.scaleX,
-      height: camera.viewportHeight * camera.scale * viewport.scaleY,
-    });
+    drawActionCompositionState(context, { ...action, point }, null, sizeScale, bounds);
   }
 }

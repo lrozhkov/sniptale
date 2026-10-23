@@ -73,25 +73,31 @@ export function usePackageCaptureBehaviorPreferences() {
 
 function ToggleRow(props: {
   checked: boolean;
-  description: string;
+  description?: string;
   label: string;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-start gap-2.5 py-2.5">
+    <label className="sniptale-ai-modal-adopted bg-transparent! font-normal! flex min-h-8 items-start gap-2.5 py-2">
       <input
         type="checkbox"
-        className="mt-0.5 h-3.5 w-3.5 accent-[var(--sniptale-color-accent)]"
+        className={[
+          'sniptale-checkbox rounded-full! mt-0.5 focus:outline-none',
+          'focus-visible:outline focus-visible:outline-2',
+          'focus-visible:outline-[var(--sniptale-color-accent)]',
+        ].join(' ')}
         checked={props.checked}
         onChange={(event) => props.onChange(event.currentTarget.checked)}
       />
       <span className="min-w-0">
-        <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+        <span className="block text-[12px] text-[var(--sniptale-color-text-secondary)]">
           {props.label}
         </span>
-        <span className="mt-0.5 block text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
-          {props.description}
-        </span>
+        {props.description ? (
+          <span className="mt-0.5 block text-[11px] leading-4 text-[var(--sniptale-color-text-dim)]">
+            {props.description}
+          </span>
+        ) : null}
       </span>
     </label>
   );
@@ -121,16 +127,18 @@ export function PackageCaptureBehaviorSettings(props: {
       <ToggleRow
         checked={props.preferences.freezeMotion}
         label={translate('popup.export.captureFreezeMotionLabel')}
-        description={translate('popup.export.captureFreezeMotionDescription')}
         onChange={(freezeMotion) => props.onChange({ ...props.preferences, freezeMotion })}
       />
-      <div className="flex min-w-0 items-start justify-between gap-2 py-2.5">
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+      <div
+        className="flex min-w-0 items-center justify-between gap-2 py-2"
+        data-ui="popup.export.capture-floating-elements-row"
+      >
+        <span
+          className="min-w-0 flex-1"
+          data-popup-hint={translate('popup.export.captureFloatingElementsDescription')}
+        >
+          <span className="block text-[12px] text-[var(--sniptale-color-text-secondary)]">
             {translate('popup.export.captureFloatingElementsLabel')}
-          </span>
-          <span className="mt-0.5 block text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
-            {translate('popup.export.captureFloatingElementsDescription')}
           </span>
         </span>
         <PopupSelect
@@ -151,16 +159,10 @@ export function PackageCaptureBehaviorSettings(props: {
           ]}
         />
       </div>
-      <p className="py-2.5 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
-        {translate('popup.export.captureBehaviorHelp')}
-      </p>
-      <div className="py-2.5">
-        <div className="text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+      <div className="py-2">
+        <div className="text-[12px] font-medium text-[var(--sniptale-color-text-primary)]">
           {translate('popup.export.resourceLimitsTitle')}
         </div>
-        <p className="mt-0.5 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
-          {translate('popup.export.resourceLimitsDescription')}
-        </p>
         <ResourceLimitSelect
           label={translate('popup.export.resourceLimitCountLabel')}
           value={props.resourceLimits.maxFileCount}
@@ -187,7 +189,7 @@ export function PackageCaptureBehaviorSettings(props: {
             props.onResourceLimitsChange({ ...props.resourceLimits, maxTotalSizeMiB })
           }
         />
-        <p className="mt-2 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+        <p className="mt-2 text-[11px] leading-4 text-[var(--sniptale-color-text-dim)]">
           {translate('popup.export.resourceLimitsHelp')}
         </p>
       </div>
@@ -207,7 +209,7 @@ function ResourceLimitSelect(props: {
     : [...props.values, props.value].sort((left, right) => left - right);
   return (
     <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-      <span className="min-w-0 flex-1 text-[10px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+      <span className="min-w-0 flex-1 text-[11px] leading-4 text-[var(--sniptale-color-text-secondary)]">
         {props.label}
       </span>
       <PopupSelect

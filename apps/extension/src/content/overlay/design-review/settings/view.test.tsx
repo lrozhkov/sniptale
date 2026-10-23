@@ -19,7 +19,9 @@ const actions: DesignReviewActions = {
   },
   copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
+  navigateElement: vi.fn(),
   delete: vi.fn(),
+  text: { edit: vi.fn(), reset: vi.fn() },
   resetValue: vi.fn(),
   selectAction: vi.fn(),
   setSettingsOpen: vi.fn(),
@@ -30,12 +32,14 @@ const actions: DesignReviewActions = {
 };
 
 const state: DesignReviewViewState = {
+  treeNavigation: { parent: null, child: null },
   action: 'refine',
   anchor: { x: 40, y: 40 },
   comment: { commitFailed: false, draft: '', marker: null },
   defaultValues: { color: 'rgb(0, 0, 0)', height: '40px', width: '120px' },
   draftPatch: { declarations: [] },
   modifiedProperties: [],
+  text: { editable: true, modified: false, preview: 'Heading', resettable: false },
   selection: {
     domPath: 'html > body > main > h1:nth-of-type(1)',
     element: document.createElement('h1'),
@@ -79,6 +83,7 @@ it('uses compact non-collapsible navigation and renders only the active logical 
   const navigation = container.querySelector('nav');
   expect(navigation?.querySelectorAll('button')).toHaveLength(4);
   expect(navigation?.className).toContain('border-solid');
+  expect(navigation?.className).toContain('justify-items-center');
   expect(container.querySelector('details')).toBeNull();
   expect(container.querySelector('summary')).toBeNull();
   expect(container.textContent).toContain('Цвет');
@@ -292,6 +297,15 @@ it('preserves text-property toggles, accepted-value reset, and disabled admissio
     expect(localActions.updateValue).toHaveBeenLastCalledWith(property, value);
   }
   for (const key of ['textStyleGroup', 'textAlign'] as const) {
+    const reset = button(
+      `${translate(`content.designReview.${key}`)}: ${translate('content.designReview.resetProperty')}`
+    );
+    expect(reset.closest('.sniptale-parameter-name')).not.toBeNull();
+    expect(reset.closest('.sniptale-parameter-value')).toBeNull();
+    expect(reset.className).not.toContain('opacity-0');
+    expect(reset.closest('.sniptale-parameter-name')?.className).toContain(
+      '!text-[var(--sniptale-color-accent)]'
+    );
     act(() =>
       button(
         `${translate(`content.designReview.${key}`)}: ${translate('content.designReview.resetProperty')}`

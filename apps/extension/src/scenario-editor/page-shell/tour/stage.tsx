@@ -1,5 +1,6 @@
+import { prepareTourWindowHeaders } from '../../../features/scenario/tour-player/document';
 import type { TourPlayerLabels } from '../../../features/scenario/tour-player/public';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { TourDocument, TourRect } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourPlayer } from '../../../features/scenario/tour-player/controller';
@@ -21,12 +22,16 @@ export function TourStage({
   onMoveObject,
   onResizeObject,
   onFrameCamera,
+  onFrameImage,
   view = 'edit',
   previewKey = 0,
+  previewOrigin = 'selection',
   t,
 }: {
-  view?: 'edit' | 'frame' | 'preview';
+  view?: 'edit' | 'frame' | 'preview' | 'image';
+  onFrameImage?: (placement: { center: { x: number; y: number }; zoom: number }) => void;
   previewKey?: number;
+  previewOrigin?: 'selection' | 'beginning';
   onFrameCamera?: (camera: { center: { x: number; y: number }; zoom: number }) => void;
   tour: TourDocument;
   images: Record<string, string | null>;
@@ -46,6 +51,7 @@ export function TourStage({
     onMoveObject,
     onResizeObject,
     onFrameCamera,
+    onFrameImage,
     disabled,
     onNavigateSelection,
   });
@@ -54,33 +60,74 @@ export function TourStage({
     onMoveObject,
     onResizeObject,
     onFrameCamera,
+    onFrameImage,
     disabled,
     onNavigateSelection,
   };
   const labels = useRef(tourPlayerLabels(t)).current;
+  const selectionKind = selection?.kind;
+  const selectedSlide = selection?.kind === 'slide' ? selection.slideId : null;
+  const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
+  const framedTour = useMemo(() => {
+    if (view === 'image')
+      return {
+        ...tour,
+        slides: tour.slides.map((slide) =>
+          slide.kind === 'image'
+            ? { ...slide, camera: { ...slide.camera, mode: 'off' as const } }
+            : slide
+        ),
+      };
+    if (view !== 'frame' || !selectedSlide || !selectedObject) return tour;
+    return {
+      ...tour,
+      slides: tour.slides.map((slide) => {
+        if (slide.id !== selectedSlide || slide.kind !== 'image') return slide;
+        const camera = slide.actions.find((entry) => entry.object.id === selectedObject)?.object
+          .camera;
+        return camera ? { ...slide, camera } : slide;
+      }),
+    };
+  }, [tour, view, selectedSlide, selectedObject]);
   const input = {
     tour:
       view === 'preview'
         ? { ...tour, playback: { ...tour.playback, autoplay: true, loop: false } }
-        : tour,
+        : framedTour,
     labels,
+    headers: prepareTourWindowHeaders(framedTour),
     assets: Object.entries(images).flatMap(([id, src]) => (src ? [{ id, src }] : [])),
   };
-  const latest = useRef({ input, selection });
-  latest.current = { input, selection };
+  const latest = useRef({ input, selection, tour, images });
+  latest.current = { input, selection, tour: framedTour, images };
+  const admitted = useRef<{ tour: TourDocument; images: Record<string, string | null> } | null>(
+    null
+  );
+  const authoringScroll = useRef(0);
+  const lastSelection = useRef<TourSelection | null>(null);
   const hasAuthoringNavigation = Boolean(onNavigateSelection);
   useLayoutEffect(() => {
-    if (!root.current) return;
-    const player = createTourPlayer(root.current, latest.current.input, {
+    const stageRoot = root.current;
+    if (!stageRoot) return;
+    const player = createTourPlayer(stageRoot, latest.current.input, {
       preview: view === 'preview',
-      ...(view === 'preview' && latest.current.selection?.kind === 'slide'
-        ? { initialSlideId: latest.current.selection.slideId }
+      ...(view === 'preview' &&
+      previewOrigin === 'selection' &&
+      latest.current.selection?.kind === 'slide'
+        ? {
+            initialSlideId: latest.current.selection.slideId,
+            ...(latest.current.selection.objectId
+              ? { initialActionId: latest.current.selection.objectId }
+              : {}),
+          }
         : {}),
       authoring:
         view === 'preview'
           ? undefined
           : {
               cameraFrame: view === 'frame',
+              imageFrame: view === 'image',
+              onFrameImage: (placement) => callbacks.current.onFrameImage?.(placement),
               onFrameCamera: (camera) => callbacks.current.onFrameCamera?.(camera),
               canEdit: () => !callbacks.current.disabled,
               onSelectObject: (id) => callbacks.current.onSelectObject(id),
@@ -117,23 +164,45 @@ export function TourStage({
             },
     });
     controller.current = player;
-    restoreSelection(player, latest.current.selection);
+    admitted.current = { tour: latest.current.tour, images: latest.current.images };
+    lastSelection.current = latest.current.selection;
+    if (
+      view !== 'preview' ||
+      (previewOrigin === 'selection' && latest.current.selection?.kind === 'end')
+    )
+      restoreSelection(player, latest.current.selection);
+    if (view !== 'preview') {
+      const body = stageRoot.querySelector<HTMLElement>('[data-tour-hint-text]');
+      if (body) body.scrollTop = authoringScroll.current;
+    }
     return () => {
+      if (view !== 'preview')
+        authoringScroll.current =
+          stageRoot.querySelector<HTMLElement>('[data-tour-hint-text]')?.scrollTop ?? 0;
       player.dispose();
       controller.current = null;
     };
-  }, [shadow, view, previewKey, hasAuthoringNavigation]);
+  }, [shadow, view, previewKey, previewOrigin, hasAuthoringNavigation]);
   useLayoutEffect(() => {
     if (!controller.current) return;
+    if (admitted.current?.tour === framedTour && admitted.current.images === images) return;
+    admitted.current = { tour: framedTour, images };
     controller.current.update(latest.current.input);
-    restoreSelection(controller.current, latest.current.selection);
-  }, [tour, images]);
-  const selectionKind = selection?.kind;
-  const selectedSlide = selection?.kind === 'slide' ? selection.slideId : null;
-  const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
+    if (view !== 'preview') restoreSelection(controller.current, latest.current.selection);
+  }, [tour, framedTour, images, view]);
   useLayoutEffect(() => {
-    if (controller.current) restoreSelection(controller.current, latest.current.selection);
-  }, [selectionKind, selectedSlide, selectedObject]);
+    const previous = lastSelection.current;
+    const current = latest.current.selection;
+    const same =
+      previous?.kind === current?.kind &&
+      (current?.kind !== 'slide' ||
+        (previous?.kind === 'slide' &&
+          previous.slideId === current.slideId &&
+          previous.objectId === current.objectId));
+    lastSelection.current = current;
+    if (controller.current && (view !== 'preview' || !same))
+      restoreSelection(controller.current, current);
+  }, [selectionKind, selectedSlide, selectedObject, view]);
   return (
     <div
       className="tour-stage-host"
@@ -182,28 +251,28 @@ function TourStageScaffold({
         </section>
         <aside className="tour-hint" data-tour-hint hidden>
           <div className="tour-hint-header">
-            <strong className="tour-hint-action-title" data-tour-hint-action-title hidden />
             <button
               className="tour-button tour-caption-title"
               data-tour-hint-toggle
               hidden
               aria-expanded="true"
+              aria-label={labels.collapse}
             >
-              <span data-tour-hint-title />
+              <TourControlIcon path="m6 15 6-6 6 6" />
             </button>
             <button className="tour-button" data-tour-hint-close aria-label={labels.close}>
-              ×
+              <TourControlIcon path="m6 6 12 12M6 18 18 6" />
             </button>
           </div>
           <div className="tour-hint-text" data-tour-hint-text />
           <div className="tour-hint-controls">
             <button className="tour-button" data-tour-hint-previous aria-label={labels.previous}>
-              {labels.previous}
+              <TourControlIcon path="m15 18-6-6 6-6" />
             </button>
             <span data-tour-hint-point-count hidden />
             <span data-tour-hint-count hidden />
             <button className="tour-button" data-tour-hint-next aria-label={labels.next}>
-              {labels.next}
+              <TourControlIcon path="m9 18 6-6-6-6" />
             </button>
           </div>
         </aside>
@@ -217,14 +286,31 @@ function TourStageScaffold({
         <div className="tour-controls">
           <div className="tour-playback" data-tour-playback />
           <div className="tour-nav">
-            <button className="tour-button" data-tour-previous>
-              {labels.previous}
+            <button
+              className="tour-button tour-icon-button"
+              data-tour-previous
+              aria-label={labels.previous}
+            >
+              <TourControlIcon path="m15 18-6-6 6-6" />
             </button>
             <span data-tour-counter />
-            <button className="tour-button" data-tour-next>
-              {labels.next}
+            <button
+              className="tour-button tour-icon-button"
+              data-tour-next
+              aria-label={labels.next}
+            >
+              <TourControlIcon path="m9 18 6-6-6-6" />
             </button>
           </div>
+          <button
+            id="hints"
+            className="tour-button tour-icon-button"
+            data-tour-hints
+            aria-pressed="true"
+            aria-label={labels.showHints || labels.details}
+          >
+            <TourControlIcon path="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H3l2-5a8.5 8.5 0 1 1 16-3.5Z" />
+          </button>
           <button
             className="tour-button"
             data-tour-contents
@@ -236,5 +322,21 @@ function TourStageScaffold({
         </div>
       </footer>
     </div>
+  );
+}
+
+function TourControlIcon({ path }: { path: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d={path} />
+    </svg>
   );
 }

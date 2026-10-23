@@ -6,6 +6,40 @@ import {
   serializeEditorDrawingMetadata,
 } from './import-boundary';
 
+it('roundtrips bounded freehand bends and rejects malformed or incompatible bend metadata', () => {
+  const arrow = {
+    kind: 'arrow' as const,
+    id: 'bent',
+    design: 'freehand' as const,
+    start: { x: 0, y: 0 },
+    end: { x: 200, y: 0 },
+    bendPoints: [{ x: 100, y: 80 }],
+    color: '#f00',
+    width: 12,
+    dynamicWidth: false,
+  };
+  expect(parseEditorDrawingMetadata(serializeEditorDrawingMetadata(arrow))).toEqual(arrow);
+  for (const bendPoints of [
+    null,
+    {},
+    'points',
+    [{ x: NaN, y: 0 }],
+    [{ x: 0, y: Infinity }],
+    [{ x: 131073, y: 0 }],
+    [{ x: '1', y: 0 }],
+    Array.from({ length: 129 }, () => ({ x: 1, y: 2 })),
+  ]) {
+    expect(parseEditorDrawingMetadata({ version: 1, object: { ...arrow, bendPoints } })).toBeNull();
+  }
+  expect(
+    parseEditorDrawingMetadata({ version: 1, object: { ...arrow, design: 'standard' } })
+  ).toBeNull();
+  expect(parseEditorDrawingMetadata({ version: 1, object: { ...arrow, bendPoints: [] } })).toEqual({
+    ...arrow,
+    bendPoints: [],
+  });
+});
+
 const objects: readonly DrawingObject[] = [
   { id: 'p', kind: 'pencil', color: '#111', width: 4, samples: [{ x: 1, y: 2, t: 3 }] },
   {

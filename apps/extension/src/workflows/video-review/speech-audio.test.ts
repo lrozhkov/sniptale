@@ -1,4 +1,4 @@
-import { AUDIO_INPUT_MAX_SECONDS } from '../../contracts/ai/audio';
+import { AUDIO_INPUT_MAX_BYTES, AUDIO_INPUT_MAX_SECONDS } from '../../contracts/ai/audio';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   encodeReviewSpeechWav,
@@ -221,4 +221,33 @@ it('keeps the supplied 330.425-second source in one upload under the PCM byte bu
     )
   ).toEqual([{ start: 0, end: 330.425 }]);
   expect(decoder.bytes).not.toHaveBeenCalled();
+});
+
+it('extracts maximum native chunks at late offsets within the physical WAV byte budget', async () => {
+  const nativeStart = 10000;
+  decoder.samples = [
+    {
+      numberOfChannels: 1,
+      numberOfFrames: 1,
+      sampleRate: 16000,
+      timestamp: nativeStart,
+      copyTo: (plane) => plane.fill(0.5),
+      close: vi.fn(),
+    },
+  ];
+  const wav = await extractReviewSpeechWav(
+    new Blob(['source']),
+    nativeStart,
+    nativeStart + AUDIO_INPUT_MAX_SECONDS,
+    new AbortController().signal
+  );
+  expect(wav.size).toBe(AUDIO_INPUT_MAX_BYTES);
+  await expect(
+    extractReviewSpeechWav(
+      new Blob(['source']),
+      nativeStart,
+      nativeStart + AUDIO_INPUT_MAX_SECONDS + 1 / 16000,
+      new AbortController().signal
+    )
+  ).rejects.toThrow('invalid-request');
 });

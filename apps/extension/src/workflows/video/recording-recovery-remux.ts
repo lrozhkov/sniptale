@@ -19,6 +19,10 @@ import {
   readAssetFile,
 } from '../../composition/persistence/assets';
 import type { PersistenceMutationTransitionPermit } from '../../composition/persistence/infrastructure/mutation-barrier';
+import {
+  createRecoveryProgressReporter,
+  type RecordingRecoveryProgressObserver,
+} from './recording-recovery-progress';
 
 /** A broken suffix ends packet reading; it never removes the source or acknowledges output. */
 async function nextRetainedPacket(sink: EncodedPacketSink, packet: EncodedPacket) {
@@ -32,8 +36,11 @@ async function nextRetainedPacket(sink: EncodedPacketSink, packet: EncodedPacket
 /** Remuxes packets to disk with bounded mux buffers, then decodes the complete result. */
 export async function remuxRecoveryRecording(
   file: File,
-  persistenceTransitionPermit?: PersistenceMutationTransitionPermit
+  persistenceTransitionPermit?: PersistenceMutationTransitionPermit,
+  onProgress?: RecordingRecoveryProgressObserver
 ) {
+  const report = createRecoveryProgressReporter(onProgress);
+  report({ stage: 'remuxing', completed: 0 });
   const mimeType = file.type.includes('mp4') ? 'video/mp4' : 'video/webm';
   const writer = await createSeekableAssetObjectWriter(
     { mimeType },
@@ -74,6 +81,7 @@ export async function remuxRecoveryRecording(
     output.addVideoTrack(videoSource, { rotation: video.rotation });
     if (audioSource) output.addAudioTrack(audioSource);
     await output.start();
+    let packets = 0;
     while (v || a) {
       if (v && (!a || v.timestamp <= a.timestamp)) {
         await videoSource.add(v, { decoderConfig: videoConfig });
@@ -84,13 +92,15 @@ export async function remuxRecoveryRecording(
       } else {
         throw new Error('The saved audio track cannot be recovered.');
       }
+      report({ stage: 'remuxing', completed: ++packets });
     }
+    report({ stage: 'remuxing', completed: packets }, true);
     videoSource.close();
     audioSource?.close();
     await output.finalize();
     const prepared = await writer.finalize();
     const result = await readAssetFile(prepared.ref, file.name);
-    await validateRecoveredRecording(result);
+    await validateRecoveredRecording(result, report);
     return { file: result, preparedAsset: prepared, release: () => writer.abort() };
   } catch (error) {
     await output?.cancel().catch(() => undefined);
@@ -101,25 +111,34 @@ export async function remuxRecoveryRecording(
   }
 }
 
-async function validateRecoveredRecording(file: File) {
+async function validateRecoveredRecording(
+  file: File,
+  report: ReturnType<typeof createRecoveryProgressReporter>
+) {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   try {
     const video = await input.getPrimaryVideoTrack();
     if (!video) throw new Error('The recovered video track is missing.');
     let frames = 0;
+    report({ stage: 'validatingVideo', completed: 0 });
     for await (const sample of new VideoSampleSink(video).samples()) {
       frames++;
       sample.close();
+      report({ stage: 'validatingVideo', completed: frames });
     }
     if (!frames) throw new Error('The recovered recording has no decodable frames.');
+    report({ stage: 'validatingVideo', completed: frames }, true);
     const audio = await input.getPrimaryAudioTrack();
     if (audio) {
       let samples = 0;
+      report({ stage: 'validatingAudio', completed: 0 });
       for await (const sample of new AudioSampleSink(audio).samples()) {
         samples++;
         sample.close();
+        report({ stage: 'validatingAudio', completed: samples });
       }
       if (!samples) throw new Error('The recovered audio track has no decodable samples.');
+      report({ stage: 'validatingAudio', completed: samples }, true);
     }
   } finally {
     input.dispose();

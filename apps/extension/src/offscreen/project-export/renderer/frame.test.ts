@@ -188,7 +188,7 @@ it('contains a rounded standard output without stretching or cropping project co
     transitionTranslations.push(readTranslationX());
   });
 
-  drawProjectFrame(context, roundedProject, roundedSettings, 0, loadedImages, new Map());
+  await drawProjectFrame(context, roundedProject, roundedSettings, 0, loadedImages, new Map());
 
   const scale = Math.min(
     roundedSettings.width / roundedProject.width,
@@ -226,7 +226,7 @@ it('crops only the odd Source encoder edge without a resampling transform', asyn
     visualPasses: [{ alpha: 1, frame, time: 0, transitionOverlays: [] }],
   });
 
-  drawProjectFrame(context, project, settings, 0, loadedImages, new Map());
+  await drawProjectFrame(context, project, settings, 0, loadedImages, new Map());
 
   expect(drawCompositionLayerMock).toHaveBeenCalledWith(
     context,
@@ -267,7 +267,7 @@ async function verifyFrameRendering() {
     ],
   });
 
-  drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
+  await drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
 
   expectFrameRenderingCalls(context, frame, project);
 }
@@ -353,7 +353,7 @@ it('uses an accumulation buffer for multi-pass motion blur rendering', async () 
     ],
   });
 
-  drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
+  await drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
 
   expect(bufferContext.globalCompositeOperation).toBe('lighter');
   expect(context.drawImage).toHaveBeenCalledWith(expect.any(OffscreenCanvasMock), 0, 0, 200, 100);
@@ -382,7 +382,7 @@ it('skips cursor drawing when the composition frame has no cursor state', async 
     visualPasses: [],
   });
 
-  drawProjectFrame(
+  await drawProjectFrame(
     createContext(),
     { backgroundColor: '#000', height: 50, width: 100 } as never,
     { height: 100, width: 200 } as never,
@@ -409,7 +409,7 @@ it('passes the burn-in flag into composition rendering when subtitle export is e
     visualPasses: [],
   });
 
-  drawProjectFrame(
+  await drawProjectFrame(
     createContext(),
     project,
     { burnInSubtitles: true, height: 100, width: 200 } as never,

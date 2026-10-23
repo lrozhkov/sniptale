@@ -227,14 +227,14 @@ function expectMultiPassLockedOverlayDraws(params: {
   );
 }
 
-it('draws locked annotation overlays once while media stays in the preview blur buffer', () => {
+it('draws locked annotation overlays once while media stays in the preview blur buffer', async () => {
   const canvasContext = createCanvasContext();
   const bufferContext = createBufferContext();
   const { overlayFrame, passes } = createPreviewPasses();
 
   stubOffscreenCanvas(bufferContext);
 
-  drawPreviewVisualPasses({
+  await drawPreviewVisualPasses({
     canvas: createPreviewCanvas(canvasContext),
     clipMediaElements: new Map(),
     imageBank: {},

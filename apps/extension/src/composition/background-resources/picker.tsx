@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
+import { useInspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { FolderOpen, Library, LoaderCircle } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { BackgroundThumbnails } from '../../ui/background-thumbnails';
@@ -117,38 +119,12 @@ export function BackgroundImagePicker(props: {
           if (file) void run(async (signal) => ({ file: await prepareImage(file, signal) }));
         }}
       />
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={`${backgroundActionClassName} grow`}
-          disabled={isBusy}
-          onClick={() => input.current?.click()}
-        >
-          {isBusy && pendingId === undefined ? (
-            <LoaderCircle
-              size={14}
-              className="shrink-0 animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-          ) : (
-            <FolderOpen size={14} className="shrink-0" aria-hidden="true" />
-          )}
-          <span className="min-w-0 whitespace-normal">
-            {translate('settings.editor.backgrounds.upload')}
-          </span>
-        </button>
-        <button
-          type="button"
-          className={`${backgroundActionClassName} grow`}
-          disabled={isBusy}
-          onClick={() => setLibrary(true)}
-        >
-          <Library size={14} className="shrink-0" aria-hidden="true" />
-          <span className="min-w-0 whitespace-normal">
-            {translate('settings.editor.backgrounds.library')}
-          </span>
-        </button>
-      </div>
+      <BackgroundAcquisitionCommands
+        busy={isBusy}
+        uploading={isBusy && pendingId === undefined}
+        onUpload={() => input.current?.click()}
+        onLibrary={() => setLibrary(true)}
+      />
       {(failed || catalog.status === 'failed') && (
         <p role="alert" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('settings.editor.backgrounds.failed')}
@@ -167,6 +143,68 @@ export function BackgroundImagePicker(props: {
           onSelect={(id) => void run((signal) => acquireLibrary(id, signal), id)}
         />
       )}
+    </div>
+  );
+}
+
+function BackgroundAcquisitionCommands(props: {
+  busy: boolean;
+  uploading: boolean;
+  onUpload(): void;
+  onLibrary(): void;
+}) {
+  const scoped = useContext(CommandPressScope);
+  const inspector = useInspectorLayout();
+  const uploadPress = useCommandPress({
+    enabled: scoped,
+    disabled: props.busy,
+    onClick: props.onUpload,
+  });
+  const libraryPress = useCommandPress({
+    enabled: scoped,
+    disabled: props.busy,
+    onClick: props.onLibrary,
+  });
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]!' : ''}`}
+        disabled={props.busy}
+        {...uploadPress.props}
+        data-command-press={scoped ? '' : undefined}
+        data-pressing={uploadPress.pressed ? 'true' : undefined}
+      >
+        <span className={scoped ? 'sniptale-command-content' : 'contents'}>
+          {props.uploading ? (
+            <LoaderCircle
+              size={14}
+              className="shrink-0 animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          ) : (
+            <FolderOpen size={14} className="shrink-0" aria-hidden="true" />
+          )}
+          <span className="min-w-0 whitespace-normal">
+            {translate('settings.editor.backgrounds.upload')}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]!' : ''}`}
+        disabled={props.busy}
+        {...libraryPress.props}
+        data-command-press={scoped ? '' : undefined}
+        data-pressing={libraryPress.pressed ? 'true' : undefined}
+      >
+        <span className={scoped ? 'sniptale-command-content' : 'contents'}>
+          <Library size={14} className="shrink-0" aria-hidden="true" />
+          <span className="min-w-0 whitespace-normal">
+            {translate('settings.editor.backgrounds.library')}
+          </span>
+        </span>
+      </button>
     </div>
   );
 }

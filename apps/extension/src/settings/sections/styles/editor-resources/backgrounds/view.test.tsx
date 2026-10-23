@@ -7,6 +7,7 @@ const io = vi.hoisted(() => ({
   edit: vi.fn(),
   add: vi.fn(),
   props: null as SettingsCollectionProps | null,
+  realCollection: false,
 }));
 vi.mock('../../../../../composition/background-resources/catalog', () => ({
   useBackgroundCatalog: () => ({
@@ -43,21 +44,77 @@ vi.mock('../../../../../composition/background-resources/picker', () => ({
     </button>
   ),
 }));
-vi.mock('../../../../section-surface', () => ({
-  settingsModalClassName: '',
-  SettingsCollection: (props: SettingsCollectionProps) => {
-    io.props = props;
-    return null;
-  },
-}));
+vi.mock('../../../../section-surface', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../section-surface')>();
+  return {
+    settingsModalClassName: '',
+    SettingsCollection: (props: SettingsCollectionProps) => {
+      io.props = props;
+      return io.realCollection ? <actual.SettingsCollection {...props} /> : null;
+    },
+  };
+});
 import { BackgroundPresetsSettings } from './view';
 import { translate } from '../../../../../platform/i18n';
+
+it.each(['success', 'failure'])(
+  'keeps background handle focus during pending %s',
+  async (outcome) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    io.realCollection = true;
+    let settle!: () => void;
+    io.edit.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          settle = outcome === 'success' ? resolve : () => reject(new Error('Failed write'));
+        })
+    );
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<BackgroundPresetsSettings />));
+      const source = host.querySelector<HTMLButtonElement>(
+        `[aria-label="${translate('settings.collection.dragHandle')}"]`
+      )!;
+      act(() => source.focus());
+      let completion: unknown;
+      act(() => {
+        completion = io.props!.onMove!({
+          itemId: 'user:one',
+          beforeItemId: 'builtin:one',
+          groupId: null,
+          source: 'drag',
+        });
+      });
+      expect(source.matches(':disabled')).toBe(false);
+      expect(source.getAttribute('aria-disabled')).toBe('true');
+      expect(document.activeElement).toBe(source);
+      expect(io.props!.addAction!.disabled).toBe(true);
+      expect(io.props!.items.every((item) => item.busy)).toBe(true);
+      await act(async () => {
+        settle();
+        await completion;
+      });
+      expect(document.activeElement).toBe(source);
+      expect(source.isConnected).toBe(true);
+      expect(source.getAttribute('aria-disabled')).not.toBe('true');
+      expect(Boolean(host.querySelector('[role=alert]'))).toBe(outcome === 'failure');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      io.realCollection = false;
+      vi.unstubAllGlobals();
+    }
+  }
+);
 it('marks bundled entries and offers custom editing without exposing built-in editing', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
   try {
     await act(async () => root.render(<BackgroundPresetsSettings />));
+    expect(host.textContent).not.toContain(translate('settings.editor.backgrounds.libraryNote'));
     expect(io.props!.items[0]).toMatchObject({
       isBuiltIn: true,
       capabilities: { edit: false, delete: false, toggle: true, reorder: true },
@@ -120,12 +177,23 @@ it('renames, reorders, removes and adds custom presets, reporting failed writes'
     );
     expect(io.edit).toHaveBeenLastCalledWith({ type: 'rename', id: 'user:one', name: 'Renamed' });
     await act(async () => io.props!.addAction?.onInvoke());
+    const backgroundName = host.querySelector<HTMLInputElement>('input')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        backgroundName,
+        'My background'
+      );
+      backgroundName.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     await act(async () =>
       Array.from(host.querySelectorAll('button'))
         .find((button) => button.textContent === 'pick-upload')
         ?.click()
     );
-    expect(io.add).toHaveBeenCalled();
+    expect(io.add).toHaveBeenCalledWith(
+      expect.objectContaining({ file: expect.any(File) }),
+      'My background'
+    );
     io.edit.mockRejectedValueOnce(new Error('failed'));
     await act(async () => io.props!.onAction?.({ type: 'delete', itemId: 'user:one' }));
     expect(host.querySelector('[role=alert]')).not.toBeNull();

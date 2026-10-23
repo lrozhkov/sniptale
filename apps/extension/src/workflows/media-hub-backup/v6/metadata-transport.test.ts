@@ -1,3 +1,8 @@
+import { encodePortableTour, decodePortableTour } from './root-codecs/scenario-tour';
+import {
+  createTourDocument,
+  createTourImageSlide,
+} from '../../../features/scenario/project/public';
 import { expect, it } from 'vitest';
 import {
   createArchivePathAllocator,
@@ -5,7 +10,7 @@ import {
 } from '../../../composition/archive-transfer';
 import { createArchiveMemorySink } from '../../../composition/archive-transfer/test-support';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
-import { DEFAULT_WINDOW_HEADER } from '../../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { encodePortableReviewAssetRefs } from '../../../composition/persistence/review-workspaces/asset-refs';
 import {
   replayReviewHistory,
@@ -511,4 +516,35 @@ it('round trips PCM profiles and retained WAV take refs through ZIP metadata, re
     assetId: 'project-asset:restored-voice',
     textSnapshot: { profile },
   });
+});
+
+it('roundtrips Scenario window PNG and placement through canonical portable tour JSON', () => {
+  const tour = createTourDocument();
+  tour.stage.windowHeader = { ...header };
+  const slide = createTourImageSlide('image');
+  slide.image = {
+    assetId: 'source',
+    editDocumentId: null,
+    galleryAssetId: null,
+    width: 1600,
+    height: 900,
+    alt: '',
+    source: { kind: 'import', filename: 'source.png' },
+  };
+  slide.imagePlacement = { center: { x: 0.3, y: 0.7 }, zoom: 2 };
+  tour.slides = [slide];
+  const before = structuredClone(tour);
+  const portable = JSON.parse(JSON.stringify(encodePortableTour(tour)));
+  const restored = decodePortableTour(portable, {
+    assetIds: new Map([['source', 'restored']]),
+    documentIds: new Map(),
+    rootIdMap: {},
+  });
+  expect(restored.stage.windowHeader).toEqual(header);
+  expect(restored.stage.windowHeader?.faviconDataUrl).toBe(favicon);
+  const result = restored.slides[0]!;
+  if (result.kind !== 'image') throw new Error('Expected restored image');
+  expect(result.imagePlacement).toEqual(slide.imagePlacement);
+  expect(result.image?.assetId).toBe('restored');
+  expect(tour).toEqual(before);
 });

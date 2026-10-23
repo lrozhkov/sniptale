@@ -117,3 +117,31 @@ it('prepares separate cached buffers when the tempo changes', async () => {
   expect(graph.value.decode).toHaveBeenLastCalledWith(plan.assetBlob, plan.assetMimeType, 1.5);
   await cleanupPreviewEffectAudio(state);
 });
+
+it('applies the latest scene gain after delayed decode without restarting sources', async () => {
+  let deliver!: (buffer: PreviewEffectAudioBuffer) => void;
+  let began!: () => void;
+  const decoding = new Promise<void>((resolve) => {
+    began = resolve;
+  });
+  const graph = createGraph(() => {
+    began();
+    return new Promise<PreviewEffectAudioBuffer>((resolve) => {
+      deliver = resolve;
+    });
+  });
+  const state = createPreviewEffectAudioState();
+  state.audioGraph = graph.value;
+  const args = { currentTime: 2.5, isPlaying: true, plans: [createPlan()], state };
+  const first = syncPreviewEffectAudio({ ...args, outputGain: 0.5 });
+  await decoding;
+  const second = syncPreviewEffectAudio({ ...args, outputGain: 0.25 });
+  deliver(createAudioBuffer());
+  await Promise.all([first, second]);
+  expect(graph.value.start).toHaveBeenCalledOnce();
+  expect(graph.node.setVolume).toHaveBeenLastCalledWith(0.1);
+  await syncPreviewEffectAudio({ ...args, outputGain: 0.75 });
+  expect(graph.node.setVolume).toHaveBeenLastCalledWith(expect.closeTo(0.3, 12));
+  expect(graph.value.start).toHaveBeenCalledOnce();
+  await cleanupPreviewEffectAudio(state);
+});

@@ -158,3 +158,18 @@
     transform: translateY(0) scale(1);
   }
 }
+
+.sniptale-popover-menu.sniptale-content-menu-adopted,
+.sniptale-popover-menu.sniptale-drawing-options-adopted {
+  animation-name: sniptaleContentMenuFadeIn;
+}
+
+@keyframes sniptaleContentMenuFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

@@ -142,6 +142,8 @@ function PreviewStageRootOverlayLayer(props: {
         onUpdateAnnotationClipTemplate={params.onUpdateAnnotationClipTemplate}
         onUpdateActionEventDetails={params.onUpdateActionEventDetails}
         onUpdateMotionRegion={params.onUpdateMotionRegion}
+        motionProject={params.motionProject}
+        onPreviewMotion={params.onPreviewMotion}
         onUpsertObjectTrackCorrectionAnchor={params.onUpsertObjectTrackCorrectionAnchor}
         placementMode={params.placementMode}
         project={params.project}
@@ -183,6 +185,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
 
   usePreviewStageCanvasScene({
     activeClips: params.activeClips,
+    assetUrls: params.assetUrls,
     canvasRef,
     currentTime: params.currentTime,
     effectRuntimeFeedback: params.effectRuntimeFeedback,
@@ -229,6 +232,7 @@ export function createPreviewStageSelectionOverlay(
   return (
     <>
       <PreviewStageSelectionOverlay
+        currentTime={params.currentTime}
         beginInteraction={params.beginInteraction}
         camera={params.camera}
         project={params.project}

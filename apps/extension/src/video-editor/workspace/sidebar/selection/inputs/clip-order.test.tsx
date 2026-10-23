@@ -25,6 +25,13 @@ it('exposes contextual neighbor actions and re-evaluates availability after the 
   try {
     await act(async () => render());
     const [left, right] = [...container.querySelectorAll('button')];
+    expect(container.querySelector('.sniptale-parameter-name')?.textContent).toBe(
+      translate('videoEditor.app.clipOrder')
+    );
+    expect(
+      container.querySelector('[data-ui="video-editor.inspector.clip-order.descriptions"]')
+        ?.className
+    ).not.toContain('group-focus-within');
     expect(left?.disabled).toBe(true);
     expect(right?.disabled).toBe(false);
     expect(right?.parentElement?.title).toContain(asset.name);

@@ -25,14 +25,26 @@ const labels = {
 function fixture() {
   const tour = createTourDocument();
   const slide = createTourImageSlide('first');
-  slide.narration = {
-    assetId: 'music',
-    duration: 4,
-    trimStart: 0,
-    trimEnd: 4,
-    gain: 1,
-    transcript: '',
-  };
+  slide.actions.unshift({
+    type: 'annotation',
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'music',
+          duration: 4,
+          trimStart: 0,
+          trimEnd: 4,
+          gain: 1,
+          transcript: '',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   tour.slides = [slide];
   tour.backgroundMusic = {
     assetId: 'music',
@@ -70,12 +82,20 @@ it('embeds only bound music once and produces identical standalone HTML and Blob
   expect(data.assets).toEqual([{ id: 'music', src: 'data:audio/wav;base64,bXVzaWM=' }]);
   expect(data.tour.backgroundMusic).toEqual(args.tour.backgroundMusic);
   expect(data.tour.audioResources).toBeUndefined();
-  args.tour.slides[0]!.narration = null;
+  const first = args.tour.slides[0]!;
+  if (first.kind === 'image')
+    first.actions.forEach((entry) => {
+      entry.object.narration = null;
+    });
   expect(payload(await buildTourPlayerHtml({ ...args, assets })).assets).toEqual(data.assets);
 });
 it('rejects missing, duplicate, wrong-MIME and image-conflicting music', async () => {
   const args = fixture();
-  args.tour.slides[0]!.narration = null;
+  const first = args.tour.slides[0]!;
+  if (first.kind === 'image')
+    first.actions.forEach((entry) => {
+      entry.object.narration = null;
+    });
   for (const assets of [
     [],
     [{ id: 'music', mime: 'image/png', base64: 'AA==' }],
@@ -100,7 +120,11 @@ it('rejects missing, duplicate, wrong-MIME and image-conflicting music', async (
 });
 it('does not embed detached music and rejects empty bytes or aborted encoding', async () => {
   const args = fixture();
-  args.tour.slides[0]!.narration = null;
+  const first = args.tour.slides[0]!;
+  if (first.kind === 'image')
+    first.actions.forEach((entry) => {
+      entry.object.narration = null;
+    });
   const assets = [{ id: 'music', mime: 'audio/wav', blob: new Blob([], { type: 'audio/wav' }) }];
   await expect(
     buildTourPlayerBlob({ ...args, assets, signal: new AbortController().signal })

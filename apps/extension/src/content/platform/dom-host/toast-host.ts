@@ -12,8 +12,8 @@ function isContentToastHostHidden(): boolean {
     return true;
   }
 
-  const showButton = queryContentUiElement('.sniptale-show-toolbar-button');
-  return showButton?.getAttribute('data-hidden') === 'true';
+  const collapsedPanels = queryContentUiElement('.sniptale-collapsed-panels');
+  return collapsedPanels?.getAttribute('data-hidden') === 'true';
 }
 
 const contentToastHostAdapter: ToastHostAdapter = {

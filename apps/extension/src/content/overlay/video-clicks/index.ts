@@ -1,5 +1,6 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createLazyContentDefaultOwner } from '../../application/default-owner';
+import { isContentOwnedEvent } from '../../platform/dom-host';
 import { createVideoClicksDomDriver, type VideoClicksDomDriverDeps } from './dom-driver';
 
 const logger = createLogger({ namespace: 'ContentVideoClicks' });
@@ -35,7 +36,7 @@ function createVideoClickHandler(
   domDriver: { showRipple: (x: number, y: number) => void }
 ) {
   return (event: MouseEvent): void => {
-    if (!state.isEnabled) {
+    if (!state.isEnabled || isContentOwnedEvent(event)) {
       return;
     }
 

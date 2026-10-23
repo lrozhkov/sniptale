@@ -147,3 +147,38 @@ it('reveals custom fitting only on demand and closes it after choosing a corner'
   expect(container.textContent).not.toContain('Custom fitting controls');
   expect(props.onApplyCameraLayout).toHaveBeenLastCalledWith(props.clip.id, 'OVERLAY', 'TOP_LEFT');
 });
+
+it('edits the active position transition through measured choices and disables every choice when locked', () => {
+  const props = createProps();
+  props.clip.cameraPositions = [
+    {
+      id: 'position',
+      sourceTime: props.clip.sourceStart + 1,
+      transform: props.clip.transform,
+      fitMode: props.clip.fitMode,
+      transition: { kind: 'smooth', duration: 0.75 },
+    },
+  ];
+  const render = (disabled = false) =>
+    root.render(<CameraLayoutControls {...props} currentTime={2} disabled={disabled} />);
+  act(() => render());
+  const choices = () => [
+    ...container.querySelectorAll<HTMLButtonElement>(
+      '[role="group"][aria-label="videoEditor.sidebar.cameraTransition"] button'
+    ),
+  ];
+  expect(choices()).toHaveLength(3);
+  const instant = choices().find((button) =>
+    button.textContent?.includes('cameraTransitionInstant')
+  )!;
+  act(() => instant.click());
+  expect(props.onEditCameraPosition).toHaveBeenCalledExactlyOnceWith(props.clip.id, {
+    kind: 'update',
+    id: 'position',
+    transition: { kind: 'instant', duration: 0.75 },
+  });
+  act(() => render(true));
+  expect(choices().every((button) => button.disabled)).toBe(true);
+  act(() => choices()[0]!.click());
+  expect(props.onEditCameraPosition).toHaveBeenCalledTimes(1);
+});

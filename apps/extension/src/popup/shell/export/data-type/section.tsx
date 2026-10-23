@@ -43,10 +43,14 @@ type DataTypeSectionProps = ExportOptionToggleProps & {
 };
 
 const rowClassName = [
-  'flex items-start gap-2.5 border-b px-0.5 py-2.5',
+  'flex min-h-8 items-start gap-2.5 border-b px-0.5 py-2',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_68%,transparent)] last:border-b-0',
 ].join(' ');
-const checkboxClassName = 'mt-0.5 h-3.5 w-3.5 shrink-0 accent-[var(--sniptale-color-accent)]';
+const checkboxClassName = [
+  'sniptale-checkbox rounded-full! mt-0.5 focus:outline-none disabled:cursor-not-allowed',
+  'focus-visible:outline focus-visible:outline-2',
+  'focus-visible:outline-[var(--sniptale-color-accent)]',
+].join(' ');
 const REQUIRED_LIBRARY_OPTION_KEYS = new Set<ExportOptionKey>(['webCopy', 'fullPageScreenshot']);
 const REQUIRED_WEB_COPY_OPTION_KEYS = new Set<ExportOptionKey>(['fullPageScreenshot']);
 
@@ -78,6 +82,7 @@ function DataTypeDrawerRow(props: {
   return (
     <label
       className={cx(
+        'sniptale-ai-modal-adopted bg-transparent! font-normal!',
         rowClassName,
         props.disabled && 'cursor-not-allowed opacity-60',
         props.active && 'text-[var(--sniptale-color-text-primary)]'
@@ -91,10 +96,10 @@ function DataTypeDrawerRow(props: {
         onChange={props.onToggle}
       />
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-medium text-[var(--sniptale-color-text-primary)]">
+        <div className="text-[12px] text-[var(--sniptale-color-text-secondary)]">
           <span>{props.label}</span>
         </div>
-        <div className="mt-0.5 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+        <div className="mt-0.5 text-[11px] leading-4 text-[var(--sniptale-color-text-dim)]">
           {props.description}
         </div>
       </div>
@@ -184,7 +189,7 @@ function DataTypeFilterBar(props: {
             'transition-[width] duration-150',
             'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
             'text-[var(--sniptale-color-text-primary)] placeholder:text-[var(--sniptale-color-text-dim)]',
-            'outline-none focus:border-[var(--sniptale-color-accent)]',
+            'outline-none focus:border-[var(--sniptale-color-text-secondary)]',
           ].join(' ')}
           onBlur={() => setIsFilterFocused(false)}
           onFocus={() => setIsFilterFocused(true)}
@@ -341,7 +346,10 @@ export function WebCopyResourceControls(props: {
             !props.offlineOnly || item.setChecked !== props.resources.setExternalLinksEnabled
         )
         .map((item) => (
-          <label key={item.label} className="flex items-start gap-2 py-1.5">
+          <label
+            key={item.label}
+            className="sniptale-ai-modal-adopted bg-transparent! font-normal! flex items-start gap-2 py-1.5"
+          >
             <input
               type="checkbox"
               className={checkboxClassName}
@@ -350,17 +358,17 @@ export function WebCopyResourceControls(props: {
               onChange={(event) => void item.setChecked(event.currentTarget.checked)}
             />
             <span className="min-w-0">
-              <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+              <span className="block text-[12px] text-[var(--sniptale-color-text-secondary)]">
                 {item.label}
               </span>
-              <span className="block text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+              <span className="block text-[11px] leading-4 text-[var(--sniptale-color-text-dim)]">
                 {item.description}
               </span>
             </span>
           </label>
         ))}
       {props.resources.error ? (
-        <div role="status" className="pb-1 text-[10px] text-[var(--sniptale-color-danger)]">
+        <div role="status" className="popup-error-message">
           {translate('popup.export.webCopyResourceSettingsError')}
         </div>
       ) : null}
@@ -373,7 +381,7 @@ function OptionGroupLabel({ group }: { group: ExportOptionConfig['group'] }) {
     <div
       className={[
         'sticky top-0 z-[1] bg-[var(--sniptale-color-surface-panel)] pb-1 pt-2',
-        'text-[9px] font-semibold uppercase tracking-[0.08em]',
+        'text-[11px] font-medium',
         'text-[var(--sniptale-color-text-muted-strong)]',
       ].join(' ')}
     >

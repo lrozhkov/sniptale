@@ -4,6 +4,7 @@ import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/v
 import type { PopupVideoSetupRuntime } from '../../runtime/types/video-setup';
 import { createPopupVideoSetupRuntime } from '../test-support/runtime';
 import { getPopupVideoSetupProps } from './props';
+import { createTranslator } from '../../../../platform/i18n/popup';
 
 function createRuntime(): PopupVideoSetupRuntime {
   return createPopupVideoSetupRuntime({
@@ -41,6 +42,43 @@ it('maps runtime state into lazy page props', () => {
 
   props.onCancel();
   expect(runtime.recording.handleStop).toHaveBeenCalledWith({ discard: true });
+});
+
+it('clears only the recovered device permission error while refreshing the existing inventory', async () => {
+  const setStartError = vi.fn();
+  const runtime = createRuntime();
+  runtime.recording.setStartError = setStartError;
+  const refreshMicrophones = vi.fn().mockResolvedValue([]);
+  const refreshWebcams = vi.fn().mockResolvedValue([]);
+  runtime.actions = { refreshMicrophones, refreshWebcams };
+  const props = getPopupVideoSetupProps(runtime);
+  await props.onRefreshMicrophones?.();
+  expect(refreshMicrophones).toHaveBeenCalledOnce();
+  expect(setStartError).toHaveBeenCalledOnce();
+  const update = setStartError.mock.calls[0]?.[0] as (error: string | null) => string | null;
+  expect(update(createTranslator('en')('popup.video.microphonePermissionDenied'))).toBeNull();
+  expect(update(createTranslator('ru')('popup.video.microphonePermissionRequired'))).toBeNull();
+  const cameraError = createTranslator('en')('popup.video.cameraPermissionDenied');
+  expect(update(cameraError)).toBe(cameraError);
+  expect(update('Unrelated recording failure')).toBe('Unrelated recording failure');
+  expect(update(null)).toBeNull();
+  expect(runtime.recording.handleStartRecording).not.toHaveBeenCalled();
+});
+
+it('clears recovered camera permission errors without clearing microphone errors', async () => {
+  const setStartError = vi.fn();
+  const runtime = createRuntime();
+  runtime.recording.setStartError = setStartError;
+  runtime.actions = {
+    refreshMicrophones: vi.fn().mockResolvedValue([]),
+    refreshWebcams: vi.fn().mockResolvedValue([]),
+  };
+  await getPopupVideoSetupProps(runtime).onRefreshWebcams?.();
+  const update = setStartError.mock.calls[0]?.[0] as (error: string | null) => string | null;
+  expect(update(createTranslator('ru')('popup.video.cameraPermissionDenied'))).toBeNull();
+  const microphoneError = createTranslator('en')('popup.video.microphonePermissionDenied');
+  expect(update(microphoneError)).toBe(microphoneError);
+  expect(runtime.actions.refreshWebcams).toHaveBeenCalledOnce();
 });
 
 it('uses start cancellation while the recorder has not activated yet', () => {

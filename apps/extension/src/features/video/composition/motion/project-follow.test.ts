@@ -1,3 +1,10 @@
+import {
+  bindMotionRegionToClip,
+  reconcileMotionSourceBindings,
+} from '../../project/motion/source-binding';
+import { materializeVideoProjectCursorSourceObservations } from '../../project/cursor-source-observations';
+import { sliceClipPlaybackWindow } from '../../project/timeline/rate';
+import { mapCompositionPointThroughCamera, resolveVideoCompositionCamera } from './index';
 import { isValidVideoProject } from '../../project/validation/root';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../../project/factories/creation';
@@ -266,38 +273,305 @@ it('retains both source-owned sides at a cut without interpolating across source
   expect(project).toEqual(before);
 });
 
-it('coordinates adjacent retained portions of the same nominal animation clock', () => {
+it.each([false, true])(
+  'coordinates adjacent retained portions of the same nominal animation clock with remembered link=%s',
+  (remembered) => {
+    const { project, region } = fixture();
+    project.version = remembered ? 34 : 4;
+    project.cameraFollowDefaults = createCameraFollowSettings('fast');
+    project.cursorTrack!.samples[0] = {
+      ...project.cursorTrack!.samples[0]!,
+      x: 400,
+      recordingPoint: { x: 0.4, y: 0.5 },
+    };
+    const left = {
+      ...region,
+      id: 'clock-left',
+      scale: 2,
+      duration: 1.5,
+      zoomInDuration: 0.6,
+      zoomOutDuration: 0.6,
+      easing: VideoTemporalEasing.EASE_IN_OUT,
+      animation: { start: 0, end: 1.5, duration: 3 },
+    };
+    const right = {
+      ...left,
+      id: 'clock-right',
+      startTime: 1.5,
+      animation: { start: 1.5, end: 3, duration: 3 },
+    };
+    if (remembered) left.phaseTransitions = { link: VideoTemporalEasing.LINEAR };
+    project.motionRegions = [left, right];
+    expect(isValidVideoProject(project)).toBe(true);
+    const before = structuredClone(project);
+    const end = resolveProjectFollowingCamera(project, left, 1.5);
+    const start = resolveProjectFollowingCamera(project, right, 1.5);
+    expect(end.plan.status).toBe('ready');
+    expect(start.plan.status).toBe('ready');
+    expect(start.pan.x).toBeCloseTo(end.pan.x, 8);
+    expect(project).toEqual(before);
+  }
+);
+
+it('projects a cropped source cursor once during camera containment and preserves native observations', async () => {
+  const { resolveVideoCompositionCursor } = await import('../timeline/frame/cursor');
   const { project, region } = fixture();
-  project.version = 4;
-  project.cameraFollowDefaults = createCameraFollowSettings('fast');
-  project.cursorTrack!.samples[0] = {
-    ...project.cursorTrack!.samples[0]!,
-    x: 400,
-    recordingPoint: { x: 0.4, y: 0.5 },
-  };
-  const left = {
-    ...region,
-    id: 'clock-left',
-    scale: 2,
-    duration: 1.5,
-    zoomInDuration: 0.6,
-    zoomOutDuration: 0.6,
-    easing: VideoTemporalEasing.EASE_IN_OUT,
-    animation: { start: 0, end: 1.5, duration: 3 },
-  };
-  const right = {
-    ...left,
-    id: 'clock-right',
-    startTime: 1.5,
-    animation: { start: 1.5, end: 3, duration: 3 },
-  };
-  project.motionRegions = [left, right];
-  expect(isValidVideoProject(project)).toBe(true);
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source');
+  clip.transform = { x: 100, y: 100, width: 400, height: 300, rotation: 0, opacity: 1 };
+  clip.sourceCrop = { x: 0.5, y: 0, width: 0.5, height: 1 };
+  clip.fitMode = 'STRETCH';
   const before = structuredClone(project);
-  const end = resolveProjectFollowingCamera(project, left, 1.5);
-  const start = resolveProjectFollowingCamera(project, right, 1.5);
-  expect(end.plan.status).toBe('ready');
-  expect(start.plan.status).toBe('ready');
-  expect(start.pan.x).toBeCloseTo(end.pan.x, 8);
+  const cursor = resolveVideoCompositionCursor(project, 1, [])!;
+  expect(cursor.x).toBeCloseTo(156, 9);
+  expect(cursor.y).toBeCloseTo(250, 9);
+  const camera = resolveProjectFollowingCamera(project, region, 1);
+  expect(camera.plan.status).toBe('ready');
+  const x = cursor.x * camera.targetScale - camera.pan.x,
+    y = cursor.y * camera.targetScale - camera.pan.y;
+  expect(x).toBeGreaterThanOrEqual(-0.5);
+  expect(x).toBeLessThanOrEqual(project.width + 0.5);
+  expect(y).toBeGreaterThanOrEqual(-0.5);
+  expect(y).toBeLessThanOrEqual(project.height + 0.5);
   expect(project).toEqual(before);
 });
+
+it('does not admit stale cursor containment after an instant camera position', async () => {
+  const { resolveVideoCompositionCursor } = await import('../timeline/frame/cursor');
+  const { project, region } = fixture();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample) => ({
+    ...sample,
+    x: 500,
+    recordingPoint: { x: 0.5, y: 0.5 },
+  }));
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source');
+  project.tracks = project.tracks.map((track) =>
+    track.id === clip.trackId ? { ...track, role: 'CAMERA' } : track
+  );
+  clip.transform = { x: 100, y: 200, width: 200, height: 200, rotation: 0, opacity: 1 };
+  clip.fitMode = 'STRETCH';
+  clip.cameraPositions = [
+    {
+      id: 'right',
+      sourceTime: 1,
+      transform: { ...clip.transform, x: 700 },
+      fitMode: 'STRETCH',
+      transition: { kind: 'instant', duration: 0 },
+    },
+  ];
+  const cameraRegion = { ...region, scale: 2 };
+  project.motionRegions = [cameraRegion];
+  expect(isValidVideoProject(project)).toBe(true);
+  const cursor = resolveVideoCompositionCursor(project, 1.5, [])!;
+  expect(cursor.x).toBeCloseTo(800, 9);
+  const camera = resolveProjectFollowingCamera(project, cameraRegion, 1.5);
+  if (camera.plan.status === 'ready') {
+    const x = cursor.x * camera.targetScale - camera.pan.x;
+    expect(x).toBeGreaterThanOrEqual(-0.5);
+    expect(x).toBeLessThanOrEqual(project.width + 0.5);
+  } else expect(camera.plan.status).toBe('conflict');
+});
+
+it.each(['instant', 'smooth', 'shrink'] as const)(
+  'admits a feasible %s camera move after an initially hidden interval',
+  (kind) => {
+    const { project, region } = fixture();
+    project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+    project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample) => ({
+      ...sample,
+      x: 500,
+      recordingPoint: { x: 0.5, y: 0.5 },
+    }));
+    const clip = project.clips[0]!;
+    if (clip.type !== 'VIDEO') throw new Error('Missing source');
+    project.tracks = project.tracks.map((track) =>
+      track.id === clip.trackId ? { ...track, role: 'CAMERA' } : track
+    );
+    clip.transform = { x: 100, y: 200, width: 80, height: 80, rotation: 0, opacity: 1 };
+    clip.fitMode = 'STRETCH';
+    clip.cameraHiddenRanges = [{ id: 'opening', start: 0, end: 0.5 }];
+    clip.cameraPositions = [
+      {
+        id: 'small',
+        sourceTime: 1,
+        transform: { ...clip.transform, x: 120 },
+        fitMode: 'STRETCH',
+        transition: { kind, duration: 0.5 },
+      },
+    ];
+    const cameraRegion = { ...region, scale: 2 };
+    project.motionRegions = [cameraRegion];
+    const camera = resolveProjectFollowingCamera(project, cameraRegion, 2);
+    expect(camera.plan.status).toBe('ready');
+  }
+);
+
+it.each([
+  [0, 0.99, 'ready'],
+  [45, 0.99, 'conflict'],
+  [90, 0.99, 'ready'],
+  [-135, 0.99, 'conflict'],
+  [45, 0.5, 'ready'],
+] as const)(
+  'admits the physical rotated window cursor: rotation=%s position=%s',
+  (rotation, position, status) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'rotated-admission',
+      filename: 'window.webm',
+      width: 400,
+      height: 400,
+      duration: 3,
+      mimeType: 'video/webm',
+      size: 10,
+      cursorTrack: {
+        captureMode: VideoCursorCaptureMode.EMBEDDED_FALLBACK,
+        skin: normalizeVideoProjectCursorSkin(undefined),
+        samples: [0, 3].map((time) => ({
+          id: `cursor:${time}`,
+          time,
+          x: position * 400,
+          y: position * 400,
+          visible: true,
+          observation: 'observed' as const,
+          recordingPoint: { x: position, y: position },
+          captureSegment: 0,
+        })),
+      },
+    });
+    const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    if (clip.type !== 'VIDEO') throw new Error('Missing video');
+    clip.transform.rotation = rotation;
+    const region = {
+      ...createVideoProjectMotionRegion(project, 0, { enter: 'none', exit: 'none' }),
+      duration: 3,
+      scale: 2,
+      focusMode: VideoMotionFocusMode.CURSOR,
+      zoomInDuration: 0,
+      zoomOutDuration: 0,
+      sourceBinding: {
+        clipId: clip.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: 0,
+        sourceEnd: 3,
+        animation: { start: 0, end: 3, duration: 3 },
+      },
+    };
+    project.motionRegions = [region];
+    const before = structuredClone(project);
+    const plan = resolveProjectCursorCameraPlan(project, region);
+    expect(plan.status).toBe(status);
+    if (status === 'conflict') expect(plan).toMatchObject({ reason: 'viewport' });
+    for (const output of [undefined, { width: 320, height: 180 }]) {
+      expect(resolveProjectCursorCameraPlan(project, region, output).status).toBe(status);
+    }
+    if (status === 'ready') {
+      const angle = (rotation * Math.PI) / 180;
+      const dx = position * project.width - project.width / 2;
+      const dy = position * project.height - project.height / 2;
+      const physical = {
+        x: 200 + dx * Math.cos(angle) - dy * Math.sin(angle),
+        y: 200 + dx * Math.sin(angle) + dy * Math.cos(angle),
+      };
+      const camera = resolveVideoCompositionCamera({
+        project,
+        currentTime: 1.5,
+        actions: [],
+        cursorSample: null,
+      });
+      const pixel = mapCompositionPointThroughCamera(physical, camera)!;
+      expect(pixel.x).toBeGreaterThanOrEqual(-1e-6);
+      expect(pixel.y).toBeGreaterThanOrEqual(-1e-6);
+      expect(pixel.x).toBeLessThanOrEqual(project.width + 1e-6);
+      expect(pixel.y).toBeLessThanOrEqual(project.height + 1e-6);
+    }
+    expect(project).toEqual(before);
+  }
+);
+
+it.each([0, 3.05, 0.05])(
+  'retains the complete source-follow context for a window at %s',
+  (placement) => {
+    const { project, region: raw } = fixture();
+    const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    clip.sourceInstanceId = 'retained-follow';
+    project.version = 33;
+    project.cursorTrack = {
+      captureMode: 'separate',
+      skin: normalizeVideoProjectCursorSkin(undefined),
+      samples: [],
+      sourceObservations: [
+        {
+          recordingId: 'zones',
+          sourceInstanceId: 'retained-follow',
+          samples: [0, 0.5, 1, 1.5, 2, 2.5, 3].map((time) => ({
+            id: `p:${time}`,
+            time,
+            x: 150 + (700 * time) / 3,
+            y: 300,
+            visible: true,
+            captureSegment: 0,
+            recordingPoint: { x: (150 + (700 * time) / 3) / 1000, y: 0.5 },
+          })),
+        },
+      ],
+    };
+    project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+    const bound = bindMotionRegionToClip({ ...raw, scale: 2 }, clip);
+    bound.sourceBinding = { ...bound.sourceBinding!, coordinateSpace: 'source-window' };
+    project.motionRegions = [bound];
+    const expected = resolveVideoCompositionCamera({
+      project,
+      currentTime: 2.5,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(resolveProjectCursorCameraPlan(project, bound).status).toBe('ready');
+    const windowed = {
+      ...clip,
+      duration: 3.2,
+      playbackWindow: { offset: 0, extent: 3.2, holdAt: 2.5 },
+    };
+    const held = { ...project, version: 43 as const, duration: 3.2, clips: [windowed] };
+    let candidate: typeof project = held;
+    let time = 3.1;
+    if (placement > 0) {
+      const trailing = {
+        ...windowed,
+        id: 'retained-tail',
+        startTime: placement,
+        duration: 0.15,
+        playbackWindow: sliceClipPlaybackWindow(windowed, 3.05),
+      };
+      candidate = reconcileMotionSourceBindings(
+        held,
+        { ...held, clips: [{ ...windowed, duration: 3.05 }, trailing] },
+        new Map([[clip.id, trailing.id]])
+      );
+      if (placement < 1)
+        candidate = {
+          ...candidate,
+          clips: [trailing],
+          motionRegions: candidate.motionRegions!.filter(
+            (item) => item.sourceBinding?.clipId === trailing.id
+          ),
+        };
+      time = placement + 0.05;
+    }
+    candidate.cursorTrack = materializeVideoProjectCursorSourceObservations(candidate);
+    expect(isValidVideoProject(candidate)).toBe(true);
+    const before = structuredClone(candidate);
+    const actual = resolveVideoCompositionCamera({
+      project: candidate,
+      currentTime: time,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(actual.scale).toBeCloseTo(expected.scale, 6);
+    expect(actual.viewportX).toBeCloseTo(expected.viewportX, 6);
+    expect(actual.viewportY).toBeCloseTo(expected.viewportY, 6);
+    expect(candidate).toEqual(before);
+  }
+);

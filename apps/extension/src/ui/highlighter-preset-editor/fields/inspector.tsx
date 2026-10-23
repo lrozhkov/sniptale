@@ -20,7 +20,12 @@ import { CompactColorSelector } from '../../color-selector';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import { EditorCompactRangeField } from './sections/compact-range-field';
-import { CompactSelect, NumericValueField, ToggleField } from '../../compact-inspector-controls';
+import {
+  CompactSelect,
+  SegmentedRow,
+  NumericValueField,
+  ToggleField,
+} from '../../compact-inspector-controls';
 import { useInspectorLayout } from '../../compact-inspector-controls/layout';
 import { editorResizeHandleClassName } from '../constants';
 import { cloneBorderPresetEffects } from '@sniptale/runtime-contracts/highlighter/border-preset';
@@ -76,6 +81,7 @@ type BorderStyleInspectorProps = {
 function BorderColorField(props: {
   label: string;
   onChange: (color: string) => void;
+  onOpenChange?: ((open: boolean) => void) | undefined;
   value: string;
 }) {
   return (
@@ -83,6 +89,7 @@ function BorderColorField(props: {
       <CompactColorSelector
         label={props.label}
         onChange={props.onChange}
+        {...(props.onOpenChange ? { onOpenChange: props.onOpenChange } : {})}
         palette={BORDER_PALETTE}
         recentColors={[props.value]}
         title={props.label}
@@ -97,23 +104,22 @@ function BorderOutlineSection(props: BorderStyleInspectorProps) {
   return (
     <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
       <BorderColorField
+        onOpenChange={props.onFloatingInteractionChange}
         label={translate('highlighter.editor.borderColorLabel')}
         onChange={(color) => props.onChange({ color })}
         value={props.style.color}
       />
-      <PropertyField label={translate('highlighter.editor.styleLabel')}>
-        <CompactSelect
-          appearance="plain"
-          aria-label={translate('highlighter.editor.styleLabel')}
-          onChange={(style) => props.onChange({ style })}
-          options={[
-            { label: translate('highlighter.editor.styleSolid'), value: 'solid' },
-            { label: translate('highlighter.editor.styleDashed'), value: 'dashed' },
-            { label: translate('highlighter.editor.styleDotted'), value: 'dotted' },
-          ]}
-          value={props.style.style}
-        />
-      </PropertyField>
+      <SegmentedRow
+        label={translate('highlighter.editor.styleLabel')}
+        ariaLabel={translate('highlighter.editor.styleLabel')}
+        onChange={(style) => props.onChange({ style })}
+        options={[
+          { label: translate('highlighter.editor.styleSolid'), value: 'solid' },
+          { label: translate('highlighter.editor.styleDashed'), value: 'dashed' },
+          { label: translate('highlighter.editor.styleDotted'), value: 'dotted' },
+        ]}
+        value={props.style.style}
+      />
       <EditorCompactRangeField
         displaySuffix="px"
         label={translate('highlighter.editor.widthLabel')}
@@ -220,20 +226,18 @@ function BorderBlurSection(props: BorderStyleInspectorProps) {
         }
         value={effects.blur.amount}
       />
-      <PropertyField label={translate('highlighter.editor.blurTypeLabel')}>
-        <CompactSelect
-          appearance="plain"
-          aria-label={translate('highlighter.editor.blurTypeLabel')}
-          onChange={(blurType) =>
-            props.onChange({ effects: { ...effects, blur: { ...effects.blur, blurType } } })
-          }
-          options={AVAILABLE_HIGHLIGHTER_BLUR_TYPES.map((value) => ({
-            label: blurTypeLabels[value],
-            value,
-          }))}
-          value={effects.blur.blurType}
-        />
-      </PropertyField>
+      <SegmentedRow
+        label={translate('highlighter.editor.blurTypeLabel')}
+        ariaLabel={translate('highlighter.editor.blurTypeLabel')}
+        onChange={(blurType) =>
+          props.onChange({ effects: { ...effects, blur: { ...effects.blur, blurType } } })
+        }
+        options={AVAILABLE_HIGHLIGHTER_BLUR_TYPES.map((value) => ({
+          label: blurTypeLabels[value],
+          value,
+        }))}
+        value={effects.blur.blurType}
+      />
     </div>
   );
 }

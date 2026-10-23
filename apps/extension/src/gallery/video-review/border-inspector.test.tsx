@@ -1,9 +1,15 @@
+import {
+  BorderAppearanceFields,
+  type BorderAppearancePatch,
+} from '../../ui/focus-appearance/border';
+import { ReviewDetails } from './controls';
+import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ReviewBorderInspector, ReviewBorderAnimation } from './border-inspector';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
+import { ReviewBorderAnimation } from './border-inspector';
+
 import {
   createQuickEditZoomRegion,
   updateQuickEditZoomRegion,
@@ -48,7 +54,7 @@ async function enter(node: HTMLInputElement, value: string) {
   );
 }
 async function choose(label: string, option: string, scope: ParentNode = host) {
-  if (label !== 'focusReveal') {
+  if (label !== 'focusReveal' && label !== 'borderStyle') {
     await act(async () => field(label, scope).click());
     await act(async () =>
       [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
@@ -90,12 +96,20 @@ async function scrub(name: string, value: string, cancel = false, scope: ParentN
 it('edits stroke style and clamped source area without changing unrelated appearance', async () => {
   let value = createQuickEditBorder();
   const preview = vi.fn();
-  const change = vi.fn((next: typeof value) => {
-    value = next;
+  const change = vi.fn((patch: BorderAppearancePatch) => {
+    value = { ...value, ...patch, area: { ...value.area, ...patch.area } };
     render();
   });
   const render = () =>
-    root.render(<ReviewBorderInspector value={value} onChange={change} onPreview={preview} />);
+    root.render(
+      <BorderAppearanceFields
+        Details={ReviewDetails}
+        preferenceId="gallery.videoReview.borderPreciseArea"
+        value={value}
+        onChange={change}
+        onPreview={preview}
+      />
+    );
   act(render);
   await choose('borderStyle', 'borderStyle_dashed');
   await choose('borderStyle', 'borderStyle_dotted');
@@ -213,7 +227,9 @@ it('commits an edited color and discards an open picker draft on Escape', async 
   const onPreview = vi.fn();
   act(() =>
     root.render(
-      <ReviewBorderInspector
+      <BorderAppearanceFields
+        Details={ReviewDetails}
+        preferenceId="gallery.videoReview.borderPreciseArea"
         value={createQuickEditBorder()}
         onChange={onChange}
         onPreview={onPreview}
@@ -237,9 +253,7 @@ it('commits an edited color and discards an open picker draft on Escape', async 
     document.querySelector<HTMLInputElement>('input[aria-label="shared.ui.colorSelectorHex"]')!,
     '#abcdef'
   );
-  expect(onPreview).toHaveBeenLastCalledWith(
-    expect.objectContaining({ border: expect.objectContaining({ color: '#abcdef' }) })
-  );
+  expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ color: '#abcdef' }));
   act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(onPreview).toHaveBeenLastCalledWith(null);
 });
@@ -266,11 +280,19 @@ it('stops rotation when switching to solid but retains pulse for all stroke styl
     style: 'dashed' as 'solid' | 'dashed' | 'dotted',
     loop: true,
   };
-  const change = vi.fn((next: typeof value) => {
-    value = next;
+  const change = vi.fn((patch: BorderAppearancePatch) => {
+    value = { ...value, ...patch, area: { ...value.area, ...patch.area } };
     render();
   });
-  const render = () => root.render(<ReviewBorderInspector value={value} onChange={change} />);
+  const render = () =>
+    root.render(
+      <BorderAppearanceFields
+        Details={ReviewDetails}
+        preferenceId="gallery.videoReview.borderPreciseArea"
+        value={value}
+        onChange={change}
+      />
+    );
   act(render);
   await choose('borderStyle', 'borderStyle_solid');
   expect(value.loop).toBe(false);

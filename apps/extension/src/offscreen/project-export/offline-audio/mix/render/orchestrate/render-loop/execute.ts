@@ -1,3 +1,4 @@
+import { applyOfflineSceneEdgeGain } from '../../../../scene-edges';
 import { type OfflineAudioRenderableClip } from '../../../../clip-audio/index';
 import { type VideoProject } from '../../../../../../../features/video/project/types/model';
 import type { EffectAudioBufferCache } from '../../../../../../../features/video/composition/effect-runtime';
@@ -57,5 +58,6 @@ export async function executeOfflineAudioMixRender({
     await mixProjectActionAudio(rendered, project, signal, actionRange);
     throwIfAborted(signal);
   }
+  await applyOfflineSceneEdgeGain(rendered, project, actionRange?.start ?? 0, signal);
   return buildOfflineAudioMixResult(rendered);
 }

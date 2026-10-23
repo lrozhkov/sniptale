@@ -342,9 +342,10 @@ it.each(['pointercancel', 'blur', 'Escape', 'outside'])(
       if (reason === 'outside') {
         window.dispatchEvent(new MouseEvent('pointermove', { clientX: 500, clientY: 300 }));
         window.dispatchEvent(new MouseEvent('pointerup'));
-      } else if (reason === 'Escape')
+      } else if (reason === 'Escape') {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-      else window.dispatchEvent(new Event(reason));
+        window.dispatchEvent(new MouseEvent('pointerup'));
+      } else window.dispatchEvent(new Event(reason));
     });
     expect(getDragState().isDragging).toBe(false);
     expect(getDragState().dockPreview).toBeNull();
@@ -364,7 +365,7 @@ it('restores a saved dock and keeps its orientation when free placement is enabl
   });
   await renderElement(<DragHarness currentViewport={null} />);
   expect(getDragState().displayMode).toBe('vertical');
-  expect(getDragState().position.x).toBe(window.innerWidth - 120 - 8);
+  expect(getDragState().position.x).toBe(window.innerWidth - 120 - 20);
   act(() => getDragState().setFreePlacement(true));
   expect(getDragState().displayMode).toBe('vertical');
   act(() => getDragState().setDisplayMode('horizontal'));
@@ -409,3 +410,35 @@ it.each([false, true])(
     expect(getDragState().position.y).toBe(90);
   }
 );
+
+it('keeps a parked corner clear when a classic scrollbar appears without window resize', async () => {
+  let clientWidth = window.innerWidth;
+  vi.spyOn(document.documentElement, 'clientWidth', 'get').mockImplementation(() => clientWidth);
+  let deliverViewportResize = () => {};
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      private targets = new Set<Element>();
+      constructor(callback: ResizeObserverCallback) {
+        deliverViewportResize = () => {
+          if (this.targets.has(document.documentElement)) callback([], this);
+        };
+      }
+      observe(target: Element) {
+        this.targets.add(target);
+      }
+      unobserve(target: Element) {
+        this.targets.delete(target);
+      }
+      disconnect() {
+        this.targets.clear();
+      }
+    }
+  );
+  storageMocks.loadSettings.mockResolvedValue({ contentToolbar: { dockEdge: 'right-bottom' } });
+  await renderElement(<DragHarness currentViewport={null} />);
+  expect(getDragState().position.x).toBe(clientWidth - 120 - 20);
+  clientWidth -= 17;
+  act(() => deliverViewportResize());
+  expect(getDragState().position.x).toBe(clientWidth - 120 - 20);
+});

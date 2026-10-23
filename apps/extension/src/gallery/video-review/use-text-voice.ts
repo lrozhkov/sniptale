@@ -1,3 +1,4 @@
+import { runSpeechQueue } from '../../workflows/audio-jobs/speech-queue';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
@@ -369,27 +370,33 @@ export function useReviewTextVoiceOperation(props: Options) {
         await attempt.beforeRequest();
         signal.throwIfAborted();
         const prepared = await prepareReviewTextVoiceBatch(props.access.session, selected, signal);
-        for (const [index, basis] of prepared.entries()) {
-          try {
-            const preview = await generateReviewTextVoice(
-              props.access.session,
-              basis.fragment.id,
-              captured,
-              signal,
-              approvedProviderId,
-              basis
-            );
-            if (!attempt.isCurrent() || signal.aborted) {
-              await cleanupReviewTextVoicePreview(props.access.session, preview);
-              return;
-            }
-            remember(preview);
-          } catch (cause) {
-            if (signal.aborted) break;
-            report(cause);
+        await runSpeechQueue(
+          prepared,
+          signal,
+          {
+            validate: () => {
+              if (!attempt.isCurrent()) throw new DOMException('Unmounted', 'AbortError');
+            },
+            generate: (basis, activeSignal) =>
+              generateReviewTextVoice(
+                props.access.session,
+                basis.fragment.id,
+                captured,
+                activeSignal,
+                approvedProviderId,
+                basis
+              ),
+            cleanup: (preview) => cleanupReviewTextVoicePreview(props.access.session, preview),
+          },
+          {
+            ready: (preview) => {
+              if (!attempt.isCurrent()) throw new DOMException('Unmounted', 'AbortError');
+              remember(preview);
+            },
+            progress: ({ completed }) => attempt.complete(completed),
+            failed: report,
           }
-          attempt.complete(index + 1);
-        }
+        );
       }, selected.length);
     },
   };

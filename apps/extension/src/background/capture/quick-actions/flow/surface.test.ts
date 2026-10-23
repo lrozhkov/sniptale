@@ -144,6 +144,7 @@ it('keeps Current size native without resolving or applying a preset and returns
 
   await expect(applyQuickActionSurface(args)).resolves.toEqual({
     surfaceCapabilityToken: 'capability-1',
+    transactionId: expect.any(String),
   });
 
   expect(mocks.beginSession).toHaveBeenCalledWith(7);
@@ -332,6 +333,7 @@ it('clears the transaction after normal completion so another quick action can s
   await releaseQuickActionSurface(7, args.viewportState);
   await expect(applyQuickActionSurface(args)).resolves.toEqual({
     surfaceCapabilityToken: 'capability-1',
+    transactionId: expect.any(String),
   });
   await releaseQuickActionSurface(7, args.viewportState);
 
@@ -349,6 +351,7 @@ it('retains the transaction for retry when privileged surface rollback fails', a
   await expect(releaseQuickActionSurface(7, args.viewportState)).resolves.toBeUndefined();
   await expect(applyQuickActionSurface(args)).resolves.toEqual({
     surfaceCapabilityToken: 'capability-1',
+    transactionId: expect.any(String),
   });
 });
 
@@ -370,4 +373,75 @@ it('preserves both the operation and rollback errors', async () => {
     expect.objectContaining({ message: 'restore failed' }),
   ]);
   await expect(releaseQuickActionSurface(7, args.viewportState)).resolves.toBeUndefined();
+});
+
+it('issues a fresh transaction identity for every native borrowed capture', async () => {
+  mocks.getSession.mockReturnValue({ sessionId: 'existing' });
+  const args = createArgs({ viewportPresetId: null });
+  const first = await applyQuickActionSurface(args);
+  expect(first).toMatchObject({ transactionId: expect.any(String) });
+  await releaseQuickActionSurface(7, args.viewportState);
+  const second = await applyQuickActionSurface(args);
+  expect(second.transactionId).not.toBe(first.transactionId);
+});
+
+it('rejects a stale scoped release without releasing a replacement transaction', async () => {
+  mocks.getSession.mockReturnValue({ sessionId: 'existing' });
+  const args = createArgs();
+  const first = await applyQuickActionSurface(args);
+  await releaseQuickActionSurface(7, args.viewportState);
+  const second = await applyQuickActionSurface(args);
+  mocks.releaseTabOwners.mockClear();
+  await expect(
+    releaseQuickActionSurface(7, args.viewportState, first.transactionId)
+  ).rejects.toThrow('stale-transaction');
+  expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
+  await releaseQuickActionSurface(7, args.viewportState, second.transactionId);
+  expect(mocks.releaseTabOwners).toHaveBeenCalledOnce();
+  expect(mocks.endSession).not.toHaveBeenCalled();
+});
+
+it('rejects borrowed-only cleanup for an owned one-shot surface', async () => {
+  const args = createArgs();
+  const surface = await applyQuickActionSurface(args);
+  await expect(
+    releaseQuickActionSurface(7, args.viewportState, surface.transactionId)
+  ).rejects.toThrow('owned-transaction');
+  expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
+  expect(shouldCloseQuickActionTools(7)).toBe(true);
+});
+
+it('restores the borrowed viewport and retains the transaction on scoped release failure', async () => {
+  const priorViewport = {
+    presetId: 'original',
+    target: 'window' as const,
+    width: 900,
+    height: 600,
+  };
+  mocks.getSession.mockReturnValue({ sessionId: 'existing' });
+  const args = createArgs();
+  args.viewportState.set(7, priorViewport);
+  const surface = await applyQuickActionSurface(args);
+  mocks.releaseTabOwners.mockRejectedValueOnce(new Error('restore failed'));
+  await expect(
+    releaseQuickActionSurface(7, args.viewportState, surface.transactionId)
+  ).rejects.toThrow('restore failed');
+  expect(args.viewportState.get(7)?.presetId).toBe('preset-1');
+  await expect(applyQuickActionSurface(args)).rejects.toThrow('surface-busy');
+  await releaseQuickActionSurface(7, args.viewportState, surface.transactionId);
+  expect(args.viewportState.get(7)).toEqual(priorViewport);
+  expect(mocks.releaseTabOwners).toHaveBeenCalledTimes(2);
+  expect(mocks.releaseTabOwners).toHaveBeenLastCalledWith(7, ['quick-action']);
+  expect(mocks.endSession).not.toHaveBeenCalled();
+  await releaseQuickActionSurface(7, args.viewportState, surface.transactionId);
+  expect(mocks.releaseTabOwners).toHaveBeenCalledTimes(2);
+});
+
+it('restores an absent borrowed viewport after scoped cleanup without ending the session', async () => {
+  mocks.getSession.mockReturnValue({ sessionId: 'existing' });
+  const args = createArgs();
+  const surface = await applyQuickActionSurface(args);
+  await releaseQuickActionSurface(7, args.viewportState, surface.transactionId);
+  expect(args.viewportState.has(7)).toBe(false);
+  expect(mocks.endSession).not.toHaveBeenCalled();
 });

@@ -17,7 +17,8 @@ export function createVideoEditorProjectHistoryActions(
   get: VideoEditorStoreGet
 ): VideoEditorProjectHistoryActions {
   return {
-    beginProjectHistoryTransaction: () => {
+    beginProjectHistoryTransaction: (options) => {
+      if (options?.onlyIfIdle && get().projectHistory.transaction) return null;
       let lease = null;
       set((state) => {
         if (!state.project) return {};

@@ -5,6 +5,10 @@ import { createRoot } from 'react-dom/client';
 import { Camera, CameraOff } from 'lucide-react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RecordingMediaSplitControl } from './media-menu';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+
+const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: showToastMock }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -15,6 +19,7 @@ let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 
 beforeEach(() => {
+  showToastMock.mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -26,6 +31,271 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+it('edits microphone gain without closing the menu and reports refusal with retry', async () => {
+  const onChange = vi.fn().mockResolvedValue(undefined);
+  act(() =>
+    root.render(
+      <RecordingMediaSplitControl
+        active
+        activeIcon={Camera}
+        inactiveIcon={CameraOff}
+        disabled={false}
+        kind="audioinput"
+        dataUi="test.mic"
+        displayMode="horizontal"
+        label="Microphone"
+        selectedDeviceId={null}
+        onToggle={vi.fn()}
+        microphoneGain={{ value: 1, onChange }}
+      />
+    )
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="test.mic.menu"]')!.click()
+  );
+  let input = host.querySelector<HTMLInputElement>(
+    'input[aria-label="popup.video.microphoneGainLabel"]'
+  )!;
+  expect(input.value).toBe('100');
+  const commit = async (value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+  await commit('150');
+  expect(onChange).toHaveBeenLastCalledWith(1.5);
+  expect(host.querySelector('[data-ui="test.mic.menu"]')?.getAttribute('aria-expanded')).toBe(
+    'true'
+  );
+  onChange.mockRejectedValueOnce(new Error('refused'));
+  await commit('50');
+  expect(showToastMock).toHaveBeenLastCalledWith(expect.any(String), 'error');
+  input = host.querySelector<HTMLInputElement>(
+    'input[aria-label="popup.video.microphoneGainLabel"]'
+  )!;
+  expect(input.value).toBe('100');
+  await commit('125');
+  expect(onChange).toHaveBeenLastCalledWith(1.25);
+});
+
+it.each([false, true])('serializes camera appearance commits with unmount %s', async (unmount) => {
+  let finish!: () => void;
+  const onAppearanceChange = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    )
+    .mockResolvedValue(undefined);
+  const onPreview = vi.fn();
+  act(() =>
+    root.render(
+      <RecordingMediaSplitControl
+        active
+        activeIcon={Camera}
+        inactiveIcon={CameraOff}
+        disabled={false}
+        kind="videoinput"
+        dataUi="test.camera"
+        displayMode="horizontal"
+        label="Camera"
+        selectedDeviceId={null}
+        onToggle={vi.fn()}
+        cameraPlacement={{
+          mode: 'embedded',
+          locked: false,
+          onChange: vi.fn(),
+          presentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, mode: 'embedded' },
+          onAppearanceChange,
+          onPreview,
+        }}
+      />
+    )
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+  );
+  const choose = (label: string) =>
+    host
+      .querySelector<HTMLButtonElement>(`[aria-label="popup.video.webcamPresentation${label}"]`)!
+      .click();
+  await act(async () => choose('Square'));
+  await act(async () => choose('Ellipse'));
+  expect(onAppearanceChange).toHaveBeenCalledTimes(1);
+  if (unmount) act(() => root.unmount());
+  await act(async () => finish());
+  if (unmount) {
+    expect(onAppearanceChange).toHaveBeenCalledTimes(1);
+    return;
+  }
+  expect(onAppearanceChange).toHaveBeenCalledTimes(2);
+  expect(onAppearanceChange).toHaveBeenLastCalledWith({ shape: 'ellipse' });
+  expect(host.querySelector('[data-ui="test.camera.menu"]')?.getAttribute('aria-expanded')).toBe(
+    'true'
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+  );
+  expect(onPreview).toHaveBeenLastCalledWith(null);
+});
+
+it.each([false, true])(
+  'exposes controlled free placement with selected state %s',
+  async (freePlacement) => {
+    const onFreePlacementChange = vi.fn();
+    act(() =>
+      root.render(
+        <RecordingMediaSplitControl
+          active
+          activeIcon={Camera}
+          inactiveIcon={CameraOff}
+          disabled={false}
+          kind="videoinput"
+          dataUi="test.camera"
+          displayMode="horizontal"
+          label="Camera"
+          selectedDeviceId={null}
+          onToggle={vi.fn()}
+          cameraPlacement={{
+            mode: 'embedded',
+            locked: false,
+            onChange: vi.fn(),
+            presentation: {
+              ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+              mode: 'embedded',
+              freePlacement,
+            },
+            onAppearanceChange: onFreePlacementChange,
+          }}
+        />
+      )
+    );
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+    );
+    const option = host.querySelector<HTMLButtonElement>(
+      '[role="switch"][aria-label="popup.video.webcamFreePlacement"]'
+    )!;
+    expect(option.getAttribute('aria-checked')).toBe(String(freePlacement));
+    expect(option.className).toContain('sniptale-glass-switch');
+    await act(async () => option.click());
+    expect(onFreePlacementChange).toHaveBeenCalledExactlyOnceWith({
+      freePlacement: !freePlacement,
+    });
+    expect(option.disabled).toBe(false);
+    onFreePlacementChange.mockRejectedValueOnce(new Error('storage failed'));
+    await act(async () => option.click());
+    expect(showToastMock).toHaveBeenLastCalledWith(expect.any(String), 'error');
+    expect(option.getAttribute('aria-checked')).toBe(String(freePlacement));
+    await act(async () => option.click());
+    expect(onFreePlacementChange).toHaveBeenCalledTimes(3);
+  }
+);
+
+it.each(['audioinput', 'videoinput'] as const)(
+  'marks only the selected %s device with a check',
+  async (kind) => {
+    act(() =>
+      root.render(
+        <RecordingMediaSplitControl
+          active
+          activeIcon={Camera}
+          inactiveIcon={CameraOff}
+          disabled={false}
+          kind={kind}
+          dataUi="test.media"
+          displayMode="horizontal"
+          label="Device"
+          selectedDeviceId="selected"
+          onToggle={vi.fn()}
+          onLoadDevices={async () => [
+            { deviceId: 'selected', kind, label: 'Selected device' },
+            { deviceId: 'other', kind, label: 'Other device' },
+          ]}
+        />
+      )
+    );
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[data-ui="test.media.menu"]')!.click()
+    );
+    const choices = host.querySelectorAll('.sniptale-popover-item');
+    expect(choices).toHaveLength(2);
+    expect(choices[0]!.querySelector('svg.lucide-check')).not.toBeNull();
+    expect(choices[1]!.querySelector('svg.lucide-check')).toBeNull();
+  }
+);
+
+it('keeps camera placement and toolbar controls stable during a pending change', async () => {
+  let finish!: () => void;
+  const onToggle = vi.fn();
+  const onChange = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const render = (locked = false) =>
+    act(() =>
+      root.render(
+        <RecordingMediaSplitControl
+          active
+          activeIcon={Camera}
+          inactiveIcon={CameraOff}
+          disabled={false}
+          kind="videoinput"
+          dataUi="test.camera"
+          displayMode="horizontal"
+          label="Camera"
+          selectedDeviceId="camera-1"
+          onToggle={onToggle}
+          onLoadDevices={async () => [
+            { deviceId: 'camera-1', kind: 'videoinput', label: 'Camera' },
+          ]}
+          cameraPlacement={{
+            mode: 'embedded',
+            locked,
+            onChange,
+            presentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, mode: 'embedded' },
+            onAppearanceChange: vi.fn(),
+          }}
+        />
+      )
+    );
+  render();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+  );
+  const placement = host.querySelector(
+    '[data-ui="content.toolbar.video-recording.camera.placement"]'
+  )!;
+  const next = placement.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')!;
+  act(() => {
+    next.click();
+    next.click();
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.toggle"]')!.click();
+    host.querySelector<HTMLButtonElement>('.sniptale-popover-item')!.click();
+  });
+  expect(onChange).toHaveBeenCalledOnce();
+  expect(onToggle).not.toHaveBeenCalled();
+  for (const control of host.querySelectorAll('button')) expect(control.disabled).toBe(false);
+  expect(host.querySelector('[aria-busy="true"]')).not.toBeNull();
+  await act(async () => {
+    finish();
+  });
+  expect(host.querySelector('[data-ui="content.toolbar.video-recording.camera.placement"]')).toBe(
+    placement
+  );
+  expect(host.querySelector('[aria-busy="false"]')).not.toBeNull();
+  await act(async () => render(true));
+  expect(next.disabled).toBe(true);
+  act(() => next.click());
+  expect(onChange).toHaveBeenCalledOnce();
 });
 
 it('awaits device switching and keeps the menu open when the owner rejects it', async () => {
@@ -73,8 +343,10 @@ it('awaits device switching and keeps the menu open when the owner rejects it', 
   });
 
   expect(onDeviceChange).toHaveBeenCalledWith('camera-2');
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-    'content.toolbar.unknownError'
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(showToastMock).toHaveBeenCalledExactlyOnceWith(
+    'content.toolbar.videoRecordingActionFailed',
+    'error'
   );
   expect(host.querySelector('[data-ui="test.camera.menu"]')?.getAttribute('aria-expanded')).toBe(
     'true'
@@ -120,4 +392,124 @@ it('does not flash the loading row for a fast device catalog', async () => {
   expect(host.textContent).not.toContain('content.toolbar.videoRecordingDevicesLoading');
   expect(host.textContent).toContain('Camera 1');
   vi.useRealTimers();
+});
+
+it.each(['toggle', 'catalog', 'placement'])(
+  'uses one shared toast for %s failure without adding an inline alert',
+  async (action) => {
+    const failure = new Error('Device action failed');
+    const onToggle = vi.fn().mockRejectedValue(failure);
+    const onPlacement = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(undefined);
+    const onLoadDevices = vi.fn(async () => {
+      if (action === 'catalog') throw failure;
+      return [];
+    });
+    act(() =>
+      root.render(
+        <RecordingMediaSplitControl
+          active
+          activeIcon={Camera}
+          disabled={false}
+          inactiveIcon={CameraOff}
+          kind="videoinput"
+          dataUi="test.camera"
+          displayMode="horizontal"
+          label="Camera"
+          selectedDeviceId={null}
+          onLoadDevices={onLoadDevices}
+          onToggle={onToggle}
+          cameraPlacement={{
+            mode: 'embedded',
+            locked: false,
+            onChange: onPlacement,
+            presentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, mode: 'embedded' },
+            onAppearanceChange: vi.fn(),
+          }}
+        />
+      )
+    );
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          action === 'toggle' ? '[data-ui="test.camera.toggle"]' : '[data-ui="test.camera.menu"]'
+        )
+        ?.click();
+    });
+    if (action === 'placement')
+      await act(async () => {
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-ui="content.toolbar.video-recording.camera.placement"] button[aria-pressed="false"]'
+          )
+          ?.click();
+      });
+    expect(showToastMock).toHaveBeenCalledExactlyOnceWith(
+      'content.toolbar.videoRecordingActionFailed',
+      'error'
+    );
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    if (action !== 'toggle')
+      expect(
+        host.querySelector('[data-ui="test.camera.menu"]')?.getAttribute('aria-expanded')
+      ).toBe('true');
+    if (action === 'placement') {
+      expect(
+        host
+          .querySelector('[data-ui="content.toolbar.video-recording.camera.placement"] button')
+          ?.getAttribute('aria-pressed')
+      ).toBe('true');
+      await act(async () => {
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-ui="content.toolbar.video-recording.camera.placement"] button[aria-pressed="false"]'
+          )
+          ?.click();
+      });
+      expect(onPlacement).toHaveBeenCalledTimes(2);
+      expect(showToastMock).toHaveBeenCalledTimes(1);
+    }
+  }
+);
+
+it('keeps the explicit permission result authoritative across native prompt focus changes', async () => {
+  let grant!: (devices: { deviceId: string; kind: 'videoinput'; label: string }[]) => void;
+  const onLoadDevices = vi.fn().mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        grant = resolve;
+      })
+  );
+  act(() =>
+    root.render(
+      <RecordingMediaSplitControl
+        active={false}
+        activeIcon={Camera}
+        disabled={false}
+        inactiveIcon={CameraOff}
+        kind="videoinput"
+        dataUi="test.camera"
+        displayMode="horizontal"
+        label="Camera"
+        selectedDeviceId={null}
+        onLoadDevices={onLoadDevices}
+        onToggle={vi.fn()}
+      />
+    )
+  );
+  await act(async () => {
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')?.click();
+  });
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'));
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(onLoadDevices).toHaveBeenCalledExactlyOnceWith(true);
+  await act(async () =>
+    grant([
+      { deviceId: '', kind: 'videoinput', label: '' },
+      { deviceId: 'camera-real', kind: 'videoinput', label: 'Actual camera' },
+    ])
+  );
+  expect(host.textContent).toContain('Actual camera');
+  expect(host.querySelectorAll('.sniptale-popover-item')).toHaveLength(1);
 });

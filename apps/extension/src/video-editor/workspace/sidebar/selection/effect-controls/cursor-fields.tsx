@@ -1,7 +1,6 @@
 import { translate } from '../../../../../platform/i18n';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { getCursorAnimationOptions, getCursorPresetOptions } from './cursor-options';
-import { InspectorDetails } from '../shared/details';
 import { ColorField, SelectInput, ToggleField } from '../shared/controls';
 import { DetailItem, DetailList, PANEL_META_CLASS_NAME } from '../shared/panel';
 import { VideoCursorCaptureMode } from '../../../../../features/video/project/types';
@@ -37,6 +36,7 @@ export function CursorVisibilityField(props: {
 
 export function CursorSkinFields(props: {
   part?: 'appearance' | 'animation';
+  showVisibility?: boolean;
   showCaptureCapability?: boolean;
   animationPreset: NonNullable<
     NonNullable<WorkspaceSidebarSelectionPanelProps['project']['cursorTrack']>['skin']
@@ -82,6 +82,7 @@ export function CursorSkinFields(props: {
       <CursorSkinToggles
         hidden={props.hidden}
         shadow={props.shadow}
+        showVisibility={props.showVisibility !== false}
         onUpdateCursorSkin={props.onUpdateCursorSkin}
       />
     </div>
@@ -198,28 +199,25 @@ function CursorAnimationField(props: {
 }
 
 function CursorSkinToggles(props: {
+  showVisibility: boolean;
   hidden: boolean;
   shadow: boolean;
   onUpdateCursorSkin: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSkin'];
 }) {
   return (
     <>
-      <CursorSkinToggle
-        checked={!props.hidden}
-        label={translate('videoEditor.sidebar.cursorVisibleLabel')}
-        onChange={(checked) => props.onUpdateCursorSkin({ hidden: !checked })}
-      />
-      <InspectorDetails
-        preferenceId="cursor-fields:videoEditor.sidebar.inspectorMoreDetails"
-        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
-      >
-        {' '}
+      {props.showVisibility ? (
         <CursorSkinToggle
-          checked={props.shadow}
-          label={translate('videoEditor.sidebar.cursorShadowLabel')}
-          onChange={(checked) => props.onUpdateCursorSkin({ shadow: checked })}
+          checked={!props.hidden}
+          label={translate('videoEditor.sidebar.cursorVisibleLabel')}
+          onChange={(checked) => props.onUpdateCursorSkin({ hidden: !checked })}
         />
-      </InspectorDetails>
+      ) : null}
+      <CursorSkinToggle
+        checked={props.shadow}
+        label={translate('videoEditor.sidebar.cursorShadowLabel')}
+        onChange={(checked) => props.onUpdateCursorSkin({ shadow: checked })}
+      />
     </>
   );
 }

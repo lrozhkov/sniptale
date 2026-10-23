@@ -106,7 +106,7 @@ afterEach(() => {
 });
 
 describe('save-presets list', () => {
-  it('distinguishes loading and search results, and disables reorder while filtered', () => {
+  it('keeps loading, Add, defaults and reorder without search or duplicated headings', () => {
     const onMoveBefore = vi.fn(async () => undefined);
     renderList({
       isLoading: true,
@@ -123,15 +123,37 @@ describe('save-presets list', () => {
       defaultImagePresetId: 'preset-1',
     });
     expect(container?.textContent).toContain(translate('savePresets.section.imageDefault'));
-    const search = container?.querySelector('input[type="search"]') as HTMLInputElement;
-    act(() => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-      setter?.call(search, 'missing');
-      search.dispatchEvent(new Event('input', { bubbles: true }));
-      search.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(container?.querySelector('input[type="search"]')).toBeNull();
+    expect(container?.querySelector('h2')).toBeNull();
+    expect(container?.textContent).not.toContain(translate('savePresets.section.listDescription'));
+    expect(container?.querySelector('[data-settings-collection-root]')).not.toBeNull();
+    expect(
+      container?.querySelector(
+        `button[aria-label="${translate('settings.collection.dragHandle')}"]`
+      )
+    ).not.toBeNull();
+  });
+
+  it('commits keyboard reordering and opens Add without a preset', () => {
+    const onMoveBefore = vi.fn(async () => undefined);
+    const handlers = renderList({
+      onMoveBefore,
+      presets: [createPreset(), createPreset({ id: 'preset-2', name: 'Archive', order: 2 })],
     });
-    expect(container?.textContent).toContain(translate('savePresets.section.noMatches'));
-    expect(container?.querySelector('[data-settings-collection-root]')).toBeNull();
+    const handle = container?.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('settings.collection.dragHandle')}"]`
+    );
+    expect(handle).not.toBeNull();
+    for (const key of [' ', 'ArrowDown', ' ']) {
+      act(() => handle?.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+    }
+    expect(onMoveBefore).toHaveBeenCalledExactlyOnceWith('preset-1', null);
+    const add = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === translate('savePresets.section.addButton')
+    );
+    expect(add).toBeDefined();
+    act(() => add?.click());
+    expect(handlers.onEdit).toHaveBeenCalledExactlyOnceWith();
   });
   it('routes row actions through the list body helpers', () => {
     const handlers = renderList();

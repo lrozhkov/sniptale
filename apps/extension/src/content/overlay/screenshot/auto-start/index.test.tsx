@@ -148,6 +148,30 @@ it('passes the queued navigation baseline into the auto-start capture', async ()
   });
 });
 
+it('consumes a newer queued generation when its preparation baseline is unchanged', async () => {
+  const preparationBaseline = {
+    captureAction: 'edit' as const,
+    timerDelay: 7,
+    isToolbarVisible: true,
+    navigationLockEnabled: false,
+    editingMode: 'drawing' as const,
+  };
+  for (const runGeneration of [1, 2]) {
+    await renderHarness({
+      pendingAutoStartCapture: {
+        type: 'visible',
+        startContext: { preparationBaseline, runGeneration },
+      },
+      screenshotMode: true,
+    });
+  }
+  expect(fallbackHandleTakeScreenshot).toHaveBeenCalledTimes(2);
+  expect(fallbackHandleTakeScreenshot).toHaveBeenLastCalledWith('visible', undefined, {
+    preparationBaseline,
+    runGeneration: 2,
+  });
+});
+
 it('waits for the content document to regain focus before starting queued capture', async () => {
   vi.useFakeTimers();
   const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false);

@@ -63,7 +63,7 @@ for (const theme of ['light', 'dark'] as const) {
       { tourFixture: '1' }
     );
     await page.getByRole('button', { name: 'Interactive tour', exact: true }).click();
-    const host = page.locator('.tour-stage-host');
+    const host = page.locator('.tour-canvas .tour-stage-host');
     await expectFittedFrame(host);
     const surface = await page
       .locator('.guide-center-panel')
@@ -76,9 +76,15 @@ for (const theme of ['light', 'dark'] as const) {
       }),
       contentType: 'image/png',
     });
+    const panel = page.locator('#guide-inspector-panel');
+    await panel
+      .getByRole('navigation')
+      .getByRole('button', { name: 'Actions', exact: true })
+      .click();
+    await panel.getByRole('button', { name: 'Text action', exact: true }).click();
     await page
       .locator('.tour-header-controls')
-      .getByRole('button', { name: 'Preview', exact: true })
+      .getByRole('button', { name: 'Preview from here', exact: true })
       .click();
     expect(
       await host.locator<HTMLInputElement>('[data-tour-seek]').evaluate((range) => {
@@ -172,7 +178,7 @@ for (const [locale, theme] of [
       { tourFixture: '1' }
     );
     await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
-    const host = page.locator('.tour-stage-host');
+    const host = page.locator('.tour-canvas .tour-stage-host');
     await expect(host.locator('.tour-toolbar')).toBeHidden();
     await page.locator('.tour-slide-select').nth(1).click();
     await expect(host.locator('#tour-player')).toHaveAttribute('data-slide-id', 'tour-after');
@@ -420,7 +426,7 @@ for (const [locale, theme] of [
     const field = panel.getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true });
     const short = locale === 'ru' ? 'Короткое пояснение' : 'Short explanation';
     await field.fill(short);
-    const host = page.locator('.tour-stage-host');
+    const host = page.locator('.tour-canvas .tour-stage-host');
     await expect(host.locator('[data-tour-hint-text]')).toHaveText(short);
     await expect(host.locator('[data-tour-hint-toggle]')).toBeHidden();
     const copy = (
@@ -484,7 +490,10 @@ for (const [locale, theme] of [
     expect(await inspectSharedCaption(exported, copy)).toEqual(editing);
     await drawerBounds(exported);
     await info.attach(`shared-caption-${locale}`, {
-      body: await page.screenshot({ path: `.tmp/backlog6-w18-caption-${locale}.png` }),
+      body: await page.screenshot({
+        path: info.outputPath(`shared-caption-${locale}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
   });
@@ -531,6 +540,7 @@ for (const locale of ['en', 'ru'] as const) {
       .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
       .click();
     const checkSequence = async (player: Locator) => {
+      await player.locator('[data-tour-manual]').click();
       const hint = player.locator('[data-tour-hint]');
       const body = hint.locator('[data-tour-hint-text]');
       const previous = hint.locator('[data-tour-hint-previous]');
@@ -540,7 +550,7 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(body).toHaveText(copies[0]!);
       await expect(previous).toBeDisabled();
       await expect(next).toBeEnabled();
-      await expect(count).toHaveText('1 / 3');
+      await expect(count).toHaveText('1 / 2');
       const buttons = await hint.locator('.tour-hint-controls').boundingBox();
       const position = await count.boundingBox();
       const copyBox = await body.boundingBox();
@@ -550,7 +560,7 @@ for (const locale of ['en', 'ru'] as const) {
       await next.click();
       await expect(body).toHaveText(copies[1]!);
       await expect(hint).not.toHaveAttribute('inert', '');
-      await expect(count).toHaveText('2 / 3');
+      await expect(count).toHaveText('2 / 2');
       await previous.click();
       await expect(body).toHaveText(copies[0]!);
       await expect(hint).not.toHaveAttribute('inert', '');
@@ -562,7 +572,7 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(player.locator('[data-tour-next]')).toBeDisabled();
       await expect(hint).toBeHidden();
     };
-    await checkSequence(page.locator('.tour-stage-host'));
+    await checkSequence(page.locator('.tour-canvas .tour-stage-host'));
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
     await page
       .locator('.guide-export-stage')
@@ -572,7 +582,10 @@ for (const locale of ['en', 'ru'] as const) {
       page.frameLocator('.tour-export-frame iframe').frameLocator('iframe').locator('#tour-player')
     );
     await info.attach(`sequence-${locale}`, {
-      body: await page.screenshot(),
+      body: await page.screenshot({
+        path: info.outputPath(`explanation-sequence-${locale}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
   });
@@ -625,7 +638,10 @@ for (const [locale, theme, viewport] of [
     await numeric(t('scenario.editor.tourCalloutGap'), '60');
     await numeric(t('scenario.editor.tourHintWidth'), '200');
     await info.attach(`global-marker-fields-${locale}`, {
-      body: await page.screenshot({ fullPage: false }),
+      body: await page.screenshot({
+        path: info.outputPath(`global-marker-fields-${locale}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
     await page.locator('.tour-slide-select').first().click();
@@ -659,7 +675,10 @@ for (const [locale, theme, viewport] of [
     await color(t('scenario.editor.tourMarkerColor'), '#111827');
     await numeric(t('scenario.editor.tourMarkerSize'), '48');
     await info.attach(`local-marker-fields-${locale}`, {
-      body: await page.screenshot({ fullPage: false }),
+      body: await page.screenshot({
+        path: info.outputPath(`local-marker-fields-${locale}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
     const marker = page.locator('.tour-stage-host .tour-hotspot').first();
@@ -691,7 +710,7 @@ for (const [locale, theme, viewport] of [
     await category(t('scenario.editor.tourObjects')).click();
     await panel.locator('.tour-object-add button').click();
     await page
-      .getByRole('group', { name: t('scenario.editor.tourAddObject'), exact: true })
+      .locator('.guide-action-menu')
       .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
       .click();
     await category(t('scenario.editor.appearance')).click();
@@ -707,7 +726,12 @@ for (const [locale, theme, viewport] of [
       .fill('Corner spacing proof');
     await expect(page.locator('.tour-stage-host .tour-hotspot')).toHaveCount(2);
     await expect(page.getByRole('status').first()).toHaveText(t('scenario.editor.guideSaved'));
-    await page.reload();
+    const reopen = new URL(page.url());
+    reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+    reopen.searchParams.set('tourFixture', '1');
+    reopen.searchParams.set('locale', locale);
+    reopen.searchParams.set('theme', theme);
+    await page.goto(reopen.href, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
     await page.locator('.tour-slide-select').first().click();
     await expect
@@ -721,7 +745,12 @@ for (const [locale, theme, viewport] of [
       .locator('.tour-header-controls')
       .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
       .click();
+    const livePlayer = page.locator('.tour-stage-host #tour-player');
+    await livePlayer.locator('[data-tour-manual]').click();
+    await expect(livePlayer.locator('[data-tour-object-id]')).toHaveCount(1);
+    const firstAction = await livePlayer.getAttribute('data-action-id');
     await marker.hover();
+    await expect(livePlayer).toHaveAttribute('data-action-id', firstAction!);
     const hint = page.locator('.tour-stage-host [data-tour-hint]');
     await expect(hint).toBeVisible();
     await expect(hint).toContainText('Marker spacing proof');
@@ -738,7 +767,12 @@ for (const [locale, theme, viewport] of [
     });
     // The marker is inside the stage border; the hint is positioned in its outer viewport.
     expect(Math.abs(gap - 60)).toBeLessThanOrEqual(1);
-    await page.locator('.tour-stage-host .tour-hotspot').nth(1).hover();
+    await livePlayer.locator('[data-tour-next]').click();
+    await expect(livePlayer.locator('[data-tour-counter]')).toHaveText('2 / 2');
+    await expect(livePlayer.locator('[data-tour-object-id]')).toHaveCount(1);
+    const secondAction = await livePlayer.getAttribute('data-action-id');
+    await livePlayer.locator('.tour-hotspot').hover();
+    await expect(livePlayer).toHaveAttribute('data-action-id', secondAction!);
     await expect(hint).toContainText('Corner spacing proof');
     const corner = await hint.boundingBox();
     const stage = await page.locator('.tour-stage-host [data-tour-stage]').boundingBox();
@@ -803,7 +837,10 @@ for (const [locale, theme, viewport] of [
         size: '20px',
       });
     await info.attach(`saved-marker-tour-${locale}`, {
-      body: await page.screenshot({ fullPage: false }),
+      body: await page.screenshot({
+        path: info.outputPath(`saved-marker-tour-${locale}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
     await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
@@ -898,13 +935,12 @@ for (const [locale, theme, viewport] of [
       .click();
     await expect(
       panel.getByRole('button', {
-        name: t('scenario.editor.guideUploadImage'),
+        name: t('settings.editor.backgrounds.upload'),
         exact: true,
       })
     ).toBeVisible();
-    await panel.getByRole('button', { name: t('scenario.editor.tourAspect'), exact: true }).click();
-    await page.getByRole('option', { name: '4:3', exact: true }).click();
-    const player = page.locator('.tour-stage-host');
+    await panel.getByRole('button', { name: '4:3', exact: true }).click();
+    const player = page.locator('.tour-canvas .tour-stage-host');
     const stage = player.locator('[data-tour-stage]');
     await expect(player.locator('.tour-hotspot')).toHaveCount(1);
     await expect(player.locator('.tour-image')).toBeVisible();
@@ -954,8 +990,15 @@ for (const [locale, theme, viewport] of [
     await expect(stage).toHaveCSS('background-image', /url\(/);
     await expect(stage).toHaveCSS('background-size', 'cover, auto');
     const chooseFit = async (fit: 'tourContain' | 'tourCover') => {
-      await panel.getByRole('button', { name: t('scenario.editor.tourFit'), exact: true }).click();
-      await page.getByRole('option', { name: t(`scenario.editor.${fit}`), exact: true }).click();
+      const option = t(`scenario.editor.${fit}`);
+      const segment = panel.getByRole('button', { name: option, exact: true });
+      if (await segment.isVisible()) await segment.click();
+      else {
+        await panel
+          .getByRole('button', { name: t('scenario.editor.tourFit'), exact: true })
+          .click();
+        await page.getByRole('option', { name: option, exact: true }).click();
+      }
     };
     await chooseFit('tourContain');
     await expect(stage).toHaveCSS('background-size', 'contain, auto');
@@ -984,24 +1027,10 @@ for (const [locale, theme, viewport] of [
     expect(await inspectStageContent(player)).toEqual(original);
     await appearance();
     await panel
-      .getByRole('button', { name: t('scenario.editor.guideOpenImageLibrary'), exact: true })
+      .getByRole('button', { name: t('settings.editor.backgrounds.library'), exact: true })
       .click();
-    const drawer = page.locator('#guide-resource-drawer');
-    const select = drawer.getByRole('button', {
-      name: `${t('gallery.app.selectItem')}: Library screenshot.png`,
-      exact: true,
-    });
-    await expect(select).toBeVisible();
-    await select.click();
-    await expect(drawer.locator('.guide-import-count')).toHaveText(
-      t('scenario.editor.guideImportSelectedCount').replace('{count}', '1')
-    );
-    const importSelected = drawer.getByRole('button', {
-      name: t('scenario.editor.guideImportSelected'),
-      exact: true,
-    });
-    await expect(importSelected).toBeInViewport({ ratio: 1 });
-    await importSelected.click();
+    const drawer = page.locator('[data-ui="background.library.drawer"]');
+    await drawer.getByRole('button', { name: /Library screenshot\.png/ }).click();
     await expect(drawer).toHaveCount(0);
     await expect(stage).toHaveCSS('background-image', /url\(/);
     expect(await inspectStageContent(player)).toEqual(original);
@@ -1021,6 +1050,7 @@ for (const [locale, theme, viewport] of [
     });
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
+      let complete = false;
       Object.defineProperty(window, 'showSaveFilePicker', {
         configurable: true,
         value: async () => ({
@@ -1029,12 +1059,25 @@ for (const [locale, theme, viewport] of [
               write: (chunk) => {
                 chunks.push(chunk);
               },
+              close: () => {
+                complete = true;
+              },
             }),
         }),
       });
+      Object.defineProperty(window, 'savedStageTourComplete', {
+        configurable: true,
+        get: () => complete,
+      });
       Object.defineProperty(window, 'savedStageTour', {
         configurable: true,
-        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+        get: () => {
+          const decoder = new TextDecoder();
+          return (
+            chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join('') +
+            decoder.decode()
+          );
+        },
       });
     });
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
@@ -1044,8 +1087,8 @@ for (const [locale, theme, viewport] of [
       .click();
     await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
     await expect
-      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedStageTour'))))
-      .toContain('<!doctype html>');
+      .poll(() => page.evaluate(() => Reflect.get(window, 'savedStageTourComplete')))
+      .toBe(true);
     const html = await page.evaluate(() => String(Reflect.get(window, 'savedStageTour')));
     const output = info.outputPath('stage-background-tour.html');
     await writeFile(output, html);
@@ -1148,6 +1191,13 @@ for (const [locale, theme, viewport] of [
       .getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true })
       .fill(copy);
     await page.locator('.tour-slide-select').nth(1).click();
+    await category(t('scenario.editor.tourObjects')).click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourAnnotation'), exact: true })
+      .click();
+    await panel
+      .getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true })
+      .fill('Portrait explanation');
     const portrait = await page.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = 160;
@@ -1256,15 +1306,26 @@ for (const [locale, theme, viewport] of [
       await player.locator('[data-tour-next]').click();
       await expect(player.locator('.tour-navigation-scene')).toBeVisible();
       await assertFrame('navigation content', baseline);
+      await expect(status).toHaveText(t('scenario.editor.tourChooseDestination'));
+      await assertFrame('paused contents choice', baseline);
+      const contentsId = await player.getAttribute('data-slide-id');
       await player.locator('[data-tour-seek]').evaluate((range: HTMLInputElement) => {
         range.value = String(Number(range.max) - 1);
         range.dispatchEvent(new Event('input', { bubbles: true }));
       });
+      await expect(player).toHaveAttribute('data-slide-id', contentsId!);
+      await expect(player.locator('[data-tour-play]')).toHaveAccessibleName(
+        t('scenario.editor.tourPlay')
+      );
+      await assertFrame('seek within paused contents', baseline);
       await player.locator('[data-tour-play]').click();
-      await expect(status).toHaveText(t('scenario.editor.tourChooseDestination'));
-      await assertFrame('choice status', baseline);
+      await expect(player).toHaveAttribute('data-slide-id', 'end');
+      await assertFrame('continue to technical end', baseline);
+      await player.locator('[data-tour-previous]').click();
+      await expect(player).toHaveAttribute('data-slide-id', contentsId!);
       await player.locator('[data-tour-previous]').click();
       await expect(status).toBeHidden();
+      await expect(player.locator('.tour-image')).toHaveJSProperty('naturalHeight', 240);
       await assertFrame('previous portrait', baseline);
       await direct(0);
       await expect(status).toBeHidden();
@@ -1342,6 +1403,21 @@ for (const [locale, theme, viewport] of [
       tourFixture: '1',
     });
     await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    for (let index = 0; index < 2; index += 1) {
+      await page.locator('.tour-slide-select').nth(index).click();
+      await panel
+        .getByRole('navigation')
+        .getByRole('button', { name: t('scenario.editor.tourObjects'), exact: true })
+        .click();
+      await panel
+        .getByRole('button', { name: t('scenario.editor.tourAnnotation'), exact: true })
+        .click();
+      await panel
+        .getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true })
+        .fill(`Keyboard action ${index + 1}`);
+    }
+    await page.locator('.tour-slide-select').first().click();
     await page
       .locator('.tour-header-controls')
       .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
@@ -1652,7 +1728,7 @@ for (const [locale, theme, viewport] of [
   ['ru', 'light', { width: 1280, height: 560 }],
   ['en', 'dark', { width: 1920, height: 900 }],
 ] as const) {
-  test(`tour highlight phases inherit and play in live fullscreen and offline ${locale}`, async ({
+  test(`hotspot highlight phases play in live fullscreen and offline ${locale}`, async ({
     page,
     hostOrigin,
   }, info) => {
@@ -1663,19 +1739,22 @@ for (const [locale, theme, viewport] of [
     });
     await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
     const panel = page.locator('#guide-inspector-panel');
-    const category = (key: 'tourObjects' | 'tourMask' | 'appearance') =>
+    const category = (key: 'tourObjects' | 'appearance') =>
       panel
         .getByRole('navigation')
         .getByRole('button', { name: t(`scenario.editor.${key}`), exact: true });
     const choose = async (label: string, option: string) => {
-      await panel.getByRole('button', { name: label, exact: true }).click();
+      const control = panel.getByRole('button', { name: label, exact: true });
+      if ((await control.textContent())?.trim() === option) return;
+      await control.click();
       await page.getByRole('option', { name: option, exact: true }).click();
     };
-    await page
-      .locator('.guide-page-header')
-      .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
+    await category('tourObjects').click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
       .click();
-    await category('tourMask').click();
+    await category('appearance').click();
+    await choose(t('scenario.editor.tourVisual'), t('scenario.editor.tourHighlight'));
     for (const [phase, duration] of [
       ['tourHighlightEnter', 'tourHighlightEnterDuration'],
       ['tourHighlightExit', 'tourHighlightExitDuration'],
@@ -1688,120 +1767,43 @@ for (const [locale, theme, viewport] of [
       await field.fill('0.6');
       await field.press('Enter');
     }
-    await page.locator('.tour-slide-select').first().click();
-    await category('tourObjects').click();
-    await panel.getByRole('button', { name: t('scenario.editor.tourMask'), exact: true }).click();
-    await expect(page.locator('.tour-stage-host .tour-mask-highlight')).toHaveCount(1);
     await panel
       .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
       .click();
     await category('tourObjects').click();
-    await panel.locator('.tour-object-add button').click();
-    await page
-      .getByRole('group', { name: t('scenario.editor.tourAddObject'), exact: true })
-      .getByRole('button', { name: t('scenario.editor.tourMask'), exact: true })
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourAddObject'), exact: true })
       .click();
-    await expect(page.locator('.tour-stage-host .tour-mask-highlight')).toHaveCount(2);
-    await category('appearance').click();
-    await choose(t('scenario.editor.tourHighlightEnter'), t('scenario.editor.tourAnimationNone'));
-    await choose(t('scenario.editor.tourHighlightExit'), t('scenario.editor.tourAnimationNone'));
-    await expect(
-      panel.getByRole('switch', { name: t('scenario.editor.tourUseTourAnimation'), exact: true })
-    ).not.toBeChecked();
-    await expect(
-      panel.getByRole('switch', { name: t('scenario.editor.tourUseCentralStyle'), exact: true })
-    ).toBeChecked();
-    await info.attach(`highlight-controls-${locale}`, {
-      body: await page.screenshot({
-        fullPage: false,
-        path: info.outputPath(`highlight-controls-${locale}.png`),
-      }),
-      contentType: 'image/png',
-    });
+    await page
+      .locator('.guide-action-menu')
+      .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
+      .click();
     await page
       .locator('.tour-header-controls')
-      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
+      .getByRole('button', { name: t('scenario.editor.tourPreviewStart'), exact: true })
       .click();
-    const check = async (player: Locator, surface: string, automatic = false) => {
+    const check = async (player: Locator, surface: string) => {
       await player.locator('[data-tour-manual]').click();
-      const direct = async (index: number) => {
-        await player.locator('[data-tour-contents]').click();
-        await player.locator('.tour-contents-list button').nth(index).click();
-      };
-      await direct(1);
-      await expect(player).toHaveAttribute('data-slide-id', 'tour-after');
-      await player.evaluate((root) => {
-        const samples: { slide: string; opacity: number[] }[] = [];
-        Reflect.set(window, 'highlightSamples', samples);
-        const sample = () => {
-          if (!root.isConnected || Reflect.get(window, 'highlightSamples') !== samples) return;
-          samples.push({
-            slide: (root as HTMLElement).dataset['slideId'] ?? '',
-            opacity: [...root.querySelectorAll('.tour-mask-highlight .tour-mask-effect')].map(
-              (node) => Number(getComputedStyle(node).opacity)
-            ),
-          });
-          if (samples.length > 1200) samples.shift();
-          requestAnimationFrame(sample);
-        };
-        requestAnimationFrame(sample);
-      });
-      await direct(0);
+      await player.locator('[data-tour-contents]').click();
+      await player.locator('.tour-contents-list button').nth(1).click();
+      await expect(player.locator('[data-tour-counter]')).toHaveText('2 / 2');
+      await expect(player.locator('.tour-mask-highlight')).toHaveCount(0);
+      await player.locator('[data-tour-previous]').click();
       const effect = player.locator('.tour-mask-highlight .tour-mask-effect');
-      await expect(effect).toHaveCount(2);
-      const samples = () =>
-        page.evaluate(
-          () => Reflect.get(window, 'highlightSamples') as { slide: string; opacity: number[] }[]
-        );
-      await expect
-        .poll(async () =>
-          (await samples()).some(
-            (sample) =>
-              sample.slide === 'tour-before' &&
-              sample.opacity[0]! > 0 &&
-              sample.opacity[0]! < 0.29 &&
-              sample.opacity[1] === 0.3
-          )
-        )
-        .toBe(true);
-      await expect(effect.first()).toHaveCSS('opacity', '0.3');
-      await expect(effect.nth(1)).toHaveCSS('opacity', '0.3');
-      await expect(player.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
-      await info.attach(`highlight-settled-${surface}-${locale}`, {
-        body: await page.screenshot({
-          fullPage: false,
-          path: info.outputPath(`highlight-settled-${surface}-${locale}.png`),
-        }),
-        contentType: 'image/png',
+      await expect(effect).toHaveCount(1);
+      await expect(effect).toHaveCSS('opacity', '0.4');
+      await expect(player.locator('[data-tour-object-id]')).toHaveCount(1);
+      await page.screenshot({
+        path: info.outputPath(`hotspot-highlight-${surface}-${locale}.png`),
+        fullPage: false,
       });
-      await page.evaluate(() =>
-        Reflect.set(
-          window,
-          'highlightExitStart',
-          (Reflect.get(window, 'highlightSamples') as unknown[]).length
-        )
-      );
-      if (automatic) await player.locator('[data-tour-play]').click();
-      else await player.locator('[data-tour-next]').click();
-      await expect(player).toHaveAttribute('data-slide-id', 'tour-after', { timeout: 12000 });
-      const start = await page.evaluate(() => Number(Reflect.get(window, 'highlightExitStart')));
-      expect(
-        (await samples())
-          .slice(start)
-          .some(
-            (sample) =>
-              sample.slide === 'tour-before' &&
-              sample.opacity[0]! > 0 &&
-              sample.opacity[0]! < 0.29 &&
-              sample.opacity[1] === 0.3
-          )
-      ).toBe(true);
-      await player.locator('[data-tour-manual]').click();
-      await direct(0);
-      await expect(effect.first()).toHaveCSS('opacity', '0.3');
+      await player.locator('[data-tour-next]').click();
+      await expect(player.locator('[data-tour-counter]')).toHaveText('2 / 2');
+      await expect(effect).toHaveCount(0);
+      await expect(player.locator('[data-tour-object-id]')).toHaveCount(1);
     };
     const player = page.locator('.tour-stage-host #tour-player');
-    await check(player, 'normal', true);
+    await check(player, 'live');
     await player.evaluate((root) => root.requestFullscreen());
     await check(player, 'fullscreen');
     await page.evaluate(() => document.exitFullscreen());
@@ -1840,15 +1842,12 @@ for (const [locale, theme, viewport] of [
     await page.context().setOffline(true);
     try {
       await page.goto(pathToFileURL(output).href);
-      const offline = page.locator('#tour-player');
-      await check(offline, 'offline');
+      await check(page.locator('#tour-player'), 'offline');
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      await offline.locator('[data-tour-next]').click();
-      await expect(offline).toHaveAttribute('data-slide-id', 'tour-after');
-      await offline.locator('[data-tour-previous]').click();
-      await expect(offline.locator('.tour-mask-highlight .tour-mask-effect').first()).toHaveCSS(
+      await page.locator('[data-tour-previous]').click();
+      await expect(page.locator('.tour-mask-highlight .tour-mask-effect')).toHaveCSS(
         'opacity',
-        '0.3'
+        '0.4'
       );
     } finally {
       await page.context().setOffline(false);

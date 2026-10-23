@@ -35,6 +35,11 @@ export function applyAppTheme(
   const applyColorSchemeInline = shouldApplyColorSchemeInline(options);
   for (const element of targets) {
     element.setAttribute(THEME_ATTRIBUTE, theme);
+    if (typeof navigator !== 'undefined' && navigator.platform.startsWith('Win')) {
+      element.setAttribute('data-ui-platform', 'windows');
+    } else {
+      element.removeAttribute('data-ui-platform');
+    }
     if (applyColorSchemeInline) {
       element.style.colorScheme = theme;
       continue;

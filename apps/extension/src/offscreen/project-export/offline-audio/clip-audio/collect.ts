@@ -1,3 +1,10 @@
+import { normalizeClipPlaybackRate } from '../../../../features/video/project/timeline/rate';
+import { planProjectSourceVoiceoverPlayback } from '../../../../features/video/project/source-voiceover-playback';
+import { composeSourceAudioRanges } from '../../../../features/video/audio/source-attenuation';
+import { getProjectSourceAudioRanges } from '../../../../features/video/project/source-audio';
+import { getClipGainRange } from '../../../../features/video/project/timeline/audio';
+import { getProjectTrackAudioVolume } from '../../../../features/video/project/timeline/track-audio';
+import { getProjectOriginalAudioRanges } from '../../../../features/video/project/timeline/original-audio';
 import { buildProjectTransitionSegments } from '../../../../features/video/project/transition/project';
 import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 import { resolveEffectRuntimeAudioPlans } from '../../../../features/video/composition/effect-runtime/audio/plan';
@@ -23,7 +30,26 @@ export function collectRenderableAudioClips(
       shouldRenderClipAudio(project, clip)
   );
   const segments = buildProjectTransitionSegments(project);
-  const preparedMediaClips = mediaClips.map((clip) => {
+  const preparedMediaClips = mediaClips.flatMap((clip): OfflineAudioRenderableClip[] => {
+    const { playbackWindow: window, ...media } = clip;
+    const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+    const sourceOffset = (window?.offset ?? 0) * rate;
+    const duration = window
+      ? Math.min(clip.duration, Math.max(0, clip.sourceDuration - sourceOffset) / rate)
+      : clip.duration;
+    if (duration <= 0) return [];
+    const range = getClipGainRange(clip);
+    const phase = window?.gainPhase;
+    const gainAt = (elapsed: number) =>
+      range.start +
+      (range.end - range.start) *
+        Math.min(
+          1,
+          Math.max(0, ((phase?.offset ?? 0) + elapsed) / (phase?.duration ?? clip.duration))
+        );
+    const retainedGainPhase =
+      phase && (phase.offset < 0 || phase.offset + duration > phase.duration) ? phase : undefined;
+    const gain = window && !retainedGainPhase ? { start: gainAt(0), end: gainAt(duration) } : range;
     const audioTransitions = segments
       .filter((segment) => segment.leadingClipId === clip.id || segment.trailingClipId === clip.id)
       .map((segment) => ({
@@ -32,10 +58,69 @@ export function collectRenderableAudioClips(
         easing: segment.transition.easing,
         incoming: segment.trailingClipId === clip.id,
       }));
-    return audioTransitions.length ? { ...clip, audioTransitions } : clip;
+    const originalAudioRanges = composeSourceAudioRanges(
+      getProjectSourceAudioRanges(project, clip),
+      getProjectOriginalAudioRanges(project, clip)
+    );
+    const prepared: OfflineAudioRenderableClip = {
+      ...media,
+      ...(window
+        ? {
+            duration,
+            sourceStart: clip.sourceStart + sourceOffset,
+            sourceDuration: duration * rate,
+          }
+        : {}),
+      volume: getProjectTrackAudioVolume(project, clip.trackId),
+      audioGainStart: gain.start,
+      audioGainEnd: gain.end,
+      volumeEnvelopeStart: gain.start,
+      volumeEnvelopeEnd: gain.end,
+      ...(audioTransitions.length ? { audioTransitions } : {}),
+      originalAudioRanges,
+      audioFadePhase: window?.fadePhase
+        ? { ...window.fadePhase }
+        : { offset: 0, duration: clip.duration },
+    };
+    delete prepared.audioGainPhase;
+    if (retainedGainPhase) prepared.audioGainPhase = { ...retainedGainPhase };
+    return [prepared];
   });
   const clips: OfflineAudioRenderableClip[] = [
     ...preparedMediaClips,
+    ...planProjectSourceVoiceoverPlayback(project).flatMap(
+      ({ entry }): OfflineAudioRenderableClip[] => {
+        if (entry.volume <= 0) return [];
+        if (entry.source.kind !== 'project')
+          throw new Error('Source voiceover requires a declared project material');
+        const rate = entry.playbackRate ?? 1;
+        return [
+          {
+            sourceKind: 'source-voiceover',
+            playbackEntry: entry,
+            id: entry.clipId,
+            assetId: entry.source.assetId,
+            startTime: entry.timelineStart,
+            duration: entry.duration,
+            sourceStart: entry.sourceOffset,
+            sourceDuration: entry.duration * rate,
+            playbackRate: rate,
+            volume: entry.volume,
+            muted: false,
+            fadeInMs: (entry.fadeIn / rate) * 1000,
+            fadeOutMs: (entry.fadeOut / rate) * 1000,
+            audioGainStart: 1,
+            audioGainEnd: 1,
+            volumeEnvelopeStart: 1,
+            volumeEnvelopeEnd: 1,
+            audioFadePhase: {
+              offset: (entry.fadePhase?.offset ?? 0) / rate,
+              duration: (entry.fadePhase?.duration ?? entry.duration * rate) / rate,
+            },
+          },
+        ];
+      }
+    ),
     ...resolveEffectRuntimeAudioPlans(project),
   ];
 
@@ -75,29 +160,51 @@ export function clipAudioClipToExportRange(
           })),
         }
       : {}),
+    ...(clip.originalAudioRanges
+      ? {
+          originalAudioRanges: clip.originalAudioRanges.flatMap((cell) => {
+            const start = Math.max(cell.start, overlapStart),
+              end = Math.min(cell.end, overlapEnd);
+            return end > start
+              ? [{ ...cell, start: start - range.start, end: end - range.start }]
+              : [];
+          }),
+        }
+      : {}),
     startTime: overlapStart - range.start,
     duration: overlapDuration,
     sourceStart:
       clip.sourceStart + getSourceTimedClipSourceOffset(clip, overlapStart - clip.startTime),
     sourceDuration: getSourceTimedClipSourceOffset(clip, overlapDuration),
-    fadeInMs: overlapStart > clip.startTime ? 0 : Math.min(clip.fadeInMs, overlapDuration * 1000),
-    fadeOutMs: overlapEnd < clipEnd ? 0 : Math.min(clip.fadeOutMs, overlapDuration * 1000),
-    ...buildOptionalGainPatch(
-      'audioGainStart',
-      interpolateGain(clip.audioGainStart, clip.audioGainEnd, startProgress)
-    ),
-    ...buildOptionalGainPatch(
-      'audioGainEnd',
-      interpolateGain(clip.audioGainStart, clip.audioGainEnd, endProgress)
-    ),
-    ...buildOptionalGainPatch(
-      'volumeEnvelopeStart',
-      interpolateGain(clip.volumeEnvelopeStart, clip.volumeEnvelopeEnd, startProgress)
-    ),
-    ...buildOptionalGainPatch(
-      'volumeEnvelopeEnd',
-      interpolateGain(clip.volumeEnvelopeStart, clip.volumeEnvelopeEnd, endProgress)
-    ),
+    audioFadePhase: {
+      offset: (clip.audioFadePhase?.offset ?? 0) + overlapStart - clip.startTime,
+      duration: clip.audioFadePhase?.duration ?? clip.duration,
+    },
+    ...(clip.audioGainPhase
+      ? {
+          audioGainPhase: {
+            offset: clip.audioGainPhase.offset + overlapStart - clip.startTime,
+            duration: clip.audioGainPhase.duration,
+          },
+        }
+      : {
+          ...buildOptionalGainPatch(
+            'audioGainStart',
+            interpolateGain(clip.audioGainStart, clip.audioGainEnd, startProgress)
+          ),
+          ...buildOptionalGainPatch(
+            'audioGainEnd',
+            interpolateGain(clip.audioGainStart, clip.audioGainEnd, endProgress)
+          ),
+          ...buildOptionalGainPatch(
+            'volumeEnvelopeStart',
+            interpolateGain(clip.volumeEnvelopeStart, clip.volumeEnvelopeEnd, startProgress)
+          ),
+          ...buildOptionalGainPatch(
+            'volumeEnvelopeEnd',
+            interpolateGain(clip.volumeEnvelopeStart, clip.volumeEnvelopeEnd, endProgress)
+          ),
+        }),
   };
 }
 

@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  browserActionOpenPopupMock,
+  browserActionGetPopupMock,
+  browserActionSetPopupMock,
   browserTabsCreateMock,
+  browserTabsGetMock,
   browserTabsQueryMock,
   browserTabsUpdateMock,
   browserWindowsCreateMock,
   browserWindowsUpdateMock,
   runtimeGetUrlMock,
 } = vi.hoisted(() => ({
+  browserActionOpenPopupMock: vi.fn(),
+  browserActionGetPopupMock: vi.fn(),
+  browserActionSetPopupMock: vi.fn(),
   browserTabsCreateMock: vi.fn(),
+  browserTabsGetMock: vi.fn(),
   browserTabsQueryMock: vi.fn(),
   browserTabsUpdateMock: vi.fn(),
   browserWindowsCreateMock: vi.fn(),
@@ -16,9 +24,18 @@ const {
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
 }));
 
+vi.mock('@sniptale/platform/browser/action', () => ({
+  browserAction: {
+    openPopup: browserActionOpenPopupMock,
+    getPopup: browserActionGetPopupMock,
+    setPopup: browserActionSetPopupMock,
+  },
+}));
+
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: {
     create: browserTabsCreateMock,
+    get: browserTabsGetMock,
     query: browserTabsQueryMock,
     update: browserTabsUpdateMock,
   },
@@ -52,7 +69,11 @@ const POPUP_PAGE_URL = `${EXTENSION_URL_ROOT}/popup/index.html`;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  browserActionGetPopupMock.mockReset().mockResolvedValue(POPUP_PAGE_URL);
+  browserActionSetPopupMock.mockReset().mockResolvedValue(undefined);
+  browserActionOpenPopupMock.mockResolvedValue(undefined);
   browserTabsCreateMock.mockResolvedValue(undefined);
+  browserTabsGetMock.mockResolvedValue(undefined);
   browserTabsQueryMock.mockResolvedValue([]);
   browserTabsUpdateMock.mockResolvedValue(undefined);
   browserWindowsCreateMock.mockResolvedValue(undefined);
@@ -60,6 +81,93 @@ beforeEach(() => {
 });
 
 describe('extension page settings helpers', () => {
+  it.each(['microphone', 'camera'] as const)(
+    'opens a one-shot %s request on the Permissions page',
+    async (permission) => {
+      const { openSettingsPage, SETTINGS_MEDIA_ACCESS_QUERY_PARAM } = await import('./index');
+      await openSettingsPage({ route: { section: 'native-app' }, requestMediaAccess: permission });
+      const url = new URL(browserTabsCreateMock.mock.calls[0]![0].url);
+      expect(url.searchParams.get('section')).toBe('access-data');
+      expect(url.searchParams.get('view')).toBe('permissions');
+      expect(url.searchParams.getAll(SETTINGS_MEDIA_ACCESS_QUERY_PARAM)).toEqual([permission]);
+    }
+  );
+
+  it('reuses an existing Settings tab for the targeted permission request', async () => {
+    browserTabsQueryMock.mockResolvedValueOnce([
+      { id: 3, windowId: 9, url: 'https://example.test' },
+    ]);
+    browserTabsQueryMock.mockResolvedValueOnce([{ id: 7, windowId: 9 }]);
+    const { openSettingsPage } = await import('./index');
+    await openSettingsPage({ requestMediaAccess: 'camera' });
+    expect(browserTabsUpdateMock).toHaveBeenCalledExactlyOnceWith(7, {
+      active: true,
+      openerTabId: 3,
+      url: `${SETTINGS_PAGE_URL}?section=access-data&view=permissions&requestMediaAccess=camera`,
+    });
+    expect(browserWindowsUpdateMock).toHaveBeenCalledExactlyOnceWith(9, { focused: true });
+  });
+
+  it('creates targeted Settings in the source window with its browser-owned opener', async () => {
+    browserTabsQueryMock.mockResolvedValueOnce([
+      { id: 3, windowId: 9, url: 'https://example.test' },
+    ]);
+    browserTabsQueryMock.mockResolvedValueOnce([{ id: 7, windowId: 10 }]);
+    const { openSettingsPage } = await import('./index');
+    await openSettingsPage({ requestMediaAccess: 'microphone' });
+    expect(browserTabsQueryMock).toHaveBeenNthCalledWith(1, { active: true, currentWindow: true });
+    expect(browserTabsQueryMock).toHaveBeenNthCalledWith(2, {
+      url: `${SETTINGS_PAGE_URL}*`,
+      windowId: 9,
+    });
+    expect(browserTabsCreateMock).toHaveBeenCalledExactlyOnceWith({
+      url: `${SETTINGS_PAGE_URL}?section=access-data&view=permissions&requestMediaAccess=microphone`,
+      openerTabId: 3,
+      windowId: 9,
+    });
+    expect(browserTabsUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('does not reuse the source Settings tab or inherit its previous opener', async () => {
+    browserTabsQueryMock.mockResolvedValueOnce([{ id: 7, windowId: 9, url: SETTINGS_PAGE_URL }]);
+    browserTabsQueryMock.mockResolvedValueOnce([{ id: 7, windowId: 9, openerTabId: 3 }]);
+    const { openSettingsPage } = await import('./index');
+    await openSettingsPage({ requestMediaAccess: 'camera' });
+    expect(browserTabsCreateMock).toHaveBeenCalledExactlyOnceWith({
+      url: `${SETTINGS_PAGE_URL}?section=access-data&view=permissions&requestMediaAccess=camera`,
+      windowId: 9,
+      openerTabId: 7,
+    });
+    expect(browserTabsUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['microphone', 'chrome://settings/content/microphone'],
+    ['camera', 'chrome://settings/content/camera'],
+  ] as const)('opens the fixed %s browser permission settings', async (permission, url) => {
+    const { openMediaPermissionSettingsPage } = await import('./index');
+    await openMediaPermissionSettingsPage(permission);
+    expect(browserTabsCreateMock).toHaveBeenCalledExactlyOnceWith({ url });
+  });
+
+  it('propagates browser permission settings navigation failure', async () => {
+    const error = new Error('navigation unavailable');
+    browserTabsCreateMock.mockRejectedValueOnce(error);
+    const { openMediaPermissionSettingsPage } = await import('./index');
+    await expect(openMediaPermissionSettingsPage('microphone')).rejects.toBe(error);
+  });
+
+  it.each(['microphone', 'camera'] as const)(
+    'opens only this extension site details for blocked %s',
+    async (permission) => {
+      const { openMediaPermissionSettingsPage } = await import('./index');
+      await openMediaPermissionSettingsPage(permission, 'extension');
+      expect(browserTabsCreateMock).toHaveBeenCalledExactlyOnceWith({
+        url: 'chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Ftest%2F',
+      });
+    }
+  );
+
   it('identifies extension-owned settings page urls', expectOwnedSettingsPageIdentity);
 
   it('opens the settings page through the shared browser tabs seam', async () => {
@@ -118,8 +226,127 @@ async function expectOwnedSettingsPageIdentity() {
   expect(isOwnedSettingsPage(`${SETTINGS_PAGE_URL}/extra`)).toBe(false);
   expect(isOwnedSettingsPage(`${EXTENSION_URL_ROOT}/%73ettings/index.html`)).toBe(false);
   expect(isOwnedSettingsPage(`https://example.test/${SETTINGS_PAGE_PATH}`)).toBe(false);
+  expect(isOwnedSettingsPage(`chrome-extension://other/${SETTINGS_PAGE_PATH}`)).toBe(false);
   expect(isOwnedSettingsPage(undefined)).toBe(false);
 }
+
+describe('returnToMediaRecordingPopup', () => {
+  it('activates the original source before focusing and opening the actual popup', async () => {
+    const operations: string[] = [];
+    browserTabsQueryMock.mockResolvedValueOnce([
+      { id: 7, windowId: 9, url: SETTINGS_PAGE_URL, openerTabId: 3 },
+    ]);
+    browserTabsGetMock.mockResolvedValueOnce({ id: 3, windowId: 9 });
+    browserTabsUpdateMock.mockImplementationOnce(async () => {
+      operations.push('source');
+    });
+    browserWindowsUpdateMock.mockImplementationOnce(async () => {
+      operations.push('window');
+    });
+    browserActionOpenPopupMock.mockImplementationOnce(async () => {
+      operations.push('popup');
+    });
+    const { returnToMediaRecordingPopup } = await import('./index');
+    await expect(returnToMediaRecordingPopup()).resolves.toBe(true);
+    expect(browserTabsQueryMock).toHaveBeenCalledExactlyOnceWith({
+      active: true,
+      currentWindow: true,
+    });
+    expect(browserTabsGetMock).toHaveBeenCalledExactlyOnceWith(3);
+    expect(browserTabsUpdateMock).toHaveBeenCalledExactlyOnceWith(3, { active: true });
+    expect(browserWindowsUpdateMock).toHaveBeenCalledExactlyOnceWith(9, { focused: true });
+    expect(browserActionOpenPopupMock).toHaveBeenCalledExactlyOnceWith({ windowId: 9 });
+    expect(browserActionGetPopupMock).toHaveBeenCalledExactlyOnceWith({ tabId: 3 });
+    expect(browserActionSetPopupMock).toHaveBeenNthCalledWith(1, {
+      tabId: 3,
+      popup: `${POPUP_PAGE_URL}?recordingSetup=1`,
+    });
+    expect(browserActionSetPopupMock).toHaveBeenNthCalledWith(2, {
+      tabId: 3,
+      popup: POPUP_PAGE_URL,
+    });
+    expect(operations).toEqual(['source', 'window', 'popup']);
+    expect(browserTabsCreateMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { id: 7, windowId: 9, url: SETTINGS_PAGE_URL },
+    { id: 7, windowId: 9, url: SETTINGS_PAGE_URL, openerTabId: 7 },
+  ])('refuses an absent or invalid Settings source: %j', async (settingsTab) => {
+    browserTabsQueryMock.mockResolvedValueOnce(settingsTab ? [settingsTab] : []);
+    const { returnToMediaRecordingPopup } = await import('./index');
+    await expect(returnToMediaRecordingPopup()).rejects.toThrow();
+    expect(browserTabsUpdateMock).not.toHaveBeenCalled();
+    expect(browserActionOpenPopupMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    undefined,
+    { id: 7, windowId: 9, url: POPUP_PAGE_URL, openerTabId: 3 },
+    { id: 7, windowId: 9, url: `chrome-extension://other/${SETTINGS_PAGE_PATH}`, openerTabId: 3 },
+  ])('defers while the active page is not owned Settings: %j', async (settingsTab) => {
+    browserTabsQueryMock.mockResolvedValueOnce(settingsTab ? [settingsTab] : []);
+    const { returnToMediaRecordingPopup } = await import('./index');
+    await expect(returnToMediaRecordingPopup()).resolves.toBe(false);
+    expect(browserTabsUpdateMock).not.toHaveBeenCalled();
+    expect(browserActionOpenPopupMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a source opener that has moved to another window', async () => {
+    browserTabsQueryMock.mockResolvedValueOnce([
+      { id: 7, windowId: 9, url: SETTINGS_PAGE_URL, openerTabId: 3 },
+    ]);
+    browserTabsGetMock.mockResolvedValueOnce({ id: 3, windowId: 10 });
+    const { returnToMediaRecordingPopup } = await import('./index');
+    await expect(returnToMediaRecordingPopup()).rejects.toThrow();
+    expect(browserTabsUpdateMock).not.toHaveBeenCalled();
+    expect(browserActionOpenPopupMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['source missing', 'popup refused'])(
+    'propagates %s without creating or replacing tabs',
+    async (failure) => {
+      browserTabsQueryMock.mockResolvedValueOnce([
+        { id: 7, windowId: 9, url: SETTINGS_PAGE_URL, openerTabId: 3 },
+      ]);
+      const error = new Error(failure);
+      if (failure === 'source missing') browserTabsGetMock.mockRejectedValueOnce(error);
+      else {
+        browserTabsGetMock.mockResolvedValueOnce({ id: 3, windowId: 9 });
+        browserActionOpenPopupMock.mockRejectedValueOnce(error);
+      }
+      const { returnToMediaRecordingPopup } = await import('./index');
+      await expect(returnToMediaRecordingPopup()).rejects.toBe(error);
+      expect(browserTabsCreateMock).not.toHaveBeenCalled();
+      if (failure === 'popup refused') {
+        expect(browserActionSetPopupMock).toHaveBeenLastCalledWith({
+          tabId: 3,
+          popup: POPUP_PAGE_URL,
+        });
+        expect(browserActionSetPopupMock).toHaveBeenCalledTimes(2);
+      }
+    }
+  );
+
+  it.each(['read', 'override', 'restore'] as const)(
+    'propagates a popup configuration %s failure',
+    async (failure) => {
+      browserTabsQueryMock.mockResolvedValueOnce([
+        { id: 7, windowId: 9, url: SETTINGS_PAGE_URL, openerTabId: 3 },
+      ]);
+      browserTabsGetMock.mockResolvedValueOnce({ id: 3, windowId: 9 });
+      const error = new Error(`configuration ${failure}`);
+      if (failure === 'read') browserActionGetPopupMock.mockRejectedValueOnce(error);
+      if (failure === 'override') browserActionSetPopupMock.mockRejectedValueOnce(error);
+      if (failure === 'restore')
+        browserActionSetPopupMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(error);
+      const { returnToMediaRecordingPopup } = await import('./index');
+      await expect(returnToMediaRecordingPopup()).rejects.toBe(error);
+      if (failure !== 'restore') expect(browserActionOpenPopupMock).not.toHaveBeenCalled();
+      expect(browserTabsCreateMock).not.toHaveBeenCalled();
+    }
+  );
+});
 
 describe('extension page editor helpers', () => {
   it('opens the image editor through the shared editor url helper', async () => {
@@ -262,5 +489,21 @@ it('scopes quick-edit intent to the requested recording route', async () => {
   await openGalleryPage({ quickEdit: true });
   expect(browserTabsCreateMock).toHaveBeenLastCalledWith({
     url: `${EXTENSION_URL_ROOT}/gallery/index.html`,
+  });
+});
+
+it('opens the selected saved Gallery review generation in the full editor', async () => {
+  const { openVideoEditorPage } = await import('./index');
+  await openVideoEditorPage(null, null, {
+    aggregateId: 'recording:source-7',
+    revision: 12,
+    createdAt: 100,
+    sourceAssetId: 'source-body-7',
+  });
+  expect(browserTabsCreateMock).toHaveBeenCalledWith({
+    url:
+      'chrome-extension://test/apps/extension/src/video-editor/index.html' +
+      '?review=recording%3Asource-7&reviewRevision=12&reviewCreatedAt=100' +
+      '&reviewSourceAssetId=source-body-7',
   });
 });

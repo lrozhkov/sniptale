@@ -3,6 +3,9 @@ import { writeFile } from 'node:fs/promises';
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
 import { expect } from '@playwright/test';
+import type { Locator, Page, TestInfo } from '@playwright/test';
+import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
+import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { createVideoClipFromAsset } from '../../../../apps/extension/src/features/video/project/factories/clip';
@@ -11,6 +14,97 @@ import { createVideoProjectAsset } from '../../../../apps/extension/src/features
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
+
+async function checkInspectorScroll(page: Page, panel: Locator, info: TestInfo) {
+  const categories = panel.locator('[data-ui="video-editor.inspector.categories"]');
+  const rail = categories.locator(':scope > nav');
+  const settings = categories.locator(':scope > div');
+  const header = page.locator('[data-ui="video-editor.inspector.presentation-toggle"]');
+  await page.evaluate(() => document.fonts.ready);
+  await expect(settings).toHaveCSS('overflow-y', 'auto');
+  const bodyBox = (await panel.locator('[data-ui="video-editor.inspector.body"]').boundingBox())!;
+  const buttonBox = (await rail.getByRole('button').first().boundingBox())!;
+  expect(buttonBox.x).toBeGreaterThanOrEqual(bodyBox.x);
+  const railGeometry = await rail.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    return {
+      left: box.left + node.clientLeft,
+      right: box.left + node.clientLeft + node.clientWidth,
+      clippingLeft: (() => {
+        let left = box.left;
+        for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+          if (getComputedStyle(parent).overflowX !== 'visible')
+            left = Math.max(left, parent.getBoundingClientRect().left + parent.clientLeft);
+        }
+        return left;
+      })(),
+      clientWidth: node.clientWidth,
+      scrollWidth: node.scrollWidth,
+      buttons: [...node.querySelectorAll('button')].map((button) => {
+        const rect = button.getBoundingClientRect();
+        return { name: button.title, left: rect.left, right: rect.right, width: rect.width };
+      }),
+    };
+  });
+  await writeFile(
+    info.outputPath('category-rail-geometry.json'),
+    JSON.stringify(railGeometry, null, 2)
+  );
+  expect(railGeometry.scrollWidth).toBe(railGeometry.clientWidth);
+  for (const button of railGeometry.buttons) {
+    expect(button.left, button.name).toBeGreaterThanOrEqual(railGeometry.clippingLeft + 4);
+    expect(button.right, button.name).toBeLessThanOrEqual(railGeometry.right - 4);
+    expect(button.width, button.name).toBe(36);
+  }
+  const railBox = (await rail.boundingBox())!;
+  const headerBox = (await header.boundingBox())!;
+  const bounds = (await settings.boundingBox())!;
+  const canScroll = await settings.evaluate((node) => node.scrollHeight > node.clientHeight);
+  if (page.viewportSize()!.height === 560) expect(canScroll).toBe(true);
+  if (canScroll) {
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.wheel(0, 2000);
+    await expect.poll(() => settings.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+    expect((await rail.boundingBox())!.y).toBeCloseTo(railBox.y, 0);
+    expect((await header.boundingBox())!.y).toBeCloseTo(headerBox.y, 0);
+    expect(await panel.evaluate((node) => node.scrollTop)).toBe(0);
+    await expect(settings.getByRole('button').last()).toBeInViewport();
+    await page.screenshot({
+      path: info.outputPath('inspector-settings-scrolled.png'),
+      fullPage: false,
+    });
+  }
+  const first = rail.getByRole('button').first();
+  await first.focus();
+  await first.press('End');
+  await expect(rail.getByRole('button').last()).toBeFocused();
+  await expect(rail.getByRole('button').last()).toBeInViewport();
+  expect((await header.boundingBox())!.y).toBeCloseTo(headerBox.y, 0);
+  await rail.getByRole('button').last().press('Home');
+  await expect(first).toBeFocused();
+  await expect(first).toBeInViewport();
+}
+
+async function checkInspectorHeadingFont(page: Page) {
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('DOM.enable');
+    await session.send('CSS.enable');
+    const { root } = await session.send('DOM.getDocument');
+    const { nodeId } = await session.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: '[data-ui="shared.categorized-inspector.section-heading"] > span',
+    });
+    const { fonts } = await session.send('CSS.getPlatformFontsForNode', { nodeId });
+    expect(
+      fonts.some(
+        (font) => font.isCustomFont && font.familyName === 'Golos UI VF' && font.glyphCount > 0
+      )
+    ).toBe(true);
+  } finally {
+    await session.detach();
+  }
+}
 
 for (const locale of ['ru', 'en'] as const) {
   for (const theme of ['light', 'dark'] as const) {
@@ -31,7 +125,7 @@ for (const locale of ['ru', 'en'] as const) {
         (value) => localStorage.setItem('sniptale-locale-preference', value),
         locale
       );
-      await page.setViewportSize({ width: 1600, height: 1000 });
+      await page.setViewportSize({ ...PRIMARY_BROWSER_VIEWPORTS[theme === 'dark' ? 0 : 1].size });
       await page.goto(
         `${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${theme}`
       );
@@ -42,7 +136,33 @@ for (const locale of ['ru', 'en'] as const) {
         (node as HTMLElement).style.width = '320px';
       });
       const categories = panel.locator('[data-ui="video-editor.inspector.categories"]');
+      await categories
+        .getByRole('button', {
+          name: translate('videoEditor.sidebar.inspectorGroupStyle', locale),
+          exact: true,
+        })
+        .click();
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: info.outputPath('inspector-categories.png'), fullPage: false });
+      await checkInspectorScroll(page, panel, info);
       const active = categories.locator('nav button[aria-pressed="true"]');
+      await expect
+        .poll(() =>
+          active.evaluate((node) => {
+            const style = getComputedStyle(node);
+            const probe = document.createElement('span');
+            probe.style.backgroundColor = 'var(--sniptale-color-surface-hover)';
+            probe.style.color = 'var(--sniptale-color-text-primary)';
+            node.append(probe);
+            const expected = getComputedStyle(probe);
+            const matches =
+              style.backgroundColor === expected.backgroundColor && style.color === expected.color;
+            probe.remove();
+            return matches;
+          })
+        )
+        .toBe(true);
+      await checkInspectorHeadingFont(page);
       const activeName = await active.getAttribute('aria-label');
       await categories.locator('nav button[aria-pressed="false"]').first().hover();
       await expect(active).toHaveAttribute('aria-label', activeName!);
@@ -81,13 +201,13 @@ for (const locale of ['ru', 'en'] as const) {
       await height.click();
       await checkInspectorUtility(page, height, '4px', 'secondary');
       await height.click();
-      await page.screenshot({ path: info.outputPath('inspector-utilities.png') });
+      await page.screenshot({ path: info.outputPath('inspector-utilities.png'), fullPage: false });
       const section = panel.locator('[data-presentation="all"] > section').first();
       const disclosure = section.locator(':scope > details');
       const summary = disclosure.locator(':scope > summary');
       await expect(disclosure).toHaveAttribute('open', '');
       await expect(summary).toHaveCSS('font-size', '14px');
-      await expect(summary).toHaveCSS('font-weight', '600');
+      await expect(summary).toHaveCSS('font-weight', '500');
       await expect(disclosure).toHaveCSS('border-top-width', '0px');
       await expect(summary).toHaveCSS('min-height', '32px');
       const draft = section.getByRole('textbox').first();
@@ -131,7 +251,7 @@ for (const locale of ['ru', 'en'] as const) {
       const headingBox = (await animationHeading.boundingBox())!;
       const fieldBox = (await animationField.boundingBox())!;
       expect(fieldBox.y - headingBox.y - headingBox.height).toBeLessThanOrEqual(9);
-      for (const width of [420, 280]) {
+      for (const width of [420, 359, 360, 361, 280]) {
         await page
           .locator('[data-ui="video-editor.floating.context-inspector"]')
           .evaluate((node, size) => {
@@ -140,10 +260,7 @@ for (const locale of ['ru', 'en'] as const) {
         await expect
           .poll(() => panel.evaluate((node) => node.scrollWidth - node.clientWidth))
           .toBeLessThanOrEqual(1);
-        await info.attach(`inspector-${width}`, {
-          body: await panel.screenshot(),
-          contentType: 'image/png',
-        });
+        await page.screenshot({ path: info.outputPath(`inspector-${width}.png`), fullPage: false });
       }
       await page.locator('[data-ui="video-editor.viewer.scene"]').click();
       const paint = panel.locator('[data-ui="shared.ui.paint-selector"]').first();
@@ -425,8 +542,8 @@ for (const viewport of [
     const styleDropdown = settings.getByRole('button', { name: 'Style', exact: true });
     expect(segmentGeometry).toHaveLength((await styleDropdown.count()) ? 3 : 5);
     for (const geometry of segmentGeometry) {
-      expect(geometry.height).toBe(geometry.dropdown ? 32 : 28);
-      expect(geometry.minHeight).toBe(geometry.dropdown ? '32px' : '28px');
+      expect(geometry.height).toBe(32);
+      expect(geometry.minHeight).toBe('32px');
       expect(geometry.lineHeight).toBe('18px');
       expect(geometry.fontSize).toBe('13px');
       expect(geometry.paddingTop).toBe(geometry.paddingBottom);

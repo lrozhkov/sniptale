@@ -1,5 +1,5 @@
 import { composeWindowHeaderSvg } from '../../../browser-frame/appearance';
-import type { WindowHeader } from '../../../browser-frame/header';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { VideoProject, VideoProjectClip } from '../../project/types';
 
 /** Content-bound keys prevent a stale async raster from appearing after an edit or undo. */
@@ -29,4 +29,22 @@ export function projectWindowHeaderImages(
       },
     ];
   });
+}
+
+/** Admit the loaded header for concrete video and image consumers. */
+export function admittedVisualWindowHeader(
+  clip: {
+    id: string;
+    windowHeader?: import('@sniptale/runtime-contracts/window-header').WindowHeader;
+  },
+  images: Record<string, HTMLImageElement>,
+  camera: boolean
+) {
+  const header = camera ? undefined : clip.windowHeader;
+  const image = header ? images[windowHeaderImageKey(clip.id, header)] : undefined;
+  if (image?.complete && image.naturalWidth === 0)
+    throw new Error('Window header image could not be decoded.');
+  return image && clip.windowHeader
+    ? { windowHeaderImage: image, windowHeader: clip.windowHeader }
+    : {};
 }

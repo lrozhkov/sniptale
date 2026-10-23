@@ -292,7 +292,9 @@ function HistoryMarker(props: {
       style={{
         left: props.left,
         top: props.top,
-        ...(props.width ? { width: props.width, transform: 'translateX(-12px)' } : {}),
+        ...(props.width
+          ? { width: props.width, translate: 'none', transform: 'translateX(-12px)' }
+          : {}),
       }}
       onPointerDown={(event) => {
         event.stopPropagation();

@@ -17,7 +17,17 @@ export type ScreenshotSuccessFeedbackOptions = {
 };
 
 export type ScreenshotStartContext = {
+  runGeneration?: number | undefined;
   navigationLockBaseline?: boolean | undefined;
+  preparationBaseline?: ScreenshotPreparationBaseline | undefined;
+};
+
+type ScreenshotPreparationBaseline = {
+  captureAction: CaptureActionType;
+  timerDelay: number;
+  isToolbarVisible: boolean;
+  navigationLockEnabled: boolean;
+  editingMode: ScreenshotEditingMode | null;
 };
 
 export type ScreenshotEditingMode =
@@ -25,7 +35,8 @@ export type ScreenshotEditingMode =
   | 'design-review'
   | 'drawing'
   | 'highlighter'
-  | 'quick-edit';
+  | 'quick-edit'
+  | 'quick-edit-document';
 
 export type ScreenshotType = 'visible' | 'full' | 'selection';
 
@@ -40,6 +51,7 @@ export interface ScreenshotControllerCapturePersistenceBridge {
 }
 
 export interface ScreenshotControllerRuntimeSession {
+  preparationBaseline?: ScreenshotPreparationBaseline | null;
   editingModeBaseline: ScreenshotEditingMode | null;
   navigationLockBaseline: boolean;
   runActive: boolean;

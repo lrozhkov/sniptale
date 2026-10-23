@@ -467,7 +467,7 @@ it('retains the complete known source history when only a narrow range is insert
   expect(store.getState().project!.actionEvents).toEqual(facts);
 });
 
-it('lets appended captured keys inherit global keystroke visibility', () => {
+it('keeps appended captured keys under source feedback settings', () => {
   const { store, asset } = setup();
   asset.source = { kind: 'recording', recordingId: 'source' };
   const telemetry: RecordingTelemetryEntry = {
@@ -499,6 +499,19 @@ it('lets appended captured keys inherit global keystroke visibility', () => {
     ...getVideoProjectActionPresentation(project),
     showKeystrokes: true,
   };
+  expect(resolveVideoProjectActionPresentations(project)[0]?.enabled).toBe(false);
+  const facts = structuredClone(project.actionEvents);
+  project.actionFeedback![0]!.keyStyles = [
+    {
+      id: 'key',
+      enabled: true,
+      before: 0.1,
+      after: 0.7,
+      offset: 0,
+      style: resolveVideoProjectActionPresentations(project)[0]!.keyStyle,
+    },
+  ];
+  expect(project.actionEvents).toEqual(facts);
   expect(resolveVideoProjectActionPresentations(project)[0]).toMatchObject({
     enabled: true,
     renderKind: 'keystroke',
@@ -559,4 +572,39 @@ it('keeps typing-only telemetry with its inserted source instance through undo a
   expect(undoneInsertion?.status).toBe('applied');
   if (undoneInsertion?.status !== 'applied') throw new Error('Expected insertion undo');
   expect(undoneInsertion.project.actionFeedback ?? []).toHaveLength(0);
+});
+
+it('keeps text-capable schema while adding recording telemetry to a material placement', () => {
+  const { store, asset } = setup();
+  asset.source = { kind: 'recording', recordingId: 'source' };
+  const project = store.getState().project!;
+  store.setState({ project: { ...project, version: 5, textDocuments: [] } });
+  const result = store.getState().appendMaterial(
+    asset.id,
+    { start: 0, end: 2 },
+    {
+      recordingId: 'source',
+      createdAt: 1,
+      updatedAt: 1,
+      captureMode: null,
+      viewport: null,
+      cursorTrack: null,
+      signals: [],
+      actionEvents: [
+        {
+          id: 'click',
+          kind: 'CLICK',
+          time: 1,
+          duration: 0.1,
+          preset: 'NONE',
+          label: '',
+          point: null,
+          data: {},
+        },
+      ],
+    }
+  );
+  expect(result.status).toBe('placed');
+  expect(store.getState().project?.version).toBe(5);
+  expect(store.getState().project?.textDocuments).toEqual([]);
 });

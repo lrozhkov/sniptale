@@ -38,7 +38,7 @@ export function resolveCompactSelectMenuStyle(anchor: HTMLElement): CSSPropertie
   const belowRoom = window.innerHeight - rect.bottom - viewportPadding;
   const aboveRoom = rect.top - viewportPadding;
   const placeAbove = belowRoom < 104 && aboveRoom > belowRoom;
-  const maxHeight = Math.max(96, Math.min(208, placeAbove ? aboveRoom - gap : belowRoom - gap));
+  const maxHeight = Math.max(96, placeAbove ? aboveRoom - gap : belowRoom - gap);
   const width = Math.min(
     Math.max(horizontal.width, bounds ? 0 : 144),
     Math.max(96, viewportWidth - viewportPadding * 2)

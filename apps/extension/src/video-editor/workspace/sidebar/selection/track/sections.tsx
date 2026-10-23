@@ -1,9 +1,19 @@
+import {
+  getProjectTrackAudioVolume,
+  updateProjectTrackAudioVolume,
+} from '../../../../../features/video/project/timeline/track-audio';
+import type { VideoProject } from '../../../../../features/video/project/types';
+import { useVideoEditorTimelineEditingPort } from '../../../../runtime/controller/store';
+import { useAppLocale } from '../../../../../platform/i18n';
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
-import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
+import {
+  InspectorParameterRow,
+  useInspectorLayout,
+} from '../../../../../ui/compact-inspector-controls/layout';
 import { TextField, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { ToggleField } from '../shared/controls';
@@ -88,11 +98,8 @@ export function TrackLayoutFields({
       className="sniptale-parameter-stack space-y-2"
       data-ui="video-editor.inspector.track-layout"
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('videoEditor.app.trackOrder')}
-        </span>
-        <div className="flex gap-1">
+      <InspectorParameterRow label={translate('videoEditor.app.trackOrder')} valueMinimum={68}>
+        <div className="flex min-w-0 flex-wrap justify-end gap-1">
           <InspectorActionButton
             compact
             tone="secondary"
@@ -114,7 +121,7 @@ export function TrackLayoutFields({
             <span className="sr-only">{translate('videoEditor.timeline.moveTrackDown')}</span>
           </InspectorActionButton>
         </div>
-      </div>
+      </InspectorParameterRow>
       <>
         <ToggleField
           label={translate('videoEditor.timeline.hideClipNames')}
@@ -136,6 +143,39 @@ export function TrackLayoutFields({
           onCommitValue={setHeight}
         />
       </>
+    </div>
+  );
+}
+
+/** Track master editing keeps clip gain and visibility under their existing owners. */
+export function TrackAudioFields(props: {
+  project: VideoProject;
+  selectedTrack: VideoProject['tracks'][number];
+}) {
+  useAppLocale();
+  const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
+  const change = (value: number) =>
+    updateProject((current) =>
+      current === props.project
+        ? updateProjectTrackAudioVolume(current, props.selectedTrack.id, value / 100)
+        : current
+    );
+  return (
+    <div data-ui="video-editor.inspector.track-audio" className="sniptale-parameter-stack">
+      <NumericRow
+        appearance="plain"
+        label={translate('videoEditor.sidebar.trackVolumeLabel')}
+        scrub={{ min: 0, max: 200, step: 1 }}
+        value={getProjectTrackAudioVolume(props.project, props.selectedTrack.id) * 100}
+        min={0}
+        max={200}
+        step={1}
+        precision={0}
+        unit="%"
+        disabled={props.selectedTrack.locked}
+        onPreviewValue={change}
+        onCommitValue={change}
+      />
     </div>
   );
 }

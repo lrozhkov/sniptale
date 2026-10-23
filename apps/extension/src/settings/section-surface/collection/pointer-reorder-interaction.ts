@@ -21,14 +21,61 @@ type PointerSession = {
 
 const POINTER_DRAG_THRESHOLD = 4;
 
+function usePointerMoveCompletion(announce: (message: string) => void) {
+  const [committedPreview, setCommittedPreview] =
+    useState<SettingsCollectionKeyboardPreview | null>(null);
+  const pendingRef = useRef<SettingsCollectionKeyboardPreview | null>(null);
+  useEffect(
+    () => () => {
+      pendingRef.current = null;
+    },
+    []
+  );
+  const complete = (
+    current: SettingsCollectionKeyboardPreview,
+    result: void | Promise<unknown>
+  ) => {
+    if (!(result instanceof Promise)) {
+      announce(translate('settings.collection.announcements.moved'));
+      return;
+    }
+    pendingRef.current = current;
+    setCommittedPreview(current);
+    void result
+      .then(
+        (accepted) => {
+          if (pendingRef.current === current)
+            announce(
+              translate(
+                accepted === false
+                  ? 'settings.collection.announcements.cancelled'
+                  : 'settings.collection.announcements.moved'
+              )
+            );
+        },
+        () => {
+          if (pendingRef.current === current)
+            announce(translate('settings.collection.announcements.cancelled'));
+        }
+      )
+      .finally(() => {
+        if (pendingRef.current !== current) return;
+        pendingRef.current = null;
+        setCommittedPreview(null);
+      });
+  };
+  return { committedPreview, complete, isPending: () => pendingRef.current !== null };
+}
+
 export function useSettingsCollectionPointerReorder(props: {
   announce: (message: string) => void;
   groups: readonly SettingsCollectionResolvedGroup[];
-  onMove: ((intent: SettingsCollectionMoveIntent) => void) | undefined;
+  onMove: ((intent: SettingsCollectionMoveIntent) => void | Promise<unknown>) | undefined;
   resetKeyboardPreview: () => void;
 }) {
   const { announce, groups, onMove, resetKeyboardPreview } = props;
   const [preview, setPreview] = useState<SettingsCollectionKeyboardPreview | null>(null);
+  const completion = usePointerMoveCompletion(announce);
   const sessionRef = useRef<PointerSession | null>(null);
   const previewRef = useRef<SettingsCollectionKeyboardPreview | null>(null);
   const canMove = onMove !== undefined;
@@ -78,7 +125,8 @@ export function useSettingsCollectionPointerReorder(props: {
       const next = movePointerPreviewToClientY(
         session.root,
         previewRef.current ?? session.preview,
-        event.clientY
+        event.clientY,
+        event.clientX
       );
       if (next !== previewRef.current) updatePreview(next);
     };
@@ -90,12 +138,11 @@ export function useSettingsCollectionPointerReorder(props: {
       if (!session.active) return;
       const intent =
         cancelled || !current ? null : getKeyboardPreviewIntent(groups, current, 'drag');
-      if (!intent || !onMove) {
+      if (!intent || !onMove || !current) {
         announce(translate('settings.collection.announcements.cancelled'));
         return;
       }
-      onMove(intent);
-      announce(translate('settings.collection.announcements.moved'));
+      completion.complete(current, onMove(intent));
     };
     const cancelSession = () => {
       const session = sessionRef.current;
@@ -122,10 +169,11 @@ export function useSettingsCollectionPointerReorder(props: {
       window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('pointercancel', handleCancel);
     };
-  }, [announce, canMove, clear, groups, onMove, updatePreview]);
+  }, [announce, canMove, clear, completion, groups, onMove, updatePreview]);
 
   return {
     preview,
+    committedPreview: completion.committedPreview,
     clear,
     start(
       itemId: string,
@@ -135,7 +183,14 @@ export function useSettingsCollectionPointerReorder(props: {
       root: HTMLElement | null
     ) {
       const next = createKeyboardPreview(groups, itemId);
-      if (!root || !next || !canMove || !isKeyboardPreviewCurrent(groups, next)) return;
+      if (
+        completion.isPending() ||
+        !root ||
+        !next ||
+        !canMove ||
+        !isKeyboardPreviewCurrent(groups, next)
+      )
+        return;
       resetKeyboardPreview();
       sessionRef.current = {
         active: false,

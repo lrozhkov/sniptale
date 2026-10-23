@@ -1,3 +1,5 @@
+import { hasCameraMediaAt } from '../../../../features/video/project/camera/animation';
+import { getVideoProjectSceneEdgeAudioGain } from '../../../../features/video/project/scene/edge-fades';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
 import {
@@ -28,10 +30,6 @@ import { applyPreviewPitchPreservation } from './playback/pitch';
 
 const logger = createLogger({ namespace: 'VideoEditorPreviewAudio' });
 
-function clampPreviewAudioVolume(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
 function preparePreviewAudioElement(audio: HTMLAudioElement, playbackRate: number): void {
   applyPreviewPitchPreservation(audio);
   audio.defaultMuted = false;
@@ -53,6 +51,10 @@ function stopPreviewAudioClip(
 
 function syncPreviewAudioClip(params: PreviewStageAudioClipSyncParams): void {
   const { audio, audioGraphState, clip, currentTime, isPlaying, mediaSyncState, project } = params;
+  if (!hasCameraMediaAt(project, clip, currentTime)) {
+    stopPreviewAudioClip(audioGraphState, clip.id, audio);
+    return;
+  }
   const nextTime = getMediaClipSourceTime(clip, currentTime);
   const playbackRate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
   const isClipActive = isClipActiveAtTime(clip, currentTime);
@@ -80,7 +82,8 @@ function syncPreviewAudioClip(params: PreviewStageAudioClipSyncParams): void {
 
   const gain =
     !params.mutePreviewAudio && isClipActive
-      ? clampPreviewAudioVolume(getClipCompositeAudioGain(project, clip, currentTime))
+      ? getClipCompositeAudioGain(project, clip, currentTime) *
+        getVideoProjectSceneEdgeAudioGain(project, currentTime)
       : 0;
   setPreviewAudioNodeGain(node, gain);
 

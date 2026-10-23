@@ -3,7 +3,7 @@ import { createPreviewRenderResources } from '../../../../apps/extension/src/wor
 import { resolvePreviewRenderAllocation } from '../../../../apps/extension/src/workflows/video-review/preview-render-allocation';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import { drawReviewSceneOverlays } from '../../../../apps/extension/src/workflows/video-review/render-scene-overlays';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/workflows/video-review/spatial-renderer';
+import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import {
   loadReviewWindowHeader,
   reviewWindowHeaderUrl,
@@ -14,7 +14,7 @@ import {
   evaluateQuickEditCameraAtTime,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/click-animation';
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 import { reviewCutTransitionAt } from '../../../../apps/extension/src/features/video/review/cuts';
 import {

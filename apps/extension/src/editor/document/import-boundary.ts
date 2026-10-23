@@ -1,7 +1,7 @@
 import { isValidScenarioBlurCanvasObject } from './scenario-blur-metadata';
 // policyStateIds: [] - parser sets and resource ceilings are immutable document import policy,
 // not mutable authority or capability state.
-import type { DrawingObject } from '../../features/drawing/public';
+import { MAX_DRAWING_ARROW_BENDS, type DrawingObject } from '../../features/drawing/public';
 
 const DRAWING_TYPES = new Set(['pencil', 'marker', 'shape', 'arrow', 'blur', 'text']);
 const REMOVED_EDITOR_OBJECT_TYPES = new Set([
@@ -118,6 +118,7 @@ function isDrawingObject(value: unknown): value is DrawingObject {
   if (!isRecord(value) || typeof value['id'] !== 'string' || value['id'].length === 0) return false;
   if (isFreehandObject(value) || isShapeObject(value)) return true;
   if (value['kind'] === 'arrow') {
+    const bends = value['bendPoints'];
     return (
       isPoint(value['start']) &&
       isPoint(value['end']) &&
@@ -126,6 +127,11 @@ function isDrawingObject(value: unknown): value is DrawingObject {
         value['design'] === 'standard' ||
         value['design'] === 'freehand') &&
       typeof value['dynamicWidth'] === 'boolean' &&
+      (bends === undefined ||
+        (value['design'] === 'freehand' &&
+          Array.isArray(bends) &&
+          bends.length <= MAX_DRAWING_ARROW_BENDS &&
+          bends.every(isPoint))) &&
       isPositiveSize(value['width'])
     );
   }

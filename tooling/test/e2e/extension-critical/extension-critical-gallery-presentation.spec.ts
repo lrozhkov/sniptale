@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
@@ -98,7 +99,11 @@ for (const variant of variants) {
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
       const open = async () => {
-        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page
+          .locator(`[data-gallery-keyboard-id="${betaV1Fixture.records.media_library[0].id}"]`)
+          .getByRole('button', { name: 'beta-v1.webm', exact: true })
+          .first()
+          .click();
         await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       };
       await open();
@@ -119,8 +124,7 @@ for (const variant of variants) {
       const mode = (key: Message) => intro.getByRole('button', { name: label(key), exact: true });
       const settled = () => expect(fields).toHaveAttribute('aria-busy', 'false');
       const select = async (owner: Locator, field: Message, option: Message) => {
-        await owner.getByRole('button', { name: label(field), exact: true }).click();
-        await page.getByRole('option', { name: label(option), exact: true }).click();
+        await chooseInspectorValue(page, owner, label(field), label(option));
         await settled();
       };
       await fields.scrollIntoViewIfNeeded();
@@ -404,7 +408,7 @@ for (const variant of variants) {
         await expect(outroModal).toHaveCount(0);
 
         await expect(
-          outro.getByRole('button', {
+          outro.getByRole('switch', {
             name: label('gallery.videoReview.presentationSound'),
             exact: true,
           })
@@ -417,7 +421,7 @@ for (const variant of variants) {
         ).toBeVisible();
         await uploadVideo('review-webcam-clock.webm');
         await expect(
-          outro.getByRole('button', {
+          outro.getByRole('switch', {
             name: label('gallery.videoReview.presentationSound'),
             exact: true,
           })

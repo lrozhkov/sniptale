@@ -2,6 +2,45 @@
  * Toolbar Menu Status
  * ======================================== */
 
+.sniptale-toolbar-delay {
+  container: sniptale-toolbar-delay / size;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--sniptale-toolbar-button-size, 32px) - 2px);
+  height: calc(var(--sniptale-toolbar-button-size, 32px) - 2px);
+  flex-shrink: 0;
+}
+
+.sniptale-toolbar-delay-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sniptale-toolbar-delay-value {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  color: var(--sniptale-color-text-secondary);
+  font-size: 9px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+@container sniptale-toolbar-delay (width < 28px) or (height < 28px) {
+  .sniptale-toolbar-delay[data-has-value='true'] > .sniptale-toolbar-delay-icon {
+    display: none;
+  }
+
+  .sniptale-toolbar-delay-value {
+    position: static;
+    font-size: 13px;
+  }
+}
+
 .sniptale-timer-badge,
 .sniptale-viewport-badge {
   display: inline-flex;

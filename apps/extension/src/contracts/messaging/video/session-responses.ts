@@ -17,6 +17,8 @@ type RuntimeRecordingStartResult = RuntimeRecordingCommandResult & {
 };
 
 export type RuntimeVideoSessionResponseByType = {
+  [VideoMessageType.COUNTDOWN_CAMERA_OFFER]: RuntimeMessageResponse<{ sdp?: string }>;
+  [VideoMessageType.COUNTDOWN_CAMERA_CLOSE]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.RECORDING_OBSERVATIONS]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: RuntimeMessageResponse<{

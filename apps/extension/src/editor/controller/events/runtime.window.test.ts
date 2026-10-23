@@ -190,10 +190,11 @@ it('forwards keyup and blur ownership into the input seam', () => {
   });
   expect(bindings.setIsSpacePressed).toHaveBeenCalledWith(false);
   expect(mocks.handleEditorWindowBlur).toHaveBeenCalledWith({
-    cancelTransientInteraction: bindings.cancelTransientInteraction,
+    cancelTransientInteraction: expect.any(Function),
     endCurrentTransform: expect.any(Function),
     finalizeSelectionNudge: expect.any(Function),
   });
   expect(endCurrentTransform).toHaveBeenCalledOnce();
   expect(bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
+  expect(bindings.cancelTransientInteraction).toHaveBeenCalledWith('window-blur');
 });

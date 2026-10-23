@@ -1,4 +1,11 @@
-import { resolveCameraVisualClip } from '../../../project/camera/animation';
+import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../../project/types/export';
+import type { VideoProjectRenderScope } from '../../../project/export/render-scope';
+import { resolveVideoCompositionSpotlights } from './spotlights';
+import { resolveEffectSourceClip } from '../../../project/effect-instance/placement';
+import { resolveCursorSourcePointMapping } from './cursor';
+import { resolveVideoCompositionBorders } from './borders';
+import type { VideoCompositionBorderState, VideoCompositionSpotlightState } from '../../types';
+import { hasCameraMediaAt, resolveCameraVisualClip } from '../../../project/camera/animation';
 import { resolveVideoCompositionActions } from './actions';
 import {
   getClipCompositeVisualOpacity,
@@ -12,11 +19,7 @@ import {
   resolveSubtitleClipStyle,
   resolveTextualClipStyle,
 } from '../../../project/text/subtitle-track';
-import {
-  VideoProjectTrackRole,
-  type VideoProject,
-  type VideoProjectClip,
-} from '../../../project/types/index';
+import { VideoProjectTrackRole, type VideoProjectClip } from '../../../project/types/index';
 import type { EffectRuntimeFramePlan } from '../../effect-runtime/runtime/types';
 import type { VideoCompositionVisualLayer, VideoCompositionActionState } from '../../types';
 import { createAnnotationVisualLayer } from './annotation-layer';
@@ -27,7 +30,7 @@ import {
 
 function createBaseVisualLayer(
   clip: Extract<VideoProjectClip, { transform: VideoProjectClip['transform'] }>,
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   currentTime: number,
   opacity: number,
   zIndex: number
@@ -53,14 +56,17 @@ function createBaseVisualLayer(
 function createVisualLayer(
   clip: VideoProjectClip,
   currentTime: number,
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   zIndex: number,
   options: {
     includeSubtitles: boolean;
     includeTransparent: boolean;
     actions: readonly VideoCompositionActionState[];
+    windowBorders: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
+    windowSpotlights: ReadonlyMap<string, readonly VideoCompositionSpotlightState[]>;
   }
 ): VideoCompositionVisualLayer | null {
+  if (!hasCameraMediaAt(project, clip, currentTime)) return null;
   clip = resolveCameraVisualClip(project, clip, currentTime);
   if (!isVisualClip(clip)) {
     return null;
@@ -83,6 +89,12 @@ function createVisualLayer(
         ...resolvedBaseLayer,
         clip,
         kind: 'video',
+        ...(options.windowBorders.get(clip.id)?.length
+          ? { borders: options.windowBorders.get(clip.id)! }
+          : {}),
+        ...(options.windowSpotlights.get(clip.id)?.length
+          ? { spotlights: options.windowSpotlights.get(clip.id)! }
+          : {}),
         actions: options.actions.filter((action) => action.clipId === clip.id),
         ...(project.tracks.find((track) => track.id === clip.trackId)?.role ===
         VideoProjectTrackRole.CAMERA
@@ -96,8 +108,22 @@ function createVisualLayer(
       return createTextVisualLayer(clip, project, resolvedBaseLayer);
     case 'ANNOTATION':
       return createAnnotationVisualLayer(clip, currentTime, project, zIndex);
-    case 'EFFECT':
-      return { ...resolvedBaseLayer, clip, kind: 'effect' };
+    case 'EFFECT': {
+      if (clip.attachment?.kind !== 'source') return { ...resolvedBaseLayer, clip, kind: 'effect' };
+      const geometryProject = project[VIDEO_PROJECT_ATTACHMENT_GEOMETRY] ?? project;
+      const source = resolveEffectSourceClip(geometryProject, clip, currentTime);
+      const mapping =
+        source && resolveCursorSourcePointMapping(geometryProject, source.id, currentTime);
+      const owner =
+        source && createVisualLayer(source, currentTime, geometryProject, zIndex, options);
+      if (!mapping || owner?.kind !== 'video') return null;
+      return {
+        ...resolvedBaseLayer,
+        clip,
+        kind: 'effect',
+        sourceAttachment: { owner, mapping },
+      };
+    }
     case 'SHAPE':
       return { ...resolvedBaseLayer, clip, kind: 'shape' };
   }
@@ -105,7 +131,7 @@ function createVisualLayer(
 
 function createTextVisualLayer(
   clip: Extract<VideoProjectClip, { type: 'TEXT' | 'SUBTITLE' }>,
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   baseLayer: ReturnType<typeof createBaseVisualLayer>
 ): VideoCompositionVisualLayer {
   return {
@@ -122,17 +148,23 @@ function createTextVisualLayer(
 }
 
 export function resolveVideoCompositionVisualLayers(
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   currentTime: number,
   options: {
     includeSubtitles?: boolean;
     timelineIndex?: VideoCompositionTimelineIndex;
     actions?: readonly VideoCompositionActionState[];
+    windowBorders?: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
+    windowSpotlights?: ReadonlyMap<string, readonly VideoCompositionSpotlightState[]>;
   } = {}
 ): VideoCompositionVisualLayer[] {
   const resolvedOptions = {
     includeSubtitles: options.includeSubtitles ?? true,
     includeTransparent: false,
+    windowBorders:
+      options.windowBorders ?? resolveVideoCompositionBorders(project, currentTime).windows,
+    windowSpotlights:
+      options.windowSpotlights ?? resolveVideoCompositionSpotlights(project, currentTime).windows,
     actions: options.actions ?? resolveVideoCompositionActions(project, currentTime),
   };
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
@@ -161,13 +193,15 @@ export function resolveVideoCompositionVisualLayers(
 }
 
 export function resolveVideoCompositionEffectInputLayers(
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   currentTime: number,
   plans: readonly EffectRuntimeFramePlan[],
   options: {
     includeSubtitles?: boolean;
     timelineIndex?: VideoCompositionTimelineIndex;
     actions?: readonly VideoCompositionActionState[];
+    windowBorders?: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
+    windowSpotlights?: ReadonlyMap<string, readonly VideoCompositionSpotlightState[]>;
   } = {}
 ): VideoCompositionVisualLayer[] {
   const requestedClipIds = collectEffectInputClipIds(plans);
@@ -175,6 +209,10 @@ export function resolveVideoCompositionEffectInputLayers(
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
   const layers: VideoCompositionVisualLayer[] = [];
   const actions = options.actions ?? resolveVideoCompositionActions(project, currentTime);
+  const windowBorders =
+    options.windowBorders ?? resolveVideoCompositionBorders(project, currentTime).windows;
+  const windowSpotlights =
+    options.windowSpotlights ?? resolveVideoCompositionSpotlights(project, currentTime).windows;
   let zIndex = 0;
   for (const track of timelineIndex.tracksInRenderOrder) {
     if (!track.visible) continue;
@@ -184,6 +222,8 @@ export function resolveVideoCompositionEffectInputLayers(
         includeSubtitles: options.includeSubtitles ?? true,
         includeTransparent: true,
         actions,
+        windowBorders,
+        windowSpotlights,
       });
       if (layer) layers.push(layer);
       zIndex += 1;

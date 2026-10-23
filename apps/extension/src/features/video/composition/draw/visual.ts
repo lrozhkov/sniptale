@@ -1,12 +1,14 @@
-import { windowHeaderImageKey } from './window-header';
-import { drawActionCompositionState } from './effects/actions';
+import { admittedVisualWindowHeader } from './window-header';
+import { drawVideoLayer } from './video';
+import { getFittedMediaContentFrame, getFittedMediaWindowFrame } from './fitted-media';
+import { roundedWindowRadius } from '../../project/window-geometry';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types.ts';
 import type { VideoCompositionVisualLayer } from '../types';
 import { drawAnnotationCompositionLayer } from './annotation';
 import { drawFittedMediaLayer } from './fitted-media';
 import { drawTextCompositionLayer } from './overlays';
 import { drawShapeCompositionLayer } from './shape';
-import { isVideoCompositionFrameSource, type VideoCompositionMediaSource } from './media-source';
+import { type VideoCompositionMediaSource } from './media-source';
 
 export function drawCompositionVisualLayer(
   context: CanvasRenderingContext2D,
@@ -45,6 +47,18 @@ export function drawCompositionVisualLayerBitmap(
   opacityMultiplier = 1,
   bitmapBounds = { x: 0, y: 0, width: 1, height: 1 }
 ): void {
+  if (layer.kind === 'effect' && layer.sourceAttachment) {
+    drawSourceAttachedEffectBitmap(
+      context,
+      layer,
+      bitmap,
+      scaleX,
+      scaleY,
+      opacityMultiplier,
+      bitmapBounds
+    );
+    return;
+  }
   const frame = getScaledLayerFrame(layer, scaleX, scaleY);
   const displayScale = (scaleX + scaleY) / 2;
   const renderState = layer.renderState ?? IDENTITY_TRANSITION_VISUAL_STATE;
@@ -65,6 +79,89 @@ export function drawCompositionVisualLayerBitmap(
     frame.height * bitmapBounds.height
   );
   context.restore();
+}
+
+/** Uses the source's static window mask before its disposable inner content camera. */
+function drawSourceAttachedEffectBitmap(
+  context: CanvasRenderingContext2D,
+  layer: Extract<VideoCompositionVisualLayer, { kind: 'effect' }>,
+  bitmap: ImageBitmap,
+  scaleX: number,
+  scaleY: number,
+  opacityMultiplier: number,
+  bitmapBounds: { x: number; y: number; width: number; height: number }
+): void {
+  const { sourceAttachment, ...body } = layer;
+  if (!sourceAttachment) return;
+  const { owner, mapping, innerTransform } = sourceAttachment;
+  const window = getFittedMediaWindowFrame(mapping);
+  const content = getFittedMediaContentFrame(mapping);
+  const radius = roundedWindowRadius(
+    window.width * scaleX,
+    window.height * scaleY,
+    ((mapping.windowCornerRadius ?? 0) * (scaleX + scaleY)) / 2
+  );
+  context.save();
+  try {
+    applyLayerTransform(
+      context,
+      owner,
+      owner.renderState,
+      getScaledLayerFrame(owner, scaleX, scaleY),
+      scaleX,
+      scaleY
+    );
+    context.beginPath();
+    if (radius > 0)
+      context.roundRect(
+        window.x * scaleX,
+        window.y * scaleY,
+        window.width * scaleX,
+        window.height * scaleY,
+        radius
+      );
+    else
+      context.rect(
+        window.x * scaleX,
+        window.y * scaleY,
+        window.width * scaleX,
+        window.height * scaleY
+      );
+    context.clip();
+    if (mapping.sourceCrop) {
+      const crop = mapping.sourceCrop;
+      context.beginPath();
+      context.rect(
+        (content.x + crop.x * content.width) * scaleX,
+        (content.y + crop.y * content.height) * scaleY,
+        crop.width * content.width * scaleX,
+        crop.height * content.height * scaleY
+      );
+      context.clip();
+    }
+    if (innerTransform)
+      context.transform(
+        innerTransform[0],
+        (innerTransform[3] * scaleY) / scaleX,
+        (innerTransform[1] * scaleX) / scaleY,
+        innerTransform[4],
+        innerTransform[2] * scaleX,
+        innerTransform[5] * scaleY
+      );
+    context.translate(content.x * scaleX, content.y * scaleY);
+    context.scale(content.width / mapping.sourceWidth, content.height / mapping.sourceHeight);
+    drawCompositionVisualLayerBitmap(
+      context,
+      body,
+      bitmap,
+      scaleX,
+      scaleY,
+      opacityMultiplier * owner.opacity,
+      bitmapBounds
+    );
+  } finally {
+    context.restore();
+  }
 }
 
 function buildLayerFilter(blurAmount: number): string {
@@ -185,123 +282,6 @@ function applyLayerTransform(
   context.translate(-centerX, -centerY);
 }
 
-function drawVideoLayer(
-  context: CanvasRenderingContext2D,
-  layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }>,
-  frame: ReturnType<typeof getScaledLayerFrame>,
-  displayScale: number,
-  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>,
-  loadedImages: Record<string, HTMLImageElement>
-) {
-  const source = clipMediaElements.get(layer.clipId);
-  if (!source) {
-    return;
-  }
-
-  if (
-    source instanceof HTMLVideoElement &&
-    source.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
-  ) {
-    return;
-  }
-
-  if (!(source instanceof HTMLVideoElement) && !isVideoCompositionFrameSource(source)) {
-    return;
-  }
-
-  const header = admittedVisualWindowHeader(layer.clip, loadedImages, layer.trackRole === 'CAMERA');
-  drawFittedMediaLayer({
-    ...header,
-    ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
-    context,
-    displayScale,
-    fitMode: layer.clip.fitMode,
-    frame,
-    camera: layer.trackRole === 'CAMERA',
-    ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
-      ? { cameraAppearance: layer.clip.cameraAppearance }
-      : {}),
-    shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
-    shadowMode: layer.clip.shadowMode,
-    sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
-    sourceWidth: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
-    render: (drawX, drawY, drawWidth, drawHeight, drawContext = context) => {
-      if (!layer.effectActionsOnly && source instanceof HTMLVideoElement) {
-        drawContext.drawImage(source, drawX, drawY, drawWidth, drawHeight);
-      } else if (!layer.effectActionsOnly && !(source instanceof HTMLVideoElement)) {
-        source.draw(drawContext, drawX, drawY, drawWidth, drawHeight);
-      }
-      drawContext.save();
-      drawContext.beginPath();
-      const contentBounds = {
-        x: Math.max(frame.x, drawX),
-        y: Math.max(frame.y, drawY),
-        width: Math.max(
-          0,
-          Math.min(frame.x + frame.width, drawX + drawWidth) - Math.max(frame.x, drawX)
-        ),
-        height: Math.max(
-          0,
-          Math.min(frame.y + frame.height, drawY + drawHeight) - Math.max(frame.y, drawY)
-        ),
-      };
-      drawContext.rect(contentBounds.x, contentBounds.y, contentBounds.width, contentBounds.height);
-      drawContext.clip();
-      const sourceWidth =
-        source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth;
-      const sourceHeight =
-        source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight;
-      const actionScale = (drawWidth / sourceWidth + drawHeight / sourceHeight) / 2;
-      for (const action of layer.actions ?? []) {
-        const point = action.point
-          ? { x: drawX + action.point.x * drawWidth, y: drawY + action.point.y * drawHeight }
-          : action.renderKind === 'keystroke'
-            ? {
-                x: contentBounds.x + 12 * Math.max(0.2, actionScale),
-                y: contentBounds.y + 24 * Math.max(0.2, actionScale),
-              }
-            : null;
-        drawActionCompositionState(
-          drawContext,
-          {
-            ...action,
-            point,
-            ...(action.gestureFeedback
-              ? {
-                  gestureFeedback: {
-                    ...action.gestureFeedback,
-                    ...(action.gestureFeedback.path
-                      ? {
-                          path: action.gestureFeedback.path.map((item) => ({
-                            x: drawX + item.x * drawWidth,
-                            y: drawY + item.y * drawHeight,
-                          })),
-                        }
-                      : {}),
-                    ...(action.gestureFeedback.area
-                      ? {
-                          area: {
-                            x: drawX + action.gestureFeedback.area.x * drawWidth,
-                            y: drawY + action.gestureFeedback.area.y * drawHeight,
-                            width: action.gestureFeedback.area.width * drawWidth,
-                            height: action.gestureFeedback.area.height * drawHeight,
-                          },
-                        }
-                      : {}),
-                  },
-                }
-              : {}),
-          },
-          null,
-          actionScale,
-          contentBounds
-        );
-      }
-      drawContext.restore();
-    },
-  });
-}
-
 function drawImageLayer(
   context: CanvasRenderingContext2D,
   layer: Extract<VideoCompositionVisualLayer, { kind: 'image' }>,
@@ -321,27 +301,18 @@ function drawImageLayer(
     context,
     displayScale,
     fitMode: layer.clip.fitMode,
+    ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
     frame,
+    ...(layer.clip.windowCornerRadius === undefined
+      ? {}
+      : { windowCornerRadius: layer.clip.windowCornerRadius }),
     shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,
+    ...(layer.clip.shadowColor === undefined ? {} : { shadowColor: layer.clip.shadowColor }),
     sourceHeight: image.naturalHeight,
     sourceWidth: image.naturalWidth,
     render: (drawX, drawY, drawWidth, drawHeight, drawContext = context) => {
       drawContext.drawImage(image, drawX, drawY, drawWidth, drawHeight);
     },
   });
-}
-
-function admittedVisualWindowHeader(
-  clip: { id: string; windowHeader?: import('../../../browser-frame/header').WindowHeader },
-  images: Record<string, HTMLImageElement>,
-  camera: boolean
-) {
-  const header = camera ? undefined : clip.windowHeader;
-  const image = header ? images[windowHeaderImageKey(clip.id, header)] : undefined;
-  if (image?.complete && image.naturalWidth === 0)
-    throw new Error('Window header image could not be decoded.');
-  return image && clip.windowHeader
-    ? { windowHeaderImage: image, windowHeader: clip.windowHeader }
-    : {};
 }

@@ -113,6 +113,7 @@ export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
     if (section === 'colors') {
       return (
         <StepBadgeColorSection
+          onFloatingInteractionChange={props.onFloatingInteractionChange}
           embedded
           frame={props.frameVisuals}
           onChange={props.onSettingsChange}

@@ -12,7 +12,6 @@ const {
   useFrameUIControllerMock,
   useModeDisabledListenerMock,
   useQuickActionHotkeysMock,
-  useShowToolbarButtonMock,
 } = vi.hoisted(() => ({
   clearHistoryMock: vi.fn(),
   disableNavigationLockMock: vi.fn(),
@@ -28,7 +27,6 @@ const {
   useFrameUIControllerMock: vi.fn(),
   useModeDisabledListenerMock: vi.fn(),
   useQuickActionHotkeysMock: vi.fn(),
-  useShowToolbarButtonMock: vi.fn(),
 }));
 
 vi.mock('../../../selection/highlighter', async (importOriginal) => ({
@@ -64,10 +62,6 @@ vi.mock('../../toolbar/quick-action-hotkeys', () => ({
   useQuickActionHotkeys: useQuickActionHotkeysMock,
 }));
 
-vi.mock('../../toolbar/show-button', () => ({
-  useShowToolbarButton: useShowToolbarButtonMock,
-}));
-
 import { useContentAppBindings } from '.';
 
 let container: HTMLDivElement | null = null;
@@ -93,13 +87,11 @@ async function renderBindings(props: Parameters<typeof useContentAppBindings>[0]
 
 function createBindingsProps() {
   return {
-    countdownActive: false,
     InteractiveFrameComponent,
     modeControls: {
       setAiPickMode: vi.fn(),
       setDesignReviewMode: vi.fn(),
       setHighlighterMode: vi.fn(),
-      setIsToolbarVisible: vi.fn(),
       setQuickEditDocumentMode: vi.fn(),
       setQuickEditMode: vi.fn(),
     },
@@ -110,11 +102,6 @@ function createBindingsProps() {
       quickEditDocumentMode: false,
       quickEditMode: false,
       screenshotMode: true,
-    },
-    visibilityState: {
-      isCompletelyHidden: false,
-      isToolbarVisible: false,
-      setPinnedToolbarVisible: vi.fn(),
     },
   };
 }
@@ -132,27 +119,6 @@ function cleanupBindingsSuite() {
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
-}
-
-async function expectStableShowToolbarCallback() {
-  const props = createBindingsProps();
-
-  await renderBindings(props);
-  await renderBindings(props);
-
-  expect(useFrameManagerMock).toHaveBeenCalledWith({ InteractiveFrameComponent });
-  expect(useShowToolbarButtonMock).toHaveBeenCalledTimes(2);
-
-  const firstCall = useShowToolbarButtonMock.mock.calls[0]?.[0];
-  const secondCall = useShowToolbarButtonMock.mock.calls[1]?.[0];
-
-  expect(firstCall?.onShowToolbar).toBeTypeOf('function');
-  expect(secondCall?.onShowToolbar).toBe(firstCall?.onShowToolbar);
-
-  secondCall?.onShowToolbar();
-
-  expect(props.modeControls.setIsToolbarVisible).not.toHaveBeenCalled();
-  expect(props.visibilityState.setPinnedToolbarVisible).toHaveBeenCalledWith(true);
 }
 
 async function expectLatestFrameManagerCallbackRouting() {
@@ -277,10 +243,6 @@ function runUseContentAppBindingsSuite() {
   beforeEach(resetBindingsSuite);
   afterEach(cleanupBindingsSuite);
 
-  it(
-    'passes a stable show-toolbar callback across parent rerenders',
-    expectStableShowToolbarCallback
-  );
   it(
     'registers frame callbacks once and routes them through the latest frame-manager actions',
     expectLatestFrameManagerCallbackRouting

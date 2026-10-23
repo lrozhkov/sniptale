@@ -1,4 +1,5 @@
 import { replaceNativeReviewWorkspace } from './native-review-workspace';
+import { installReviewModeChoice } from './quick-editor-media-fixture';
 import { expect, type Page } from '@playwright/test';
 import { execFile } from 'node:child_process';
 import { readFile, stat, writeFile } from 'node:fs/promises';
@@ -129,11 +130,13 @@ export function previewPlaybackControls(page: Page) {
     canvas,
     panel,
     async open(camera = false) {
+      await installReviewModeChoice(page);
       await page
         .getByRole('button', { name: camera ? /: Screen$/ : 'beta-v1.webm', exact: !camera })
         .first()
         .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(video).toBeVisible();
       await expect
         .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
         .toBeGreaterThanOrEqual(2);

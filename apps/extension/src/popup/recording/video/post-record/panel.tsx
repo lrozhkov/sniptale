@@ -28,20 +28,19 @@ function PostRecordActionButton({
       type="button"
       disabled={disabled}
       className={[
-        'group flex min-w-0 items-center justify-center rounded-md text-xs font-medium',
+        'group flex min-w-0 items-center justify-center rounded-[6px] border-0 font-normal',
+        prominent
+          ? 'min-h-[88px] flex-col gap-2.5 px-1.5 py-2.5 text-center'
+          : 'min-h-10 flex-row gap-2 px-2 py-2 text-xs',
         'transition-colors motion-reduce:transition-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         prominent
-          ? [
-              'min-h-28 flex-col gap-3',
-              'bg-[var(--sniptale-color-surface-input)] px-3 py-4',
-              'hover:bg-[var(--sniptale-color-surface-hover)]',
-            ].join(' ')
-          : 'min-h-10 flex-row gap-2 px-2 py-2',
-        'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-hover)]',
+          ? 'bg-[var(--sniptale-color-surface-input)] text-[var(--sniptale-color-text-primary)]'
+          : 'bg-transparent text-[var(--sniptale-color-text-secondary)]',
+        'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
-      title={label}
+      data-popup-hint={label}
       onClick={onClick}
     >
       <Icon
@@ -49,15 +48,19 @@ function PostRecordActionButton({
         className={
           prominent
             ? [
-                'h-6 w-6 shrink-0 text-[var(--sniptale-color-accent)]',
+                'h-6 w-6 shrink-0 scale-100 stroke-[1.75] text-[var(--sniptale-color-accent)]',
                 'transition-transform duration-180 ease-out motion-reduce:transition-none',
-                'group-hover:scale-110 group-disabled:scale-100',
-                'group-focus-visible:scale-110',
+                'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
+                'motion-reduce:group-hover:scale-100 motion-reduce:group-focus-visible:scale-100',
               ].join(' ')
             : 'h-4 w-4 shrink-0'
         }
       />
-      <span className={prominent ? 'text-balance leading-relaxed' : 'whitespace-nowrap leading-5'}>
+      <span
+        className={
+          prominent ? 'text-balance text-[10px] font-medium leading-3' : 'text-balance leading-5'
+        }
+      >
         {label}
       </span>
     </button>
@@ -85,7 +88,7 @@ export function VideoPostRecordPanel({
   return (
     <div className={['flex min-h-0 flex-1 flex-col gap-5 px-2 pb-1 pt-5'].join(' ')}>
       <div className="px-2 text-center">
-        <div className="text-base font-semibold text-[var(--sniptale-color-text-primary)]">
+        <div className="text-sm font-medium text-[var(--sniptale-color-text-primary)]">
           {translate('popup.video.postRecordTitle')}
         </div>
         <div className="mt-1 text-xs text-[var(--sniptale-color-text-muted-strong)]">
@@ -99,13 +102,7 @@ export function VideoPostRecordPanel({
         runDecision={runDecision}
       />
       {actionError ? (
-        <div
-          className={[
-            'rounded-[10px] border border-[var(--sniptale-color-danger-soft)] px-3 py-2',
-            'text-xs text-[var(--sniptale-color-danger)]',
-          ].join(' ')}
-          role="alert"
-        >
+        <div className="popup-error-message" role="alert">
           {actionError}
         </div>
       ) : null}
@@ -162,9 +159,9 @@ function PostRecordActionGrid({
     <div className="flex flex-1 flex-col gap-3" data-busy={isBusy}>
       <div className="grid grid-cols-2 gap-2">
         <PostRecordActionButton
-          prominent
           disabled={isBusy}
           icon={Clapperboard}
+          prominent
           label={translate('popup.video.postRecordQuickEdit')}
           onClick={() =>
             runDecision(() => openLatestRecordingInGallery(result.primaryRecordingId, true))
@@ -172,8 +169,8 @@ function PostRecordActionGrid({
         />
         <PostRecordActionButton
           disabled={isBusy}
-          prominent
           icon={Film}
+          prominent
           label={translate('popup.video.postRecordOpenEditor')}
           onClick={() => runDecision(() => openSavedRecordingInVideoEditor(result))}
         />

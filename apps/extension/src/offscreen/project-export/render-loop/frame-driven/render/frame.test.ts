@@ -1,3 +1,4 @@
+import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
 import { afterEach, expect, it, vi } from 'vitest';
 
 const waitForEncoderQueueCapacityMock = vi.hoisted(() => vi.fn());
@@ -79,18 +80,28 @@ it('renders, queues, and encodes a frame with keyframe metadata', async () => {
   renderOffscreenProjectEffectFramesMock.mockResolvedValue(undefined);
   const encodeMock = vi.fn();
   const throwIfPipelineFailed = vi.fn();
+  const project = { ...createEmptyVideoProject('Frame'), duration: 10 };
+
+  const context = { stroke: vi.fn(), save: vi.fn(), restore: vi.fn() };
 
   await renderFrameDrivenCompositeFrame({
     canvas: { tagName: 'CANVAS' } as HTMLCanvasElement,
-    context: { stroke: vi.fn() } as never,
+    context: context as never,
     currentTime: 2.5,
     frameDurationUs: 4_000,
     frameIndex: 3,
     job: { cancelled: false, clipMediaElements: ['clip'] } as never,
     keyframeInterval: 3,
     loadedImages: { image: 'loaded' } as never,
-    project: { duration: 10 } as never,
-    settings: { fps: 30, format: 'MP4', mp4VideoCodec: 'AVC', quality: 'HIGH' } as never,
+    project,
+    settings: {
+      fps: 30,
+      width: 1280,
+      height: 720,
+      format: 'MP4',
+      mp4VideoCodec: 'AVC',
+      quality: 'HIGH',
+    } as never,
     throwIfPipelineFailed,
     videoEncoder: { encode: encodeMock } as never,
   });
@@ -98,18 +109,18 @@ it('renders, queues, and encodes a frame with keyframe metadata', async () => {
   expect(throwIfPipelineFailed).toHaveBeenCalledTimes(1);
   expect(syncVideoClipFrameMock).toHaveBeenCalledWith(
     expect.objectContaining({ cancelled: false, clipMediaElements: ['clip'] }),
-    { duration: 10 },
+    project,
     2.5,
     undefined
   );
   expect(drawProjectFrameMock).toHaveBeenCalledWith(
-    { stroke: expect.any(Function) },
-    { duration: 10 },
-    { fps: 30, format: 'MP4', mp4VideoCodec: 'AVC', quality: 'HIGH' },
+    context,
+    project,
+    { fps: 30, width: 1280, height: 720, format: 'MP4', mp4VideoCodec: 'AVC', quality: 'HIGH' },
     2.5,
     { image: 'loaded' },
     ['clip'],
-    {}
+    { spatialRenderer: expect.any(Function) }
   );
   expect(waitForEncoderQueueCapacityMock).toHaveBeenCalledWith(
     { encode: encodeMock },

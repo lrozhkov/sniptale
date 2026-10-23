@@ -1,3 +1,6 @@
+import { OptionButtonsField } from '../shared/option-buttons';
+import { NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { motionTransitionSettings } from '../../../../../features/video/project/motion/timing';
 import { InspectCameraFollowSettings } from '../inspection/cursor-path';
 import { resolveCameraFollowPolicy } from '../../../../../features/video/project/camera/cursor-policy';
 import { resolveProjectCursorFocusPath } from '../../../../../features/video/project/cursor-focus-path/projection';
@@ -12,7 +15,7 @@ import { ManualAreaFields } from './area';
 import { MotionFramingPreview } from './framing-preview';
 import {
   MotionBlurField,
-  MotionEasingField,
+  MotionTransitionTypeField,
   MotionFocusModeField,
   MotionOverlayZoomField,
   MotionTargetActionField,
@@ -27,6 +30,23 @@ export function MotionCameraFields(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
+      {props.motionRegion.sourceBinding ? (
+        <OptionButtonsField<'scene' | 'window'>
+          label={translate('videoEditor.sidebar.motionCoverage')}
+          value={
+            props.motionRegion.sourceBinding.coordinateSpace === 'source-window'
+              ? 'window'
+              : 'scene'
+          }
+          options={[
+            { value: 'scene', label: translate('videoEditor.sidebar.spotlightCoverageScene') },
+            { value: 'window', label: translate('videoEditor.sidebar.spotlightCoverageWindow') },
+          ]}
+          onChange={(cameraTarget) =>
+            props.panel.onUpdateMotionRegion(props.motionRegion.id, { cameraTarget })
+          }
+        />
+      ) : null}
       {props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL ||
       props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
       props.motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? (
@@ -67,7 +87,12 @@ export function MotionTimingFields(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
-      <MotionBindingField {...props} />
+      {props.motionRegion.borderTarget === 'window' ||
+      props.motionRegion.spotlightTarget === 'window' ||
+      props.motionRegion.spotlightTarget === 'scene' ||
+      props.motionRegion.spotlightTarget === 'source-scene' ? null : (
+        <MotionBindingField {...props} />
+      )}
       <MotionDurationField
         duration={props.motionRegion.duration}
         motionRegionId={props.motionRegion.id}
@@ -118,26 +143,18 @@ export function MotionBehaviorFields(props: {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       <MotionZoomFields motionRegion={props.motionRegion} panel={props.panel} />
-      <MotionEasingField
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-        value={props.motionRegion.easing}
-      />
-      <InspectorDetails
-        preferenceId="content:videoEditor.sidebar.inspectorMoreDetails"
-        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
-      >
-        <MotionOverlayZoomField
-          motionRegionId={props.motionRegion.id}
-          panel={props.panel}
-          value={props.motionRegion.overlayZoomMode}
-        />
-        <MotionBlurField
-          motionRegionId={props.motionRegion.id}
-          panel={props.panel}
-          value={props.motionRegion.motionBlurAmount ?? 0}
-        />
-      </InspectorDetails>
+      {props.motionRegion.sourceBinding?.coordinateSpace === 'source-window' ? null : (
+        <InspectorDetails
+          preferenceId="content:videoEditor.sidebar.inspectorMoreDetails"
+          label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+        >
+          <MotionOverlayZoomField
+            motionRegionId={props.motionRegion.id}
+            panel={props.panel}
+            value={props.motionRegion.overlayZoomMode}
+          />
+        </InspectorDetails>
+      )}
     </div>
   );
 }
@@ -190,29 +207,67 @@ function MotionZoomFields(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <div className="sniptale-parameter-stack space-y-3">
-      <SliderField
-        label={translate('videoEditor.sidebar.motionZoomInLabel')}
-        value={props.motionRegion.zoomInDuration}
-        min={0}
-        max={5}
-        step={0.05}
-        onChange={(value) =>
-          props.panel.onUpdateMotionRegion(props.motionRegion.id, { zoomInDuration: value })
-        }
-        formatValue={(value) => `${value.toFixed(2)} s`}
-      />
-      <SliderField
-        label={translate('videoEditor.sidebar.motionZoomOutLabel')}
-        value={props.motionRegion.zoomOutDuration}
-        min={0}
-        max={5}
-        step={0.05}
-        onChange={(value) =>
-          props.panel.onUpdateMotionRegion(props.motionRegion.id, { zoomOutDuration: value })
-        }
-        formatValue={(value) => `${value.toFixed(2)} s`}
-      />
+    <div className="sniptale-parameter-stack space-y-1">
+      {(['enter', 'exit'] as const).map((phase) => {
+        const changeDuration = (duration: number) =>
+          props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+            motionTransitionPhase: { phase, duration },
+          });
+        const setting = motionTransitionSettings(props.motionRegion, phase);
+        const other = motionTransitionSettings(
+          props.motionRegion,
+          phase === 'enter' ? 'exit' : 'enter'
+        );
+        const duration =
+          props.motionRegion.sourceBinding?.animation.duration ??
+          props.motionRegion.animation?.duration ??
+          props.motionRegion.duration;
+        return (
+          <InspectorDetails
+            key={phase}
+            preferenceId={`motion:transition:${phase}`}
+            initiallyOpen
+            label={translate(
+              phase === 'enter'
+                ? 'gallery.videoReview.zoomTransitionIn'
+                : 'gallery.videoReview.zoomTransitionOut'
+            )}
+          >
+            <fieldset
+              aria-label={translate(
+                phase === 'enter'
+                  ? 'gallery.videoReview.zoomTransitionIn'
+                  : 'gallery.videoReview.zoomTransitionOut'
+              )}
+              className="min-w-0 sniptale-parameter-stack"
+              data-ui="video-editor.motion.transition"
+              data-phase={phase}
+            >
+              <MotionBlurField {...props} phase={phase} />
+              <MotionTransitionTypeField {...props} phase={phase} />
+              <NumericRow
+                appearance="plain"
+                focusAppearance="accent-box"
+                label={translate('gallery.videoReview.zoomTransitionDuration')}
+                value={setting.duration}
+                min={0}
+                max={Math.min(60, Math.max(0, duration - other.duration))}
+                precision={2}
+                step={0.01}
+                unit="s"
+                scrub={{
+                  min: 0,
+                  max: Math.min(5, Math.max(0, duration - other.duration)),
+                  step: 0.01,
+                }}
+                disabled={setting.type === 'none'}
+                onPreviewValue={changeDuration}
+                onCommitValue={changeDuration}
+              />
+            </fieldset>
+          </InspectorDetails>
+        );
+      })}
     </div>
   );
 }
@@ -244,8 +299,18 @@ export function MotionOverview(props: { motionRegion: VideoProjectMotionRegion }
     <div className="sniptale-parameter-stack space-y-3">
       <DetailList>
         <DetailItem
-          label={translate('videoEditor.sidebar.motionFocusLabel')}
-          value={getMotionFocusModeLabel(props.motionRegion.focusMode)}
+          label={translate(
+            props.motionRegion.border || props.motionRegion.spotlight
+              ? 'gallery.videoReview.focusType'
+              : 'videoEditor.sidebar.motionFocusLabel'
+          )}
+          value={
+            props.motionRegion.border
+              ? translate('gallery.videoReview.focusBorder')
+              : props.motionRegion.spotlight
+                ? translate('gallery.videoReview.focusSpotlight')
+                : getMotionFocusModeLabel(props.motionRegion.focusMode)
+          }
         />
         <DetailItem
           label={translate('videoEditor.sidebar.actionTimePrefix')}

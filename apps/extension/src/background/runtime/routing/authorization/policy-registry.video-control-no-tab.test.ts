@@ -43,6 +43,39 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
 }));
 
 const POPUP_URL = 'chrome-extension://test/apps/extension/src/popup/index.html';
+it.each([VideoMessageType.COUNTDOWN_CAMERA_OFFER, VideoMessageType.COUNTDOWN_CAMERA_CLOSE])(
+  'admits %s only through popup owner control authority',
+  (type) => {
+    const message = {
+      type,
+      controlToken: 'token',
+      recordingId: 'recording',
+      peerGeneration: 0,
+      sdp: 'offer',
+    };
+    expect(
+      authorizeRegisteredIPCMessage({
+        kind: 'video-control-owner-no-tab-route',
+        message,
+        sender: { url: POPUP_URL },
+      })
+    ).toEqual({ authorized: true });
+    expect(
+      authorizeRegisteredIPCMessage({
+        kind: 'video-control-owner-no-tab-route',
+        message,
+        sender: { url: 'https://example.test/' },
+      }).authorized
+    ).toBe(false);
+    expect(
+      authorizeRegisteredIPCMessage({
+        kind: 'video-control-no-tab-route',
+        message,
+        sender: { url: POPUP_URL },
+      }).authorized
+    ).toBe(false);
+  }
+);
 const CAMERA_RECORDER_URL = 'chrome-extension://test/apps/extension/src/camera-recorder/index.html';
 const RETIRED_CAMERA_RECORDER_URL = 'chrome-extension://test/src/camera-recorder/index.html';
 

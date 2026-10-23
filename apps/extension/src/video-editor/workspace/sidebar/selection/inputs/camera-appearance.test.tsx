@@ -76,13 +76,10 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
       />
     )
   );
-  const shape = container.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.sidebar.cameraShape"]'
+  const option = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((item) =>
+    item.textContent?.includes('cameraShapeEllipse')
   )!;
-  act(() => shape.click());
-  const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
-    (item) => item.textContent?.includes('cameraShapeEllipse')
-  )!;
+  expect(option.getAttribute('aria-pressed')).toBe('false');
   await act(async () => {
     option.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     await Promise.resolve();
@@ -113,8 +110,8 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
   });
   number('cameraCropZoom', '200');
   expect(onEdit).toHaveBeenLastCalledWith(clip.id, {
-    kind: 'appearance',
-    appearance: { ...clip.cameraAppearance, zoom: 2 },
+    kind: 'crop',
+    crop: { zoom: 2, panX: 0.5, panY: 0 },
   });
   act(() =>
     container
@@ -122,8 +119,8 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
       .click()
   );
   expect(onEdit).toHaveBeenLastCalledWith(clip.id, {
-    kind: 'appearance',
-    appearance: { ...clip.cameraAppearance, panX: 0, panY: 0 },
+    kind: 'crop',
+    crop: { zoom: 1, panX: 0, panY: 0 },
   });
   act(() =>
     root.render(
@@ -139,5 +136,187 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
   expect(
     container.querySelector('input[aria-label="videoEditor.sidebar.cameraRoundness"]')
   ).toBeNull();
-  expect(shape.disabled).toBe(true);
+  const shapeChoices = [...container.querySelectorAll<HTMLButtonElement>('[aria-pressed]')];
+  expect(shapeChoices).toHaveLength(6);
+  expect(shapeChoices.every((button) => button.disabled)).toBe(true);
+  expect(
+    shapeChoices
+      .find((button) => button.textContent?.includes('cameraShapeEllipse'))
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+});
+
+it('commits reflection through the camera command and disables it on locked clips', async () => {
+  const base = createProps();
+  const onEdit = vi.fn();
+  const render = (disabled: boolean, cameraMirrored = false) =>
+    act(() =>
+      root.render(
+        <CameraAppearanceControls
+          project={base.project}
+          clip={{ ...base.clip, cameraMirrored }}
+          currentTime={0}
+          disabled={disabled}
+          onEdit={onEdit}
+        />
+      )
+    );
+  render(false);
+  const horizontal = () =>
+    [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+      button.textContent?.includes('webcamMirrorOn')
+    )!;
+  await act(async () =>
+    horizontal().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+  );
+  expect(onEdit).toHaveBeenCalledWith(base.clip.id, { kind: 'mirror', mirrored: true });
+  render(true, true);
+  expect(horizontal().getAttribute('aria-pressed')).toBe('true');
+  expect(horizontal().disabled).toBe(true);
+});
+
+it('offers circle with one diameter and retains the authored frame ratio and dormant roundness', () => {
+  const base = createProps();
+  const clip = {
+    ...base.clip,
+    transform: { ...base.clip.transform, width: 200, height: 100 },
+    cameraAppearance: { ...DEFAULT_CAMERA_APPEARANCE, roundness: 61 },
+  };
+  const onEdit = vi.fn(),
+    onUpdateClipTransform = vi.fn();
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+        onUpdateClipTransform={onUpdateClipTransform}
+      />
+    )
+  );
+  const circle = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'gallery.videoReview.webcamCircle'
+  )!;
+  act(() => circle.click());
+  expect(onEdit).toHaveBeenCalledExactlyOnceWith(clip.id, {
+    kind: 'appearance',
+    appearance: { ...clip.cameraAppearance, shape: 'circle' },
+  });
+  const circleClip = {
+    ...clip,
+    cameraAppearance: { ...clip.cameraAppearance, shape: 'circle' as const },
+  };
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={circleClip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+        onUpdateClipTransform={onUpdateClipTransform}
+      />
+    )
+  );
+  const input = container.querySelector<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.webcamDiameter"]'
+  )!;
+  expect(input.value).toBe('100');
+  expect(container.querySelector('input[aria-label="videoEditor.sidebar.widthLabel"]')).toBeNull();
+  expect(container.querySelector('input[aria-label="videoEditor.sidebar.heightLabel"]')).toBeNull();
+  expect(
+    container.querySelector('input[aria-label="videoEditor.sidebar.cameraRoundness"]')
+  ).toBeNull();
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '150');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(onUpdateClipTransform).toHaveBeenCalledWith(clip.id, { width: 300, height: 150 });
+  expect(circleClip.transform).toEqual(clip.transform);
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+      />
+    )
+  );
+  expect(
+    container.querySelector<HTMLInputElement>(
+      'input[aria-label="videoEditor.sidebar.cameraRoundness"]'
+    )?.value
+  ).toBe('61');
+  expect(
+    container.querySelector('input[aria-label="gallery.videoReview.webcamDiameter"]')
+  ).toBeNull();
+});
+
+it('shows destination framing and resets its override without copying crop into shape edits', () => {
+  const { project, clip } = createProps();
+  clip.cameraAppearance = { ...DEFAULT_CAMERA_APPEARANCE, zoom: 1.25, shape: 'circle' };
+  clip.cameraPositions = [
+    {
+      id: 'destination',
+      sourceTime: 2,
+      transform: { ...clip.transform },
+      fitMode: clip.fitMode,
+      transition: { kind: 'smooth', duration: 1 },
+      crop: { zoom: 2, panX: 0.4, panY: -0.2 },
+    },
+  ];
+  const onEdit = vi.fn();
+  const render = (disabled = false) =>
+    act(() =>
+      root.render(
+        <CameraAppearanceControls
+          project={project}
+          clip={clip}
+          currentTime={3}
+          disabled={disabled}
+          onEdit={onEdit}
+        />
+      )
+    );
+  render();
+  const input = container.querySelector<HTMLInputElement>(
+    'input[aria-label="videoEditor.sidebar.cameraCropZoom"]'
+  )!;
+  expect(input.value).toBe('200');
+  const video = container.querySelector<HTMLVideoElement>('video')!;
+  act(() => video.dispatchEvent(new Event('loadedmetadata')));
+  expect(video.currentTime).toBe(3);
+  Object.assign(clip.cameraPositions[0]!.crop!, { shape: 'ellipse', roundness: 90 });
+  render();
+  expect(
+    container.querySelector<HTMLInputElement>(
+      'input[aria-label="gallery.videoReview.webcamDiameter"]'
+    )
+  ).not.toBeNull();
+  const shape = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+    button.textContent?.includes('cameraShapeEllipse')
+  )!;
+  act(() => shape.click());
+  expect(onEdit).toHaveBeenLastCalledWith(clip.id, {
+    kind: 'appearance',
+    appearance: { ...clip.cameraAppearance, shape: 'ellipse' },
+  });
+  const reset = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="videoEditor.sidebar.cameraCropResetPosition"]'
+  )!;
+  expect(reset.disabled).toBe(false);
+  expect(reset.querySelector('svg')).not.toBeNull();
+  act(() => reset.click());
+  expect(onEdit).toHaveBeenLastCalledWith(clip.id, { kind: 'crop', crop: null });
+  render(true);
+  expect(reset.disabled).toBe(true);
+  delete clip.cameraPositions[0]!.crop;
+  render();
+  expect(reset.disabled).toBe(true);
+  expect(input.value).toBe('125');
 });

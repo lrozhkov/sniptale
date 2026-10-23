@@ -1,3 +1,5 @@
+import { activateRetainedEffectHost } from '../../../../features/video/project/effect-instance/placement';
+import { getLinkedClipIds } from '../../../../features/video/project/timeline/basics';
 import { swapProjectClips } from './reorder';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
@@ -86,7 +88,11 @@ function createMoveClipAction(set: VideoEditorStoreSet): VideoEditorProjectState
     let result: VideoEditorClipTimingResult | null = null;
     set((state) => {
       const patch = applyProjectUpdate(state, (project) =>
-        moveProjectClip(project, clipId, startTime, trackId, timelineLaneId)
+        activateExplicitlyRetimedEffects(
+          project,
+          moveProjectClip(project, clipId, startTime, trackId, timelineLaneId),
+          clipId
+        )
       );
       result = resolveAppliedClipTiming(patch.project ?? state.project, clipId);
       return patch;
@@ -106,7 +112,9 @@ function createClipTimingAction(
   return (clipId, time) => {
     let result: VideoEditorClipTimingResult | null = null;
     set((state) => {
-      const patch = applyProjectUpdate(state, (project) => mutate(project, clipId, time));
+      const patch = applyProjectUpdate(state, (project) =>
+        activateExplicitlyRetimedEffects(project, mutate(project, clipId, time), clipId)
+      );
       result = resolveAppliedClipTiming(patch.project ?? state.project, clipId);
       return patch;
     });
@@ -161,4 +169,30 @@ function createCloseTrackGapAction(
         closeProjectTrackGap(project, trackId, gapStart, gapEnd)
       )
     );
+}
+
+function activateExplicitlyRetimedEffects(
+  before: NonNullable<VideoEditorProjectState['project']>,
+  after: NonNullable<VideoEditorProjectState['project']>,
+  clipId: string
+) {
+  if (before === after) return after;
+  const selected = new Set(getLinkedClipIds(before, clipId));
+  const previous = new Map(before.clips.map((clip) => [clip.id, clip]));
+  let activated = false;
+  const clips = after.clips.map((clip) => {
+    const old = previous.get(clip.id);
+    if (
+      clip.type !== 'EFFECT' ||
+      !selected.has(clip.id) ||
+      !clip.sourceRange?.dormant ||
+      !old ||
+      (Math.abs(old.startTime - clip.startTime) <= 1e-7 &&
+        Math.abs(old.duration - clip.duration) <= 1e-7)
+    )
+      return clip;
+    activated = true;
+    return activateRetainedEffectHost(clip);
+  });
+  return activated ? applyVideoProjectMutationPatch(after, { clips }) : after;
 }

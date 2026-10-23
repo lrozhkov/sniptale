@@ -49,7 +49,13 @@ it('uses text and trimmed narration, preserving narration unless truncation is e
   expect(tourSlideDuration(tour, slide)).toBe(3000);
   const image = tour.slides[1]!;
   if (image.kind !== 'image') throw new Error('image expected');
-  image.annotations = [{ id: 'note', text: 'x'.repeat(150), anchor: null, appearance: null }];
+  image.actions = [
+    ...image.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'note', text: 'x'.repeat(150), anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   expect(tourSlideDuration(tour, image)).toBe(11000);
 });
 it.each([
@@ -64,47 +70,22 @@ it.each([
   [[{ kind: 'next' }, { kind: 'end' }], null],
   [[{ kind: 'slide', slideId: 'missing' }], null],
 ] as [TourAction[], number | null][])(
-  'resolves only an unambiguous internal route %j',
-  (actions, target) => {
+  'waits at contents regardless of authored controls %j',
+  (actions) => {
     const { tour } = fixture(actions);
-    expect(tourAutoplayDestination(tour, 0)).toBe(target);
+    expect(tourAutoplayDestination(tour, 0)).toBeNull();
   }
 );
-it('prioritizes a declared autoplay target without running URL actions', () => {
-  const { tour, slide } = fixture([{ kind: 'url', url: 'https://example.com' }]);
-  slide.timing.autoplayTarget = 'second';
-  expect(tourAutoplayDestination(tour, 0)).toBe(1);
-  slide.timing.autoplayTarget = 'missing';
+it('keeps a truthful timeline across contents and explicit looping', () => {
+  const { tour } = fixture([{ kind: 'url', url: 'https://example.com' }]);
   expect(tourAutoplayDestination(tour, 0)).toBeNull();
+  expect(tourAutoplayDestination(tour, 1)).toBe(2);
   expect(tourAutoplayDestination(tour, 20)).toBeNull();
-});
-it('exposes total time only for a non-looping structural route', () => {
-  const { tour, slide } = fixture();
   expect(tourLinearTimeline(tour)).toEqual({ offsets: [0, 4000, 8000], duration: 12000 });
-  slide.timing.autoplayTarget = 'third';
-  expect(tourLinearTimeline(tour)).toBeNull();
-  slide.timing.autoplayTarget = null;
   tour.playback.loop = true;
-  expect(tourLinearTimeline(tour)).toBeNull();
+  expect(tourLinearTimeline(tour)?.duration).toBe(12000);
   tour.slides = [];
   expect(tourLinearTimeline(tour)).toBeNull();
-});
-
-it('keeps a branching tour local even when its autoplay default follows physical order', () => {
-  const { tour, slide } = fixture([
-    { kind: 'slide', slideId: 'second' },
-    { kind: 'slide', slideId: 'third' },
-  ]);
-  slide.timing.autoplayTarget = 'second';
-  expect(tourAutoplayDestination(tour, 0)).toBe(1);
-  expect(tourLinearTimeline(tour)).toBeNull();
-  slide.buttons = [{ id: 'url', label: '', action: { kind: 'url', url: 'https://example.com' } }];
-  expect(tourLinearTimeline(tour)).toBeNull();
-  slide.buttons = [
-    { id: 'next', label: '', action: { kind: 'next' } },
-    { id: 'none', label: '', action: { kind: 'none' } },
-  ];
-  expect(tourLinearTimeline(tour)).not.toBeNull();
 });
 
 it('counts destination entrance separately and removes it for reduced motion', () => {
@@ -113,17 +94,19 @@ it('counts destination entrance separately and removes it for reduced motion', (
   expect(tourEntranceTiming(tour, slide)).toMatchObject({ switchMs: 200, travelMs: 0, total: 200 });
   const image = tour.slides[1]!;
   if (image.kind !== 'image') throw new Error('Expected image');
-  image.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: '',
-      text: '',
-      action: { kind: 'none' },
-      appearance: null,
-      pulse: true,
-    },
+  image.actions = [
+    ...image.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: '',
+        text: '',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   expect(tourEntranceTiming(tour, image).total).toBe(500);
   expect(tourLinearTimeline(tour)?.duration).toBe(12900);
@@ -149,7 +132,7 @@ it('budgets all sequential entry narration while activation cues remain gesture-
       id: 'spoken',
       label: '',
       action: { kind: 'none' },
-      narration: { ...voice, trigger: 'enter' },
+      narration: { ...voice, trigger: 'enter' as const },
     },
   ];
   expect(tourSlideDuration(tour, slide)).toBe(10000);

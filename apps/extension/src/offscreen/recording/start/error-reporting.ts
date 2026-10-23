@@ -1,3 +1,15 @@
+import type { RecordingFrameClockBinding } from '../../../contracts/video/recording-frame-clock';
+
+/** Confirms successful local startup cleanup for one exact source binding. */
+export class RecordingStartCleanupConfirmedError extends Error {
+  readonly binding: RecordingFrameClockBinding;
+
+  constructor(cause: unknown, binding: RecordingFrameClockBinding) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.binding = { ...binding };
+  }
+}
+
 const reportedRecordingStartErrors = new WeakSet<object>();
 const REPORTED_RECORDING_START_ERROR = Symbol('reportedRecordingStartError');
 

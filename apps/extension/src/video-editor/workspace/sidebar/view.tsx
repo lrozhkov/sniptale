@@ -1,7 +1,10 @@
 import { getEffectInstanceLabel } from '../../../features/video/project/effect-instance/presentation';
 import React from 'react';
 import {
+  MessageSquare,
   Camera,
+  Frame,
+  Focus,
   Keyboard,
   Film,
   ImageIcon,
@@ -87,6 +90,17 @@ export function getSelectionMeta(
       const label = project ? getEffectInstanceLabel(project, selection.effectInstanceId) : 'FX';
       return { icon: renderSidebarIcon(SlidersHorizontal), label, title: label };
     }
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER: {
+      const document = project?.sourceVoiceoverDocuments?.find(
+        (item) => item.id === selection.documentId
+      );
+      const label = translate('gallery.videoReview.audioVoiceover');
+      const title =
+        project?.assets.find((item) => item.id === document?.take.assetId)?.name ?? label;
+      return { icon: renderSidebarIcon(Volume2), label, title };
+    }
+    case VideoEditorSelectionKind.COMMENT:
+      return createStaticSelectionMeta(MessageSquare, 'videoEditor.sidebar.commentNote');
     case VideoEditorSelectionKind.SCENE:
       return createStaticSelectionMeta(SlidersHorizontal, 'videoEditor.sidebar.sceneProperties');
     case VideoEditorSelectionKind.CLIP_GROUP:
@@ -127,10 +141,21 @@ export function getSelectionMeta(
     case VideoEditorSelectionKind.HISTORY_LANE:
       return createStaticSelectionMeta(Sparkles, 'videoEditor.timeline.telemetryLane');
     case VideoEditorSelectionKind.MOTION_LANE:
-    case VideoEditorSelectionKind.MOTION_REGION:
       return createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
-    case VideoEditorSelectionKind.MOTION_CONNECTION:
-      return createStaticSelectionMeta(Search, 'videoEditor.timeline.framingConnection');
+    case VideoEditorSelectionKind.MOTION_REGION: {
+      const region = project?.motionRegions?.find((item) => item.id === selection.motionRegionId);
+      return region?.border
+        ? createStaticSelectionMeta(Frame, 'gallery.videoReview.focusBorder')
+        : region?.spotlight
+          ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusSpotlight')
+          : createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
+    }
+    case VideoEditorSelectionKind.MOTION_CONNECTION: {
+      const region = project?.motionRegions?.find((item) => item.id === selection.motionRegionId);
+      return region?.spotlight
+        ? createStaticSelectionMeta(Focus, 'videoEditor.sidebar.spotlightConnection')
+        : createStaticSelectionMeta(Search, 'videoEditor.timeline.framingConnection');
+    }
   }
 }
 

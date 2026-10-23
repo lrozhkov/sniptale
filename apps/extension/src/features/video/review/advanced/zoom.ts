@@ -1,12 +1,18 @@
-import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
+import {
+  type QuickEditBorder,
+  type QuickEditSpotlight,
+} from '../../project/scene/focus-appearance';
+import { fitCameraTransitionDurations } from '../../project/motion/transitions';
+import {
+  parseCameraPerspective as parseQuickEditPerspective,
+  parseCameraDepth as parseQuickEditDepth,
+} from '../../project/motion/spatial';
 import {
   quickEditFocusType,
   quickEditFocusConflicts,
   resolveQuickEditFocusLink,
 } from './focus-layout';
 import type {
-  QuickEditSpotlight,
-  QuickEditBorder,
   QuickEditZoomLinkEasing,
   QuickEditZoomRegion,
   QuickEditZoomTransition,
@@ -30,18 +36,11 @@ export function fitQuickEditZoomTransitions(
   region: QuickEditZoomRegion,
   duration = (region.sourceAnchor ?? region).end - (region.sourceAnchor ?? region).start
 ): QuickEditZoomRegion {
-  const enter = region.enter.type === 'none' ? 0 : region.enter.duration;
-  const exit = region.exit.type === 'none' ? 0 : region.exit.duration;
-  const available = Math.max(0, duration);
-  const total = enter + exit;
-  const factor = total > available ? available / total : 1;
-  const fittedEnter = enter * factor;
-  const fittedExit =
-    total > available ? Math.min(exit * factor, Math.max(0, available - fittedEnter)) : exit;
+  const fitted = fitCameraTransitionDurations(region.enter, region.exit, duration);
   return {
     ...region,
-    enter: { ...region.enter, duration: fittedEnter },
-    exit: { ...region.exit, duration: fittedExit },
+    enter: { ...region.enter, duration: fitted.enter },
+    exit: { ...region.exit, duration: fitted.exit },
   };
 }
 
@@ -175,6 +174,12 @@ export function updateQuickEditZoomRegion(
   return updated.map((region) => {
     if (!region.linkTo) return region;
     const target = updated.find((item) => item.id === region.linkTo);
+    // An unrelated edit must not erase a reference whose target was already absent.
+    if (
+      !target &&
+      regions.some((previous) => previous.id === region.id && previous.linkTo === region.linkTo)
+    )
+      return region;
     if (
       target &&
       quickEditFocusType(region) !== 'border' &&

@@ -1,3 +1,7 @@
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { expect, it } from 'vitest';
 import { createGuideProject, createTourDocument, createTourImageSlide } from './factories';
@@ -34,7 +38,6 @@ it('applies a detached batch, supports forward links and preserves the reference
   const original = project();
   const before = structuredClone(original);
   const third = createTourImageSlide('third');
-  third.timing.autoplayTarget = 'fourth';
   const fourth = createTourImageSlide('fourth');
   const result = applyTourCommands(
     original,
@@ -54,7 +57,6 @@ it('applies a detached batch, supports forward links and preserves the reference
   expect(result.items).toEqual(original.items);
   expect(result.name).toBe(original.name);
   expect(original).toEqual(before);
-  expect(result.tour?.slides[2]?.timing.autoplayTarget).toBe('fourth');
 });
 
 it('rejects an entire batch with a missing destination or malformed geometry', () => {
@@ -73,31 +75,33 @@ it('rejects an entire batch with a missing destination or malformed geometry', (
     )
   ).toThrow('invalid');
   bad.camera.center.x = 0.5;
-  bad.timing.autoplayTarget = 'missing';
-  expect(() =>
-    applyTourCommands(original, [{ kind: 'insert-slide', slide: bad }], resources)
-  ).toThrow();
+  expect(
+    applyTourCommands(original, [{ kind: 'insert-slide', slide: bad }], resources).tour?.slides
+  ).toHaveLength(3);
   expect(original).toEqual(before);
 });
 
-it('requires explicit repair of incoming edges and clears them atomically', () => {
+it('requires explicit repair of contents references and clears them atomically', () => {
   const original = project();
-  const slide = original.tour!.slides[0]!;
-  if (slide.kind !== 'image') throw new Error('image expected');
-  slide.timing.autoplayTarget = 'second';
-  slide.hotspots = [
+  const target = original.tour!.slides[1]!;
+  if (target.kind !== 'image') throw new Error('Expected image.');
+  target.actions = [
     {
-      id: 'hotspot',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Next',
-      text: '',
-      action: { kind: 'slide', slideId: 'second' },
-      appearance: null,
-      pulse: true,
+      type: 'annotation',
+      object: { id: 'target-action', text: '', anchor: null, appearance: null },
     },
   ];
-  expect(getTourIncomingReferences(original.tour!, 'second')).toEqual(['first', 'hotspot']);
+  original.tour!.slides.push({
+    kind: 'navigation',
+    id: 'contents',
+    title: '',
+    description: '',
+    background: { color: '#111827', image: null },
+    narration: null,
+    timing: target.timing,
+    buttons: [{ id: 'jump', label: 'Jump', action: { kind: 'action', actionId: 'target-action' } }],
+  });
+  expect(getTourIncomingReferences(original.tour!, 'second')).toEqual(['jump']);
   expect(() =>
     applyTourCommands(
       original,
@@ -110,29 +114,35 @@ it('requires explicit repair of incoming edges and clears them atomically', () =
     [{ kind: 'remove-slide', slideId: 'second', incoming: 'clear' }],
     resources
   );
-  expect(result.tour?.slides).toHaveLength(1);
-  expect(result.tour?.slides[0]?.timing.autoplayTarget).toBeNull();
-  expect(result.tour?.slides[0]).toMatchObject({ hotspots: [{ action: { kind: 'none' } }] });
+  expect(result.tour?.slides).toHaveLength(2);
+  expect(result.tour?.slides[1]).toMatchObject({ buttons: [{ action: { kind: 'none' } }] });
 });
 
 it('duplicates authored object identities and self-navigation without cloning bytes', () => {
   const original = project();
   const slide = original.tour!.slides[0]!;
   if (slide.kind !== 'image') throw new Error('image expected');
-  slide.timing.autoplayTarget = 'first';
-  slide.hotspots = [
-    {
-      id: 'hotspot',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Again',
-      text: '',
-      action: { kind: 'slide', slideId: 'first' },
-      appearance: null,
-      pulse: true,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'hotspot',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Again',
+        text: '',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
-  slide.annotations = [{ id: 'annotation', text: 'Note', anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'annotation', text: 'Note', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   let id = 0;
   const result = applyTourCommands(
     original,
@@ -143,9 +153,11 @@ it('duplicates authored object identities and self-navigation without cloning by
   expect(result.tour?.slides[1]).toMatchObject({
     id: 'copy',
     image: { assetId: 'asset' },
-    timing: { autoplayTarget: 'copy' },
-    hotspots: [{ id: 'object-1', action: { slideId: 'copy' } }],
-    annotations: [{ id: 'object-2' }],
+    timing: {},
+    actions: [
+      { type: 'hotspot' as const, object: { id: 'object-1', visual: { kind: 'point' } } },
+      { type: 'annotation' as const, object: { id: 'object-2' } },
+    ],
   });
   expect(original.tour?.slides).toHaveLength(2);
 });
@@ -154,29 +166,41 @@ it('duplicates a mixed object order through remapped identities', () => {
   const original = project();
   const slide = original.tour!.slides[0]!;
   if (slide.kind !== 'image') throw new Error('image expected');
-  slide.hotspots = [
-    {
-      id: 'hotspot',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Again',
-      text: '',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: true,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'hotspot',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Again',
+        text: '',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
-  slide.annotations = [{ id: 'annotation', text: 'Note', anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'annotation', text: 'Note', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   slide.masks = [
     {
       id: 'mask',
       rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
-      kind: 'highlight',
+      kind: 'blur',
       color: '#f97316',
       opacity: 0.3,
     },
   ];
-  slide.objectOrder = ['mask', 'annotation', 'hotspot'];
+  slide.actions.sort(
+    (left, right) =>
+      ['mask', 'annotation', 'hotspot'].indexOf(left.object.id) -
+      ['mask', 'annotation', 'hotspot'].indexOf(right.object.id)
+  );
   let id = 0;
   const result = applyTourCommands(
     original,
@@ -186,9 +210,9 @@ it('duplicates a mixed object order through remapped identities', () => {
   );
   const copy = result.tour?.slides[1];
   if (copy?.kind !== 'image') throw new Error('image expected');
-  expect(copy.objectOrder).toEqual(['object-3', 'object-2', 'object-1']);
-  expect(copy.hotspots.map((entry) => entry.id)).toEqual(['object-1']);
-  expect(copy.annotations.map((entry) => entry.id)).toEqual(['object-2']);
+  expect(copy.actions.map((entry) => entry.object.id)).toEqual(['object-1', 'object-2']);
+  expect(getTourHotspots(copy).map((entry) => entry.id)).toEqual(['object-2']);
+  expect(getTourAnnotations(copy).map((entry) => entry.id)).toEqual(['object-1']);
   expect(copy.masks.map((entry) => entry.id)).toEqual(['object-3']);
 });
 
@@ -197,14 +221,26 @@ it('keeps provenance and duration capabilities immutable while allowing authored
   const slide = structuredClone(original.tour!.slides[0]!);
   if (slide.kind !== 'image' || !slide.image) throw new Error('image expected');
   slide.image.alt = 'Description';
-  slide.narration = {
-    assetId: 'audio',
-    duration: 5,
-    trimStart: 1,
-    trimEnd: 4,
-    gain: 1,
-    transcript: 'Speech',
-  };
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'audio',
+          duration: 5,
+          trimStart: 1,
+          trimEnd: 4,
+          gain: 1,
+          transcript: 'Speech',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   expect(
     applyTourCommands(original, [{ kind: 'replace-slide', slideId: 'first', slide }], resources)
       .tour?.slides[0]
@@ -214,7 +250,7 @@ it('keeps provenance and duration capabilities immutable while allowing authored
     applyTourCommands(original, [{ kind: 'replace-slide', slideId: 'first', slide }], resources)
   ).toThrow('catalog');
   slide.image.source = image.source;
-  slide.narration.duration = 6;
+  slide.actions[0]!.object.narration!.duration = 6;
   expect(() =>
     applyTourCommands(original, [{ kind: 'replace-slide', slideId: 'first', slide }], resources)
   ).toThrow('catalog');
@@ -270,7 +306,7 @@ it('keeps adjacent/self moves stable and removes an unreferenced slide', () => {
 
 it('duplicates navigation buttons, preserves external links, and repairs branch targets', () => {
   const original = project();
-  const timing = { ...original.tour!.slides[0]!.timing, autoplayTarget: 'nav' };
+  const timing = { ...original.tour!.slides[0]!.timing };
   const inserted = applyTourCommands(
     original,
     [
@@ -307,7 +343,6 @@ it('duplicates navigation buttons, preserves external links, and repairs branch 
     ],
   });
   const replacement = structuredClone(copied.tour!);
-  replacement.slides[0]!.timing.autoplayTarget = 'nav';
   const result = applyTourCommands(
     copied,
     [
@@ -316,7 +351,7 @@ it('duplicates navigation buttons, preserves external links, and repairs branch 
     ],
     resources
   );
-  expect(result.tour?.slides[0]?.timing.autoplayTarget).toBeNull();
+  expect(result.tour?.slides.some((slide) => slide.id === 'nav')).toBe(false);
 });
 
 it('rejects template ownership and foreign media, and accepts equivalent provenance key order', () => {
@@ -345,7 +380,13 @@ it('keeps a reusable material after unlink and clears every attachment on materi
   const original = project();
   const slide = original.tour!.slides[0]!;
   if (slide.kind !== 'image') throw Error('image');
-  slide.annotations = [{ id: 'hint', text: 'Read', anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'hint', text: 'Read', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   const narration = {
     assetId: 'audio',
     duration: 5,
@@ -357,10 +398,7 @@ it('keeps a reusable material after unlink and clears every attachment on materi
   original.tour!.audioResources = [{ assetId: 'audio', duration: 5, name: 'Take.wav' }];
   const attached = applyTourCommands(
     original,
-    [
-      { kind: 'set-narration', slideId: 'first', objectId: null, narration },
-      { kind: 'set-narration', slideId: 'first', objectId: 'hint', narration },
-    ],
+    [{ kind: 'set-narration', slideId: 'first', objectId: 'hint', narration }],
     resources
   );
   const unlinked = applyTourCommands(
@@ -369,7 +407,7 @@ it('keeps a reusable material after unlink and clears every attachment on materi
     resources
   );
   expect(unlinked.tour!.audioResources).toEqual(original.tour!.audioResources);
-  expect(unlinked.tour!.slides[0]!.narration).toEqual(narration);
+  expect(unlinked.tour!.slides[0]!.narration).toBeNull();
   const deleted = applyTourCommands(
     attached,
     [{ kind: 'remove-audio-resource', assetId: 'audio' }],
@@ -378,11 +416,16 @@ it('keeps a reusable material after unlink and clears every attachment on materi
   expect(deleted.tour!.audioResources).toEqual([]);
   expect(deleted.tour!.slides[0]).toMatchObject({
     narration: null,
-    annotations: [{ narration: null }],
+    actions: [{ type: 'annotation' as const, object: { narration: null } }],
   });
   expect(attached.tour!.slides[0]).toMatchObject({
-    narration,
-    annotations: [{ narration: { ...narration, trigger: 'activation' } }],
+    narration: null,
+    actions: [
+      {
+        type: 'annotation' as const,
+        object: { narration: { ...narration, trigger: 'enter' as const } },
+      },
+    ],
   });
   expect(() =>
     applyTourCommands(

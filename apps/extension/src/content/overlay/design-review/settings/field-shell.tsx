@@ -25,47 +25,33 @@ export function Field(props: {
     >
       <InspectorParameterRow
         label={props.label}
+        labelModified={props.modified}
+        labelAccessory={
+          props.modified && props.onReset ? (
+            <FieldResetButton label={props.label} onReset={props.onReset} />
+          ) : undefined
+        }
         valueMinimum={160}
         {...(props.stacked === undefined ? {} : { stacked: props.stacked })}
       >
         <div className="flex min-w-0 items-center gap-1">
           <div className="min-w-0 flex-1">{props.children}</div>
-          {props.modified && props.onReset ? (
-            <FieldResetButton
-              disabled={false}
-              label={props.label}
-              modified
-              onReset={props.onReset}
-            />
-          ) : null}
         </div>
       </InspectorParameterRow>
     </div>
   );
 }
 
-function FieldResetButton(props: {
-  disabled: boolean;
-  label: string;
-  modified: boolean;
-  onReset: () => void;
-}) {
-  if (!props.modified) {
-    return <span className="h-8 w-8 shrink-0" aria-hidden="true" />;
-  }
-
+export function FieldResetButton(props: { label: string; onReset: () => void }) {
   return (
     <ContentToolbarButton
       tone="utility"
       type="button"
-      disabled={props.disabled}
       aria-label={`${props.label}: ${translate('content.designReview.resetProperty')}`}
       title={translate('content.designReview.resetProperty')}
       className={[
-        'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]',
-        'text-[var(--sniptale-color-text-secondary)] opacity-0 transition-opacity',
-        'hover:text-[var(--sniptale-color-text-primary)] group-hover/section-row:opacity-100 focus:opacity-100',
-        'disabled:opacity-30',
+        'inline-flex !h-6 !w-6 !p-0 shrink-0 items-center justify-center rounded-[4px] [&_svg]:!size-3',
+        'text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
       onClick={(event) => {
         event.preventDefault();

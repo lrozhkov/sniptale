@@ -14,7 +14,10 @@ import type { CalloutSaveSectionProps } from '../../../ui/highlighter-preset-edi
 import type { FloatingPopoverDrag } from '../popover/drag';
 import { SettingsPopoverHeader, type SettingsPopoverContext } from '../popover/header';
 import { selectOrClosePopoverPreset } from '../popover/preset-selection';
-import { createTemplateSourceAction, type TemplateSourceControl } from '../popover/template-source';
+import {
+  createTemplateSourceHeaderControl,
+  type TemplateSourceControl,
+} from '../popover/template-source';
 import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
 import {
   ApplyToFutureFramesGuard,
@@ -86,7 +89,7 @@ export function CalloutSettingsPopoverContent(props: {
         }}
         {...(props.templateSourceControl
           ? {
-              sourceAction: createTemplateSourceAction(props.templateSourceControl, {
+              sourceControl: createTemplateSourceHeaderControl(props.templateSourceControl, {
                 forcedDescription: translate('content.callout.templateSourceForcedHint'),
                 forcedLabel: translate('content.callout.templateSourceForced'),
                 frameDescription: translate('content.callout.templateSourceFrameHint'),

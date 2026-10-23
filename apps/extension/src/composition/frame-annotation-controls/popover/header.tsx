@@ -1,8 +1,9 @@
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { X } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ArrowLeft, Trash2, X } from 'lucide-react';
 
 import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
 import type { FloatingPopoverDrag } from './drag';
+import type { TemplateSourceHeaderControl } from './template-source';
 
 export type SettingsPopoverContext = 'element' | 'toolbar';
 
@@ -11,12 +12,13 @@ export function SettingsPopoverHeader(props: {
   closeLabel: string;
   context: SettingsPopoverContext;
   destructiveAction?: { label: string; onClick: () => void };
-  sourceAction?: { description: string; label: string; onClick: () => void };
+  sourceControl?: TemplateSourceHeaderControl;
   drag?: FloatingPopoverDrag;
   onClose: () => void;
   title: string;
 }) {
   const draggable = props.context === 'element' && props.drag !== undefined;
+  const sourceControl = props.sourceControl;
   return (
     <div
       className="sniptale-settings-popover-header"
@@ -30,62 +32,79 @@ export function SettingsPopoverHeader(props: {
           }
         : {})}
     >
-      <ProductToolbarMenuGroupLabel>
-        <span>{props.title}</span>
-      </ProductToolbarMenuGroupLabel>
+      <div className="sniptale-settings-popover-heading">
+        {props.action ? (
+          <ContentToolbarButton
+            tone="utility"
+            size="compact"
+            className="sniptale-settings-popover-icon-action sniptale-settings-popover-mode-action"
+            data-settings-action="back-to-templates"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={props.action.onClick}
+            title={props.action.label}
+          >
+            <ArrowLeft aria-hidden="true" size={16} />
+          </ContentToolbarButton>
+        ) : null}
+        <ProductToolbarMenuGroupLabel>
+          <span>{props.title}</span>
+        </ProductToolbarMenuGroupLabel>
+      </div>
       <div
         className="sniptale-settings-popover-header-actions"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        {props.sourceAction ? (
-          <ProductActionButton
-            compact
-            tone="secondary"
-            aria-label={props.sourceAction.description}
-            className="sniptale-settings-popover-mode-action"
-            onClick={props.sourceAction.onClick}
-            title={props.sourceAction.description}
-            type="button"
+        {sourceControl ? (
+          <div
+            role="group"
+            aria-label={props.title}
+            className="sniptale-settings-popover-source-switch"
+            data-ui="shared.annotation-template-source"
           >
-            {props.sourceAction.label}
-          </ProductActionButton>
+            {sourceControl.options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={sourceControl.value === option.value}
+                className="sniptale-settings-popover-source-option"
+                onClick={() => {
+                  if (sourceControl.value !== option.value) {
+                    sourceControl.onChange(option.value);
+                  }
+                }}
+                title={option.description}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         ) : null}
         {props.destructiveAction ? (
-          <ProductActionButton
-            compact
-            tone="secondary"
-            className="sniptale-settings-popover-destructive-action"
+          <ContentToolbarButton
+            tone="utility"
+            size="compact"
+            className="sniptale-settings-popover-icon-action sniptale-settings-popover-destructive-action"
+            data-settings-action="disable"
             onClick={props.destructiveAction.onClick}
             title={props.destructiveAction.label}
             type="button"
           >
-            {props.destructiveAction.label}
-          </ProductActionButton>
-        ) : null}
-        {props.action ? (
-          <ProductActionButton
-            compact
-            tone="secondary"
-            className="sniptale-settings-popover-mode-action"
-            onClick={props.action.onClick}
-            title={props.action.label}
-            type="button"
-          >
-            {props.action.label}
-          </ProductActionButton>
+            <Trash2 aria-hidden="true" size={16} />
+          </ContentToolbarButton>
         ) : null}
         {props.context === 'element' ? (
-          <ProductActionButton
-            compact
-            tone="secondary"
+          <ContentToolbarButton
+            tone="utility"
+            size="compact"
             aria-label={props.closeLabel}
-            className="sniptale-dismiss-button sniptale-settings-popover-close"
+            className="sniptale-dismiss-button sniptale-settings-popover-icon-action sniptale-settings-popover-close"
+            data-settings-action="close"
             onClick={props.onClose}
             title={props.closeLabel}
             type="button"
           >
-            <X aria-hidden="true" size={14} />
-          </ProductActionButton>
+            <X aria-hidden="true" size={16} />
+          </ContentToolbarButton>
         ) : null}
       </div>
     </div>

@@ -51,7 +51,8 @@ describe('annotation-summary', () => {
     expect(markup).toContain('videoEditor.templates.overlayDescriptionThreeDRevealCard');
     expect(markup).toContain('videoEditor.templates.catalogStatusOptional');
     expect(markup).toContain('videoEditor.sidebar.annotationSwapStyleLabel');
-    expect(markup).toContain('videoEditor.sidebar.annotationRecommendedDefaultsLabel');
+    expect(markup).not.toContain('videoEditor.sidebar.annotationResetStyleAction');
+    expect(markup).toContain('data-variant="information"');
     expect(markup).toContain('hover:bg-[color:color-mix');
     expect(markup).toContain('rounded-[12px]');
   });

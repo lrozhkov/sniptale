@@ -1,3 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { parseEffectRuntimeSnapshotDocument } from '../effect-runtime/runtime/snapshot-document';
+import { createEffectHostClip } from '../../project/factories/overlay-clip';
+import { createProject, createVideoClip } from '../../project/timeline/project-meta.test.helpers';
+import { createVideoProjectMotionRegion } from '../../project/motion';
+import {
+  bindMotionRegionToClip,
+  projectMotionSourceBinding,
+} from '../../project/motion/source-binding';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject, createVideoProjectTrack } from '../../project/factories/creation';
 import { createSubtitleClip } from '../../project/factories/overlay-clip';
@@ -197,4 +206,307 @@ it('keeps low blur strengths effective and increases exposure throughout the who
   };
   expect(exposure(0.1)).toBeGreaterThan(0);
   expect(exposure(0.9)).toBeGreaterThan(exposure(0.6));
+});
+
+function boundaryMotion(id: string, startTime: number, duration: number, scale: number) {
+  return {
+    id,
+    startTime,
+    duration,
+    scale,
+    focusMode: VideoMotionFocusMode.MANUAL,
+    focusPoint: { x: 900, y: 300 },
+    targetAction: null,
+    easing: VideoTemporalEasing.LINEAR,
+    zoomInDuration: 0,
+    zoomOutDuration: 0,
+    motionBlurAmount: 1,
+  };
+}
+
+it.each([
+  [1.999, 'first'],
+  [2.001, 'second'],
+] as const)('keeps exposure on the represented side of an unconnected cut at %s', (time, id) => {
+  const project = createEmptyVideoProject('Hard cut', 1280, 720);
+  project.duration = 6;
+  project.motionRegions = [boundaryMotion('first', 1, 1, 3), boundaryMotion('second', 2, 1, 1.5)];
+  const result = resolveVideoCompositionRenderPasses(project, time);
+  expect(result.visualPasses.every((pass) => pass.frame.camera.regionId === id)).toBe(true);
+  expect(result.visualPasses).toHaveLength(1);
+});
+
+it('keeps exposure out of an ended overlapping camera', () => {
+  const project = createEmptyVideoProject('Overlap', 1280, 720);
+  project.duration = 6;
+  project.motionRegions = [boundaryMotion('first', 1, 4, 3), boundaryMotion('second', 2, 1, 1.5)];
+  const result = resolveVideoCompositionRenderPasses(project, 3.001);
+  expect(result.visualPasses.every((pass) => pass.frame.camera.regionId === 'first')).toBe(true);
+  expect(result.visualPasses).toHaveLength(1);
+});
+
+it.each([1, 1.001, 2.499, 2.5, 2.501])(
+  'keeps legacy instant exposure on its pose at %s',
+  (time) => {
+    const project = createEmptyVideoProject('Instant legacy', 1280, 720);
+    project.duration = 6;
+    project.motionRegions = [
+      {
+        ...boundaryMotion('instant', 1, 2, 3),
+        easing: VideoTemporalEasing.INSTANT,
+        zoomInDuration: 0.5,
+        zoomOutDuration: 0.5,
+      },
+    ];
+    const result = resolveVideoCompositionRenderPasses(project, time);
+    expect(
+      result.visualPasses.every(
+        (pass) => pass.frame.camera.scale === (time === 1 || time > 2.5 ? 1 : 3)
+      )
+    ).toBe(true);
+    expect(result.visualPasses).toHaveLength(1);
+  }
+);
+
+it('keeps legacy exposure before an instantaneous connection sharp', () => {
+  const project = createEmptyVideoProject('Instant legacy link', 1280, 720);
+  project.duration = 8;
+  project.motionRegions = [
+    boundaryMotion('first', 1, 2, 3),
+    {
+      ...boundaryMotion('second', 5, 2, 2),
+      incomingConnection: { fromRegionId: 'first', easing: VideoTemporalEasing.INSTANT },
+    },
+  ];
+  const result = resolveVideoCompositionRenderPasses(project, 2.999);
+  expect(result.visualPasses.every((pass) => pass.frame.camera.scale === 3)).toBe(true);
+  expect(result.visualPasses).toHaveLength(1);
+});
+
+it.each(
+  [
+    { start: 0, offset: 0, duration: 5 / 3, time: 1.57 },
+    { start: 0, offset: 1.57, duration: 5 / 3 - 1.57, time: 0.001 },
+    { start: 2, offset: 1.57, duration: 5 / 3 - 1.57, time: 2 + 5 / 3 - 1.57 - 0.001 },
+  ].flatMap((entry) =>
+    (['viewport', 'source'] as const).map((attachment) => ({ ...entry, attachment }))
+  )
+)(
+  'retains original camera and $attachment content exposure at $start with offset $offset',
+  ({ start, offset, duration, time, attachment }) => {
+    const clip = createVideoClip({
+      id: 'held-source',
+      startTime: 0,
+      duration: 1.5,
+      sourceStart: 0,
+      sourceDuration: 0.15,
+      playbackRate: 0.1,
+      fadeOutMs: 1000,
+    });
+    const project = createProject([clip]);
+    project.motionRegions = [
+      bindMotionRegionToClip(
+        {
+          ...createVideoProjectMotionRegion(project, 0),
+          duration: 1.5,
+          scale: 2,
+          zoomInDuration: 0,
+          zoomOutDuration: 0.5,
+          motionBlurAmount: 1,
+          easing: 'LINEAR',
+        },
+        clip
+      ),
+    ];
+    const source = readFileSync(
+      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+      'utf8'
+    );
+    const document = parseEffectRuntimeSnapshotDocument({ source });
+    const snapshot = {
+      id: `effect:${'7'.repeat(64)}`,
+      documentId: document.id,
+      source,
+      sha256: '7'.repeat(64),
+      kind: 'standalone' as const,
+      schemaVersion: 'sniptale.effect.v1' as const,
+      assets: [],
+      retainedByteLength: new TextEncoder().encode(source).byteLength,
+    };
+    project.effectSnapshots = [snapshot];
+    project.effectInstances = [
+      {
+        id: 'exposure-effect',
+        kind: 'standalone',
+        target: { kind: 'scene' },
+        snapshotId: snapshot.id,
+        enabled: true,
+        startTime: 0,
+        duration: 1.5,
+        playbackRate: document.duration / 1.5,
+        sourceStart: 0,
+        controls: Object.fromEntries(
+          document.controls.map((control) => [control.id, control.defaultValue])
+        ),
+      },
+    ];
+    const track = createVideoProjectTrack('Exposure annotation', -1, VideoTrackKind.PRIMARY);
+    project.tracks.push(track);
+    const host = createEffectHostClip({
+      trackId: track.id,
+      startTime: 0,
+      duration: 1.5,
+      effectInstanceId: 'exposure-effect',
+      name: 'Exposure annotation',
+      projectWidth: project.width,
+      projectHeight: project.height,
+    });
+    host.sourceRange = {
+      assetId: clip.assetId,
+      sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+      start: 0,
+      end: 0.15,
+    };
+    host.attachment =
+      attachment === 'viewport'
+        ? { kind: 'viewport' }
+        : {
+            kind: 'source',
+            assetId: clip.assetId,
+            sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+          };
+    project.clips.push(host);
+    const expected = resolveVideoCompositionRenderPasses(project, 1.3);
+    expect(expected.visualPasses).toHaveLength(5);
+    const candidate = {
+      ...project,
+      version: 43 as const,
+      clips: [
+        {
+          ...clip,
+          startTime: start,
+          duration,
+          playbackWindow: {
+            offset,
+            extent: 5 / 3,
+            holdAt: 1.3,
+            fadePhase: { offset, duration: 1.5 },
+          },
+        },
+        {
+          ...host,
+          startTime: start,
+          duration,
+          playbackWindow: { offset, extent: 5 / 3, holdAt: 1.3 },
+        },
+      ],
+      effectInstances: project.effectInstances.map((instance) => ({
+        ...instance,
+        startTime: start,
+      })),
+    };
+    candidate.motionRegions = candidate.motionRegions!.map((region) =>
+      projectMotionSourceBinding(candidate, region)
+    );
+    const before = structuredClone(candidate);
+    const held = resolveVideoCompositionRenderPasses(candidate, time);
+    expect(held.visualPasses).toHaveLength(expected.visualPasses.length);
+    held.visualPasses.forEach((pass, index) => {
+      expect(pass.alpha).toBe(expected.visualPasses[index]!.alpha);
+      expect(pass.frame.camera.scale).toBeCloseTo(
+        expected.visualPasses[index]!.frame.camera.scale,
+        12
+      );
+      const body = pass.frame.visualLayers.find((layer) => layer.clipId === clip.id);
+      const expectedBody = expected.visualPasses[index]!.frame.visualLayers.find(
+        (layer) => layer.clipId === clip.id
+      )!;
+      expect(body?.opacity).toBeCloseTo(expectedBody.opacity, 12);
+      const effect = pass.frame.effectRuntimePlans!.find(
+        (plan) => plan.effectInstanceId === 'exposure-effect'
+      )!;
+      const expectedEffect = expected.visualPasses[index]!.frame.effectRuntimePlans!.find(
+        (plan) => plan.effectInstanceId === 'exposure-effect'
+      )!;
+      expect(effect.time).toBeCloseTo(expectedEffect.time, 12);
+    });
+    expect(candidate).toEqual(before);
+  }
+);
+
+it('keeps an independent Native camera and its exposure on project time over retained source content', () => {
+  const clip = createVideoClip({
+    id: 'retained',
+    startTime: 0,
+    duration: 5 / 3,
+    sourceStart: 0,
+    sourceDuration: 0.15,
+    playbackRate: 0.1,
+    fadeOutMs: 1000,
+    playbackWindow: {
+      offset: 0,
+      extent: 5 / 3,
+      holdAt: 1.3,
+      fadePhase: { offset: 0, duration: 1.5 },
+    },
+  });
+  const project = createProject([clip]);
+  project.version = 43;
+  const source = bindMotionRegionToClip({ ...boundaryMotion('source-camera', 0, 1.5, 2) }, clip);
+  const independent = { ...boundaryMotion('native-camera', 1.5, 0.15, 3), zoomInDuration: 0.1 };
+  project.motionRegions = [source, independent];
+  const reference = { ...project, motionRegions: [independent] };
+  const expected = resolveVideoCompositionRenderPasses(reference, 1.57);
+  const actual = resolveVideoCompositionRenderPasses(project, 1.57);
+  expect(actual.visualPasses).toHaveLength(expected.visualPasses.length);
+  actual.visualPasses.forEach((pass, index) => {
+    expect(pass.frame.camera.regionId).toBe(independent.id);
+    expect(pass.frame.camera.scale).toBeCloseTo(
+      expected.visualPasses[index]!.frame.camera.scale,
+      12
+    );
+    expect(pass.frame.visualLayers.find((layer) => layer.clipId === clip.id)?.opacity).toBeCloseTo(
+      0.2,
+      12
+    );
+  });
+});
+
+it.each([0.7, 1.35])('keeps a mixed Native camera link on project time at %s', (time) => {
+  const clip = createVideoClip({
+    id: 'retained-source',
+    sourceInstanceId: 'mixed-camera',
+    startTime: 0,
+    duration: 5 / 3,
+    sourceStart: 0,
+    sourceDuration: 0.15,
+    playbackRate: 0.1,
+    playbackWindow: { offset: 0, extent: 5 / 3, holdAt: 1.3 },
+  });
+  const project = createProject([clip]);
+  project.version = 43;
+  const source = bindMotionRegionToClip(
+    { ...boundaryMotion('source-camera', 0, 0.8, 2), zoomOutDuration: 0.2 },
+    clip
+  );
+  const independent = {
+    ...boundaryMotion('native-camera', 1.4, 0.1, 1.5),
+    incomingConnection: { fromRegionId: source.id, easing: 'LINEAR' as const },
+  };
+  project.motionRegions = [source, independent];
+  const { playbackWindow: _window, ...plain } = clip;
+  const reference = { ...project, clips: [{ ...plain, duration: 1.5 }] };
+  const expected = resolveVideoCompositionRenderPasses(reference, time);
+  const actual = resolveVideoCompositionRenderPasses(project, time);
+  expect(actual.visualPasses).toHaveLength(expected.visualPasses.length);
+  actual.visualPasses.forEach((pass, index) => {
+    expect(pass.frame.camera.scale).toBeCloseTo(
+      expected.visualPasses[index]!.frame.camera.scale,
+      12
+    );
+    expect(pass.frame.camera.viewportX).toBeCloseTo(
+      expected.visualPasses[index]!.frame.camera.viewportX,
+      9
+    );
+  });
 });

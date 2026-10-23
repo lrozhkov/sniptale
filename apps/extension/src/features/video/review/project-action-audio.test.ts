@@ -1,11 +1,15 @@
+import { materializeVideoProjectCursorSourceObservations } from '../project/cursor-source-observations';
+import { normalizeVideoProjectCursorSkin } from '../project/cursor';
 import { getVideoProjectActionPresentation } from '../project/action-presentation';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../project/factories/creation';
 import { encodeRecordingKeyboardRhythm } from '../project/keyboard-rhythm';
 import {
   buildProjectActionAudioPlan,
+  buildProjectActionAudioAuditionPlan,
   projectActionFeedbackMarkers,
   evaluateProjectGestureFeedback,
+  getProjectGestureFeedbackDefaults,
 } from './project-action-audio';
 import { iterateReviewActionAudioCues } from './action-audio';
 import { patchReviewClicks } from './advanced/click-animation';
@@ -461,4 +465,140 @@ it('honours per-event Off for saved authored gesture styles and restores them on
   expect(evaluateProjectGestureFeedback(on, 2)).toEqual(evaluateProjectGestureFeedback(project, 2));
   expect(resolveVideoCompositionActions(on, 2)).toHaveLength(1);
   expect(on.actionFeedback![0]!.gestureStyles).toEqual(styles);
+});
+
+it('auditions only the selected instance and typed identity through cut and Speed without authoring', () => {
+  const project = fixture();
+  const base = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const group = project.actionFeedback![0]!;
+  const copy = { ...structuredClone(group), sourceInstanceId: 'copy' };
+  project.actionFeedback!.push(copy);
+  project.actionEvents.push(
+    ...project.actionEvents.flatMap((event) =>
+      event.anchor.kind === 'recording-source'
+        ? [
+            {
+              ...event,
+              id: `${event.id}:copy`,
+              anchor: { ...event.anchor, sourceInstanceId: 'copy' },
+            },
+          ]
+        : []
+    )
+  );
+  project.clips.push({
+    ...base,
+    id: 'copy-clip',
+    sourceInstanceId: 'copy',
+    sourceStart: 2,
+    sourceDuration: 4,
+    startTime: 10,
+    duration: 2,
+    playbackRate: 2,
+  });
+  project.duration = 12;
+  project.actionPresentation = { ...getVideoProjectActionPresentation(project), enabled: false };
+  const before = structuredClone(project);
+  const target = { ref: { kind: 'action' as const, id: 'drag' }, family: 'mouse' as const };
+  const style = { ...group.settings[1]!, offset: 0.2 };
+  const audition = cues(buildProjectActionAudioAuditionPlan(project, copy, target, style));
+  expect(audition).toHaveLength(1);
+  expect(audition[0]!.start).toBeCloseTo(11.7, 12);
+  expect(audition[0]!.rate).toBe(1);
+  expect(audition[0]!.volume).toBeCloseTo(style.volume, 12);
+  expect(
+    buildProjectActionAudioAuditionPlan(
+      project,
+      { ...copy, sourceInstanceId: 'removed' },
+      target,
+      style
+    ).descriptors
+  ).toEqual([]);
+  const protectedProject = structuredClone(project);
+  protectedProject.actionFeedback![1]!.signals[0]!.data['privacy'] = 'protected';
+  expect(
+    buildProjectActionAudioAuditionPlan(
+      protectedProject,
+      copy,
+      { ref: { kind: 'signal', id: 'rhythm' }, family: 'typing' },
+      group.settings[0]!
+    ).descriptors
+  ).toEqual([]);
+  expect(project).toEqual(before);
+});
+
+it('shares inherited gesture appearance without changing project defaults or captured facts', () => {
+  const project = fixture();
+  project.actionPresentation = {
+    ...getVideoProjectActionPresentation(project),
+    clickStyle: { color: '#cc2200ff', size: 90, strokeWidth: 5, opacity: 0.8 },
+  };
+  const before = structuredClone(project);
+  expect(getProjectGestureFeedbackDefaults(project)).toMatchObject({
+    effect: 'press',
+    color: '#cc2200ff',
+    radius: 90,
+    stroke: 5,
+    opacity: 0.8,
+  });
+  expect(project).toEqual(before);
+  const disabled = {
+    ...project,
+    actionPresentation: { ...project.actionPresentation, enabled: false },
+  };
+  expect(getProjectGestureFeedbackDefaults(disabled)).toMatchObject({
+    effect: 'off',
+    color: '#cc2200ff',
+    radius: 90,
+    stroke: 5,
+    opacity: 0.8,
+  });
+});
+
+it('retains the full captured gesture path when only a held source frame remains visible', () => {
+  const project = fixture();
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  if (!clip.sourceInstanceId) throw new Error('Missing captured source instance');
+  project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'rec',
+        sourceInstanceId: clip.sourceInstanceId,
+        samples: [1, 3, 5].map((time, index) => ({
+          id: `captured:${time}`,
+          time,
+          x: (0.1 + index * 0.2) * 1280,
+          y: 144,
+          visible: true,
+          captureSegment: 0,
+          recordingPoint: { x: 0.1 + index * 0.2, y: 0.2 },
+        })),
+      },
+    ],
+  };
+  project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+  project.actionFeedback![0]!.gestureStyles = patchReviewClicks([], ['drag'], {
+    effect: 'press',
+    gestureAppearance: 'path',
+  });
+  const expected = evaluateProjectGestureFeedback(project, 4).map((item) => item.frame);
+  expect(expected).toHaveLength(1);
+  expect(expected[0]!.path!.length).toBeGreaterThan(1);
+  const candidate = {
+    ...project,
+    version: 43 as const,
+    duration: 11,
+    clips: [
+      { ...clip, startTime: 10, duration: 1, playbackWindow: { offset: 6, extent: 7, holdAt: 4 } },
+    ],
+  };
+  candidate.cursorTrack = materializeVideoProjectCursorSourceObservations(candidate);
+  const before = structuredClone(candidate);
+  expect(evaluateProjectGestureFeedback(candidate, 10.5).map((item) => item.frame)).toEqual(
+    expected
+  );
+  expect(candidate).toEqual(before);
 });

@@ -20,6 +20,9 @@ describe('workspace/sidebar-props', () => {
     expect(props.onToggleTrackLock).toBe(controller.projectActions.onToggleTrackLock);
     expect(props.onToggleTrackVisibility).toBe(controller.projectActions.onToggleTrackVisibility);
     expect(props.gridSettings).toBe(controller.state.gridSettings);
+    expect(props.onPreviewMotion).toBe(controller.projectActions.onPreviewMotion);
+    props.onPreviewMotion?.(null);
+    expect(controller.projectActions.onPreviewMotion).toHaveBeenCalledExactlyOnceWith(null);
     expect(props.onApplyMediaClipVisualsToTrack).toBe(
       controller.clipActions.onApplyMediaClipVisualsToTrack
     );
@@ -45,6 +48,9 @@ describe('workspace/sidebar-props', () => {
     expect(props.onUpdateMediaClipShadowMode).toBe(
       controller.clipActions.onUpdateMediaClipShadowMode
     );
+    expect(props.onUpdateMediaClipShadowColor).toBe(
+      controller.clipActions.onUpdateMediaClipShadowColor
+    );
     expect(props.onUpdateEffectInstance).toBe(controller.projectActions.onUpdateEffectInstance);
     props.onUpdateSubtitleTrackStyle?.('track-1', { color: '#fff' });
 
@@ -67,4 +73,22 @@ it('forwards camera layout actions and preserves false split eligibility', () =>
   props.onApplyCameraLayout?.('camera', 'OVERLAY', 'TOP_RIGHT');
   expect(onApplyCameraLayout).toHaveBeenCalledWith('camera', 'OVERLAY', 'TOP_RIGHT');
   expect(props.onEditCameraPosition).toBe(onEditCameraPosition);
+});
+
+it('preserves the Native watermark runtime binding through the workspace projection', () => {
+  const controller = createFloatingWorkspaceController().sidebar;
+  const watermark = {
+    onPreview: vi.fn(),
+    registerAbort: vi.fn(() => () => undefined),
+    imagePreviewUrl: 'blob:logo',
+  };
+  controller.state.watermark = watermark;
+  expect(getWorkspaceSidebarProps(controller).watermark).toBe(watermark);
+});
+
+it('preserves the Native scene edges binding through the complete workspace projection', () => {
+  const controller = createFloatingWorkspaceController().sidebar;
+  const sceneEdges = { onPreview: vi.fn() };
+  controller.state.sceneEdges = sceneEdges;
+  expect(getWorkspaceSidebarProps(controller).sceneEdges).toBe(sceneEdges);
 });

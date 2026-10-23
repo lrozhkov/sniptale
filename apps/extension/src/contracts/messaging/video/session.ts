@@ -35,6 +35,19 @@ import type {
 export type { RuntimeVideoSessionResponseByType } from './session-responses';
 
 export type RuntimeVideoSessionRequestByType = {
+  [VideoMessageType.COUNTDOWN_CAMERA_OFFER]: {
+    type: typeof VideoMessageType.COUNTDOWN_CAMERA_OFFER;
+    controlToken: string;
+    recordingId: string;
+    peerGeneration: number;
+    sdp: string;
+  };
+  [VideoMessageType.COUNTDOWN_CAMERA_CLOSE]: {
+    type: typeof VideoMessageType.COUNTDOWN_CAMERA_CLOSE;
+    controlToken: string;
+    recordingId: string;
+    peerGeneration: number;
+  };
   [VideoMessageType.RECORDING_OBSERVATIONS]: RecordingObservationsMessage;
   [VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE]: ReleaseVideoRecordingSurfaceMessage;
   [VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND]: VideoRecordingSurfaceCommandMessage;
@@ -45,7 +58,9 @@ export type RuntimeVideoSessionRequestByType = {
     capabilityToken: string;
     peerId: string;
     sdp: string;
-    settings: VideoRecordingSettings;
+    source:
+      | { kind: 'surface'; settings: VideoRecordingSettings }
+      | { kind: 'countdown'; recordingId: string; generation: number; streamInstanceId: string };
   };
   [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE]: {
     type: typeof VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE;

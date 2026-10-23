@@ -1,3 +1,15 @@
+import { getVideoClipPresentationTime } from '../../../project/timeline/rate';
+import { REVIEW_KEY_VIEWPORT_WIDTH } from '../../../project/action-feedback/key-animation';
+import {
+  getVideoProjectClickStyle,
+  getVideoProjectKeyStyle,
+} from '../../../project/action-feedback/projection';
+import { isCameraHiddenAt } from '../../../project/camera/visibility';
+import {
+  hasCameraMediaAt,
+  resolveCameraClip,
+  cameraSourceTime,
+} from '../../../project/camera/animation';
 import { evaluateProjectGestureFeedback } from '../../../review/project-action-audio';
 import type { VideoProjectActionOccurrence } from '../../../project/action-occurrences';
 import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
@@ -14,6 +26,7 @@ function clampProgress(value: number): number {
 }
 
 function resolveActionState(
+  project: VideoProject,
   presentation: ResolvedVideoProjectActionPresentation,
   currentTime: number
 ): VideoCompositionActionState | null {
@@ -26,6 +39,11 @@ function resolveActionState(
     (item) => currentTime >= item.start && currentTime < item.end
   );
   if (!interval) return null;
+  const clip = project.clips.find((item) => item.id === interval.clipId);
+  const phaseTime =
+    clip?.type === 'VIDEO' && clip.playbackWindow
+      ? getVideoClipPresentationTime(clip, currentTime)
+      : currentTime;
   return {
     occurrence: presentation.occurrence,
     clipId: interval.clipId,
@@ -37,7 +55,7 @@ function resolveActionState(
     preset: presentation.preset,
     renderKind: presentation.renderKind,
     point: presentation.point,
-    progress: clampProgress((currentTime - animationStart) / duration),
+    progress: clampProgress((phaseTime - animationStart) / duration),
     start,
   };
 }
@@ -47,8 +65,18 @@ export function resolveVideoCompositionActions(
   currentTime: number
 ): VideoCompositionActionState[] {
   const states: VideoCompositionActionState[] = [];
+  const keys = new Map<string, ResolvedVideoProjectActionPresentation>();
   for (const presentation of resolveVideoProjectActionPresentations(project)) {
-    const state = resolveActionState(presentation, currentTime);
+    if (getVideoProjectClickStyle(project, presentation.event) !== null) continue;
+    if (getVideoProjectKeyStyle(project, presentation.event) !== null) {
+      if (presentation.enabled && presentation.start <= currentTime) {
+        const previous = keys.get(presentation.keyStyle.position);
+        if (!previous || previous.start <= presentation.start)
+          keys.set(presentation.keyStyle.position, presentation);
+      }
+      continue;
+    }
+    const state = resolveActionState(project, presentation, currentTime);
     const anchor = state?.event.anchor;
     const authoredFeedback =
       anchor?.kind === 'recording-source' &&
@@ -69,6 +97,11 @@ export function resolveVideoCompositionActions(
     ) {
       states.push(state);
     }
+  }
+  for (const presentation of keys.values()) {
+    const state = resolveActionState(project, presentation, currentTime);
+    if (state)
+      states.push({ ...state, clipId: null, keyStyleViewportWidth: REVIEW_KEY_VIEWPORT_WIDTH });
   }
   for (const feedback of evaluateProjectGestureFeedback(project, currentTime)) {
     const clip = project.clips.find((clip) => clip.id === feedback.clipId);
@@ -116,6 +149,7 @@ export function resolveVideoCompositionActionSourceMapping(
   const clip = project.clips.find((item) => item.id === occurrence.clipId);
   if (
     clip?.type !== 'VIDEO' ||
+    !hasCameraMediaAt(project, clip, currentTime) ||
     clip.sourceInstanceId !== anchor.sourceInstanceId ||
     anchor.sourceTime < clip.sourceStart ||
     anchor.sourceTime >= clip.sourceStart + clip.sourceDuration
@@ -123,15 +157,27 @@ export function resolveVideoCompositionActionSourceMapping(
     return null;
   const asset = project.assets.find((item) => item.id === clip.assetId);
   if (!asset) return null;
+  const camera = project.tracks.some(
+    (track) => track.id === clip.trackId && track.role === 'CAMERA'
+  );
+  if (
+    camera &&
+    isCameraHiddenAt(clip.cameraHiddenRanges ?? [], cameraSourceTime(clip, currentTime))
+  )
+    return null;
+  const visual = camera ? resolveCameraClip(clip, currentTime) : clip;
   return {
-    frame: clip.transform,
-    fitMode: clip.fitMode,
-    ...(clip.windowHeader &&
-    !project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
-      ? { windowHeader: clip.windowHeader }
+    mirrored: camera && clip.cameraMirrored === true,
+    ...(camera && visual.cameraAppearance ? { cameraAppearance: visual.cameraAppearance } : {}),
+    frame: visual.transform,
+    fitMode: visual.fitMode,
+    ...(clip.windowHeader && !camera ? { windowHeader: clip.windowHeader } : {}),
+    ...(clip.sourceCrop ? { sourceCrop: clip.sourceCrop } : {}),
+    ...(!camera && clip.windowCornerRadius !== undefined
+      ? { windowCornerRadius: clip.windowCornerRadius }
       : {}),
     sourceWidth: asset.metadata.width,
     sourceHeight: asset.metadata.height,
-    renderState: resolveClipTransitionVisualState(project, clip, currentTime),
+    renderState: resolveClipTransitionVisualState(project, visual, currentTime),
   };
 }

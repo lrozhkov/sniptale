@@ -201,3 +201,31 @@ it('rejects dangling action instances without silently converting facts to manua
   expect(hydrated.cursorTrack?.samples[0]).not.toHaveProperty('sourceAnchor');
   expect(hydrated.cursorTrack?.samples[0]?.timeBasis).toBe('project');
 });
+
+it('retains a valid source anchor inside a held-only physical slice on repeated reopen', () => {
+  const clip = createVideoClip({
+    id: 'held-source',
+    startTime: 4,
+    duration: 0.2,
+    sourceStart: 2,
+    sourceDuration: 4,
+    playbackWindow: { offset: 3, holdAt: 2 },
+  });
+  const project = createProject([clip]);
+  project.version = 43;
+  project.cursorTrack = createVideoProjectCursorTrack();
+  const anchor = {
+    kind: 'recording-source' as const,
+    recordingId: 'rec-asset-video',
+    sourceClipId: clip.id,
+    sourceTime: 4,
+  };
+  project.cursorTrack.samples = [
+    { id: 'held-key', time: 4.1, x: 20, y: 20, visible: true, sourceAnchor: anchor },
+  ];
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(project)));
+  expect(reopened.cursorTrack?.samples[0]).toMatchObject({ time: 4.1, sourceAnchor: anchor });
+  expect(isExportReadyVideoProject(reopened)).toBe(true);
+  expect(hydrateVideoProject(reopened)).toEqual(reopened);
+});

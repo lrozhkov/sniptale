@@ -7,7 +7,7 @@ import {
 
 describe('playback-rate-slider', () => {
   it('maps playback rate extremes into the slider domain', () => {
-    expect(getPlaybackRateSliderProps(0.1)).toEqual({
+    expect(getPlaybackRateSliderProps(0.0625)).toEqual({
       min: 0,
       max: 100,
       step: 1,
@@ -22,18 +22,19 @@ describe('playback-rate-slider', () => {
   });
 
   it('round-trips representative playback rates through the slider mapping', () => {
-    const rates = [0.1, 0.25, 1, 2.25, 8, 16];
+    const rates = [0.0625, 0.1, 0.25, 1, 2.25, 8, 16];
 
     expect(
       rates.map((rate) => mapSliderValueToPlaybackRate(getPlaybackRateSliderProps(rate).value))
-    ).toEqual([0.1, 0.25, 1, 2.25, 8, 16]);
+    ).toEqual([0.0625, 0.1, 0.25, 1, 2.25, 8, 16]);
   });
 
   it('keeps the left edge bounded to a safe slow-motion rate', () => {
-    expect(mapSliderValueToPlaybackRate(0)).toBe(0.1);
+    expect(mapSliderValueToPlaybackRate(0)).toBe(0.0625);
   });
 
   it('formats sub-1x and standard playback labels canonically', () => {
+    expect(formatPlaybackRateLabel(0.0625)).toBe('0.0625x');
     expect(formatPlaybackRateLabel(0.1)).toBe('0.100x');
     expect(formatPlaybackRateLabel(0.25)).toBe('0.250x');
     expect(formatPlaybackRateLabel(8)).toBe('8.00x');

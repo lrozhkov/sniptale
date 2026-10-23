@@ -20,6 +20,7 @@ export type StoredAISecretUnlockRequest = {
 const AI_SECRET_UNLOCK_PURPOSES: ReadonlySet<LlmSessionPurpose> = new Set([
   'content-ai-pick',
   'scenario-editor',
+  'review-text',
 ]);
 const AI_SECRET_UNLOCK_STATUSES: ReadonlySet<StoredAISecretUnlockRequestStatus> = new Set([
   'pending',

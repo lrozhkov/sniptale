@@ -15,22 +15,22 @@ export function countContextMenuSections(nodes: ContextMenuTreeNode[]): number {
   );
 }
 
-export function hasDisabledContextMenuSection(nodes: ContextMenuTreeNode[]): boolean {
-  return nodes.some(
-    (node) =>
-      node.type === 'section' && (!node.enabled || hasDisabledContextMenuSection(node.children))
-  );
-}
-
-export function restoreContextMenuSections(tree: ContextMenuTree): ContextMenuTree {
-  if (!hasDisabledContextMenuSection(tree.nodes)) return tree;
-  const next = structuredClone(tree);
-  const pending = [...next.nodes];
-  while (pending.length) {
-    const node = pending.pop()!;
-    if (node.type !== 'section') continue;
-    node.enabled = true;
-    pending.push(...node.children);
+/** Restores section commands without relocating commands active elsewhere in a custom menu. */
+export function restoreContextMenuSectionCommands(
+  tree: ContextMenuTree,
+  sectionId: string,
+  commands: readonly string[]
+): ContextMenuTree {
+  if (findContextMenuNode(tree, `section:${sectionId}`)?.type !== 'section') return tree;
+  let next = updateContextMenuNode(tree, `section:${sectionId}`, { enabled: true });
+  for (const command of commands) {
+    if (isContextMenuCommandActive(next, command)) continue;
+    const section = findContextMenuNode(next, `section:${sectionId}`);
+    if (section?.type !== 'section') return tree;
+    next = addContextMenuCommand(next, command, {
+      parentId: sectionId,
+      index: section.children.length,
+    });
   }
   return next;
 }
@@ -254,7 +254,7 @@ export function visibleContextMenuNodes(
     for (const node of nodes) {
       if (!node.enabled) continue;
       result.push({ key: contextMenuNodeKey(node), node, level, parentId });
-      if (node.type === 'section' && expanded.has(node.id))
+      if (node.type === 'section' && node.enabled && expanded.has(node.id))
         visit(node.children, node.id, level + 1);
     }
   };

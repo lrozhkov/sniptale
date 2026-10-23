@@ -361,7 +361,7 @@ describe('FrameSettingsPopover effect parameter composition', () => {
       if (effectMode === 'blur') {
         expect(
           popover
-            .querySelector('button[aria-haspopup="listbox"]')
+            .querySelector('[role="group"][aria-label="Тип размытия"]')
             ?.closest('.sniptale-content-popover-section')
         ).toBe(section);
       }
@@ -472,7 +472,7 @@ describe('FrameSettingsPopover preset selection', () => {
   });
 
   it.each(['blur', 'focus'] as const)(
-    'keeps the selected template visible for %s despite a legacy hidden-decoration value',
+    'restores the selected template when %s decoration is enabled again',
     (effectMode) => {
       const presetName = getBorderPresetDisplayName(DEFAULT_BORDER_PRESET);
       storageMocks.loadHighlighterSettings.mockReturnValue(
@@ -487,15 +487,18 @@ describe('FrameSettingsPopover preset selection', () => {
           : { focusSettings: { ...DEFAULT_FOCUS_SETTINGS, showBorder: false } }),
       });
 
-      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
-      const decorationSwitch = document.querySelector('.sniptale-glass-switch');
+      expect(document.querySelector('.sniptale-frame-style-section')).toBeNull();
+      const decorationSwitch = document.querySelector<HTMLElement>('.sniptale-glass-switch');
       expect(decorationSwitch).not.toBeNull();
       expect(decorationSwitch?.classList).not.toContain('sniptale-glass-switch--on');
+      if (!decorationSwitch) throw new Error('Expected decoration switch');
+      clickTrusted(decorationSwitch);
+      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
     }
   );
 
   it.each(['border', 'blur', 'focus'] as const)(
-    'closes when the already selected %s effect mode is clicked',
+    'keeps the %s effect choice in the toolbar instead of duplicating it in properties',
     (effectMode) => {
       const onClose = vi.fn();
       const onEffectModeChange = vi.fn();
@@ -514,10 +517,9 @@ describe('FrameSettingsPopover preset selection', () => {
       const activeMode = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
         (button) => button.title === label
       );
-      expect(activeMode).not.toBeNull();
-      act(() => activeMode?.click());
-
-      expect(onClose).toHaveBeenCalledOnce();
+      expect(activeMode).toBeUndefined();
+      expect(document.querySelector('.sniptale-frame-effect-mode-section')).toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
       expect(onEffectModeChange).not.toHaveBeenCalled();
     }
   );

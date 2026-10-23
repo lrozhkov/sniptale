@@ -1,7 +1,4 @@
-import {
-  CaptureMode,
-  normalizeVideoSourceCount,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
 import { issueCameraRecorderLaunchToken } from '../runtime/camera-recorder-control';
 import { activateVideoRecordingLease } from '../recording-control-lease';
@@ -25,13 +22,8 @@ export async function finalizeAcceptedRecordingStart(
   },
   streamInstanceId: string
 ): Promise<RecordingStartResult> {
-  const isMultiSource =
-    context.captureMode === CaptureMode.SCREEN &&
-    normalizeVideoSourceCount(context.settings.sourceCount) > 1;
-  if (!isMultiSource) {
-    const binding = { generation: context.generation, recordingId, streamInstanceId };
-    await beginPreparedRecording(binding);
-  }
+  const binding = { generation: context.generation, recordingId, streamInstanceId };
+  await beginPreparedRecording(binding);
   const activeLease = await activateVideoRecordingLease({
     generation: context.generation,
     recordingId,

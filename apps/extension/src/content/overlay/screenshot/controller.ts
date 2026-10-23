@@ -21,7 +21,9 @@ interface UseScreenshotControllerResult {
     contentIntentSource?: ContentPrivilegedActionIntentSource,
     startContext?: ScreenshotStartContext
   ) => Promise<void>;
-  invalidateScreenshotRuns: () => ScreenshotStartContext | undefined;
+  invalidateScreenshotRuns: (
+    startContext?: ScreenshotStartContext
+  ) => ScreenshotStartContext | undefined;
 }
 
 function createScreenshotRuntime(args: {
@@ -45,13 +47,26 @@ function createScreenshotRuntime(args: {
 }
 
 function invalidateScreenshotRuns(args: {
+  startContext?: ScreenshotStartContext | undefined;
   session: ScreenshotControllerSession;
   setCountdown: (value: number | null) => void;
   setIsCompletelyHidden: (hidden: boolean) => void;
 }): ScreenshotStartContext | undefined {
-  const startContext = args.session.runActive
-    ? { navigationLockBaseline: args.session.navigationLockBaseline }
+  const preparationBaseline = args.startContext
+    ? (args.session.preparationBaseline ?? args.startContext.preparationBaseline)
     : undefined;
+  const startContext =
+    args.session.runActive || preparationBaseline
+      ? {
+          ...(args.session.runActive
+            ? { navigationLockBaseline: args.session.navigationLockBaseline }
+            : {}),
+          ...(preparationBaseline
+            ? { preparationBaseline, runGeneration: args.session.runGeneration + 1 }
+            : {}),
+        }
+      : undefined;
+  args.session.preparationBaseline = preparationBaseline ?? null;
   resetInvalidatedCountdownState(args.session, args.setCountdown);
   args.session.runGeneration += 1;
   args.session.runActive = false;
@@ -104,8 +119,9 @@ export function useScreenshotController(
     countdown,
     handleCancelCountdown,
     handleTakeScreenshot,
-    invalidateScreenshotRuns: () =>
+    invalidateScreenshotRuns: (startContext) =>
       invalidateScreenshotRuns({
+        startContext,
         session,
         setCountdown,
         setIsCompletelyHidden: params.setIsCompletelyHidden,

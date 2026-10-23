@@ -3,7 +3,7 @@ import { Camera, Clock3, Move, Plus, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { ColorField, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
-import { ReviewNumberRow } from './number-row';
+import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import {
   ReviewButton,
   ReviewInterval,

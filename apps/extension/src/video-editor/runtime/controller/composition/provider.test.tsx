@@ -74,6 +74,13 @@ const mocks = vi.hoisted(() => {
     setProjectDialogOpen: action,
     autoProcessingModalOpen: false,
     setAutoProcessingModalOpen: action,
+    voiceRecording: {
+      obscured: false,
+      capturing: false,
+      setCapturing: vi.fn(),
+      register: vi.fn(() => () => undefined),
+      request: vi.fn(async () => true),
+    },
     audioRecordingDialogOpen: false,
     audioRecordingTarget: null as
       | import('../../../contracts/insertion').VideoEditorAudioRecordingTarget
@@ -84,7 +91,18 @@ const mocks = vi.hoisted(() => {
     closeLibraryPanel: action,
     confirm: { dialog: null, onCancel: action, onConfirm: action, request: action },
     grid: { magnetEnabled: false },
-    inspector: { mode: 'selection', openSelection: action },
+    inspector: {
+      mode: 'selection',
+      openSelection: action,
+      sceneEdgesPreview: null,
+      previewSceneEdges: vi.fn(),
+      watermarkPreview: null,
+      previewWatermark: () => undefined,
+      registerWatermarkAbort: () => () => undefined,
+      cancelWatermarkAcquisition: fn(),
+      motionPreview: null,
+      previewMotion: action,
+    },
     leftSidebarCollapsed: false,
     libraryPanelOpen: false,
     openAudioRecordingDialog: action,
@@ -106,7 +124,7 @@ const mocks = vi.hoisted(() => {
   };
   const runtime = {
     isPreparingPlayback: false,
-    applyLoadedProject: action,
+    applyLoadedProject: fn(),
     assetUrls: {},
     pausePlayback: action,
     registerPreviewRuntime: action,
@@ -125,6 +143,10 @@ const mocks = vi.hoisted(() => {
   };
   return {
     commands,
+    commandHook: fn(
+      (_ports: Parameters<typeof import('../../commands').useVideoEditorActionHandlers>[0]) =>
+        commands
+    ),
     effects: { updateEffectInstance: fn() },
     exportPort,
     history,
@@ -143,7 +165,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('../../commands', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../commands')>()),
-  useVideoEditorActionHandlers: () => mocks.commands,
+  useVideoEditorActionHandlers: mocks.commandHook,
 }));
 vi.mock('../../session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session')>()),
@@ -219,6 +241,9 @@ beforeEach(() => {
   mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState = { dialogOpen: false, error: null, isRunning: false };
   mocks.runtimeHook.mockClear();
+  mocks.commandHook.mockClear();
+  mocks.workspace.inspector.cancelWatermarkAcquisition.mockClear();
+  mocks.workspace.voiceRecording.request.mockReset().mockResolvedValue(true);
   mocks.exportPort.openExportDialog.mockClear();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -277,7 +302,7 @@ it('keeps stable children and unrelated contexts isolated across provider update
 
   mocks.exportPort.exportState = { ...mocks.exportPort.exportState, dialogOpen: true };
   act(renderProvider);
-  expect(blockingRender).toHaveBeenCalledTimes(2);
+  expect(blockingRender).toHaveBeenCalledTimes(1);
 });
 
 it('admits montage shortcuts only when the montage viewer is active and no overlay blocks input', () => {
@@ -290,7 +315,11 @@ it('admits montage shortcuts only when the montage viewer is active and no overl
   mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState.dialogOpen = true;
   act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+  mocks.exportPort.exportState.isRunning = true;
+  act(render);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.exportPort.exportState.isRunning = false;
   mocks.exportPort.exportState.dialogOpen = false;
   act(render);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
@@ -324,8 +353,8 @@ it('binds export only to the ready montage workspace outside blocking layers and
   act(() => render());
   mocks.exportPort.exportState.dialogOpen = true;
   act(() => render());
-  expect(exportKey().defaultPrevented).toBe(false);
-  expect(mocks.exportPort.openExportDialog).toHaveBeenCalledTimes(1);
+  expect(exportKey().defaultPrevented).toBe(true);
+  expect(mocks.exportPort.openExportDialog).toHaveBeenCalledTimes(2);
 });
 
 it('keeps inspector time on the live playback port across seeks', () => {
@@ -416,4 +445,38 @@ it('publishes cache preparation changes through the playback context', () => {
   mocks.runtime.isPreparingPlayback = false;
   act(render);
   expect(preparing).toBe(false);
+});
+
+it('keeps recording-owned video playback out of overlay pause while blocking global shortcuts', () => {
+  mocks.lifecycle.project = createEmptyVideoProject('Voice');
+  mocks.workspace.voiceRecording.capturing = true;
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  expect(vi.mocked(useVideoEditorOverlayPlayback).mock.lastCall?.[0].enabled).toBe(false);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.workspace.voiceRecording.capturing = false;
+});
+
+it('cancels a watermark gesture only after the existing leave admission succeeds', async () => {
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  const leave = mocks.commandHook.mock.lastCall![0].project.beforeLeave!;
+  mocks.workspace.voiceRecording.request.mockResolvedValueOnce(false);
+  await expect(leave()).resolves.toBe(false);
+  expect(mocks.workspace.inspector.cancelWatermarkAcquisition).not.toHaveBeenCalled();
+  await expect(leave()).resolves.toBe(true);
+  expect(mocks.workspace.inspector.cancelWatermarkAcquisition).toHaveBeenCalledTimes(1);
+});
+
+it('cancels an acquisition started during project loading before applying the loaded document', () => {
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  const order: string[] = [];
+  mocks.workspace.inspector.cancelWatermarkAcquisition.mockImplementationOnce(() => {
+    order.push('cancel');
+  });
+  mocks.runtime.applyLoadedProject.mockImplementationOnce(() => {
+    order.push('apply');
+  });
+  const project = createEmptyVideoProject('Reloaded');
+  mocks.commandHook.mock.lastCall![0].project.applyLoadedProject(project, null);
+  expect(order).toEqual(['cancel', 'apply']);
+  expect(mocks.runtime.applyLoadedProject).toHaveBeenLastCalledWith(project, null);
 });

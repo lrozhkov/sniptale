@@ -256,3 +256,17 @@ it('retains every version 32 row and OPFS byte when admitting recording recovery
   );
   expect(target.domainVersions).toEqual({ ...source.domainVersions, recordings: 3 });
 });
+
+it('retains every version 33 row and immutable byte across scenario framing admission', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 33
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 34
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, scenarioProjects: 8 });
+});

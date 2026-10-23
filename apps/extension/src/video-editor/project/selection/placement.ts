@@ -1,3 +1,4 @@
+import { isCameraMotionRegion } from '../../../features/video/project/motion/normalization';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import type { VideoProject } from '../../../features/video/project/types/index';
 import { VideoMotionFocusMode } from '../../../features/video/project/types/index';
@@ -89,6 +90,7 @@ export function resolvePlacementModeAfterProjectUpdate(
       return (project.motionRegions ?? []).some(
         (region) =>
           region.id === placementMode.motionRegionId &&
+          isCameraMotionRegion(region) &&
           region.focusMode === VideoMotionFocusMode.MANUAL
       )
         ? placementMode
@@ -97,6 +99,7 @@ export function resolvePlacementModeAfterProjectUpdate(
       return (project.motionRegions ?? []).some(
         (region) =>
           region.id === placementMode.motionRegionId &&
+          isCameraMotionRegion(region) &&
           region.focusMode === VideoMotionFocusMode.MANUAL_AREA
       )
         ? placementMode

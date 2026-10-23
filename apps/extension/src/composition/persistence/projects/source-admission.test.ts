@@ -178,7 +178,7 @@ it.each(['unrelated', 'related', 'future'] as const)(
       state === 'future'
         ? {
             ...project,
-            project: { ...project.project, version: 5 },
+            project: { ...project.project, version: 6 },
           }
         : project;
     const empty = { getAll: async () => [] };

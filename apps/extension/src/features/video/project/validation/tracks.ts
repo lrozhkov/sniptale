@@ -1,5 +1,6 @@
 import {
   isBoolean,
+  isBoundedNumber,
   isBoundedArray,
   isEnumValue,
   isFiniteNumber,
@@ -22,6 +23,8 @@ export function isVideoProjectTrack(value: unknown): boolean {
     isBoolean(value['visible']) &&
     isBoolean(value['locked']) &&
     isEnumValue(value['kind'], VideoTrackKind) &&
+    (value['audioVolume'] === undefined ||
+      (value['kind'] === VideoTrackKind.AUDIO && isBoundedNumber(value['audioVolume'], 0, 2))) &&
     (value['role'] === undefined ||
       (value['kind'] === VideoTrackKind.PRIMARY &&
         isEnumValue(value['role'], VideoProjectTrackRole))) &&

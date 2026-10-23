@@ -1,19 +1,20 @@
+import {
+  sceneSpotlightOpeningPath,
+  type SceneSpotlightFrame,
+} from '../../../../apps/extension/src/features/video/composition/scene-spotlight';
 // Frozen untiled oracle from a911179c22c7c39a69508091553edad20dbde65e render-spotlight.ts.
 // Only imports, export naming and explicit test cleanup differ from the original mask algorithm.
 import {
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../../../apps/extension/src/features/video/review/advanced/spatial-geometry';
+} from '../../../../apps/extension/src/features/video/composition/motion/spatial-geometry';
 import type { QuickEditRect } from '../../../../apps/extension/src/features/video/review/advanced/scene';
-import {
-  quickEditSpotlightOpeningPath,
-  type QuickEditSpotlightFrame,
-} from '../../../../apps/extension/src/features/video/review/advanced/focus';
-type ReviewSpotlightClip = { rect: QuickEditRect; radius: number };
+
+type SceneSpotlightClip = { rect: QuickEditRect; radius: number };
 /** Preserve legacy single-mask composition when its target is fully within the window. */
-function reviewSpotlightNeedsClip(
-  frame: QuickEditSpotlightFrame,
-  clip: ReviewSpotlightClip | undefined
+function sceneSpotlightNeedsClip(
+  frame: SceneSpotlightFrame,
+  clip: SceneSpotlightClip | undefined
 ): boolean {
   if (!clip) return false;
   const hole = frame.protectionOpening ?? frame.opening;
@@ -26,10 +27,10 @@ function reviewSpotlightNeedsClip(
 }
 
 /** Opening and window clips expand in parallel; final protection keeps the real window bounds. */
-function reviewSpotlightOpeningClip(
-  frame: QuickEditSpotlightFrame,
-  clip: ReviewSpotlightClip | undefined
-): ReviewSpotlightClip | undefined {
+function sceneSpotlightOpeningClip(
+  frame: SceneSpotlightFrame,
+  clip: SceneSpotlightClip | undefined
+): SceneSpotlightClip | undefined {
   if (!clip) return undefined;
   const target = frame.protectionOpening ?? frame.opening;
   const distance =
@@ -59,17 +60,17 @@ function maskCanvas(output: { width: number; height: number }) {
 /** Rasterizes true union coverage once, shared by CSS preview and Canvas export. */
 export function createUntiledSpotlightMasks(
   output: { width: number; height: number },
-  frames: readonly QuickEditSpotlightFrame[],
-  clip?: ReviewSpotlightClip,
+  frames: readonly SceneSpotlightFrame[],
+  clip?: SceneSpotlightClip,
   projection?: QuickEditHomography
 ) {
   const dim = maskCanvas(output),
     blur = maskCanvas(output),
     hole = maskCanvas(output);
   const coverage = (
-    rect: QuickEditSpotlightFrame['opening'],
+    rect: SceneSpotlightFrame['opening'],
     radius: number,
-    bounds: ReviewSpotlightClip | undefined,
+    bounds: SceneSpotlightClip | undefined,
     clipped: boolean
   ) => {
     hole.context.clearRect(0, 0, hole.canvas.width, hole.canvas.height);
@@ -93,7 +94,7 @@ export function createUntiledSpotlightMasks(
     hole.context.fill(
       projection
         ? projectedOpening(rect, radius, projection)
-        : new Path2D(quickEditSpotlightOpeningPath({ opening: rect, radius }))
+        : new Path2D(sceneSpotlightOpeningPath({ opening: rect, radius }))
     );
     hole.context.restore();
     return hole.context.getImageData(0, 0, hole.canvas.width, hole.canvas.height).data;
@@ -102,8 +103,8 @@ export function createUntiledSpotlightMasks(
     coverage(
       frame.opening,
       frame.radius,
-      reviewSpotlightOpeningClip(frame, clip),
-      reviewSpotlightNeedsClip(frame, clip)
+      sceneSpotlightOpeningClip(frame, clip),
+      sceneSpotlightNeedsClip(frame, clip)
     )
   );
   const protections = frames.map((frame) =>
@@ -111,7 +112,7 @@ export function createUntiledSpotlightMasks(
       frame.protectionOpening ?? frame.opening,
       frame.protectionRadius ?? frame.radius,
       clip,
-      reviewSpotlightNeedsClip(frame, clip)
+      sceneSpotlightNeedsClip(frame, clip)
     )
   );
   const radius = Math.max(0, ...frames.map((frame) => frame.blur));

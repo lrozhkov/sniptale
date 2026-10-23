@@ -1,7 +1,9 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/capture-messages';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { VideoRecordingSurfaceCommandMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import type { RouteCaptureMessage } from '../../../capture/routing';
 import {
   canRouteCaptureMessageFromSender,
@@ -288,4 +290,146 @@ it('allows editor save routes without allowing arbitrary editor capture routes',
       createSender({ tabId: 7, url: EDITOR_URL })
     )
   ).toBe(false);
+});
+
+describe('recording permission frame sender', () => {
+  const permissionFrameUrl =
+    'chrome-extension://test/apps/extension/src/media-permission/index.html';
+  const request: VideoRecordingSurfaceCommandMessage = {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    surfaceSessionId: 'surface-1',
+    surfaceToken: 'token-1',
+    capabilityEpoch: 2,
+    documentGeneration: 3,
+    recordingId: null,
+    command: { kind: 'list-media-devices', deviceKind: 'audioinput', requestPermission: false },
+  };
+  const sender: chrome.runtime.MessageSender = {
+    id: 'test',
+    documentId: 'permission-document',
+    frameId: 4,
+    tab: createTab(7),
+    url: permissionFrameUrl,
+  };
+  const route = <Message extends { type: string }>(message: Message, candidate = sender) =>
+    getUnauthorizedPrivilegedTabRouteSenderReason({
+      family: 'video-recording-surface',
+      resolvedTabId: 7,
+      message,
+      sender: candidate,
+    });
+
+  beforeEach(() => {
+    vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+    runtimeInfoGetUrlMock.mockImplementation((path: string) => `chrome-extension://test/${path}`);
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('admits only explicitly read-only media lists from the owned child document', () => {
+    expect(route(request)).toBeNull();
+    expect(
+      route({
+        ...request,
+        command: { kind: 'list-media-devices', deviceKind: 'videoinput', requestPermission: false },
+      })
+    ).toBeNull();
+    expect(
+      getUnauthorizedPrivilegedTabRouteSenderReason({
+        family: 'video-control',
+        message: request,
+        resolvedTabId: 7,
+        sender,
+      })
+    ).toBe('Unauthorized video-control route sender');
+  });
+
+  it('uses the canonical extension origin when the web-accessible URL is dynamic', () => {
+    runtimeInfoGetUrlMock.mockImplementation((path: string) =>
+      path === 'apps/extension/src/media-permission/index.html'
+        ? `chrome-extension://dynamic-resource-id/${path}`
+        : `chrome-extension://test/${path}`
+    );
+    expect(route(request)).toBeNull();
+    expect(
+      route(request, {
+        ...sender,
+        url: 'chrome-extension://dynamic-resource-id/apps/extension/src/media-permission/index.html',
+      })
+    ).toBe('Unauthorized video recording surface sender');
+  });
+
+  it.each([
+    { kind: 'list-media-devices', deviceKind: 'audioinput' },
+    { kind: 'list-media-devices', deviceKind: 'audioinput', requestPermission: true },
+    { kind: 'list-media-devices', deviceKind: 'audioinput', requestPermission: 'false' },
+    { kind: 'list-media-devices', deviceKind: 'audioinput', requestPermission: false, extra: true },
+    { kind: 'set-microphone-enabled', enabled: true },
+    { kind: 'set-webcam-enabled', enabled: true },
+    { kind: 'select-microphone-device', deviceId: 'device' },
+    { kind: 'select-webcam-device', deviceId: 'device' },
+    { kind: 'set-toolbar-requested', enabled: true },
+    { kind: 'set-auto-fade-delay', delay: 0 },
+    {
+      kind: 'set-spotlight-settings',
+      cursorHaloEnabled: true,
+      cursorDimmingEnabled: true,
+      clickAnimationEnabled: true,
+    },
+    { kind: 'update-embedded-camera', appearance: {} },
+    { kind: 'cancel-start' },
+    { kind: 'pause' },
+    { kind: 'resume' },
+    { kind: 'stop' },
+  ])('rejects other commands and permission-request variants: %j', (command) => {
+    expect(route({ ...request, command })).toBe('Unauthorized video recording surface sender');
+  });
+
+  it.each([
+    VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE,
+    VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+    VideoMessageType.RELEASE_VIDEO_RECORDING_SURFACE,
+    VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER,
+    VideoMessageType.VIDEO_RECORDING_CAMERA_CLOSE,
+  ])('rejects other surface messages: %s', (type) => {
+    expect(route({ ...request, type })).toBe('Unauthorized video recording surface sender');
+  });
+
+  it.each([
+    { id: 'another-extension' },
+    { frameId: 0 },
+    { frameId: -1 },
+    { frameId: 1.5 },
+    { documentId: '' },
+    { tab: createTab(8) },
+    { url: 'https://example.test/apps/extension/src/media-permission/index.html' },
+    { url: 'chrome-extension://foreign/apps/extension/src/media-permission/index.html' },
+    { url: SETTINGS_URL },
+    { url: `${permissionFrameUrl}/extra` },
+  ])('rejects missing or foreign document context: %j', (override) => {
+    expect(route(request, { ...sender, ...override })).toBe(
+      'Unauthorized video recording surface sender'
+    );
+  });
+
+  it.each(['id', 'frameId', 'documentId', 'tab', 'url'] as const)(
+    'rejects omitted document context: %s',
+    (field) => {
+      const { [field]: omitted, ...candidate } = sender;
+      expect(omitted).toBeDefined();
+      expect(route(request, candidate)).toBe('Unauthorized video recording surface sender');
+    }
+  );
+
+  it('rejects malformed surface authority fields at ingress', () => {
+    expect(route({ ...request, surfaceToken: 3 })).toBe(
+      'Unauthorized video recording surface sender'
+    );
+    expect(route({ ...request, documentGeneration: '3' })).toBe(
+      'Unauthorized video recording surface sender'
+    );
+    expect(route({ ...request, capabilityEpoch: Number.NaN })).toBe(
+      'Unauthorized video recording surface sender'
+    );
+  });
 });

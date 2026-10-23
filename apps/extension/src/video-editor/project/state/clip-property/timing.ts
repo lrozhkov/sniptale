@@ -1,3 +1,5 @@
+import { getAudioFadeLimitSeconds } from '../../../../features/video/audio/fades';
+import { isAudioClip } from '../../../../features/video/project/timeline';
 import { applyVideoProjectClipsPatch } from '../../../../features/video/project/mutation';
 import type {
   VideoProject,
@@ -6,6 +8,8 @@ import type {
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import {
   applyProjectUpdate,
+  areClipTracksEditable,
+  getClipOperationIds,
   isSourceTimedClip,
   resolveEditableClipOperation,
   updateSourceTimedClipTiming,
@@ -33,20 +37,32 @@ function createClipFadeActions(
     updateClipFades: (clipId, patch) =>
       set((state) =>
         applyProjectUpdate(state, (project) => {
-          const operation = resolveEditableClipOperation(project, clipId);
-          if (!operation) {
+          const clip = project.clips.find((item) => item.id === clipId);
+          if (
+            !clip ||
+            (patch.fadeInMs === undefined && patch.fadeOutMs === undefined) ||
+            (patch.fadeInMs !== undefined && !Number.isFinite(patch.fadeInMs)) ||
+            (patch.fadeOutMs !== undefined && !Number.isFinite(patch.fadeOutMs))
+          )
             return project;
-          }
+          const audio = isAudioClip(clip);
+          const ids = audio ? [clipId] : getClipOperationIds(project, clipId);
+          if (!areClipTracksEditable(project, ids)) return project;
 
-          return applyEditableClipPatch(project, operation.clipIdSet, (item) => {
+          return applyEditableClipPatch(project, new Set(ids), (item) => {
             const maxFadeMs = Math.min(
-              VIDEO_CLIP_PROPERTY_LIMITS.fadeMs.max,
+              audio
+                ? getAudioFadeLimitSeconds(item.duration) * 1000
+                : VIDEO_CLIP_PROPERTY_LIMITS.fadeMs.max,
               Math.max(VIDEO_CLIP_PROPERTY_LIMITS.fadeMs.min, item.duration * 1000)
             );
             const fadeLimit = { max: maxFadeMs, min: VIDEO_CLIP_PROPERTY_LIMITS.fadeMs.min };
 
+            const playbackWindow = item.playbackWindow ? { ...item.playbackWindow } : undefined;
+            if (playbackWindow) delete playbackWindow.fadePhase;
             return {
               ...item,
+              ...(playbackWindow ? { playbackWindow } : {}),
               fadeInMs:
                 patch.fadeInMs === undefined
                   ? item.fadeInMs
@@ -85,19 +101,35 @@ function createClipTransitionActions(
       set((state) =>
         applyProjectUpdate(state, (project) => {
           const operation = resolveEditableClipOperation(project, clipId);
-          if (!operation || operation.affectedClips.some((clip) => !isSourceTimedClip(clip))) {
+          if (!operation || !isSourceTimedClip(operation.clip)) return project;
+          const anchor = operation.clip;
+          const previousRate = anchor.playbackRate ?? 1;
+          // A static fill with identical bounds follows its linked source through a speed edit.
+          if (
+            operation.affectedClips.some(
+              (clip) =>
+                !isSourceTimedClip(clip) &&
+                (clip.type !== 'SHAPE' ||
+                  Math.abs(clip.startTime - anchor.startTime) > 1e-7 ||
+                  Math.abs(clip.duration - anchor.duration) > 1e-7)
+            )
+          ) {
             return project;
           }
 
           let minimumRate: number = VIDEO_CLIP_PROPERTY_LIMITS.playbackRate.min;
           let maximumRate: number = VIDEO_CLIP_PROPERTY_LIMITS.playbackRate.max;
           for (const clip of operation.affectedClips) {
-            if (!isSourceTimedClip(clip)) continue;
-            const bounds = getReachableClipTimingBounds(project, clip);
+            const sourceDuration =
+              isSourceTimedClip(clip) && !clip.playbackWindow
+                ? clip.sourceDuration
+                : clip.duration *
+                  (isSourceTimedClip(clip) ? (clip.playbackRate ?? 1) : previousRate);
+            const bounds = getReachableClipTimingBounds(project, clip, operation.clipIdSet);
             const maximumDuration = bounds.maximumEnd - clip.startTime;
             const minimumDuration = Math.max(1 / project.fps, bounds.minimumEnd - clip.startTime);
-            minimumRate = Math.max(minimumRate, clip.sourceDuration / maximumDuration);
-            maximumRate = Math.min(maximumRate, clip.sourceDuration / minimumDuration);
+            minimumRate = Math.max(minimumRate, sourceDuration / maximumDuration);
+            maximumRate = Math.min(maximumRate, sourceDuration / minimumDuration);
           }
           if (minimumRate > maximumRate) return project;
           const nextPlaybackRate = clampVideoPropertyNumber(playbackRate, {
@@ -106,14 +138,14 @@ function createClipTransitionActions(
           });
           if (
             operation.affectedClips.every(
-              (clip) => isSourceTimedClip(clip) && (clip.playbackRate ?? 1) === nextPlaybackRate
+              (clip) => !isSourceTimedClip(clip) || (clip.playbackRate ?? 1) === nextPlaybackRate
             )
           )
             return project;
           return applyEditableClipPatch(project, operation.clipIdSet, (item) =>
             isSourceTimedClip(item)
               ? updateSourceTimedClipTiming(item, { playbackRate: nextPlaybackRate })
-              : item
+              : { ...item, duration: (anchor.duration * previousRate) / nextPlaybackRate }
           );
         })
       ),

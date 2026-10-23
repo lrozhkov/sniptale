@@ -1,3 +1,8 @@
+import { getSceneBackgroundLegacyColor } from './scene/background';
+import { materializeVideoProjectCursorSourceObservations } from './cursor-source-observations';
+import { reconcileVideoProjectCompositionJoins } from './scene/joins';
+import { removeVideoProjectBookendSources } from './scene/bookend-presets';
+import { getVideoProjectWatermarkAsset } from './scene/watermark';
 import type { VideoProject, VideoProjectAssetSource } from './types';
 import { VideoClipTransitionKind } from './types';
 import { assertExportReadyVideoProject } from './validation/root';
@@ -31,7 +36,16 @@ export function removeVideoProjectLibrarySources(
   if (removedAssetIds.size === 0) return project;
   const removedClipIds = new Set(
     project.clips
-      .filter((clip) => 'assetId' in clip && removedAssetIds.has(clip.assetId))
+      .filter(
+        (clip) =>
+          ('assetId' in clip && removedAssetIds.has(clip.assetId)) ||
+          (clip.type === 'EFFECT' &&
+            clip.attachment?.kind === 'source' &&
+            removedAssetIds.has(clip.attachment.assetId)) ||
+          (clip.type === 'EFFECT' &&
+            clip.sourceRange?.dormant === true &&
+            removedAssetIds.has(clip.sourceRange.assetId))
+      )
       .map(({ id }) => id)
   );
   const removedTransitions = (project.transitions ?? []).filter(
@@ -45,6 +59,25 @@ export function removeVideoProjectLibrarySources(
     .filter(({ id }) => !removedClipIds.has(id))
     .map((clip) => {
       const next = { ...clip };
+      if (
+        next.type === 'AUDIO' &&
+        next.transcript?.replacements.some((replacement) =>
+          removedAssetIds.has(replacement.assetId)
+        )
+      ) {
+        next.transcript = {
+          ...next.transcript,
+          replacements: next.transcript.replacements.filter(
+            (replacement) => !removedAssetIds.has(replacement.assetId)
+          ),
+        };
+      }
+      if (
+        next.type === 'EFFECT' &&
+        next.sourceRange &&
+        removedAssetIds.has(next.sourceRange.assetId)
+      )
+        delete next.sourceRange;
       if (
         next.type === 'SHAPE' &&
         next.embeddedAsset &&
@@ -69,13 +102,87 @@ export function removeVideoProjectLibrarySources(
     ...project,
     assets: project.assets.filter(({ id }) => !removedAssetIds.has(id)),
     clips,
+    ...(project.sourceVoiceoverDocuments
+      ? {
+          sourceVoiceoverDocuments: project.sourceVoiceoverDocuments
+            .filter(
+              ({ binding, take }) =>
+                !removedAssetIds.has(binding.assetId) && !removedAssetIds.has(take.assetId)
+            )
+            .map((document) => {
+              const transcript = document.take.transcript;
+              if (
+                !transcript?.replacements.some((replacement) =>
+                  removedAssetIds.has(replacement.assetId)
+                )
+              )
+                return document;
+              return {
+                ...document,
+                take: {
+                  ...document.take,
+                  transcript: {
+                    ...transcript,
+                    replacements: transcript.replacements.filter(
+                      (replacement) => !removedAssetIds.has(replacement.assetId)
+                    ),
+                  },
+                },
+              };
+            }),
+        }
+      : {}),
+    ...(project.sourceAudioDocuments
+      ? {
+          sourceAudioDocuments: project.sourceAudioDocuments
+            .filter(({ binding }) => !removedAssetIds.has(binding.assetId))
+            .map((document) => {
+              const speech = document.speech;
+              if (
+                !speech?.transcript.replacements.some((replacement) =>
+                  removedAssetIds.has(replacement.assetId)
+                )
+              )
+                return document;
+              return {
+                ...document,
+                speech: {
+                  ...speech,
+                  transcript: {
+                    ...speech.transcript,
+                    replacements: speech.transcript.replacements.filter(
+                      (replacement) => !removedAssetIds.has(replacement.assetId)
+                    ),
+                  },
+                },
+              };
+            }),
+        }
+      : {}),
+    ...(project.textDocuments
+      ? {
+          textDocuments: project.textDocuments.filter(
+            ({ binding }) => binding.kind === 'project' || !removedAssetIds.has(binding.assetId)
+          ),
+        }
+      : {}),
+    ...(project.commentDocuments
+      ? {
+          commentDocuments: project.commentDocuments.filter(
+            ({ binding }) => binding.kind === 'project' || !removedAssetIds.has(binding.assetId)
+          ),
+        }
+      : {}),
     actionEvents,
     ...(project.transitions
       ? { transitions: project.transitions.filter(({ id }) => !removedTransitionIds.has(id)) }
       : {}),
-    ...(project.sceneBackground?.kind === 'image' &&
-    removedAssetIds.has(project.sceneBackground.assetId)
-      ? { sceneBackground: { kind: 'solid', color: project.backgroundColor } }
+    ...removeSourceBackground(project, removedAssetIds),
+    ...removeSourceWatermark(project, removedAssetIds),
+    ...(project.bookendPresets
+      ? {
+          bookendPresets: removeVideoProjectBookendSources(project.bookendPresets, removedAssetIds),
+        }
       : {}),
     ...(project.cursorTrack
       ? {
@@ -102,9 +209,52 @@ export function removeVideoProjectLibrarySources(
       ? { motionRegions: removeSourceMotionRegions(project, removedClipIds, eventIds) }
       : {}),
   };
-  const reconciled = { ...next, ...reconcileVideoProjectInteractionSources(project, next) };
+  const reconciledProject = reconcileVideoProjectCompositionJoins({
+    ...next,
+    ...reconcileVideoProjectInteractionSources(project, next),
+  });
+  const reconciled = {
+    ...reconciledProject,
+    cursorTrack: materializeVideoProjectCursorSourceObservations(reconciledProject),
+  };
   assertExportReadyVideoProject(reconciled);
   return reconciled;
+}
+
+function removeSourceBackground(
+  project: VideoProject,
+  removedAssetIds: ReadonlySet<string>
+): Partial<Pick<VideoProject, 'sceneBackground' | 'backgroundColor'>> {
+  const background = project.sceneBackground;
+  if (!background) return {};
+  let remembered = background.remembered;
+  if (remembered?.image && removedAssetIds.has(remembered.image.assetId)) {
+    const { image: _removedImage, ...remaining } = remembered;
+    remembered = remaining;
+  }
+  const removedActive = background.kind === 'image' && removedAssetIds.has(background.assetId);
+  if (!removedActive && remembered === background.remembered) return {};
+  const { remembered: _previousMemory, ...active } = background;
+  // Restore authored solid settings so a later type switch cannot replace them with fallback paint.
+  const next = removedActive
+    ? (remembered?.solid ?? { kind: 'solid' as const, color: project.backgroundColor })
+    : active;
+  const sceneBackground = {
+    ...next,
+    ...(background.zoomBehavior !== undefined ? { zoomBehavior: background.zoomBehavior } : {}),
+    ...(background.enabled === false ? { enabled: false as const } : {}),
+    ...(background.blur !== undefined ? { blur: background.blur } : {}),
+    ...(background.rememberedBlur !== undefined
+      ? { rememberedBlur: background.rememberedBlur }
+      : {}),
+    ...(remembered !== undefined ? { remembered } : {}),
+  };
+  return {
+    sceneBackground,
+    ...(removedActive && next.kind === 'solid'
+      ? { backgroundColor: getSceneBackgroundLegacyColor(sceneBackground) }
+      : {}),
+  };
 }
 
 function removeSourceMotionRegions(
@@ -132,10 +282,17 @@ function removeSourceEffects(
   removedClipIds: ReadonlySet<string>,
   removedTransitionIds: ReadonlySet<string>
 ): Pick<VideoProject, 'effectInstances' | 'effectSnapshots'> {
-  const effectInstances = project.effectInstances?.filter(({ target }) =>
-    target.kind === 'clip'
-      ? !removedClipIds.has(target.clipId)
-      : target.kind !== 'transition' || !removedTransitionIds.has(target.transitionId)
+  const removedHosts = new Set(
+    project.clips.flatMap((clip) =>
+      clip.type === 'EFFECT' && removedClipIds.has(clip.id) ? [clip.effectInstanceId] : []
+    )
+  );
+  const effectInstances = project.effectInstances?.filter(({ id, target }) =>
+    target.kind === 'scene'
+      ? !removedHosts.has(id)
+      : target.kind === 'clip'
+        ? !removedClipIds.has(target.clipId)
+        : target.kind !== 'transition' || !removedTransitionIds.has(target.transitionId)
   );
   const removedSnapshots = new Set(
     project.effectInstances
@@ -176,4 +333,16 @@ function removeSourceObjectTracks(
           }
         : {}),
     }));
+}
+
+function removeSourceWatermark(
+  project: VideoProject,
+  removedAssetIds: ReadonlySet<string>
+): Partial<Pick<VideoProject, 'watermark'>> {
+  const asset = getVideoProjectWatermarkAsset(project);
+  if (!project.watermark || !asset || !removedAssetIds.has(asset.id)) return {};
+  const { image: _removedLogo, ...watermark } = project.watermark;
+  return {
+    watermark: { ...watermark, mode: watermark.mode === 'image' ? 'none' : watermark.mode },
+  };
 }

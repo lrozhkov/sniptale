@@ -55,7 +55,7 @@ export function OutputSettingsPanel(props: {
   const unsupportedReason = translate('popup.video.outputResourceUnsupported');
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       <OutputOptionGroup
         activeValue={outputProfile.quality}
         label={translate('popup.video.qualityLabel')}
@@ -106,21 +106,15 @@ export function OutputSettingsPanel(props: {
         }))}
       />
       {isSupported(outputProfile) ? null : (
-        <p
-          className="px-0.5 text-[10px] leading-4 text-[var(--sniptale-color-danger)]"
-          role="alert"
-        >
+        <p className="popup-error-message" role="alert">
           {unsupportedReason}
         </p>
       )}
-      <p className="px-0.5 text-[10px] leading-4 text-[var(--sniptale-color-text-muted-strong)]">
-        {translate('popup.video.outputAspectNotice')}
-      </p>
       <button
         type="button"
         className={[
-          'min-h-8 rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-2',
-          'text-xs font-medium text-[var(--sniptale-color-text-secondary)] transition-colors',
+          'min-h-8 rounded-[6px] px-2',
+          'text-xs font-normal text-[var(--sniptale-color-text-secondary)] transition-colors',
           'hover:bg-[var(--sniptale-color-surface-hover)]',
           'hover:text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
@@ -141,21 +135,23 @@ function OutputOptionGroup<TValue extends string | number>(props: {
   options: Array<OutputOption<TValue>>;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div role="group" aria-label={props.label} className="grid gap-1">
       <div className="px-0.5 text-[10px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
         {props.label}
       </div>
-      <div className="grid gap-1">
+      <div className="flex flex-wrap gap-1">
         {props.options.map((option) => (
           <button
             key={option.value}
             type="button"
+            aria-pressed={option.value === props.activeValue}
             className={[
-              'min-h-7 rounded-[7px] px-2 text-left text-xs font-medium transition-colors',
+              'h-8 min-h-8 min-w-0 max-w-full flex-[1_0_auto] rounded-[6px] px-2',
+              'text-center text-xs font-normal transition-colors',
               option.value === props.activeValue
                 ? [
-                    'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
-                    'text-[var(--sniptale-popup-color-text-accent,var(--sniptale-color-accent))]',
+                    'bg-[var(--sniptale-color-surface-hover)]',
+                    'text-[var(--sniptale-color-text-primary)]',
                   ].join(' ')
                 : [
                     'text-[var(--sniptale-color-text-secondary)]',
@@ -165,7 +161,9 @@ function OutputOptionGroup<TValue extends string | number>(props: {
               option.disabled ? 'cursor-not-allowed opacity-50' : '',
             ].join(' ')}
             disabled={option.disabled}
-            title={option.disabled ? translate('popup.video.outputResourceUnsupported') : undefined}
+            data-popup-hint={
+              option.disabled ? translate('popup.video.outputResourceUnsupported') : undefined
+            }
             onClick={() => props.onChange(option.value)}
           >
             {option.label}

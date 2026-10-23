@@ -24,7 +24,7 @@ export function resolveEffectOwner(
       startTime: clip.startTime,
       duration: clip.duration,
       locked: track.locked,
-      visible: track.visible,
+      visible: track.visible && !(clip.type === 'EFFECT' && clip.sourceRange?.dormant),
       bypassed: clip.effectsBypassed === true,
     };
   }
@@ -38,7 +38,9 @@ export function resolveEffectOwner(
   const end = Math.max(
     0,
     ...project.clips
-      .filter((clip) => ids.has(clip.trackId))
+      .filter(
+        (clip) => ids.has(clip.trackId) && !(clip.type === 'EFFECT' && clip.sourceRange?.dormant)
+      )
       .map((clip) => clip.startTime + clip.duration)
   );
   return {

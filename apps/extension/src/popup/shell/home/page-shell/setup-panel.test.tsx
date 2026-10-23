@@ -109,25 +109,14 @@ it('hides tab-only fields for desktop and keeps the capture action available', a
   const captureButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
     (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
-  expect(captureButton?.className).toContain('justify-start');
-  for (const label of [
-    'popup.home.captureButtonLabel',
-    'popup.home.imageEditorLabel',
-    'popup.home.libraryLabel',
-  ]) {
-    const button = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
-      (candidate) => candidate.textContent === label
-    );
-    expect(button?.dataset['iconClass']).toContain(
-      'group-hover:text-[var(--sniptale-color-accent)]'
-    );
-  }
-  expect(
-    [...(getContainer()?.querySelectorAll('button') ?? [])]
-      .find((button) => button.textContent === 'popup.home.imageEditorLabel')
-      ?.querySelector('svg')
-      ?.getAttribute('data-ui')
-  ).toBe('popup.image-editor-icon');
+  expect(captureButton?.className).toContain('justify-center');
+  expect(captureButton?.dataset['iconClass']).toContain(
+    'group-hover:text-[var(--sniptale-color-text-primary)]'
+  );
+  expect(getContainer()?.textContent).not.toContain('popup.home.imageEditorLabel');
+  expect(captureButton?.parentElement?.className).toContain('grid-cols-1');
+  expect(captureButton?.parentElement?.querySelectorAll('button')).toHaveLength(1);
+  expect(getContainer()?.textContent).not.toContain('popup.home.libraryLabel');
   captureButton?.click();
   expect(onCapture).toHaveBeenCalledOnce();
 });
@@ -226,6 +215,12 @@ it('renders tab settings, applies field changes, and disables a pending capture'
     const webp = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
       (button) => button.textContent === 'imageSettings.section.formatWebpLabel'
     );
+    expect(webp?.getAttribute('aria-pressed')).toBe('false');
+    expect(webp?.className).toContain('text-xs font-normal');
+    expect(webp?.className).not.toContain('accent');
+    const acceptedFormat = getContainer()?.querySelector('button[aria-pressed="true"]');
+    expect(acceptedFormat?.className).toContain('var(--sniptale-color-surface-hover)');
+    expect(acceptedFormat?.className).not.toContain('accent');
     webp?.click();
     const quality = getContainer()?.querySelector('input[type="range"]') as HTMLInputElement;
     expect(quality.classList).toContain('sniptale-range');

@@ -57,12 +57,14 @@ export function applyPlaybackSelectionNudge(
       return nudgeSelectedActionPoint(latestState, handlers, deltaX, deltaY);
     case VideoEditorSelectionKind.MOTION_REGION:
       return nudgeSelectedMotionRegion(latestState, handlers, deltaX, deltaY);
+    case VideoEditorSelectionKind.COMMENT:
     case VideoEditorSelectionKind.EFFECT_INSTANCE:
     case VideoEditorSelectionKind.CLIP_GROUP:
     case VideoEditorSelectionKind.HISTORY_SPAN:
     case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.MOTION_CONNECTION:
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.TRACK:
     case VideoEditorSelectionKind.TRANSITION_JUNCTION:

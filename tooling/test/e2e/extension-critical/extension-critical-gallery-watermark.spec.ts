@@ -420,15 +420,23 @@ for (const variant of variants) {
         'bottom',
         'bottom-right',
       ] as const) {
-        await anchors
-          .getByRole('button', {
-            name: label(`gallery.videoReview.watermarkAnchor_${anchor}`),
-            exact: true,
-          })
-          .click();
+        const control = anchors.getByRole('button', {
+          name: label(`gallery.videoReview.watermarkAnchor_${anchor}`),
+          exact: true,
+        });
+        await control.click();
+        const box = (await control.boundingBox())!;
+        const glyph = (await control.locator('svg').boundingBox())!;
+        expect
+          .soft(Math.abs(box.x + box.width / 2 - glyph.x - glyph.width / 2))
+          .toBeLessThanOrEqual(1);
+        expect
+          .soft(Math.abs(box.y + box.height / 2 - glyph.y - glyph.height / 2))
+          .toBeLessThanOrEqual(1);
         await expect
           .poll(async () => (await persistedWatermark(page)).watermark?.placement.anchor)
           .toBe(anchor);
+        await expect(control).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       }
       await anchors
         .getByRole('button', {
@@ -437,6 +445,11 @@ for (const variant of variants) {
         })
         .click();
       await settled();
+      await anchors.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('watermark-anchor-icons.png'),
+        fullPage: false,
+      });
       const target = overlay.getByRole('button', {
         name: label('gallery.videoReview.watermark'),
         exact: true,

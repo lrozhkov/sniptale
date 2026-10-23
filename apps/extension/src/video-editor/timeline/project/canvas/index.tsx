@@ -31,7 +31,7 @@ import type {
 } from '../types';
 import { resolveTimelineDropTrackId, type TimelineDropImportKind } from './drop-targets';
 import { ProjectTimelineCanvasEffectRows } from './effect-rows';
-import { getTimelineUtilityRowPresence } from '../effect-lanes/segments';
+import { getTimelineMotionLayout } from '../effect-lanes/segments';
 
 interface ProjectTimelineCanvasProps {
   hiddenClipNamesByTrackId?: Readonly<Record<string, boolean>> | undefined;
@@ -81,6 +81,9 @@ interface ProjectTimelineCanvasProps {
   onSeekTime: (time: number) => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
+  onSelectComment?:
+    | ((documentId: string, commentId: string, projectTime?: number) => void)
+    | undefined;
   onSelectHistorySpan?: (
     target: import('../../../contracts/commands/timeline').VideoEditorTypingSpanTarget
   ) => void;
@@ -382,8 +385,7 @@ function createTimelineFileDropHandler(props: ProjectTimelineCanvasProps) {
 }
 
 function getEffectLaneCount(project: VideoProject): number {
-  const rows = getTimelineUtilityRowPresence(project);
-  return Number(rows.motion);
+  return getTimelineMotionLayout(project).rowCount;
 }
 
 function focusTimelineWorkingSurface(event: React.PointerEvent<HTMLDivElement>): void {

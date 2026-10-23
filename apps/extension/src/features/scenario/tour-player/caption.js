@@ -1,11 +1,3 @@
-/** Compares authored copy by meaning-bearing characters so near-equal labels are detected. */
-function normalizeCaptionText(value) {
-  return String(value ?? '')
-    .toLowerCase()
-    .replace(/[\s\p{P}\p{S}]+/gu, ' ')
-    .trim();
-}
-
 /** One disclosure presentation is shared by editing and every viewing surface. */
 export function createTourCaption(hint, text, labels, redraw, signal) {
   const toggle = hint.querySelector('[data-tour-hint-toggle]');
@@ -15,7 +7,6 @@ export function createTourCaption(hint, text, labels, redraw, signal) {
   let collapsed = true;
   let enabled = false;
   let long = false;
-  let annotation = false;
   toggle.addEventListener(
     'click',
     () => {
@@ -53,23 +44,20 @@ export function createTourCaption(hint, text, labels, redraw, signal) {
         collapsed = true;
       }
       enabled = presentation !== 'callout';
-      annotation = !current.point;
       hint.dataset.collapsed = 'false';
       toggle.hidden = !enabled;
-      close.hidden = enabled;
+      close.hidden = false;
       text.hidden = false;
-      title.textContent = captionTitle(current, labels.details);
-      toggle.title = title.textContent;
+      if (title) title.hidden = true;
+      toggle.title = labels.details;
     },
     finish() {
       if (!enabled) return;
-      const voice = hint.querySelector('[data-tour-narration]:not([hidden])');
-      hint.hidden = annotation && !text.textContent.trim() && !voice;
       const metrics = globalThis.getComputedStyle(text);
       const lineHeight =
         parseFloat(metrics.lineHeight) || (parseFloat(metrics.fontSize) || 14) * 1.5;
       long = text.scrollHeight > lineHeight + 1;
-      title.hidden = !long;
+      if (title) title.hidden = true;
       toggle.hidden = !long;
       hint.dataset.captionLong = String(long);
       hint.dataset.collapsed = String(long && collapsed);
@@ -77,15 +65,7 @@ export function createTourCaption(hint, text, labels, redraw, signal) {
       text.style.overflowY = long && !collapsed ? 'auto' : 'hidden';
       toggle.setAttribute('aria-expanded', String(!long || !collapsed));
       const action = long && collapsed ? labels.expand : labels.collapse;
-      toggle.setAttribute('aria-label', `${action}: ${title.textContent}`);
+      toggle.setAttribute('aria-label', action);
     },
   };
-}
-
-/** A repeated body prefix is not a separate explanation title. */
-function captionTitle(current, fallback) {
-  const label = normalizeCaptionText(current.label);
-  const body = normalizeCaptionText(current.text);
-  const repeatsBody = body && (label === body || body.startsWith(`${label} `));
-  return (label && body && !repeatsBody ? current.label : '') || fallback;
 }

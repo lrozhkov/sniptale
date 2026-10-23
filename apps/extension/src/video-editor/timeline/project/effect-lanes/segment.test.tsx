@@ -365,3 +365,129 @@ it('renders action history once without a duplicate duration-bar utility lane', 
     act(() => root.unmount());
   }
 });
+
+it('keeps simultaneous framing, border and spotlight pointer targets in separate rows', () => {
+  const project = createEmptyVideoProject();
+  project.duration = 8;
+  const camera = { ...createVideoProjectMotionRegion(project, 0), id: 'camera', duration: 1 };
+  const next = {
+    ...createVideoProjectMotionRegion(project, 4),
+    id: 'next',
+    duration: 1,
+    incomingConnection: { fromRegionId: camera.id, easing: VideoTemporalEasing.LINEAR },
+  };
+  project.motionRegions = [
+    camera,
+    next,
+    { ...camera, id: 'border', border: createQuickEditBorder(), borderTarget: 'window' },
+    {
+      ...camera,
+      id: 'spotlight',
+      spotlight: createQuickEditSpotlight(),
+      spotlightTarget: 'viewport',
+    },
+    {
+      ...camera,
+      id: 'gap-border',
+      startTime: 2,
+      border: createQuickEditBorder(),
+      borderTarget: 'window',
+    },
+  ];
+  const snapshot = structuredClone(project);
+  const onBeginEffectInteraction = vi.fn();
+  const props = {
+    project,
+    pixelsPerSecond: 100,
+    selectedEffectSelection: null,
+    onBeginRangeSelection: vi.fn(),
+    onBeginEffectInteraction,
+    onResizeMotionRegion: vi.fn(),
+  };
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    act(() => root.render(<ProjectTimelineEffectCanvasRows {...props} />));
+    const segment = (id: string) =>
+      container.querySelector<HTMLElement>(`[data-timeline-effect-segment="${id}"]`)!;
+    const tops = ['camera', 'border', 'spotlight'].map((id) => segment(id).style.top);
+    expect(new Set(tops).size).toBe(3);
+    expect(segment('next').style.top).toBe(segment('camera').style.top);
+    expect(segment('gap-border').style.top).not.toBe(segment('camera').style.top);
+    expect(
+      container.querySelector<HTMLElement>('[data-project-timeline-effect-lane-row]')!.style.height
+    ).toBe('138px');
+    for (const id of ['camera', 'border', 'spotlight']) {
+      act(() =>
+        segment(id)
+          .querySelector('button[data-timeline-object]')!
+          .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+      );
+      expect(onBeginEffectInteraction.mock.lastCall?.[1].motionRegionId).toBe(id);
+    }
+    expect(project).toEqual(snapshot);
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../../features/video/project/scene/focus-appearance';
+
+it.each([false, true])(
+  'labels the actual manual-area fit and follows resize without changing stored scale: oriented=%s',
+  (oriented) => {
+    const project = createEmptyVideoProject('Area label', 400, 400);
+    project.duration = 3;
+    project.version = 34;
+    const c = Math.cos(Math.PI / 6),
+      s = Math.sin(Math.PI / 6);
+    const region = {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 3,
+      id: 'area-label',
+      scale: oriented ? 0.5 : 3,
+      focusMode: 'MANUAL_AREA' as const,
+      focusArea: {
+        x: 40,
+        y: 40,
+        width: oriented ? 220 : 200,
+        height: oriented ? 200 : 100,
+        ...(oriented ? { axes: { x: { x: c, y: s }, y: { x: -s, y: c } } } : {}),
+      },
+    };
+    project.motionRegions = [region];
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    const props = {
+      project,
+      pixelsPerSecond: 100,
+      selectedEffectSelection: null,
+      onBeginRangeSelection: vi.fn(),
+      onBeginEffectInteraction: vi.fn(),
+      onResizeMotionRegion: vi.fn(),
+    };
+    const segment = () =>
+      container.querySelector<HTMLElement>('[data-timeline-effect-segment="area-label"]')!;
+    try {
+      act(() => root.render(<ProjectTimelineEffectCanvasRows {...props} />));
+      expect(segment().textContent).toContain(oriented ? '1.38x' : '2.00x');
+      expect(segment().querySelector('svg.lucide-zoom-in')).not.toBeNull();
+      expect(
+        segment().querySelector('button[aria-label*=" · "]')!.getAttribute('aria-label')
+      ).toContain(oriented ? '1.38x' : '2.00x');
+      project.motionRegions = [
+        { ...region, focusArea: { ...region.focusArea, width: oriented ? 320 : 100 } },
+      ];
+      const accepted = structuredClone(project);
+      act(() => root.render(<ProjectTimelineEffectCanvasRows {...props} />));
+      expect(segment().textContent).toContain(oriented ? '1.06x' : '4.00x');
+      expect(project).toEqual(accepted);
+      expect(project.motionRegions[0]!.scale).toBe(oriented ? 0.5 : 3);
+    } finally {
+      act(() => root.unmount());
+    }
+  }
+);

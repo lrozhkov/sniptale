@@ -101,7 +101,7 @@ it('connects the storage policy state owner to all storage controls', async () =
   const root = createRoot(container);
   act(() => root.render(<SectionHarness />));
   expect(container.textContent).toContain(translate('settings.storageDrafts.newItemsTitle'));
-  expect(container.textContent).toContain(translate('settings.storageDrafts.newItemsDescription'));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.retentionConsequence'));
   expect(container.textContent).not.toContain(translate('settings.storageDrafts.loading'));
 
   const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
@@ -190,32 +190,15 @@ it('renders usage, policy warnings, confirmation, and editable policy fields', a
   };
   clickAction(translate('settings.storageDrafts.privacyLink'));
   act(() => root.render(<SectionHarness view="drafts" />));
-  clickAction(translate('settings.storageDrafts.openDrafts'));
-  clickAction(translate('settings.storageDrafts.deleteExpired'));
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.draftActionsTitle')
+  );
+  expect(container.textContent).not.toContain(translate('settings.storageDrafts.deleteAll'));
   expect(state.runCleanup).not.toHaveBeenCalled();
-  act(() => container.querySelector<HTMLButtonElement>('[data-testid="cancel"]')?.click());
-  expect(state.runCleanup).not.toHaveBeenCalled();
-  clickAction(translate('settings.storageDrafts.deleteExpired'));
-  await act(async () => {
-    container.querySelector<HTMLButtonElement>('[data-testid="confirm"]')?.click();
-  });
-
-  expect(mocks.openGalleryPage).toHaveBeenCalledWith({ scope: 'temporary' });
-  expect(state.runCleanup).toHaveBeenCalledWith(false);
   expect(mocks.openSettingsPage).toHaveBeenCalledWith({
     route: { section: 'access-data', view: 'privacy' },
   });
-
-  const deleteAll = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
-    (candidate) => candidate.textContent?.includes(translate('settings.storageDrafts.deleteAll'))
-  );
-  act(() => deleteAll?.click());
   expect(nativeConfirm).not.toHaveBeenCalled();
-  await act(async () => {
-    container.querySelector<HTMLButtonElement>('[data-testid="confirm"]')?.click();
-  });
-  expect(state.runCleanup).toHaveBeenCalledWith(true);
-
   mocks.state.mockReturnValue({
     ...state,
     policy: { ...state.policy, cleanupEnabled: false },
@@ -301,7 +284,9 @@ it('keeps trash cleanup independent and disables its age control until enabled',
   const trashAge = () => control(translate('settings.storageDrafts.trashRetention'));
   expect(trashToggle()?.getAttribute('aria-checked')).toBe('false');
   expect(trashAge()?.disabled).toBe(true);
-  expect(container.textContent).toContain(translate('settings.storageDrafts.trashCleanupDisabled'));
+  expect(container.textContent).toContain(
+    translate('settings.storageDrafts.trashRetentionConsequence')
+  );
   act(() => trashToggle()?.click());
   expect(state.updatePolicy).toHaveBeenCalledWith({ trashCleanupEnabled: true });
 
@@ -400,10 +385,10 @@ it('shows Trash save progress, acknowledgement, and retry in general Settings', 
   document.body.appendChild(container);
   const root = createRoot(container);
   act(() => root.render(<SectionHarness />));
-  expect(container.textContent).toContain(translate('settings.storageDrafts.trashSaving'));
+  expect(container.textContent).not.toContain(translate('settings.storageDrafts.trashSaving'));
   state.trashPolicyFeedback = 'saved';
   act(() => root.render(<SectionHarness />));
-  expect(container.textContent).toContain(translate('settings.storageDrafts.trashSaved'));
+  expect(container.textContent).not.toContain(translate('settings.storageDrafts.trashSaved'));
   state.trashPolicyFeedback = 'error';
   state.busy = false;
   act(() => root.render(<SectionHarness />));

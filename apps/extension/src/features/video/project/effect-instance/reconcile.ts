@@ -67,9 +67,14 @@ function reconcileEffectInstances(
     }
     if (instance.target.kind === 'scene') {
       const host = hostsByInstanceId.get(instance.id);
-      return host
-        ? [reconcileStandaloneInstanceTiming(instance, host.startTime, host.duration)]
-        : [];
+      if (!host) return [];
+      if (host.playbackWindow)
+        return [
+          instance.startTime === host.startTime
+            ? instance
+            : { ...instance, startTime: host.startTime },
+        ];
+      return [reconcileStandaloneInstanceTiming(instance, host.startTime, host.duration)];
     }
     if (instance.target.kind !== 'transition') return [];
     const segment = transitionSegments.get(instance.target.transitionId);

@@ -1,4 +1,4 @@
-import { parseWindowHeader } from '../../../features/browser-frame/header';
+import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { ArchiveRootDescriptor } from '../../../composition/archive-transfer';
 import type { JsonValue } from './contracts';
 import { MediaBackupFailure } from './errors';
@@ -60,8 +60,12 @@ export function encodeBackupHeader(
   const parsed = parseWindowHeader(header);
   if (!parsed || 'faviconObjectId' in header)
     throw new MediaBackupFailure('resource-invalid', 'encode', {}, undefined, 'favicon');
-  const { faviconDataUrl, ...rest } = parsed;
-  return { ...rest, ...(faviconDataUrl ? { faviconObjectId: addPng(faviconDataUrl) } : {}) };
+  const { faviconDataUrl, faviconSource, ...rest } = parsed;
+  return {
+    ...rest,
+    ...(faviconSource === undefined ? {} : { faviconSource }),
+    ...(faviconDataUrl ? { faviconObjectId: addPng(faviconDataUrl) } : {}),
+  };
 }
 
 export function decodeBackupHeader(
@@ -80,5 +84,10 @@ export function decodeBackupHeader(
     throw new MediaBackupFailure('resource-invalid', 'read', {}, undefined, 'favicon');
   const parsed = parseWindowHeader({ ...rest, ...(faviconDataUrl ? { faviconDataUrl } : {}) });
   if (!parsed) throw new MediaBackupFailure('resource-invalid', 'read', {}, undefined, 'favicon');
-  return { ...parsed };
+  const { faviconDataUrl: icon, faviconSource, ...fields } = parsed;
+  return {
+    ...fields,
+    ...(faviconSource === undefined ? {} : { faviconSource }),
+    ...(icon === undefined ? {} : { faviconDataUrl: icon }),
+  };
 }

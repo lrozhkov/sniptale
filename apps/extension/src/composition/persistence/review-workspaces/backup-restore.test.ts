@@ -1,7 +1,8 @@
+import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
 import { annotation, workspace, snapshotDatabase } from './backup-restore.test-support';
 import { workspaceStorageHead, workspaceStorageRows } from './storage-format';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
-import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
+
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { expect, it, vi } from 'vitest';
@@ -416,7 +417,7 @@ it('transfers an inactive image choice even without history', async () => {
 
 it('backs up remembered watermark bytes and remaps the exact slot across a restored aggregate', async () => {
   const { createQuickEditWatermark } =
-    await import('../../../features/video/review/advanced/watermark');
+    await import('../../../features/video/project/scene/watermark');
   const watermark = {
     ...createQuickEditWatermark('Saved brand'),
     mode: 'none' as const,

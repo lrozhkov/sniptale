@@ -1,3 +1,4 @@
+import type { WindowHeader } from '../../window-header';
 import type { Paint } from '@sniptale/foundation/paint';
 import type { GuideImageSource } from './image-source';
 
@@ -28,6 +29,7 @@ export interface TourRect extends TourPoint {
 export type TourAction =
   | { kind: 'none' | 'next' | 'previous' | 'end' | 'restart' }
   | { kind: 'slide'; slideId: string }
+  | { kind: 'action'; actionId: string }
   | { kind: 'url'; url: string };
 
 export interface TourHintSurface {
@@ -100,6 +102,19 @@ export function resolveTourMarkerAppearance(
   return { ...(hotspot?.markerAppearance ?? style.markerAppearance ?? TOUR_MARKER_DEFAULTS) };
 }
 
+/** A visual focus belongs to one action and cannot execute navigation. */
+export type TourHotspotVisual =
+  | { kind: 'point'; pulse: boolean }
+  | {
+      kind: 'frame' | 'highlight' | 'spotlight';
+      strokeWidth?: number | undefined;
+      radius?: number | undefined;
+      rect: TourRect;
+      color: string;
+      opacity: number;
+      animation: TourHighlightAnimation;
+    };
+
 export interface TourHotspot {
   markerAppearance?: TourMarkerAppearance | null | undefined;
   narration?: TourObjectNarration | null | undefined;
@@ -108,12 +123,15 @@ export interface TourHotspot {
   targetRect: TourRect | null;
   label: string;
   text: string;
-  action: TourAction;
+  visual: TourHotspotVisual;
+  timing?: TourTiming | undefined;
+  camera?: TourCamera | undefined;
   appearance: TourTextAppearance | null;
-  pulse: boolean;
 }
 
 export interface TourAnnotation {
+  timing?: TourTiming | undefined;
+  camera?: TourCamera | undefined;
   narration?: TourObjectNarration | null | undefined;
   id: string;
   text: string;
@@ -222,7 +240,6 @@ export interface TourTiming {
   mode: 'inherit' | 'manual' | 'auto';
   holdSeconds: number;
   truncateNarration: boolean;
-  autoplayTarget: string | null;
 }
 
 export interface TourCamera {
@@ -246,7 +263,15 @@ export interface TourImage {
   source: GuideImageSource;
 }
 
+/** Authored bitmap placement is independent from timed camera motion. */
+export interface TourImagePlacement {
+  center: TourPoint;
+  zoom: number;
+}
+
 export interface TourImageSlide {
+  /** Source placement is independent from timed action cameras. */
+  imagePlacement?: TourImagePlacement | undefined;
   kind: 'image';
   id: string;
   title: string;
@@ -256,42 +281,48 @@ export interface TourImageSlide {
   requiresTargetReview?: boolean | undefined;
   fit: 'contain' | 'cover';
   camera: TourCamera;
-  hotspots: TourHotspot[];
-  annotations: TourAnnotation[];
+  actions: TourSlideAction[];
   masks: TourMask[];
-  /**
-   * Authored display order over the hotspot, annotation and mask ids.
-   * Absent derives hotspots → annotations → masks; when present it must list each object once.
-   */
-  objectOrder?: string[] | undefined;
-  narration: TourNarration | null;
+  /** Image narration belongs to actions; the container cannot own a competing voice. */
+  narration: null;
   timing: TourTiming;
 }
 
-export type TourSlideObject =
+export type TourSlideAction =
   | { type: 'hotspot'; object: TourHotspot }
-  | { type: 'annotation'; object: TourAnnotation }
-  | { type: 'mask'; object: TourMask };
+  | { type: 'annotation'; object: TourAnnotation };
 
-/**
- * One displayed object sequence per image slide. A stored order is honored first;
- * objects missing from it keep deterministic type order at the end so none are lost.
- */
+export type TourSlideObject = TourSlideAction | { type: 'mask'; object: TourMask };
+
+/** Ordered actions precede permanent image effects in the authoring object list. */
 export function getTourSlideObjects(slide: TourImageSlide): TourSlideObject[] {
-  const grouped: TourSlideObject[] = [
-    ...slide.hotspots.map((object) => ({ type: 'hotspot' as const, object })),
-    ...slide.annotations.map((object) => ({ type: 'annotation' as const, object })),
-    ...slide.masks.map((object) => ({ type: 'mask' as const, object })),
-  ];
-  if (!slide.objectOrder) return grouped;
-  const pending = new Map(grouped.map((entry) => [entry.object.id, entry]));
-  const ordered = slide.objectOrder.flatMap((objectId) => {
-    const entry = pending.get(objectId);
-    if (!entry) return [];
-    pending.delete(objectId);
-    return [entry];
-  });
-  return [...ordered, ...pending.values()];
+  return [...slide.actions, ...slide.masks.map((object) => ({ type: 'mask' as const, object }))];
+}
+
+/** Returns references to authored hotspots without creating a second ordering authority. */
+export function getTourHotspots(slide: TourImageSlide): TourHotspot[] {
+  return slide.actions.flatMap((entry) => (entry.type === 'hotspot' ? [entry.object] : []));
+}
+
+/** Returns references to authored text actions. */
+export function getTourAnnotations(slide: TourImageSlide): TourAnnotation[] {
+  return slide.actions.flatMap((entry) => (entry.type === 'annotation' ? [entry.object] : []));
+}
+
+/** Resolves the active visual region without changing authored target geometry. */
+export function tourHotspotMask(hotspot: TourHotspot): TourMask | null {
+  const visual = hotspot.visual;
+  if (visual.kind === 'point') return null;
+  return {
+    id: hotspot.id,
+    kind: visual.kind === 'frame' ? 'highlight' : visual.kind,
+    rect: visual.rect,
+    color: visual.color,
+    opacity: visual.opacity,
+    spotlightColor: visual.color,
+    spotlightOpacity: visual.opacity,
+    highlightAnimation: visual.animation,
+  };
 }
 
 export interface TourNavigationButton {
@@ -355,9 +386,10 @@ export function createTourBackgroundMusic(
 export interface TourDocument {
   backgroundMusic?: TourBackgroundMusic | null | undefined;
   audioResources?: TourAudioResource[] | undefined;
-  version: 1;
+  version: 2;
   id: string;
   stage: {
+    windowHeader?: WindowHeader | undefined;
     aspect: '16:9' | '4:3' | '9:16';
     background: string;
     paint?: Paint | undefined;

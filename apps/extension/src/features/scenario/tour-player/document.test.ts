@@ -1,4 +1,6 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 // @vitest-environment jsdom
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import {
   TOUR_HINT_SURFACE,
   TOUR_MASK_DEFAULTS,
@@ -41,22 +43,50 @@ function fixture(binding: 'slides' | 'stage' = 'slides') {
     alt: 'Screenshot',
     source: { kind: 'import', filename: 'private-file.png' },
   };
-  slide.hotspots = [
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.25, y: 0.5 },
+        targetRect: null,
+        label: 'Continue',
+        text: 'Explanation',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
+  ];
+  tour.slides = [
+    slide,
     {
-      id: 'point',
-      point: { x: 0.25, y: 0.5 },
-      targetRect: null,
-      label: 'Continue',
-      text: 'Explanation',
-      appearance: null,
-      action: { kind: 'next' },
-      pulse: true,
+      ...createTourImageSlide('two'),
+      title: 'Second',
+      image: slide.image,
+      actions: [
+        {
+          type: 'annotation',
+          object: { id: 'second-action', text: 'Second', anchor: null, appearance: null },
+        },
+      ],
     },
   ];
-  tour.slides = [slide, { ...createTourImageSlide('two'), title: 'Second', image: slide.image }];
   if (binding === 'stage') {
     tour.stage.image = slide.image;
-    tour.slides = tour.slides.map((item) => ({ ...item, image: null }));
+    tour.slides = tour.slides.map((item) =>
+      item.kind === 'image'
+        ? {
+            ...item,
+            image: null,
+            actions: [
+              {
+                type: 'annotation',
+                object: { id: `${item.id}-text`, text: item.title, anchor: null, appearance: null },
+              },
+            ],
+          }
+        : item
+    );
   }
   tour.endScreen.title = 'Done';
   return {
@@ -111,6 +141,11 @@ it('treats authored text as text through both JSON and visible title boundaries'
   const attack = '</script><img src=x onerror="globalThis.pwned=1">';
   args.title = attack;
   args.tour.slides[0]!.title = attack;
+  const first = args.tour.slides[0]!;
+  if (first.kind === 'image') {
+    getTourHotspots(first)[0]!.label = attack;
+    getTourHotspots(first)[0]!.text = attack;
+  }
   args.labels.next = attack;
   const dom = open(await buildTourPlayerHtml(args));
   expect(dom.window.document.title).toBe(attack);
@@ -145,13 +180,16 @@ it('projects the camera and legacy marker appearance through one source-image bo
   const dom = open(await buildTourPlayerHtml(args));
   const marker = dom.window.document.querySelector<HTMLElement>('.tour-hotspot')!;
   const image = dom.window.document.querySelector<HTMLElement>('.tour-image')!;
-  expect(marker.style.left).toBe('310px');
-  expect(marker.style.top).toBe('174.375px');
+  const stage = dom.window.document.querySelector<HTMLElement>('[data-tour-stage]')!;
+  const width = Number.parseFloat(stage.style.width);
+  const height = Number.parseFloat(stage.style.height);
+  expect(Number.parseFloat(marker.style.left)).toBeCloseTo(width / 2);
+  expect(Number.parseFloat(marker.style.top)).toBeCloseTo(height / 2);
   expect(marker.style.getPropertyValue('--tour-marker-color')).toBe('transparent');
   expect(marker.style.getPropertyValue('--tour-marker-pulse-color')).toBe(args.tour.style.accent);
   expect(marker.style.getPropertyValue('--tour-marker-size')).toBe('');
   expect(marker.dataset['pulse']).toBe('true');
-  expect(image.style.width).toBe('1240px');
+  expect(Number.parseFloat(image.style.width)).toBeCloseTo(width * 2);
   dom.close();
 });
 it.each(['slides', 'stage'] as const)(
@@ -183,14 +221,26 @@ it.each(['slides', 'stage'] as const)(
     ];
     await expect(buildTourPlayerHtml(args)).rejects.toThrow('rasterized');
     first.masks = [];
-    first.narration = {
-      assetId: 'image',
-      duration: 1,
-      trimStart: 0,
-      trimEnd: 1,
-      gain: 1,
-      transcript: '',
-    };
+    first.actions.unshift({
+      type: 'annotation' as const,
+      object: {
+        id: first.id + '-voice',
+        text: '',
+        anchor: null,
+        appearance: null,
+        narration: {
+          ...{
+            assetId: 'image',
+            duration: 1,
+            trimStart: 0,
+            trimEnd: 1,
+            gain: 1,
+            transcript: '',
+          },
+          trigger: 'enter' as const,
+        },
+      },
+    });
     await expect(buildTourPlayerHtml(args)).rejects.toThrow('Invalid tour');
   }
 );
@@ -227,6 +277,7 @@ it('paginates navigation and uses native safe links for authored URLs', async ()
       })),
     },
   ];
+  args.tour.slides.push(fixture().tour.slides[0]!);
   const dom = open(await buildTourPlayerHtml(args));
   const document = dom.window.document;
   const link = document.querySelector<HTMLAnchorElement>('.tour-navigation-buttons a')!;
@@ -302,14 +353,14 @@ it('requires object narration bytes and omits unused audio material metadata fro
   const args = fixture();
   const slide = args.tour.slides[0]!;
   if (slide.kind !== 'image') throw Error('image');
-  slide.hotspots[0]!.narration = {
+  getTourHotspots(slide)[0]!.narration = {
     assetId: 'voice',
     duration: 2,
     trimStart: 0,
     trimEnd: 2,
     gain: 1,
     transcript: 'Voice',
-    trigger: 'activation',
+    trigger: 'activation' as const,
   };
   args.tour.audioResources = [{ assetId: 'unused', duration: 2, name: 'Private unused take.wav' }];
   await expect(buildTourPlayerHtml(args)).rejects.toThrow('Missing tour media');
@@ -322,76 +373,77 @@ it('requires object narration bytes and omits unused audio material metadata fro
   expect(html).toContain('"trigger":"activation"');
 });
 
-it('uses a numberless hotspot and readable explanation controls without a compound counter', async () => {
+it('uses a numberless hotspot and accessible icon explanation controls without a compound counter', async () => {
   const dom = open(await buildTourPlayerHtml(fixture()));
   const doc = dom.window.document;
   expect(doc.querySelector('.tour-hotspot')?.textContent).toBe('');
-  expect(doc.querySelector('[data-tour-hint-previous]')?.textContent?.trim()).toBe('Back');
-  expect(doc.querySelector('[data-tour-hint-next]')?.textContent?.trim()).toBe('Next');
+  expect(doc.querySelector('[data-tour-hint-previous]')?.getAttribute('aria-label')).toBe('Back');
+  expect(doc.querySelector('[data-tour-hint-previous] svg')).not.toBeNull();
+  expect(doc.querySelector('[data-tour-hint-previous]')?.textContent?.trim()).toBe('');
+  expect(doc.querySelector('[data-tour-hint-next]')?.getAttribute('aria-label')).toBe('Next');
+  expect(doc.querySelector('[data-tour-hint-next] svg')).not.toBeNull();
+  expect(doc.querySelector('[data-tour-hint-next]')?.textContent?.trim()).toBe('');
   expect(doc.querySelector('[data-tour-hint-count]')?.textContent).not.toContain('·');
-  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 3');
-  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Continue');
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 2');
+  expect(doc.querySelector('[data-tour-hint-action-title]')).toBeNull();
   dom.close();
 });
 
-it('shows each action name in the callout header and omits an empty description', async () => {
+it('shows authored callout text without an action heading and omits an empty description', async () => {
   const args = fixture();
   const slide = args.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots.push({
-    ...slide.hotspots[0]!,
-    id: 'empty-description',
-    label: 'Finish setup',
-    text: '  ',
+  slide.actions.push({
+    type: 'hotspot' as const,
+    object: {
+      ...getTourHotspots(slide)[0]!,
+      id: 'empty-description',
+      label: 'Finish setup',
+      text: '  ',
+    },
   });
   const dom = open(await buildTourPlayerHtml(args));
   const doc = dom.window.document;
-  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 4');
-  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Continue');
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 3');
+  expect(doc.querySelector('[data-tour-hint-action-title]')).toBeNull();
   expect(doc.querySelector<HTMLElement>('[data-tour-hint-text]')?.hidden).toBe(false);
   expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('Explanation');
   doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
-  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('2 / 4');
-  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Finish setup');
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('2 / 3');
+  expect(doc.querySelector('[data-tour-hint-action-title]')).toBeNull();
   expect(doc.querySelector<HTMLElement>('[data-tour-hint-text]')?.hidden).toBe(true);
   dom.close();
 });
 
-it('keeps hint surfaces decorative and restores the previous point last text page', async () => {
+it('keeps hint surfaces decorative while Next advances one action regardless of text length', async () => {
   const args = fixture();
   const slide = args.tour.slides[0]!;
-  if (slide.kind !== 'image') throw new Error('image fixture');
-  slide.hotspots[0]!.text = 'A'.repeat(170);
-  slide.hotspots[0]!.appearance = {
-    ...args.tour.style.textAppearance,
-    surface: {
-      fillPaint: { kind: 'solid', color: '#ffffff' },
-      textColor: '#111827',
-      width: 300,
-      padding: 12,
-      radius: 16,
-      surfaceCss: 'background-image: url(https://example.com/tracker);',
+  if (slide.kind !== 'image') throw new Error('Expected image.');
+  getTourHotspots(slide)[0]!.text = 'A'.repeat(170);
+  slide.actions.push({
+    type: 'hotspot',
+    object: {
+      ...getTourHotspots(slide)[0]!,
+      id: 'next-point',
+      label: 'Second',
+      text: 'Second explanation',
     },
-  };
-  slide.hotspots.push({
-    ...slide.hotspots[0]!,
-    id: 'second-point',
-    text: 'Second explanation',
-    appearance: null,
   });
   const dom = open(await buildTourPlayerHtml(args));
-  const doc = dom.window.document;
-  const hint = doc.querySelector<HTMLElement>('[data-tour-hint]')!;
-  expect(hint.style.backgroundImage).not.toContain('url(');
-  expect(hint.style.borderRadius).toBe('16px');
-  expect(doc.querySelector<HTMLElement>('[data-tour-hint-point-count]')!.hidden).toBe(false);
-  doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
-  expect(doc.querySelector('[data-tour-hint-count]')?.textContent).toBe('2 / 2');
-  doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
-  expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('Second explanation');
-  doc.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!.click();
-  expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('A'.repeat(10));
-  dom.close();
+  try {
+    const doc = dom.window.document;
+    const hint = doc.querySelector<HTMLElement>('[data-tour-hint]')!;
+    expect(hint.style.backgroundImage).not.toContain('url(');
+    expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(170));
+    expect(doc.querySelector<HTMLElement>('[data-tour-hint-count]')!.hidden).toBe(true);
+    doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+    expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('Second explanation');
+    expect(doc.querySelector('[data-tour-counter]')!.textContent).toBe('2 / 3');
+    doc.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!.click();
+    expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(170));
+  } finally {
+    dom.close();
+  }
 });
 
 it.each(['caption-top', 'caption-bottom'] as const)(
@@ -400,10 +452,16 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     const args = fixture();
     const slide = args.tour.slides[0]!;
     if (slide.kind !== 'image') throw new Error('Expected image');
-    slide.hotspots = [];
-    slide.annotations = [
-      { id: 'first-note', text: 'A'.repeat(170), anchor: null, appearance: null },
-      { id: 'second-note', text: 'Second body', anchor: null, appearance: null },
+    slide.actions = [
+      ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+      ...[].map((object) => ({ type: 'hotspot' as const, object })),
+    ];
+    slide.actions = [
+      ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+      ...[
+        { id: 'first-note', text: 'A'.repeat(170), anchor: null, appearance: null },
+        { id: 'second-note', text: 'Second body', anchor: null, appearance: null },
+      ].map((object) => ({ type: 'annotation' as const, object })),
     ];
     args.tour.style.textAppearance.presentation = presentation;
     const dom = open(await buildTourPlayerHtml(args));
@@ -420,22 +478,23 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     resize.initEvent('resize', false, false);
     dom.window.dispatchEvent(resize);
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(toggle.textContent).toContain('Details');
+    expect(toggle.textContent?.trim()).toBe('');
+    expect(toggle.querySelector('svg')).not.toBeNull();
     expect(body.textContent).toBe('A'.repeat(170));
     expect(body.hidden).toBe(false);
-    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('1 / 4');
+    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('1 / 3');
     body.click();
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(body.textContent).toBe('A'.repeat(170));
     expect(Number.parseFloat(body.style.maxHeight)).toBeGreaterThan(20);
     toggle.click();
-    expect(toggle.getAttribute('aria-label')).toBe('Expand explanation: Details');
+    expect(toggle.getAttribute('aria-label')).toBe('Expand explanation');
     expect(body.hidden).toBe(false);
     expect(body.style.maxHeight).toBe('20px');
     next.click();
     expect(body.textContent).toBe('Second body');
     expect(toggle.hidden).toBe(true);
-    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('2 / 4');
+    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('2 / 3');
     expect(doc.querySelector<HTMLElement>('[data-tour-hint-count]')!.hidden).toBe(true);
     dom.close();
   }
@@ -448,8 +507,16 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     args.tour.style.textAppearance.presentation = presentation;
     const slide = args.tour.slides[0]!;
     if (slide.kind !== 'image') throw new Error('Expected image');
-    slide.hotspots = [];
-    slide.annotations = [{ id: 'note', text: 'Slide explanation', anchor: null, appearance: null }];
+    slide.actions = [
+      ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+      ...[].map((object) => ({ type: 'hotspot' as const, object })),
+    ];
+    slide.actions = [
+      ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+      ...[{ id: 'note', text: 'Slide explanation', anchor: null, appearance: null }].map(
+        (object) => ({ type: 'annotation' as const, object })
+      ),
+    ];
     const dom = open(await buildTourPlayerHtml(args));
     const viewport = dom.window.document.querySelector('[data-tour-viewport]')!;
     const hint = dom.window.document.querySelector<HTMLElement>('[data-tour-hint]')!;
@@ -487,7 +554,9 @@ it('exports visual blur through the shared renderer without authoring handles', 
   ];
   const dom = open(await buildTourPlayerHtml(args));
   const effect = dom.window.document.querySelector<HTMLElement>('.tour-mask-effect')!;
-  expect(effect.style.backdropFilter).toBe('blur(23.25px)');
+  const stage = dom.window.document.querySelector<HTMLElement>('[data-tour-stage]')!;
+  const scale = Number.parseFloat(stage.style.width) / first.image!.width;
+  expect(Number.parseFloat(effect.style.backdropFilter.slice(5))).toBeCloseTo(24 * scale);
   expect(effect.style.opacity).toBe('');
   expect(dom.window.document.querySelector('.tour-resize-handle')).toBeNull();
   dom.close();
@@ -510,6 +579,7 @@ it('lays out one content frame above one bottom toolbar that owns every control'
     '[data-tour-seek]',
     '[data-tour-previous]',
     '[data-tour-next]',
+    '[data-tour-hints]',
     '[data-tour-contents]',
   ];
   const nodes = ordered.map((selector) => document.querySelector(selector)!);
@@ -523,6 +593,10 @@ it('lays out one content frame above one bottom toolbar that owns every control'
   expect(document.querySelectorAll('[data-tour-status]')).toHaveLength(1);
   expect(toolbar.contains(document.querySelector('[data-tour-title]'))).toBe(true);
   expect(toolbar.contains(document.querySelector('[data-tour-status]'))).toBe(true);
+  expect(document.querySelector('#mode')).toBeNull();
+  expect(document.querySelector('[data-tour-hint-title]')).toBeNull();
+  expect(document.querySelector('[data-tour-hint] [data-tour-narration]')).toBeNull();
+  expect(document.querySelector('[data-tour-hints]')?.getAttribute('aria-pressed')).toBe('true');
   dom.close();
 });
 
@@ -532,13 +606,22 @@ it('keeps short slide explanations readable without a disclosure', async () => {
   args.tour.style.textAppearance.presentation = 'caption-bottom';
   const slide = args.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots = [];
-  slide.annotations = [{ id: 'note', text, anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[].map((object) => ({ type: 'hotspot' as const, object })),
+  ];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'note', text, anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   const dom = open(await buildTourPlayerHtml(args));
   const doc = dom.window.document;
   const toggle = doc.querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
   const body = doc.querySelector<HTMLElement>('[data-tour-hint-text]')!;
-  expect(toggle.textContent?.trim()).toBe('Details');
+  expect(toggle.textContent?.trim()).toBe('');
   expect(body.textContent).toBe(text);
   expect(toggle.hidden).toBe(true);
   expect(body.hidden).toBe(false);
@@ -553,15 +636,18 @@ it('separates action callouts and slide captions despite a shared caption defaul
   args.tour.style.textAppearance.presentation = 'caption-bottom';
   const slide = args.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots[0]!.label = 'Continue';
-  slide.hotspots[0]!.text = 'Explanation';
-  slide.annotations = [
-    {
-      id: 'note',
-      anchor: null,
-      text: 'Slide note body',
-      appearance: null,
-    },
+  getTourHotspots(slide)[0]!.label = 'Continue';
+  getTourHotspots(slide)[0]!.text = 'Explanation';
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[
+      {
+        id: 'note',
+        anchor: null,
+        text: 'Slide note body',
+        appearance: null,
+      },
+    ].map((object) => ({ type: 'annotation' as const, object })),
   ];
   const dom = open(await buildTourPlayerHtml(args));
   const doc = dom.window.document;
@@ -572,7 +658,7 @@ it('separates action callouts and slide captions despite a shared caption defaul
   );
   doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
   expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('Slide note body');
-  expect(toggle.textContent?.trim()).toBe('Details');
+  expect(toggle.textContent?.trim()).toBe('');
   expect(doc.querySelector<HTMLElement>('[data-tour-hint]')!.dataset['presentation']).toBe(
     'caption-bottom'
   );
@@ -618,29 +704,38 @@ it('streams the same shell through an abortable blob with embedded assets', asyn
 it('renders independent inherited and local element styles in the standalone artifact', async () => {
   const args = fixture();
   args.tour.style.hotspotAppearance = {
-    presentation: 'callout',
-    alignment: 'start',
-    placement: 'auto',
+    presentation: 'callout' as const,
+    alignment: 'start' as const,
+    placement: 'auto' as const,
     surface: { ...TOUR_HINT_SURFACE, radius: 23 },
   };
   args.tour.style.textAppearance = {
-    presentation: 'caption-top',
-    alignment: 'center',
-    placement: 'auto',
+    presentation: 'caption-top' as const,
+    alignment: 'center' as const,
+    placement: 'auto' as const,
     surface: { ...TOUR_HINT_SURFACE, radius: 8 },
   };
   args.tour.style.maskDefaults = { ...TOUR_MASK_DEFAULTS, blur: { radius: 30 } };
   const slide = args.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('image fixture');
-  slide.hotspots.push({
-    ...slide.hotspots[0]!,
-    id: 'local',
-    appearance: {
-      ...args.tour.style.hotspotAppearance,
-      surface: { ...TOUR_HINT_SURFACE, radius: 5 },
+  slide.actions.push({
+    type: 'hotspot' as const,
+    object: {
+      ...getTourHotspots(slide)[0]!,
+      id: 'local',
+      appearance: {
+        ...args.tour.style.hotspotAppearance,
+        surface: { ...TOUR_HINT_SURFACE, radius: 5 },
+      },
     },
   });
-  slide.annotations = [{ id: 'caption', text: 'Slide text', anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'caption', text: 'Slide text', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   slide.masks = [
     {
       id: 'linked',
@@ -669,8 +764,15 @@ it('renders independent inherited and local element styles in the standalone art
   expect(hint.dataset['presentation']).toBe('caption-top');
   expect(hint.style.borderRadius).toBe('0 0 8px 8px');
   const effects = doc.querySelectorAll<HTMLElement>('.tour-mask-effect');
-  expect(effects[0]!.style.backdropFilter).toBe('blur(29.0625px)');
-  expect(effects[1]!.style.backdropFilter).toBe('blur(6.78125px)');
+  const stageWidth = Number.parseFloat(
+    doc.querySelector<HTMLElement>('[data-tour-stage]')!.style.width
+  );
+  expect(Number.parseFloat(effects[0]!.style.backdropFilter.slice(5))).toBeCloseTo(
+    (30 * stageWidth) / 640
+  );
+  expect(Number.parseFloat(effects[1]!.style.backdropFilter.slice(5))).toBeCloseTo(
+    (7 * stageWidth) / 640
+  );
   dom.close();
 });
 
@@ -680,9 +782,24 @@ it('traverses mixed explanations across slides in both directions with a control
   const first = args.tour.slides[0]!;
   const second = args.tour.slides[1]!;
   if (first.kind !== 'image' || second.kind !== 'image') throw new Error('Expected images');
-  first.annotations = [{ id: 'note', text: 'First note', anchor: null, appearance: null }];
-  first.objectOrder = ['note', 'point'];
-  second.annotations = [{ id: 'last', text: 'Last note', anchor: null, appearance: null }];
+  first.actions = [
+    ...first.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'note', text: 'First note', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
+  first.actions.sort(
+    (left, right) =>
+      ['note', 'point'].indexOf(left.object.id) - ['note', 'point'].indexOf(right.object.id)
+  );
+  second.actions = [
+    ...second.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'last', text: 'Last note', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   const dom = open(await buildTourPlayerHtml(args));
   try {
     const doc = dom.window.document;
@@ -714,47 +831,36 @@ it('traverses mixed explanations across slides in both directions with a control
   }
 });
 
-it('returns to the last callout text page and keeps empty slides and ending reachable', async () => {
+it('keeps complete action text on Back and skips empty containers before the end screen', async () => {
   const args = fixture();
   const first = args.tour.slides[0]!;
   const second = args.tour.slides[1]!;
-  if (first.kind !== 'image' || second.kind !== 'image') throw new Error('Expected images');
-  first.hotspots[0]!.text = 'A'.repeat(170);
-  second.annotations = [{ id: 'last', text: 'Last note', anchor: null, appearance: null }];
+  if (first.kind !== 'image' || second.kind !== 'image') throw new Error('Expected images.');
+  getTourHotspots(first)[0]!.text = 'A'.repeat(170);
+  second.actions = [
+    {
+      type: 'annotation',
+      object: { id: 'last', text: 'Last note', anchor: null, appearance: null },
+    },
+  ];
   const dom = open(await buildTourPlayerHtml(args));
   try {
     const doc = dom.window.document;
-    const next = doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!;
-    const previous = doc.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!;
-    const body = doc.querySelector('[data-tour-hint-text]')!;
-    next.click();
-    expect(body.textContent).toBe('A'.repeat(10));
-    next.click();
-    expect(body.textContent).toBe('Last note');
-    previous.click();
-    expect(body.textContent).toBe('A'.repeat(10));
-    previous.click();
-    expect(body.textContent).toBe('A'.repeat(160));
-    next.click();
-    next.click();
-    next.click();
-    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('end');
-    doc.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
-    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('two');
+    doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+    expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('Last note');
+    doc.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!.click();
+    expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(170));
   } finally {
     dom.close();
   }
-  second.annotations = [];
+  second.actions = [];
   const empty = open(await buildTourPlayerHtml(args));
   try {
     const doc = empty.window.document;
-    const next = doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!;
-    next.click();
-    next.click();
-    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('two');
-    expect(doc.querySelector<HTMLElement>('[data-tour-hint]')!.hidden).toBe(true);
+    expect(doc.querySelector('[data-tour-counter]')!.textContent).toBe('1 / 1');
+    expect(JSON.parse(doc.querySelector('#tour-data')!.textContent!).tour.slides).toHaveLength(1);
     doc.querySelector<HTMLButtonElement>('[data-tour-next]')!.click();
-    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('end');
+    expect(doc.getElementById('tour-player')!.dataset['slideId']).toBe('end');
   } finally {
     empty.close();
   }
@@ -769,12 +875,15 @@ it('exports marker overrides without rewriting source points', async () => {
     ...args.tour.style.textAppearance,
     calloutGap: 80,
   };
-  slide.hotspots.push({
-    ...slide.hotspots[0]!,
-    id: 'local',
-    point: { x: 0.75, y: 0.5 },
-    pulse: false,
-    markerAppearance: { color: '#123456', pulseColor: null, size: 16 },
+  slide.actions.push({
+    type: 'hotspot' as const,
+    object: {
+      ...getTourHotspots(slide)[0]!,
+      id: 'local',
+      point: { x: 0.75, y: 0.5 },
+      markerAppearance: { color: '#123456', pulseColor: null, size: 16 },
+      visual: { kind: 'point' as const, pulse: false },
+    },
   });
   const saved = JSON.stringify(args.tour);
   const dom = open(await buildTourPlayerHtml(args));
@@ -782,17 +891,48 @@ it('exports marker overrides without rewriting source points', async () => {
     const markers = [...dom.window.document.querySelectorAll<HTMLElement>('.tour-hotspot')];
     expect(markers[0]!.style.getPropertyValue('--tour-marker-color')).toBe('#2367ab');
     expect(markers[0]!.style.getPropertyValue('--tour-marker-size')).toBe('48px');
-    expect(markers[1]!.style.getPropertyValue('--tour-marker-color')).toBe('#123456');
-    expect(markers[1]!.style.getPropertyValue('--tour-marker-pulse-color')).toBe(
+    expect(markers).toHaveLength(1);
+    dom.window.document.querySelector<HTMLButtonElement>('[data-tour-next]')!.click();
+    const localMarker = dom.window.document.querySelector<HTMLElement>('.tour-hotspot')!;
+    expect(localMarker.style.getPropertyValue('--tour-marker-color')).toBe('#123456');
+    expect(localMarker.style.getPropertyValue('--tour-marker-pulse-color')).toBe(
       args.tour.style.accent
     );
-    expect(markers[1]!.dataset['pulse']).toBe('false');
+    expect(localMarker.dataset['pulse']).toBe('false');
     const exported = JSON.parse(dom.window.document.querySelector('#tour-data')!.textContent!);
     expect(exported.tour.style.hotspotAppearance.calloutGap).toBe(80);
     expect(
-      exported.tour.slides[0].hotspots.map((point: { point: unknown }) => point.point)
-    ).toEqual(slide.hotspots.map((point) => point.point));
+      getTourHotspots(exported.tour.slides[0]).map((point: { point: unknown }) => point.point)
+    ).toEqual(getTourHotspots(slide).map((point) => point.point));
     expect(JSON.stringify(args.tour)).toBe(saved);
+  } finally {
+    dom.close();
+  }
+});
+
+it('exports a passive shared window header while preserving authored source placement', async () => {
+  const args = fixture();
+  args.tour.stage.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    kind: 'application',
+    title: 'Image window',
+  };
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.imagePlacement = { center: { x: 0.3, y: 0.5 }, zoom: 2 };
+  const saved = structuredClone(args.tour);
+  const dom = open(await buildTourPlayerHtml(args));
+  try {
+    const header = dom.window.document.querySelector<HTMLImageElement>('.tour-window-header')!;
+    expect(header.src).toMatch(/^data:image\/svg\+xml/);
+    expect(decodeURIComponent(header.src)).toContain('Image window');
+    expect(
+      dom.window.document.querySelector<HTMLElement>('.tour-image-viewport')!.style.clipPath
+    ).toContain('inset(');
+    const payload = JSON.parse(dom.window.document.querySelector('#tour-data')!.textContent!);
+    expect(payload.tour.stage.windowHeader).toEqual(args.tour.stage.windowHeader);
+    expect(payload.tour.slides[0].imagePlacement).toEqual(slide.imagePlacement);
+    expect(args.tour).toEqual(saved);
   } finally {
     dom.close();
   }

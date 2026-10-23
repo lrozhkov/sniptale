@@ -1,3 +1,5 @@
+import { assertScenarioSpeechScope } from '../speech-scope';
+import { readScenarioViewingSnapshot } from '../projects/viewing';
 import type { ScenarioProjectSnapshot } from '../contracts';
 import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -12,6 +14,7 @@ import {
   getTourImages,
   getTourAudioResources,
   getTourNarrationTarget,
+  getScenarioNarrationText,
 } from '../../../../features/scenario/project/public';
 import { publishMediaHubLibraryChanged } from '../../../../features/media-hub/events';
 import {
@@ -31,6 +34,7 @@ export async function importScenarioNarration(args: {
   slideId: string | null;
   objectId?: string | null;
   expectedNarration: TourNarration | TourObjectNarration | null;
+  expectedSource?: { text: string; sourceTextHash: string };
   destination?: { kind: 'background-music'; expected: TourBackgroundMusic | null };
   blob: Blob;
   signal: AbortSignal;
@@ -59,6 +63,26 @@ export async function importScenarioNarration(args: {
       musicIdentity(tour.backgroundMusic ?? null) !== musicIdentity(args.destination.expected))
   )
     throw new Error('The music target has changed.');
+  if (args.expectedSource) {
+    const source =
+      args.slideId && args.objectId
+        ? getScenarioNarrationText(project, { slideId: args.slideId, objectId: args.objectId })
+        : null;
+    if (
+      !source ||
+      source.text !== args.expectedSource.text ||
+      args.destination ||
+      args.expectedRevision === undefined
+    )
+      throw new Error('The narration source has changed.');
+    const text = await assertScenarioSpeechScope({
+      workspaceId: project.id,
+      workspaceRevision: args.expectedRevision,
+      target: { kind: 'scenario-text', slideId: source.slideId, objectId: source.objectId },
+      sourceTextHash: args.expectedSource.sourceTextHash,
+    });
+    if (text !== args.expectedSource.text) throw new Error('The narration source has changed.');
+  }
   assertSafeScenarioAssetStorageInput(args.blob, args.blob.type);
   if (!isSafeScenarioAssetAudioMimeType(args.blob.type)) throw new Error('Unsupported audio.');
   const duration = await decodeNarrationDuration(args.blob);
@@ -129,6 +153,25 @@ export async function importScenarioNarration(args: {
         audio: [...getTourAudioResources(tour), narration],
       }
     );
+    args.signal.throwIfAborted();
+    if (args.expectedSource) {
+      const saved = await readScenarioViewingSnapshot(project.id);
+      const current =
+        saved && args.slideId && args.objectId
+          ? getScenarioNarrationText(saved.project, {
+              slideId: args.slideId,
+              objectId: args.objectId,
+            })
+          : null;
+      if (
+        !saved ||
+        saved.revision !== args.expectedRevision ||
+        !current ||
+        current.text !== args.expectedSource.text ||
+        narrationIdentity(current.narration) !== narrationIdentity(args.expectedNarration)
+      )
+        throw new Error('The narration source has changed.');
+    }
     args.signal.throwIfAborted();
     handedOff = true;
     const result = await commitScenarioAggregateMutation(next, {

@@ -27,6 +27,7 @@ import {
   updateRecordingSettings,
 } from './controls';
 import { markPostRecordPopupActivationOwnedByPopup } from '../post-record-popup-activation';
+import { routeCountdownCamera } from './countdown-camera';
 
 const logger = createLogger({ namespace: 'BackgroundVideoControlRoute' });
 
@@ -47,6 +48,9 @@ export function routeVideoControlMessage(args: RouteVideoControlMessageArgs): bo
   const { message, sendResponse, sender } = args;
 
   switch (message.type) {
+    case VideoMessageType.COUNTDOWN_CAMERA_OFFER:
+    case VideoMessageType.COUNTDOWN_CAMERA_CLOSE:
+      return routeCountdownCamera({ message, sendResponse, sender });
     case VideoMessageType.START_RECORDING:
       return routeStartRecordingControl({ ...args, message });
     case VideoMessageType.STOP_RECORDING:

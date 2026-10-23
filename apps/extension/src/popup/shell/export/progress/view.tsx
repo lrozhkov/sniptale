@@ -23,7 +23,7 @@ import type { ExportProgressSectionProps } from './types';
 
 function ExportStepIcon({ status }: Pick<PopupExportProgressStep, 'status'>) {
   if (status === 'done') {
-    return <CheckCircle2 className="h-4 w-4 text-[var(--sniptale-color-success)]" />;
+    return null;
   }
 
   if (status === 'error') {
@@ -74,7 +74,7 @@ function ExportProgressStepRow({
         >
           <ExportStepIcon status={step.status} />
         </span>
-        <span title={step.label} className={progressStepLabelClassName}>
+        <span data-popup-hint={step.label} className={progressStepLabelClassName}>
           {step.label}
         </span>
         <div aria-hidden="true" className={progressStepDividerClassName} />
@@ -196,8 +196,12 @@ function ExportStatusHeader(props: ExportProgressSectionProps) {
           </div>
           {description ? (
             <div
-              title={description}
-              className={descriptionClassName}
+              data-popup-hint={description}
+              role={props.progress.phase === 'error' ? 'alert' : undefined}
+              className={cx(
+                descriptionClassName,
+                props.progress.phase === 'error' && 'popup-error-message'
+              )}
               data-ui="popup.export.progress-description"
             >
               {description}

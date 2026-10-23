@@ -8,7 +8,7 @@ import {
   getAnnotationIntensityOptions,
 } from './options';
 import { AnnotationStyleControls } from './style-controls';
-import { ColorField, SelectInput } from '../shared/controls';
+import { ColorField } from '../shared/controls';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { SliderField } from '../shared/sliders';
 
@@ -152,7 +152,7 @@ export function renderAnnotationMotionFields(props: AnnotationFieldsSectionProps
 
 function renderDirectionField(props: AnnotationFieldsSectionProps) {
   return (
-    <SelectInput
+    <OptionButtonsField
       label={translate('videoEditor.sidebar.annotationDirectionLabel')}
       value={props.clip.direction}
       disabled={props.disabled}
@@ -170,7 +170,7 @@ function renderIntroFields(props: AnnotationFieldsSectionProps) {
   return (
     <>
       {controls.showIntroAnimation ? (
-        <SelectInput
+        <OptionButtonsField
           label={translate('videoEditor.sidebar.annotationIntroLabel')}
           value={props.clip.introAnimation}
           disabled={props.disabled}
@@ -197,7 +197,7 @@ function renderOutroFields(props: AnnotationFieldsSectionProps) {
   return (
     <>
       {controls.showOutroAnimation ? (
-        <SelectInput
+        <OptionButtonsField
           label={translate('videoEditor.sidebar.annotationOutroLabel')}
           value={props.clip.outroAnimation}
           disabled={props.disabled}

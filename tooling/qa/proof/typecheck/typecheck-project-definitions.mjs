@@ -131,6 +131,12 @@ export const PRODUCTION_TYPECHECK_PROJECTS = [
     references: ['app-core'],
     rootPrefixes: ['apps/extension/src/camera-recorder/'],
   },
+  {
+    id: 'media-permission',
+    include: ['apps/extension/src/media-permission/**/*'],
+    references: ['app-core'],
+    rootPrefixes: ['apps/extension/src/media-permission/'],
+  },
 ];
 
 function createOwnerTestProject(project) {

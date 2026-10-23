@@ -7,6 +7,7 @@ import { expect, it } from 'vitest';
 import { generateDependencyLegalClosure } from './index.mjs';
 import { createLegalFixture, TEST_INTERFACE_FONT } from './test-support';
 import { writeDependencyLegalClosure } from './output.mjs';
+import { releaseLegalArchivePath } from '../policy/oss-release-policy.mjs';
 import { validateDependencyLegalClosure } from './validation.mjs';
 
 function sha256(contents: string) {
@@ -17,7 +18,7 @@ async function seedBaseLegalFiles(repoRoot: string) {
   const baseLegal = new Map([
     ['LICENSE', 'AGPL fixture\n'],
     ['LICENSES/OFL-1.1.txt', 'OFL fixture\n'],
-    ['packages/ui/src/styles/golos-ui/LICENSE.txt', 'Golos OFL fixture\n'],
+    ['LICENSES/fonts/golos-ui.txt', 'Golos OFL fixture\n'],
     ['NOTICE', 'Notice fixture\n'],
     ['THIRD_PARTY_NOTICES.md', 'generated below'],
   ]);
@@ -121,8 +122,8 @@ it('requires Text provenance in generated notices when the policy declares Text'
   );
   policy.bundledAssets.push(documentFont);
   policy.legalFiles.push({
-    archivePath: documentFont.licensePath,
-    source: documentFont.licensePath,
+    archivePath: releaseLegalArchivePath(documentFont.licensePath),
+    source: releaseLegalArchivePath(documentFont.licensePath),
     sha256: 'a'.repeat(64),
   });
   await fs.writeFile(policyPath, JSON.stringify(policy));

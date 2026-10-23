@@ -8,7 +8,7 @@ import type { ReviewTelemetryMarker } from '../../../../features/video/review/te
 
 afterEach(() => vi.unstubAllGlobals());
 
-function installAudioGraph() {
+function installAudioGraph(onStart?: () => void) {
   const nodes: {
     buffer: unknown;
     playbackRate: { value: number };
@@ -25,6 +25,15 @@ function installAudioGraph() {
     currentTime = 0;
     state = 'running';
     destination = {};
+    gains: {
+      gain: {
+        value: number;
+        setValueAtTime: ReturnType<typeof vi.fn>;
+        linearRampToValueAtTime: ReturnType<typeof vi.fn>;
+      };
+      connect: ReturnType<typeof vi.fn>;
+      disconnect: ReturnType<typeof vi.fn>;
+    }[] = [];
     constructor() {
       graphs.push(this);
     }
@@ -36,11 +45,13 @@ function installAudioGraph() {
       return { sampleRate: 44100, length: (bytes.byteLength - 44) / 2, numberOfChannels: 1 };
     }
     createGain() {
-      return {
-        gain: { setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
+      const gain = {
+        gain: { value: 1, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
         connect: vi.fn(),
         disconnect: vi.fn(),
       };
+      this.gains.push(gain);
+      return gain;
     }
     createBufferSource() {
       const node = {
@@ -48,7 +59,7 @@ function installAudioGraph() {
         playbackRate: { value: 0 },
         connect: vi.fn(),
         disconnect: vi.fn(),
-        start: vi.fn(),
+        start: vi.fn(onStart),
         stop: vi.fn(),
         onended: null,
       };
@@ -230,7 +241,9 @@ it('schedules actual attacks once, resets seek/pause, keeps native pitch and rel
     applied: true,
   });
   const { sync, close } = createProjectActionAudioRuntime();
-  await sync({ plan, currentTime: 0.9, isPlaying: true });
+  await sync({ plan, currentTime: 0.9, isPlaying: true, outputGain: 0.25 });
+  expect(graphs[0]!.gains[0]!.gain.value).toBe(0.25);
+  expect(graphs[0]!.gains[1]!.connect).toHaveBeenCalledWith(graphs[0]!.gains[0]);
   expect(nodes).toHaveLength(1);
   expect(nodes[0]!.playbackRate.value).toBe(1);
   expect(nodes[0]!.start.mock.calls[0]![0]).toBeCloseTo(0.1, 12);
@@ -239,6 +252,7 @@ it('schedules actual attacks once, resets seek/pause, keeps native pitch and rel
   graphs.at(-1)!.currentTime = 0.11;
   await sync({ plan: structuredClone(plan), currentTime: 1.01, isPlaying: true });
   expect(graphs.at(-1)!.close).not.toHaveBeenCalled();
+  expect(graphs[0]!.gains[0]!.gain.value).toBe(1);
   expect(nodes).toHaveLength(1);
   graphs.at(-1)!.currentTime = 0.2;
   await sync({ plan, currentTime: 3.9, isPlaying: true });
@@ -250,4 +264,157 @@ it('schedules actual attacks once, resets seek/pause, keeps native pitch and rel
   await close();
   expect(graphs.at(-1)!.close).toHaveBeenCalledOnce();
   expect(nodes.every((node) => node.disconnect.mock.calls.length > 0)).toBe(true);
+  expect(graphs[0]!.gains[0]!.disconnect).toHaveBeenCalledOnce();
+});
+
+function auditionPlan() {
+  return buildReviewActionAudioPlan({
+    markers: [
+      {
+        ref: { kind: 'action', id: 'paired' },
+        eventType: 'HOLD',
+        start: 1,
+        end: 1.3,
+        gesture: {
+          id: 'paired',
+          type: 'hold',
+          button: 0,
+          downTime: 1,
+          upTime: 1.3,
+          completion: 'released',
+        },
+      },
+    ],
+    settings: [
+      {
+        ref: { kind: 'action', id: 'paired' },
+        enabled: true,
+        presetId: 'mouse-classic-paired-v2',
+        volume: 0.5,
+        offset: 0,
+      },
+    ],
+    segments: buildReviewTimeMap(6, []),
+    applied: true,
+  });
+}
+
+it('cancels audition during sample preparation without a late attack or retained graph', async () => {
+  const { nodes, graphs } = installAudioGraph();
+  let deliver!: (response: Response) => void;
+  let begin!: () => void;
+  const started = new Promise<void>((resolve) => {
+    begin = resolve;
+  });
+  const response = new Promise<Response>((resolve) => {
+    deliver = resolve;
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => {
+      begin();
+      return response;
+    })
+  );
+  const controller = new AbortController();
+  const runtime = createProjectActionAudioRuntime();
+  const result = runtime
+    .audition(auditionPlan(), controller.signal)
+    .catch((error: unknown) => error);
+  await started;
+  expect(nodes).toHaveLength(0);
+  controller.abort();
+  deliver(
+    new Response(
+      await readFile(
+        new URL('../../../../../public/action-sounds/v1/mouse-click.wav', import.meta.url)
+      )
+    )
+  );
+  expect(await result).toBeInstanceOf(Error);
+  expect(nodes).toHaveLength(0);
+  expect(graphs[0]!.state).toBe('closed');
+});
+
+it('permits a fresh audition after resource failure and closes playback on caller cancellation', async () => {
+  const controller = new AbortController();
+  const { nodes, graphs } = installAudioGraph(() => controller.abort());
+  const read = vi.fn(
+    async (path: string) =>
+      new Response(await readFile(new URL(`../../../../../public/${path}`, import.meta.url)))
+  );
+  read.mockImplementationOnce(async () => new Response('', { status: 503 }));
+  vi.stubGlobal('fetch', read);
+  await expect(
+    createProjectActionAudioRuntime().audition(auditionPlan(), new AbortController().signal)
+  ).rejects.toThrow();
+  expect(nodes).toHaveLength(0);
+  expect(graphs[0]!.state).toBe('closed');
+  await createProjectActionAudioRuntime()
+    .audition(auditionPlan(), controller.signal)
+    .catch(() => undefined);
+  expect(nodes.length).toBeGreaterThan(0);
+  expect(nodes[0]!.playbackRate.value).toBe(1);
+  expect(nodes[0]!.start).toHaveBeenCalledOnce();
+  expect(nodes[0]!.stop).toHaveBeenCalled();
+  expect(graphs[1]!.state).toBe('closed');
+});
+
+it('closes audition after its playback budget when the audio clock stops', async () => {
+  let began!: () => void;
+  const playing = new Promise<void>((resolve) => {
+    began = resolve;
+  });
+  const { nodes, graphs } = installAudioGraph(began);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async (path: string) =>
+        new Response(await readFile(new URL(`../../../../../public/${path}`, import.meta.url)))
+    )
+  );
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  try {
+    const done = createProjectActionAudioRuntime().audition(
+      auditionPlan(),
+      new AbortController().signal
+    );
+    await playing;
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(2050);
+    await done;
+    expect(nodes.length).toBeGreaterThan(0);
+    expect(graphs[0]!.state).toBe('closed');
+    expect(nodes.every((node) => node.disconnect.mock.calls.length > 0)).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('keeps the first audition attack whole when resume advances the native audio clock', async () => {
+  const controller = new AbortController();
+  let attacks = 0;
+  const { nodes, graphs, resume } = installAudioGraph(() => {
+    if (++attacks === 2) controller.abort();
+  });
+  resume.mockImplementationOnce(async () => {
+    graphs[0]!.currentTime += 384 / 44100;
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async (path: string) =>
+        new Response(await readFile(new URL(`../../../../../public/${path}`, import.meta.url)))
+    )
+  );
+  await createProjectActionAudioRuntime()
+    .audition(auditionPlan(), controller.signal)
+    .catch(() => undefined);
+  expect(nodes).toHaveLength(2);
+  expect(nodes[0]!.start.mock.calls[0]![1]).toBe(0);
+  expect(nodes[1]!.start.mock.calls[0]![0] - nodes[0]!.start.mock.calls[0]![0]).toBeCloseTo(
+    0.3,
+    12
+  );
+  expect(graphs[0]!.state).toBe('closed');
 });

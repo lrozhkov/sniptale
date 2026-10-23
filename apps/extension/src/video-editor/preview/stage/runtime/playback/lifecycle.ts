@@ -24,6 +24,27 @@ async function prepareRuntimeAttempt(
   const revision = authority.configurationRevisionRef.current;
   const latest = authority.latestStateRef.current;
   latest.onPresentationTime(request.time);
+  if (request.isPlaying && latest.prepareSourceVoiceover) {
+    const controller = new AbortController();
+    authority.activePreparationRef.current = controller;
+    const signal = AbortSignal.any([request.signal, controller.signal]);
+    try {
+      await latest.prepareSourceVoiceover({ ...request, signal });
+    } catch (error) {
+      const stale = resolvePreviewAttemptFreshness(authority, request, revision);
+      if (stale) return stale;
+      if (latest.prepareSourceVoiceover !== authority.latestStateRef.current.prepareSourceVoiceover)
+        return 'retry';
+      throw error;
+    } finally {
+      if (authority.activePreparationRef.current === controller)
+        authority.activePreparationRef.current = null;
+    }
+    const stale = resolvePreviewAttemptFreshness(authority, request, revision);
+    if (stale) return stale;
+    if (latest.prepareSourceVoiceover !== authority.latestStateRef.current.prepareSourceVoiceover)
+      return 'retry';
+  }
   await preparePreviewStagePlayback(latest, request.time);
   const stale = resolvePreviewAttemptFreshness(authority, request, revision);
   if (stale) return stale;

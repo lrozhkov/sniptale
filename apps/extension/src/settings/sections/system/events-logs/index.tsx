@@ -39,6 +39,36 @@ export function EventsLogsSection() {
       aria-label={translate('settings.eventsLogs.title')}
       className="flex min-h-[320px] h-full flex-col gap-3"
     >
+      <div className="flex shrink-0 flex-wrap gap-2" data-ui="settings.events-log.actions">
+        <ProductActionButton
+          tone="secondary"
+          type="button"
+          className={buttonClass}
+          disabled={exporting}
+          onClick={() => {
+            void exportHistory();
+          }}
+        >
+          {translate(exporting ? 'settings.eventsLogs.exporting' : 'settings.eventsLogs.exportZip')}
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          type="button"
+          className={buttonClass}
+          onClick={refresh}
+        >
+          {translate('settings.eventsLogs.refresh')}
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          type="button"
+          className={buttonClass}
+          disabled={status !== 'ready' || !filtered.length}
+          onClick={exportLog}
+        >
+          {translate('settings.eventsLogs.export')}
+        </ProductActionButton>
+      </div>
       <JournalFilters
         filters={filters}
         onChange={setFilters}
@@ -65,38 +95,6 @@ export function EventsLogsSection() {
             ? translate('settings.eventsLogs.exportFailed')
             : `${filtered.length} / ${entries.length}`}
         </span>
-        <div className="flex gap-2">
-          <ProductActionButton
-            tone="secondary"
-            type="button"
-            className={buttonClass}
-            disabled={exporting}
-            onClick={() => {
-              void exportHistory();
-            }}
-          >
-            {translate(
-              exporting ? 'settings.eventsLogs.exporting' : 'settings.eventsLogs.exportZip'
-            )}
-          </ProductActionButton>
-          <ProductActionButton
-            tone="secondary"
-            type="button"
-            className={buttonClass}
-            onClick={refresh}
-          >
-            {translate('settings.eventsLogs.refresh')}
-          </ProductActionButton>
-          <ProductActionButton
-            tone="secondary"
-            type="button"
-            className={buttonClass}
-            disabled={status !== 'ready' || !filtered.length}
-            onClick={exportLog}
-          >
-            {translate('settings.eventsLogs.export')}
-          </ProductActionButton>
-        </div>
       </div>
     </section>
   );

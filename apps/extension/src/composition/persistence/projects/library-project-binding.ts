@@ -9,7 +9,7 @@ import {
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 import { createAssetPublicationJournal } from '../assets/publication';
 import { readAssetFile } from '../assets/opfs-store';
-import { readKnownLibrarySource } from './known-library-source';
+import { type LibraryProjectBinding, readKnownLibrarySource } from './known-library-source';
 import { sameLibrarySourceRef } from './library-source-ref';
 import { createLibraryBinding } from './library-binding';
 import type { ProjectAssetPublicationPayload } from './asset-publication-payload';
@@ -74,4 +74,23 @@ export async function prepareLibraryProjectBinding(
     });
   });
   return createLibraryBinding(journal, projectAssetId);
+}
+
+/** Keeps acquisition disposable until the destination transaction accepts the exact source. */
+export function prepareLibraryProjectBindingForCommit(
+  source: Awaited<ReturnType<typeof readLibraryProjectBindingSource>>,
+  projectAssetId: string
+): LibraryProjectBinding {
+  return {
+    claim: { mediaId: source.mediaId, source: source.source },
+    ref: source.ref,
+    entry: {
+      id: projectAssetId,
+      assetId: source.ref.assetId,
+      mimeType: source.ref.mimeType,
+      size: source.ref.size,
+      createdAt: Date.now(),
+      originMediaId: source.mediaId,
+    },
+  };
 }

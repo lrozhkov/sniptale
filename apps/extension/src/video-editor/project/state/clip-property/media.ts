@@ -1,4 +1,14 @@
-import { parseWindowHeader } from '../../../../features/browser-frame/header';
+import {
+  resolveMediaPaddingLayout,
+  maximumMediaPadding,
+} from '../../../../features/video/project/factories/framing-presets';
+import { parseMediaSourceCrop } from '../../../../features/video/project/media-crop';
+import { parseColor } from '@sniptale/foundation/color';
+import {
+  isBoundedNumber,
+  isColorString,
+} from '../../../../features/video/project/validation/primitives';
+import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 import {
   activeCameraPosition,
@@ -34,10 +44,52 @@ export function createClipMediaStyleActions(
   | 'updateMediaClipFitScalePercent'
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
+  | 'updateMediaClipShadowColor'
+  | 'editMediaClip'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
 > {
   return {
+    editMediaClip: (clipId, edit) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) => {
+          const clip = project.clips.find((item) => item.id === clipId);
+          if (!isMediaClip(clip) || !areClipTracksEditable(project, [clipId])) return project;
+          if (edit.kind === 'padding') return updateMediaPadding(project, clip, edit.padding);
+          if (edit.kind === 'window-layout-restore') {
+            const layout = clip.rememberedWindowLayout;
+            return layout ? updateMediaPadding(project, clip, layout.padding, true) : project;
+          }
+          if (edit.kind === 'window-corner-radius') {
+            if (edit.radius !== null && !isBoundedNumber(edit.radius, 0, 4096)) return project;
+            const radius = edit.radius === null ? undefined : edit.radius;
+            if (radius === clip.windowCornerRadius) return project;
+            const { windowCornerRadius: _previous, ...rest } = clip;
+            const updated = radius === undefined ? rest : { ...rest, windowCornerRadius: radius };
+            return applyVideoProjectMutationPatch(project, {
+              clips: project.clips.map((item) => (item.id === clipId ? updated : item)),
+            });
+          }
+          const crop = edit.crop === null ? undefined : parseMediaSourceCrop(edit.crop);
+          if (crop === null) return project;
+          if (
+            (['x', 'y', 'width', 'height'] as const).every(
+              (key) => crop?.[key] === clip.sourceCrop?.[key]
+            )
+          )
+            return project;
+          const { sourceCrop: previous, rememberedSourceCrop: _remembered, ...rest } = clip;
+          const updated =
+            crop === undefined
+              ? previous
+                ? { ...rest, rememberedSourceCrop: previous }
+                : rest
+              : { ...rest, sourceCrop: crop };
+          return applyVideoProjectMutationPatch(project, {
+            clips: project.clips.map((item) => (item.id === clipId ? updated : item)),
+          });
+        })
+      ),
     updateMediaClipFitMode: (clipId, fitMode, fitScalePercent) =>
       set((state) =>
         applyProjectUpdate(state, (project) =>
@@ -59,6 +111,12 @@ export function createClipMediaStyleActions(
       set((state) =>
         applyProjectUpdate(state, (project) =>
           updateMediaClipVisuals(project, clipId, { shadowIntensity })
+        )
+      ),
+    updateMediaClipShadowColor: (clipId, shadowColor) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) =>
+          updateMediaClipVisuals(project, clipId, { shadowColor })
         )
       ),
     updateMediaClipShadowMode: (clipId, shadowMode) =>
@@ -83,8 +141,12 @@ export function createClipMediaStyleActions(
           return applyVideoProjectMutationPatch(project, {
             clips: project.clips.map((item) => {
               if (item.id !== clipId || !isMediaClip(item)) return item;
-              const { windowHeader: _previous, ...rest } = item;
-              return header === undefined ? rest : { ...rest, windowHeader: header };
+              const { windowHeader: previous, rememberedWindowHeader: _remembered, ...rest } = item;
+              return header === undefined
+                ? previous
+                  ? { ...rest, rememberedWindowHeader: previous }
+                  : rest
+                : { ...rest, windowHeader: header };
             }),
           });
         })
@@ -113,14 +175,20 @@ function resolveMediaClipFitTransform(
     return clip.transform;
   }
 
-  return resolveMediaClipTransformForFitMode(
-    asset.metadata.width,
-    asset.metadata.height,
+  const isCamera =
+    clip.type === 'VIDEO' &&
+    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
+  const transform = resolveMediaClipTransformForFitMode(
+    asset.metadata.width * (clip.sourceCrop?.width ?? 1),
+    asset.metadata.height * (clip.sourceCrop?.height ?? 1),
     project.width,
     project.height,
     fitMode,
-    fitScalePercent
+    fitScalePercent,
+    isCamera ? undefined : clip.windowHeader,
+    { width: asset.metadata.width, height: asset.metadata.height }
   );
+  return isCamera ? transform : { ...transform, opacity: clip.transform.opacity };
 }
 
 function updateMediaClipVisuals(
@@ -131,6 +199,7 @@ function updateMediaClipVisuals(
     fitScalePercent?: number;
     shadowIntensity?: number;
     shadowMode?: VideoMediaShadowMode;
+    shadowColor?: string;
   },
   time = 0
 ) {
@@ -139,15 +208,28 @@ function updateMediaClipVisuals(
     return project;
   }
 
+  if (
+    patch.shadowColor !== undefined &&
+    (!isColorString(patch.shadowColor) || !parseColor(patch.shadowColor))
+  )
+    return project;
+  const shadowColor = patch.shadowColor ?? clip.shadowColor;
   const isCamera =
     clip.type === 'VIDEO' &&
     project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
   const position = isCamera ? activeCameraPosition(clip, time) : undefined;
   const fitMode = patch.fitMode ?? position?.fitMode ?? clip.fitMode;
+  const scaleLimits = isCamera
+    ? VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent
+    : VIDEO_CLIP_PROPERTY_LIMITS.ordinaryMediaFitScalePercent;
   const fitScalePercent =
     patch.fitScalePercent === undefined
-      ? normalizeMediaFitScalePercent(clip.fitScalePercent ?? 100)
-      : normalizeMediaFitScalePercent(patch.fitScalePercent, clip.fitScalePercent ?? 100);
+      ? normalizeMediaFitScalePercent(clip.fitScalePercent ?? 100, 100, scaleLimits)
+      : normalizeMediaFitScalePercent(
+          patch.fitScalePercent,
+          clip.fitScalePercent ?? 100,
+          scaleLimits
+        );
   const shadowIntensity =
     patch.shadowIntensity === undefined
       ? normalizeVideoMediaShadowIntensity(clip.shadowIntensity)
@@ -159,6 +241,7 @@ function updateMediaClipVisuals(
   const shouldRefreshTransform = patch.fitMode !== undefined || patch.fitScalePercent !== undefined;
   if (
     !shouldRefreshTransform &&
+    shadowColor === clip.shadowColor &&
     shadowIntensity === normalizeVideoMediaShadowIntensity(clip.shadowIntensity) &&
     shadowMode === normalizeVideoMediaShadowMode(clip.shadowMode)
   ) {
@@ -177,6 +260,7 @@ function updateMediaClipVisuals(
           fitScalePercent,
           shadowIntensity,
           shadowMode,
+          ...(shadowColor === undefined ? {} : { shadowColor }),
         };
       }
       return {
@@ -185,6 +269,7 @@ function updateMediaClipVisuals(
         fitScalePercent,
         shadowIntensity,
         shadowMode,
+        ...(shadowColor === undefined ? {} : { shadowColor }),
         transform: shouldRefreshTransform
           ? resolveMediaClipFitTransform(project, item, fitMode, fitScalePercent)
           : item.transform,
@@ -193,14 +278,16 @@ function updateMediaClipVisuals(
   });
 }
 
-function normalizeMediaFitScalePercent(value: number, fallback = 100): number {
+function normalizeMediaFitScalePercent(
+  value: number,
+  fallback = 100,
+  limits: { min: number; max: number } = VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent
+): number {
   if (!Number.isFinite(value)) {
-    return Number.isFinite(fallback)
-      ? clampVideoPropertyNumber(fallback, VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent)
-      : 100;
+    return Number.isFinite(fallback) ? clampVideoPropertyNumber(fallback, limits) : 100;
   }
 
-  return clampVideoPropertyNumber(value, VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent);
+  return clampVideoPropertyNumber(value, limits);
 }
 
 function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string, time: number) {
@@ -226,7 +313,7 @@ function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string, tim
     clips: project.clips.map((item) =>
       item.trackId === clip.trackId && isMediaClip(item)
         ? {
-            ...item,
+            ...copyMediaWindowRadius(copyMediaShadowColor(item, clip), clip),
             fitMode: clip.fitMode,
             fitScalePercent: clip.fitScalePercent ?? 100,
             shadowIntensity: normalizeVideoMediaShadowIntensity(clip.shadowIntensity),
@@ -256,7 +343,7 @@ function applyCameraVisualsToTrack(
     clips: project.clips.map((clip) => {
       if (clip.type !== 'VIDEO' || clip.trackId !== source.trackId) return clip;
       return {
-        ...clip,
+        ...copyMediaShadowColor(clip, source),
         cameraAppearance: { ...appearance },
         shadowIntensity: normalizeVideoMediaShadowIntensity(source.shadowIntensity),
         shadowMode: normalizeVideoMediaShadowMode(source.shadowMode),
@@ -273,5 +360,94 @@ function applyCameraVisualsToTrack(
           : {}),
       };
     }),
+  });
+}
+
+function copyMediaShadowColor<T extends { shadowColor?: string }>(
+  target: T,
+  source: { shadowColor?: string }
+): T {
+  const copy = { ...target };
+  if (source.shadowColor === undefined) delete copy.shadowColor;
+  else copy.shadowColor = source.shadowColor;
+  return copy;
+}
+
+function copyMediaWindowRadius<T extends { windowCornerRadius?: number }>(
+  target: T,
+  source: { windowCornerRadius?: number }
+): T {
+  const copy = { ...target };
+  if (source.windowCornerRadius === undefined) delete copy.windowCornerRadius;
+  else copy.windowCornerRadius = source.windowCornerRadius;
+  return copy;
+}
+
+function updateMediaPadding(
+  project: VideoProject,
+  clip: MediaClip,
+  padding: number,
+  restoreWindowLayout = false
+) {
+  const remembered = restoreWindowLayout ? clip.rememberedWindowLayout : undefined;
+  if (
+    clip.type === 'VIDEO' &&
+    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+  )
+    return project;
+  const asset = getAssetById(project, clip.assetId);
+  if (!asset) return project;
+  const effectivePadding = remembered
+    ? Math.min(padding, maximumMediaPadding(project.width, project.height))
+    : padding;
+  const keepRecipe = remembered !== undefined && effectivePadding !== padding;
+  const layout = resolveMediaPaddingLayout(
+    asset.metadata.width * (clip.sourceCrop?.width ?? 1),
+    asset.metadata.height * (clip.sourceCrop?.height ?? 1),
+    project.width,
+    project.height,
+    effectivePadding,
+    clip.windowHeader,
+    { width: asset.metadata.width, height: asset.metadata.height }
+  );
+  if (!layout) return project;
+  const transform = { ...layout.transform, opacity: clip.transform.opacity };
+  if (
+    (!remembered ||
+      (keepRecipe &&
+        clip.windowCornerRadius === remembered.windowCornerRadius &&
+        clip.shadowIntensity === remembered.shadowIntensity &&
+        clip.shadowColor === remembered.shadowColor &&
+        clip.shadowMode === remembered.shadowMode)) &&
+    clip.fitMode === layout.fitMode &&
+    clip.fitScalePercent === layout.fitScalePercent &&
+    (['x', 'y', 'width', 'height', 'rotation', 'opacity'] as const).every(
+      (key) => clip.transform[key] === transform[key]
+    )
+  )
+    return project;
+  let updated = { ...clip, ...layout, transform };
+  if (remembered) {
+    const {
+      rememberedWindowLayout: _memory,
+      windowCornerRadius: _radius,
+      shadowIntensity: _intensity,
+      shadowColor: _color,
+      shadowMode: _mode,
+      ...rest
+    } = updated;
+    updated = {
+      ...rest,
+      windowCornerRadius: remembered.windowCornerRadius,
+      ...(remembered.shadowIntensity !== undefined
+        ? { shadowIntensity: remembered.shadowIntensity }
+        : {}),
+      ...(remembered.shadowColor !== undefined ? { shadowColor: remembered.shadowColor } : {}),
+      ...(remembered.shadowMode !== undefined ? { shadowMode: remembered.shadowMode } : {}),
+      ...(keepRecipe ? { rememberedWindowLayout: remembered } : {}),
+    };
+  }
+  return applyVideoProjectMutationPatch(project, {
+    clips: project.clips.map((item) => (item.id === clip.id ? updated : item)),
   });
 }

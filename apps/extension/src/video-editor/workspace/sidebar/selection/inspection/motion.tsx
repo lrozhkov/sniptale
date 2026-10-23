@@ -1,3 +1,16 @@
+import { OptionButtonsField } from '../shared/option-buttons';
+import { isCameraMotionRegion } from '../../../../../features/video/project/motion/normalization';
+import {
+  MotionEffectModeField,
+  MotionFocusFields,
+  MotionFocusAnimationFields,
+} from '../motion/appearance';
+import {
+  MotionPerspectiveFields,
+  MotionDepthFields,
+  MotionSpatialReferenceFields,
+} from '../motion/spatial';
+import { MotionBlurField } from '../motion/fields';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
@@ -13,7 +26,6 @@ import {
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
 import { resolveMotionConnectionSource } from '../../../../../features/video/project/motion';
-import { SelectInput } from '../shared/controls';
 import { getTemporalEasingOptions } from '../effect-controls/options';
 
 export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPanelProps) {
@@ -27,13 +39,15 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
     !resolveMotionConnectionSource(props.project, destination)
   )
     return <SelectionEmptyState />;
+  const source = resolveMotionConnectionSource(props.project, destination)!;
   const connection = destination.incomingConnection;
   const locked = getVideoProjectUtilityLanes(props.project).camera.locked;
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
       <MotionInspectorFieldset locked={locked}>
-        <SelectInput
+        <OptionButtonsField
           label={translate('videoEditor.sidebar.motionEasingLabel')}
+          layout="stacked"
           value={connection.easing}
           options={getTemporalEasingOptions()}
           onChange={(easing) =>
@@ -42,13 +56,20 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
             })
           }
         />
+        {isCameraMotionRegion(source) ? (
+          <MotionBlurField motionRegion={source} phase="link" panel={props} />
+        ) : null}
         <InspectorActionButton
           compact
           tone="danger"
           separated
           onClick={() => props.onUpdateMotionRegion(destination.id, { incomingConnection: null })}
         >
-          {translate('videoEditor.timeline.disconnectFraming')}
+          {translate(
+            source.spotlight
+              ? 'videoEditor.sidebar.disconnectSpotlight'
+              : 'videoEditor.timeline.disconnectFraming'
+          )}
         </InspectorActionButton>
       </MotionInspectorFieldset>
     </section>
@@ -78,12 +99,60 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'zoom',
-            semantic: 'framing' as const,
-            label: translate('videoEditor.sidebar.inspectorGroupFraming'),
+            semantic: isCameraMotionRegion(motionRegion)
+              ? ('framing' as const)
+              : ('appearance' as const),
+            label: translate(
+              !isCameraMotionRegion(motionRegion)
+                ? 'videoEditor.sidebar.inspectorGroupAppearance'
+                : 'videoEditor.sidebar.inspectorGroupFraming'
+            ),
             defaultActive: true,
             content: (
               <MotionInspectorFieldset locked={isLocked}>
-                <MotionCameraFields motionRegion={motionRegion} panel={props} />
+                <div className="sniptale-parameter-stack">
+                  <MotionEffectModeField motionRegion={motionRegion} panel={props} />
+                  {!isCameraMotionRegion(motionRegion) ? (
+                    <MotionFocusFields motionRegion={motionRegion} panel={props} />
+                  ) : (
+                    <MotionCameraFields motionRegion={motionRegion} panel={props} />
+                  )}
+                </div>
+              </MotionInspectorFieldset>
+            ),
+          },
+          {
+            id: 'perspective',
+            visible: isCameraMotionRegion(motionRegion),
+            semantic: 'perspective' as const,
+            label: translate('gallery.videoReview.perspective'),
+            content: (
+              <MotionInspectorFieldset locked={isLocked}>
+                <MotionPerspectiveFields motionRegion={motionRegion} panel={props} />
+              </MotionInspectorFieldset>
+            ),
+          },
+          {
+            id: 'depth',
+            visible: isCameraMotionRegion(motionRegion),
+            semantic: 'depth' as const,
+            label: translate('gallery.videoReview.depthOfField'),
+            content: (
+              <MotionInspectorFieldset locked={isLocked}>
+                <MotionDepthFields motionRegion={motionRegion} panel={props} />
+              </MotionInspectorFieldset>
+            ),
+          },
+          {
+            id: 'spatial-reference',
+            visible:
+              isCameraMotionRegion(motionRegion) &&
+              motionRegion.sourceBinding?.coordinateSpace !== 'source-window',
+            semantic: 'framing' as const,
+            label: translate('videoEditor.sidebar.inspectorGroupSpatialReference'),
+            content: (
+              <MotionInspectorFieldset locked={isLocked}>
+                <MotionSpatialReferenceFields motionRegion={motionRegion} panel={props} />
               </MotionInspectorFieldset>
             ),
           },
@@ -103,7 +172,11 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
             label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
             content: (
               <MotionInspectorFieldset locked={isLocked}>
-                <MotionBehaviorFields motionRegion={motionRegion} panel={props} />
+                {!isCameraMotionRegion(motionRegion) ? (
+                  <MotionFocusAnimationFields motionRegion={motionRegion} panel={props} />
+                ) : (
+                  <MotionBehaviorFields motionRegion={motionRegion} panel={props} />
+                )}
               </MotionInspectorFieldset>
             ),
           },

@@ -1,8 +1,15 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import type { PopupMediaDeviceOption } from '../media-devices/index';
+import type { PopupMediaDeviceOption, PopupMediaPermissionName } from '../media-devices/index';
 import type { TranslationKey } from '../../../platform/i18n';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
+import { translate } from '../../../platform/i18n/popup';
+import {
+  getPopupMediaAccessErrorKey,
+  PopupMediaAccessError,
+  readPopupMediaAccessState,
+} from '../media-devices';
+import { openSettingsPage } from '../../../platform/navigation/extension-pages';
 
 type RefreshMediaDevicesParams<TDevice extends PopupMediaDeviceOption> = {
   refreshOwner: symbol;
@@ -14,6 +21,10 @@ type RefreshMediaDevicesParams<TDevice extends PopupMediaDeviceOption> = {
 };
 
 const mediaDeviceRefreshSequences = new Map<symbol, number>();
+const pendingMediaPermissionHandoffs = new WeakMap<
+  Dispatch<SetStateAction<VideoRecordingSettings>>,
+  Set<PopupMediaPermissionName>
+>();
 
 function isCurrentRefresh(owner: symbol, sequence: number): boolean {
   return mediaDeviceRefreshSequences.get(owner) === sequence;
@@ -56,12 +67,67 @@ type ToggleMediaDeviceParams<TDevice extends PopupMediaDeviceOption> = {
   setVideoSettings: Dispatch<SetStateAction<VideoRecordingSettings>>;
   setStartError: Dispatch<SetStateAction<string | null>>;
   refreshDevices: () => Promise<TDevice[]>;
+  requestPermission: (deviceId: string | null) => Promise<void>;
   enabledKey: 'microphoneEnabled' | 'webcamEnabled';
   deviceIdKey: 'microphoneDeviceId' | 'webcamDeviceId';
   noDevicesError: string;
   accessErrorKey: TranslationKey;
   resolveDeviceId: (currentId: string | null, devices: TDevice[]) => string | null;
 };
+
+async function acquireVerifiedMediaDevices<TDevice extends PopupMediaDeviceOption>(
+  selectedDeviceId: string | null,
+  {
+    requestPermission,
+    refreshDevices,
+    resolveDeviceId,
+  }: Pick<
+    ToggleMediaDeviceParams<TDevice>,
+    'requestPermission' | 'refreshDevices' | 'resolveDeviceId'
+  >
+): Promise<TDevice[]> {
+  try {
+    await requestPermission(selectedDeviceId);
+  } catch (error) {
+    if (
+      !(error instanceof PopupMediaAccessError) ||
+      error.state !== 'no-device' ||
+      !selectedDeviceId
+    ) {
+      throw error;
+    }
+    const devices = await refreshDevices();
+    const replacementId = resolveDeviceId(selectedDeviceId, devices);
+    if (!replacementId || replacementId === selectedDeviceId) {
+      throw error;
+    }
+    await requestPermission(replacementId);
+    return devices;
+  }
+  return refreshDevices();
+}
+
+async function handOffMissingMediaPermission(
+  permissionName: PopupMediaPermissionName,
+  setVideoSettings: Dispatch<SetStateAction<VideoRecordingSettings>>
+): Promise<boolean> {
+  if ((await readPopupMediaAccessState(permissionName)) === 'granted') return false;
+  const pending =
+    pendingMediaPermissionHandoffs.get(setVideoSettings) ?? new Set<PopupMediaPermissionName>();
+  if (pending.has(permissionName)) return true;
+  pending.add(permissionName);
+  pendingMediaPermissionHandoffs.set(setVideoSettings, pending);
+  try {
+    await openSettingsPage({
+      route: { section: 'access-data', view: 'permissions' },
+      requestMediaAccess: permissionName,
+    });
+  } finally {
+    pending.delete(permissionName);
+    if (pending.size === 0) pendingMediaPermissionHandoffs.delete(setVideoSettings);
+  }
+  return true;
+}
 
 export async function togglePopupMediaDevice<TDevice extends PopupMediaDeviceOption>(
   params: ToggleMediaDeviceParams<TDevice>
@@ -70,7 +136,6 @@ export async function togglePopupMediaDevice<TDevice extends PopupMediaDeviceOpt
     videoSettings,
     setVideoSettings,
     setStartError,
-    refreshDevices,
     enabledKey,
     deviceIdKey,
     noDevicesError,
@@ -89,7 +154,12 @@ export async function togglePopupMediaDevice<TDevice extends PopupMediaDeviceOpt
   setStartError(null);
 
   try {
-    const devices = await refreshDevices();
+    const permissionName = enabledKey === 'microphoneEnabled' ? 'microphone' : 'camera';
+    if (await handOffMissingMediaPermission(permissionName, setVideoSettings)) {
+      return;
+    }
+    const selectedDeviceId = videoSettings[deviceIdKey] ?? null;
+    const devices = await acquireVerifiedMediaDevices(selectedDeviceId, params);
 
     if (devices.length === 0) {
       throw new Error(noDevicesError);
@@ -101,6 +171,11 @@ export async function togglePopupMediaDevice<TDevice extends PopupMediaDeviceOpt
       [deviceIdKey]: resolveDeviceId(previous[deviceIdKey] ?? null, devices),
     }));
   } catch (error) {
+    const mediaErrorKey = getPopupMediaAccessErrorKey(error);
+    if (mediaErrorKey) {
+      setStartError(translate(mediaErrorKey));
+      return;
+    }
     if (error instanceof Error && error.message === noDevicesError) {
       setStartError(noDevicesError);
       return;

@@ -129,10 +129,15 @@ it('routes multi-source starts to the multi-source session owner', async () => {
     streamId: 'desktop-multi',
   } as never);
 
-  expect(startMultiSourceRecordingMock).toHaveBeenCalledWith({
-    recordingId: 'multi-1',
-    settings: expect.objectContaining({ sourceCount: 2, systemAudioEnabled: false }),
-  });
+  expect(startMultiSourceRecordingMock).toHaveBeenCalledWith(
+    {
+      generation: 1,
+      recordingId: 'multi-1',
+      streamInstanceId: 'stream-instance-multi-1',
+      settings: expect.objectContaining({ sourceCount: 2, systemAudioEnabled: false }),
+    },
+    expect.objectContaining({ sendRuntimeMessage: expect.any(Function) })
+  );
   expect(startRecordingImplMock).not.toHaveBeenCalled();
 });
 

@@ -8,12 +8,17 @@ import { tourActionTarget } from './action-navigation';
 it('walks mixed actions and empty slides in both directions without modifying the tour', () => {
   const tour = createTourDocument();
   const first = createTourImageSlide('first');
-  first.annotations = ['one', 'two'].map((id) => ({
-    id,
-    text: id,
-    anchor: null,
-    appearance: null,
-  }));
+  first.actions = [
+    ...first.actions.filter((entry) => entry.type !== 'annotation'),
+    ...['one', 'two']
+      .map((id) => ({
+        id,
+        text: id,
+        anchor: null,
+        appearance: null,
+      }))
+      .map((object) => ({ type: 'annotation' as const, object })),
+  ];
   first.masks = [
     {
       id: 'mask',
@@ -24,7 +29,13 @@ it('walks mixed actions and empty slides in both directions without modifying th
     },
   ];
   const last = createTourImageSlide('last');
-  last.annotations = [{ id: 'three', text: 'Three', anchor: null, appearance: null }];
+  last.actions = [
+    ...last.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'three', text: 'Three', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   tour.slides = [first, createTourImageSlide('empty'), last];
   const original = structuredClone(tour);
   const at = (slideId: string, objectId: string | null) => ({
@@ -41,10 +52,14 @@ it('walks mixed actions and empty slides in both directions without modifying th
   expect(tourActionTarget(tour, at('empty', null), -1)).toEqual(at('first', 'two'));
   expect(tourActionTarget(tour, at('first', 'two'), -1)).toEqual(at('first', 'one'));
   expect(tour).toEqual(original);
-  first.objectOrder = ['two', 'mask', 'one'];
+  first.actions.sort(
+    (left, right) =>
+      ['two', 'mask', 'one'].indexOf(left.object.id) -
+      ['two', 'mask', 'one'].indexOf(right.object.id)
+  );
   expect(tourActionTarget(tour, at('first', 'two'), 1)).toEqual(at('first', 'one'));
   expect(tourActionTarget(tour, at('first', 'one'), -1)).toEqual(at('first', 'two'));
-  delete first.objectOrder;
+  first.actions.reverse();
   tour.slides.reverse();
   expect(tourActionTarget(tour, at('empty', null), 1)).toEqual(at('first', 'one'));
   expect(tourActionTarget(tour, at('empty', null), -1)).toEqual(at('last', 'three'));

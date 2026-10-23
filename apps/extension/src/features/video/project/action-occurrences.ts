@@ -1,3 +1,4 @@
+import { areVideoClipSourceClocksContinuous } from './timeline/rate';
 import { recordingIdForProjectAsset } from './source-interactions';
 import type { VideoProject, VideoProjectActionEvent, VideoProjectVideoClip } from './types';
 
@@ -20,7 +21,7 @@ function touches(left: VideoProjectVideoClip, right: VideoProjectVideoClip): boo
     left.trackId === right.trackId &&
     left.assetId === right.assetId &&
     Math.abs(left.startTime + left.duration - right.startTime) <= CONTINUITY_EPSILON &&
-    Math.abs(left.sourceStart + left.sourceDuration - right.sourceStart) <= CONTINUITY_EPSILON
+    areVideoClipSourceClocksContinuous(left, right)
   );
 }
 
@@ -96,9 +97,23 @@ export function resolveVideoProjectActionOccurrences(
     }
     const key = JSON.stringify([anchor.recordingId, anchor.sourceInstanceId]);
     const clips = instances.get(key) ?? [];
-    const containsDown = (clip: VideoProjectVideoClip) =>
+    const pointTime = (clip: VideoProjectVideoClip) =>
+      clip.startTime +
+      (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) -
+      (clip.playbackWindow?.offset ?? 0);
+    const containsSource = (clip: VideoProjectVideoClip) =>
       anchor.sourceTime >= clip.sourceStart &&
       anchor.sourceTime < clip.sourceStart + clip.sourceDuration;
+    const beforeHold = (clip: VideoProjectVideoClip) =>
+      clip.playbackWindow?.holdAt === undefined ||
+      (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) <=
+        clip.playbackWindow.holdAt + CONTINUITY_EPSILON;
+    const containsDown = (clip: VideoProjectVideoClip) =>
+      containsSource(clip) &&
+      (!clip.playbackWindow ||
+        (beforeHold(clip) &&
+          pointTime(clip) >= clip.startTime - CONTINUITY_EPSILON &&
+          pointTime(clip) < clip.startTime + clip.duration - CONTINUITY_EPSILON));
     const clipRuns = runs.get(key);
     const gesture = event.data['gestureType'];
     const down = event.data['downTime'];
@@ -121,13 +136,15 @@ export function resolveVideoProjectActionOccurrences(
       clips.filter(containsDown).map((clip) => clipRuns?.get(clip.id)?.id ?? clip.id)
     );
     const continuations = new Map<string, VideoProjectVideoClip>();
-    if (observedEnd > anchor.sourceTime)
+    if (observedEnd > anchor.sourceTime || clips.some((clip) => clip.playbackWindow))
       for (const clip of clips) {
         const runId = clipRuns?.get(clip.id)?.id ?? clip.id;
         if (
           anchoredRuns.has(runId) ||
           anchor.sourceTime >= clip.sourceStart + clip.sourceDuration ||
-          observedEnd <= clip.sourceStart
+          (clip.playbackWindow
+            ? !(containsSource(clip) && beforeHold(clip) && pointTime(clip) < clip.startTime)
+            : observedEnd <= clip.sourceStart)
         )
           continue;
         const previous = continuations.get(runId);
@@ -146,7 +163,7 @@ export function resolveVideoProjectActionOccurrences(
           event,
           eventId: event.id,
           clipId: clip.id,
-          time: clip.startTime + (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1),
+          time: pointTime(clip),
           sourceInstanceId: anchor.sourceInstanceId,
           playbackRun: runs.get(key)?.get(clip.id) ?? null,
         },

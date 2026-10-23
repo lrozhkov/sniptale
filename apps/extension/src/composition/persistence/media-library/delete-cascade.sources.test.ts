@@ -321,7 +321,7 @@ it.each(
     });
     if (resource === 'watermark') {
       const { createQuickEditWatermark } =
-        await import('../../../features/video/review/advanced/watermark');
+        await import('../../../features/video/project/scene/watermark');
       advanced.audio.music = [];
       advanced.watermark = {
         ...createQuickEditWatermark('Remembered'),
@@ -496,7 +496,7 @@ it('confirmed image-origin purge strips active and remembered logos from the ret
   const { createQuickEditAdvancedState, createQuickEditAdvancedContent } =
     await import('../../../features/video/review/advanced/defaults');
   const { createQuickEditWatermark } =
-    await import('../../../features/video/review/advanced/watermark');
+    await import('../../../features/video/project/scene/watermark');
   const { parseVideoWorkspace } = await import('../review-workspaces/parser');
   const { collectReviewAssetReferences } = await import('../review-workspaces/asset-refs');
   installSource({ kind: 'screenshot' });

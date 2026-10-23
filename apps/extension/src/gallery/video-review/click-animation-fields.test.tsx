@@ -173,8 +173,10 @@ it('offers factual hold appearance without inapplicable pulse timing or pointer 
   expect(host.querySelector('[aria-label="gallery.videoReview.gestureAppearance"]')).not.toBeNull();
   expect(host.querySelector('[aria-label="gallery.videoReview.clickBefore"]')).toBeNull();
   expect(host.querySelector('[aria-label="gallery.videoReview.clickX"]')).toBeNull();
-  const choices = host.querySelector('[aria-label="gallery.videoReview.clickEffect"]');
-  expect(choices?.textContent).not.toContain('gallery.videoReview.click_magnify');
+  const display = host.querySelector('[aria-label="gallery.videoReview.gestureFeedback"]');
+  expect(display?.getAttribute('role')).toBe('switch');
+  expect(display?.getAttribute('aria-checked')).toBe('true');
+  expect(host.textContent).not.toContain('gallery.videoReview.click_magnify');
 });
 
 it('puts frame geometry in a disclosure with bounded plain sliders', () => {

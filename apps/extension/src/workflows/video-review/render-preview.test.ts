@@ -15,7 +15,7 @@ import type { RenderResources } from '../../features/video/composition/canvas/re
 import { createReviewPreviewRenderer } from './render-preview';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { reviewCutTransitionAt } from '../../features/video/review/cuts';
-import { DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/review/advanced/spatial';
+import { DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/project/motion/spatial';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -43,12 +43,12 @@ vi.mock('./cut-transition-frames', async (original) => ({
   paintReviewCutTransition: io.transition,
   paintReviewCutBlackout: io.blackout,
 }));
-vi.mock('./render-watermark', () => ({
-  createReviewWatermarkRenderer: io.watermark,
-  measureReviewWatermark: async (...args: unknown[]) => ({
+vi.mock('../../features/video/composition/canvas/watermark', () => ({
+  createWatermarkRenderer: io.watermark,
+  measureWatermark: async (...args: unknown[]) => ({
     cache: null,
     source: null,
-    paint: (readAsset: unknown) => io.watermark(args[0], args[1], args[2], readAsset, args[3]),
+    paint: (assets: unknown) => io.watermark(args[0], args[1], assets, args[2], args[3]),
   }),
 }));
 vi.mock('./window-header', async (original) => ({
@@ -56,7 +56,9 @@ vi.mock('./window-header', async (original) => ({
   loadReviewWindowHeader: io.header,
   reviewWindowHeaderUrl: () => 'local-header',
 }));
-vi.mock('./spatial-renderer', () => ({ createReviewSpatialRenderer: io.spatial }));
+vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({
+  createReviewSpatialRenderer: io.spatial,
+}));
 vi.mock('./scene-background', () => ({ createReviewBackgroundPainter: io.background }));
 
 const size = { width: 1920, height: 1080 };
@@ -908,7 +910,9 @@ it('admits the full output dissolve scratch and endpoint overlays before acquiri
   snapshot.zoomRegions = [
     {
       ...createQuickEditZoomRegion({ id: 'border', at: 2, duration: 2 }),
-      border: (await import('../../features/video/review/advanced/border')).createQuickEditBorder(),
+      border: (
+        await import('../../features/video/project/scene/focus-appearance')
+      ).createQuickEditBorder(),
     },
   ];
   const prepared = await renderer.prepare(snapshot, dimensions, new AbortController().signal);

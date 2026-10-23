@@ -2,6 +2,10 @@ import { defineMessageSource } from '../source';
 
 export const backgroundMessages = defineMessageSource({
   runtime: {
+    actionMicrophoneQuiet: {
+      ru: 'Sniptale • Некоторое время нет сигнала микрофона. Запись продолжается.',
+      en: 'Sniptale • No microphone signal for a while. Recording continues.',
+    },
     offscreenDocumentTitle: {
       ru: 'Sniptale — Фоновый модуль записи',
       en: 'Sniptale — Recording runtime',

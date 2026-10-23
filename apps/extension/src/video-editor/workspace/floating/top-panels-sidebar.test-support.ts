@@ -73,6 +73,7 @@ function createProjectEditActions(): Omit<
 
     onInsertCursorSample: noop(),
     onMoveEffectInstance: noop(),
+    onPreviewMotion: noop(),
     onPreviewSceneBackground: noop(),
     onRememberRecentColor: noop(),
     onRenameTrack: noop(),
@@ -131,6 +132,8 @@ function createClipActions(): VideoEditorSidebarController['clipActions'] {
     onUpdateMediaClipFitScalePercent: noop(),
     onUpdateMediaClipShadowIntensity: noop(),
     onUpdateMediaClipShadowMode: noop(),
+    onUpdateMediaClipShadowColor: noop(),
+    onEditMediaClip: noop(),
     onUpdateMediaClipWindowHeader: noop(),
     onUpdateShapeStyle: noop(),
     onUpdateSubtitleTrackStyle: noop(),

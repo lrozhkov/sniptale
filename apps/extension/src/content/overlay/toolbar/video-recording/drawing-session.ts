@@ -105,7 +105,7 @@ export function createRecordingDrawingOwner(options?: {
   };
 
   controller = createContentDrawingController(
-    createDrawingSession({ onDocumentCommit: acceptCommit })
+    createDrawingSession({ autoSelectCreatedObjects: false, onDocumentCommit: acceptCommit })
   );
 
   return {

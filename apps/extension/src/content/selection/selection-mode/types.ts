@@ -1,8 +1,10 @@
 import type { CaptureActionType } from '../../../contracts/settings';
+import type { ContentDrawingCaptureSnapshot } from '../../drawing/capture';
 
 export type SelectionState = 'idle' | 'hover' | 'drag' | 'confirmed';
 
 export interface SelectionModeActivationOptions {
+  onDrawingSnapshot?: (snapshot: ContentDrawingCaptureSnapshot) => void;
   frozenFrame?: FrozenSelectionFrame;
   captureAction?: CaptureActionType;
   onCaptureActionChange?: (action: CaptureActionType) => void;

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sniptale</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: transparent;
+      }
+      body {
+        font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
+      }
+      main {
+        box-sizing: border-box;
+        min-height: 100vh;
+        padding: 8px 12px;
+        background: var(--sniptale-color-surface-panel);
+        color: var(--sniptale-color-text-primary);
+        border: 1px solid var(--sniptale-color-border-soft);
+        border-radius: var(--sniptale-radius-md);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      h1 {
+        margin: 0;
+        font: var(--sniptale-font-weight-interface-heading) 13px / 18px
+          var(--sniptale-font-interface);
+      }
+      p {
+        margin: 0;
+        color: var(--sniptale-color-text-secondary);
+      }
+      button {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 0;
+        border-radius: var(--sniptale-radius-sm);
+        background: transparent;
+        color: var(--sniptale-color-text-secondary);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        color: var(--sniptale-color-text-primary);
+        font-weight: var(--sniptale-font-weight-interface-emphasis);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--sniptale-color-border-strong);
+        outline-offset: 2px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .settings {
+        width: auto;
+        height: 24px;
+        margin: 4px 0 0 auto;
+        padding: 0 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main hidden>
+      <header>
+        <h1 id="heading"></h1>
+        <button type="button" data-ui="recording.media-permission.cancel">
+          <svg
+            aria-hidden="true"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          >
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </header>
+      <p role="status" aria-live="polite" data-ui="recording.media-permission.status"></p>
+      <button
+        type="button"
+        class="settings"
+        data-ui="recording.media-permission.settings"
+        hidden
+      ></button>
+    </main>
+    <script type="module" src="./index.ts"></script>
+  </body>
+</html>

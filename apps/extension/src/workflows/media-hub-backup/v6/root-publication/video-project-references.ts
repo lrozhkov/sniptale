@@ -117,6 +117,14 @@ export function transformPortableVideoProjectReferences(
     cursorTrack: project.cursorTrack
       ? {
           ...project.cursorTrack,
+          ...(project.cursorTrack.sourceObservations
+            ? {
+                sourceObservations: project.cursorTrack.sourceObservations.map((group) => ({
+                  ...group,
+                  recordingId: requireRecordingId(rootIds, group.recordingId),
+                })),
+              }
+            : {}),
           samples: project.cursorTrack.samples.map((sample) => ({
             ...sample,
             ...(sample.sourceAnchor

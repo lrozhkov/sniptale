@@ -331,3 +331,27 @@ it('preserves independent exposure settings while changing timing and clamps aut
   expect(timed[0]?.motionBlur).toEqual(updated[0]?.motionBlur);
   expect(original.motionBlur.enter.strength).toBe(0.2);
 });
+
+it.each([false, true])(
+  'preserves a pre-existing missing target during unrelated authoring; dormant=%s',
+  (dormant) => {
+    const passive = {
+      ...region('legacy', 0, 2),
+      dormant,
+      linkTo: 'deleted-target',
+      linkEasing: 'linear' as const,
+    };
+    const input = [passive, region('other', 4, 6)];
+    const before = structuredClone(input);
+    const changed = updateQuickEditZoomRegion(input, 'other', { scale: 2 });
+    expect(changed[0]).toBe(passive);
+    expect(resolveQuickEditZoomLink(changed, passive.id)).toBeNull();
+    expect(input).toEqual(before);
+    const unlinked = updateQuickEditZoomRegion(changed, passive.id, { linkTo: null });
+    expect(unlinked[0]!.linkTo).toBeUndefined();
+    expect(unlinked[0]!.linkEasing).toBe('linear');
+    expect(
+      updateQuickEditZoomRegion(changed, 'other', { linkTo: 'another-missing-target' })
+    ).toEqual(changed);
+  }
+);

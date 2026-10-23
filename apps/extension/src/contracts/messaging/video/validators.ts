@@ -1,16 +1,17 @@
 import {
   CaptureMode,
   isVideoOutputProfile,
+  isVideoCursorEffectSettings,
   parseVideoRecordingProfiles,
   VIDEO_AUTO_FADE_DELAYS,
   VideoResolutionPreset,
-  WebcamPresentationMode,
-  WebcamPresentationShape,
   type CaptureMode as CaptureModeValue,
   type VideoRecordingLiveMediaState,
+  type VideoMicrophoneActivity,
   type VideoRecordingRuntimeState,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { isWebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import type {
   VideoProject,
   VideoProjectExportSettings,
@@ -94,6 +95,7 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
     !Object.hasOwn(value, 'quality') &&
     !Object.hasOwn(value, 'output') &&
     isBoolean(value['microphoneEnabled']) &&
+    hasOptionalField(value, 'warnWithoutMicrophone', isBoolean) &&
     (value['microphoneDeviceId'] === null || isString(value['microphoneDeviceId'])) &&
     hasOptionalField(value, 'echoCancellation', isBoolean) &&
     hasOptionalField(value, 'noiseSuppression', isBoolean) &&
@@ -126,41 +128,14 @@ function isVideoRecordingSurfaceSettings(value: unknown): boolean {
         'cursorSpotlightEnabled',
         'cursorDimmingEnabled',
         'cursorClickAnimationEnabled',
+        'cursorEffects',
       ].includes(key)
     ) &&
     isBoolean(value['toolbarEnabled']) &&
     isBoolean(value['cursorSpotlightEnabled']) &&
     hasOptionalField(value, 'cursorDimmingEnabled', isBoolean) &&
-    hasOptionalField(value, 'cursorClickAnimationEnabled', isBoolean)
-  );
-}
-
-function isNormalizedPoint(value: unknown, minimum: number, maximum: number): boolean {
-  return (
-    isRecord(value) &&
-    Object.keys(value).length === 2 &&
-    isNumber(value['x']) &&
-    value['x'] >= minimum &&
-    value['x'] <= maximum &&
-    isNumber(value['y']) &&
-    value['y'] >= minimum &&
-    value['y'] <= maximum
-  );
-}
-
-function isWebcamPresentationSettings(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    Object.keys(value).length === 5 &&
-    (value['mode'] === WebcamPresentationMode.EMBEDDED ||
-      value['mode'] === WebcamPresentationMode.SEPARATE_TRACK) &&
-    (value['shape'] === WebcamPresentationShape.CIRCLE ||
-      value['shape'] === WebcamPresentationShape.RECTANGLE) &&
-    isNormalizedPoint(value['center'], 0, 1) &&
-    isNumber(value['sizeFraction']) &&
-    value['sizeFraction'] > 0 &&
-    value['sizeFraction'] <= 1 &&
-    isNormalizedPoint(value['cropOffset'], -1, 1)
+    hasOptionalField(value, 'cursorClickAnimationEnabled', isBoolean) &&
+    hasOptionalField(value, 'cursorEffects', isVideoCursorEffectSettings)
   );
 }
 
@@ -181,9 +156,29 @@ export function isVideoRecordingLiveMediaState(
   );
 }
 
+export function isVideoMicrophoneActivity(value: unknown): value is VideoMicrophoneActivity {
+  return (
+    isRecord(value) &&
+    (value['status'] === 'disabled' ||
+      value['status'] === 'unavailable' ||
+      value['status'] === 'ready') &&
+    typeof value['level'] === 'number' &&
+    Number.isFinite(value['level']) &&
+    value['level'] >= 0 &&
+    value['level'] <= 1 &&
+    isBoolean(value['warning'])
+  );
+}
+
 export function isVideoRecordingRuntimeState(value: unknown): value is VideoRecordingRuntimeState {
   return (
     isRecord(value) &&
+    (value['outputProfile'] === undefined ||
+      value['outputProfile'] === null ||
+      isVideoOutputProfile(value['outputProfile'])) &&
+    (value['microphoneActivity'] === undefined ||
+      value['microphoneActivity'] === null ||
+      isVideoMicrophoneActivity(value['microphoneActivity'])) &&
     isString(value['status']) &&
     isNumber(value['duration']) &&
     (value['countdownEndsAt'] === null || isNumber(value['countdownEndsAt'])) &&

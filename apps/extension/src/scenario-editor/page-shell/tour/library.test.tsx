@@ -38,6 +38,12 @@ function fixture() {
     editDocumentId: null,
     source: { kind: 'import', filename: 'image.png' },
   };
+  slide.actions = [
+    {
+      type: 'annotation',
+      object: { id: 'first-action', text: 'Read', anchor: null, appearance: null },
+    },
+  ];
   project.tour.slides = [slide];
   project.tour.audioResources = [{ assetId: 'audio', duration: 2, name: 'Voice.wav' }];
   return project;
@@ -48,18 +54,26 @@ function Probe({ importer = true }: { importer?: boolean }) {
   const panels = useGuidePanels();
   const state = useTourSelection(project, false, setProject);
   return (
-    <TourLibraryPanel
-      project={project}
-      images={{ image: 'data:image/png;base64,aA==' }}
-      panels={panels}
-      state={state}
-      disabled={false}
-      t={t}
-      onSelect={select}
-      onUpload={upload}
-      onGenerate={generate}
-      {...(importer ? { onImportNarration: narration } : {})}
-    />
+    <>
+      <button
+        onClick={() => state.select({ kind: 'slide', slideId: 'first', objectId: 'first-action' })}
+        title="Select action"
+      >
+        Select action
+      </button>
+      <TourLibraryPanel
+        project={project}
+        images={{ image: 'data:image/png;base64,aA==' }}
+        panels={panels}
+        state={state}
+        disabled={false}
+        t={t}
+        onSelect={select}
+        onUpload={upload}
+        onGenerate={generate}
+        {...(importer ? { onImportNarration: narration } : {})}
+      />
+    </>
   );
 }
 beforeEach(() => {
@@ -99,8 +113,12 @@ it('groups acquisition with media and preserves exact usage, attachment and impo
   );
   await click('Used in slides: 1');
   expect(select).toHaveBeenCalledWith('first');
+  await click('Select action');
   await click('Attach to selection');
-  expect(current.tour?.slides[0]?.narration?.assetId).toBe('audio');
+  expect(
+    current.tour?.slides[0]?.kind === 'image' &&
+      current.tour.slides[0].actions[0]?.object.narration?.assetId
+  ).toBe('audio');
   expect(host.querySelector('[title="Bindings: 1"]')).not.toBeNull();
   const audio = host.querySelector('.tour-audio-resources')!;
   expect(audio.querySelector('h3')?.nextElementSibling?.className).toBe('tour-audio-acquisition');

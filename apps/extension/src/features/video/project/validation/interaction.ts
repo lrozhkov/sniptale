@@ -1,3 +1,12 @@
+import { isMotionFocusArea } from '../motion/focus-area';
+import { parseQuickEditBorder, parseQuickEditSpotlight } from '../scene/focus-appearance';
+import {
+  parseCameraPerspective,
+  parseCameraDepth,
+  parseMotionSpatialReference,
+} from '../motion/spatial';
+import { parseMotionPhaseTransitions } from '../motion/transitions';
+import { parseMotionBlurPhases } from '../motion/blur';
 import { parseCameraFollowSettings } from '../camera/cursor-policy';
 import { isRecordingInteractionMetadata } from './recording-telemetry';
 import {
@@ -30,10 +39,10 @@ import {
   isPoint,
   isPrimitiveRecord,
   isRecord,
-  isRect,
   isScale,
   isString,
   MAX_VIDEO_PROJECT_DURATION_SECONDS,
+  MAX_VIDEO_PROJECT_ITEMS,
 } from './primitives';
 
 function isCursorSkin(value: unknown): boolean {
@@ -80,11 +89,87 @@ function isCursorSample(value: unknown): boolean {
   );
 }
 
+function isCursorSourceIdentity(value: unknown): value is string {
+  return (
+    isString(value) && value.length > 0 && isBoundedString(value, 256) && value.trim() === value
+  );
+}
+
+function isCursorSourceObservations(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length > MAX_VIDEO_PROJECT_ITEMS) return false;
+  const groups = new Set<string>();
+  return value.every((group) => {
+    if (
+      !isRecord(group) ||
+      Object.keys(group).some(
+        (key) => !['recordingId', 'sourceInstanceId', 'samples'].includes(key)
+      ) ||
+      !isCursorSourceIdentity(group['recordingId']) ||
+      !isCursorSourceIdentity(group['sourceInstanceId']) ||
+      !Array.isArray(group['samples'])
+    )
+      return false;
+    const identity = JSON.stringify([group['recordingId'], group['sourceInstanceId']]);
+    if (groups.has(identity)) return false;
+    groups.add(identity);
+    const ids = new Set<string>();
+    let previous = -1;
+    return group['samples'].every((sample: unknown) => {
+      if (
+        !isRecord(sample) ||
+        Object.keys(sample).some(
+          (key) =>
+            ![
+              'id',
+              'time',
+              'x',
+              'y',
+              'visible',
+              'recordingPoint',
+              'observationClockId',
+              'captureSegment',
+              'observation',
+              'interpolation',
+              'interpolationRange',
+              'skinOverride',
+            ].includes(key)
+        ) ||
+        !isCursorSample(sample) ||
+        !isCursorSourceIdentity(sample['id']) ||
+        ids.has(sample['id']) ||
+        !isBoundedNumber(sample['time'], previous, MAX_VIDEO_PROJECT_DURATION_SECONDS) ||
+        (sample['recordingPoint'] !== undefined &&
+          sample['recordingPoint'] !== null &&
+          (!isRecord(sample['recordingPoint']) ||
+            Object.keys(sample['recordingPoint']).some((key) => key !== 'x' && key !== 'y') ||
+            !isBoundedNumber(sample['recordingPoint']['x'], 0, 1) ||
+            !isBoundedNumber(sample['recordingPoint']['y'], 0, 1))) ||
+        (sample['captureSegment'] !== undefined &&
+          (!isBoundedNumber(sample['captureSegment'], 0, Number.MAX_SAFE_INTEGER) ||
+            !Number.isInteger(sample['captureSegment']))) ||
+        (sample['observationClockId'] !== undefined &&
+          !isCursorSourceIdentity(sample['observationClockId'])) ||
+        (sample['observation'] !== undefined &&
+          (!isString(sample['observation']) ||
+            !['observed', 'outside', 'hidden', 'blur', 'paused'].includes(sample['observation'])))
+      )
+        return false;
+      ids.add(sample['id']);
+      previous = sample['time'];
+      return true;
+    });
+  });
+}
+
 export function isCursorTrack(value: unknown): boolean {
   return (
     isRecord(value) &&
     isEnumValue(value['captureMode'], VideoCursorCaptureMode) &&
-    isBoundedArray(value['samples'], isCursorSample) &&
+    (value['sourceObservations'] === undefined ||
+      isCursorSourceObservations(value['sourceObservations'])) &&
+    (Array.isArray(value['sourceObservations']) && value['sourceObservations'].length > 0
+      ? Array.isArray(value['samples']) && value['samples'].every(isCursorSample)
+      : isBoundedArray(value['samples'], isCursorSample)) &&
     isCursorSkin(value['skin'])
   );
 }
@@ -195,8 +280,30 @@ export function isVideoProjectActionPresentationOverride(value: unknown): boolea
 }
 
 export function isMotionRegion(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const phaseTransitions = parseMotionPhaseTransitions(value['phaseTransitions']);
   return (
-    isRecord(value) &&
+    phaseTransitions !== null &&
+    (!isRecord(value['sourceBinding']) ||
+      value['sourceBinding']['dormant'] !== true ||
+      value['duration'] === 0) &&
+    (value['border'] === undefined
+      ? value['borderTarget'] === undefined
+      : parseQuickEditBorder(value['border']) !== null &&
+        (value['borderTarget'] === 'viewport' ||
+          (value['borderTarget'] === 'window' && value['sourceBinding'] !== undefined))) &&
+    (value['spotlight'] === undefined
+      ? value['spotlightTarget'] === undefined
+      : value['border'] === undefined &&
+        parseQuickEditSpotlight(value['spotlight']) !== null &&
+        (value['spotlightTarget'] === 'viewport' ||
+          ((value['spotlightTarget'] === 'window' ||
+            value['spotlightTarget'] === 'scene' ||
+            value['spotlightTarget'] === 'source-scene') &&
+            value['sourceBinding'] !== undefined))) &&
+    parseCameraPerspective(value['perspective']) !== null &&
+    parseCameraDepth(value['depthOfField']) !== null &&
+    parseMotionSpatialReference(value['spatialReference']) !== null &&
     (value['cameraFollow'] === undefined ||
       parseCameraFollowSettings(value['cameraFollow']) !== null) &&
     (value['sourceBinding'] === undefined ||
@@ -210,16 +317,25 @@ export function isMotionRegion(value: unknown): boolean {
     isEnumValue(value['easing'], VideoTemporalEasing) &&
     isEnumValue(value['focusMode'], VideoMotionFocusMode) &&
     isNullable(value['focusPoint'], isPoint) &&
-    (value['focusArea'] === undefined || isNullable(value['focusArea'], isRect)) &&
+    (value['focusArea'] === undefined || isNullable(value['focusArea'], isMotionFocusArea)) &&
     isBoundedNumber(value['scale'], 0.1, 4) &&
     isNullable(
       value['targetAction'],
       (target) =>
         isRecord(target) && isString(target['eventId']) && isNullable(target['clipId'], isString)
     ) &&
-    isBoundedNumber(value['zoomInDuration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
-    isBoundedNumber(value['zoomOutDuration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+    isBoundedNumber(
+      value['zoomInDuration'],
+      0,
+      phaseTransitions?.enter === undefined ? MAX_VIDEO_PROJECT_DURATION_SECONDS : 60
+    ) &&
+    isBoundedNumber(
+      value['zoomOutDuration'],
+      0,
+      phaseTransitions?.exit === undefined ? MAX_VIDEO_PROJECT_DURATION_SECONDS : 60
+    ) &&
     (value['motionBlurAmount'] === undefined || isBoundedNumber(value['motionBlurAmount'], 0, 1)) &&
+    parseMotionBlurPhases(value['motionBlur']) !== null &&
     value['cameraMode'] !== 'PATH' &&
     (value['path'] === undefined || value['path'] === null) &&
     (value['overlayZoomMode'] === undefined ||

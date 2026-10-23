@@ -4,7 +4,7 @@ import { translate, useAppLocale } from '../../platform/i18n';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import { createReviewPresentationMedia } from '../../workflows/video-review/presentation-media';
 import { ReviewButton } from './controls';
-import { ReviewPreviewNumberRow } from './number-row';
+import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 
 type Slot = Exclude<QuickEditPresentationSettings['intro'], { mode: 'none' }>;
 type MediaPreviewProps = {

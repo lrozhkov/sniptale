@@ -28,7 +28,9 @@ const io = vi.hoisted(() => ({
 }));
 vi.mock('./presentation-main', () => ({ createReviewPresentationMain: io.main }));
 vi.mock('./presentation-media', () => ({ createReviewPresentationMedia: io.media }));
-vi.mock('./render-watermark', () => ({ createReviewWatermarkRenderer: io.watermark }));
+vi.mock('../../features/video/composition/canvas/watermark', () => ({
+  createWatermarkRenderer: io.watermark,
+}));
 
 /** Small software raster oracle; native browser composition has separate integration proof. */
 class Raster {
@@ -91,6 +93,15 @@ class RasterContext {
   }
   setTransform(x: number, _b: number, _c: number, y: number) {
     this.scale = [x, y];
+  }
+  clearRect(x: number, y: number, width: number, height: number) {
+    for (let row = Math.max(0, y); row < Math.min(this.raster.height, y + height); row++)
+      for (let col = Math.max(0, x); col < Math.min(this.raster.width, x + width); col++)
+        this.raster.pixels.fill(
+          0,
+          (row * this.raster.width + col) * 3,
+          (row * this.raster.width + col + 1) * 3
+        );
   }
   drawImage(source: Raster, _x: number, _y: number) {
     for (let index = 0; index < this.raster.pixels.length; index++)
@@ -545,3 +556,34 @@ it('releases an acquired outgoing endpoint when incoming decode fails', async ()
   expect(io.mainDispose).toHaveBeenCalledOnce();
   expect(io.mediaDispose).toHaveBeenCalledTimes(2);
 });
+
+it.each([
+  { before: 0, after: 0.5, tick: 2, color: [255, 255, 255] },
+  { before: 0, after: 0.5, tick: 3, color: [127.5, 127.5, 255] },
+  { before: 0.5, after: 0, tick: 1, color: [255, 127.5, 127.5] },
+  { before: 0.5, after: 0, tick: 2, color: [0, 0, 255] },
+])(
+  'renders one-sided color joins on the current composition: %j',
+  async ({ before, after, tick, color }) => {
+    const args = fixture();
+    args.settings.fadeIn.enabled = args.settings.fadeOut.enabled = false;
+    args.settings.introTransition = { type: 'fade-black', before, after, color: '#ffffff' };
+    const planned = planReviewPresentationSequence({
+      settings: args.settings,
+      mainDuration: 1,
+      fragmentOffset: 7,
+      includeBookends: true,
+      rate: args.plan.rate,
+    });
+    if (!planned.ok) throw new Error('Invalid one-sided join fixture');
+    args.plan = planned.plan;
+    const owner = await open(args);
+    const lease = await owner.render([...iteratePresentationCandidates(args.plan)][tick]!);
+    try {
+      expect((lease.canvas as unknown as Raster).pixel(0, 0)).toEqual(color);
+      expect(args.plan.totalDurationUs).toBe(2_000_000);
+    } finally {
+      lease.release();
+    }
+  }
+);

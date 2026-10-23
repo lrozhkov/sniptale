@@ -35,8 +35,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await checkOptionalNote(panel);
       expect(
         await panel.locator('.guide-template-controls').evaluate((node) => {
-          const note = node.closest('.guide-inspector-group')!.previousElementSibling!;
-          return node.getBoundingClientRect().top - note.getBoundingClientRect().bottom;
+          const wrapper = node.closest('.guide-inspector-categorized')!;
+          const note = wrapper.previousElementSibling!;
+          return wrapper.getBoundingClientRect().top - note.getBoundingClientRect().bottom;
         })
       ).toBeGreaterThanOrEqual(8);
       await page.screenshot({ path: info.outputPath('guide-appearance.png'), fullPage: false });
@@ -45,18 +46,25 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await checkOptionalNote(panel);
       await page.screenshot({ path: info.outputPath('slide-timing.png'), fullPage: false });
       await category('Камера').click();
-      await panel.getByRole('button', { name: /Приближение/ }).click();
-      await page.getByRole('option', { name: 'Вручную', exact: true }).click();
+      const manual = panel.getByRole('button', { name: 'Вручную', exact: true });
+      if (await manual.count()) await manual.click();
+      else {
+        await panel.getByRole('button', { name: /Приближение/ }).click();
+        await page.getByRole('option', { name: 'Вручную', exact: true }).click();
+      }
       await checkOptionalNote(panel);
       await page.screenshot({ path: info.outputPath('camera-settings.png'), fullPage: false });
-      await category('Объекты слайда').click();
+      await category('Действия').click();
       await panel.getByRole('button', { name: 'Точка действия', exact: true }).click();
       const back = panel.getByRole('button', { name: 'К настройкам слайда', exact: true });
       await back.hover();
-      await expect(back).toHaveCSS('font-size', '13px');
-      await expect(back).toHaveCSS('line-height', '18px');
-      await expect(back).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
-      await expect(back).toHaveCSS('box-shadow', 'none');
+      await expect(
+        panel
+          .locator(':scope > .guide-panel-heading')
+          .getByRole('button', { name: 'К настройкам слайда', exact: true })
+      ).toBeVisible();
+      await expect(back.locator('.lucide-arrow-left')).toHaveCount(1);
+      await expect(back).toHaveCSS('width', '32px');
       await page.screenshot({ path: info.outputPath('object-settings.png'), fullPage: false });
       await back.click();
       await page

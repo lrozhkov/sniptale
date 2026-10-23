@@ -1,3 +1,4 @@
+import type { VideoEditorMotionPreview } from '../../contracts/workspace';
 import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/patches';
 import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type React from 'react';
@@ -89,6 +90,8 @@ export interface PreviewStageCanvasProps {
   onClearPlacementMode: () => void;
   onSelectClip: (clipId: string | null) => void;
   onUpdateActionEventDetails: (actionEventId: string, patch: VideoEditorActionEventPatch) => void;
+  motionProject?: VideoProject | undefined;
+  onPreviewMotion?: ((preview: VideoEditorMotionPreview | null) => void) | undefined;
   onUpdateMotionRegion: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   onUpsertObjectTrackCorrectionAnchor?:
     | VideoEditorObjectTrackActions['upsertObjectTrackCorrectionAnchor']

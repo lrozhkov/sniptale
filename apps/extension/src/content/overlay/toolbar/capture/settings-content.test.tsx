@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
-import { ToolbarSettingsDropdown } from './settings-content';
+import { ToolbarSettingsDropdown, useToolbarSettingsDropdownLayout } from './settings-content';
+import {
+  RecordingToolbarControlsContext,
+  type useRecordingToolbarControls,
+} from '../state/recording-controls';
 
 const createTrustedContentActionIntentSource = vi.hoisted(() =>
   vi.fn(() => ({ kind: 'trusted-content-event' as const }))
@@ -22,6 +26,13 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+
+function SettingsDropdownHarness(
+  props: Omit<ComponentProps<typeof ToolbarSettingsDropdown>, 'layout'>
+) {
+  const resolveLayout = useToolbarSettingsDropdownLayout({ ...props, open: true });
+  return <ToolbarSettingsDropdown {...props} layout={resolveLayout()} />;
+}
 
 function ensureContainer() {
   if (!container) {
@@ -59,12 +70,15 @@ function createMenuRef() {
 }
 
 function renderSettingsDropdown(params?: {
+  displayMode?: 'horizontal' | 'vertical';
+  anchorLeft?: number;
   freePlacement?: boolean;
   onFreePlacementChange?: (value: boolean) => void;
   onDisableScreenshotMode?: (activationEvent?: Event) => void;
   pinToTab?: boolean;
   pinToTabAvailable?: boolean;
   pinToTabLocked?: boolean;
+  recording?: ReturnType<typeof useRecordingToolbarControls>;
 }) {
   ensureContainer();
   const onPinToTabChange = vi.fn();
@@ -74,37 +88,43 @@ function renderSettingsDropdown(params?: {
 
   act(() => {
     root?.render(
-      <ToolbarSettingsDropdown
-        compactMenus={true}
-        {...(params?.freePlacement === undefined ? {} : { freePlacement: params.freePlacement })}
-        onFreePlacementChange={params?.onFreePlacementChange}
-        displayMode="vertical"
-        menuRef={createMenuRef()}
-        onClose={() => undefined}
-        onCompactMenusChange={() => undefined}
-        onDisplayModeChange={() => undefined}
-        onDisableScreenshotMode={onDisableScreenshotMode}
-        onHide={() => undefined}
-        onPinToTabChange={onPinToTabChange}
-        pinToTab={params?.pinToTab ?? false}
-        pinToTabAvailable={params?.pinToTabAvailable ?? true}
-        pinToTabLocked={params?.pinToTabLocked ?? false}
-        screenshotMode={true}
-        triggerRef={createButtonRef()}
-        viewportRightInset={0}
-      />
+      <RecordingToolbarControlsContext.Provider value={params?.recording ?? null}>
+        <SettingsDropdownHarness
+          compactMenus={true}
+          {...(params?.freePlacement === undefined ? {} : { freePlacement: params.freePlacement })}
+          onFreePlacementChange={params?.onFreePlacementChange}
+          displayMode={params?.displayMode ?? 'vertical'}
+          menuRef={createMenuRef()}
+          onClose={() => undefined}
+          onCompactMenusChange={() => undefined}
+          onDisplayModeChange={() => undefined}
+          onDisableScreenshotMode={onDisableScreenshotMode}
+          onHide={() => undefined}
+          onPinToTabChange={onPinToTabChange}
+          pinToTab={params?.pinToTab ?? false}
+          pinToTabAvailable={params?.pinToTabAvailable ?? true}
+          pinToTabLocked={params?.pinToTabLocked ?? false}
+          screenshotMode={true}
+          triggerRef={createButtonRef(
+            params?.anchorLeft === undefined
+              ? undefined
+              : { left: params.anchorLeft, x: params.anchorLeft, right: params.anchorLeft + 36 }
+          )}
+          viewportRightInset={0}
+        />
+      </RecordingToolbarControlsContext.Provider>
     );
   });
 
   return { onDisableScreenshotMode, onPinToTabChange };
 }
 
-function renderSettingsDropdownNearSidebar() {
+function renderSettingsDropdownNearSidebar(viewportRightInset = 348) {
   ensureContainer();
 
   act(() => {
     root?.render(
-      <ToolbarSettingsDropdown
+      <SettingsDropdownHarness
         compactMenus={true}
         displayMode="vertical"
         menuRef={createMenuRef()}
@@ -123,7 +143,7 @@ function renderSettingsDropdownNearSidebar() {
           right: 896,
           x: 860,
         })}
-        viewportRightInset={348}
+        viewportRightInset={viewportRightInset}
       />
     );
   });
@@ -154,6 +174,59 @@ afterEach(() => {
 });
 
 describe('ToolbarSettingsDropdown', () => {
+  it.each([
+    { enabled: true, anchorLeft: 500, left: 0 },
+    { enabled: false, anchorLeft: 500, left: 0 },
+    { enabled: false, anchorLeft: 1100, left: -108 },
+  ])(
+    'aligns recording settings and exposes acknowledged fading state %j',
+    ({ enabled, anchorLeft, left }) => {
+      const recording: ReturnType<typeof useRecordingToolbarControls> = {
+        active: false,
+        controls: {},
+        hasHidden: false,
+        revealed: false,
+        toggleRevealed: vi.fn(),
+        editing: false,
+        error: null,
+        pending: false,
+        ready: true,
+        fadeDuringRecording: enabled,
+        reload: vi.fn(async () => undefined),
+        setVisible: vi.fn(async () => undefined),
+        setFadeDuringRecording: vi.fn(async () => undefined),
+        toggleEditing: vi.fn(),
+      };
+      renderSettingsDropdown({ recording, displayMode: 'horizontal', anchorLeft });
+      expect(container!.querySelector<HTMLElement>('.sniptale-popover-menu')!.style.left).toBe(
+        `${left}px`
+      );
+      const item = container!.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.settings.recording-fade"]'
+      )!;
+      expect(item.getAttribute('aria-pressed')).toBe(String(enabled));
+      act(() => {
+        item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      });
+      expect(recording.setFadeDuringRecording).not.toHaveBeenCalled();
+      act(() => {
+        item.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      });
+      expect(recording.setFadeDuringRecording).toHaveBeenCalledExactlyOnceWith(!enabled);
+      expect(item.getAttribute('aria-pressed')).toBe(String(enabled));
+    }
+  );
+
+  it('omits the recording-only preference from other toolbar settings', () => {
+    renderSettingsDropdown({ displayMode: 'horizontal', anchorLeft: 500 });
+    expect(container!.querySelector<HTMLElement>('.sniptale-popover-menu')!.style.left).toBe(
+      '-244px'
+    );
+    expect(
+      container!.querySelector('[data-ui="content.toolbar.settings.recording-fade"]')
+    ).toBeNull();
+  });
+
   it('opens beside the toolbar in vertical mode', () => {
     renderSettingsDropdown();
 
@@ -173,6 +246,46 @@ describe('ToolbarSettingsDropdown', () => {
 
     expect(menuSurface?.style.left).toBe('auto');
     expect(menuSurface?.style.right).toBe('calc(100% + 10px)');
+  });
+
+  it('uses the measured settings width to select the opening side', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(200);
+    renderSettingsDropdownNearSidebar(0);
+
+    const menuSurface = container?.querySelector<HTMLElement>('.sniptale-popover-menu');
+
+    expect(menuSurface?.style.left).toBe('auto');
+    expect(menuSurface?.style.right).toBe('calc(100% + 10px)');
+  });
+
+  it('retains the measured opening direction after the settings menu closes', () => {
+    ensureContainer();
+    const triggerRef = createButtonRef({ top: 600, bottom: 636, y: 600 });
+    const menuRef = createMenuRef();
+    menuRef.current = document.createElement('div');
+    const surface = document.createElement('div');
+    Object.defineProperty(surface, 'offsetWidth', { value: 280 });
+    Object.defineProperty(surface, 'offsetHeight', { value: 200 });
+    menuRef.current.appendChild(surface);
+
+    function RetainedSettingsLayout(props: { open: boolean }) {
+      const resolveLayout = useToolbarSettingsDropdownLayout({
+        menuRef,
+        triggerRef,
+        compactMenus: true,
+        displayMode: 'horizontal',
+        open: props.open,
+      });
+      return <output data-placement={resolveLayout().placement} />;
+    }
+
+    act(() => root?.render(<RetainedSettingsLayout open={true} />));
+    expect(container?.querySelector('output')?.dataset['placement']).toBe('down');
+    act(() => root?.render(<RetainedSettingsLayout open={false} />));
+    expect(container?.querySelector('output')?.dataset['placement']).toBe('down');
+    act(() => root?.render(<RetainedSettingsLayout open={true} />));
+    expect(container?.querySelector('output')?.dataset['placement']).toBe('down');
   });
 
   it('toggles pin-to-tab from the settings menu', () => {

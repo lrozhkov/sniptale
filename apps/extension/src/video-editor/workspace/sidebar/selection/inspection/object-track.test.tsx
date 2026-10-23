@@ -200,3 +200,33 @@ function clickGroup(title: string) {
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
+
+it('keeps selected object deletion after all groups while Tracking is active', () => {
+  const objectTrack = createObjectTrack();
+  const project = createEmptyVideoProject('Delete selected track');
+  project.objectTracks = [objectTrack];
+  const onDeleteObjectTrack = vi.fn();
+  act(() =>
+    root!.render(
+      <WorkspaceSidebarInspectPanel
+        {...createSelectionPanelProps({
+          ...createSelectionPanelSource({ project, selectedObjectTrack: objectTrack }),
+        })}
+        onDeleteObjectTrack={onDeleteObjectTrack}
+      />
+    )
+  );
+  const command = Array.from(container!.querySelectorAll<HTMLButtonElement>('button')).find(
+    (button) => button.textContent?.includes('videoEditor.sidebar.objectTrackDeleteLabel')
+  )!;
+  expect(command).toBeDefined();
+  expect(command.closest('[data-section]')).toBeNull();
+  act(() => command.click());
+  expect(onDeleteObjectTrack).toHaveBeenCalledExactlyOnceWith(objectTrack.id);
+  clickGroup('videoEditor.sidebar.inspectorGroupSummary');
+  expect(
+    Array.from(container!.querySelectorAll('button')).filter((button) =>
+      button.textContent?.includes('videoEditor.sidebar.objectTrackDeleteLabel')
+    )
+  ).toHaveLength(1);
+});

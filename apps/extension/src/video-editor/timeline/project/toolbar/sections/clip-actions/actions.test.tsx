@@ -32,7 +32,8 @@ function renderClipActions(
   selectedClip: boolean,
   canSplitSelectedClip = selectedClip,
   canEditSelectedClip = selectedClip,
-  canDeleteSelectedClip = canEditSelectedClip
+  canDeleteSelectedClip = canEditSelectedClip,
+  canDuplicateSelection = selectedClip && canEditSelectedClip
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -47,6 +48,7 @@ function renderClipActions(
   act(() => {
     root?.render(
       <ProjectTimelineClipActions
+        canDuplicateSelection={canDuplicateSelection}
         canDeleteSelectedClip={canDeleteSelectedClip}
         canEditSelectedClip={canEditSelectedClip}
         canSplitSelectedClip={canSplitSelectedClip}
@@ -145,4 +147,13 @@ it('allows an admitted group delete without a single selected clip', () => {
   expect(buttons[2]!.disabled).toBe(false);
   act(() => buttons[2]!.click());
   expect(handlers.onDeleteSelectedClip).toHaveBeenCalledOnce();
+});
+
+it('permits whole-take commands while clip editing and splitting remain unavailable', () => {
+  renderClipActions(false, false, false, true, true);
+  const [split, duplicate, remove] = container!.querySelectorAll<HTMLButtonElement>('button');
+  expect(split!.disabled).toBe(true);
+  expect(duplicate!.disabled).toBe(false);
+  expect(remove!.disabled).toBe(false);
+  expect(split!.title).toBe('videoEditor.timeline.splitUnavailableTitle');
 });

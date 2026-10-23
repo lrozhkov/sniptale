@@ -9,6 +9,11 @@ import {
 type WorkspaceSidebarSelectionBodyProps = Partial<
   Pick<
     WorkspaceSidebarProps,
+    | 'recognition'
+    | 'textRewrite'
+    | 'textVoice'
+    | 'watermark'
+    | 'sceneEdges'
     | 'onImportImage'
     | 'gridSettings'
     | 'typingProject'
@@ -60,6 +65,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onStartMotionFocusPlacement'
     | 'onStartObjectTrackAnchorPlacement'
     | 'onClearPlacementMode'
+    | 'onPreviewMotion'
     | 'onUpdateMotionRegion'
     | 'onUpdateTransitionDuration'
     | 'onUpdateTransitionEasing'
@@ -77,6 +83,8 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onUpdateMediaClipFitScalePercent'
     | 'onUpdateMediaClipShadowIntensity'
     | 'onUpdateMediaClipShadowMode'
+    | 'onUpdateMediaClipShadowColor'
+    | 'onEditMediaClip'
     | 'onUpdateMediaClipWindowHeader'
     | 'onApplyMediaClipVisualsToTrack'
     | 'onConvertTextClipToAnnotation'
@@ -141,6 +149,11 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
       ? { onApplyTypingCompression: props.onApplyTypingCompression }
       : {}),
     ...(props.onImportImage ? { onImportImage: props.onImportImage } : {}),
+    ...(props.recognition ? { recognition: props.recognition } : {}),
+    ...(props.textRewrite ? { textRewrite: props.textRewrite } : {}),
+    ...(props.textVoice ? { textVoice: props.textVoice } : {}),
+    ...(props.watermark ? { watermark: props.watermark } : {}),
+    ...(props.sceneEdges ? { sceneEdges: props.sceneEdges } : {}),
     project: props.project,
     selection: props.selection ?? createSceneSelection(),
     selectedClip: props.selectedClip ?? null,
@@ -160,6 +173,8 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     onUpdateMediaClipFitScalePercent: props.onUpdateMediaClipFitScalePercent,
     onUpdateMediaClipShadowIntensity: props.onUpdateMediaClipShadowIntensity,
     onUpdateMediaClipShadowMode: props.onUpdateMediaClipShadowMode,
+    onUpdateMediaClipShadowColor: props.onUpdateMediaClipShadowColor,
+    onEditMediaClip: props.onEditMediaClip,
     onUpdateMediaClipWindowHeader: props.onUpdateMediaClipWindowHeader,
     onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack,
     ...createSelectionAnnotationUpdateDefaults(props),
@@ -212,6 +227,7 @@ function createInspectPanelEffectProps(props: WorkspaceSidebarSelectionBodyProps
 
     onStartObjectTrackAnchorPlacement: props.onStartObjectTrackAnchorPlacement ?? (() => undefined),
     onClearPlacementMode: props.onClearPlacementMode ?? (() => undefined),
+    ...(props.onPreviewMotion ? { onPreviewMotion: props.onPreviewMotion } : {}),
     onUpdateMotionRegion: props.onUpdateMotionRegion ?? (() => undefined),
     onUpdateTransitionDuration: props.onUpdateTransitionDuration ?? (() => undefined),
     onUpdateTransitionEasing: props.onUpdateTransitionEasing ?? (() => undefined),

@@ -139,3 +139,91 @@ describe('preview audio graph', () => {
   it('updates gain without changing DOM mute or volume', verifiesGainRampWithoutDomMute);
   it('fails soft when AudioContext resume rejects', verifiesResumeFailureStopsPlayback);
 });
+
+it('admits source, clip and master amplification up to eight while retaining invalid gain protection', () => {
+  installPreviewAudioContextHarness();
+  const state = createPreviewAudioGraphState();
+  const node = ensurePreviewAudioGraphNode(state, 'master', createAudioElement());
+  if (!node) throw new Error('Missing preview graph');
+  for (const [input, expected] of [
+    [3, 3],
+    [4, 4],
+    [5, 5],
+    [8, 8],
+    [9, 8],
+    [-1, 0],
+    [NaN, 0],
+    [Infinity, 0],
+  ]) {
+    setPreviewAudioNodeGain(node, input!);
+    expect(node.gain.gain.value).toBe(expected);
+  }
+});
+
+it('passes source times clip times track amplification through the actual preview consumer', async () => {
+  const { createEmptyVideoProject, createVideoProjectAsset, createVideoProjectTrack } =
+    await import('../../../../../features/video/project/factories/creation');
+  const { createAudioClipFromAsset } =
+    await import('../../../../../features/video/project/factories/clip');
+  const { syncPreviewAudioElements } = await import('../audio-elements');
+  const { createPreviewMediaSyncState } = await import('../../media/sync');
+  const project = createEmptyVideoProject('Source gain');
+  const track = createVideoProjectTrack('Audio', 1, 'AUDIO');
+  track.audioVolume = 2;
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 10,
+      mimeType: 'audio/wav',
+      size: 100,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(track.id, asset);
+  clip.audioGainStart = clip.audioGainEnd = 2;
+  project.assets = [asset];
+  project.tracks = [track];
+  project.clips = [clip];
+  project.duration = 10;
+  project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: {
+        kind: 'source',
+        assetId: asset.id,
+        sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+      },
+      ranges: [{ id: 'boost', start: 0, end: 10, volume: 2 }],
+      mutes: [],
+    },
+  ];
+  const harness = installPreviewAudioContextHarness();
+  const audioGraphState = createPreviewAudioGraphState();
+  const audio = createAudioElement();
+  const params = {
+    project,
+    syncedClips: [clip],
+    currentTime: 1,
+    isPlaying: false,
+    audioGraphState,
+    audioRefs: { current: { [clip.id]: audio } },
+    mediaSyncState: createPreviewMediaSyncState(),
+  };
+  syncPreviewAudioElements(params);
+  const gain = harness.latestContext.gains[0]!.gain;
+  expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(8, expect.any(Number));
+  expect(gain.value).toBe(8);
+  gain.linearRampToValueAtTime.mockImplementationOnce(() => {
+    throw new Error('Unavailable automation');
+  });
+  syncPreviewAudioElements(params);
+  expect(gain.value).toBe(8);
+  project.sourceAudioDocuments = [];
+  syncPreviewAudioElements(params);
+  expect(gain.value).toBe(4);
+});

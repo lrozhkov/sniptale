@@ -3,6 +3,31 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
+  contentDuration: { ru: 'Длительность видео', en: 'Video duration' },
+  contentDurationProject: { ru: 'Монтаж', en: 'Timeline' },
+  audioDurationContent: { ru: 'Монтаж и аудио', en: 'Timeline and audio' },
+  textDurationContent: { ru: 'Монтаж и текст', en: 'Timeline and text' },
+  sceneBackgroundImageFit: { en: 'Image fit', ru: 'Масштаб' },
+  sceneBackgroundImageCover: { en: 'Fill', ru: 'Заполнить' },
+  sceneBackgroundImageContain: { en: 'Fit', ru: 'Вписать' },
+  mediaCrop: { ru: 'Кадрирование исходника', en: 'Source crop' },
+  mediaCropLeft: { ru: 'Слева', en: 'Left' },
+  mediaCropTop: { ru: 'Сверху', en: 'Top' },
+  mediaCropWidth: { ru: 'Ширина области', en: 'Area width' },
+  mediaCropHeight: { ru: 'Высота области', en: 'Area height' },
+  mediaCropPreview: {
+    ru: 'Область исходника: перетащите или используйте стрелки',
+    en: 'Source area: drag or use arrow keys',
+  },
+  textDocuments: { ru: 'Текстовые документы', en: 'Text documents' },
+  captionInheritDocument: { ru: 'Стиль документа', en: 'Use document style' },
+  textRewriteScopeDetails: { ru: 'Размещение текста и запрос', en: 'Text placement and request' },
+  cameraHiddenRanges: { ru: 'Скрытые интервалы', en: 'Hidden intervals' },
+  cameraHiddenRange: { ru: 'Интервал', en: 'Interval' },
+  cameraHideInterval: { ru: 'Скрыть интервал', en: 'Hide interval' },
+  cameraShowInterval: { ru: 'Удалить скрытый интервал', en: 'Remove hidden interval' },
+  cameraHiddenStart: { ru: 'Начало в исходнике', en: 'Source start' },
+  cameraHiddenEnd: { ru: 'Конец в исходнике', en: 'Source end' },
   cameraLayoutCustom: { ru: 'Произвольное вписывание', en: 'Custom fit' },
   cameraShape: { ru: 'Форма', en: 'Shape' },
   cameraShapeRounded: { ru: 'Прямоугольник', en: 'Rectangle' },
@@ -15,6 +40,7 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
   },
   cameraCropZoom: { ru: 'Приближение', en: 'Zoom in' },
   cameraCropSection: { ru: 'Изображение внутри', en: 'Image inside frame' },
+  cameraCropResetPosition: { ru: 'Сбросить кадрирование позиции', en: 'Reset position crop' },
   cameraCropCenter: { ru: 'Центрировать изображение', en: 'Center image' },
 
   typingSelection: { ru: 'Набор текста', en: 'Typing interval' },
@@ -175,6 +201,7 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     ru: 'Отдельно',
     en: 'Standalone',
   },
+  spatialReferenceReset: { ru: 'Весь холст', en: 'Full canvas' },
   widthLabel: {
     ru: 'Ширина',
     en: 'Width',
@@ -374,6 +401,10 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
   audioClipLabel: {
     ru: 'Аудио-клип',
     en: 'Audio clip',
+  },
+  trackVolumeLabel: {
+    ru: 'Громкость дорожки',
+    en: 'Track volume',
   },
   volumeLabel: {
     ru: 'Общая громкость',

@@ -40,11 +40,6 @@ export function QuickActionsEditorToggleRow(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack">
-      <QuickActionsBooleanToggle
-        checked={Boolean(props.state.editForm?.status)}
-        label={translate('settings.quickActions.enabledLabel')}
-        onToggle={() => props.state.updateFormField('status', !props.state.editForm?.status)}
-      />
       {props.includeExitAfterCapture ? (
         <QuickActionsBooleanToggle
           checked={Boolean(props.state.editForm?.exitAfterCapture)}

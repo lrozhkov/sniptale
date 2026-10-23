@@ -51,6 +51,7 @@ import type { ArchiveRootObjectSource, MediaHubBackupRootInventoryItem } from '.
 import { METADATA_ROOT, withDraftRoot } from '../layout';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import { buildPortableAggregatePresentation } from './presentation';
+import { createObjectCollector } from './helpers';
 
 interface MediaInventoryDatabase extends VideoReviewBackupDatabase {
   get(store: string, key: unknown): Promise<unknown>;
@@ -134,33 +135,19 @@ function createMediaObjectCollector(
   rootIndex: number,
   paths: ArchivePathAllocator
 ): MediaObjectCollector {
-  const objects: ArchiveRootObjectSource[] = [];
-  let sequence = 0;
+  const collector = createObjectCollector(`media-${String(rootIndex + 1).padStart(6, '0')}`, paths);
   return {
-    add(blob, filename, mimeType = blob.type || 'application/octet-stream', directory) {
-      const rootNumber = String(rootIndex + 1).padStart(6, '0');
-      const objectNumber = String(++sequence).padStart(6, '0');
-      const objectId = `media-${rootNumber}-object-${objectNumber}`;
-      const safeFilename = filename || `object-${sequence}`;
-      objects.push({
+    add(blob, filename, mimeType, directory) {
+      return collector.addObject(
         blob,
-        ref: {
-          filename: safeFilename,
-          mimeType,
-          objectId,
-          path: paths.reserve(
-            directory
-              ? [...directory, safeFilename]
-              : ['_sniptale', 'assets', objectId, safeFilename]
-          ),
-          size: blob.size,
-        },
-      });
-      return objectId;
+        filename || `object-${collector.objects.length + 1}`,
+        mimeType,
+        directory
+      );
     },
-    objects,
+    objects: collector.objects,
     sizeOf(objectId) {
-      const object = objects.find((candidate) => candidate.ref.objectId === objectId);
+      const object = collector.objects.find((candidate) => candidate.ref.objectId === objectId);
       if (!object) throw new Error(`Media backup object is missing from inventory: ${objectId}.`);
       return object.ref.size;
     },

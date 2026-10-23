@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { VideoSample } from 'mediabunny';
 import { afterEach, expect, it, vi } from 'vitest';
-import { drawReviewSpotlights } from './render-spotlight';
+import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import { renderRenderWindowFrames } from './render-export';
 
-vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
+vi.mock('../../features/video/composition/draw/spotlight', () => ({
+  drawSceneSpotlights: vi.fn(),
+}));
 vi.mock('mediabunny', async (original) => ({
   ...(await original<typeof import('mediabunny')>()),
   VideoSample: class {
@@ -22,7 +24,7 @@ it.each([false, true])(
   'composes camera above Focus with global source time and releases its iterator (encoder failure=%s)',
   async (fail) => {
     const order: string[] = [];
-    vi.mocked(drawReviewSpotlights).mockImplementation(() => {
+    vi.mocked(drawSceneSpotlights).mockImplementation(() => {
       order.push('focus');
     });
     const context = {

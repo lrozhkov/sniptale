@@ -43,14 +43,17 @@ export interface ProjectTimelineInsertionActions {
   onUnsupportedFileDrop: () => void;
 }
 
-export interface TimelineClipRevealRequest {
-  clipId: string;
-  serial: number;
-}
+/** Disposable view destinations never enter the saved project clip namespace. */
+export type TimelineRevealTarget =
+  | { kind: 'clip'; clipId: string }
+  | { kind: 'source-voiceover'; documentId: string; viewId: string };
+
+export type TimelineRevealRequest = TimelineRevealTarget & { serial: number };
 
 export interface ProjectTimelineProps {
   collapsedFxByTrackId?: Readonly<Record<string, boolean>> | undefined;
-  revealClipRequest?: TimelineClipRevealRequest | undefined;
+  revealRequest?: TimelineRevealRequest | undefined;
+  canDuplicateSelection: boolean;
   canDeleteSelectedClip: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
@@ -77,6 +80,9 @@ export interface ProjectTimelineProps {
   onSeek: (time: number) => void;
   onZoomChange: (value: number) => void;
   onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
+  onSelectComment?:
+    | ((documentId: string, commentId: string, projectTime?: number) => void)
+    | undefined;
   onSelectScene: () => void;
   onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSelectTrack: (trackId: string | null) => void;

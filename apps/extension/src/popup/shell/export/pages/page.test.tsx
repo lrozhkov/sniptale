@@ -124,8 +124,6 @@ function getRenderedFooterProps(): RenderedFooterProps {
 
 function triggerFooterActions(footerProps: RenderedFooterProps) {
   footerProps.onCancelExport();
-  footerProps.onCopyJson();
-  footerProps.onCopyMarkdown();
   footerProps.onResetExportView();
   footerProps.onStartExport();
 }
@@ -156,7 +154,7 @@ async function verifyContentAndFooterWiring() {
   const footerProps = getRenderedFooterProps();
 
   expect(mocks.exportPageContentMock).toHaveBeenCalledWith(expect.objectContaining({ controller }));
-  expect(section?.className).toContain('rounded-[16px]');
+  expect(section?.className).toContain('rounded-[6px]');
   expect(section?.className).toContain('p-3');
   const actions = section?.querySelector<HTMLElement>('[data-ui="popup.export.actions"]');
   expect(actions?.querySelector('[data-testid="export-footer-actions"]')).not.toBeNull();
@@ -166,11 +164,7 @@ async function verifyContentAndFooterWiring() {
 
   triggerFooterActions(footerProps);
 
-  expect(footerProps.copyJsonTitle).toBe('Копировать JSON текущей открытой вкладки');
-  expect(footerProps.copyMarkdownTitle).toBe('Копировать Markdown текущей открытой вкладки');
   expect(controller.actions.handleCancelExport).toHaveBeenCalledTimes(1);
-  expect(controller.actions.handleCopyJson).toHaveBeenCalledTimes(1);
-  expect(controller.actions.handleCopyMarkdown).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleResetExportView).toHaveBeenCalledTimes(1);
   expect(controller.actions.handleSaveWebSnapshot).not.toHaveBeenCalled();
   expect(controller.actions.handleStartExport).toHaveBeenCalledTimes(1);

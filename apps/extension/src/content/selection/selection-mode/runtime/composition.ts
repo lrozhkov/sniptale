@@ -24,6 +24,44 @@ import {
 } from '../constants';
 import { createSelectionModeRuntimeSetup } from './setup';
 import { adjustSelectionPadding } from '../interaction/selection/padding';
+import { createSelectionDrawingRuntime } from '../ui/drawing';
+import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'ContentSelectionMode' });
+
+function createCropModePreferences() {
+  let pendingMutation = Promise.resolve();
+  return {
+    save(drawing: boolean): void {
+      pendingMutation = patchSettings({
+        contentToolbar: { cropMode: drawing ? 'drawing' : 'resize' },
+      }).then(
+        () => undefined,
+        (error) => {
+          logger.error('Failed to save Crop mode preference', error);
+        }
+      );
+    },
+    prepare(prepareUi: () => Promise<void>) {
+      let initialDrawing = true;
+      return {
+        get initialDrawing() {
+          return initialDrawing;
+        },
+        prepare: async () => {
+          await prepareUi();
+          await pendingMutation;
+          try {
+            initialDrawing = (await loadSettings()).contentToolbar?.cropMode !== 'resize';
+          } catch {
+            initialDrawing = true;
+          }
+        },
+      };
+    },
+  };
+}
 
 type SelectionModeEvents = ReturnType<typeof createSelectionModeEventsBridge>;
 type SelectionModeHandlers = ReturnType<typeof createSelectionModeEventHandlers>;
@@ -35,15 +73,33 @@ export interface SelectionModeRuntime {
   isSelectionModeActive: () => boolean;
 }
 
-export function createSelectionModeRuntime(args: {
+interface SelectionModeRuntimeArgs {
   cleanup: () => void;
   session: SelectionModeSession;
-}): SelectionModeRuntime {
+}
+
+function watchSelectionModeFrozenViewport(
+  session: SelectionModeSession,
+  onChanged: () => void
+): void {
+  if (!session.frozenFrame) return;
+  const cleanup = session.cleanupEventListeners;
+  const stopWatching = watchFrozenSelectionViewport(session.frozenFrame.geometry, onChanged);
+  session.cleanupEventListeners = () => {
+    stopWatching();
+    cleanup?.();
+  };
+}
+
+export function createSelectionModeRuntime(args: SelectionModeRuntimeArgs): SelectionModeRuntime {
   let events: SelectionModeEvents;
   let handlers: SelectionModeHandlers;
+  let drawing: ReturnType<typeof createSelectionDrawingRuntime> | null = null;
+  let publishDrawingSnapshot: SelectionModeActivationOptions['onDrawingSnapshot'];
+  const cropModePreferences = createCropModePreferences();
 
   const getEvents = () => events;
-  const getHandlers = () => handlers;
+  const getHandlers = () => (drawing?.isDrawing() ? null : handlers);
   const visual = getSelectionFrameVisual();
   const setupSizePanelListeners = createSelectionModeSizePanelSetup({
     constrainSelection: () => getEvents().constrainSelection(),
@@ -82,17 +138,21 @@ export function createSelectionModeRuntime(args: {
   });
   const runtimeArgs = createSelectionModeRuntimeSetup({
     createDragFrame: () => uiRuntime.createDragFrame(),
-    createFinalElements: () => uiRuntime.createFinalElements(),
+    createFinalElements: () => {
+      uiRuntime.createFinalElements();
+      if (args.session.dom.finalOverlay) args.session.dom.finalOverlay.style.zIndex = '3';
+      if (args.session.dom.sizeTooltip) drawing?.attachToolbar(args.session.dom.sizeTooltip);
+    },
     flushFinalFrameUpdate: () => flushScheduledFinalFrameUpdate(args.session.dom),
     getMaxSelectionHeight,
     getMaxSelectionWidth,
-    handleClick: (event, iframe) => getHandlers().handleClick(event, iframe),
-    handleDragStart: (event) => getHandlers().handleDragStart(event),
-    handleKeyDown: (event) => getHandlers().handleKeyDown(event),
-    handleMouseDown: (event, iframe) => getHandlers().handleMouseDown(event, iframe),
-    handleMouseLeave: () => getHandlers().handleMouseLeave(),
-    handleMouseMove: (event, iframe) => getHandlers().handleMouseMove(event, iframe),
-    handleMouseUp: (event) => getHandlers().handleMouseUp(event),
+    handleClick: (event, iframe) => getHandlers()?.handleClick(event, iframe),
+    handleDragStart: (event) => getHandlers()?.handleDragStart(event),
+    handleKeyDown: (event) => getHandlers()?.handleKeyDown(event),
+    handleMouseDown: (event, iframe) => getHandlers()?.handleMouseDown(event, iframe),
+    handleMouseLeave: () => getHandlers()?.handleMouseLeave(),
+    handleMouseMove: (event, iframe) => getHandlers()?.handleMouseMove(event, iframe),
+    handleMouseUp: (event) => getHandlers()?.handleMouseUp(event),
     minSelectionSize: MIN_SELECTION_SIZE,
     scheduleFinalFrameUpdate: () =>
       scheduleFinalFrameUpdate(args.session.dom, args.session.currentSelection),
@@ -101,23 +161,40 @@ export function createSelectionModeRuntime(args: {
     zIndexBase: Z_INDEX_BASE,
   });
 
-  events = createSelectionModeEventsBridge({
+  const eventBridge = createSelectionModeEventsBridge({
     cleanupEvent: args.cleanup,
     disableCursor: () => disableSelectionModeCursor(args.session),
-    handleKeyDown: (event) => getHandlers().handleKeyDown(event),
+    handleKeyDown: (event) => getHandlers()?.handleKeyDown(event),
     runtimeArgs,
   });
+  events = {
+    ...eventBridge,
+    confirmSelection: (event?: Event) => {
+      const snapshot = drawing?.finalize();
+      if (snapshot) publishDrawingSnapshot?.(snapshot);
+      eventBridge.confirmSelection(event);
+    },
+  };
   handlers = createSelectionModeEventHandlers({
     selectionModeEvents: events,
     state: runtimeArgs.state,
   });
 
   return {
-    cleanupEffects: events.cleanup,
+    cleanupEffects: () => {
+      try {
+        drawing?.dispose();
+      } finally {
+        drawing = null;
+        publishDrawingSnapshot = undefined;
+        events.cleanup();
+      }
+    },
     disableSelectionMode: () =>
       disableSelectionModeApi({ cleanup: args.cleanup, session: args.session }),
-    enableSelectionMode: (options) =>
-      enableSelectionModeApi({
+    enableSelectionMode: (options) => {
+      const preparation = cropModePreferences.prepare(uiRuntime.prepare);
+      return enableSelectionModeApi({
         cleanup: args.cleanup,
         createHoverElements: () => uiRuntime.createHoverElements(),
         createOverlayContainer: () => {
@@ -125,9 +202,19 @@ export function createSelectionModeRuntime(args: {
           if (args.session.frozenFrame) {
             mountFrozenSelectionFrame(args.session.dom.overlayContainer, args.session.frozenFrame);
           }
+          const container = args.session.dom.overlayContainer;
+          if (container) {
+            publishDrawingSnapshot = options?.onDrawingSnapshot;
+            drawing = createSelectionDrawingRuntime({
+              container,
+              initialDrawing: preparation.initialDrawing,
+              onModeChange: cropModePreferences.save,
+              onLayout: () => getEvents().updateFinalFrame(),
+            });
+          }
         },
         enableCursor: () => enableSelectionModeCursor(args.session),
-        prepareUi: () => uiRuntime.prepare(),
+        prepareUi: preparation.prepare,
         ...(options === undefined ? {} : { options }),
         session: args.session,
         setupEventListeners: () => {
@@ -136,19 +223,10 @@ export function createSelectionModeRuntime(args: {
             session: args.session,
             setupListenerHandlers: runtimeArgs.setupListenerHandlers,
           });
-          if (args.session.frozenFrame) {
-            const cleanup = args.session.cleanupEventListeners;
-            const stopWatching = watchFrozenSelectionViewport(
-              args.session.frozenFrame.geometry,
-              () => getEvents().cancelSelection()
-            );
-            args.session.cleanupEventListeners = () => {
-              stopWatching();
-              cleanup?.();
-            };
-          }
+          watchSelectionModeFrozenViewport(args.session, () => getEvents().cancelSelection());
         },
-      }),
+      });
+    },
     isSelectionModeActive: () => isSelectionModeActiveApi(args.session.isActive),
   };
 }

@@ -1,5 +1,47 @@
 import { expect, test } from '../support/extension-fixture';
+import type { Page, TestInfo } from '@playwright/test';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+
+async function expectScreenshotDelayIndicator(page: Page, info: TestInfo, orientation: string) {
+  const trigger = page.locator('[data-ui="content.toolbar.timer-button"]');
+  for (const [index, delay] of [
+    [1, 3],
+    [2, 5],
+    [3, 10],
+    [0, 0],
+  ] as const) {
+    await trigger.click();
+    await page
+      .locator('[data-ui="content.toolbar.timer-menu"] .sniptale-toolbar-menu-item')
+      .nth(index)
+      .click();
+    const value = trigger.locator('[data-ui="content.toolbar.timer-value"]');
+    if (delay === 0) {
+      await expect(value).toHaveCount(0);
+      await expect(trigger).toHaveAttribute('data-menu-indicator', 'true');
+      continue;
+    }
+    await expect(value).toHaveText(String(delay));
+    await expect(trigger).not.toHaveAttribute('data-menu-indicator');
+    for (const size of [29, 30, 31]) {
+      await trigger.evaluate(
+        (node, size) => node.style.setProperty('--sniptale-toolbar-button-size', `${size}px`),
+        size
+      );
+      const icon = trigger.locator('.sniptale-toolbar-delay-icon');
+      if (size < 30) await expect(icon).toBeHidden();
+      else await expect(icon).toBeVisible();
+      await expect(value).toHaveCSS('position', size < 30 ? 'static' : 'absolute');
+      await expect(value).toHaveCSS('font-size', size < 30 ? '13px' : '9px');
+      if (delay === 10)
+        await page.screenshot({
+          path: info.outputPath(`timer-${orientation}-${size}.png`),
+          fullPage: false,
+        });
+    }
+    await trigger.evaluate((node) => node.style.removeProperty('--sniptale-toolbar-button-size'));
+  }
+}
 function readFocusPaint(element: Element) {
   const style = getComputedStyle(element);
   return {
@@ -11,11 +53,206 @@ function readFocusPaint(element: Element) {
   };
 }
 let opened: Awaited<ReturnType<typeof openDesignReview>> | null = null;
+
+for (const appearance of [
+  { theme: 'dark', locale: 'en', width: 1280, height: 560 },
+  { theme: 'light', locale: 'ru', width: 1280, height: 560 },
+  { theme: 'dark', locale: 'ru', width: 1920, height: 900 },
+  { theme: 'light', locale: 'en', width: 1920, height: 900 },
+  { theme: 'dark', locale: 'en', width: 960, height: 560 },
+] as const) {
+  test(`toolbar menu text stays regular ${appearance.theme} ${appearance.locale} ${appearance.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const windowsRendering = appearance.locale === 'ru';
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+    await worker.evaluate(async ({ theme, locale }) => {
+      await chrome.storage.local.set({
+        'sniptale-locale-preference': locale,
+        'sniptale-theme-preference': theme,
+      });
+    }, appearance);
+    opened = await openDesignReview(context, extensionId, hostOrigin, appearance);
+    const { page } = opened;
+    if (windowsRendering) {
+      await page.locator('.sniptale-toolbar').evaluate((element) => {
+        const root = element.getRootNode();
+        if (root instanceof ShadowRoot) root.host.setAttribute('data-ui-platform', 'windows');
+      });
+    }
+    await page.addStyleTag({
+      content: `body { background: ${appearance.theme === 'dark' ? '#222' : '#fff'}; } * { -webkit-text-stroke: 0.35px !important; }`,
+    });
+    await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+    await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+    await page.evaluate(() => document.fonts.ready);
+    for (const compact of [false, true]) {
+      await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+      const toggle = page
+        .locator('.sniptale-toolbar-menu-item')
+        .filter({ hasText: /Compact menu view|Компактный вид меню/ });
+      const selected = await toggle.evaluate((element) =>
+        element.classList.contains('sniptale-popover-item-selected')
+      );
+      if (selected !== compact) await toggle.click();
+      await page.keyboard.press('Escape');
+      for (const name of ['mode-selector', 'settings', 'viewport']) {
+        await page.locator(`[data-ui="content.toolbar.${name}-button"]`).click();
+        const menu = page.locator('.sniptale-toolbar-menu:visible').last();
+        await expect(menu).toBeVisible();
+        expect(
+          await menu.evaluate((element) =>
+            element.classList.contains('sniptale-toolbar-menu--compact')
+          )
+        ).toBe(compact);
+        const labels = menu.locator('.sniptale-toolbar-menu-item-label');
+        expect(await labels.count()).toBeGreaterThan(0);
+        const typography = await labels.evaluateAll((elements) =>
+          elements.map((element) => {
+            const style = getComputedStyle(element);
+            return {
+              weight: style.fontWeight,
+              stroke: style.webkitTextStrokeWidth,
+              family: style.fontFamily,
+              fill: style.getPropertyValue('-webkit-text-fill-color'),
+            };
+          })
+        );
+        for (const style of typography) {
+          expect(style.weight).toBe('400');
+          expect(style.stroke).toBe('0px');
+          expect(style.family).toContain('Sniptale Interface');
+          if (appearance.theme === 'dark' && windowsRendering) {
+            expect(style.fill).toContain('/ 0.82)');
+          } else {
+            expect(style.fill).not.toContain('/ 0.82)');
+          }
+        }
+        const option = menu.getByRole('button').first();
+        await option.hover();
+        await expect(labels.first()).toHaveCSS('font-weight', '400');
+        await option.focus();
+        await expect(labels.first()).toHaveCSS('font-weight', '400');
+        await expect(labels.first()).toHaveCSS('-webkit-text-stroke-width', '0px');
+        if (compact || name === 'mode-selector') {
+          await page.screenshot({
+            path: info.outputPath(`${compact ? 'compact' : 'expanded'}-${name}.png`),
+            fullPage: false,
+          });
+        }
+        await page.keyboard.press('Escape');
+      }
+    }
+    await expect(page.locator('h1').first()).toHaveCSS('-webkit-text-stroke-width', '0.35px');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true
+    );
+  });
+}
 test.afterEach(async () => {
   await opened?.page.close();
   await opened?.popup.close();
   opened = null;
 });
+
+for (const appearance of [
+  { theme: 'light', width: 1280, height: 560 },
+  { theme: 'dark', width: 1280, height: 560 },
+  { theme: 'light', width: 1920, height: 900 },
+  { theme: 'dark', width: 1920, height: 900 },
+] as const) {
+  test(`settings menu trigger uses borderless property chrome ${appearance.theme} ${appearance.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+    await worker.evaluate(async (theme) => {
+      await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+    }, appearance.theme);
+    opened = await openDesignReview(context, extensionId, hostOrigin, appearance);
+    const { page } = opened;
+    const trigger = page.locator('[data-ui="content.toolbar.settings-button"]');
+    for (const mode of ['cursor', 'video-recording', 'design-review']) {
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+      if (mode === 'video-recording')
+        await expect(
+          page.locator('[data-ui="content.toolbar.video-recording.customize"] .tabler-eye-cog')
+        ).toBeVisible();
+      for (const orientation of ['horizontal', 'vertical']) {
+        await trigger.click();
+        const direction = page.getByRole('button', {
+          name:
+            orientation === 'horizontal'
+              ? /Horizontal view|Горизонтальный вид/u
+              : /Vertical view|Вертикальный вид/u,
+        });
+        if (!(await direction.isVisible()))
+          await page
+            .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+            .click();
+        await direction.click();
+        if ((await trigger.getAttribute('aria-expanded')) === 'true')
+          await page.keyboard.press('Escape');
+        await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveAttribute(
+          'data-display-mode',
+          orientation
+        );
+        await page.mouse.move(0, 0);
+        await expect(trigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await trigger.hover();
+        await expect(trigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        await expect(trigger).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(trigger).toHaveAttribute('data-command-property', 'true');
+        await expect(trigger).toHaveAttribute('data-menu-indicator', 'true');
+        expect(
+          await trigger.evaluate((element) => getComputedStyle(element, '::before').borderTopStyle)
+        ).toBe('solid');
+        await page.screenshot({
+          path: info.outputPath(`${mode}-${orientation}-hover.png`),
+          fullPage: false,
+        });
+        await trigger.click();
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        await expect(trigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        await page.keyboard.press('Escape');
+        await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        if (mode === 'cursor') await expectScreenshotDelayIndicator(page, info, orientation);
+        if (mode === 'design-review') {
+          if (
+            !(await page
+              .locator('[data-ui="content.toolbar.annotation-export-button"]')
+              .isVisible())
+          ) {
+            await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+            await page.locator('[data-ui="content.toolbar.mode-option.design-review"]').click();
+          }
+          const exportTrigger = page.locator(
+            '[data-ui="content.toolbar.annotation-export-button"]'
+          );
+          await page.mouse.move(0, 0);
+          await expect(exportTrigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+          await exportTrigger.hover();
+          await expect(exportTrigger).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+          await expect(exportTrigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+          await expect(exportTrigger).toHaveAttribute('data-command-property', 'true');
+          await expect(exportTrigger).toHaveAttribute('data-menu-indicator', 'true');
+          await page.screenshot({
+            path: info.outputPath(`export-${orientation}-hover.png`),
+            fullPage: false,
+          });
+          await exportTrigger.click();
+          await expect(exportTrigger).toHaveAttribute('aria-expanded', 'true');
+          await page.keyboard.press('Escape');
+          await expect(exportTrigger).toHaveAttribute('aria-expanded', 'false');
+        }
+      }
+    }
+  });
+}
 
 test('pointer-open toolbar menu Escape preserves pointer paint at HD', async ({
   context,

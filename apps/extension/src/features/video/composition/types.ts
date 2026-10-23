@@ -1,3 +1,8 @@
+import type { QuickEditHomography } from './motion/spatial-geometry';
+import type { VisualLayerSourcePointMapping } from './draw/fitted-media';
+import type { QuickEditBorder, QuickEditSpotlight } from '../project/scene/focus-appearance';
+import type { SceneBorderClock } from './scene-border';
+import type { CameraSpatialFrame, CameraSpatialRect } from '../project/motion/spatial';
 import type { VideoProjectActionOccurrence } from '../project/action-occurrences';
 import type { ResolvedAnnotationPresentation } from '../project/annotation/template';
 import type { ResolvedAnnotationScene } from '../project/annotation-engine';
@@ -37,6 +42,8 @@ interface VideoCompositionLayerBase<TClip, TKind extends string> {
   /** Already composed in viewport coordinates by a track/global FX stage. */
   effectViewportRaster?: boolean;
   effectActionsOnly?: boolean;
+  /** Source-scene utility projection also paints its deferred border after the scene mask. */
+  deferSourceBorders?: boolean;
   clip: TClip;
   clipId: string;
   kind: TKind;
@@ -73,16 +80,52 @@ export interface VideoCompositionResolvedAnnotationClip {
   trackId: string;
 }
 
+/** Disposable authored appearance and retained phase clock, before output geometry is known. */
+export interface VideoCompositionBorderState {
+  coordinateSpace?: 'source-window';
+  id: string;
+  border: QuickEditBorder;
+  clock: SceneBorderClock;
+}
+
+/** Evaluated Native source phase; an optional concrete clip anchors scene-wide coverage. */
+export interface VideoCompositionSpotlightState {
+  /** Source-scene masks run after this authored layer, before later layers. */
+  afterClipId?: string;
+  /** Split appearances of one authored focus share a single Native transition mask pass. */
+  sourceTransition?: { id: string; leadingClipId: string; trailingClipId: string; blend?: true };
+  coordinateSpace?: 'source-window';
+  id: string;
+  spotlight: QuickEditSpotlight;
+  phase: 'enter' | 'hold' | 'exit';
+  progress: number;
+  from?: QuickEditSpotlight;
+  clipId?: string;
+}
+
 export type VideoCompositionVisualLayer =
   | (VideoCompositionLayerBase<VideoProjectVideoClip, 'video'> & {
       /** Role of the source track, retained for independent camera composition. */
       trackRole?: VideoProjectTrackRole;
+      /** Inner source exposure remains inside the decorated window mask. */
+      sourceContentTransform?: QuickEditHomography;
       actions?: readonly VideoCompositionActionState[];
+      /** Window borders enter clip FX once; source-scene utility borders follow their scene mask. */
+      borders?: readonly VideoCompositionBorderState[];
+      /** Window masks operate on isolated source pixels before clip/track effects. */
+      spotlights?: readonly VideoCompositionSpotlightState[];
     })
   | VideoCompositionLayerBase<VideoProjectImageClip, 'image'>
   | VideoCompositionLayerBase<VideoCompositionResolvedTextClip, 'text'>
   | VideoCompositionLayerBase<VideoCompositionResolvedAnnotationClip, 'annotation'>
-  | VideoCompositionLayerBase<VideoProjectEffectClip, 'effect'>
+  | (VideoCompositionLayerBase<VideoProjectEffectClip, 'effect'> & {
+      /** Disposable source geometry; the host still owns body geometry and animation timing. */
+      sourceAttachment?: {
+        owner: Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
+        mapping: Omit<VisualLayerSourcePointMapping, 'point'>;
+        innerTransform?: QuickEditHomography;
+      };
+    })
   | VideoCompositionLayerBase<VideoProjectShapeClip, 'shape'>;
 
 export interface VideoCompositionCursorState {
@@ -102,6 +145,8 @@ export interface VideoCompositionActionState {
   gestureFeedback?: import('../review/click-animation').ReviewClickFrame;
   clickStyle?: import('../project/types').VideoActionClickStyle;
   keyStyle?: import('../project/types').VideoActionKeyStyle;
+  /** Absent for legacy project-pixel keys. Captured captions declare their authored viewport width. */
+  keyStyleViewportWidth?: number;
   easing?: import('../project/types').VideoTemporalEasing;
   preset: VideoProjectActionPreset;
   occurrence: VideoProjectActionOccurrence;
@@ -115,6 +160,18 @@ export interface VideoCompositionActionState {
 }
 
 export interface VideoCompositionCameraState {
+  /** A source-window camera leaves all other visual layers outside its exposure passes. */
+  sourceClipId?: string;
+  /** Inner source motion in the clip plane, before outer window projection. */
+  sourceContentTransform?: QuickEditHomography;
+  /** Following paint uses the source exposure without moving independent clips. */
+  backgroundCamera?: { scale: number; viewportX: number; viewportY: number };
+  /** Disposable pose and absolute project-plane reference, never persisted. */
+  spatial?: CameraSpatialFrame & {
+    reference: CameraSpatialRect;
+    /** The bound media affine placement; local perspective/depth remain in the original plane. */
+    planeTransform?: QuickEditHomography;
+  };
   focusPoint: { x: number; y: number };
   motionBlurAmount: number;
   overlayZoomMode?: VideoMotionOverlayZoomMode;
@@ -127,6 +184,9 @@ export interface VideoCompositionCameraState {
 }
 
 export interface VideoCompositionFrame {
+  sceneSpotlights?: readonly VideoCompositionSpotlightState[];
+  /** Viewport-normalized borders stay independent of the project camera. */
+  viewportBorders?: readonly VideoCompositionBorderState[];
   actions: VideoCompositionActionState[];
   camera: VideoCompositionCameraState;
   cursor: VideoCompositionCursorState | null;

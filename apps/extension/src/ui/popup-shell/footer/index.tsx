@@ -31,7 +31,7 @@ export function PopupFooter({ onOpenGithub, onOpenSettings }: PopupFooterProps) 
     <footer
       data-ui="shared.ui.popup-footer"
       className={[
-        'flex h-11 items-center justify-between rounded-[16px]',
+        'flex h-11 items-center justify-between rounded-[6px]',
         'border border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_88%,transparent)]',
         [
           'bg-[color:color-mix(',

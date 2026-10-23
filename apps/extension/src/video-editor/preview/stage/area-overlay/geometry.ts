@@ -1,3 +1,8 @@
+import {
+  motionWindowFocusToComposition,
+  resolveMotionSourceWindow,
+} from '../../../../features/video/composition/motion/source-window';
+import type { VideoProjectMotionRegion } from '../../../../features/video/project/types';
 import type { CSSProperties } from 'react';
 import { getMotionFocusAreaCenter } from '../../../../features/video/project/motion/index';
 import type { VideoProjectMotionArea } from '../../../../features/video/project/types/index';
@@ -14,13 +19,26 @@ export function resolveAreaPointFromPointer(
   clientY: number,
   stage: HTMLDivElement,
   project: PreviewStageCanvasProps['project'],
-  camera: PreviewStageCanvasProps['camera']
+  camera: PreviewStageCanvasProps['camera'],
+  region?: VideoProjectMotionRegion,
+  time = 0
 ) {
+  if (
+    region?.sourceBinding?.coordinateSpace === 'source-window' &&
+    !resolveMotionSourceWindow(project, region, time)
+  )
+    return null;
   const point = mapClientPointToCompositionPoint({
     camera,
     clientX,
     clientY,
-    lockToViewport: false,
+    clampToViewport: !region?.focusArea?.axes,
+    lockToViewport: Boolean(
+      camera.sourceClipId &&
+      (region?.focusArea?.axes || region?.sourceBinding?.coordinateSpace === 'source-window') &&
+      (region?.sourceBinding?.coordinateSpace !== 'source-window' ||
+        camera.sourceClipId !== region.sourceBinding.clipId)
+    ),
     project,
     stage,
   });
@@ -28,7 +46,10 @@ export function resolveAreaPointFromPointer(
     return null;
   }
 
-  return clampStagePoint(project, point);
+  const authored = region
+    ? motionWindowFocusToComposition(project, region, point, time, true)
+    : point;
+  return region?.focusArea?.axes ? authored : clampStagePoint(project, authored);
 }
 
 export function getAreaStyle(

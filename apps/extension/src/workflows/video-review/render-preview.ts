@@ -1,5 +1,6 @@
+import { reviewWatermarkAssets } from './asset-bytes';
 import type { PreviewScene as Scene, PreviewSceneDimensions as Dimensions } from './preview-scene';
-import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
+import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
 import {
   presentationMainColorOpacity,
   presentationMainColor,
@@ -26,15 +27,15 @@ import {
   reviewWindowRasterBacking,
 } from './window-header';
 import { evaluateReviewClicks } from '../../features/video/review/click-animation';
-import { measureReviewWatermark } from './render-watermark';
-import type { createReviewWatermarkRenderer } from './render-watermark';
+import { measureWatermark } from '../../features/video/composition/canvas/watermark';
+import type { createWatermarkRenderer } from '../../features/video/composition/canvas/watermark';
 import {
   resolvePreviewRenderAllocation,
   calculatePreviewPreparationAllocation,
   calculatePreviewRenderAllocation,
   type PreviewRenderAllocationInput,
 } from './preview-render-allocation';
-import { createReviewSpatialRenderer } from './spatial-renderer';
+import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import { drawReviewSceneFrame } from './scene-frame';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
 import { drawReviewWebcam } from './render-webcam';
@@ -104,7 +105,7 @@ type Assets = {
   allocation: PreviewRenderAllocationInput['assets'];
   background: ImageBitmap | null;
   header: ImageBitmap | null;
-  watermark: Awaited<ReturnType<typeof createReviewWatermarkRenderer>> | null;
+  watermark: Awaited<ReturnType<typeof createWatermarkRenderer>> | null;
   painter: ReturnType<typeof createReviewBackgroundPainter>;
   spatial: ReturnType<typeof createReviewSpatialRenderer> | undefined;
   reservations: { release(): void }[];
@@ -260,7 +261,7 @@ async function prepareAssets(
     signal.throwIfAborted();
   }
   admit(scene.watermark?.mode === 'text' && Boolean(scene.watermark.text.value));
-  const watermark = await measureReviewWatermark(scene.watermark, dimensions.canonical, signal, {
+  const watermark = await measureWatermark(scene.watermark, dimensions.canonical, signal, {
     scaleX: dimensions.backing.width / dimensions.canonical.width,
     scaleY: dimensions.backing.height / dimensions.canonical.height,
     resources,
@@ -275,7 +276,7 @@ async function prepareAssets(
       }
     : null;
   admit(false);
-  assets.watermark = await watermark.paint(readAsset);
+  assets.watermark = await watermark.paint(reviewWatermarkAssets(readAsset));
   signal.throwIfAborted();
   if (document.fonts) await document.fonts.ready;
   signal.throwIfAborted();

@@ -14,11 +14,12 @@ export type AreaOverlayParams = Pick<
   | 'project'
   | 'selectedMotionRegion'
   | 'stageRef'
->;
+> &
+  Partial<Pick<PreviewStageCanvasProps, 'currentTime' | 'motionProject' | 'onPreviewMotion'>>;
 
 export interface AreaDragParams {
   area: VideoProjectMotionArea;
-  event: React.PointerEvent<HTMLElement>;
+  event: React.PointerEvent<HTMLElement | SVGElement>;
   mode: 'move' | 'resize';
   params: AreaOverlayParams;
 }

@@ -2,10 +2,19 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createGuideProject } from '../../../features/scenario/project/public';
+import {
+  createGuideProject,
+  createTourDocument,
+  createTourImageSlide,
+} from '../../../features/scenario/project/public';
 import { createTranslator } from '../../../platform/i18n';
 const io = vi.hoisted(() => ({ prepare: vi.fn(), save: vi.fn() }));
-vi.mock('../runtime/tour-html', () => ({ prepareTourHtml: io.prepare, saveTourHtml: io.save }));
+vi.mock('../runtime/tour-html', async (original) => ({
+  ...(await original<typeof import('../runtime/tour-html')>()),
+  prepareTourHtml: io.prepare,
+  saveTourHtml: io.save,
+}));
+import { TourHtmlPreparationError } from '../runtime/tour-html';
 import { TourHtmlExport } from './export';
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -73,8 +82,9 @@ it.each(['ru', 'en'] as const)(
       volume: locale === 'ru' ? 'Громкость' : 'Volume',
       mute: locale === 'ru' ? 'Выключить звук' : 'Mute',
       unmute: locale === 'ru' ? 'Включить звук' : 'Unmute',
-      manual: t('scenario.editor.tourManual'),
-      fullView: locale === 'ru' ? 'Слайд целиком' : 'Full slide',
+      showHints: t('scenario.editor.tourShowHints'),
+      hideHints: t('scenario.editor.tourHideHints'),
+      fullView: locale === 'ru' ? 'Изображение целиком' : 'Full image',
       authoredView: locale === 'ru' ? 'Авторский вид' : 'Authored view',
       end: t('scenario.editor.tourEnd'),
     });
@@ -197,6 +207,7 @@ it('invalidates preview when compression changes and supports retry, replay, can
   io.prepare.mockRejectedValueOnce(new Error('decode'));
   await action('tourHtmlPrepare');
   expect(host.textContent).toContain(t('scenario.editor.tourHtmlFailed'));
+  expect(host.textContent).not.toContain('decode');
   io.prepare.mockImplementationOnce(() => new Promise(() => {}));
   await action('tourHtmlPrepare');
   const signal = io.prepare.mock.calls.at(-1)?.[0].signal;
@@ -211,5 +222,114 @@ it('invalidates preview when compression changes and supports retry, replay, can
   );
   expect(close).toHaveBeenCalledOnce();
   act(() => root.unmount());
+  host.remove();
+});
+
+it.each(['ru', 'en'] as const)(
+  'shows the actionable %s blocker and replaces it with a retried exact preview',
+  async (locale) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const t = createTranslator(locale);
+    const artifact = {
+      blob: new Blob(['repaired exact bytes']),
+      filename: 'tour.html',
+      projectId: 'project',
+      mediaCount: 1,
+    };
+    io.prepare.mockRejectedValueOnce(
+      new TourHtmlPreparationError({
+        code: 'missingAudioMedia',
+        slideNumber: 2,
+        slideTitle: 'Checkout',
+        actionNumber: 4,
+      })
+    );
+    io.prepare.mockResolvedValueOnce(artifact);
+    io.save.mockResolvedValue('saved');
+    await act(async () =>
+      root.render(<TourHtmlExport project={createGuideProject('Guide')} t={t} onClose={() => {}} />)
+    );
+    const button = (key: 'tourHtmlPrepare' | 'htmlSave') =>
+      [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+        (node) => node.title === t(`scenario.editor.${key}`)
+      )!;
+    await act(async () => button('tourHtmlPrepare').click());
+    expect(host.textContent).toContain(t('scenario.editor.tourHtmlBlockerMissingAudioMedia'));
+    expect(host.textContent).toContain('Checkout');
+    expect(host.textContent).toContain(
+      t('scenario.editor.tourHtmlBlockerAction').replace('{number}', '4')
+    );
+    expect(button('htmlSave').disabled).toBe(true);
+    expect(host.querySelector('iframe')).toBeNull();
+    await act(async () => button('tourHtmlPrepare').click());
+    expect(host.textContent).not.toContain(t('scenario.editor.tourHtmlBlockerMissingAudioMedia'));
+    expect(host.querySelector('iframe')).not.toBeNull();
+    await act(async () => button('htmlSave').click());
+    expect(io.save.mock.calls[0]![0]).toBe(artifact);
+    await act(async () => root.unmount());
+    host.remove();
+  }
+);
+
+it('retains pending preparation and the exact preview after equivalent autosave publication', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const t = createTranslator('en');
+  const project = createGuideProject('Guide');
+  project.tour = createTourDocument();
+  let resolve!: (value: unknown) => void;
+  io.prepare.mockImplementation(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      })
+  );
+  io.save.mockResolvedValue('saved');
+  const render = async (current: typeof project) =>
+    act(async () => root.render(<TourHtmlExport project={current} t={t} onClose={() => {}} />));
+  const button = (key: 'tourHtmlPrepare' | 'htmlSave') =>
+    [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (node) => node.title === t(`scenario.editor.${key}`)
+    )!;
+  await render(project);
+  await act(async () => button('tourHtmlPrepare').click());
+  const signal = io.prepare.mock.calls[0]![0].signal;
+  const published = structuredClone(project);
+  published.updatedAt += 1;
+  // Persistence publication reconstructs nested objects in a canonical property order.
+  const { slides, ...rest } = published.tour!;
+  published.tour = { slides, ...rest };
+  await render(published);
+  expect(signal.aborted).toBe(false);
+  const artifact = {
+    blob: new Blob(['exact saved snapshot']),
+    filename: 'tour.html',
+    projectId: project.id,
+    mediaCount: 0,
+  };
+  await act(async () => resolve(artifact));
+  expect(host.querySelector('iframe')).not.toBeNull();
+  await render({ ...structuredClone(project), updatedAt: project.updatedAt + 2 });
+  expect(host.querySelector('iframe')).not.toBeNull();
+  await act(async () => button('htmlSave').click());
+  expect(io.save.mock.calls[0]![0]).toBe(artifact);
+  await render({
+    ...published,
+    tour: { ...published.tour!, slides: [createTourImageSlide('new-slide')] },
+  });
+  expect(host.querySelector('iframe')).toBeNull();
+  expect(button('htmlSave').disabled).toBe(true);
+  await act(async () => button('tourHtmlPrepare').click());
+  const changedSignal = io.prepare.mock.calls.at(-1)![0].signal;
+  await render({ ...published, name: 'Revised title' });
+  expect(changedSignal.aborted).toBe(true);
+  await act(async () => resolve(artifact));
+  expect(host.querySelector('iframe')).toBeNull();
+  await act(async () => root.unmount());
   host.remove();
 });

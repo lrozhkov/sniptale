@@ -1,4 +1,19 @@
+import type { CameraBackgroundZoomBehavior } from '../motion/spatial';
 import type { Gradient } from '@sniptale/foundation/paint';
+
+/** Controls whether retained content extends the montage clock. */
+export const VideoProjectDurationMode = {
+  CONTENT: 'content',
+  PROJECT: 'project',
+} as const;
+
+export type VideoProjectDurationMode =
+  (typeof VideoProjectDurationMode)[keyof typeof VideoProjectDurationMode];
+
+/** Admits only the two serialized policies shared by retained audio and text. */
+export function isVideoProjectDurationMode(value: unknown): value is VideoProjectDurationMode {
+  return value === VideoProjectDurationMode.CONTENT || value === VideoProjectDurationMode.PROJECT;
+}
 
 export const VideoTrackKind = {
   PRIMARY: 'PRIMARY',
@@ -127,6 +142,8 @@ export interface VideoProjectShapeStyle {
 }
 
 export interface VideoProjectTrack {
+  /** Independent AUDIO track master; omission means unity. */
+  audioVolume?: number;
   effectsBypassed?: boolean;
   id: string;
   name: string;
@@ -158,9 +175,26 @@ export interface VideoProjectGradientBackground {
 export interface VideoProjectImageBackground {
   kind: typeof VideoSceneBackgroundKind.IMAGE;
   assetId: string;
+  imageFit?: 'cover' | 'contain';
 }
 
-export type VideoProjectSceneBackground =
+export interface VideoProjectBackgroundVariants {
+  solid?: VideoProjectSolidBackground;
+  gradient?: VideoProjectGradientBackground;
+  image?: VideoProjectImageBackground;
+}
+
+export type VideoProjectSceneBackground = (
   | VideoProjectSolidBackground
   | VideoProjectGradientBackground
-  | VideoProjectImageBackground;
+  | VideoProjectImageBackground
+) & {
+  /** Disabled paint retains its authored variants without entering composition. */
+  enabled?: false;
+  blur?: number;
+  /** Passive legacy layout blur when a distinct active layout also exists. */
+  rememberedBlur?: number;
+  /** Window is the Native default; Gallery defaults are explicit after conversion. */
+  zoomBehavior?: CameraBackgroundZoomBehavior;
+  remembered?: VideoProjectBackgroundVariants;
+};

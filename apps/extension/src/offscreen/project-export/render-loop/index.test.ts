@@ -110,13 +110,18 @@ function installVideoFrameMock(closeMock: ReturnType<typeof vi.fn>) {
   );
 }
 
+function createDrawingContext(): CanvasRenderingContext2D {
+  const context: Partial<CanvasRenderingContext2D> = { save: vi.fn(), restore: vi.fn() };
+  return context as CanvasRenderingContext2D;
+}
+
 async function runMp4RenderLoop() {
   await runFrameDrivenCompositeRenderLoop(
     createJob('job-2') as never,
     createProject(1) as never,
     createSettings(VideoExportFormat.MP4, 6),
     {} as HTMLCanvasElement,
-    {} as CanvasRenderingContext2D,
+    createDrawingContext(),
     {},
     {
       encode: vi.fn(),
@@ -175,11 +180,12 @@ it('renders WebM frames from deterministic frame indexes instead of wall-clock d
     return current;
   });
 
+  const context = { save: vi.fn(), restore: vi.fn() };
   await runCompositeRenderLoop(
     createJob() as never,
     createProject(1) as never,
     createSettings(VideoExportFormat.WEBM, 4),
-    {} as CanvasRenderingContext2D,
+    context as unknown as CanvasRenderingContext2D,
     {}
   );
 
@@ -187,6 +193,8 @@ it('renders WebM frames from deterministic frame indexes instead of wall-clock d
     0, 0.25, 0.5, 0.75,
   ]);
   expect(drawProjectFrameMock).toHaveBeenCalledTimes(4);
+  expect(context.save).toHaveBeenCalledTimes(4);
+  expect(context.restore).toHaveBeenCalledTimes(4);
   expect(waitForDelayMock).toHaveBeenCalledTimes(3);
   expect(sendProgressMock).toHaveBeenLastCalledWith(
     'job-1',
@@ -219,7 +227,7 @@ it('sends actual measured ETA from the frame-driven producer and clears the last
     createProject(1) as never,
     createSettings(VideoExportFormat.MP4, 6),
     {} as HTMLCanvasElement,
-    {} as CanvasRenderingContext2D,
+    createDrawingContext(),
     {},
     { encode: vi.fn() } as never,
     vi.fn()

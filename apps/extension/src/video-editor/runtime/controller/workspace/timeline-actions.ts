@@ -7,11 +7,13 @@ import { resolveMotionConnectionSource } from '../../../../features/video/projec
 import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
 import { getClipEndTime } from '../../../../features/video/project/timeline';
+import { mapProjectTimeToSourcePoint } from '../../../../features/video/project/timeline/source-time';
 import { getProjectTransitionById } from '../../../../features/video/project/transition/project';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import { VideoProjectInteractionTimeBasis } from '../../../../features/video/project/types';
 import type { VideoEditorRuntimeController } from '../../session';
 import type {
+  AnnotationEditingPort,
   ClipSelectionPort,
   EffectEditingPort,
   HistoryPort,
@@ -38,6 +40,7 @@ type NonEffectTimelineSelection = Exclude<
 >;
 
 type TimelineActionStore = TimelineEditingPort &
+  Pick<AnnotationEditingPort, 'editCommentDocument'> &
   Pick<EffectEditingPort, 'deleteEffectInstance'> &
   ClipSelectionPort &
   Pick<
@@ -93,9 +96,8 @@ function createCursorSegmentMover(store: TimelineActionStore) {
               : undefined;
           if (binding.kind === 'recording-source' && clip?.type !== 'VIDEO') return;
           const sourceTime =
-            clip?.type === 'VIDEO'
-              ? clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1)
-              : time;
+            clip?.type === 'VIDEO' ? mapProjectTimeToSourcePoint([clip], time)?.sourceTime : time;
+          if (sourceTime === undefined) return;
           cursorFocusPath = updateCursorFocusKey(cursorFocusPath, id, { time: sourceTime });
         };
         move(sampleId, startTime);
@@ -159,8 +161,18 @@ function deleteSelectedTimelineObject(
   selectedClipActions: Pick<SelectedClipActions, 'deleteSelectedClip'>
 ) {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER:
+      store.deleteSourceVoiceover(selection.documentId);
+      return;
     case VideoEditorSelectionKind.MOTION_CONNECTION:
       store.updateMotionRegion(selection.motionRegionId, { incomingConnection: null });
+      return;
+    case VideoEditorSelectionKind.COMMENT:
+      if (store.project)
+        store.editCommentDocument(store.project, selection.documentId, {
+          kind: 'remove-note',
+          id: selection.commentId,
+        });
       return;
     case VideoEditorSelectionKind.HISTORY_SPAN:
     case VideoEditorSelectionKind.HISTORY_LANE:
@@ -270,6 +282,8 @@ export function createWorkspaceTimelineSelectionActions(
     onStepToPreviousFrame: () => runtime.stepByFrames(-1),
     onSetPlaybackRange: workspace.setPlaybackRange,
     onClearPlaybackRange: workspace.clearPlaybackRange,
+    onSelectSourceVoiceover: selectWithInspector(store.selectSourceVoiceover),
+    onSelectComment: selectWithInspector(store.selectComment),
     onSelectHistorySpan: selectWithInspector(store.selectHistorySpan),
     onSelectActionOccurrence: selectWithInspector(store.selectActionOccurrence),
     onSelectClip: selectWithInspector(store.selectClip),
@@ -282,7 +296,12 @@ export function createWorkspaceTimelineSelectionActions(
       const incomingConnection = { fromRegionId, easing: VideoTemporalEasing.EASE_IN_OUT };
       const source = resolveMotionConnectionSource(project, { ...destination, incomingConnection });
       if (!source) return;
-      store.updateMotionRegion(motionRegionId, { incomingConnection });
+      store.updateMotionRegion(motionRegionId, {
+        incomingConnection: {
+          ...incomingConnection,
+          easing: source.phaseTransitions?.link ?? incomingConnection.easing,
+        },
+      });
       selectWithInspector(store.selectMotionRegion)(motionRegionId, 'connection');
       seekOutsideRange((source.startTime + source.duration + destination.startTime) / 2);
     },

@@ -31,7 +31,16 @@ export function encodePortableTour(tour: TourDocument) {
       ...slide,
       narration: media(slide.narration),
       ...(slide.kind === 'image'
-        ? { image: media(slide.image) }
+        ? {
+            image: media(slide.image),
+            actions: slide.actions.map((entry) => ({
+              ...entry,
+              object: {
+                ...entry.object,
+                ...(entry.object.narration ? { narration: media(entry.object.narration) } : {}),
+              },
+            })),
+          }
         : { background: { ...slide.background, image: media(slide.background.image) } }),
     })),
   };
@@ -105,8 +114,31 @@ export function decodePortableTour(
     slides: slides.map((slide) => {
       if (!record(slide)) throw new Error('Portable tour slide is invalid.');
       const narration = media(slide['narration'], false);
-      if (slide['kind'] === 'image')
-        return { ...slide, narration, image: media(slide['image'], true) };
+      if (slide['kind'] === 'image') {
+        const actions = slide['actions'];
+        if (
+          !Array.isArray(actions) ||
+          actions.length > TOUR_LIMITS.maxHotspots + TOUR_LIMITS.maxAnnotations
+        )
+          throw new Error('Portable tour actions are invalid.');
+        return {
+          ...slide,
+          narration,
+          image: media(slide['image'], true),
+          actions: actions.map((entry: unknown) => {
+            if (!record(entry) || !record(entry['object']))
+              throw new Error('Portable tour action is invalid.');
+            const object = entry['object'];
+            return {
+              ...entry,
+              object: {
+                ...object,
+                ...(object['narration'] ? { narration: media(object['narration'], false) } : {}),
+              },
+            };
+          }),
+        };
+      }
       if (slide['kind'] !== 'navigation' || !record(slide['background']))
         throw new Error('Portable tour background is invalid.');
       return {

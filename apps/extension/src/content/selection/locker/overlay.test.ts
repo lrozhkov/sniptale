@@ -3,14 +3,23 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 const targetResolver = vi.hoisted(() => ({ resolveShieldedPageElement: vi.fn() }));
+const routing = vi.hoisted(() => ({
+  isPageElementPickerActive: vi.fn(() => false),
+  isSelectionDelegatedMode: vi.fn(() => false),
+}));
 
 vi.mock('../page-element-target', () => targetResolver);
+vi.mock('./routing', () => routing);
 
-import { handleOverlayWheel } from './overlay';
+import { handleOverlayWheel, syncNavigationLockOverlay } from './overlay';
+import { getContentUiElementById } from '../../platform/dom-host';
+import { FRAME_ANNOTATION_Z_INDEX } from '../../../features/highlighter/frame-annotation/interaction/z-index';
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
+  routing.isPageElementPickerActive.mockReturnValue(false);
+  routing.isSelectionDelegatedMode.mockReturnValue(false);
   vi.unstubAllGlobals();
   document.body.replaceChildren();
 });
@@ -125,4 +134,34 @@ it('chains wheel fallback from a bounded iframe window to the scrollable top win
 
   expect(innerScrollBy).not.toHaveBeenCalled();
   expect(topScrollBy).toHaveBeenCalledWith({ behavior: 'auto', left: 0, top: 80 });
+});
+
+it('blocks page pointer input below editable frames and above passive frames', () => {
+  syncNavigationLockOverlay(true);
+  const overlay = getContentUiElementById('sniptale-navigation-lock-overlay');
+  expect(overlay).toBeInstanceOf(HTMLDivElement);
+  const stack = Number(overlay?.style.zIndex);
+  expect(stack).toBeGreaterThan(FRAME_ANNOTATION_Z_INDEX.frameIdleMax);
+  expect(stack).toBeLessThan(FRAME_ANNOTATION_Z_INDEX.frameActive);
+  const pointer = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+  overlay?.dispatchEvent(pointer);
+  expect(pointer.defaultPrevented).toBe(true);
+  syncNavigationLockOverlay(false);
+  expect(overlay?.style.display).toBe('none');
+});
+
+it('restores a native arrow after delegated selection exits', () => {
+  routing.isSelectionDelegatedMode.mockReturnValue(true);
+  syncNavigationLockOverlay(true);
+  const overlay = getContentUiElementById('sniptale-navigation-lock-overlay');
+  expect(overlay?.style.cursor).toBe('inherit');
+
+  routing.isSelectionDelegatedMode.mockReturnValue(false);
+  syncNavigationLockOverlay(true);
+
+  expect(overlay?.style.cursor).toBe('default');
+  expect(overlay?.style.display).toBe('block');
+  routing.isPageElementPickerActive.mockReturnValue(true);
+  syncNavigationLockOverlay(true);
+  expect(overlay?.style.cursor).toBe('inherit');
 });

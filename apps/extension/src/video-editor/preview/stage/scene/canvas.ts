@@ -1,3 +1,4 @@
+import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 import {
   drawSceneBackground,
   getProjectSceneBackground,
@@ -35,6 +36,7 @@ function syncCanvasResolution(
   return dpr;
 }
 
+/** Measures the existing preview viewport without changing the presented canvas. */
 function resolvePreviewSceneMetrics(
   canvas: HTMLCanvasElement,
   project: VideoProject,
@@ -100,10 +102,11 @@ function resolvePreviewSceneContext(
   canvas: HTMLCanvasElement,
   project: VideoProject,
   stage: HTMLDivElement | null,
-  rasterSize?: VideoEditorPreviewRasterSize
+  rasterSize?: VideoEditorPreviewRasterSize,
+  viewportCanvas?: HTMLCanvasElement
 ) {
   const context = canvas.getContext('2d');
-  const { bounds, viewport } = resolvePreviewSceneMetrics(canvas, project, stage);
+  const { bounds, viewport } = resolvePreviewSceneMetrics(viewportCanvas ?? canvas, project, stage);
   if (!context) {
     return null;
   }
@@ -120,6 +123,7 @@ function clearPreviewSceneCanvas(params: {
   bounds: PreviewSceneBounds;
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
+  backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   currentTime?: number;
   dpr: number;
   imageBank: Record<string, HTMLImageElement>;
@@ -129,6 +133,8 @@ function clearPreviewSceneCanvas(params: {
   params.context.clearRect(0, 0, params.canvas.width, params.canvas.height);
   params.context.setTransform(params.dpr, 0, 0, params.dpr, 0, 0);
   drawSceneBackground({
+    ...(params.backgroundCamera ? { camera: params.backgroundCamera } : {}),
+    projectScale: params.bounds.width / params.project.width,
     context: params.context,
     currentTime: params.currentTime ?? 0,
     audioEnvelope: resolveSceneBackgroundAudioEnvelope(params.project, params.currentTime ?? 0),
@@ -152,7 +158,9 @@ function hasUsablePreviewViewport(
 }
 
 export function resolvePreparedPreviewSceneCanvas(params: {
+  backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   canvas: HTMLCanvasElement;
+  viewportCanvas?: HTMLCanvasElement;
   imageBank: Record<string, HTMLImageElement>;
   project: VideoProject;
   previewRasterSize?: VideoEditorPreviewRasterSize;
@@ -164,7 +172,8 @@ export function resolvePreparedPreviewSceneCanvas(params: {
     params.canvas,
     params.project,
     params.stage,
-    params.previewRasterSize
+    params.previewRasterSize,
+    params.viewportCanvas
   );
   if (!hasUsablePreviewViewport(prepared)) {
     return null;
@@ -173,6 +182,7 @@ export function resolvePreparedPreviewSceneCanvas(params: {
   if (params.shouldClearCanvas) {
     const currentTime = params.currentTime ?? 0;
     clearPreviewSceneCanvas({
+      ...(params.backgroundCamera ? { backgroundCamera: params.backgroundCamera } : {}),
       bounds: prepared.bounds,
       canvas: params.canvas,
       context: prepared.context,
@@ -213,4 +223,100 @@ export function beginPreviewCameraPass(
     -camera.viewportX * prepared.viewport.scale,
     -camera.viewportY * prepared.viewport.scale
   );
+}
+
+/** Publishes a finished transaction canvas after asynchronous preparation succeeds. */
+export function publishCompletedPreviewFrame(
+  presented: HTMLCanvasElement,
+  staging: HTMLCanvasElement
+): void {
+  const context = presented.getContext('2d');
+  if (!context) throw new Error('Preview frame context is unavailable.');
+  if (presented.width !== staging.width) presented.width = staging.width;
+  if (presented.height !== staging.height) presented.height = staging.height;
+  context.save();
+  try {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = 'copy';
+    context.filter = 'none';
+    context.shadowColor = 'transparent';
+    context.shadowBlur = 0;
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.drawImage(staging, 0, 0);
+  } finally {
+    context.restore();
+  }
+}
+
+type CompletedCompositionPresentation = Pick<
+  Parameters<typeof resolvePreparedPreviewSceneCanvas>[0],
+  'imageBank' | 'project' | 'stage' | 'previewRasterSize'
+> & {
+  canvas: HTMLCanvasElement;
+  currentTime: number;
+  stagingCanvas?: () => HTMLCanvasElement;
+  signal?: AbortSignal;
+};
+
+/** Uses the canonical contained viewport to select the completed-composition sample size. */
+export function resolvePreviewCompositionFrameSize(
+  input: Pick<
+    CompletedCompositionPresentation,
+    'canvas' | 'project' | 'stage' | 'previewRasterSize'
+  >
+) {
+  const { viewport } = resolvePreviewSceneMetrics(input.canvas, input.project, input.stage);
+  const dpr = input.canvas.ownerDocument.defaultView?.devicePixelRatio || 1;
+  const size = input.previewRasterSize ?? {
+    width: Math.round(viewport.width * dpr),
+    height: Math.round(viewport.height * dpr),
+  };
+  return size.width > 0 && size.height > 0 && viewport.width > 0 && viewport.height > 0
+    ? size
+    : null;
+}
+
+/** Publishes one completed composition through the existing viewport and transaction canvas. */
+export function publishPreviewCompositionFrame(
+  input: CompletedCompositionPresentation,
+  frame: CanvasImageSource
+) {
+  const owned = !input.stagingCanvas;
+  const staging = input.stagingCanvas?.() ?? input.canvas.ownerDocument.createElement('canvas');
+  if (staging === input.canvas || staging.ownerDocument !== input.canvas.ownerDocument)
+    throw new Error('Preview frame canvas is unavailable.');
+  try {
+    const prepared = resolvePreparedPreviewSceneCanvas({
+      canvas: staging,
+      viewportCanvas: input.canvas,
+      imageBank: input.imageBank,
+      project: input.project,
+      ...(input.previewRasterSize ? { previewRasterSize: input.previewRasterSize } : {}),
+      shouldClearCanvas: true,
+      stage: input.stage,
+      currentTime: input.currentTime,
+    });
+    if (!prepared) return false;
+    beginPreviewViewportClip(prepared);
+    try {
+      const context = prepared.context;
+      context.globalAlpha = 1;
+      context.globalCompositeOperation = 'copy';
+      context.filter = 'none';
+      context.shadowColor = 'transparent';
+      context.shadowBlur = context.shadowOffsetX = context.shadowOffsetY = 0;
+      context.drawImage(frame, 0, 0, prepared.viewport.width, prepared.viewport.height);
+    } finally {
+      prepared.context.restore();
+    }
+    input.signal?.throwIfAborted();
+    publishCompletedPreviewFrame(input.canvas, staging);
+  } finally {
+    if (owned) {
+      staging.width = 0;
+      staging.height = 0;
+    }
+  }
 }

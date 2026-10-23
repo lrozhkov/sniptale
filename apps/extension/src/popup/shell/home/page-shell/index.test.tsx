@@ -71,7 +71,7 @@ it('uses the authoritative desktop snapshot for the first screenshot frame', asy
 
   await act(async () => {
     getContainer()
-      ?.querySelector<HTMLButtonElement>('button[title="popup.home.captureButtonTitle"]')
+      ?.querySelector<HTMLButtonElement>('button[data-popup-hint="popup.home.captureButtonTitle"]')
       ?.click();
     await Promise.resolve();
   });

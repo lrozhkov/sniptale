@@ -32,18 +32,11 @@ let root: Root | null = null;
 
 function createProps() {
   return {
-    canCopyJson: true,
-    canCopyMarkdown: true,
     canExport: true,
-    copyJsonTitle: 'Copy JSON current tab',
-    copyMarkdownTitle: 'Copy Markdown current tab',
-    copiedFormat: null,
     exportTitle: 'Экспортировать',
     isExporting: false,
     isResultReady: false,
     onCancelExport: vi.fn(),
-    onCopyJson: vi.fn(),
-    onCopyMarkdown: vi.fn(),
     onResetExportView: vi.fn(),
     onStartExport: vi.fn(),
   };
@@ -87,14 +80,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders only Export and preview copy actions while idle', async () => {
+it('renders only the full-width Export action while idle', async () => {
   await renderLayout();
 
-  expect(container?.firstElementChild?.className).toContain('rounded-[16px]');
+  expect(container?.firstElementChild?.className).toContain('pt-2');
+  expect(container?.firstElementChild?.className).not.toContain('border');
   expect(container?.querySelector('[data-ui="popup.export.export-button"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="popup.export.web-snapshot-disclosure"]')).toBeNull();
   expect(container?.querySelector('[aria-label="Save web snapshot"]')).toBeNull();
-  expect(container?.querySelectorAll('button')).toHaveLength(3);
+  expect(container?.querySelectorAll('button')).toHaveLength(1);
+  expect(container?.firstElementChild?.firstElementChild?.className).toContain('grid-cols-1');
 });
 
 it('shows only Done for a completed downloaded package', async () => {

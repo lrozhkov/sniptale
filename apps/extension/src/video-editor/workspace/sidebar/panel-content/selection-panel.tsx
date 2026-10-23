@@ -47,6 +47,10 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
     ...(props.onUpdateMediaClipShadowMode
       ? { onUpdateMediaClipShadowMode: props.onUpdateMediaClipShadowMode }
       : {}),
+    ...(props.onUpdateMediaClipShadowColor
+      ? { onUpdateMediaClipShadowColor: props.onUpdateMediaClipShadowColor }
+      : {}),
+    ...(props.onEditMediaClip ? { onEditMediaClip: props.onEditMediaClip } : {}),
     ...(props.onUpdateMediaClipWindowHeader
       ? { onUpdateMediaClipWindowHeader: props.onUpdateMediaClipWindowHeader }
       : {}),
@@ -72,6 +76,11 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
 function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProps) {
   return {
     ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
+    ...(props.recognition ? { recognition: props.recognition } : {}),
+    ...(props.textRewrite ? { textRewrite: props.textRewrite } : {}),
+    ...(props.textVoice ? { textVoice: props.textVoice } : {}),
+    ...(props.sceneEdges ? { sceneEdges: props.sceneEdges } : {}),
+    ...(props.watermark ? { watermark: props.watermark } : {}),
     project: props.project,
     selection: props.selection,
     canAddCameraPosition: props.canAddCameraPosition ?? false,
@@ -92,6 +101,7 @@ function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProp
 
 function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelProps) {
   return {
+    ...(props.onPreviewMotion ? { onPreviewMotion: props.onPreviewMotion } : {}),
     onPreviewSceneBackground: props.onPreviewSceneBackground,
     onRememberRecentColor: props.onRememberRecentColor,
     onResetSceneBackgroundPreview: props.onResetSceneBackgroundPreview,
@@ -167,6 +177,11 @@ function createSelectionPanelStateProps(
   props: WorkspaceSidebarSelectionPanelSourceProps
 ): Pick<
   WorkspaceSidebarSelectionPanelProps,
+  | 'recognition'
+  | 'textRewrite'
+  | 'textVoice'
+  | 'watermark'
+  | 'sceneEdges'
   | 'gridSettings'
   | 'placementMode'
   | 'project'
@@ -188,6 +203,11 @@ function createSelectionPanelStateProps(
   return {
     ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     selection: props.selection ?? createSceneSelection(),
+    ...(props.recognition ? { recognition: props.recognition } : {}),
+    ...(props.textRewrite ? { textRewrite: props.textRewrite } : {}),
+    ...(props.textVoice ? { textVoice: props.textVoice } : {}),
+    ...(props.sceneEdges ? { sceneEdges: props.sceneEdges } : {}),
+    ...(props.watermark ? { watermark: props.watermark } : {}),
     project: props.project,
     recentColors: props.recentColors ?? [],
     canAddCameraPosition: props.canAddCameraPosition ?? false,
@@ -214,6 +234,7 @@ function createSelectionPanelUpdateProps(
   | 'onTrimClipEnd'
   | 'onDetachClipGroup'
   | 'onResizeProject'
+  | 'onPreviewMotion'
   | 'onPreviewSceneBackground'
   | 'onRememberRecentColor'
   | 'onResetSceneBackgroundPreview'
@@ -240,6 +261,7 @@ function createSelectionPanelUpdateProps(
   | 'onUpdateTransitionTemplate'
 > {
   return {
+    ...(props.onPreviewMotion ? { onPreviewMotion: props.onPreviewMotion } : {}),
     ...createSelectionPanelBaseUpdateProps(props),
     ...createSelectionPanelAnnotationUpdateProps(props),
     onConvertTextClipToAnnotation: props.onConvertTextClipToAnnotation,

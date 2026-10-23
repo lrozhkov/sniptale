@@ -1,3 +1,6 @@
+import { createVideoProjectFromRecording, createVideoProjectTrack } from './factories/creation';
+import { evaluateProjectGestureFeedback } from '../review/project-action-audio';
+import { REVIEW_CLICK_DEFAULT } from './action-feedback/validation';
 import { getActionClickStyle, getActionKeyStyle } from './action-style';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from './factories/creation';
@@ -222,5 +225,155 @@ it('keeps an unresolved observed press out of generic ripple and completed-click
   expect(resolveVideoProjectActionPresentations(project)[0]).toMatchObject({
     enabled: true,
     renderKind: 'accent',
+  });
+});
+
+function sourceClickProject() {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'source-click',
+    filename: 'source.webm',
+    width: 160,
+    height: 90,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 1024,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'captured-click',
+        kind: 'CLICK',
+        time: 1.5,
+        duration: 0,
+        point: { x: 0.5, y: 0.5 },
+        label: '',
+        preset: 'NONE',
+        data: {},
+      },
+    ],
+  });
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  clip.sourceStart = 0.5;
+  clip.sourceDuration = 4;
+  clip.playbackRate = 2;
+  clip.duration = 2;
+  project.duration = 2;
+  return project;
+}
+it('keeps source clicks off by default without rewriting legacy settings or captured facts', () => {
+  const project = sourceClickProject(),
+    event = project.actionEvents[0]!;
+  event.presentation = { preset: 'SPOTLIGHT', duration: 2, offset: 1, point: { x: 0.9, y: 0.9 } };
+  const before = structuredClone(project);
+  expect(resolveVideoProjectActionPresentations(project)[0]).toMatchObject({
+    enabled: false,
+    reason: 'preset-none',
+    preset: 'NONE',
+    offset: 0,
+    point: { x: 0.5, y: 0.5 },
+    overridden: false,
+  });
+  expect(project).toEqual(before);
+});
+it('projects source click phases and offsets in result seconds while preserving source coordinates', () => {
+  const project = sourceClickProject();
+  project.actionEvents[0]!.presentation = {
+    preset: 'NONE',
+    duration: 2,
+    offset: 1,
+    point: { x: 0.9, y: 0.9 },
+  };
+  project.actionFeedback![0]!.gestureStyles = [
+    {
+      ...REVIEW_CLICK_DEFAULT,
+      id: 'captured-click',
+      effect: 'ripple',
+      before: 0.4,
+      after: 0.6,
+      offset: 0.1,
+      x: 0.1,
+      y: -0.2,
+      pulses: 2,
+      easing: 'linear',
+    },
+  ];
+  const row = resolveVideoProjectActionPresentations(project)[0]!;
+  expect(row).toMatchObject({
+    enabled: true,
+    preset: 'CLICK_RIPPLE',
+    easing: 'LINEAR',
+    duration: 1,
+    offset: 0.1,
+    point: { x: 0.6, y: 0.3 },
+    overridden: true,
+  });
+  expect(row.animationStart).toBeCloseTo(0.2, 12);
+  expect(row.start).toBeCloseTo(0.2, 12);
+  expect(row.end).toBeCloseTo(1.2, 12);
+  expect(row.renderIntervals).toHaveLength(1);
+  project.actionEvents[0]!.presentation!.enabled = false;
+  expect(resolveVideoProjectActionPresentations(project)[0]).toMatchObject({
+    enabled: false,
+    reason: 'event-disabled',
+  });
+  expect(project.actionFeedback![0]!.gestureStyles![0]!.before).toBe(0.4);
+});
+it('retains clipped before phases as metadata without moving the factual source anchor', () => {
+  const project = sourceClickProject();
+  const event = project.actionEvents[0]!;
+  if (event.anchor.kind !== 'recording-source') throw new Error('Expected source anchor.');
+  event.anchor = { ...event.anchor, sourceTime: 0.7 };
+  project.actionFeedback![0]!.gestureStyles = [
+    { ...REVIEW_CLICK_DEFAULT, id: 'captured-click', effect: 'press', before: 0.4 },
+  ];
+  const row = resolveVideoProjectActionPresentations(project)[0]!;
+  expect(row.occurrence.time).toBeCloseTo(0.1, 12);
+  expect(row.animationStart).toBeCloseTo(-0.3, 12);
+  expect(row.start).toBe(0);
+  expect(row.end).toBeCloseTo(0.7, 12);
+  expect(event.anchor.sourceTime).toBe(0.7);
+});
+
+it('matches rendered click phases across continuous source fragments on different tracks', () => {
+  const project = sourceClickProject(),
+    base = project.clips[0]!;
+  if (base.type !== 'VIDEO') throw new Error('Expected source video.');
+  const other = createVideoProjectTrack('Moved fragment', 1, 'PRIMARY');
+  project.tracks.push(other);
+  project.clips = [
+    { ...base, duration: 0.25, sourceDuration: 0.5 },
+    {
+      ...base,
+      id: 'tail',
+      trackId: other.id,
+      timelineLaneId: other.logicalLanes?.[0]?.id ?? null,
+      startTime: 0.25,
+      sourceStart: 1,
+      sourceDuration: 1,
+      duration: 1,
+      playbackRate: 1,
+    },
+  ];
+  project.duration = 1.25;
+  project.actionFeedback![0]!.gestureStyles = [
+    { ...REVIEW_CLICK_DEFAULT, id: 'captured-click', effect: 'ripple', before: 0.6, after: 0.5 },
+  ];
+  const row = resolveVideoProjectActionPresentations(project)[0]!;
+  expect(row.occurrence.time).toBeCloseTo(0.75, 12);
+  expect(evaluateProjectGestureFeedback(project, 0.2)).toHaveLength(1);
+  expect(row.start).toBeCloseTo(0.15, 12);
+  expect(row.renderIntervals.map((interval) => interval.clipId)).toEqual([base.id, 'tail']);
+});
+
+it('does not report a source click as visible when its capture has no point', () => {
+  const project = sourceClickProject();
+  project.actionEvents[0]!.point = null;
+  project.actionFeedback![0]!.gestureStyles = [
+    { ...REVIEW_CLICK_DEFAULT, id: 'captured-click', effect: 'press' },
+  ];
+  expect(evaluateProjectGestureFeedback(project, 0.6)).toEqual([]);
+  expect(resolveVideoProjectActionPresentations(project)[0]).toMatchObject({
+    point: null,
+    enabled: false,
+    reason: 'unsupported',
+    renderKind: null,
   });
 });

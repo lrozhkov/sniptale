@@ -1,7 +1,9 @@
+import { getTourAnnotations } from '@sniptale/runtime-contracts/scenario/types/tour';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml } from './document';
+import { createTourDocument } from '../project/factories';
+import { createTourActionSlide as createTourImageSlide } from './test-support';
+import { buildTourPlayerTestHtml as buildTourPlayerHtml } from './test-support';
 import { createTourPlayer } from './controller';
 
 const labels = {
@@ -117,22 +119,27 @@ async function mount(autoplay = false) {
     gain: 0.5,
     transcript: '',
   };
-  first.annotations = [
-    {
-      id: 'entry',
-      text: 'Entry voice',
-      anchor: null,
-      appearance: null,
-      narration: { ...narration, trigger: 'enter' },
-    },
-    {
-      id: 'activation',
-      text: 'Activation voice',
-      anchor: null,
-      appearance: null,
-      narration: { ...narration, trimStart: 4, trimEnd: 6, trigger: 'activation' },
-    },
-    { id: 'silent', text: 'Silent', anchor: null, appearance: null },
+  first.actions = [
+    ...first.actions.filter(
+      (entry) => entry.type !== 'annotation' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'entry',
+        text: 'Entry voice',
+        anchor: null,
+        appearance: null,
+        narration: { ...narration, trigger: 'enter' as const },
+      },
+      {
+        id: 'activation',
+        text: 'Activation voice',
+        anchor: null,
+        appearance: null,
+        narration: { ...narration, trimStart: 4, trimEnd: 6, trigger: 'activation' as const },
+      },
+      { id: 'silent', text: 'Silent', anchor: null, appearance: null },
+    ].map((object) => ({ type: 'annotation' as const, object })),
   ];
   tour.slides = [first, createTourImageSlide('second')];
   const assets = [
@@ -161,39 +168,62 @@ async function mount(autoplay = false) {
   };
   return { root, player, tour, input, ...clock, button, media: root.querySelector('audio')! };
 }
-it('locally pauses and resumes entry narration without moving clock, slide or playback mode', async () => {
-  const h = await mount(true);
-  expect(h.media.paused).toBe(false);
-  h.media.currentTime = 2.7;
-  const toggle = h.button('[data-tour-narration-toggle="entry"]');
-  toggle.click();
+it.each(['entry', 'activation'])(
+  'plays and pauses %s narration through the single global clock',
+  async (id) => {
+    const h = await mount();
+    if (id === 'activation') h.button('[data-tour-next]').click();
+    await h.tick();
+    expect(h.media.paused).toBe(true);
+    expect(h.root.querySelector('[data-tour-hint] [data-tour-narration-controls]')).toBeNull();
+    const authored = JSON.stringify(h.tour);
+    const action = h.root.dataset['actionId'];
+    h.button('[data-tour-play]').click();
+    await h.tick(300);
+    expect(h.media.paused).toBe(false);
+    const position = h.root.querySelector<HTMLInputElement>('[data-tour-seek]')!.value;
+    const time = h.media.currentTime;
+    h.button('[data-tour-play]').click();
+    await h.tick(1000);
+    expect(h.media.paused).toBe(true);
+    expect(h.root.querySelector<HTMLInputElement>('[data-tour-seek]')!.value).toBe(position);
+    expect(h.root.dataset['actionId']).toBe(action);
+    h.button('[data-tour-play]').click();
+    await h.tick();
+    expect(h.media.paused).toBe(false);
+    expect(h.media.currentTime).toBeCloseTo(time);
+    expect(JSON.stringify(h.tour)).toBe(authored);
+    expect(h.root.querySelectorAll('audio:not([data-tour-music])')).toHaveLength(1);
+  }
+);
+it('uses the complete legacy activation narration duration in the global timeline', async () => {
+  const h = await mount();
+  const slide = h.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.actions = slide.actions.filter((entry) => entry.object.id === 'activation');
+  slide.actions[0]!.object.narration!.trimEnd = 8;
+  slide.actions[0]!.object.narration!.duration = 8;
+  h.tour.slides = [slide];
+  h.player.update(h.input);
+  await h.tick();
+  const seek = h.root.querySelector<HTMLInputElement>('[data-tour-seek]')!;
+  expect(Number(seek.max)).toBeGreaterThanOrEqual(4000);
   expect(h.media.paused).toBe(true);
-  expect(h.media.currentTime).toBe(2.7);
-  expect(toggle.getAttribute('aria-label')).toBe(labels.narrationResume);
-  const elapsed = h.root.querySelector<HTMLInputElement>('[data-tour-seek]')!.value;
-  await h.tick(10000);
-  expect(h.root.dataset['slideId']).toBe('first');
-  expect(h.root.dataset['tourMode']).toBe('playback');
-  expect(h.root.querySelector<HTMLInputElement>('[data-tour-seek]')!.value).toBe(elapsed);
-  toggle.click();
-  await h.tick();
+  h.button('[data-tour-play]').click();
+  await h.tick(3000);
+  expect(h.root.dataset['actionId']).toBe('activation');
   expect(h.media.paused).toBe(false);
-  expect(h.media.currentTime).toBe(2.7);
-  h.button('[data-tour-narration-replay="entry"]').click();
-  await h.tick();
-  expect(h.media.currentTime).toBe(2);
-  expect(h.root.querySelectorAll('audio:not([data-tour-music])')).toHaveLength(1);
+  expect(slide.actions[0]!.object.narration!.trigger).toBe('activation');
 });
 it('composes viewer volume and mute without restarting narration or changing authored gain', async () => {
   const h = await mount();
-  h.button('[data-tour-narration-replay="entry"]').click();
+  h.button('[data-tour-play]').click();
   await h.tick();
   h.media.currentTime = 2.8;
   const plays = h.play.mock.calls.length;
-  const range = h.root.querySelector<HTMLInputElement>('[data-tour-volume]');
-  expect(range).not.toBeNull();
-  range!.value = '0.4';
-  range!.dispatchEvent(new Event('input', { bubbles: true }));
+  const range = h.root.querySelector<HTMLInputElement>('[data-tour-volume]')!;
+  range.value = '0.4';
+  range.dispatchEvent(new Event('input', { bubbles: true }));
   expect(h.media.volume).toBeCloseTo(0.2);
   h.button('[data-tour-mute]').click();
   expect(h.media.volume).toBe(0);
@@ -202,60 +232,36 @@ it('composes viewer volume and mute without restarting narration or changing aut
   expect(h.media.currentTime).toBe(2.8);
   expect(h.play).toHaveBeenCalledTimes(plays);
   expect(
-    h.tour.slides[0]!.kind === 'image' && h.tour.slides[0]!.annotations[0]!.narration!.gain
+    h.tour.slides[0]!.kind === 'image' && getTourAnnotations(h.tour.slides[0]!)[0]!.narration!.gain
   ).toBe(0.5);
 });
-
-it('projects a newly selected hint identity without a media event and hides controls for silent points', async () => {
-  const h = await mount();
-  h.button('[data-tour-narration-replay="entry"]').click();
-  await h.tick();
-  h.button('[data-tour-hint-next]').click();
-  const activation = h.button('[data-tour-narration-toggle="activation"]');
-  expect(activation.getAttribute('aria-label')).toBe(labels.narrationReplay);
-  activation.click();
-  await h.tick();
-  expect(h.media.currentTime).toBe(4);
-  expect(activation.getAttribute('aria-label')).toBe(labels.narrationPause);
-  h.button('[data-tour-hint-next]').click();
-  expect(h.root.querySelector<HTMLElement>('[data-tour-narration-controls]')!.hidden).toBe(true);
-  expect(h.root.dataset['slideId']).toBe('first');
-});
-it('resyncs global Play once and stops local audio on full view and navigation', async () => {
+it('stops narration on full view and navigation until global Play resumes it', async () => {
   const h = await mount(true);
   await h.tick(300);
-  h.button('[data-tour-narration-replay="entry"]').click();
-  await h.tick();
-  h.media.currentTime = 3.1;
-  const plays = h.play.mock.calls.length;
-  h.button('[data-tour-play]').click();
-  await h.tick();
-  expect(h.play).toHaveBeenCalledTimes(plays + 1);
-  expect(h.media.currentTime).toBeCloseTo(2.3);
   h.button('[data-tour-full-view]').click();
   expect(h.media.paused).toBe(true);
-  expect(h.root.dataset['tourMode']).toBe('playback');
-  h.button('[data-tour-narration-replay="entry"]').click();
+  h.button('[data-tour-play]').click();
+  await h.tick();
+  expect(h.media.paused).toBe(false);
+  h.button('[data-tour-next]').click();
+  await h.tick();
+  expect(h.media.paused).toBe(true);
+  h.button('[data-tour-play]').click();
   await h.tick();
   expect(h.media.paused).toBe(false);
   h.player.select('second');
   await h.tick();
   expect(h.media.paused).toBe(true);
   expect(h.media.getAttribute('src')).toBeNull();
-  expect(h.root.querySelector<HTMLElement>('[data-tour-audio-controls]')!.hidden).toBe(false);
 });
-it('retries blocked narration by local gesture without advancing and preserves native Space admission', async () => {
+it('retries blocked narration with global Play and preserves native Space admission', async () => {
   const h = await mount();
   h.play.mockRejectedValueOnce(new DOMException('Gesture required', 'NotAllowedError'));
-  h.button('[data-tour-narration-replay="entry"]').click();
+  h.button('[data-tour-play]').click();
   await h.tick();
   expect(h.media.paused).toBe(true);
-  expect(
-    h.root.querySelector<HTMLElement>('[data-tour-narration-controls]')!.dataset[
-      'tourNarrationStatus'
-    ]
-  ).toBe('blocked');
-  const control = h.button('[data-tour-narration-toggle="entry"]');
+  expect(h.root.querySelector('[data-tour-status]')!.textContent).not.toBe('');
+  const control = h.button('[data-tour-play]');
   const key = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
   control.dispatchEvent(key);
   expect(key.defaultPrevented).toBe(false);
@@ -264,15 +270,13 @@ it('retries blocked narration by local gesture without advancing and preserves n
   await h.tick();
   expect(h.play).toHaveBeenCalledTimes(attempts + 1);
   expect(h.media.paused).toBe(false);
-  await h.tick(10000);
-  expect(h.root.dataset['slideId']).toBe('first');
-  expect(h.root.dataset['tourMode']).toBe('manual');
+  expect(h.root.dataset['actionId']).toBe('entry');
 });
 it('refreshes actual recreated navigation controls from retained audio state after resize', async () => {
   const h = await mount();
   const first = h.tour.slides[0]!;
   if (first.kind !== 'image') throw new Error('Expected image fixture');
-  const narration = first.annotations[1]!.narration!;
+  const narration = getTourAnnotations(first)[1]!.narration!;
   h.tour.slides[0] = {
     kind: 'navigation',
     id: 'first',

@@ -33,7 +33,7 @@ vi.mock('../../../composition/persistence/media-library/index', () => ({
   getMediaAssetBlob: assetUrlMocks.getMediaAssetBlobMock,
 }));
 
-import { useVideoEditorAssetUrls } from './asset-urls';
+import { loadVideoEditorAssetBlob, useVideoEditorAssetUrls } from './asset-urls';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -62,6 +62,13 @@ function createProjectWithSingleAsset(projectAssetId = 'project-asset-1') {
       },
     ],
   });
+}
+
+function createLoadedProjectAssetEntry() {
+  return {
+    ...createProjectAssetEntry(),
+    file: new File(['logo'], 'logo.png', { type: 'image/png' }),
+  };
 }
 
 function AssetUrlsHarness(props: {
@@ -119,7 +126,7 @@ it('keeps existing asset urls when the project rerenders without asset-list chan
   const project = createProjectWithSingleAsset();
 
   assetUrlMocks.getProjectAssetMock.mockResolvedValue({
-    entry: createProjectAssetEntry(),
+    entry: createLoadedProjectAssetEntry(),
     status: 'ready',
   });
 
@@ -151,7 +158,7 @@ it('replaces a cached URL when the source changes under the same asset id', asyn
     .mockReturnValueOnce('blob:old-source')
     .mockReturnValueOnce('blob:new-source');
   assetUrlMocks.getProjectAssetMock.mockResolvedValue({
-    entry: createProjectAssetEntry(),
+    entry: createLoadedProjectAssetEntry(),
     status: 'ready',
   });
 
@@ -185,7 +192,7 @@ it('revokes a URL produced by a cancelled stale load exactly once', async () => 
   });
   assetUrlMocks.getProjectAssetMock
     .mockImplementationOnce(async () => ({ entry: await oldLoad, status: 'ready' }))
-    .mockResolvedValueOnce({ entry: createProjectAssetEntry(), status: 'ready' });
+    .mockResolvedValueOnce({ entry: createLoadedProjectAssetEntry(), status: 'ready' });
   vi.mocked(URL.createObjectURL)
     .mockReturnValueOnce('blob:new-source')
     .mockReturnValueOnce('blob:old-source');
@@ -193,7 +200,7 @@ it('revokes a URL produced by a cancelled stale load exactly once', async () => 
   await renderHarness({ onUrlsChange, project: createProjectWithSingleAsset('source-1') });
   await renderHarness({ onUrlsChange, project: createProjectWithSingleAsset('source-2') });
   await act(async () => {
-    resolveOld(createProjectAssetEntry());
+    resolveOld(createLoadedProjectAssetEntry());
     await oldLoad;
     await Promise.resolve();
   });
@@ -225,4 +232,16 @@ it('reads stable library identity and refreshes it without needing a scenario ch
   });
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:asset-1');
   expect(onUrlsChange).toHaveBeenLastCalledWith({});
+});
+
+it('reads declared image bytes without allocating a URL and preserves missing and failure outcomes', async () => {
+  const asset = createProjectWithSingleAsset().assets[0]!;
+  const entry = createLoadedProjectAssetEntry();
+  assetUrlMocks.getProjectAssetMock.mockResolvedValueOnce({ status: 'ready', entry });
+  expect(await loadVideoEditorAssetBlob(asset)).toBe(entry.file);
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  assetUrlMocks.getProjectAssetMock.mockResolvedValueOnce({ status: 'not-found' });
+  expect(await loadVideoEditorAssetBlob(asset)).toBeNull();
+  assetUrlMocks.getProjectAssetMock.mockResolvedValueOnce({ status: 'unavailable' });
+  await expect(loadVideoEditorAssetBlob(asset)).rejects.toThrow('unavailable');
 });

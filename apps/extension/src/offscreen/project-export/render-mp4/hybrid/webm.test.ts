@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -12,6 +13,8 @@ const pauseRenderLoopMediaElementsMock = vi.hoisted(() => vi.fn());
 const effectRuntimeDisposeMock = vi.hoisted(() => vi.fn());
 const effectRuntimeRenderProjectFramesMock = vi.hoisted(() => vi.fn());
 const waitForEncoderQueueCapacityMock = vi.hoisted(() => vi.fn());
+
+const spatialOwner = vi.hoisted(() => ({ get: vi.fn(() => ({ dispose: vi.fn() })) }));
 
 const inputDisposeMocks: ReturnType<typeof vi.fn>[] = [];
 
@@ -56,6 +59,7 @@ vi.mock('../../effect-runtime', async (importOriginal) => ({
 vi.mock('../../runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime')>()),
   sendProgress: sendProgressMock,
+  getProjectExportSpatialRenderer: spatialOwner.get,
 }));
 
 vi.mock('../../codecs', async (importOriginal) => ({
@@ -119,6 +123,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(document, 'fonts');
 });
 
 it('renders decoded WebM samples into canvas frames and forwards them to the encoder', async () => {
@@ -241,4 +246,115 @@ it('marks irreversible output only after the encoder accepts a frame', async () 
   expect(args.videoEncoder.encode.mock.invocationCallOrder[0]).toBeLessThan(
     submitted.mock.invocationCallOrder[0]!
   );
+});
+
+it('burns authored captions into accelerated frames before encoding and refuses font failure', async () => {
+  const args = createArgs();
+  args.project.duration = 1;
+  args.project.textDocuments = [
+    {
+      id: 'doc',
+      binding: { kind: 'project' },
+      captions: {
+        enabled: true,
+        style: { position: 'bottom', fontSize: 0.04, color: '#ffffff', background: '#000000' },
+      },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text',
+            text: 'Accelerated caption',
+            originalText: '',
+            start: 0,
+            end: 1,
+            timeDomain: 'result',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const load = vi.fn(async () => [{ status: 'loaded' }]);
+  Object.defineProperty(document, 'fonts', { configurable: true, value: { load } });
+  samplesAtTimestampsMock.mockImplementation(() => createSamples([createSample(), createSample()]));
+  const fillText = vi.spyOn(args.context, 'fillText');
+  await expect(renderAcceleratedCompositeWebmSpan(args)).resolves.toBe(true);
+  expect(load).toHaveBeenCalledOnce();
+  expect(fillText).toHaveBeenCalledWith(
+    'Accelerated caption',
+    expect.any(Number),
+    expect.any(Number)
+  );
+  expect(drawProjectFrameMock.mock.invocationCallOrder[0]).toBeLessThan(
+    fillText.mock.invocationCallOrder[0]!
+  );
+  expect(fillText.mock.invocationCallOrder[0]).toBeLessThan(
+    args.videoEncoder.encode.mock.invocationCallOrder[0]!
+  );
+  fillText.mockRestore();
+  load.mockResolvedValue([]);
+  delete args.job.captionRenderer;
+  await expect(renderAcceleratedCompositeWebmSpan(args)).rejects.toThrow(
+    'Caption font is unavailable'
+  );
+  expect(args.videoEncoder.encode).toHaveBeenCalledTimes(2);
+});
+
+it('paints decoded composite watermark before encoding and never encodes a failed preparation', async () => {
+  samplesAtTimestampsMock.mockImplementation(() => createSamples([createSample(), createSample()]));
+  const args = createArgs();
+  args.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  const order: string[] = [];
+  const draw = vi.fn(() => {
+    order.push('watermark');
+  });
+  const prepare = vi.fn(async () => ({ bounds: { x: 0, y: 0, width: 20, height: 10 }, draw }));
+  args.job.watermarkRenderer = { prepare, clear: vi.fn() };
+  drawProjectFrameMock.mockImplementation(() => {
+    order.push('scene');
+  });
+  args.videoEncoder.encode.mockImplementation(() => {
+    order.push('encode');
+  });
+  await expect(renderAcceleratedCompositeWebmSpan(args)).resolves.toBe(true);
+  expect(order).toEqual(['scene', 'watermark', 'encode', 'scene', 'watermark', 'encode']);
+  prepare.mockRejectedValueOnce(new Error('Logo unavailable'));
+  await expect(renderAcceleratedCompositeWebmSpan(args)).rejects.toThrow('Logo unavailable');
+  expect(args.videoEncoder.encode).toHaveBeenCalledTimes(2);
+});
+
+it('shares the job spatial renderer between decoded effect capture and final output', async () => {
+  samplesAtTimestampsMock.mockReturnValue(createSamples([createSample(), createSample()]));
+  const args = createArgs();
+  await expect(renderAcceleratedCompositeWebmSpan(args)).resolves.toBe(true);
+  expect(spatialOwner.get).not.toHaveBeenCalled();
+  const capture = effectRuntimeRenderProjectFramesMock.mock.calls[0]![0].spatialRenderer;
+  const paint = drawProjectFrameMock.mock.calls[0]![6].spatialRenderer;
+  expect(capture).toEqual(expect.any(Function));
+  expect(paint).toEqual(expect.any(Function));
+  capture();
+  paint();
+  expect(spatialOwner.get).toHaveBeenNthCalledWith(1, args.job, args.signal);
+  expect(spatialOwner.get).toHaveBeenNthCalledWith(2, args.job, args.signal);
+});
+
+it('refuses direct decoded acceleration inside an active composition join before decoder acquisition', async () => {
+  const args = createArgs();
+  args.project.duration = 2;
+  args.project.compositionJoins = [
+    {
+      id: 'join',
+      clipId: 'clip-1',
+      edge: 'end',
+      transition: { type: 'dissolve', before: 0.2, after: 0.2 },
+    },
+  ];
+  await expect(renderAcceleratedCompositeWebmSpan(args)).resolves.toBe(false);
+  expect(loadBlobForAssetMock).not.toHaveBeenCalled();
+  expect(getPrimaryVideoTrackMock).not.toHaveBeenCalled();
+  expect(args.videoEncoder.encode).not.toHaveBeenCalled();
 });

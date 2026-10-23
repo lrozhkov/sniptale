@@ -61,12 +61,7 @@ export function VideoEffectsSection() {
           state={controller.loading ? 'loading' : 'ready'}
           items={items}
           toolbarControls={
-            <EffectCatalogControls
-              themes={themes}
-              filter={effectiveFilter}
-              onChange={setFilter}
-              disabled={controller.busy}
-            />
+            <EffectCatalogControls themes={themes} filter={effectiveFilter} onChange={setFilter} />
           }
           addAction={{
             label: translate('videoEditor.effectsLibrary.importMany'),

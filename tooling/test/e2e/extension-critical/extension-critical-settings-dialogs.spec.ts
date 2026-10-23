@@ -220,6 +220,16 @@ test('settings background name retains the standard field and rename flow', asyn
     context.fillRect(0, 0, 64, 64);
     return canvas.toDataURL('image/png').split(',')[1]!;
   });
+  await dialog.getByRole('textbox').fill('Named before upload');
+  await page.evaluate(async () => {
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined))
+    );
+  });
+  await page.screenshot({ path: info.outputPath('background-add-name.png'), fullPage: false });
   await dialog.locator('input[type="file"]').setInputFiles({
     name: 'Dialog background.png',
     mimeType: 'image/png',
@@ -228,7 +238,7 @@ test('settings background name retains the standard field and rename flow', asyn
   await expect(dialog).toHaveCount(0);
   const row = page
     .locator('[data-settings-collection-item]')
-    .filter({ hasText: 'Dialog background' });
+    .filter({ hasText: 'Named before upload' });
   await row
     .getByRole('button', { name: text('settings.collection.actions.edit'), exact: true })
     .click();

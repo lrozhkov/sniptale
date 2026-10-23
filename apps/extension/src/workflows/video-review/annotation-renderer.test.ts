@@ -15,6 +15,10 @@ import { readReviewAnnotationEffectDocument } from '../../features/video/review/
 import { initializeReviewAnnotationEffectAnchors } from '../../features/video/review/annotation-effects/layout';
 import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review/annotation-effects/types';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { projectReviewAnnotationEffect } from '../../features/video/review/annotation-effects/timing';
+import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
+import { createEffectHostClip } from '../../features/video/project/factories/overlay-clip';
+import { resolveEffectRuntimeFramePlans } from '../../features/video/composition/effect-runtime/frame/plan';
 import {
   createReviewAnnotationRenderer,
   drawReviewAnnotationFrame,
@@ -417,4 +421,107 @@ it('pixel paint uses the same body centre/rotation and external bounds, without 
   expect(context.restore).toHaveBeenCalledOnce();
   frame.release();
   renderer.dispose();
+});
+
+it('keeps Gallery annotation phase and anchors in ordinary Native cut and rate intervals', async () => {
+  const f = await fixture(['title', 'callout', 'corners', 'frame']);
+  const plane = f.scene.planes.content;
+  const segments = buildReviewTimeMap(12, [
+    { id: 'cut', kind: 'cut', start: 5, end: 7, requestedStart: 5, requestedEnd: 7 },
+    {
+      id: 'rate',
+      kind: 'speed',
+      start: 7,
+      end: 10,
+      requestedStart: 7,
+      requestedEnd: 10,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  for (const instance of f.scene.lane.instances) {
+    const snapshot = f.scene.snapshots.find((entry) => entry.id === instance.snapshotId)!;
+    const document = readReviewAnnotationEffectDocument(snapshot.source)!;
+    const projection = projectReviewAnnotationEffect(instance, segments);
+    const project = createEmptyVideoProject('Annotation parity', plane.width, plane.height);
+    project.effectSnapshots = [{ ...snapshot, assets: [] }];
+    project.effectInstances = [];
+    project.clips = [];
+    const playbackRate = document.duration / projection.duration;
+    for (const [index, slice] of projection.slices.entries()) {
+      const id = `${instance.id}:${index}`;
+      const duration = slice.end - slice.start;
+      const host = createEffectHostClip({
+        duration,
+        effectInstanceId: id,
+        name: id,
+        projectWidth: plane.width,
+        projectHeight: plane.height,
+        startTime: slice.start,
+        trackId: project.tracks[0]!.id,
+      });
+      host.transform = {
+        x: instance.transform.x * plane.width,
+        y: instance.transform.y * plane.height,
+        width: instance.transform.width * plane.width,
+        height: instance.transform.height * plane.height,
+        rotation: (instance.transform.rotation * 180) / Math.PI,
+        opacity: 1,
+      };
+      project.clips.push(host);
+      project.effectInstances.push({
+        id,
+        snapshotId: snapshot.id,
+        enabled: instance.enabled,
+        controls: instance.controls,
+        kind: 'standalone',
+        target: { kind: 'scene' },
+        startTime: slice.start,
+        duration,
+        playbackRate,
+        sourceStart: slice.offset * playbackRate,
+        ...(instance.anchors
+          ? {
+              sceneAnchors: Object.fromEntries(
+                Object.entries(instance.anchors).map(([key, point]) => [
+                  key,
+                  { x: point.x * plane.width, y: point.y * plane.height },
+                ])
+              ),
+            }
+          : {}),
+      });
+      for (const fraction of [0, 0.173, 0.619, 0.999]) {
+        const time = slice.start + duration * fraction;
+        const gallery = planReviewAnnotationFrame({
+          snapshot,
+          document,
+          instance,
+          segments,
+          time,
+          plane,
+          density: { width: 1, height: 1 },
+          fps: project.fps,
+        })!;
+        const native = resolveEffectRuntimeFramePlans(project, time).find(
+          (entry) => entry.effectInstanceId === id
+        )!;
+        expect(native.time).toBeCloseTo(gallery.plan.time, 7);
+        expect(native.progress).toBeCloseTo(gallery.plan.progress, 7);
+        expect(native.frameIndex).toBe(gallery.plan.frameIndex);
+        for (const [key, value] of Object.entries(gallery.plan.controls)) {
+          if (typeof value === 'number') expect(native.controls[key]).toBeCloseTo(value, 7);
+          else expect(native.controls[key]).toBe(value);
+        }
+        const bounds = native.bitmapBounds ?? { x: 0, y: 0, width: 1, height: 1 };
+        for (const key of ['x', 'y', 'width', 'height'] as const)
+          expect(bounds[key]).toBeCloseTo(gallery.bitmapBounds[key], 7);
+      }
+      expect(
+        resolveEffectRuntimeFramePlans(project, slice.end).some(
+          (entry) => entry.effectInstanceId === id
+        )
+      ).toBe(false);
+    }
+  }
 });

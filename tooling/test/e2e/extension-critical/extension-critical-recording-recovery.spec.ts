@@ -29,6 +29,29 @@ async function attachProbe(page: Page, code: string) {
   );
 }
 
+async function holdRecoveryValidation(page: Page) {
+  await page.evaluate(() => {
+    const decode = VideoDecoder.prototype.decode;
+    const flush = VideoDecoder.prototype.flush;
+    const chunks: { decoder: VideoDecoder; chunk: EncodedVideoChunk }[] = [];
+    const flushes: { decoder: VideoDecoder; resolve(): void; reject(error: unknown): void }[] = [];
+    VideoDecoder.prototype.decode = function (chunk) {
+      chunks.push({ decoder: this, chunk });
+    };
+    VideoDecoder.prototype.flush = function () {
+      return new Promise<void>((resolve, reject) => {
+        flushes.push({ decoder: this, resolve, reject });
+      });
+    };
+    Reflect.set(window, 'releaseRecoveryValidation', () => {
+      VideoDecoder.prototype.decode = decode;
+      VideoDecoder.prototype.flush = flush;
+      for (const item of chunks) decode.call(item.decoder, item.chunk);
+      for (const item of flushes) flush.call(item.decoder).then(item.resolve, item.reject);
+    });
+  });
+}
+
 async function killBrowser(child: ChildProcess) {
   if (child.exitCode !== null || child.signalCode !== null || !child.pid) return;
   const exited = once(child, 'exit');
@@ -282,9 +305,54 @@ test('Gallery exposes only interrupted video, retains downloads, and removes com
     await page.screenshot({ path: info.outputPath('delete-confirmation.png'), fullPage: false });
     await dialog.getByRole('button', { name: /^Cancel$|^Отмена$/ }).click();
     await expect(panel.getByText('Recovery webm.webm', { exact: true })).toBeVisible();
+    await holdRecoveryValidation(page);
     await panel
       .getByRole('button', { name: /Recover to library|Восстановить в библиотеку/ })
       .click();
+    const recoveryProgress = panel.locator('[data-ui="gallery.recovery-progress"]');
+    await expect(recoveryProgress.getByRole('progressbar')).toHaveAttribute(
+      'aria-label',
+      /Checking video playback|Проверяем воспроизведение видео/
+    );
+    expect(
+      await recoveryProgress.getByRole('progressbar').getAttribute('aria-valuenow')
+    ).toBeNull();
+    await expect(
+      panel.getByRole('button', { name: /Recover to library|Восстановить в библиотеку/ })
+    ).toBeDisabled();
+    for (const appearance of [
+      { theme: 'light', locale: 'en' },
+      { theme: 'dark', locale: 'ru' },
+    ] as const) {
+      await page.evaluate(async ({ theme, locale }) => {
+        await chrome.storage.local.set({
+          'sniptale-theme-preference': theme,
+          'sniptale-locale-preference': locale,
+        });
+      }, appearance);
+      await expect(recoveryProgress.getByRole('status')).toContainText(
+        appearance.locale === 'en' ? 'Checking video playback' : 'Проверяем воспроизведение видео'
+      );
+      for (const size of [
+        { width: 1280, height: 560 },
+        { width: 1920, height: 900 },
+        { width: 1000, height: 560 },
+      ]) {
+        await page.setViewportSize(size);
+        await expect(recoveryProgress).toBeVisible();
+        expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+        await page.screenshot({
+          path: info.outputPath(`recovery-progress-${appearance.theme}-${size.width}.png`),
+          fullPage: false,
+        });
+      }
+    }
+    await page.evaluate(() => {
+      const release: unknown = Reflect.get(window, 'releaseRecoveryValidation');
+      if (typeof release !== 'function') throw new Error('Recovery validation gate is missing.');
+      release();
+      Reflect.deleteProperty(window, 'releaseRecoveryValidation');
+    });
     await expect(panel).toHaveCount(0);
     await expect(page.getByRole('main')).not.toContainText('Your Library is empty');
     await page.reload();

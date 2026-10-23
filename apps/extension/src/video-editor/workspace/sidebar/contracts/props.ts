@@ -1,4 +1,9 @@
-import type { WindowHeader } from '../../../../features/browser-frame/header';
+import type { VideoEditorSceneBackgroundEdit } from '../../../contracts/commands/patches';
+import type { VideoEditorMediaClipEdit } from '../../../contracts/commands/patches';
+import type { VideoProjectTextVoiceController } from '../../../runtime/session/text-voice';
+import type { VideoProjectTextRewriteController } from '../../../runtime/session/text-rewrite';
+import type { VideoProjectRecognitionController } from '../../../runtime/session/recognition';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type { VideoEditorSessionActions } from '../../../contracts/commands/session';
@@ -13,7 +18,10 @@ import type {
   VideoProjectAnnotationTemplatePatch,
 } from '../../../../features/video/project/annotation/contract';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
-import type { VideoEditorInspectorMode } from '../../../contracts/workspace';
+import type {
+  VideoEditorInspectorMode,
+  VideoEditorMotionPreview,
+} from '../../../contracts/workspace';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoObjectTrack } from '../../../../features/video/project/object-tracks';
 import type { VideoObjectTrackCorrectionAnchor } from '../../../../features/video/project/object-tracks';
@@ -41,6 +49,11 @@ import type {
 import type { ProjectListItem, RecordingListItem } from '../../../library/contracts/items';
 
 export interface WorkspaceSidebarProps {
+  sceneEdges?: import('../../../contracts/workspace').VideoEditorSceneEdgesInspectorRuntime;
+  watermark?: import('../../../contracts/workspace').VideoEditorWatermarkInspectorRuntime;
+  recognition?: VideoProjectRecognitionController;
+  textRewrite?: VideoProjectTextRewriteController;
+  textVoice?: VideoProjectTextVoiceController;
   typingProject?: VideoProject;
   recordingTelemetry?: readonly RecordingTelemetryEntry[];
   onApplyTypingCompression?: VideoEditorSessionActions['applyTypingCompression'];
@@ -88,7 +101,7 @@ export interface WorkspaceSidebarProps {
   onToggleTrackLock?: (trackId: string) => void;
   onToggleTrackVisibility?: (trackId: string) => void;
   onSetCursorCaptureMode: (mode: VideoCursorCaptureMode) => void;
-  onSetSceneBackground: (sceneBackground: NonNullable<VideoProject['sceneBackground']>) => void;
+  onSetSceneBackground: (sceneBackground: VideoEditorSceneBackgroundEdit) => void;
   onStartActionPointPlacement?: (eventId: string, clipId: string | null) => void;
   onStartMotionAreaPlacement?: (motionRegionId: string) => void;
   onStartMotionFocusPlacement?: (motionRegionId: string) => void;
@@ -146,12 +159,15 @@ export interface WorkspaceSidebarProps {
   onUpdateMediaClipFitScalePercent?: (clipId: string, fitScalePercent: number) => void;
   onUpdateMediaClipShadowIntensity?: (clipId: string, shadowIntensity: number) => void;
   onUpdateMediaClipShadowMode?: (clipId: string, shadowMode: VideoMediaShadowMode) => void;
+  onEditMediaClip?: (clipId: string, edit: VideoEditorMediaClipEdit) => void;
+  onUpdateMediaClipShadowColor?: (clipId: string, shadowColor: string) => void;
   onUpdateMediaClipWindowHeader?: (clipId: string, windowHeader: WindowHeader | undefined) => void;
   onApplyMediaClipVisualsToTrack?: (clipId: string) => void;
   onConvertTextClipToAnnotation?: (
     clipId: string,
     templateKind: VideoProjectAnnotationClip['templateKind']
   ) => void;
+  onPreviewMotion?: (preview: VideoEditorMotionPreview | null) => void;
   onUpdateMotionRegion?: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   onUpdateShapeStyle: (clipId: string, patch: Record<string, string | number>) => void;
   onUpdateSubtitleTrackStyle?: (trackId: string, patch: Record<string, string | number>) => void;

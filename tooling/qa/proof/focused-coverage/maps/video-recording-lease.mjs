@@ -7,6 +7,8 @@ export const VIDEO_RECORDING_LEASE_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/media/video/recording-control-lease.test.ts',
       'apps/extension/src/background/media/video/recording-control-lease.conditional-cleanup.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/control-route.start-cancellation.test.ts',
     ],
   },
   {
@@ -17,6 +19,8 @@ export const VIDEO_RECORDING_LEASE_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/media/video/recording-control-lease.test.ts',
       'apps/extension/src/background/media/video/recording-control-lease.conditional-cleanup.test.ts',
+      'apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts',
+      'apps/extension/src/background/media/video/runtime/manager/control-route.start-cancellation.test.ts',
       'apps/extension/src/background/storage/video/recording-control-lease.test.ts',
     ],
   },

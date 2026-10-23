@@ -1,3 +1,7 @@
+import {
+  createQuickEditWatermark,
+  parseQuickEditWatermark,
+} from '../../../features/video/project/scene/watermark';
 import { syncProjectSceneBackground } from '../../../features/video/project/scene/background';
 import { isAudioRecordingRangeAvailable } from '../../project/operations/timeline-gaps';
 import { addAssetClipToProject } from '../../project/state/asset-actions';
@@ -78,25 +82,37 @@ async function importProjectAssetFile(
     return;
   }
 
-  if (placement?.destination === 'background' && assetType !== VideoProjectAssetType.IMAGE) return;
+  const privatePresentation =
+    placement?.destination === 'background' || placement?.destination === 'watermark';
+  if (privatePresentation && assetType !== VideoProjectAssetType.IMAGE) return;
+  if (placement?.destination === 'watermark') placement.signal.throwIfAborted();
   const targetProjectId = project.id;
   const originMediaId =
-    placement?.destination === 'background' && assetType === VideoProjectAssetType.IMAGE
-      ? placement.backgroundOriginMediaId
-      : undefined;
-  const asset =
     placement?.destination === 'background'
-      ? await importProjectAsset(file, assetType, {
-          publishToLibrary: false,
-          ...(originMediaId ? { originMediaId } : {}),
-        })
-      : await importProjectAsset(file, assetType);
+      ? placement.backgroundOriginMediaId
+      : placement?.destination === 'watermark'
+        ? placement.watermarkOriginMediaId
+        : undefined;
+  const asset = privatePresentation
+    ? await importProjectAsset(file, assetType, {
+        publishToLibrary: false,
+        ...(originMediaId ? { originMediaId } : {}),
+      })
+    : await importProjectAsset(file, assetType);
   if (originMediaId && asset.source.kind === 'project-asset')
     asset.source.originMediaId = originMediaId;
+  if (placement?.destination === 'watermark' && placement.signal.aborted) {
+    await cleanupStaleImportedAsset(asset);
+    placement.signal.throwIfAborted();
+  }
   if (await isStaleImportedAsset({ asset, port, targetProjectId })) {
     return;
   }
 
+  if (placement?.destination === 'watermark') {
+    await attachImportedWatermark(asset, port, targetProjectId, placement.signal);
+    return;
+  }
   if (placement?.destination === 'background') {
     port.updateProject((current) => ({
       ...current,
@@ -113,6 +129,49 @@ async function importProjectAssetFile(
     placement?.startTime ?? port.getCurrentTime(),
     placement?.timelineLaneId
   );
+}
+
+async function attachImportedWatermark(
+  asset: VideoProjectAsset,
+  port: AssetHandlerPort,
+  targetProjectId: string,
+  signal: AbortSignal
+): Promise<void> {
+  let accepted = false;
+  try {
+    signal.throwIfAborted();
+    port.updateProject((current) => {
+      if (signal.aborted || current.id !== targetProjectId) return current;
+      const previous =
+        current.watermark ??
+        createQuickEditWatermark(translate('gallery.videoReview.watermarkSeed'));
+      const watermark = parseQuickEditWatermark({
+        ...previous,
+        mode: 'image',
+        image: {
+          assetId: `project-asset:${asset.id}`,
+          width: asset.metadata.width,
+          height: asset.metadata.height,
+          size: previous.image?.size ?? 0.2,
+          opacity: previous.image?.opacity ?? 1,
+        },
+      });
+      if (!watermark || asset.type !== VideoProjectAssetType.IMAGE) return current;
+      accepted = true;
+      const { watermarkEnabled: _disabled, ...active } = current;
+      return {
+        ...active,
+        assets: [...current.assets.filter((item) => item.id !== asset.id), asset],
+        watermark,
+      };
+    });
+    if (!accepted) {
+      signal.throwIfAborted();
+      throw new Error('Watermark attachment was refused.');
+    }
+  } finally {
+    if (!accepted) await cleanupStaleImportedAsset(asset);
+  }
 }
 
 function isRecordingDestinationAvailable(
@@ -232,6 +291,7 @@ function useProjectAssetImportHandler(
       try {
         await importProjectAssetFile(file, assetType, port, placement);
       } catch (assetError) {
+        if (placement?.destination === 'watermark') throw assetError;
         logger.error(`Failed to import ${failureLabel}`, assetError);
         toast.error(translate('videoEditor.app.materialsImportFailed'));
       }

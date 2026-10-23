@@ -1,3 +1,4 @@
+import type { VideoEditorMotionPreview } from '../../../contracts/workspace';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
 import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
@@ -30,6 +31,8 @@ export interface VideoEditorPreviewController {
   grid: VideoEditorPreviewGridController;
   onImport: VideoEditorInsertionActions['onImport'];
   pointAuthoring: {
+    motionProject?: VideoProject | undefined;
+    onPreviewMotion?: ((preview: VideoEditorMotionPreview | null) => void) | undefined;
     onClearPlacementMode: VideoEditorSessionActions['clearPlacementMode'];
     onUpdateActionEventDetails: VideoEditorProjectActions['updateActionEventDetails'];
     onUpdateMotionRegion: VideoEditorProjectActions['updateMotionRegion'];
@@ -58,6 +61,7 @@ export interface VideoEditorPreviewController {
     selectedMotionRegion: VideoEditorSelections['selectedMotionRegion'];
     onSelectClip: VideoEditorSessionActions['selectClip'];
     onSelectScene: VideoEditorSessionActions['selectScene'];
+    onSelectSourceVoiceover: VideoEditorSessionActions['selectSourceVoiceover'];
   };
   transport: {
     currentTime: number;

@@ -3,10 +3,8 @@ import {
   convertReviewAnnotationAttachment,
 } from '../../../../apps/extension/src/gallery/video-review/annotation-effects-geometry';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
-import {
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-  quickEditSpatialTargetCamera,
-} from '../../../../apps/extension/src/features/video/review/advanced/spatial';
+import { quickEditSpatialTargetCamera } from '../../../../apps/extension/src/features/video/review/advanced/spatial';
+import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../../../apps/extension/src/features/video/project/motion/spatial';
 import {
   sha256EffectV1Bytes,
   resolveEffectV1ControlDefault,
@@ -30,7 +28,7 @@ import {
   computeQuickEditSceneLayout,
   evaluateQuickEditCameraAtTime,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/workflows/video-review/spatial-renderer';
+import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import { drawReviewSceneOverlays } from '../../../../apps/extension/src/workflows/video-review/render-scene-overlays';
 import {

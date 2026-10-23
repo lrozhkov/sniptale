@@ -16,6 +16,7 @@ import { normalizePopupExportTabTitle } from '@sniptale/runtime-contracts/export
 import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { browserWindows } from '@sniptale/platform/browser/windows';
 import { CaptureSurfaceError, getCaptureSurfaceService } from '../../capture-surface';
 import { startRecording } from '../../media/lifecycle';
 import { startPagePackageJob } from '../../capture/page-package/job';
@@ -119,6 +120,14 @@ export async function startContextMenuVideoRecording(
   }
 
   const popupOwnerUrl = runtimeInfo.getURL('apps/extension/src/popup/index.html');
+  if (!videoSettings.microphoneEnabled && videoSettings.warnWithoutMicrophone !== false) {
+    const url = new URL(popupOwnerUrl);
+    url.searchParams.set('videoLaunchMode', captureMode);
+    url.searchParams.set('videoLaunchTabId', String(tabId));
+    if (viewportPresetId) url.searchParams.set('videoLaunchPresetId', viewportPresetId);
+    await browserWindows.create({ type: 'popup', url: url.toString(), width: 408, height: 620 });
+    return;
+  }
   await startRecording(tabId, videoSettings, captureMode, viewportPresetId, popupOwnerUrl);
 }
 

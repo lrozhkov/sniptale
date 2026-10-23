@@ -1,11 +1,23 @@
-export interface VideoEditorImportPlacement {
-  destination?: 'materials' | 'timeline' | 'background';
-  /** Original Library identity when freezing a selected background presentation. */
-  backgroundOriginMediaId?: string;
+interface VideoEditorImportCoordinates {
   startTime?: number;
   timelineLaneId?: string | null;
   trackId?: string | null;
 }
+
+export type VideoEditorImportPlacement = VideoEditorImportCoordinates &
+  (
+    | {
+        destination?: 'materials' | 'timeline' | 'background';
+        /** Original Library identity when freezing a selected background presentation. */
+        backgroundOriginMediaId?: string;
+      }
+    | {
+        destination: 'watermark';
+        /** The invoking inspector cancels attachment when its project lifetime ends. */
+        signal: AbortSignal;
+        watermarkOriginMediaId?: string;
+      }
+  );
 
 export type VideoEditorImportKind = 'audio' | 'image' | 'video';
 
@@ -58,3 +70,26 @@ export interface VideoEditorMaterialTarget {
   startTime: number;
   timelineLaneId: string;
 }
+
+/** Edge placement can refuse a stale inspector or an unavailable atomic history snapshot. */
+export type VideoEditorBookendPlacementResult =
+  | { status: 'placed'; clipId: string }
+  | {
+      status: 'rejected';
+      reason:
+        | Extract<VideoEditorMaterialPlacementResult, { status: 'rejected' }>['reason']
+        | 'stale-project'
+        | 'history-busy'
+        | 'history-unavailable'
+        | 'invalid-project';
+    };
+
+/** A recipe edit never edits an already inserted timeline instance. */
+export type VideoEditorBookendPresetUpdateResult =
+  | { status: 'updated' | 'unchanged' }
+  | Extract<VideoEditorBookendPlacementResult, { status: 'rejected' }>;
+
+/** Whole-composition boundaries use the existing accepted-root/history refusal contract. */
+export type VideoEditorCompositionJoinUpdateResult =
+  | { status: 'updated' | 'unchanged' }
+  | Extract<VideoEditorBookendPlacementResult, { status: 'rejected' }>;

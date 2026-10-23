@@ -5,6 +5,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { refreshPopupMediaDevices, togglePopupMediaDevice } from '../media-device-flow/index';
 import {
   loadWebcamDevices,
+  requestWebcamPermission,
   resolveWebcamDeviceId,
   type LoadWebcamDevicesOptions,
   type WebcamOption,
@@ -54,6 +55,7 @@ export async function toggleWebcam(params: ToggleWebcamParams): Promise<void> {
     videoSettings,
     setVideoSettings,
     setStartError,
+    requestPermission: requestWebcamPermission,
     refreshDevices: () =>
       refreshWebcams({
         hydrateLabels: 'always',

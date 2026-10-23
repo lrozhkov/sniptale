@@ -5,12 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewSpatialControls, ReviewSpatialToolbar } from './spatial-controls';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
 import {
-  DEFAULT_QUICK_EDIT_DEPTH,
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-  quickEditSpatialTargetCamera,
-} from '../../features/video/review/advanced/spatial';
-import { quickEditPlaneProjection } from '../../features/video/review/advanced/spatial-geometry';
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+  DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
+} from '../../features/video/project/motion/spatial';
+import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
 import {
   resolveReviewSpatialFocusGeometry,
   type ReviewSpatialControlGeometryInput,

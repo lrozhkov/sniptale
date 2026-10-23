@@ -1,6 +1,7 @@
 import { isContentOwnedElement } from '../../platform/dom-host';
 import { isQuickEditTextElement } from './elements';
 import { resolveQuickEditTextTarget } from './target';
+import { walkAllDocuments } from '../../platform/frame';
 
 export interface QuickEditRuntimeEventOptions {
   isEnabled: () => boolean;
@@ -29,12 +30,12 @@ export function isQuickEditOwnedElement(target: HTMLElement): boolean {
 }
 
 export function resolveActiveQuickEditElement(target: EventTarget | null): HTMLElement | null {
-  if (!(target instanceof Node)) {
+  const node = resolveQuickEditNode(target);
+  if (!node) {
     return null;
   }
 
-  const element =
-    target.nodeType === Node.ELEMENT_NODE ? (target as HTMLElement) : target.parentElement;
+  const element = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement;
 
   if (!element) {
     return null;
@@ -43,6 +44,16 @@ export function resolveActiveQuickEditElement(target: EventTarget | null): HTMLE
   return element.classList.contains('sniptale-editing')
     ? element
     : element.closest<HTMLElement>('.sniptale-editing');
+}
+
+function resolveQuickEditNode(target: EventTarget | null): Node | null {
+  if (target instanceof Node) return target;
+  let resolved: Node | null = null;
+  walkAllDocuments((currentDocument) => {
+    const NodeConstructor = currentDocument.defaultView?.Node;
+    if (NodeConstructor && target instanceof NodeConstructor) resolved = target;
+  });
+  return resolved;
 }
 
 export function isQuickEditTextTarget(target: HTMLElement): boolean {

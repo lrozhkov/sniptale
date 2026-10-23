@@ -65,7 +65,16 @@ export function planMp4VideoRenderSpans(
     return [{ kind: 'composite', reason: 'non-mp4-asset', start: range.start, end: range.end }];
   }
 
-  const boundaries = collectTimelineBoundaries(project, settings);
+  const range = resolveProjectExportRange(project, settings);
+  const fps = Math.max(1, settings.fps);
+  // All spans sample the same export lattice. A fractional edge belongs to the next output tick.
+  const boundaries = [
+    ...new Set(
+      collectTimelineBoundaries(project, settings).map((time) =>
+        Math.min(range.end, range.start + Math.ceil((time - range.start) * fps) / fps)
+      )
+    ),
+  ];
   const timelineIndex = createVideoCompositionTimelineIndex(project);
   const spans: Mp4VideoRenderSpan[] = [];
   for (let index = 0; index < boundaries.length - 1; index += 1) {

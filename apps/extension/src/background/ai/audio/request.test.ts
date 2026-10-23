@@ -527,3 +527,113 @@ it('does not return WAV when cancellation arrives while PCM is being read', asyn
     requestAudio({ request: pcmRequest, config: pcmConfig, signal: abort.signal, onReceiving() {} })
   ).rejects.toThrow();
 });
+
+it('refuses project transport without the coordinator admission callback', async () => {
+  const post = vi.fn<typeof fetch>();
+  vi.stubGlobal('fetch', post);
+  await expect(
+    requestAudio({
+      request: {
+        ...transcription,
+        approvedProviderId: 'provider',
+        scope: {
+          projectId: 'project',
+          projectRevision: 3,
+          projectUpdatedAt: 10,
+          target: { kind: 'project-clip', clipId: 'clip' },
+          assetId: 'asset',
+          nativeStart: 0,
+          nativeEnd: 1,
+        },
+      },
+      config: transcriptionConfig,
+      input,
+      signal: new AbortController().signal,
+      onReceiving() {},
+    })
+  ).rejects.toThrow('unauthorized');
+  expect(post).not.toHaveBeenCalled();
+});
+
+it('requires current project-text admission before the single speech POST', async () => {
+  const request: AudioJobStart = {
+    ...speech,
+    approvedProviderId: 'provider',
+    scope: {
+      projectId: 'project',
+      projectRevision: 3,
+      projectUpdatedAt: 10,
+      target: { kind: 'project-text', documentId: 'script', fragmentId: 'p' },
+      basisHash: `sha256:${'a'.repeat(64)}`,
+    },
+  };
+  const post = vi.fn<typeof fetch>(
+    async () =>
+      new Response(new Uint8Array([1, 2, 3, 4]), {
+        headers: { 'Content-Type': 'audio/mpeg' },
+      })
+  );
+  vi.stubGlobal('fetch', post);
+  const args = {
+    request,
+    config: speechConfig,
+    signal: new AbortController().signal,
+    onReceiving() {},
+  };
+  await expect(requestAudio(args)).rejects.toThrow('unauthorized');
+  expect(post).not.toHaveBeenCalled();
+  const beforeSend = vi.fn<() => Promise<void>>(async () => {
+    throw new Error('stale');
+  });
+  await expect(requestAudio({ ...args, beforeSend })).rejects.toThrow('stale');
+  expect(post).not.toHaveBeenCalled();
+  beforeSend.mockResolvedValueOnce(undefined);
+  await expect(requestAudio({ ...args, beforeSend })).resolves.toMatchObject({ kind: 'audio' });
+  expect(beforeSend).toHaveBeenCalledTimes(2);
+  expect(beforeSend).toHaveBeenCalledBefore(post);
+  expect(post).toHaveBeenCalledOnce();
+  expect(post.mock.calls[0]?.[1]).toMatchObject({
+    method: 'POST',
+    body: JSON.stringify({
+      model: 'speech',
+      input: 'hello',
+      voice: 'voice',
+      response_format: 'mp3',
+    }),
+  });
+});
+
+it('sends Scenario text and profile without source scope metadata or video phrase fields', async () => {
+  const fetchMock = vi.fn<typeof fetch>(
+    async () =>
+      new Response(new Uint8Array([73, 68, 51, 0]), { headers: { 'Content-Type': 'audio/mpeg' } })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const scenario: AudioJobStart = {
+    type: 'start',
+    requestId: 'scenario',
+    operation: 'speech',
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    text: 'Exact saved action',
+    profile: speech.profile,
+    scope: {
+      workspaceId: 'scenario',
+      workspaceRevision: 1,
+      target: { kind: 'scenario-text', slideId: 'slide', objectId: 'action' },
+      sourceTextHash: 'a'.repeat(64),
+    },
+  };
+  await run(scenario);
+  expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+    model: 'speech',
+    input: 'Exact saved action',
+    voice: 'voice',
+    response_format: 'mp3',
+  });
+  expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+    redirect: 'error',
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+  });
+});

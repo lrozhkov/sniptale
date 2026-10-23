@@ -8,6 +8,78 @@ import { RecordingMediaSplitControl } from './media-menu';
 import { RecordingSpotlightMenu } from './spotlight-menu';
 import { RecordingDrawingControls } from './drawing-controls';
 import { createRecordingDrawingOwner } from './drawing-session';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: showToastMock }));
+
+it.each([false, true])(
+  'keeps the camera placement choice authoritative with recording locked=%s',
+  async (locked) => {
+    showToastMock.mockClear();
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const onChange = vi.fn(async () => {
+      throw new Error('storage failed');
+    });
+    const onToggle = vi.fn();
+    const onLoadDevices = vi.fn(async () => []);
+    try {
+      await act(async () =>
+        root.render(
+          <RecordingMediaSplitControl
+            active={false}
+            activeIcon={Camera}
+            inactiveIcon={CameraOff}
+            disabled={false}
+            kind="videoinput"
+            dataUi="test.camera"
+            displayMode="horizontal"
+            label="Camera"
+            selectedDeviceId={null}
+            onToggle={onToggle}
+            onLoadDevices={onLoadDevices}
+            cameraPlacement={{
+              mode: 'embedded',
+              locked,
+              onChange,
+              presentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, mode: 'embedded' },
+              onAppearanceChange: vi.fn(),
+            }}
+          />
+        )
+      );
+      await act(async () =>
+        host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+      );
+      const placement = host.querySelector(
+        '[data-ui="content.toolbar.video-recording.camera.placement"]'
+      )!;
+      const buttons = placement.querySelectorAll('button');
+      expect(buttons).toHaveLength(2);
+      expect(buttons[0]!.getAttribute('aria-pressed')).toBe('true');
+      expect(buttons[1]!.disabled).toBe(locked);
+      await act(async () => buttons[1]!.click());
+      expect(onToggle).not.toHaveBeenCalled();
+      expect(onLoadDevices).toHaveBeenCalledTimes(1);
+      expect(buttons[0]!.getAttribute('aria-pressed')).toBe('true');
+      expect(
+        host.querySelector('[data-ui="test.camera.menu"]')!.getAttribute('aria-expanded')
+      ).toBe('true');
+      if (locked) expect(onChange).not.toHaveBeenCalled();
+      else {
+        expect(onChange).toHaveBeenCalledWith('separate-track');
+        expect(showToastMock).toHaveBeenCalledWith(expect.any(String), 'error');
+        expect(buttons[1]!.disabled).toBe(false);
+      }
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  }
+);
 
 it.each(['camera', 'microphone', 'spotlight', 'auto-hide'] as const)(
   '%s Escape restoration survives the real dismissal callback',

@@ -41,12 +41,14 @@ function getTimelineEffectSelection(
       )
         ? { kind: 'motion', segmentId: selection.motionRegionId }
         : null;
+    case VideoEditorSelectionKind.COMMENT:
     case VideoEditorSelectionKind.EFFECT_INSTANCE:
     case VideoEditorSelectionKind.CLIP_GROUP:
     case VideoEditorSelectionKind.HISTORY_SPAN:
     case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.MOTION_CONNECTION:
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.CLIP:
     case VideoEditorSelectionKind.TRACK:

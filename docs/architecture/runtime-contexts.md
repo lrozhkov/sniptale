@@ -42,6 +42,26 @@ Offscreen project export acquires before consuming persisted input and transfers
 
 These leases protect source identity and bytes, and introduce no second document authority.
 
+Settings documents that complete targeted recording-device enable keep one-time browser access valid during recording. The Settings root owns this disposable session across section navigation. It observes authoritative recording state, not control capabilities. Only admitted active or paused recording sessions can retain selected devices.
+
+Each retained device has a disabled native track in Settings. These tracks have no consumer and supply no samples to the application. Native per-kind locks prevent duplicate Settings resources across windows. Offscreen remains the recording source and encoder owner. Idle, terminal state, revocation, disposal and stale acquisition release the Settings resources. A bounded state heartbeat releases them after observation failure. No durable grant flag, idle capture or browser permission override exists. Closing the Settings tab still ends temporary browser access.
+
+## Recording media permissions
+
+`apps/extension/src/media-permission/index.html` owns microphone and camera permission requests inside an extension-origin child frame. Content mounts this frame after an explicit recording-toolbar enable or device-menu action. It does not navigate to Settings or start recording.
+
+The frame owns one private `MessagePort`, its permission stream and resource cleanup. Shared contracts parse the bootstrap, cancellation and bounded results. Content retains toolbar interaction ownership. The frame returns results only through the private port. Host code receives no capability token or device label.
+
+The dynamic resource URL can differ from the loaded extension origin. Content uses the canonical extension origin for bootstrap and explicit camera/microphone delegation. Sender checks bind the canonical extension origin and exact frame path. Chrome alone shows the pending permission prompt. The frame remains hidden during the request and after success, and shows a card only after failure.
+
+Before `getUserMedia`, the frame submits the existing read-only surface command with `requestPermission: false`. Background checks the exact extension document, child frame/document metadata and sender-owned tab. The existing surface owner checks the complete lease. The frame cannot mutate recording state or settings. Its readiness acknowledgement proves transport readiness, not permission.
+
+After native permission succeeds, content retries the original enable or device-list command. It does not enable a device optimistically. The frame retains its stream during countdown, including a cancelled start. Content releases that stream after recording acquires its sources, accepted disable, toolbar deactivation or disposal. Live enable also releases its probe after the recording owner accepts the source. Recording completion releases remaining recording probes. Offscreen remains the recording source and encoder owner.
+
+Cancellation stops pending acquisition and any late stream. Denial or host policy failure leaves the requested device disabled and shows a localized error. The flow grants no permission to the host site. It does not bypass host policy or automatically open another tab.
+
+After native denial, the frame checks the extension permission state. A blocked permission exposes an explicit action that opens Chrome site details for this extension. Prompt dismissal and host policy failure do not expose this action. Opening settings does not grant access, enable a source or start recording. Navigation failure preserves the action for retry.
+
 ## Recording clock
 
 TAB recording calibration stays in the offscreen source/encoder owner. Before countdown, it samples an original frame from the same freshly acquired track. It bounds the native epoch offset by acquisition and receipt. It maps initial/resumed source timestamps to the encoder’s chosen PTS. Reader cancellation never stops the borrowed track.
@@ -156,9 +176,11 @@ A missing contextMenu field leaves the current setting unchanged during selectiv
 
 Action availability remains an independent runtime decision. Section titles and positions convey no action authority, and action/preset IDs cannot be introduced by imported section data.
 
-### Gallery audio operations
+### Audio operations
 
-`background/ai/audio` owns the Gallery-only `sniptale-gallery-audio-job` Port. Each Port permits one explicit transcription or speech operation. Background checks the exact extension Gallery document. It replays the durable workspace. It checks the workspace revision and discriminated original/voiceover target.
+`background/ai/audio` owns the `sniptale-gallery-audio-job` Port for Gallery, Montage and Scenario pages. The transport retains its existing name. Background checks the exact top-level extension document and binds its consumer for the Port lifetime. Gallery permits transcription and video speech. Montage permits saved project-clip transcription and saved project-text speech. Scenario permits only authored Scenario speech. A trusted sender cannot submit another consumer's scope.
+
+For Gallery, background replays the durable workspace. It checks the workspace revision and discriminated original/voiceover target.
 
 It admits only a continuous authorized native interval. Original transcription includes Cut intervals. Timeline projection remains independent. Original jobs bind the current Library immutable locator and physical object to the workspace source identity, MIME and size. A caller-supplied asset ID alone grants no access.
 
@@ -169,6 +191,10 @@ The receiver checks staging scope, WAV shape and duration before egress.
 Before the POST, recheck provider configuration, secret availability and optional origin permission. One deadline covers authorization, upload preparation and response. Disconnect, cancel and local-data erasure abort active jobs. Erasure reserves exclusion before cancellation and waits for writes. Worker restart loses all tickets and the page observes Port interruption.
 
 No automatic retry or resumable paid job exists. Ports carry only parsed text, timing data, fixed errors and scoped handles, never audio bytes or credentials.
+
+Scenario speech binds the saved project revision, slide, action and SHA256 of the exact authored text. The canonical gate uses `readScenarioViewingSnapshot`, without publication recovery or editor writes. It checks the source before egress, after response and at temporary staging boundaries. Scenario requires an approved provider identity before permission or secret activation. The shared runtime-neutral client resides under `workflows/audio-jobs`. Gallery, Montage and Scenario retain separate workflow and UI owners.
+
+The Scenario page explicitly saves the source before generation without changing its autosave preference. The mounted form owns sequential requests, cancellation and disposable preview Blobs. Apply remains unavailable until generation settles. Each explicit Apply uses the current page snapshot and aggregate revision through the existing narration import. It checks frozen source text and expected narration after asynchronous preparation. Serial Apply uses each accepted snapshot for the next import, without another writer or atomic batch operation. Earlier accepted imports survive a later failure. Project replacement or page disposal ends the form lifetime.
 
 `background/ai/llm/review-text-job` and its typed `sniptale-gallery-review-text` Port own Gallery AI text editing. They use the existing one-shot LLM capability authority with purpose `review-text`. It does not masquerade as a DOM, scenario or audio operation. Consume the exact top-level Gallery document and disclosed context/destination binding once. Recheck committed workspace text and result-time projection before POST.
 

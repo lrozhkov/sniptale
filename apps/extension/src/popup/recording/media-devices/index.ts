@@ -1,4 +1,10 @@
 import { translate, type TranslationKey } from '../../../platform/i18n/popup';
+import {
+  readMicrophoneAccessState,
+  requestMicrophoneAccess,
+  subscribeToMicrophoneAccessChanges,
+  type MicrophoneAccessState,
+} from '@sniptale/platform/browser/user-media';
 
 export type PopupMediaDeviceOption = {
   deviceId: string;
@@ -22,13 +28,140 @@ export type PopupMediaDeviceConfig = {
 };
 
 type MediaPermissionState = 'granted' | 'denied' | 'prompt';
+const pendingMediaPermissionRequests = new Map<
+  PopupMediaPermissionName,
+  {
+    deviceId: string | null;
+    request: Promise<void>;
+  }
+>();
+
+export type PopupMediaAccessState = MicrophoneAccessState;
+
+export class PopupMediaAccessError extends Error {
+  constructor(
+    readonly permissionName: PopupMediaPermissionName,
+    readonly state: PopupMediaAccessState
+  ) {
+    super(`media-access:${permissionName}:${state}`);
+    this.name = 'PopupMediaAccessError';
+  }
+}
+
+export function getPopupMediaAccessErrorKey(error: unknown): TranslationKey | null {
+  if (!(error instanceof PopupMediaAccessError)) return null;
+  if (error.state === 'prompt') {
+    return error.permissionName === 'microphone'
+      ? 'popup.video.microphonePermissionRequired'
+      : 'popup.video.cameraPermissionRequired';
+  }
+  if (error.state === 'denied') {
+    return error.permissionName === 'microphone'
+      ? 'popup.video.microphonePermissionDenied'
+      : 'popup.video.cameraPermissionDenied';
+  }
+  if (error.state === 'no-device') {
+    return error.permissionName === 'microphone'
+      ? 'popup.video.noMicrophonesError'
+      : 'popup.video.noWebcamsError';
+  }
+  if (error.state === 'device-busy') return 'popup.video.mediaDeviceBusy';
+  if (error.state === 'unavailable') return 'popup.video.mediaAccessUnavailable';
+  return 'popup.video.mediaAccessUnconfirmed';
+}
+
+export async function readPopupMediaAccessState(
+  permissionName: PopupMediaPermissionName
+): Promise<PopupMediaAccessState> {
+  if (permissionName === 'microphone') return readMicrophoneAccessState();
+  try {
+    if (!navigator.permissions?.query) return 'unknown';
+    const status = await navigator.permissions.query({ name: 'camera' as PermissionName });
+    return status.state;
+  } catch {
+    return 'unknown';
+  }
+}
+
+export async function subscribeToPopupMediaAccessChanges(
+  permissionName: PopupMediaPermissionName,
+  listener: (state: PopupMediaAccessState) => void
+): Promise<() => void> {
+  if (permissionName === 'microphone') return subscribeToMicrophoneAccessChanges(listener);
+  try {
+    if (!navigator.permissions?.query) return () => undefined;
+    const status = await navigator.permissions.query({ name: 'camera' as PermissionName });
+    const handleChange = () => listener(status.state);
+    status.addEventListener('change', handleChange);
+    return () => status.removeEventListener('change', handleChange);
+  } catch {
+    return () => undefined;
+  }
+}
+
+function classifyMediaAccessFailure(error: unknown): PopupMediaAccessState {
+  if (!(error instanceof DOMException)) return 'unknown';
+  if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') return 'denied';
+  if (error.name === 'NotFoundError' || error.name === 'OverconstrainedError') return 'no-device';
+  if (error.name === 'NotReadableError' || error.name === 'AbortError') return 'device-busy';
+  if (error.name === 'SecurityError' || error.name === 'TypeError') return 'unavailable';
+  return 'unknown';
+}
 
 export async function requestPopupMediaDevicePermission(
   config: PopupMediaDeviceConfig,
   deviceId?: string | null
 ): Promise<void> {
-  const stream = await navigator.mediaDevices.getUserMedia(config.createConstraints(deviceId));
-  stopMediaStreamTracks(stream);
+  const pending = pendingMediaPermissionRequests.get(config.permissionName);
+  if (pending) {
+    if (pending.deviceId === (deviceId ?? null)) return pending.request;
+    await pending.request.then(
+      () => undefined,
+      () => undefined
+    );
+    return requestPopupMediaDevicePermission(config, deviceId);
+  }
+  const request = acquirePopupMediaDevicePermission(config, deviceId);
+  pendingMediaPermissionRequests.set(config.permissionName, {
+    deviceId: deviceId ?? null,
+    request,
+  });
+  try {
+    await request;
+  } finally {
+    if (pendingMediaPermissionRequests.get(config.permissionName)?.request === request) {
+      pendingMediaPermissionRequests.delete(config.permissionName);
+    }
+  }
+}
+
+async function acquirePopupMediaDevicePermission(
+  config: PopupMediaDeviceConfig,
+  deviceId?: string | null
+): Promise<void> {
+  if (config.permissionName === 'microphone') {
+    const state = await requestMicrophoneAccess(deviceId || null);
+    if (state !== 'granted') {
+      const observed = state === 'denied' ? await readPopupMediaAccessState('microphone') : state;
+      throw new PopupMediaAccessError('microphone', observed === 'prompt' ? 'prompt' : state);
+    }
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new PopupMediaAccessError(config.permissionName, 'unavailable');
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(config.createConstraints(deviceId));
+    stopMediaStreamTracks(stream);
+  } catch (error) {
+    const state = classifyMediaAccessFailure(error);
+    const observed =
+      state === 'denied' ? await readPopupMediaAccessState(config.permissionName) : state;
+    throw new PopupMediaAccessError(
+      config.permissionName,
+      observed === 'prompt' ? 'prompt' : state
+    );
+  }
 }
 
 export async function loadPopupMediaDevices(

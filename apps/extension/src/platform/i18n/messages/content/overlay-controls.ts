@@ -132,9 +132,12 @@ export const contentOverlayControlsMessages = defineMessageSource({
     en: 'Save',
   },
   regionConfirm: {
-    ru: 'Выбрать область',
-    en: 'Select region',
+    ru: 'Начать запись',
+    en: 'Start recording',
   },
+  regionAspectRatio: { ru: 'Соотношение сторон', en: 'Aspect ratio' },
+  regionAspectFree: { ru: 'Свободно', en: 'Free' },
+  regionAspectCurrent: { ru: 'Текущее', en: 'Current' },
   regionInstruction: {
     ru: 'Перетащите область для записи или измените её размер',
     en: 'Drag a region to record or resize it',

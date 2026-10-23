@@ -5,11 +5,14 @@ import type {
   RecordingStagingCoordinator,
 } from '../../../composition/persistence/recordings/staging';
 import type { RecordingArtifactSession } from '../encoding/artifact-session';
+import type { MicrophoneActivityObserver } from '../stream/microphone-activity';
 
 export type MultiSourceRecorder = {
   artifact: FinalizedRecordingStagingArtifact | null;
   artifactSession: RecordingArtifactSession;
   label: string | null;
+  microphoneActivity?: MicrophoneActivityObserver;
+  setMicrophoneGain?: (gain: number) => void;
   recorder: MediaRecorder;
   recordingId: string;
   release?: () => void;

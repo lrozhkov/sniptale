@@ -4,7 +4,7 @@ import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,
 } from '../../features/video/review/advanced/scene';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 
 it('paints the observed path and authored area in the fitted video while the held halo stays filled', () => {
   const context = {
@@ -110,7 +110,7 @@ it.each(['fixed', 'follow-video'] as const)(
       clip.radius
     );
     expect(context.stroke).toHaveBeenCalledOnce();
-    expect(context.restore).toHaveBeenCalledOnce();
+    expect(context.restore.mock.calls.length).toBe(context.save.mock.calls.length);
   }
 );
 

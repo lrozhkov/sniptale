@@ -1,10 +1,15 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
+import { reviewWatermarkAssets } from '../../../../apps/extension/src/workflows/video-review/asset-bytes';
 import { createPreviewRenderResources } from '../../../../apps/extension/src/workflows/video-review/preview-render-resources';
 import {
   calculatePreviewRenderAllocation,
   resolvePreviewRenderAllocation,
   type PreviewRenderAllocationInput,
 } from '../../../../apps/extension/src/workflows/video-review/preview-render-allocation';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/workflows/video-review/spatial-renderer';
+import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import { drawReviewWebcam } from '../../../../apps/extension/src/workflows/video-review/render-webcam';
 import { quickEditMotionBlurCameras } from '../../../../apps/extension/src/features/video/review/advanced/motion-blur';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../apps/extension/src/features/video/project/camera/appearance';
@@ -12,7 +17,7 @@ import { createReviewPreviewRenderer } from '../../../../apps/extension/src/work
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import { drawReviewSceneOverlays } from '../../../../apps/extension/src/workflows/video-review/render-scene-overlays';
 import { drawReviewKeys } from '../../../../apps/extension/src/workflows/video-review/render-key-animation';
-import { createReviewWatermarkRenderer } from '../../../../apps/extension/src/workflows/video-review/render-watermark';
+import { createWatermarkRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/watermark';
 import {
   loadReviewWindowHeader,
   reviewWindowHeaderUrl,
@@ -28,11 +33,10 @@ import {
   evaluateQuickEditCameraAtTime,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { createCanvasComment } from '../../../../apps/extension/src/features/video/review/comments';
-import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/review/advanced/border';
-import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/review/advanced/focus';
+
 import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/click-animation';
-import { REVIEW_KEY_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/key-animation';
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { REVIEW_KEY_DEFAULT } from '../../../../apps/extension/src/features/video/project/action-feedback/key-animation';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { reviewCutTransitionAt } from '../../../../apps/extension/src/features/video/review/cuts';
 import type { RenderResources } from '../../../../apps/extension/src/features/video/composition/canvas/render-resources';
 
@@ -294,11 +298,11 @@ async function reference(
         }
       )
     : null;
-  const watermark = await createReviewWatermarkRenderer(
+  const watermark = await createWatermarkRenderer(
     scene.watermark,
     size,
+    reviewWatermarkAssets(undefined),
     signal,
-    undefined,
     scale === 1
       ? undefined
       : { scaleX: scale, scaleY: backing.height / size.height, resources: textOwner.resources }

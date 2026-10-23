@@ -2,12 +2,12 @@ import { evaluateReviewFollowCursor } from '../../features/video/review/advanced
 import {
   quickEditPlaneProjection,
   quickEditProjectionCss,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 import {
-  DEFAULT_QUICK_EDIT_DEPTH,
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-  interpolateQuickEditSpatial,
-} from '../../features/video/review/advanced/spatial';
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+  DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
+  interpolateCameraSpatial as interpolateQuickEditSpatial,
+} from '../../features/video/project/motion/spatial';
 import {
   ReviewSpatialToolbar,
   ReviewSpatialControls,

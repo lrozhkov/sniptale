@@ -1,3 +1,4 @@
+import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from '../assets/contracts';
 import { parseAssetOwner, parseAssetRef } from '../assets/guards';
 import {
@@ -114,4 +115,35 @@ export async function admitKnownLibraryPublication(args: {
   if (!sameLocator || !sameLibrarySourceRef(current.ref, ref))
     throw new SupersededAssetPublicationError();
   return 'fresh';
+}
+
+/** An in-memory claim on existing bytes, published only with a new destination project. */
+export interface LibraryProjectBinding {
+  claim: KnownLibrarySourceClaim;
+  entry: StoredProjectAssetEntry;
+  ref: AssetRef;
+}
+
+/** The destination transaction owns admission, publication, and abort for this private binding. */
+export async function publishLibraryProjectBindingInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  binding: LibraryProjectBinding
+): Promise<void> {
+  const { entry, ref, claim } = binding;
+  if ((await tx.objectStore(MEDIA_LIBRARY_STORE).get(`project-asset:${entry.id}`)) !== undefined)
+    throw new SupersededAssetPublicationError();
+  const admission = await admitKnownLibraryPublication({
+    entry,
+    ref,
+    claim,
+    read: (store, key) => tx.objectStore(store).get(key),
+  });
+  if (admission !== 'fresh') throw new SupersededAssetPublicationError();
+  await tx.objectStore(ASSET_OWNERS_STORE).put({
+    assetId: ref.assetId,
+    ownerId: entry.id,
+    ownerKind: 'project-asset',
+    role: 'body',
+  });
+  await tx.objectStore(PROJECT_ASSETS_STORE).put(entry);
 }

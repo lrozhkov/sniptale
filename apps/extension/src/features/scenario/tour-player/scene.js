@@ -4,13 +4,10 @@ import { createTourMotion } from './motion.js';
 import { renderTourImage } from './image-scene.js';
 import { createTourNavigation } from './navigation.js';
 import { createTourHints } from './hints.js';
-import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 /** Explanation hints follow the authored mixed-object order; masks stay purely visual. */
 function slideExplanations(slide) {
-  return getTourSlideObjects(slide)
-    .filter((entry) => entry.type !== 'mask')
-    .map((entry) => entry.object);
+  return slide.actions.map((entry) => entry.object);
 }
 
 /** Mount policy decides interaction affordances once; rendering stays policy-free. */
@@ -22,7 +19,6 @@ function scenePolicy(root, options) {
     // Editor preview never creates an executable link; denied actions stay plain buttons.
     linkedUrls: !authoring && !preview,
     keyboardScope: authoring || preview ? root : null,
-    hideVoice: Boolean(authoring),
   };
 }
 
@@ -32,9 +28,8 @@ function createSceneHints(root, input, policy, signal, getHints, boundary) {
   return createTourHints(root, input.tour.style, {
     signal,
     keyboardScope: policy.keyboardScope,
-    hideVoice: policy.hideVoice,
     navigation: policy.authoring?.navigation,
-    boundary: policy.authoring ? null : boundary,
+    boundary,
     onClose: () => {},
     labels: input.labels,
     focusTrigger: (activeIndex) => {
@@ -53,6 +48,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
   const policy = scenePolicy(root, options);
   const { authoring } = policy;
   let { tour } = input;
+  let headers = input.headers ?? {};
   const { assets, labels } = input;
   const media = new Map(assets.map((asset) => [asset.id, asset.src]));
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
@@ -76,7 +72,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
   const refreshFullView = () =>
     updateFullView({
       slide: ended ? null : current,
-      viewport: { stageWidth, stageHeight },
+      viewport: { stageWidth, stageHeight, windowHeader: tour.stage.windowHeader },
       autoZoom: tour.playback.autoZoom,
       fullView,
       state: stage.dataset.motion,
@@ -98,7 +94,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
     if (signal.aborted) return;
     hints = renderSceneContent(
       ended ? endSlide(tour, labels) : current,
-      { stageWidth, stageHeight },
+      { stageWidth, stageHeight, windowHeader: tour.stage.windowHeader },
       {
         scene,
         element,
@@ -113,6 +109,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
         maskDefaults: tour.style.maskDefaults,
         style: tour.style,
         fullView,
+        headers,
       },
       navigationController,
       selectedObjectId
@@ -127,18 +124,22 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
       height: stageHeight,
       fontSize: lastFontSize,
     });
-    if (!next) return;
+    if (!next) {
+      hintController.reflow();
+      return;
+    }
     lastFontSize = next.fontSize;
-    stageWidth = next.width;
-    stageHeight = next.height;
+    stageWidth = stage.clientWidth || next.width;
+    stageHeight = stage.clientHeight || next.height;
     render();
-    motion?.reflow({ stageWidth, stageHeight });
+    motion?.reflow({ stageWidth, stageHeight, windowHeader: tour.stage.windowHeader });
   }
   applySceneStyle(root, stage, tour, media);
   return {
     update(next) {
       fullView = false;
       tour = next.tour;
+      headers = next.headers ?? {};
       media.clear();
       for (const asset of next.assets) media.set(asset.id, asset.src);
       hintController.setDefaultAppearance(tour.style);
@@ -170,7 +171,9 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
       if (signal.aborted) return;
       const previous = motion?.capture() ?? null;
       fullView = false;
-      hintController.reset(current?.id === slide?.id && ended === isEnd);
+      const sameAction =
+        authoring || current?.actions?.[0]?.object.id === slide?.actions?.[0]?.object.id;
+      hintController.reset(current?.id === slide?.id && sameAction && ended === isEnd);
       current = slide;
       ended = isEnd;
       navigationController.reset();
@@ -181,7 +184,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
         previous,
         ended ? null : slide,
         tour,
-        { stageWidth, stageHeight },
+        { stageWidth, stageHeight, windowHeader: tour.stage.windowHeader },
         reducedMotion()
       );
     },
@@ -199,8 +202,8 @@ function selectObjectHint(slide, id, hints) {
 function resizeTourViewport(root, viewport, stage, aspect, previous) {
   const next = measureScene(root, viewport, aspect);
   if (
-    next.width === previous.width &&
-    next.height === previous.height &&
+    next.width === parseFloat(stage.style.width) &&
+    next.height === parseFloat(stage.style.height) &&
     next.fontSize === previous.fontSize &&
     stage.style.width
   )
@@ -226,7 +229,7 @@ function renderSceneBody(slide, viewport, context, navigation, selectedObjectId)
   if (slide?.kind === 'image')
     return {
       imageBox: renderTourImage(slide, viewport, context),
-      hints: slide.image ? slideExplanations(slide) : [],
+      hints: context.authoring?.imageFrame ? [] : slideExplanations(slide),
     };
   if (slide) {
     const rendered = navigation.render(
@@ -328,20 +331,22 @@ function applySceneStyle(root, stage, tour, media) {
   root.style.setProperty('--tour-accent', tour.style.accent);
   root.style.setProperty('--tour-text', tour.style.text);
   root.style.setProperty('--tour-surface', tour.style.surface);
-  stage.style.background = tour.stage.paint
-    ? serializePaintToCss(tour.stage.paint)
-    : tour.stage.background;
+  const paint = tour.stage.paint;
+  const underlay = paint?.kind === 'gradient' ? serializePaintToCss(paint) : null;
   const source = tour.stage.image && media.get(tour.stage.image.assetId);
-  if (source) {
-    const underlay = stage.style.backgroundImage;
-    stage.style.backgroundImage = `url("${source}")${underlay && underlay !== 'none' ? `, ${underlay}` : ''}`;
-    stage.style.backgroundPosition = 'center';
-    stage.style.backgroundRepeat = 'no-repeat';
-    stage.style.backgroundSize =
-      underlay && underlay !== 'none'
-        ? `${tour.stage.imageFit ?? 'cover'}, auto`
-        : (tour.stage.imageFit ?? 'cover');
-  }
+  // Explicit layers avoid reading shorthand resets through browser-specific CSSOM serialization.
+  stage.style.backgroundColor = paint?.kind === 'solid' ? paint.color : tour.stage.background;
+  stage.style.backgroundImage = source
+    ? `url("${source}")${underlay ? `, ${underlay}` : ''}`
+    : (underlay ?? 'none');
+  stage.style.backgroundPosition = 'center';
+  stage.style.backgroundRepeat = 'no-repeat';
+  stage.style.backgroundSize =
+    source && underlay
+      ? `${tour.stage.imageFit ?? 'cover'}, auto`
+      : source
+        ? (tour.stage.imageFit ?? 'cover')
+        : 'auto';
 }
 
 /** Viewport geometry and font metrics jointly determine scene and explanation layout. */
@@ -350,14 +355,13 @@ function measureScene(root, viewport, aspect) {
   const spacing = globalThis.getComputedStyle(viewport);
   const horizontal = (parseFloat(spacing.marginLeft) || 0) + (parseFloat(spacing.marginRight) || 0);
   const vertical = (parseFloat(spacing.marginTop) || 0) + (parseFloat(spacing.marginBottom) || 0);
-  const toolbarHeight = root.querySelector('.tour-toolbar')?.offsetHeight || 0;
   const availableWidth = Math.max(
     1,
     (root.clientWidth || viewport.clientWidth || 640) - horizontal
   );
   const availableHeight = Math.max(
     1,
-    (root.clientHeight || viewport.clientHeight || 360) - toolbarHeight - vertical
+    (root.clientHeight || viewport.clientHeight || 360) - vertical
   );
   const stageWidth = Math.min(availableWidth, (availableHeight * width) / height);
   return {

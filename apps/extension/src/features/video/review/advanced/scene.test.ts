@@ -10,13 +10,16 @@ import {
   quickEditContentPointToCanvas,
 } from './scene';
 import type { QuickEditZoomRegion } from './types';
-import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
-import { DEFAULT_QUICK_EDIT_PERSPECTIVE, DEFAULT_QUICK_EDIT_DEPTH } from './spatial';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import {
+  DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+} from '../../project/motion/spatial';
 import {
   quickEditPlaneProjection,
   projectQuickEditPoint,
   invertQuickEditProjection,
-} from './spatial-geometry';
+} from '../../composition/motion/spatial-geometry';
 import {
   computeQuickEditSpatialWindow,
   computeQuickEditSpatialRasterLayout,
@@ -662,5 +665,27 @@ it('preserves continuous off-center camera paths in both zoom directions at 30 F
       expect(rendered(camera).x).toBeCloseTo(start.x + (end.x - start.x) * progress, 9);
       expect(rendered(camera).y).toBeCloseTo(start.y + (end.y - start.y) * progress, 9);
     }
+  }
+});
+
+it('shares inset geometry while retaining Gallery background-enabled and disabled policy', async () => {
+  const { insetMediaCanvas } = await import('../../project/window-geometry');
+  const { computeQuickEditContentRect } = await import('./scene');
+  for (const padding of [0, 12.25, 40, 4096]) {
+    const output = { width: 320, height: 180 };
+    expect(
+      computeQuickEditContentRect(output, {
+        enabled: true,
+        type: 'solid',
+        color: '#123456',
+        layout: { padding, cornerRadius: 0 },
+      })
+    ).toEqual(insetMediaCanvas(output, padding));
+    expect(
+      computeQuickEditContentRect(output, {
+        enabled: false,
+        rememberedLayout: { padding, cornerRadius: 0 },
+      })
+    ).toEqual(insetMediaCanvas(output, 0));
   }
 });

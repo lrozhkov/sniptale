@@ -167,3 +167,28 @@ it.each(['permission', 'playback'])(
     expect(args.state.setAudioBlob).not.toHaveBeenCalled();
   }
 );
+
+it('retains final data after a recorder error and stops the current timeline', async () => {
+  const { args, stop } = fixture();
+  args.timeline = {
+    startTime: 2,
+    duration: 10,
+    beforeStart: vi.fn(async () => {}),
+    onStop: vi.fn(),
+  };
+  await beginRecordingSession(args);
+  vi.advanceTimersByTime(300);
+  Recorder.latest.dispatchEvent(new Event('error'));
+  Recorder.latest.stop();
+  expect(args.resetSession).not.toHaveBeenCalled();
+  expect(args.clearTimer).toHaveBeenCalledOnce();
+  expect(stop).toHaveBeenCalledOnce();
+  expect(args.timeline.onStop).toHaveBeenCalledOnce();
+  expect(args.state.setStatus).toHaveBeenLastCalledWith('recorded');
+  const take = vi.mocked(args.state.setAudioBlob).mock.calls[0]![0];
+  expect(take).toBeInstanceOf(Blob);
+  expect(take).toMatchObject({ size: 5, type: 'audio/webm' });
+  expect(args.state.setAudioUrl).toHaveBeenCalledWith('blob:recorded');
+  expect(args.state.setTrimEnd).toHaveBeenCalledWith(0.3);
+  expect(vi.getTimerCount()).toBe(0);
+});

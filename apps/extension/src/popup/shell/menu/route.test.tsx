@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { MenuRoute } from './route';
 
 const mocks = vi.hoisted(() => ({
   activeTabCapabilities: {
@@ -88,7 +89,6 @@ it('replaces the primary capture cards with page-access controls when the tab is
     siteGranted: false,
     supported: true,
   };
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
 
   expect(container.querySelector('[data-ui="popup.page-access.controls"]')).not.toBeNull();
@@ -102,11 +102,12 @@ afterEach(() => {
 });
 
 it('runs canonical transient screenshot downloads without persisting quick actions', async () => {
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
 
   await act(async () => {
-    container.querySelector<HTMLButtonElement>('[title="popup.home.captureFullHint"]')?.click();
+    container
+      .querySelector<HTMLButtonElement>('[data-popup-hint="popup.home.captureFullHint"]')
+      ?.click();
   });
 
   expect(mocks.triggerScreenshotCapture).toHaveBeenCalledWith({
@@ -121,23 +122,28 @@ it('runs canonical transient screenshot downloads without persisting quick actio
 });
 
 it('uses the shared screenshot icon set for visible, full-page, and selection capture', async () => {
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
 
   expect(
-    container.querySelector('[title="popup.home.captureVisibleHint"] svg')?.getAttribute('class')
+    container
+      .querySelector('[data-popup-hint="popup.home.captureVisibleHint"] svg')
+      ?.getAttribute('class')
   ).toContain('lucide-app-window');
   expect(
-    container.querySelector('[title="popup.home.captureFullHint"] svg')?.getAttribute('class')
+    container
+      .querySelector('[data-popup-hint="popup.home.captureFullHint"] svg')
+      ?.getAttribute('class')
   ).toContain('lucide-unfold-vertical');
   expect(
-    container.querySelector('[title="popup.home.captureSelectionHint"] svg')?.getAttribute('class')
+    container
+      .querySelector('[data-popup-hint="popup.home.captureSelectionHint"] svg')
+      ?.getAttribute('class')
   ).toContain('lucide-crop');
   const captureButtons = [
     'popup.home.captureVisibleHint',
     'popup.home.captureFullHint',
     'popup.home.captureSelectionHint',
-  ].map((title) => container.querySelector<HTMLButtonElement>(`[title="${title}"]`));
+  ].map((title) => container.querySelector<HTMLButtonElement>(`[data-popup-hint="${title}"]`));
   expect(captureButtons.every((button) => button?.className.includes('group '))).toBe(true);
   expect(
     captureButtons.every((button) =>
@@ -150,7 +156,6 @@ it('uses the shared screenshot icon set for visible, full-page, and selection ca
 });
 
 it('wires the workspace, direct page tools and menu-only footer', async () => {
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
 
   const clickLabel = (label: string) =>
@@ -204,7 +209,7 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
   ];
   expect(toolButtons.every((button) => button !== null)).toBe(true);
   const quickScenario = container.querySelector<HTMLButtonElement>(
-    '[title="popup.home.quickEditTabHint"]'
+    '[data-popup-hint="popup.home.quickEditTabHint"]'
   );
   expect(toolButtons.every((button) => button?.className === quickScenario?.className)).toBe(true);
   expect(container.querySelector('[data-ui="popup.menu.tools"] .grid')?.className).toContain(
@@ -224,7 +229,7 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
     'popup.home.videoEditorLabel',
     'popup.home.scenarioEditorLabel',
   ]);
-  expect(container.querySelector('[data-ui="popup.menu.route"] > section')?.className).toContain(
+  expect(container.querySelector('[data-ui="popup.menu.content"]')?.className).toContain(
     'justify-between'
   );
   for (const selector of ['[data-ui="popup.menu.tools"]', '[data-ui="popup.menu.workspace"]']) {
@@ -259,7 +264,6 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
 
 it('renders page tools as disabled when the active tab cannot run them', async () => {
   mocks.activeTabCapabilities.screenshotMode.reason = 'Page unavailable';
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
 
   const buttons = [
@@ -275,7 +279,6 @@ it('renders page tools as disabled when the active tab cannot run them', async (
 });
 
 it('runs the secondary capture scenarios in their displayed order', async () => {
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
 
   const clickLabel = (label: string) =>
@@ -344,7 +347,6 @@ it('runs the secondary capture scenarios in their displayed order', async () => 
 
 it('keeps window or screen capture available when only tab capture is blocked', async () => {
   mocks.activeTabCapabilities.screenshotMode.reason = 'Tab capture blocked';
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
 
   const desktopButton = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -364,7 +366,6 @@ it('keeps window or screen capture available when only tab capture is blocked', 
 
 it('surfaces a rejected page-tool operation through the menu alert', async () => {
   mocks.openScreenshotMode.mockRejectedValue(new Error('Toolbar unavailable'));
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
 
   const toolbarButton = container.querySelector<HTMLButtonElement>(
@@ -378,11 +379,10 @@ it('surfaces a rejected page-tool operation through the menu alert', async () =>
 });
 
 it('starts Screen or Window with a three-second delay', async () => {
-  const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
   await act(async () => {
     container
-      .querySelector<HTMLButtonElement>('[title="popup.home.quickDesktopEditHint"]')
+      .querySelector<HTMLButtonElement>('[data-popup-hint="popup.home.quickDesktopEditHint"]')
       ?.click();
   });
   expect(mocks.triggerScreenshotCapture).toHaveBeenCalledWith(

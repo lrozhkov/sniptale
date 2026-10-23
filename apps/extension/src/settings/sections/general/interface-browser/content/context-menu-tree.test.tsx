@@ -211,14 +211,48 @@ it('moves keyboard focus to the first rendered child when an earlier child is di
   expect(document.activeElement).toBe(row('command:sniptale.settings'));
 });
 
-it('offers one-time recovery when an imported section is disabled and empty', async () => {
+it('omits legacy disabled sections and has no folder state switch', async () => {
   const start: ContextMenuTree = {
     version: 2,
     nodes: [{ type: 'section', id: 'hidden', title: 'Hidden', enabled: false, children: [] }],
   };
   await act(async () => root.render(<Harness key="hidden" start={start} />));
   expect(container.querySelector('[data-tree-key="section:hidden"]')).toBeNull();
-  await click('Restore hidden sections');
-  expect(row('section:hidden')).toBeTruthy();
+  expect(container.querySelector('[role="switch"]')).toBeNull();
   expect(container.textContent).not.toContain('Restore hidden sections');
+  await act(async () => root.render(<Harness key="active-section" />));
+  expect(row('section:tools').querySelector('[role="switch"]')).toBeNull();
+});
+
+it('creates a visible section when only legacy disabled sections exist and can cancel it', async () => {
+  const start: ContextMenuTree = {
+    version: 2,
+    nodes: [{ type: 'section', id: 'disabled', title: 'Disabled', enabled: false, children: [] }],
+  };
+  await act(async () => root.render(<Harness key="disabled-creation" start={start} />));
+  expect(container.querySelector('[data-tree-key="section:disabled"]')).toBeNull();
+  await click('Add');
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]');
+  expect(input).not.toBeNull();
+  expect(latest.nodes[0]).toEqual(start.nodes[0]);
+  expect(latest.nodes).toHaveLength(2);
+  expect(document.activeElement).toBe(input);
+  await key(input!, 'Escape');
+  expect(latest).toEqual(start);
+});
+
+it('explains an expanded empty user section without changing its contents', async () => {
+  const start: ContextMenuTree = {
+    version: 2,
+    nodes: [{ type: 'section', id: 'custom', title: 'Custom', enabled: true, children: [] }],
+  };
+  await act(async () => root.render(<Harness key="empty-custom" start={start} />));
+  expect(container.textContent).not.toContain('No commands in this section.');
+  await key(row('section:custom'), 'ArrowRight');
+  expect(container.textContent).toContain(
+    'No commands in this section. Select a command from the catalog to add it.'
+  );
+  expect(latest).toEqual(start);
+  await key(row('section:custom'), 'ArrowLeft');
+  expect(container.textContent).not.toContain('No commands in this section.');
 });

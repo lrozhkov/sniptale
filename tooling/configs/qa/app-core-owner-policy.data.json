@@ -57,7 +57,6 @@
   "featurePublicEntrypoints": [
     "apps/extension/src/features/ai/schemas/public.ts",
     "apps/extension/src/features/browser-frame/appearance.ts",
-    "apps/extension/src/features/browser-frame/header.ts",
     "apps/extension/src/features/drawing/public.ts",
     "apps/extension/src/features/editor/document/public.ts",
     "apps/extension/src/features/highlighter/contracts/index.ts",

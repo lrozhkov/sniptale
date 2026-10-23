@@ -12,7 +12,6 @@ import type { ContentAppModeState } from '../../../content/overlay/app/mode';
 import {
   buildContentModeControls,
   buildContentModeFlags,
-  buildContentVisibilityState,
 } from '../../../content/overlay/app/view-state/helpers';
 import { useScenarioController } from '../../../content/overlay/scenario/controller';
 import { useContentScreenshotAutoStart } from '../../../content/overlay/screenshot/auto-start';
@@ -99,11 +98,9 @@ function usePreparationFrameCallbacks(
 
 function usePreparationFrameManager(modeState: ContentAppModeState): FrameManager {
   return useContentAppBindings({
-    countdownActive: false,
     InteractiveFrameComponent: InteractiveFrame,
     modeControls: buildContentModeControls(modeState),
     modeFlags: buildContentModeFlags(modeState),
-    visibilityState: buildContentVisibilityState(modeState),
   });
 }
 
@@ -138,6 +135,7 @@ function usePreparationScreenshotController(
       },
       highlighterMode: modeState.highlighterMode,
       quickEditMode: modeState.quickEditMode,
+      quickEditDocumentMode: modeState.quickEditDocumentMode,
       restoreEditingMode,
       setAiPickMode: modeState.setAiPickMode,
       setDesignReviewMode: modeState.setDesignReviewMode,
@@ -282,6 +280,10 @@ function usePreparationControllers(
         },
         highlighter: () => modeController.handleToggleHighlighterMode(true),
         'quick-edit': () => modeController.handleToggleQuickEditMode(true),
+        'quick-edit-document': () => {
+          modeController.handleToggleQuickEditMode(true);
+          modeController.handleToggleQuickEditDocumentMode(true);
+        },
       })
   );
   const videoRecordingController = useVideoRecordingSurfaceController({

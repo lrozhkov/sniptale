@@ -15,7 +15,9 @@ const actions: DesignReviewActions = {
   },
   copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
+  navigateElement: vi.fn(),
   delete: vi.fn(),
+  text: { edit: vi.fn(), reset: vi.fn() },
   resetValue: vi.fn(),
   selectAction: vi.fn(),
   setSettingsOpen: vi.fn(),
@@ -45,12 +47,14 @@ const borderValues = {
 } as const;
 
 const state: DesignReviewViewState = {
+  treeNavigation: { parent: null, child: null },
   action: 'refine',
   anchor: null,
   comment: { commitFailed: false, draft: '', marker: null },
   defaultValues: borderValues,
   draftPatch: { declarations: [] },
   modifiedProperties: [],
+  text: { editable: true, modified: false, preview: 'Heading', resettable: false },
   selection: null,
   settingsOpen: true,
   values: borderValues,

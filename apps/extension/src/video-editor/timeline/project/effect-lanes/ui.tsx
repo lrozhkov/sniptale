@@ -15,12 +15,14 @@ const EFFECT_LANE_EMPTY_LABEL_CLASS_NAME = [
 export function ProjectTimelineEffectLaneRow({
   children,
   muted = false,
+  height = EFFECT_LANE_ROW_HEIGHT,
   onClick,
   onMouseLeave,
   onMouseMove,
   onPointerDown,
 }: React.PropsWithChildren<{
   muted?: boolean;
+  height?: number;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   onMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
   onMouseMove?: React.MouseEventHandler<HTMLDivElement>;
@@ -31,7 +33,7 @@ export function ProjectTimelineEffectLaneRow({
       className={EFFECT_LANE_ROW_CLASS_NAME}
       data-project-timeline-effect-lane-row="true"
       data-timeline-lane-muted={muted}
-      style={{ height: EFFECT_LANE_ROW_HEIGHT }}
+      style={{ height }}
       onClick={(event) => {
         onClick?.(event);
         event.stopPropagation();
@@ -55,6 +57,7 @@ export function ProjectTimelineEffectLaneEmptyLabel({ label }: { label?: string 
 
 export function ProjectTimelineEffectLaneLabelRow({
   compactRows = false,
+  height,
   icon,
   trailingControls,
   title,
@@ -62,6 +65,7 @@ export function ProjectTimelineEffectLaneLabelRow({
   isSelected,
 }: {
   compactRows?: boolean;
+  height?: number | undefined;
   icon: React.ReactNode;
   trailingControls?: React.ReactNode;
   title: string;
@@ -69,7 +73,7 @@ export function ProjectTimelineEffectLaneLabelRow({
   isSelected?: boolean | undefined;
 }) {
   return (
-    <ProjectTimelineEffectLaneRow>
+    <ProjectTimelineEffectLaneRow {...(height !== undefined ? { height } : {})}>
       <div
         className={`${TIMELINE_LANE_HEADER_CLASS_NAME} h-full !border-b-0`}
         data-selected={isSelected ?? false}

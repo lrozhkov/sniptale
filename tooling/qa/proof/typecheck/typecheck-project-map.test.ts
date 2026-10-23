@@ -1,9 +1,54 @@
 import { expect, it } from 'vitest';
 
 import {
+  OWNER_TEST_TYPECHECK_PROJECTS,
+  PRODUCTION_TYPECHECK_PROJECTS,
   requiresFullTypecheckControlProof,
   resolveAffectedTypecheckProjects,
 } from './typecheck-project-map.mjs';
+
+it('covers the permission frame runtime and derives its owner-local test project', () => {
+  expect(
+    PRODUCTION_TYPECHECK_PROJECTS.find((project) => project.id === 'media-permission')
+  ).toEqual({
+    id: 'media-permission',
+    include: ['apps/extension/src/media-permission/**/*'],
+    references: ['app-core'],
+    rootPrefixes: ['apps/extension/src/media-permission/'],
+  });
+  expect(
+    OWNER_TEST_TYPECHECK_PROJECTS.find((project) => project.id === 'media-permission-tests')
+  ).toMatchObject({
+    include: expect.arrayContaining(['apps/extension/src/media-permission/**/*.test.ts']),
+    references: ['media-permission', 'test-harness'],
+    rootPrefixes: ['apps/extension/src/media-permission/'],
+    testProject: true,
+  });
+});
+
+it('selects the permission frame and its tests for runtime changes', () => {
+  expect(
+    resolveAffectedTypecheckProjects(['apps/extension/src/media-permission/index.ts'], {
+      fileExists: () => true,
+    })
+  ).toEqual({
+    mode: 'affected',
+    projectIds: ['media-permission', 'media-permission-tests'],
+    reason: 'changed owner projects',
+  });
+});
+
+it('keeps permission frame tests within their owner test project', () => {
+  expect(
+    resolveAffectedTypecheckProjects(['apps/extension/src/media-permission/session.test.ts'], {
+      fileExists: () => true,
+    })
+  ).toEqual({
+    mode: 'affected',
+    projectIds: ['media-permission-tests'],
+    reason: 'changed owner projects',
+  });
+});
 
 it('resolves owner source changes to the owner and owner-local test projects', () => {
   expect(resolveAffectedTypecheckProjects(['apps/extension/src/popup/index.tsx'])).toEqual({

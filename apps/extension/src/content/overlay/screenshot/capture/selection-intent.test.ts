@@ -9,6 +9,7 @@ const {
   attachContentActionIntentMock,
   createTrustedContentActionIntentSourceMock,
   cropImageMock,
+  compositeDrawingMock,
   enableSelectionModeDeferredIfCurrentMock,
   persistSelectionCaptureMock,
   sendRuntimeMessageMock,
@@ -17,10 +18,15 @@ const {
   attachContentActionIntentMock: vi.fn(async (message) => message),
   createTrustedContentActionIntentSourceMock: vi.fn(),
   cropImageMock: vi.fn(),
+  compositeDrawingMock: vi.fn(),
   enableSelectionModeDeferredIfCurrentMock: vi.fn(),
   persistSelectionCaptureMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
   setUIHiddenMock: vi.fn(),
+}));
+
+vi.mock('../../../drawing/capture', () => ({
+  compositeContentDrawingCapture: compositeDrawingMock,
 }));
 
 vi.mock('../../../application/privileged-action-intent', async (importOriginal) => ({
@@ -103,6 +109,7 @@ beforeEach(() => {
     success: true,
   });
   cropImageMock.mockResolvedValue('data:image/png;base64,crop');
+  compositeDrawingMock.mockResolvedValue('data:image/png;base64,annotated');
   persistSelectionCaptureMock.mockResolvedValue({ successMessage: null });
 });
 
@@ -112,6 +119,46 @@ afterEach(() => {
 });
 
 describe('selection screenshot confirmation intent', () => {
+  it('composites only the confirmed crop snapshot before cropping without an input event', async () => {
+    const snapshot = {
+      objects: [],
+      projection: { x: 10, y: 20 },
+      viewport: { width: 1280, height: 560 },
+    };
+    enableSelectionModeDeferredIfCurrentMock.mockImplementationOnce(async (_isCurrent, options) => {
+      options?.onDrawingSnapshot?.(snapshot);
+      return { x: 10, y: 20, width: 100, height: 80 };
+    });
+    const capturePromise = runSelectionScreenshot(createRuntime(), { showSuccessToast: false });
+    await vi.advanceTimersByTimeAsync(500);
+    await capturePromise;
+    expect(compositeDrawingMock).toHaveBeenCalledWith('data:image/png;base64,frame', snapshot);
+    expect(cropImageMock).toHaveBeenCalledWith('data:image/png;base64,annotated', {
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 80,
+    });
+    expect(createTrustedContentActionIntentSourceMock).not.toHaveBeenCalled();
+  });
+
+  it('does not crop or persist when annotation composition fails', async () => {
+    enableSelectionModeDeferredIfCurrentMock.mockImplementationOnce(async (_isCurrent, options) => {
+      options?.onDrawingSnapshot?.({
+        objects: [],
+        projection: { x: 0, y: 0 },
+        viewport: { width: 1280, height: 560 },
+      });
+      return { x: 10, y: 20, width: 100, height: 80 };
+    });
+    compositeDrawingMock.mockRejectedValueOnce(new Error('Drawing capture blur is unavailable'));
+    const capturePromise = runSelectionScreenshot(createRuntime(), { showSuccessToast: false });
+    const failure = expect(capturePromise).rejects.toThrow('Drawing capture blur is unavailable');
+    await vi.advanceTimersByTimeAsync(500);
+    await failure;
+    expect(cropImageMock).not.toHaveBeenCalled();
+    expect(persistSelectionCaptureMock).not.toHaveBeenCalled();
+  });
   it('replaces an expired quick-action grant with the final trusted confirm after a delay', async () => {
     const selection = createDeferred<CaptureArea>();
     let activationOptions: SelectionModeActivationOptions | undefined;

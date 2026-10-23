@@ -1,6 +1,6 @@
 import { ReviewButton } from './controls';
-import { quickEditPlaneProjection } from '../../features/video/review/advanced/spatial-geometry';
-import { createReviewSpatialRenderer } from '../../workflows/video-review/spatial-renderer';
+import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
+import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ReviewFocusFrame, useFocusFrameHover } from './focus-area-frame';
 import { useReviewCameraGesture } from './camera-gesture';

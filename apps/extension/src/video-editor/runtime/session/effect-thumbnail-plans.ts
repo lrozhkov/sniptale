@@ -24,8 +24,10 @@ export function buildEffectThumbnailPlans(
       const plan = resolveEffectRuntimeFramePlans(
         {
           ...project,
-          clips: [clip],
-          tracks: [{ ...track, visible: true }],
+          clips: project.clips.filter(
+            (candidate) => candidate.type !== 'EFFECT' || candidate.id === clip.id
+          ),
+          tracks: project.tracks.map((candidate) => ({ ...candidate, visible: true })),
           transitions: [],
           effectInstances: [{ ...instance, enabled: true }],
         },

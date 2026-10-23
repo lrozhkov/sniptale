@@ -14,7 +14,7 @@ import {
   projectQuickEditPoint,
   quickEditPlaneProjection,
   type QuickEditHomography,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import {
   resolveReviewAnnotationEffectBox,

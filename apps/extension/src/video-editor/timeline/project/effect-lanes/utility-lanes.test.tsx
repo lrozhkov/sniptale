@@ -1,3 +1,8 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../../features/video/project/scene/focus-appearance';
+import { translate } from '../../../../platform/i18n';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -7,9 +12,16 @@ import { createVideoProjectMotionRegion } from '../../../../features/video/proje
 import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { ProjectTimelineEffectCanvasRows } from './utility-lanes';
 
-it.each([false, true])(
-  'adds a transition only through its centered button; locked=%s',
-  (locked) => {
+it.each([
+  { locked: false, withBorder: false, spotlight: true },
+  { locked: true, withBorder: false, spotlight: true },
+  { locked: false, withBorder: false },
+  { locked: true, withBorder: false },
+  { locked: false, withBorder: true },
+  { locked: true, withBorder: true },
+])(
+  'adds camera connections through their button; locked=$locked, border=$withBorder, spotlight=$spotlight',
+  ({ locked, withBorder, spotlight }) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const project = createEmptyVideoProject();
     project.duration = 8;
@@ -17,6 +29,20 @@ it.each([false, true])(
       { ...createVideoProjectMotionRegion(project, 0), id: 'first', startTime: 0, duration: 1 },
       { ...createVideoProjectMotionRegion(project, 4), id: 'second', startTime: 4, duration: 1 },
     ];
+    if (spotlight)
+      for (const region of project.motionRegions) {
+        region.spotlight = createQuickEditSpotlight();
+        region.spotlightTarget = 'viewport';
+      }
+    if (withBorder)
+      project.motionRegions.push({
+        ...createVideoProjectMotionRegion(project, 2),
+        id: 'intervening-border',
+        startTime: 2,
+        duration: 1,
+        border: createQuickEditBorder(),
+        borderTarget: 'viewport',
+      });
     project.utilityLanes = {
       camera: { visible: true, locked },
       actions: { visible: true, locked: false },
@@ -72,6 +98,63 @@ it.each([false, true])(
       act(() => transition.click());
       expect(select).toHaveBeenCalledWith('second', 'connection');
       expect(seek).not.toHaveBeenCalled();
+    } finally {
+      act(() => root.unmount());
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
+it.each(['border', 'spotlight'] as const)(
+  'identifies a %s segment without dormant camera scale or connection',
+  (kind) => {
+    const project = createEmptyVideoProject('Border lane');
+    project.duration = 4;
+    project.motionRegions = [
+      {
+        ...createVideoProjectMotionRegion(project, 0),
+        id: 'border',
+        duration: 2,
+        border: createQuickEditBorder(),
+        borderTarget: 'viewport',
+      },
+    ];
+    if (kind === 'spotlight') {
+      const region = project.motionRegions[0]!;
+      delete region.border;
+      delete region.borderTarget;
+      region.spotlight = createQuickEditSpotlight();
+      region.spotlightTarget = 'viewport';
+    }
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    try {
+      act(() =>
+        root.render(
+          <ProjectTimelineEffectCanvasRows
+            project={project}
+            pixelsPerSecond={90}
+            selectedEffectSelection={null}
+            onBeginRangeSelection={vi.fn()}
+            onBeginEffectInteraction={vi.fn()}
+            onResizeMotionRegion={vi.fn()}
+          />
+        )
+      );
+      const segment = host.querySelector('[data-timeline-effect-segment="border"]')!;
+      expect(segment.textContent).toContain(
+        translate(
+          kind === 'border'
+            ? 'gallery.videoReview.focusBorder'
+            : 'gallery.videoReview.focusSpotlight'
+        )
+      );
+      expect(
+        segment.querySelector(kind === 'border' ? '.lucide-frame' : '.lucide-focus')
+      ).not.toBeNull();
+      expect(segment.textContent).not.toContain('1.35x');
+      expect(host.querySelector('[data-ui="video-editor.timeline.framing-connection"]')).toBeNull();
     } finally {
       act(() => root.unmount());
       vi.unstubAllGlobals();

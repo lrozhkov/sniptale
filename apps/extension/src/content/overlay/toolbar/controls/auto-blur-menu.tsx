@@ -16,6 +16,7 @@ import {
   useToolbarFloatingMenuDismissal,
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
+import { useToolbarMenuDirection } from '../menu/direction';
 import type { ToolbarMenuState } from '../state/menu';
 
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
@@ -70,11 +71,13 @@ function AutoBlurMenuItem(props: {
   );
 }
 
-function resolveDropdownLayout(props: DropdownProps) {
+function resolveDropdownLayout(
+  props: Pick<DropdownProps, 'displayMode' | 'sidebarVisible' | 'triggerRef'>
+) {
   const placement = getToolbarMenuPosition(props.triggerRef.current, 240);
   return {
-    menuPlacement: resolveToolbarMenuPlacement(props.displayMode, placement),
-    menuStyle: resolveToolbarFloatingMenuStyle({
+    placement: resolveToolbarMenuPlacement(props.displayMode, placement),
+    style: resolveToolbarFloatingMenuStyle({
       anchorEl: props.triggerRef.current,
       displayMode: props.displayMode,
       menuHeight: 240,
@@ -166,7 +169,7 @@ function AutoBlurDropdownItems(props: Pick<DropdownProps, 'autoBlur' | 'isLoadin
 }
 
 function AutoBlurDropdown(props: DropdownProps) {
-  const { menuPlacement, menuStyle } = resolveDropdownLayout(props);
+  const { placement: menuPlacement, style: menuStyle } = resolveDropdownLayout(props);
 
   if (!menuStyle) return null;
 
@@ -243,11 +246,19 @@ function renderAutoBlurDropdown(
 
 export function AutoBlurMenu(props: AutoBlurMenuProps) {
   const bindings = useAutoBlurMenuBindings(props);
+  const menuSide = useToolbarMenuDirection(() =>
+    resolveDropdownLayout({
+      displayMode: props.displayMode,
+      sidebarVisible: props.sidebarVisible,
+      triggerRef: bindings.triggerRef,
+    })
+  );
 
   return (
     <div className="relative sniptale-toolbar-privacy-group-start">
       <ContentToolbarButton
         ref={bindings.triggerRef}
+        data-menu-side={menuSide}
         tone="property"
         active={props.autoBlur?.autoApplyEnabled === true}
         onClick={(event: React.MouseEvent<HTMLButtonElement>) => {

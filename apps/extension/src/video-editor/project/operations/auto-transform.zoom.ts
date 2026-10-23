@@ -1,3 +1,5 @@
+import { isCameraMotionRegion } from '../../../features/video/project/motion/normalization';
+import { DEFAULT_MOTION_PHASE_TRANSITIONS } from '../../../features/video/project/motion/transitions';
 import {
   constrainMotionTiming,
   getMotionInsertionRange,
@@ -145,6 +147,7 @@ function buildNormalizedRecordingClicks(params: {
 }
 
 function hasEquivalentManualRegion(region: MotionRegion, click: Click): boolean {
+  if (!isCameraMotionRegion(region)) return false;
   if (region.targetAction?.eventId === click.eventId && region.targetAction.clipId === click.clipId)
     return true;
   if (region.focusPoint === null) return false;
@@ -224,9 +227,13 @@ function createAutoRegion(
     return null;
   }
 
+  const occupiedIds = new Set(project.motionRegions?.map((region) => region.id));
+  const baseId = `auto-motion:${click.id}`;
+  let id = baseId;
+  for (let suffix = 1; occupiedIds.has(id); suffix++) id = `${baseId}:${suffix}`;
   const normalized = normalizeVideoProjectMotionRegion(project, {
-    ...createVideoProjectMotionRegion(project, click.time),
-    id: `auto-motion:${click.id}`,
+    ...createVideoProjectMotionRegion(project, click.time, DEFAULT_MOTION_PHASE_TRANSITIONS),
+    id,
     duration,
     focusMode: VideoMotionFocusMode.ACTION,
     focusPoint: click.point,
@@ -249,6 +256,7 @@ export function buildAutoZoomRegions(params: BuildParams): MotionRegion[] {
   // Once added to the montage, framing is authored content, regardless of how it was created.
   const manualRegions = project.motionRegions ?? [];
   const autoRegions: MotionRegion[] = [];
+  const regionRuns = new Map<string, string>();
   const lastAutoZoomTimes = new Map<string, number>();
 
   for (const [index, click] of clicks.entries()) {
@@ -269,11 +277,8 @@ export function buildAutoZoomRegions(params: BuildParams): MotionRegion[] {
     };
     profile.scale = params.scale ?? 1.4;
     profile.motionBlurAmount = 0;
-    const sameRunIds = new Set(
-      clicks.filter((item) => item.runId === click.runId).map((item) => item.id)
-    );
     const reusableRegion = findReusableAutoRegion(
-      autoRegions.filter((region) => sameRunIds.has(region.id.slice('auto-motion:'.length))),
+      autoRegions.filter((region) => regionRuns.get(region.id) === click.runId),
       click
     );
     const isRepeatedNearby =
@@ -302,6 +307,7 @@ export function buildAutoZoomRegions(params: BuildParams): MotionRegion[] {
     );
     if (region) {
       autoRegions.push(region);
+      regionRuns.set(region.id, click.runId);
       lastAutoZoomTimes.set(click.runId, click.time);
     }
   }

@@ -143,7 +143,7 @@ it('renders composition layers and scales cursor and action overlays through the
     visualPasses: [{ alpha: 1, frame, time: 1.5 }],
   });
 
-  drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
+  await drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
 
   expect(resolveVideoCompositionRenderPassesMock).toHaveBeenCalledWith(project, 1.5, {
     includeSubtitles: false,
@@ -176,7 +176,7 @@ it('skips cursor drawing when the composition frame does not expose cursor state
     visualPasses: [],
   });
 
-  drawProjectFrame(
+  await drawProjectFrame(
     createContext(),
     { backgroundColor: '#000', height: 50, width: 100 } as never,
     {

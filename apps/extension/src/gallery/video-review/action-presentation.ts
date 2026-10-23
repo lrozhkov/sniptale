@@ -1,7 +1,7 @@
 import {
   patchReviewKeys,
   type ReviewKeyPatch,
-} from '../../features/video/review/advanced/key-animation';
+} from '../../features/video/project/action-feedback/key-animation';
 import {
   patchReviewClicks,
   type ReviewClickStyle,

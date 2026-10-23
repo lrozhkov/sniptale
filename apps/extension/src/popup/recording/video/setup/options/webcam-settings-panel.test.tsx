@@ -16,6 +16,10 @@ vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+  translate: (key: string) => key,
+}));
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -103,7 +107,25 @@ it('shows embedded presentation controls when explicitly selected for tab record
   });
 
   expect(container?.textContent).toContain('popup.video.webcamPresentationEmbedded');
-  expect(container?.textContent).toContain('popup.video.webcamPresentationCircle');
+  expect(
+    container?.querySelector('[aria-label="popup.video.webcamPresentationCircle"]')
+  ).not.toBeNull();
+  const freePlacement = container?.querySelector<HTMLButtonElement>(
+    '[aria-label="popup.video.webcamFreePlacement"]'
+  );
+  expect(freePlacement?.getAttribute('aria-checked')).toBe('false');
+  await act(async () => freePlacement?.click());
+  expect(onSettingsChange).toHaveBeenCalledWith({
+    webcamPresentation: expect.objectContaining({ freePlacement: true }),
+  });
+  expect(freePlacement?.className).toContain('sniptale-glass-switch');
+  expect(
+    container?.querySelector('[aria-label="popup.video.webcamPresentationSoft"]')
+  ).not.toBeNull();
+  expect(
+    container?.querySelector('[aria-label="popup.video.webcamPresentationEllipse"]')
+  ).not.toBeNull();
+  expect(container?.textContent).toContain('popup.video.webcamPresentationZoom');
 
   await act(async () => {
     Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])

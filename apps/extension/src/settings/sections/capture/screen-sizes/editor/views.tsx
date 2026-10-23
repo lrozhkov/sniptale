@@ -29,7 +29,7 @@ function ViewportPresetNameField(props: {
   const input = useRef<HTMLInputElement>(null);
   const label = translate('viewportPresets.editor.nameLabel');
   return (
-    <SettingsControlRow label={label} description={translate('viewportPresets.editor.nameHint')}>
+    <SettingsControlRow label={label} keepInline>
       <div className="sniptale-text-value">
         <ProductInput
           ref={input}

@@ -35,6 +35,10 @@ const FORBIDDEN_FILE_PATTERNS = [
     message: 'secret-like artifact',
     pattern: /(?:^|\/)(?:raw-diagnostics|raw-history|secret|private-key|token)[^/]*$/iu,
   },
+  {
+    message: 'repository-only directory',
+    pattern: /^(?:packages|tooling|tasks|docs|node_modules)\//u,
+  },
 ];
 const HASHED_UI_TOKENS_BUNDLE_PATTERN = /^assets\/tokens-[a-z0-9_-]{8}\.js$/iu;
 const HASHED_SECRET_REDACTION_BUNDLE_PATTERN = /^assets\/secret-redaction-[a-z0-9_-]{8}\.js$/iu;

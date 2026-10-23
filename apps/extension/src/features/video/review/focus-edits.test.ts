@@ -1,6 +1,7 @@
+import { createQuickEditSpotlight } from '../project/scene/focus-appearance';
 import { expect, it } from 'vitest';
 import { createQuickEditZoomRegion } from './advanced/zoom';
-import { createQuickEditSpotlight } from './advanced/focus';
+
 import { evaluateQuickEditCameraAtTime } from './advanced/scene';
 import { projectReviewFocus, reconcileReviewFocus } from './focus-edits';
 import { buildReviewTimeMap } from './timeline';

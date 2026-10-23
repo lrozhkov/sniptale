@@ -1,4 +1,6 @@
-import { uncropQuickEditVideoRect } from './canvas';
+import { cameraTransitionProgress } from '../../project/motion/transitions';
+import { insetMediaCanvas } from '../../project/window-geometry';
+import { uncropMediaSourceRect } from '../../project/media-crop';
 import {
   evaluateReviewFollowCursor,
   resolveReviewCursorCameraPlan,
@@ -19,14 +21,14 @@ import type {
 import type { WorkingZoneCameraGeometry } from '../../composition/motion/follow-cursor';
 import type { WorkingZoneCameraPlan } from '../../composition/motion/follow-cursor';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
+import { quickEditSpatialSpan } from './spatial';
 import {
-  interpolateQuickEditSpatial,
-  quickEditSpatialSpan,
-  hasQuickEditPerspective,
-} from './spatial';
+  interpolateCameraSpatial as interpolateQuickEditSpatial,
+  hasCameraPerspective as hasQuickEditPerspective,
+} from '../../project/motion/spatial';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
-import { windowHeaderGeometry } from '../../../browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { fitVideoRect } from '../geometry';
 import { fitQuickEditSourceCrop } from './canvas';
 import type {
@@ -48,26 +50,13 @@ const QUICK_EDIT_IDENTITY_CAMERA: QuickEditCameraTransform = {
   centerY: 0.5,
 };
 
-const easing = (progress: number, type: QuickEditZoomRegion['enter']['type']) => {
-  if (type === 'none') return 1;
-  if (type === 'linear') return progress;
-  return progress * progress * (3 - 2 * progress);
-};
-
 /** Content area inside the output frame; padding never collapses the canvas below one pixel. */
 export function computeQuickEditContentRect(
   output: { width: number; height: number },
   background: QuickEditBackgroundSettings
 ): QuickEditRect {
   const padding = background.enabled ? background.layout.padding : 0;
-  const x = Math.min(padding, output.width / 2);
-  const y = Math.min(padding, output.height / 2);
-  return {
-    x,
-    y,
-    width: Math.max(1, output.width - 2 * x),
-    height: Math.max(1, output.height - 2 * y),
-  };
+  return insetMediaCanvas(output, padding);
 }
 
 type SceneInput = Omit<QuickEditCameraSceneInput, 'output'> & {
@@ -463,7 +452,7 @@ export function computeQuickEditSceneLayout(input: SceneInput) {
     width: fitted.width,
     height: fitted.height,
   };
-  const videoRect = crop ? uncropQuickEditVideoRect(visibleVideoRect, crop) : visibleVideoRect;
+  const videoRect = crop ? uncropMediaSourceRect(visibleVideoRect, crop) : visibleVideoRect;
   const windowRect = {
     ...visibleVideoRect,
     y: visibleVideoRect.y - headerHeight,
@@ -595,10 +584,15 @@ function cameraProgress(
   if (transition.duration <= 0) return 1;
   if (phase === 'exit') {
     if (timelineTime <= boundary) return 1;
-    return 1 - easing((timelineTime - boundary) / transition.duration, transition.type);
+    return (
+      1 - cameraTransitionProgress((timelineTime - boundary) / transition.duration, transition.type)
+    );
   }
   if (timelineTime >= region.start + transition.duration) return 1;
-  return easing((timelineTime - region.start) / transition.duration, transition.type);
+  return cameraTransitionProgress(
+    (timelineTime - region.start) / transition.duration,
+    transition.type
+  );
 }
 
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
@@ -654,7 +648,7 @@ export function sampleQuickEditFocusAtTime(
       (item) => resolveQuickEditFocusLink(topology, item.id)?.target.id === region.id
     );
     if (linkedNext && next && timelineTime >= region.end && timelineTime < next.start) {
-      const progress = easing(
+      const progress = cameraTransitionProgress(
         (timelineTime - region.end) / (next.start - region.end),
         region.linkEasing ?? 'ease-in-out'
       );

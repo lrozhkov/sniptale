@@ -13,6 +13,7 @@ import {
 } from '../../viewport-selector/capability';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { teardownDesignReviewSessionAfterUiTransition } from '../../design-review/runtime/session-teardown';
+import type { ScreenshotStartContext, ScreenshotEditingMode } from '../../screenshot/types';
 
 function disableEditingModes(params: RuntimeMessageBridgeParams): void {
   if (params.modeState.aiPickMode) {
@@ -71,8 +72,8 @@ function hasModeOwnedNavigationLock(params: RuntimeMessageBridgeParams): boolean
 
 function createAutoStartNavigationContext(
   params: RuntimeMessageBridgeParams,
-  invalidatedStartContext?: { navigationLockBaseline?: boolean | undefined }
-) {
+  invalidatedStartContext?: ScreenshotStartContext
+): ScreenshotStartContext {
   if (invalidatedStartContext) {
     return invalidatedStartContext;
   }
@@ -80,6 +81,18 @@ function createAutoStartNavigationContext(
   return {
     navigationLockBaseline: hasModeOwnedNavigationLock(params) ? false : isLockEnabled(),
   };
+}
+
+function resolvePreparationEditingMode(
+  params: RuntimeMessageBridgeParams
+): ScreenshotEditingMode | null {
+  if (params.modeState.aiPickMode) return 'ai-pick';
+  if (params.modeState.designReviewMode) return 'design-review';
+  if (params.modeState.drawingMode) return 'drawing';
+  if (params.modeState.highlighterMode) return 'highlighter';
+  if (params.modeState.quickEditDocumentMode) return 'quick-edit-document';
+  if (params.modeState.quickEditMode) return 'quick-edit';
+  return null;
 }
 
 function enableScreenshotModeState(
@@ -109,11 +122,28 @@ function queueAutoStartCaptureIfNeeded(
     return;
   }
 
-  const invalidatedStartContext = params.viewport.invalidateScreenshotRuns();
+  const preparationBaseline =
+    request.quickActionOverlay &&
+    params.modeState.screenshotMode &&
+    !params.quickAction.quickActionOverlayRef.current
+      ? {
+          captureAction: params.quickAction.captureActionRef.current,
+          timerDelay: params.quickAction.timerDelay ?? 0,
+          isToolbarVisible: params.modeState.isToolbarVisible,
+          navigationLockEnabled: params.modeState.navigationLockEnabled ?? isLockEnabled(),
+          editingMode: resolvePreparationEditingMode(params),
+        }
+      : undefined;
+  const invalidatedStartContext = params.viewport.invalidateScreenshotRuns(
+    preparationBaseline ? { preparationBaseline } : {}
+  );
   const autoStartNavigationContext = createAutoStartNavigationContext(
     params,
     invalidatedStartContext
   );
+  if (preparationBaseline && !autoStartNavigationContext.preparationBaseline) {
+    autoStartNavigationContext.preparationBaseline = preparationBaseline;
+  }
 
   if (request.autoStartSelection) {
     params.viewport.queueAutoStartCapture(

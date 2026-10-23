@@ -1,6 +1,6 @@
 import { isReviewKey } from '../../features/video/review/key-animation';
 import { historySelectableKey } from './action-history-filters';
-import type { ReviewKeyAnimation } from '../../features/video/review/advanced/key-animation';
+import type { ReviewKeyAnimation } from '../../features/video/project/action-feedback/key-animation';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Check, Minus, Clock3, Sparkles, X } from 'lucide-react';
 import { useLayoutEffect, useRef, type RefObject } from 'react';

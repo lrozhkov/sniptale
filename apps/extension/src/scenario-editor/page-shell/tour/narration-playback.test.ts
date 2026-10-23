@@ -88,7 +88,7 @@ it('plays the selected trim at authored gain and stops exactly at its end', asyn
   f.owner.seek(99);
   expect(f.audio.currentTime).toBe(3);
   f.owner.update({ ...f.narration, trimStart: 0, trimEnd: 2, gain: 2 });
-  expect(f.audio.currentTime).toBe(0);
+  expect(f.audio.currentTime).toBe(2);
   expect(f.gain.gain.value).toBe(2);
   f.life.abort();
   expect(f.source.disconnect).toHaveBeenCalledOnce();
@@ -144,4 +144,21 @@ it('stops late native play completion after disposal without publishing stale st
   await pending;
   expect(f.audio.paused).toBe(true);
   expect(f.changed).toHaveBeenCalledTimes(count);
+});
+
+it('stops playback at an updated trim boundary', async () => {
+  const f = fixture();
+  await f.owner.toggle();
+  f.audio.currentTime = 2;
+  f.owner.update({ ...f.narration, trimEnd: 2 });
+  expect(f.audio.paused).toBe(true);
+  expect(f.audio.currentTime).toBe(2);
+  expect(f.changed).toHaveBeenLastCalledWith(expect.objectContaining({ playing: false }));
+  await f.owner.toggle();
+  expect(f.audio.currentTime).toBe(1);
+  f.audio.currentTime = 1.5;
+  f.owner.update({ ...f.narration, trimStart: 2 });
+  expect(f.audio.paused).toBe(true);
+  expect(f.audio.currentTime).toBe(2);
+  f.life.abort();
 });

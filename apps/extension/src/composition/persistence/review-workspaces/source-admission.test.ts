@@ -768,7 +768,7 @@ it.each(['missing', 'trash', 'active'] as const)(
   'readmits watermark origin in its consuming transaction: %s',
   async (state) => {
     const { createQuickEditWatermark } =
-      await import('../../../features/video/review/advanced/watermark');
+      await import('../../../features/video/project/scene/watermark');
     if (state !== 'missing')
       rows.get('media_library')!.set(
         'origin',

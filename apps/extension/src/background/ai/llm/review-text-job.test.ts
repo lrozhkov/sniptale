@@ -7,7 +7,7 @@ import {
   type ReviewTextServerMessage,
 } from '../../../contracts/ai/review-text';
 
-const start: ReviewTextStart = {
+const start = {
   type: 'start',
   requestId: '6403111a-85e3-4b64-8c89-0d64feb910dc',
   modelId: 'model',
@@ -26,7 +26,7 @@ const start: ReviewTextStart = {
     window: { start: 1, end: 2 },
     fragments: [{ id: 'text', text: 'Authored words', start: 1, end: 2 }],
   },
-};
+} satisfies ReviewTextStart;
 const proposal = { version: 1, fragments: [{ fromIds: ['text'], text: 'Short words' }] };
 const config = {
   modelId: 'model',
@@ -69,7 +69,7 @@ describe('one-shot cancellable text editing jobs', () => {
     await reservation.waitForActiveMutations();
     reservation.release();
     expect(deps.authorize).toHaveBeenCalledOnce();
-    expect(deps.assertScope).toHaveBeenCalledOnce();
+    expect(deps.assertScope).toHaveBeenCalledTimes(2);
     expect(deps.resolveModel).toHaveBeenCalledTimes(2);
     expect(deps.request).toHaveBeenCalledOnce();
     expect(deps.request).toHaveBeenCalledWith(

@@ -28,7 +28,7 @@ import {
   quickEditPlaneProjection,
   quickEditProjectionCss,
   invertQuickEditProjection,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 import { ReviewClickOverlay } from './click-animation-overlay';
 import type { ReviewClickCue } from '../../features/video/review/click-animation';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
@@ -489,7 +489,7 @@ function ReviewStageContent({
     'size' | 'sceneLayout' | 'zoomLayout' | 'borders' | 'overlayClip'
   >;
   projection:
-    | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+    | import('../../features/video/composition/motion/spatial-geometry').QuickEditHomography
     | undefined;
   projected: ReturnType<typeof projectVideoRegion> | null;
 }) {
@@ -606,7 +606,7 @@ function ReviewStageComments(props: {
   clip?: Parameters<typeof ReviewCommentOverlay>[0]['clip'];
   attachment: CanvasComment['attachment'];
   projection?:
-    | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+    | import('../../features/video/composition/motion/spatial-geometry').QuickEditHomography
     | undefined;
   comments: ReviewStageCommentBinding | undefined;
   layout: ReturnType<typeof computeQuickEditSceneLayout> | null;

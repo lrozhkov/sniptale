@@ -1,4 +1,4 @@
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ReviewStage } from '../../../../apps/extension/src/gallery/video-review/stage';

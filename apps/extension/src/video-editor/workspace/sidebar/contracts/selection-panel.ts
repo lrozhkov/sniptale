@@ -13,6 +13,11 @@ import type {
 import type { WorkspaceSidebarProps } from './props';
 
 export interface WorkspaceSidebarSelectionPanelProps {
+  sceneEdges?: WorkspaceSidebarProps['sceneEdges'];
+  watermark?: WorkspaceSidebarProps['watermark'];
+  recognition?: WorkspaceSidebarProps['recognition'];
+  textRewrite?: WorkspaceSidebarProps['textRewrite'];
+  textVoice?: WorkspaceSidebarProps['textVoice'];
   typingProject?: VideoProject;
   recordingTelemetry?: WorkspaceSidebarProps['recordingTelemetry'];
   onApplyTypingCompression?: WorkspaceSidebarProps['onApplyTypingCompression'];
@@ -85,9 +90,12 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onUpdateMediaClipFitScalePercent?: WorkspaceSidebarProps['onUpdateMediaClipFitScalePercent'];
   onUpdateMediaClipShadowIntensity?: WorkspaceSidebarProps['onUpdateMediaClipShadowIntensity'];
   onUpdateMediaClipShadowMode?: WorkspaceSidebarProps['onUpdateMediaClipShadowMode'];
+  onUpdateMediaClipShadowColor?: WorkspaceSidebarProps['onUpdateMediaClipShadowColor'];
+  onEditMediaClip?: WorkspaceSidebarProps['onEditMediaClip'];
   onUpdateMediaClipWindowHeader?: WorkspaceSidebarProps['onUpdateMediaClipWindowHeader'];
   onApplyMediaClipVisualsToTrack?: WorkspaceSidebarProps['onApplyMediaClipVisualsToTrack'];
   onConvertTextClipToAnnotation?: WorkspaceSidebarProps['onConvertTextClipToAnnotation'];
+  onPreviewMotion?: WorkspaceSidebarProps['onPreviewMotion'];
   onUpdateMotionRegion: NonNullable<WorkspaceSidebarProps['onUpdateMotionRegion']>;
   onUpdateShapeStyle: WorkspaceSidebarProps['onUpdateShapeStyle'];
   onUpdateSubtitleTrackStyle?: WorkspaceSidebarProps['onUpdateSubtitleTrackStyle'];

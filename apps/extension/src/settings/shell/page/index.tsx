@@ -1,3 +1,4 @@
+import { NativeHints } from '../../../ui/native-hints';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import '../../../ui/compact-inspector-controls/inspector-surface.css';
@@ -28,6 +29,7 @@ import {
 } from './sections';
 import { useSettingsRoute } from '../route/history';
 import { useSettingsStickyNavScrollPadding } from './sticky-nav-scroll';
+import { RecordingMediaAccessProvider } from '../../runtime/recording-media-access/provider';
 
 function SettingsPageSurface(props: {
   navigationLocked: boolean;
@@ -165,13 +167,16 @@ export function SettingsPage() {
   return (
     <CommandPressScope value={true}>
       <InspectorLayout>
+        <NativeHints />
         <div className="sniptale-settings-viewport">
           {isAIUnlockPage ? (
             <AISecretUnlockPage />
           ) : (
             <SettingsSectionHeaderActionsProvider>
               <SettingsNavigationLockProvider>
-                <SettingsPageMain />
+                <RecordingMediaAccessProvider>
+                  <SettingsPageMain />
+                </RecordingMediaAccessProvider>
               </SettingsNavigationLockProvider>
             </SettingsSectionHeaderActionsProvider>
           )}

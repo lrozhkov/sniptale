@@ -1,3 +1,4 @@
+import { resolveVideoMediaShadowParams } from '../../composition/canvas/media-shadow';
 import type { QuickEditBackgroundSettings } from './types';
 
 /** Source-image style glow: centered, intensity controls opacity and spread. */
@@ -7,6 +8,6 @@ export function resolveQuickEditShadow(background: QuickEditBackgroundSettings, 
   return {
     color: shadow.color,
     opacity: shadow.intensity / 100,
-    blur: shadow.intensity * 0.75 * scale,
+    blur: resolveVideoMediaShadowParams(shadow.intensity, scale)!.blur,
   };
 }

@@ -51,16 +51,12 @@ export function MicrophoneSettingsPanel({
   return (
     <div className="grid gap-3">
       <MicrophoneDeviceLabel currentDeviceLabel={currentDeviceLabel} />
-      <MicrophoneProbeStatus probeStatus={probe.status} />
       <MicrophoneLevelMeter
         gain={resolveMicrophoneGain(settings)}
         stream={readyProbe?.stream ?? null}
       />
       <MicrophoneGainControl settings={settings} onSettingsChange={onSettingsChange} />
       <MicrophoneTestRecorder stream={readyProbe?.stream ?? null} />
-      {errorKey ? (
-        <div className="text-[11px] text-[var(--sniptale-color-danger)]">{translate(errorKey)}</div>
-      ) : null}
       <MicrophoneProcessingList
         onError={() => setErrorKey('popup.video.microphoneStatusError')}
         onSettingsChange={onSettingsChange}
@@ -71,6 +67,10 @@ export function MicrophoneSettingsPanel({
         settings={settings}
         statusOverrides={statusOverrides}
       />
+      <div role="status" className="min-h-4 text-[11px]">
+        <MicrophoneProbeStatus probeStatus={probe.status} />
+        {errorKey ? <div className="popup-error-message">{translate(errorKey)}</div> : null}
+      </div>
     </div>
   );
 }
@@ -175,10 +175,11 @@ function MicrophoneProcessingToggle({
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={[
         OPTION_BUTTON_CLASS_NAME,
         active
-          ? 'text-[var(--sniptale-popup-color-text-accent,var(--sniptale-color-accent))]'
+          ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
           : 'text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       disabled={disabled || unsupported}

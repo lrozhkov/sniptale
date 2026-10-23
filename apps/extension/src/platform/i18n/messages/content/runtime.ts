@@ -189,6 +189,18 @@ export const contentRuntimeMessages = defineMessageSource({
     ru: 'Показать панель',
     en: 'Show toolbar',
   },
+  collapsedPanelsTitle: {
+    ru: 'Свёрнутые панели',
+    en: 'Collapsed panels',
+  },
+  moveCollapsedPanels: {
+    ru: 'Переместить свёрнутые панели',
+    en: 'Move collapsed panels',
+  },
+  moveCollapsedPanelsHint: {
+    ru: 'Перетащите в угол экрана или выберите угол клавишами со стрелками',
+    en: 'Drag to a screen corner or choose a corner with the arrow keys',
+  },
   exportRequestHandlingFailed: {
     ru: 'Не удалось обработать экспортный запрос',
     en: 'Failed to handle export request',

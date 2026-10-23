@@ -1,4 +1,4 @@
-import type { WindowHeader } from '../../browser-frame/header';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { BorderPreset } from '../../highlighter/contracts';
 import type { EditorRasterEffect } from './effects';
 import type { EditorRichShapeDocumentObject } from './rich-shape/types';

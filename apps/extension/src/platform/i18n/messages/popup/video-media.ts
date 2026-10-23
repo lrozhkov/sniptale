@@ -1,6 +1,38 @@
 import { defineMessageSource } from '../source';
 
 export const popupVideoMediaMessages = defineMessageSource({
+  mediaAccessBlocked: {
+    ru: 'Доступ заблокирован',
+    en: 'Access blocked',
+  },
+  microphonePermissionRequired: {
+    ru: 'Разрешите доступ к микрофону перед записью.',
+    en: 'Allow microphone access before recording.',
+  },
+  cameraPermissionRequired: {
+    ru: 'Разрешите доступ к камере перед записью.',
+    en: 'Allow camera access before recording.',
+  },
+  microphonePermissionDenied: {
+    ru: 'Доступ к микрофону заблокирован. Откройте раздел «Разрешения» в настройках и разрешите доступ.',
+    en: 'Microphone access is blocked. Open Permissions in Settings to allow access.',
+  },
+  cameraPermissionDenied: {
+    ru: 'Доступ к камере заблокирован. Откройте раздел «Разрешения» в настройках и разрешите доступ.',
+    en: 'Camera access is blocked. Open Permissions in Settings to allow access.',
+  },
+  mediaDeviceBusy: {
+    ru: 'Устройство занято. Закройте другие приложения, которые его используют, и повторите попытку.',
+    en: 'This device is busy. Close other apps that use it and try again.',
+  },
+  mediaAccessUnavailable: {
+    ru: 'Доступ к устройству недоступен в этом окне. Откройте раздел «Разрешения» в настройках.',
+    en: 'Device access is unavailable in this window. Open Permissions in Settings.',
+  },
+  mediaAccessUnconfirmed: {
+    ru: 'Не удалось подтвердить доступ. Повторите запрос или откройте раздел «Разрешения» в настройках.',
+    en: 'Device access could not be confirmed. Request access again or open Permissions in Settings.',
+  },
   microphoneToggleLabel: {
     ru: 'Микрофон',
     en: 'Microphone',
@@ -118,8 +150,8 @@ export const popupVideoMediaMessages = defineMessageSource({
     en: 'Auto gain',
   },
   microphoneGainLabel: {
-    ru: 'Громкость микрофона для записи',
-    en: 'Microphone volume for recording',
+    ru: 'Громкость записи',
+    en: 'Recording volume',
   },
   microphoneStatusApplied: {
     ru: 'Применено',
@@ -156,6 +188,14 @@ export const popupVideoMediaMessages = defineMessageSource({
   microphoneTestPlay: {
     ru: 'Воспроизвести',
     en: 'Play',
+  },
+  microphoneTestPause: {
+    ru: 'Пауза',
+    en: 'Pause',
+  },
+  microphoneTestPlaybackError: {
+    ru: 'Не удалось воспроизвести тест. Попробуйте ещё раз или запишите новый.',
+    en: 'Could not play the test. Try again or record a new test.',
   },
   microphoneTestDelete: {
     ru: 'Удалить тест',
@@ -217,6 +257,10 @@ export const popupVideoMediaMessages = defineMessageSource({
     ru: 'Размещение',
     en: 'Placement',
   },
+  webcamFreePlacement: {
+    ru: 'Свободное размещение камеры',
+    en: 'Free camera placement',
+  },
   webcamPresentationEmbedded: {
     ru: 'На странице',
     en: 'On page',
@@ -233,6 +277,14 @@ export const popupVideoMediaMessages = defineMessageSource({
     ru: 'Круг',
     en: 'Circle',
   },
+  webcamPresentationSoft: { ru: 'Мягкая форма', en: 'Soft shape' },
+  webcamPresentationSquare: { ru: 'Квадрат', en: 'Square' },
+  webcamPresentationEllipse: { ru: 'Овал', en: 'Ellipse' },
+  webcamPresentationRoundness: { ru: 'Скругление', en: 'Roundness' },
+  webcamPresentationMirror: { ru: 'Отражение', en: 'Mirror' },
+  webcamPresentationShadow: { ru: 'Тень', en: 'Shadow' },
+  webcamPresentationShadowColor: { ru: 'Цвет тени', en: 'Shadow color' },
+  webcamPresentationZoom: { ru: 'Приближение', en: 'Zoom' },
   webcamPresentationRectangle: {
     ru: 'Прямоугольник 16:9',
     en: '16:9 rectangle',

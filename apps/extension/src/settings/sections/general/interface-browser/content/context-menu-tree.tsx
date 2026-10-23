@@ -1,4 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { Plus } from 'lucide-react';
 import { settingsAddButtonClassName } from '../../../../section-surface';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
@@ -12,7 +20,7 @@ import type {
 import { CONTEXT_MENU_MAX_SECTIONS } from '../../../../../contracts/settings/context-menu-layout';
 import type { ContextMenuCatalogItem } from './context-menu-catalog';
 import { contextMenuCommandLabel } from './context-menu-catalog';
-import { ContextMenuTreeRow, treeIconButton } from './context-menu-tree-row';
+import { ContextMenuTreeRow } from './context-menu-tree-row';
 import type { ContextMenuDropTarget } from './context-menu-tree-drop';
 import {
   createSectionAtSelection,
@@ -23,12 +31,10 @@ import {
 } from './context-menu-tree-controller';
 import {
   contextMenuNodePosition,
+  restoreContextMenuSectionCommands,
   countContextMenuSections,
   findContextMenuNode,
-  hasDisabledContextMenuSection,
   removeContextMenuNode,
-  restoreContextMenuSections,
-  updateContextMenuNode,
   visibleContextMenuNodes,
 } from './context-menu-tree-model';
 
@@ -235,8 +241,6 @@ function useContextMenuTree(props: TreeViewProps) {
       setEditing(null);
       if (!editing?.isNew) select(key);
     },
-    toggleEnabled: (key: string, enabled: boolean) =>
-      apply(updateContextMenuNode(tree, key, { enabled }), key),
     moveRelative,
     moveInside,
     moveOutside,
@@ -258,6 +262,39 @@ function useContextMenuTree(props: TreeViewProps) {
   };
 }
 
+function EmptyContextMenuSection(props: {
+  sectionId: string;
+  level: number;
+  locale: AppLocale;
+  catalog: readonly ContextMenuCatalogItem[];
+  onAddWindowSizes(sectionId: string): void;
+}) {
+  const hasWindowSizes =
+    (props.sectionId === 'window' || props.sectionId.endsWith('-window')) &&
+    props.catalog.some(
+      (item) => item.available && item.command.startsWith('sniptale.window-resize.preset.')
+    );
+  return (
+    <div
+      className="px-3 py-2 text-[13px] text-[var(--sniptale-color-text-muted)]"
+      style={{ paddingInlineStart: props.level * 18 + 12 }}
+    >
+      {hasWindowSizes ? (
+        <button
+          type="button"
+          className={settingsAddButtonClassName}
+          onClick={() => props.onAddWindowSizes(props.sectionId)}
+        >
+          <Plus size={14} aria-hidden="true" />
+          {translate('settings.appearance.contextMenuAddWindowSizes', props.locale)}
+        </button>
+      ) : (
+        translate('settings.appearance.contextMenuEmptySection', props.locale)
+      )}
+    </div>
+  );
+}
+
 export function ContextMenuTreeView(props: TreeViewProps) {
   const instructionsId = useId();
   const { tree, catalog, locale, selectedKey, expanded, drop } = props;
@@ -273,6 +310,13 @@ export function ContextMenuTreeView(props: TreeViewProps) {
     confirmSectionRemoval,
   } = useContextMenuTree(props);
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const addWindowSizes = (sectionId: string) => {
+    const commands = catalog
+      .filter((item) => item.available && item.command.startsWith('sniptale.window-resize.preset.'))
+      .map((item) => item.command);
+    props.onChange(restoreContextMenuSectionCommands(tree, sectionId, commands));
+    props.onExpanded(new Set([...expanded, sectionId]));
+  };
   const dropRow = rows.find((row) => row.key === drop?.rowKey);
   let afterKey = dropRow?.key;
   if (drop?.edge === 'after' && dropRow) {
@@ -292,15 +336,6 @@ export function ContextMenuTreeView(props: TreeViewProps) {
         ].join(' ')}
       >
         <h3 className="text-[13px] font-semibold">{t('settings.appearance.contextMenuTree')}</h3>
-        {hasDisabledContextMenuSection(tree.nodes) ? (
-          <button
-            type="button"
-            className={`${treeIconButton} w-auto px-2`}
-            onClick={() => props.onChange(restoreContextMenuSections(tree))}
-          >
-            {t('settings.appearance.contextMenuRestoreHiddenSections')}
-          </button>
-        ) : null}
         <button
           type="button"
           className={`${settingsAddButtonClassName} !w-auto gap-1.5`}
@@ -342,30 +377,43 @@ export function ContextMenuTreeView(props: TreeViewProps) {
             node.type === 'command' &&
             !catalog.find((item) => item.command === node.command)?.available;
           return (
-            <ContextMenuTreeRow
-              key={key}
-              row={row}
-              label={label}
-              selected={selectedKey === key}
-              first={!selectedKey && rows[0]?.key === key}
-              expanded={node.type === 'section' && expanded.has(node.id)}
-              dropEdge={
-                drop?.edge === 'after'
-                  ? afterKey === key
-                    ? 'after'
-                    : undefined
-                  : drop?.rowKey === key
-                    ? drop.edge
-                    : undefined
-              }
-              dropIndent={dropRow ? (row.level - dropRow.level) * 18 : 0}
-              {...(drop ? { dropTargetKey: drop.rowKey } : {})}
-              unavailable={unavailable}
-              editingValue={editing?.key === key ? editing.value : undefined}
-              inputRef={inputRef}
-              locale={locale}
-              actions={rowActions}
-            />
+            <Fragment key={key}>
+              <ContextMenuTreeRow
+                row={row}
+                label={label}
+                selected={selectedKey === key}
+                first={!selectedKey && rows[0]?.key === key}
+                expanded={node.type === 'section' && expanded.has(node.id)}
+                dropEdge={
+                  drop?.edge === 'after'
+                    ? afterKey === key
+                      ? 'after'
+                      : undefined
+                    : drop?.rowKey === key
+                      ? drop.edge
+                      : undefined
+                }
+                dropIndent={dropRow ? (row.level - dropRow.level) * 18 : 0}
+                {...(drop ? { dropTargetKey: drop.rowKey } : {})}
+                unavailable={unavailable}
+                editingValue={editing?.key === key ? editing.value : undefined}
+                inputRef={inputRef}
+                locale={locale}
+                actions={rowActions}
+              />
+              {node.type === 'section' &&
+              node.enabled &&
+              expanded.has(node.id) &&
+              !node.children.some((child) => child.enabled) ? (
+                <EmptyContextMenuSection
+                  sectionId={node.id}
+                  level={row.level}
+                  locale={locale}
+                  catalog={catalog}
+                  onAddWindowSizes={addWindowSizes}
+                />
+              ) : null}
+            </Fragment>
           );
         })}
       </div>

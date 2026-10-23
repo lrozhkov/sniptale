@@ -1,3 +1,4 @@
+import { getAudioFadeLimitSeconds } from '../../../../../features/video/audio/fades';
 import { translate } from '../../../../../platform/i18n';
 import { isAudioClip, isVideoClip } from '../../../../../features/video/project/timeline';
 import type { WorkspaceSidebarProps } from '../../contracts/props';
@@ -25,7 +26,13 @@ function renderClipFadeFields(
         disabled={selectedTrackLocked}
         value={selectedClip.fadeInMs / 1000}
         min={0}
-        max={5}
+        max={
+          isAudioClip(selectedClip)
+            ? getAudioFadeLimitSeconds(selectedClip.duration)
+            : Math.min(5, selectedClip.duration)
+        }
+        scrubMax={Math.min(5, selectedClip.duration)}
+        scrubValue={selectedClip.fadeInMs / 1000}
         step={0.05}
         onChange={(value) =>
           onUpdateClipFades(selectedClip.id, { fadeInMs: Math.max(0, Math.round(value * 1000)) })
@@ -37,7 +44,13 @@ function renderClipFadeFields(
         disabled={selectedTrackLocked}
         value={selectedClip.fadeOutMs / 1000}
         min={0}
-        max={5}
+        max={
+          isAudioClip(selectedClip)
+            ? getAudioFadeLimitSeconds(selectedClip.duration)
+            : Math.min(5, selectedClip.duration)
+        }
+        scrubMax={Math.min(5, selectedClip.duration)}
+        scrubValue={selectedClip.fadeOutMs / 1000}
         step={0.05}
         onChange={(value) =>
           onUpdateClipFades(selectedClip.id, { fadeOutMs: Math.max(0, Math.round(value * 1000)) })
@@ -62,6 +75,7 @@ function renderClipPlaybackRateField(
       label={translate('videoEditor.sidebar.playbackRateLabel')}
       disabled={selectedTrackLocked}
       value={playbackRate}
+      precision={4}
       min={VIDEO_EDITOR_PLAYBACK_RATE_MIN}
       max={VIDEO_EDITOR_PLAYBACK_RATE_MAX}
       step={0.01}

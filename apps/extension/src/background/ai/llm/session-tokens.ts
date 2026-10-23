@@ -108,6 +108,14 @@ export function resolveLlmSessionSenderKey(
     isOwnedExtensionPagePath(sender.url, 'apps/extension/src/gallery/index.html')
   )
     return `review-text:document:${sender.documentId}`;
+  if (
+    purpose === 'review-text' &&
+    sender.id === chrome.runtime.id &&
+    sender.frameId === 0 &&
+    sender.documentId &&
+    isOwnedExtensionPagePath(sender.url, 'apps/extension/src/video-editor/index.html')
+  )
+    return `review-text:project:document:${sender.documentId}`;
   return null;
 }
 

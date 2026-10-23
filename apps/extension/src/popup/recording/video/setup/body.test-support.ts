@@ -57,7 +57,6 @@ export function createBodyViewModel(selectedPreset: ReturnType<typeof createSele
     controlledCursorDisabled: true,
     controlledCursorDisabledReason: 'Desktop app required',
     currentModeCapability: { supported: true, reason: null },
-    galleryTitle: 'Gallery title',
     knownOutputBasisDimensions: { height: selectedPreset.height, width: selectedPreset.width },
     selectedPreset,
     startButtonLabel: 'Start recording',

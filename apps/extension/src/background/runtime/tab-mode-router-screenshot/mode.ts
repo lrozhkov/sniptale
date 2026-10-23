@@ -10,7 +10,10 @@ import {
   enablePreparationByCapability,
 } from '../../capture/routes';
 import { createWebSnapshotViewerPorts, type WebSnapshotViewerPorts } from '../../capture/lifecycle';
-import { releaseQuickActionSurface } from '../../capture/quick-actions/flow/surface';
+import {
+  assertBorrowedQuickActionSurfaceTransaction,
+  releaseQuickActionSurface,
+} from '../../capture/quick-actions/flow/surface';
 import { getCaptureSurfaceService } from '../../capture-surface';
 import {
   authorizeScreenshotSurfaceMutation,
@@ -343,6 +346,7 @@ export async function disableScreenshotModeForContent(
   args: DisableScreenshotModeArgs & {
     leaseGeneration: number | null | undefined;
     operationGeneration: number | undefined;
+    quickActionTransactionId?: string;
     senderDocumentId: string | null | undefined;
     surfaceCapabilityToken: string | undefined;
   }
@@ -360,6 +364,11 @@ export async function disableScreenshotModeForContent(
       throw new Error('authorization-expired');
     }
     if (
+      args.quickActionTransactionId !== undefined &&
+      !assertBorrowedQuickActionSurfaceTransaction(args.tabId, args.quickActionTransactionId)
+    )
+      return;
+    if (
       !claimScreenshotModeDisable({
         capabilityToken: surfaceCapabilityToken,
         documentId: args.senderDocumentId,
@@ -369,6 +378,14 @@ export async function disableScreenshotModeForContent(
       })
     ) {
       throw new Error('stale-generation');
+    }
+    if (args.quickActionTransactionId !== undefined) {
+      await releaseQuickActionSurface(
+        args.tabId,
+        args.viewportState,
+        args.quickActionTransactionId
+      );
+      return;
     }
     await disableScreenshotModeOperation(args);
   });

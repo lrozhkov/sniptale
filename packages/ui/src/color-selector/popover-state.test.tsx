@@ -178,6 +178,21 @@ it('preserves alpha across channel edits and clamps manual alpha changes', () =>
   expect(getColor().resolvedColor).toBe('#ff000000');
 });
 
+it('preserves exact RGB bytes when changing only alpha across repeated edits', () => {
+  renderHarness(() => ({ color: usePickerColorState('#2563eb') }));
+  const getColor = () => hookState['color'] as ReturnType<typeof usePickerColorState>;
+  for (const [alpha, expected] of [
+    ['70', '#2563ebb3'],
+    ['0', '#2563eb00'],
+    ['100', '#2563eb'],
+  ] as const) {
+    act(() => {
+      getColor().handleAlphaChange(alpha);
+    });
+    expect(getColor().resolvedColor).toBe(expected);
+  }
+});
+
 it('exposes eyedropper pressed state, resolves picked colors, and clears on unmount', async () => {
   let resolvePick: ((result: { sRGBHex: string }) => void) | null = null;
   const onColorChange = vi.fn();

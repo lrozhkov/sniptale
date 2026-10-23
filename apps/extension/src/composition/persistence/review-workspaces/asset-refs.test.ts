@@ -693,7 +693,7 @@ it('finds the exact audio clip in current, history and recovery without confusin
 
 it('retains remembered watermark logos across portable current, history and recovery', async () => {
   const { createQuickEditWatermark } =
-    await import('../../../features/video/review/advanced/watermark');
+    await import('../../../features/video/project/scene/watermark');
   const { reviewWorkspaceHasWatermarkImage } = await import('./asset-refs');
   const logo = (id: string) => ({
     ...createQuickEditWatermark('Saved text'),

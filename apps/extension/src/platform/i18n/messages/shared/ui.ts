@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const sharedUiMessages = defineMessageSource({
+  numericOutsideSliderRange: { ru: 'Вне шкалы слайдера', en: 'Outside slider range' },
   clearField: {
     ru: 'Очистить поле «{field}»',
     en: 'Clear {field}',

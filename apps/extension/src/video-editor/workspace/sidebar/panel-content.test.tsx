@@ -61,6 +61,7 @@ function createPanelActionProps() {
     onDeleteProject: vi.fn(),
     onAddRecording: vi.fn(),
     onImportImage: vi.fn(),
+    onPreviewMotion: vi.fn(),
     onSetSceneBackground: vi.fn(),
     onResizeProject: vi.fn(),
     onEnableCursorTrack: vi.fn(),
@@ -108,6 +109,7 @@ describe('workspace-sidebar/panel-content', () => {
 
     expect(selectionBodyMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        onPreviewMotion: props.onPreviewMotion,
         onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack,
         onConvertTextClipToAnnotation: props.onConvertTextClipToAnnotation,
         onRenameTrack: props.onRenameTrack,

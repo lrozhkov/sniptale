@@ -1,4 +1,7 @@
-import { DEFAULT_WINDOW_HEADER, parseWindowHeader } from '../../browser-frame/header';
+import {
+  DEFAULT_WINDOW_HEADER,
+  parseWindowHeader,
+} from '@sniptale/runtime-contracts/window-header';
 import type { EditorDocument } from './types';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import {

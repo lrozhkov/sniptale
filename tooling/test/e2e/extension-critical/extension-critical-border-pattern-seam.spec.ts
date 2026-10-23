@@ -7,8 +7,8 @@ test('rotating border patterns cross the closed seam like an uninterrupted strai
 }, info) => {
   const bundle = await build({
     stdin: {
-      contents: `export { drawReviewBorders } from './apps/extension/src/workflows/video-review/render-border';
-export { quickEditBorderPath } from './apps/extension/src/features/video/review/advanced/border';`,
+      contents: `export { drawSceneBorders } from './apps/extension/src/features/video/composition/draw/border';
+export { sceneBorderPath } from './apps/extension/src/features/video/composition/scene-border';`,
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -19,7 +19,7 @@ export { quickEditBorderPath } from './apps/extension/src/features/video/review/
   const results = await page.evaluate(async (source) => {
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
     try {
-      const { drawReviewBorders, quickEditBorderPath } = await import(url);
+      const { drawSceneBorders, sceneBorderPath } = await import(url);
       const actual = document.createElement('canvas');
       const expected = document.createElement('canvas');
       actual.width = expected.width = 420;
@@ -34,7 +34,7 @@ export { quickEditBorderPath } from './apps/extension/src/features/video/review/
           for (const width of [1.5, 4, 9])
             for (const style of ['dashed', 'dotted']) {
               const rect = { x: 20, y: 30, width: 363.125, height };
-              const geometry = quickEditBorderPath(rect, radius, true);
+              const geometry = sceneBorderPath(rect, radius, true);
               const pitch =
                 geometry.perimeter /
                 Math.max(
@@ -46,7 +46,7 @@ export { quickEditBorderPath } from './apps/extension/src/features/video/review/
                 const offset = (phase * pitch) / 13;
                 context.clearRect(0, 0, actual.width, actual.height);
                 reference.clearRect(0, 0, expected.width, expected.height);
-                drawReviewBorders(context, actual, [
+                drawSceneBorders(context, actual, [
                   {
                     id: 'border',
                     ...geometry,

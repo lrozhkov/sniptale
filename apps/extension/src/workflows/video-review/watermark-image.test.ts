@@ -3,7 +3,7 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { AssetReadyJournal, AssetRef } from '../../composition/persistence/assets/contracts';
 import { createMediaLibraryEntry } from '../../composition/persistence/projects/index.storage.test-support';
 import { betaV1Fixture } from '../../composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 
 const harness = vi.hoisted(() => ({
   database: vi.fn(),

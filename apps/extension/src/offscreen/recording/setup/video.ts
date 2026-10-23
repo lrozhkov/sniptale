@@ -2,10 +2,6 @@ import { AudioMixer } from '../stream/audio-mixer';
 import { recordingContext } from '../context';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import {
-  buildMicrophoneAudioConstraints,
-  resolveMicrophoneGain,
-} from '@sniptale/runtime-contracts/video/types/microphone-processing';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingSetup' });
 
@@ -21,22 +17,14 @@ async function attachDirectMicrophoneTrack(
 ): Promise<void> {
   const videoTracks = recordingContext.videoStream?.getVideoTracks();
   if (!videoTracks?.length) return;
-  if (resolveMicrophoneGain(settings) !== 1) {
-    recordingContext.audioMixer = new AudioMixer();
-    await recordingContext.audioMixer.initialize();
-    await recordingContext.audioMixer.addMicrophone(settings);
-    recordingContext.videoStream = new MediaStream([
-      ...videoTracks,
-      ...recordingContext.audioMixer.getMixedStream().getAudioTracks(),
-    ]);
-    return;
-  }
-  const microphoneStream = await navigator.mediaDevices.getUserMedia({
-    audio: buildMicrophoneAudioConstraints(settings),
-  });
+  recordingContext.audioMixer = new AudioMixer(
+    recordingContext.createMicrophoneObservationCallback()
+  );
+  await recordingContext.audioMixer.initialize();
+  await recordingContext.audioMixer.addMicrophone(settings);
   recordingContext.videoStream = new MediaStream([
     ...videoTracks,
-    ...microphoneStream.getAudioTracks(),
+    ...recordingContext.audioMixer.getMixedStream().getAudioTracks(),
   ]);
 }
 
@@ -50,7 +38,9 @@ export async function attachMicrophoneAudioIfEnabled(settings: VideoRecordingSet
     }
     return;
   }
-  recordingContext.audioMixer = new AudioMixer();
+  recordingContext.audioMixer = new AudioMixer(
+    recordingContext.createMicrophoneObservationCallback()
+  );
   await recordingContext.audioMixer.initialize();
   if (recordingContext.sourceStream) {
     await recordingContext.audioMixer
@@ -72,7 +62,9 @@ export async function prepareStableTabRecordingAudio(settings: VideoRecordingSet
   const videoTracks = recordingContext.videoStream?.getVideoTracks();
   if (!videoTracks?.length) return;
 
-  recordingContext.audioMixer = new AudioMixer();
+  recordingContext.audioMixer = new AudioMixer(
+    recordingContext.createMicrophoneObservationCallback()
+  );
   await recordingContext.audioMixer.initialize();
   if (settings.systemAudioEnabled && recordingContext.sourceStream) {
     await recordingContext.audioMixer

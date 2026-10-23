@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../ui/native-hints', () => ({ NativeHints: () => null }));
 
 const settingsPageMocks = vi.hoisted(() => ({
   loadSettingsMock: vi.fn(),
@@ -11,6 +13,14 @@ const settingsPageMocks = vi.hoisted(() => ({
   useAppLocaleMock: vi.fn(),
   useCommandPaletteHotkeyMock: vi.fn(),
   useSettingsStoreMock: vi.fn(),
+  mediaAccessProviderMock: vi.fn(),
+}));
+
+vi.mock('../../runtime/recording-media-access/provider', () => ({
+  RecordingMediaAccessProvider: ({ children }: { children: ReactNode }) => {
+    settingsPageMocks.mediaAccessProviderMock();
+    return children;
+  },
 }));
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
@@ -161,6 +171,7 @@ function clickButton(label: string) {
 }
 
 function expectSettingsPageShell() {
+  expect(settingsPageMocks.mediaAccessProviderMock).toHaveBeenCalled();
   expect(container?.querySelector('[data-ui="settings.page.root"]')?.className).toContain(
     'sniptale-settings-workspace'
   );

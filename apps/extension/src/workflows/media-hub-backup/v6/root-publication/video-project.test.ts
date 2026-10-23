@@ -1,3 +1,5 @@
+import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance/integrity';
+import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
 import { annotationReviewFixture } from './media.review-assets.test-support';
 import { encodePortableReviewAssetRefs } from '../../../../composition/persistence/review-workspaces/asset-refs';
 import { materializeWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage-format';
@@ -569,3 +571,139 @@ it.each(
     expect(vi.mocked(readAssetFile)).toHaveBeenCalledOnce();
   }
 });
+
+it('restores Native effect snapshot resource bytes without passing Blobs through the JSON decoder', async () => {
+  const fixture = await annotationReviewFixture();
+  const { assets, ...snapshot } = fixture.snapshot;
+  const resource = assets[0]!;
+  const { assetId: _assetId, ...resourceMetadata } = resource;
+  const file = new File([fixture.blob], 'mark.svg', { type: fixture.blob.type });
+  const nativeSnapshot = { ...snapshot, assets: [{ ...resourceMetadata, blob: file }] };
+  const entry = createVideoProjectEntry(
+    { id: 'p', effectSnapshots: [nativeSnapshot] },
+    { id: 'p' }
+  );
+  expect(parseVideoProjectEntry(entry)).not.toBeNull();
+  await verifyVideoProjectEffectSnapshotIntegrity(entry.project);
+  const portableProject = encodePortableVideoProjectAssetRefs({
+    ...entry.project,
+    effectSnapshots: [],
+  });
+  if (!isRecord(portableProject)) throw new Error('Invalid portable project fixture');
+  const metadata = {
+    entry: {
+      ...entry,
+      project: {
+        ...portableProject,
+        effectSnapshots: [
+          { ...snapshot, assets: [{ ...resourceMetadata, objectId: 'mark-object' }] },
+        ],
+      },
+    },
+    projectAssets: [],
+    projectExports: [],
+  };
+  assertPortableJson(metadata);
+  const { readAssetFile } = await import('../../../../composition/persistence/assets');
+  vi.mocked(readAssetFile).mockResolvedValue(file);
+  const values = new Map<string, unknown[]>();
+  mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
+  await videoProjectRootPublisher.publish(
+    publishArgs(metadata, [stagedObject('mark-object', 'mark-bytes', file.type, file.size)])
+  );
+  const restored = parseVideoProjectEntry(values.get('video_projects')?.[0]);
+  expect(restored).not.toBeNull();
+  const restoredBlob = restored!.project.effectSnapshots![0]!.assets[0]!.blob;
+  expect(restoredBlob).toBeInstanceOf(Blob);
+  await verifyVideoProjectEffectSnapshotIntegrity(restored!.project);
+  expect(await restoredBlob.arrayBuffer()).toEqual(await file.arrayBuffer());
+  expect(restored!.project.effectSnapshots![0]).toMatchObject({
+    ...snapshot,
+    assets: [resourceMetadata],
+  });
+  expect(entry.project.effectSnapshots![0]!.assets[0]!.blob).toBe(file);
+  const originalBytes = await file.arrayBuffer();
+  vi.spyOn(file, 'arrayBuffer').mockRejectedValue(
+    new DOMException('Staging file removed', 'NotFoundError')
+  );
+  expect(await restoredBlob.arrayBuffer()).toEqual(originalBytes);
+  expect(mocks.checkpoint).toHaveBeenCalledOnce();
+});
+
+it.each(['resource', 'source', 'closure'] as const)(
+  'refuses direct Native snapshot %s corruption before replacing the existing project',
+  async (mode) => {
+    const fixture = await annotationReviewFixture();
+    const { assets, ...snapshot } = fixture.snapshot;
+    const { assetId: _assetId, ...resource } = assets[0]!;
+    const originalFile = new File([fixture.blob], 'mark.svg', { type: fixture.blob.type });
+    const original = createVideoProjectEntry(
+      {
+        id: 'p',
+        effectSnapshots: [{ ...snapshot, assets: [{ ...resource, blob: originalFile }] }],
+      },
+      { id: 'p' }
+    );
+    await verifyVideoProjectEffectSnapshotIntegrity(original.project);
+    const source =
+      mode === 'source'
+        ? snapshot.source.replace('Neutral runtime conformance', 'Neutram runtime conformance')
+        : snapshot.source;
+    if (mode === 'source') expect(source).not.toBe(snapshot.source);
+    const resourceMetadata = {
+      ...resource,
+      ...(mode === 'closure' ? { id: 'different-resource' } : {}),
+    };
+    const file =
+      mode === 'resource'
+        ? new File([(await fixture.blob.text()).replace('width="1"', 'width="2"')], 'mark.svg', {
+            type: fixture.blob.type,
+          })
+        : originalFile;
+    const candidate = {
+      ...original,
+      project: {
+        ...original.project,
+        effectSnapshots: [{ ...snapshot, source, assets: [{ ...resourceMetadata, blob: file }] }],
+      },
+    };
+    expect(parseVideoProjectEntry(candidate)).not.toBeNull();
+    await expect(
+      verifyVideoProjectEffectSnapshotIntegrity(candidate.project)
+    ).rejects.toMatchObject({ code: 'effectSnapshotIntegrityFailure' });
+    const portable = encodePortableVideoProjectAssetRefs({
+      ...candidate.project,
+      effectSnapshots: [],
+    });
+    if (!isRecord(portable)) throw new Error('Invalid portable corruption fixture');
+    const metadata = {
+      entry: {
+        ...candidate,
+        project: {
+          ...portable,
+          effectSnapshots: [
+            { ...snapshot, source, assets: [{ ...resourceMetadata, objectId: 'direct-resource' }] },
+          ],
+        },
+      },
+      projectAssets: [],
+      projectExports: [],
+    };
+    assertPortableJson(metadata);
+    const { readAssetFile } = await import('../../../../composition/persistence/assets');
+    vi.mocked(readAssetFile).mockResolvedValue(file);
+    const values = new Map<string, unknown[]>([['video_projects', [original]]]);
+    mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
+    const args = publishArgs(metadata, [
+      stagedObject('direct-resource', 'direct-bytes', file.type, file.size),
+    ]);
+    args.session = { ...args.session, strategy: 'replace' };
+    await expect(videoProjectRootPublisher.publish(args)).rejects.toMatchObject({
+      code: 'effectSnapshotIntegrityFailure',
+    });
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(mocks.checkpoint).not.toHaveBeenCalled();
+    expect(values.get('video_projects')).toEqual([original]);
+    await verifyVideoProjectEffectSnapshotIntegrity(original.project);
+  }
+);

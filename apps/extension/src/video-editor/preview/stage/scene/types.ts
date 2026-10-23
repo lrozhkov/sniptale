@@ -12,6 +12,7 @@ import type { VideoPreviewExactFrameCache } from '../../cache/exact-frame-cache'
 
 export interface PreviewStageCanvasSceneParams {
   activeClips: VideoProjectClip[];
+  assetUrls?: Record<string, string>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   currentTime: number;
   effectRuntimeFeedback: PreviewEffectRuntimeFeedback;

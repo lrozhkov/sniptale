@@ -1,4 +1,8 @@
 import {
+  createBookendImagePresentation,
+  createBookendVideoPresentation,
+} from '../../features/video/project/scene/bookend-media';
+import {
   parseQuickEditPresentationSettings,
   presentationEdgeControl,
   type QuickEditPresentationSettings,
@@ -128,20 +132,18 @@ export function attachedPresentationSettings(
   assetId: string
 ): Settings {
   const before = initial[slot];
-  const framing = { fit: 'contain', fillColor: '#000000ff', crop: { panX: 0, panY: 0 } } as const;
   const variant =
     media.kind === 'image'
       ? {
-          ...framing,
+          ...createBookendImagePresentation(),
           ...before.image,
           assetId,
           ...(media.filename === undefined ? {} : { filename: media.filename }),
           width: media.width,
           height: media.height,
-          duration: before.image?.duration ?? 3,
         }
       : {
-          ...framing,
+          ...createBookendVideoPresentation(media.source.duration),
           ...before.video,
           assetId,
           ...(media.filename === undefined ? {} : { filename: media.filename }),

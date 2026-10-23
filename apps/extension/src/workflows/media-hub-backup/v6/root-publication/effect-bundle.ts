@@ -2,7 +2,7 @@ import {
   appendCommittedArchiveRootInTransaction,
   readAssetFile,
 } from '../../../../composition/persistence/assets';
-import { putEffectBundleBackupRestore } from '../../../../composition/persistence/effect-bundles/backup-restore';
+import { prepareEffectBundleBackupRestore } from '../../../../composition/persistence/effect-bundles/backup-restore';
 import {
   ASSET_OPERATIONS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -52,32 +52,41 @@ export const effectBundleRootPublisher: ArchiveRootPublisher = {
       })
     );
     const { assets: _assets, ...entry } = metadata.entry;
+    const publishCatalog = await prepareEffectBundleBackupRestore({ assets, entry });
     const rootKey = `media:effect-bundle:${envelope.descriptor.rootId}`;
     let targetPackId = metadata.entry.packId;
     let conflicted = false;
     let imported = false;
     await runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction([VIDEO_EFFECT_BUNDLES_STORE, ASSET_OPERATIONS_STORE], 'readwrite');
-      const restored = await putEffectBundleBackupRestore({
-        assets,
-        entry,
-        store: tx.objectStore(VIDEO_EFFECT_BUNDLES_STORE),
-        strategy: session.strategy,
-      });
-      targetPackId = restored.packId;
-      conflicted = restored.conflicted;
-      imported = restored.imported;
-      await appendCommittedArchiveRootInTransaction(
-        tx.objectStore(ASSET_OPERATIONS_STORE),
-        session.operationId,
-        {
-          rootKey,
-          targetRootId: targetPackId,
-          imported,
-          conflicted: restored.conflicted,
+      try {
+        const restored = await publishCatalog({
+          store: tx.objectStore(VIDEO_EFFECT_BUNDLES_STORE),
+          strategy: session.strategy,
+        });
+        targetPackId = restored.packId;
+        conflicted = restored.conflicted;
+        imported = restored.imported;
+        await appendCommittedArchiveRootInTransaction(
+          tx.objectStore(ASSET_OPERATIONS_STORE),
+          session.operationId,
+          {
+            rootKey,
+            targetRootId: targetPackId,
+            imported,
+            conflicted: restored.conflicted,
+          }
+        );
+        await tx.done;
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {
+          /* The transaction may already have aborted. */
         }
-      );
-      await tx.done;
+        await tx.done.catch(() => undefined);
+        throw error;
+      }
     });
     return { conflicted, imported, retainedAssetIds: [] };
   },

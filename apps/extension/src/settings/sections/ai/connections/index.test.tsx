@@ -68,6 +68,7 @@ afterEach(() => {
 it('renders the loading owner state when ai providers data is still loading', async () => {
   aiProvidersSectionMocks.useAiProvidersSectionMock.mockReturnValue({
     isLoading: true,
+    models: [],
   });
 
   await renderSection();
@@ -75,6 +76,22 @@ it('renders the loading owner state when ai providers data is still loading', as
   expect(container?.textContent).toContain('loading');
   expect(aiProvidersSectionMocks.loadingStateMock).toHaveBeenCalledTimes(1);
   expect(aiProvidersSectionMocks.contentMock).not.toHaveBeenCalled();
+});
+
+it('keeps populated model content mounted during the move owner refresh', async () => {
+  const state = {
+    isLoading: false,
+    models: [
+      { id: 'model-1', providerId: 'provider-1', modelCode: 'fixture', displayName: 'Fixture' },
+    ],
+  };
+  aiProvidersSectionMocks.useAiProvidersSectionMock.mockReturnValue(state);
+  await renderSection();
+  const content = container?.querySelector('[data-testid="ai-providers-content"]');
+  state.isLoading = true;
+  await renderSection();
+  expect(container?.querySelector('[data-testid="ai-providers-content"]')).toBe(content);
+  expect(aiProvidersSectionMocks.loadingStateMock).not.toHaveBeenCalled();
 });
 
 it('renders the content owner state once ai providers data is ready', async () => {

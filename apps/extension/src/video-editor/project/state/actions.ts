@@ -1,3 +1,7 @@
+import { createVideoEditorSourceVoiceoverActions } from './source-voiceover';
+import { createCompositionJoinUpdateAction } from './joins';
+import { createBookendPresetUpdateAction } from './bookend-presets';
+import { createVideoEditorProjectCommentActions } from './comments';
 import { getProjectAssetUseCounts } from '../../../features/video/project/media-usage';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import type {
@@ -24,6 +28,11 @@ type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 type VideoEditorStoreGet = VideoEditorProjectSliceGet;
 
 type VideoEditorProjectActionKeys =
+  | 'editSourceVoiceover'
+  | 'deleteSourceVoiceover'
+  | 'duplicateSourceVoiceover'
+  | 'addCommentDocument'
+  | 'editCommentDocument'
   | 'renameProject'
   | 'renameTrack'
   | 'addTrackLogicalLane'
@@ -42,6 +51,9 @@ type VideoEditorProjectActionKeys =
   | 'addAssetClip'
   | 'placeMaterial'
   | 'appendMaterial'
+  | 'placeBookendMaterial'
+  | 'updateBookendPresets'
+  | 'updateCompositionJoins'
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'addAnnotationOverlay'
@@ -69,6 +81,8 @@ type VideoEditorProjectActionKeys =
   | 'updateMediaClipFitScalePercent'
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
+  | 'updateMediaClipShadowColor'
+  | 'editMediaClip'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
   | 'applyEffectDocument'
@@ -78,6 +92,8 @@ type VideoEditorProjectActionKeys =
   | 'selectEffectInstance'
   | 'setEffectTargetBypassed'
   | 'setClipEffectsBypassed'
+  | 'restoreEffectSourceRange'
+  | 'updateEffectAttachment'
   | 'updateEffectInstance'
   | 'upsertObjectTrack'
   | 'deleteObjectTrack'
@@ -136,6 +152,10 @@ export function createVideoEditorProjectActions(
   };
 
   return {
+    updateBookendPresets: createBookendPresetUpdateAction(set),
+    updateCompositionJoins: createCompositionJoinUpdateAction(set),
+    ...createVideoEditorProjectCommentActions(set),
+    ...createVideoEditorSourceVoiceoverActions(set),
     ...trackActions,
     upsertAsset: (asset) => upsertAssets([asset]),
     upsertAssets,

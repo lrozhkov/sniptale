@@ -1,3 +1,5 @@
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import type { VideoProjectSceneBackground } from '../../../features/video/project/types';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { drawExportSceneBackground } from './background';
 
@@ -7,7 +9,10 @@ const {
   resolveSceneBackgroundAudioEnvelopeMock,
 } = vi.hoisted(() => ({
   drawSceneBackgroundMock: vi.fn(),
-  getProjectSceneBackgroundMock: vi.fn(() => ({ color: '#000000', kind: 'solid' })),
+  getProjectSceneBackgroundMock: vi.fn<() => VideoProjectSceneBackground>(() => ({
+    color: '#000000',
+    kind: 'solid',
+  })),
   resolveSceneBackgroundAudioEnvelopeMock: vi.fn(() => 0.5),
 }));
 
@@ -33,7 +38,7 @@ beforeEach(() => {
 
 it('draws export backgrounds with the shared time-aware resolver inputs', () => {
   const context = {} as CanvasRenderingContext2D;
-  const project = { id: 'project' } as never;
+  const project = { id: 'project', width: 640 } as never;
   const loadedImages = { image: {} as HTMLImageElement };
 
   drawExportSceneBackground({
@@ -48,6 +53,7 @@ it('draws export backgrounds with the shared time-aware resolver inputs', () => 
   expect(resolveSceneBackgroundAudioEnvelopeMock).toHaveBeenCalledWith(project, 3);
   expect(getProjectSceneBackgroundMock).toHaveBeenCalledWith(project);
   expect(drawSceneBackgroundMock).toHaveBeenCalledWith({
+    projectScale: 2,
     audioEnvelope: 0.5,
     context,
     currentTime: 3,
@@ -74,7 +80,7 @@ it('reuses a static background cache when the background key is unchanged', () =
     currentTime: 3,
     height: 720,
     loadedImages: {},
-    project: { id: 'project' } as never,
+    project: { id: 'project', width: 640 } as never,
     width: 1280,
   };
 
@@ -108,7 +114,7 @@ it('uses document-backed buffers for cached image backgrounds when OffscreenCanv
     currentTime: 3,
     height: 720,
     loadedImages: {},
-    project: { id: 'project' } as never,
+    project: { id: 'project', width: 640 } as never,
     width: 1280,
   });
 
@@ -122,7 +128,7 @@ it('falls back to uncached drawing for dynamic or unavailable cache buffers', ()
   vi.stubGlobal('OffscreenCanvas', undefined);
   vi.stubGlobal('document', undefined);
   const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
-  const project = { id: 'project' } as never;
+  const project = { id: 'project', width: 640 } as never;
 
   getProjectSceneBackgroundMock.mockReturnValue({ colors: [], kind: 'gradient' } as never);
   drawExportSceneBackground({
@@ -148,4 +154,98 @@ it('falls back to uncached drawing for dynamic or unavailable cache buffers', ()
 
   expect(drawSceneBackgroundMock).toHaveBeenCalledTimes(2);
   expect(context.drawImage).not.toHaveBeenCalled();
+});
+
+it('invalidates cached image paint for blur, fit, source and authored pixel scale changes', () => {
+  const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+  class CanvasMock {
+    getContext = () => ({});
+    constructor(_w: number, _h: number) {}
+  }
+  vi.stubGlobal('OffscreenCanvas', CanvasMock);
+  const cache = { buffer: null, key: null };
+  const params = {
+    cache,
+    context,
+    currentTime: 0,
+    height: 180,
+    loadedImages: {},
+    project: { width: 320 } as never,
+    width: 320,
+  };
+  for (const background of [
+    { kind: 'image', assetId: 'image', blur: 0 },
+    { kind: 'image', assetId: 'image', blur: 12 },
+    { kind: 'image', assetId: 'image', blur: 12, imageFit: 'contain' },
+    { kind: 'image', assetId: 'other', blur: 12, imageFit: 'contain' },
+  ]) {
+    getProjectSceneBackgroundMock.mockReturnValue(background as never);
+    const before = drawSceneBackgroundMock.mock.calls.length;
+    drawExportSceneBackground(params);
+    drawExportSceneBackground(params);
+    expect(drawSceneBackgroundMock.mock.calls.length).toBe(before + 1);
+  }
+  drawExportSceneBackground({ ...params, project: { width: 640 } as never });
+  expect(drawSceneBackgroundMock).toHaveBeenCalledTimes(5);
+});
+
+it('retries a failed static raster instead of publishing an incomplete cached surface', () => {
+  const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+  class CanvasMock {
+    getContext = () => ({});
+    constructor(_w: number, _h: number) {}
+  }
+  vi.stubGlobal('OffscreenCanvas', CanvasMock);
+  getProjectSceneBackgroundMock.mockReturnValue({
+    kind: 'image',
+    assetId: 'image',
+    blur: 12,
+  } as never);
+  const cache = { buffer: null, key: null };
+  const params = {
+    cache,
+    context,
+    currentTime: 0,
+    height: 180,
+    loadedImages: {},
+    project: { width: 320 } as never,
+    width: 320,
+  };
+  drawSceneBackgroundMock.mockImplementationOnce(() => {
+    throw new Error('native filter failed');
+  });
+  expect(() => drawExportSceneBackground(params)).toThrow('native filter failed');
+  expect(cache.key).toBeNull();
+  expect(context.drawImage).not.toHaveBeenCalled();
+  drawExportSceneBackground(params);
+  expect(drawSceneBackgroundMock).toHaveBeenCalledTimes(2);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+});
+
+it('keeps moving background cameras out of the static export cache', () => {
+  const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+  const buffer = {} as HTMLCanvasElement;
+  const cache = { buffer, key: JSON.stringify(['image', 1280, 720, 640, 'image-1', 'cover', 0]) };
+  const project = createEmptyVideoProject('Moving background');
+  project.width = 640;
+  getProjectSceneBackgroundMock.mockReturnValue({ assetId: 'image-1', kind: 'image' });
+  for (const viewportX of [20, 40]) {
+    const camera = { scale: 2, viewportX, viewportY: 30 };
+    drawExportSceneBackground({
+      context,
+      cache,
+      currentTime: 1,
+      width: 1280,
+      height: 720,
+      project,
+      loadedImages: {},
+      backgroundCamera: camera,
+    });
+    expect(drawSceneBackgroundMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ camera, projectScale: 2 })
+    );
+  }
+  expect(context.drawImage).not.toHaveBeenCalled();
+  expect(drawSceneBackgroundMock).toHaveBeenCalledTimes(2);
+  expect(cache.buffer).toBe(buffer);
 });

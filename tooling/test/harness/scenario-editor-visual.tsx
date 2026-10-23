@@ -8,6 +8,7 @@ import {
 import { clearScenarioSavedHistory } from '../../../apps/extension/src/composition/persistence/scenario/retention';
 import { createRoot } from 'react-dom/client';
 import { harnessReady } from './browser-mocks/browser-mocks';
+import { installPcmSpeechFixture } from './pcm-speech';
 import { ScenarioEditorPage } from '../../../apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage';
 import {
   createGuideProject,
@@ -128,6 +129,8 @@ async function seedGuide(projectId: string, withTour: boolean, withAccent: boole
 
 async function mountGuideHarness(): Promise<void> {
   await harnessReady;
+  if (new URLSearchParams(window.location.search).get('pcmSpeechFixture') === '1')
+    installPcmSpeechFixture('scenario');
   if (!(await getMediaLibraryEntry('guide-visual-library-image'))) {
     await saveScreenshotMediaAsset({
       id: 'guide-visual-library-image',
@@ -175,11 +178,12 @@ async function mountGuideHarness(): Promise<void> {
   initializeAppTheme(params.get('theme') === 'dark' ? 'dark' : 'light');
   await setLocalePreference(params.get('locale') === 'ru' ? 'ru' : 'en');
   const projectId = params.get('projectId') ?? 'guide-visual';
-  await seedGuide(
-    projectId,
-    params.get('tourFixture') === '1',
-    params.get('accentFixture') === '1'
-  );
+  if (params.get('skipSeed') !== '1')
+    await seedGuide(
+      projectId,
+      params.get('tourFixture') === '1',
+      params.get('accentFixture') === '1'
+    );
   if (params.get('clearHistory') === '1') {
     const project = await getScenarioProject(projectId);
     if (!project) throw new Error('Missing retention fixture');

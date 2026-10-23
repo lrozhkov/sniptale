@@ -62,7 +62,7 @@ export function TemplatesList(props: {
     if (action.type === 'toggle') props.onToggle(template.id, action.nextChecked);
   };
   const onMove = (intent: SettingsCollectionMoveIntent) => {
-    void props.onMove(intent.itemId, intent.beforeItemId);
+    return props.onMove(intent.itemId, intent.beforeItemId);
   };
   return (
     <SettingsCollection

@@ -224,7 +224,7 @@ it.each([false, true])(
         accent: '#fff',
         cornerRadius: 12,
         frame: { image: {} as CanvasImageSource, ...output },
-        spatialRenderer: { surface, draw, dispose: vi.fn() },
+        spatialRenderer: { validateSizes: vi.fn(), surface, draw, dispose: vi.fn() },
       });
     if (failure) expect(paint).toThrow('frame failed');
     else paint();

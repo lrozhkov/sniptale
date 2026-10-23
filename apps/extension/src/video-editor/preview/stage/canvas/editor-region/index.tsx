@@ -4,6 +4,7 @@ import { getCurrentLocale, translate } from '../../../../../platform/i18n';
 import type { PreviewStageCanvasProps } from '../../types';
 import {
   getCompositionRectStageStyle,
+  getCompositionPointStageStyle,
   mapClientPointToCompositionPoint,
   shouldLockPreviewClipToViewport,
 } from '../geometry';
@@ -60,6 +61,7 @@ function EditorRegionFrame(
     props.project,
     {
       ...model.rect,
+      rotation: model.placement.rotation,
       x: center.x - model.rect.width / 2,
       y: center.y - model.rect.height / 2,
     },
@@ -67,6 +69,8 @@ function EditorRegionFrame(
     lockedToViewport,
     stage
   );
+  if (style.display === 'none') return null;
+  const projected = Boolean(props.camera.spatial && !lockedToViewport);
   const label = resolveEffectLocaleText(model.document.editorRegion!.label, getCurrentLocale());
   const commit = (controls: Record<string, number>) =>
     props.onUpdateEffectInstance?.(model.instance.id, { controls });
@@ -98,63 +102,84 @@ function EditorRegionFrame(
       commit,
     });
   };
-  return (
-    <div
-      data-effect-editor-region={model.instance.id}
-      className="pointer-events-none absolute z-30 border border-dashed border-[var(--sniptale-color-accent-emphasis)]"
+  const handles = (['nw', 'ne', 'sw', 'se'] as const).map((handle) => (
+    <button
+      key={handle}
+      type="button"
+      aria-label={`${label}: ${translate(
+        (
+          {
+            nw: 'videoEditor.effectsLibrary.resizeRegionTopLeft',
+            ne: 'videoEditor.effectsLibrary.resizeRegionTopRight',
+            sw: 'videoEditor.effectsLibrary.resizeRegionBottomLeft',
+            se: 'videoEditor.effectsLibrary.resizeRegionBottomRight',
+          } as const
+        )[handle]
+      )}`}
+      data-effect-region-handle={handle}
+      className={[
+        'pointer-events-auto absolute z-30 -translate-x-1/2 -translate-y-1/2 rounded-full border',
+        projected ? 'h-3.5 w-3.5' : 'h-3 w-3',
+      ].join(' ')}
       style={{
-        ...style,
-        transform: `rotate(${model.placement.rotation}deg)`,
-        transformOrigin: 'center',
+        ...(projected
+          ? getCompositionPointStageStyle(
+              props.project,
+              mapRegionPoint(model, {
+                x: model.rect.x + (handle.includes('e') ? model.rect.width : 0),
+                y: model.rect.y + (handle.includes('s') ? model.rect.height : 0),
+              }),
+              props.camera,
+              false,
+              stage
+            )
+          : {
+              left: handle.includes('e') ? '100%' : '0%',
+              top: handle.includes('s') ? '100%' : '0%',
+            }),
+        background: 'var(--sniptale-color-surface-panel)',
+        borderColor: 'var(--sniptale-color-accent-emphasis)',
+        cursor: getPreviewTransformResizeCursor(handle, model.placement.rotation),
       }}
-    >
-      <button
-        type="button"
-        aria-label={label}
-        title={label}
-        data-video-editor-local-navigation="true"
-        className="pointer-events-auto absolute inset-0 cursor-grab bg-transparent focus-visible:outline"
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => begin(event, 'move')}
-        onKeyDown={(event) => {
-          const delta = {
-            ArrowLeft: [-1, 0],
-            ArrowRight: [1, 0],
-            ArrowUp: [0, -1],
-            ArrowDown: [0, 1],
-          }[event.key];
-          if (!delta) return;
-          event.preventDefault();
-          event.stopPropagation();
-          const step = event.shiftKey ? 10 : 1;
-          commit(resizeEditorRegion(model, 'move', delta[0]! * step, delta[1]! * step));
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => begin(event, handle)}
+      onKeyDown={(event) => {
+        const delta = {
+          ArrowLeft: [-1, 0],
+          ArrowRight: [1, 0],
+          ArrowUp: [0, -1],
+          ArrowDown: [0, 1],
+        }[event.key];
+        if (!delta) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const step = event.shiftKey ? 10 : 1;
+        commit(resizeEditorRegion(model, handle, delta[0]! * step, delta[1]! * step));
+      }}
+    />
+  ));
+  return (
+    <>
+      <div
+        data-effect-editor-region={model.instance.id}
+        className={[
+          'pointer-events-none absolute z-30 border border-dashed',
+          'border-[var(--sniptale-color-accent-emphasis)]',
+        ].join(' ')}
+        style={{
+          ...style,
+          transform: style.transform ?? `rotate(${model.placement.rotation}deg)`,
+          transformOrigin: style.transformOrigin ?? 'center',
         }}
-      />
-      {(['nw', 'ne', 'sw', 'se'] as const).map((handle) => (
+      >
         <button
-          key={handle}
           type="button"
-          aria-label={`${label}: ${translate(
-            (
-              {
-                nw: 'videoEditor.effectsLibrary.resizeRegionTopLeft',
-                ne: 'videoEditor.effectsLibrary.resizeRegionTopRight',
-                sw: 'videoEditor.effectsLibrary.resizeRegionBottomLeft',
-                se: 'videoEditor.effectsLibrary.resizeRegionBottomRight',
-              } as const
-            )[handle]
-          )}`}
-          data-effect-region-handle={handle}
-          className="pointer-events-auto absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border"
-          style={{
-            left: handle.includes('e') ? '100%' : '0%',
-            top: handle.includes('s') ? '100%' : '0%',
-            background: 'var(--sniptale-color-surface-panel)',
-            borderColor: 'var(--sniptale-color-accent-emphasis)',
-            cursor: getPreviewTransformResizeCursor(handle, model.placement.rotation),
-          }}
+          aria-label={label}
+          title={label}
+          data-video-editor-local-navigation="true"
+          className="pointer-events-auto absolute inset-0 cursor-grab bg-transparent focus-visible:outline"
           onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => begin(event, handle)}
+          onPointerDown={(event) => begin(event, 'move')}
           onKeyDown={(event) => {
             const delta = {
               ArrowLeft: [-1, 0],
@@ -166,10 +191,12 @@ function EditorRegionFrame(
             event.preventDefault();
             event.stopPropagation();
             const step = event.shiftKey ? 10 : 1;
-            commit(resizeEditorRegion(model, handle, delta[0]! * step, delta[1]! * step));
+            commit(resizeEditorRegion(model, 'move', delta[0]! * step, delta[1]! * step));
           }}
         />
-      ))}
-    </div>
+        {projected ? null : handles}
+      </div>
+      {projected ? handles : null}
+    </>
   );
 }

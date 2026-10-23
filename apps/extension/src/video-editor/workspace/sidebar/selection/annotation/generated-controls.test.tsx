@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -150,7 +150,7 @@ function registerCustomGeneratedControlTests() {
     expect(markup).toContain('Stored headline');
     expect(markup).toContain('Generated accent');
     expect(markup).toContain('Generated family');
-    expect(markup).toContain('shared.ui.compact-inspector.select-field');
+    expect(markup).toContain('shared.ui.compact-inspector.segmented-field');
     expect(markup).not.toContain('video-editor.selection.compact-field');
   });
 }
@@ -291,3 +291,119 @@ function setInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: str
   const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
   valueSetter?.call(input, value);
 }
+
+it('keeps the focused generated headline editor mounted across the former 72-character boundary', () => {
+  const props = createBuiltInProps(
+    APPLE_GLASS_ANNOTATION_PACK,
+    APPLE_GLASS_ANNOTATION_PACK.templates.title[0]!
+  );
+  props.clip.templateControlValues = {
+    ...props.clip.templateControlValues,
+    headline: 'a'.repeat(73),
+  };
+  function EditingControls() {
+    const [clip, setClip] = useState(props.clip);
+    return (
+      <AnnotationGeneratedControls
+        {...props}
+        clip={clip}
+        section={VideoAnnotationControlSection.CONTENT}
+        onUpdateAnnotationClipTemplate={(_id, patch) =>
+          setClip((current) => ({
+            ...current,
+            content: { ...current.content, ...patch.content },
+            templateControlValues: {
+              ...current.templateControlValues,
+              ...patch.templateControlValues,
+            },
+            templateSnapshot: patch.templateSnapshot ?? current.templateSnapshot,
+          }))
+        }
+      />
+    );
+  }
+  act(() => root!.render(<EditingControls />));
+  const editor = container!.querySelector<HTMLTextAreaElement>('textarea')!;
+  expect(editor).not.toBeNull();
+  editor.focus();
+  act(() => {
+    setInputValue(editor, 'b'.repeat(72));
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(container!.querySelector('textarea')).toBe(editor);
+  expect(document.activeElement).toBe(editor);
+  expect(editor.value).toBe('b'.repeat(72));
+});
+
+it('displays timeline milliseconds as editable seconds and writes native milliseconds', () => {
+  const props = createBuiltInProps(
+    APPLE_GLASS_ANNOTATION_PACK,
+    APPLE_GLASS_ANNOTATION_PACK.templates.title[0]!
+  );
+  act(() =>
+    root!.render(
+      <AnnotationGeneratedControls {...props} section={VideoAnnotationControlSection.MOTION} />
+    )
+  );
+  const duration = container!.querySelector<HTMLInputElement>(
+    'input[aria-label="videoEditor.sidebar.annotationTemplates.controls.durationMs"]'
+  )!;
+  expect(duration.value).toBe('2.2');
+  expect(container!.textContent).toContain('s');
+  act(() => {
+    duration.focus();
+    setInputValue(duration, '1.7');
+    duration.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => duration.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(props.onUpdateAnnotationClipTemplate).toHaveBeenCalledWith(
+    props.clip.id,
+    expect.objectContaining({
+      templateControlValues: expect.objectContaining({ durationMs: expect.closeTo(1700, 8) }),
+    })
+  );
+});
+
+it('labels known radius with pixels and leaves arbitrary imported numbers unitless', () => {
+  const template = createTemplate();
+  template.controls = [
+    ...template.controls,
+    {
+      id: 'radius',
+      label: { fallback: 'Radius' },
+      type: VideoAnnotationControlType.NUMBER,
+      defaultValue: 12,
+      min: 0,
+      max: 36,
+      binding: {
+        kind: VideoAnnotationControlBindingKind.NODE_PROPERTY,
+        nodeId: 'root',
+        property: 'radius',
+      },
+    },
+    {
+      id: 'opacity',
+      label: { fallback: 'Imported amount' },
+      type: VideoAnnotationControlType.NUMBER,
+      defaultValue: 0.5,
+      min: 0,
+      max: 1,
+      step: 0.1,
+      binding: {
+        kind: VideoAnnotationControlBindingKind.NODE_PROPERTY,
+        nodeId: 'root',
+        property: 'opacity',
+      },
+    },
+  ];
+  const props = createBuiltInProps(APPLE_GLASS_ANNOTATION_PACK, template);
+  act(() => root!.render(<AnnotationGeneratedControls {...props} />));
+  const radius = container!.querySelector<HTMLInputElement>('input[aria-label="Radius"]')!;
+  const amount = container!.querySelector<HTMLInputElement>('input[aria-label="Imported amount"]')!;
+  expect(
+    radius.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')?.textContent
+  ).toContain('px');
+  expect(
+    amount.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')?.textContent
+  ).not.toContain('px');
+});

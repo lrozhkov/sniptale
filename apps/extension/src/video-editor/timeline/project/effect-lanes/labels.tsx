@@ -1,4 +1,5 @@
-import { getTimelineUtilityRowPresence } from './segments';
+import { getTimelineMotionLayout, getTimelineUtilityRowPresence } from './segments';
+import { EFFECT_LANE_ROW_HEIGHT } from '../interaction-state/helpers';
 import { Eye, EyeOff, Lock, Unlock, Trash2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
@@ -34,6 +35,7 @@ export function ProjectTimelineEffectLaneLabelRows({
     <>
       {rows.motion ? (
         <ProjectTimelineUtilityLaneLabelRow
+          height={getTimelineMotionLayout(project).rowCount * EFFECT_LANE_ROW_HEIGHT}
           compactRows={compactRows}
           label={translate('videoEditor.timeline.motionLane')}
           lane="camera"
@@ -50,6 +52,7 @@ export function ProjectTimelineEffectLaneLabelRows({
 }
 
 function ProjectTimelineUtilityLaneLabelRow(props: {
+  height: number;
   compactRows: boolean;
   label: string;
   onSelect?: (() => void) | undefined;
@@ -62,6 +65,7 @@ function ProjectTimelineUtilityLaneLabelRow(props: {
 }) {
   return (
     <ProjectTimelineEffectLaneLabelRow
+      height={props.height}
       compactRows={props.compactRows}
       icon={getUtilityLaneIcon(props.lane)}
       title={props.label}

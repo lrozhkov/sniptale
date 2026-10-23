@@ -22,6 +22,7 @@ const {
   browserTabsGetMock,
   runtimeGetUrlMock,
   translateMock,
+  createWindowMock,
 } = vi.hoisted(() => ({
   captureSurfaceGetAvailabilityMock: vi.fn(),
   ensureLocaleHydratedMock: vi.fn(),
@@ -41,6 +42,11 @@ const {
   browserTabsGetMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
   translateMock: vi.fn((key: string, locale?: string) => (locale ? `${key}:${locale}` : key)),
+  createWindowMock: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/windows', () => ({
+  browserWindows: { create: createWindowMock },
 }));
 
 vi.mock('../../capture-surface', async (importOriginal) => ({
@@ -225,11 +231,36 @@ it('rejects a disabled explicit video preset', async () => {
   ).resolves.toBeNull();
 });
 
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP, CaptureMode.SCREEN])(
+  'hands off %s confirmation without starting recording or mutating settings',
+  async (mode) => {
+    createWindowMock.mockResolvedValueOnce({ id: 9 });
+    await startContextMenuVideoRecording(21, mode);
+    expect(startRecordingMock).not.toHaveBeenCalled();
+    expect(createWindowMock).toHaveBeenCalledOnce();
+    const options = createWindowMock.mock.calls[0]?.[0];
+    const url = new URL(options.url);
+    expect(options.type).toBe('popup');
+    expect(url.searchParams.get('videoLaunchMode')).toBe(mode);
+    expect(url.searchParams.get('videoLaunchTabId')).toBe('21');
+    expect(url.searchParams.has('videoLaunchPresetId')).toBe(false);
+  }
+);
+
+it('preserves a viewport preset in the confirmation handoff', async () => {
+  await startContextMenuVideoRecording(21, CaptureMode.TAB, true);
+  const url = new URL(createWindowMock.mock.calls[0]?.[0].url);
+  expect(url.searchParams.get('videoLaunchPresetId')).toBe('preset-alt');
+  expect(startRecordingMock).not.toHaveBeenCalled();
+});
+
 it('starts non-preset video recording without a viewport preset payload', async () => {
+  const settings = { ...contextMenuVideoSettingsFixture, warnWithoutMicrophone: false };
+  loadVideoSettingsMock.mockResolvedValueOnce(settings);
   await startContextMenuVideoRecording(21, CaptureMode.TAB);
   expect(startRecordingMock).toHaveBeenCalledWith(
     21,
-    contextMenuVideoSettingsFixture,
+    settings,
     CaptureMode.TAB,
     null,
     'chrome-extension://test/apps/extension/src/popup/index.html'
@@ -251,6 +282,8 @@ it('throws a translated error when preset recording has no resolvable preset', a
 });
 
 it('rechecks physical preset availability immediately before recording', async () => {
+  const settings = { ...contextMenuVideoSettingsFixture, warnWithoutMicrophone: false };
+  loadVideoSettingsMock.mockResolvedValueOnce(settings);
   await startContextMenuVideoRecording(21, CaptureMode.TAB, true);
 
   expect(captureSurfaceGetAvailabilityMock).toHaveBeenCalledWith({
@@ -260,7 +293,7 @@ it('rechecks physical preset availability immediately before recording', async (
   });
   expect(startRecordingMock).toHaveBeenCalledWith(
     21,
-    contextMenuVideoSettingsFixture,
+    settings,
     CaptureMode.TAB,
     'preset-alt',
     'chrome-extension://test/apps/extension/src/popup/index.html'

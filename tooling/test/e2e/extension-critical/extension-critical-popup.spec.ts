@@ -41,6 +41,383 @@ const MENU_STARTUP = {
   lastExportDestination: 'export',
 } as const;
 
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`popup result secondary actions and header strokes ${viewport.name} ${theme}`, async ({
+      page,
+      hostOrigin,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await applyHarnessBootstrap(page, {
+        apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+        runtimeResponses: {
+          [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
+          [VideoMessageType.GET_RECORDING_STATE]: {
+            success: true,
+            recordingHealth: 'healthy',
+            state: createRecordingRuntimeState(VideoRecordingStatus.IDLE),
+            postRecordResult: {
+              primaryRecordingId: 'result-1',
+              projectId: null,
+              recordingId: 'result-1',
+            },
+          },
+        },
+        storage: {
+          'sniptale-theme-preference': theme,
+          sniptale_popup_startup: {
+            selection: 'video',
+            lastPage: 'video',
+            lastExportDestination: 'export',
+          },
+        },
+      });
+      await openPopupHarness(page, hostOrigin);
+      await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+      const header = page.locator('[data-ui="popup.app.tabs"]');
+      const referenceStroke = await header
+        .locator('button[data-page="screenshots"] svg path')
+        .first()
+        .evaluate((node) => getComputedStyle(node).strokeWidth);
+      expect(referenceStroke).toBe('1.8px');
+      for (const route of ['tools', 'export']) {
+        expect(
+          await header
+            .locator(`button[data-page="${route}"] svg :is(g,path)`)
+            .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).strokeWidth))
+        ).toEqual(expect.arrayContaining([referenceStroke]));
+        expect(
+          await header
+            .locator(`button[data-page="${route}"] svg :is(g,path)`)
+            .evaluateAll((nodes) =>
+              nodes.every((node) => getComputedStyle(node).strokeWidth === '1.8px')
+            )
+        ).toBe(true);
+      }
+      const primary = page.getByRole('button', {
+        name: translate('popup.video.postRecordQuickEdit', 'ru'),
+        exact: true,
+      });
+      await expect(primary).toBeVisible();
+      for (const key of [
+        'postRecordOpenGallery',
+        'postRecordDownload',
+        'postRecordClose',
+      ] as const) {
+        const action = page.getByRole('button', {
+          name: translate(`popup.video.${key}`, 'ru'),
+          exact: true,
+        });
+        await expect(action).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      }
+      for (const key of ['postRecordQuickEdit', 'postRecordOpenEditor'] as const) {
+        const action = page.getByRole('button', {
+          name: translate(`popup.video.${key}`, 'ru'),
+          exact: true,
+        });
+        const icon = action.locator('svg');
+        const before = await action.boundingBox();
+        await expect(icon).toHaveCSS('scale', '1');
+        await action.hover();
+        await expect(icon).toHaveCSS('scale', '1.1');
+        expect(await action.boundingBox()).toEqual(before);
+        await page.mouse.move(1, 1);
+        await expect(icon).toHaveCSS('scale', '1');
+      }
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await primary.hover();
+      await expect(primary.locator('svg')).toHaveCSS('scale', '1');
+      await page.mouse.move(1, 1);
+      await page.screenshot({
+        path: info.outputPath('result-secondary-actions.png'),
+        fullPage: false,
+      });
+      await header.locator('button[data-page="export"]').click();
+      await expect(header.locator('button[data-page="export"]')).toHaveAttribute(
+        'data-active',
+        'true'
+      );
+      await expect(header.locator('button[data-page="export"] svg g').first()).toHaveCSS(
+        'stroke-width',
+        '1.8px'
+      );
+    });
+  }
+}
+
+for (const route of ['screenshots', 'video', 'export'] as const) {
+  test(`popup ${route} primary command keeps its target fixed through hover and press`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await page.setViewportSize({ width: 392, height: 560 });
+    await applyHarnessBootstrap(page, {
+      apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+      runtimeResponses: { [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE },
+      storage: {
+        sniptale_popup_startup: {
+          selection:
+            route === 'screenshots'
+              ? 'screenshots:tab'
+              : route === 'export'
+                ? 'export:download'
+                : 'video',
+          lastPage: route,
+          lastExportDestination: 'export',
+        },
+      },
+    });
+    await openPopupHarness(page, hostOrigin);
+    await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+    const action =
+      route === 'screenshots'
+        ? page.getByRole('button', {
+            name: translate('popup.home.captureButtonLabel', 'ru'),
+            exact: true,
+          })
+        : page.locator(
+            route === 'video'
+              ? '[data-ui="popup.video-setup.start-recording-button"]'
+              : '[data-ui="popup.export.export-button"]'
+          );
+    await expect(action).toBeEnabled();
+    await expect(action).toHaveCSS('height', '40px');
+    const resting = await action.boundingBox();
+    const background = await action.evaluate((node) => getComputedStyle(node).backgroundColor);
+    await action.hover();
+    await expect
+      .poll(() => action.evaluate((node) => getComputedStyle(node).backgroundColor))
+      .not.toBe(background);
+    await expect(action).toHaveCSS('outline-style', 'none');
+    const icon = action.locator(':scope > span').first();
+    const before = await icon.boundingBox();
+    await page.mouse.down();
+    await expect.poll(async () => (await icon.boundingBox())!.y - before!.y).toBeCloseTo(1, 1);
+    expect(await action.boundingBox()).toEqual(resting);
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
+    await expect.poll(async () => (await icon.boundingBox())!.y - before!.y).toBeCloseTo(0, 1);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await action.hover();
+    await page.mouse.down();
+    expect(await icon.boundingBox()).toEqual(before);
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(action).toBeFocused();
+    await expect(action).toHaveCSS('outline-style', 'solid');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await action.evaluate((node) => {
+      (node as HTMLButtonElement).disabled = true;
+    });
+    const disabled = await icon.boundingBox();
+    await page.mouse.move(resting!.x + resting!.width / 2, resting!.y + resting!.height / 2);
+    await page.mouse.down();
+    expect(await icon.boundingBox()).toEqual(disabled);
+    await page.mouse.up();
+  });
+}
+
+for (const route of ['screenshots', 'menu', 'tools', 'export'] as const) {
+  test(`popup ${route} failure retains its action inside the fixed popup`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize({ width: 392, height: 560 });
+    const messageType =
+      route === 'tools'
+        ? 'ENABLE_SCREENSHOT_MODE'
+        : route === 'export'
+          ? 'START_PAGE_PACKAGE_JOB'
+          : 'TRIGGER_SCREENSHOT_CAPTURE';
+    await applyHarnessBootstrap(page, {
+      apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+      runtimeResponses: {
+        [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
+        [messageType]: { success: false, error: 'Browser operation failed' },
+      },
+      storage: {
+        sniptale_popup_startup: {
+          selection:
+            route === 'screenshots'
+              ? 'screenshots:tab'
+              : route === 'export'
+                ? 'export:download'
+                : route,
+          lastPage: route,
+          lastExportDestination: 'export',
+        },
+      },
+    });
+    await openPopupHarness(page, hostOrigin);
+    await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+    const action =
+      route === 'tools'
+        ? page.locator('[data-ui="popup.home.tools.open"]')
+        : route === 'export'
+          ? page.locator('[data-ui="popup.export.export-button"]')
+          : page.getByRole('button', {
+              name: translate(
+                route === 'menu'
+                  ? 'popup.home.captureVisibleLabel'
+                  : 'popup.home.captureButtonLabel',
+                'ru'
+              ),
+              exact: true,
+            });
+    await expect(action).toBeEnabled();
+    await action.click();
+    const error = page.locator('.popup-error-message[role="alert"]').first();
+    await expect(error).toBeVisible();
+    await expect(error).not.toHaveText('');
+    await expect(action).toBeVisible();
+    await expect(action).toBeInViewport();
+    if (route === 'menu' || route === 'tools') {
+      const content = page.locator(
+        route === 'menu' ? '[data-ui="popup.menu.content"]' : '[data-ui="popup.tools.actions"]'
+      );
+      expect(
+        await content.evaluate((element) => element.scrollHeight - element.clientHeight)
+      ).toBeLessThanOrEqual(1);
+      const lastAction =
+        route === 'menu'
+          ? page.locator('[data-ui="popup.menu.workspace"] button').last()
+          : page.locator('[data-ui="popup.home.tools.video-recording"]');
+      await expect(lastAction).toBeInViewport({ ratio: 1 });
+      for (const button of await content.getByRole('button').all()) {
+        expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+        expect(
+          await button.evaluate((element) => element.scrollHeight - element.clientHeight)
+        ).toBeLessThanOrEqual(1);
+      }
+    }
+    const geometry = await page.evaluate(() => {
+      const root = document.querySelector<HTMLElement>('[data-ui="popup.app.root"]')!;
+      const rect = root.getBoundingClientRect();
+      return {
+        width: rect.width,
+        height: rect.height,
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+      };
+    });
+    expect(geometry).toEqual({ width: 392, height: 560, scrollWidth: 392, scrollHeight: 560 });
+    await page.screenshot({ path: info.outputPath(`${route}-error.png`), fullPage: false });
+  });
+}
+
+test('popup video long error keeps complete text and recording controls accessible', async ({
+  page,
+  hostOrigin,
+}, info) => {
+  await page.setViewportSize({ width: 392, height: 560 });
+  const message = `${'Recording control failed. Retry the action. '.repeat(8)}${'unbroken'.repeat(30)}`;
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    runtimeResponses: {
+      [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
+      [VideoMessageType.GET_RECORDING_STATE]: {
+        success: true,
+        recordingHealth: 'healthy',
+        state: { ...createRecordingRuntimeState(VideoRecordingStatus.RECORDING), error: message },
+      },
+    },
+    storage: {
+      sniptale_popup_startup: {
+        selection: 'video',
+        lastPage: 'video',
+        lastExportDestination: 'export',
+      },
+    },
+  });
+  await openPopupHarness(page, hostOrigin);
+  await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+  const error = page.locator('.popup-error-message[role="alert"]');
+  await expect(error).toHaveText(message);
+  const details = await error.evaluate((element) => {
+    const style = getComputedStyle(element);
+    element.scrollTop = element.scrollHeight;
+    return {
+      height: element.clientHeight,
+      width: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      scrollTop: element.scrollTop,
+      overflow: style.overflowY,
+      whiteSpace: style.whiteSpace,
+    };
+  });
+  expect(details.height).toBeLessThanOrEqual(112);
+  expect(details.scrollWidth).toBeLessThanOrEqual(details.width);
+  expect(details.scrollTop).toBeGreaterThan(0);
+  expect(details.overflow).toBe('auto');
+  expect(details.whiteSpace).toBe('normal');
+  await expect(
+    page.getByRole('button', { name: POPUP_VIDEO_PAUSE_LABEL, exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: POPUP_VIDEO_STOP_LABEL, exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: POPUP_VIDEO_PAUSE_LABEL, exact: true })
+  ).toBeInViewport();
+  await expect(
+    page.getByRole('button', { name: POPUP_VIDEO_STOP_LABEL, exact: true })
+  ).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(560);
+  await page.screenshot({ path: info.outputPath('video-long-error.png'), fullPage: false });
+});
+
+test('popup page access failure preserves full error and all recovery targets', async ({
+  page,
+  hostOrigin,
+}, info) => {
+  await page.setViewportSize({ width: 392, height: 560 });
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    runtimeResponses: {
+      [MessageType.PAGE_ACCESS]: { success: true, status: createInactivePageAccessStatus() },
+    },
+    storage: {
+      sniptale_popup_startup: {
+        selection: 'screenshots:tab',
+        lastPage: 'screenshots',
+        lastExportDestination: 'export',
+      },
+    },
+  });
+  await openPopupHarness(page, hostOrigin);
+  await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+  await page.evaluate(() => {
+    window.__sniptaleHarness?.setRuntimeResponse('PAGE_ACCESS', {
+      success: false,
+      status: {
+        allSitesGranted: false,
+        currentTabActive: false,
+        currentTabId: 1,
+        currentTabOrigin: 'https://example.test',
+        siteGranted: false,
+        supported: true,
+      },
+    });
+  });
+  await page.getByRole('button', { name: POPUP_ENABLE_FOR_TAB_LABEL, exact: true }).click();
+  const controls = page.locator('[data-ui="popup.page-access.controls"]');
+  await expect(controls.getByRole('alert')).toHaveText(
+    translate('popup.home.pageAccessFailed', 'ru')
+  );
+  await expect(controls.getByRole('button')).toHaveCount(3);
+  for (const button of await controls.getByRole('button').all()) {
+    await expect(button).toBeEnabled();
+    await expect(button).toBeInViewport();
+    expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(88);
+  }
+  expect(
+    await controls.getByRole('alert').evaluate((element) => getComputedStyle(element).textOverflow)
+  ).not.toBe('ellipsis');
+  await page.screenshot({ path: info.outputPath('page-access-error.png'), fullPage: false });
+});
+
 async function openPopupHarness(page: Page, hostOrigin: string) {
   const runtimeErrors: string[] = [];
   page.on('pageerror', (error) => {
@@ -404,7 +781,7 @@ test('popup mode keeps one icon while expanding a hovered option', async ({ page
   );
 });
 
-test('video mode descriptions stay fully readable throughout the width transition', async ({
+test('video mode descriptions crossfade immediately without reflow during the width transition', async ({
   page,
   hostOrigin,
 }) => {
@@ -419,19 +796,48 @@ test('video mode descriptions stay fully readable throughout the width transitio
   const screenLabel = translate('popup.video.modeScreenLabel', 'ru');
   const screen = page.getByRole('button', { name: screenLabel, exact: true });
   await expect(screen).toBeEnabled();
-  const heights = await screen.evaluate(async (button) => {
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__sniptaleHarness?.getStorageState()['sniptale_video_ui_state'])
+    )
+    .toMatchObject({ captureMode: CaptureMode.TAB });
+  await screen.click();
+  await expect(screen).toHaveAttribute('aria-pressed', 'true');
+  const samples = await screen.evaluate(async (button) => {
     const description = button.lastElementChild?.lastElementChild?.lastElementChild;
     if (!(description instanceof HTMLElement)) throw new Error('Mode description is unavailable');
-    button.click();
-    const samples: number[] = [];
+    const layer = button.lastElementChild;
+    if (!(layer instanceof HTMLElement)) throw new Error('Expanded mode layer is unavailable');
+    const frames: { height: number; width: number; buttonWidth: number; opacity: number }[] = [];
     for (let frame = 0; frame < 24; frame += 1) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      samples.push(description.getBoundingClientRect().height);
+      frames.push({
+        height: description.getBoundingClientRect().height,
+        width: description.getBoundingClientRect().width,
+        buttonWidth: button.getBoundingClientRect().width,
+        opacity: Number(getComputedStyle(layer).opacity),
+      });
     }
-    return samples;
+    await Promise.allSettled(
+      button.getAnimations({ subtree: true }).map((animation) => animation.finished)
+    );
+    return frames;
   });
   await expect(screen).toHaveAttribute('aria-pressed', 'true');
-  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1);
+  const visibleHeights = samples
+    .filter((sample) => sample.opacity > 0)
+    .map((sample) => sample.height);
+  expect(samples.some((sample) => sample.opacity > 0 && sample.opacity < 1)).toBe(true);
+  expect(
+    Math.max(...samples.map((sample) => sample.buttonWidth)) -
+      Math.min(...samples.map((sample) => sample.buttonWidth))
+  ).toBeGreaterThan(1);
+  expect(visibleHeights.length).toBeGreaterThan(0);
+  expect(Math.max(...visibleHeights) - Math.min(...visibleHeights)).toBeLessThan(1);
+  expect(
+    Math.max(...samples.map((sample) => sample.width)) -
+      Math.min(...samples.map((sample) => sample.width))
+  ).toBeLessThan(1);
   const textLayout = await screen.evaluate((button) => {
     const description = button.lastElementChild?.lastElementChild?.lastElementChild;
     if (!(description instanceof HTMLElement)) throw new Error('Mode description is unavailable');

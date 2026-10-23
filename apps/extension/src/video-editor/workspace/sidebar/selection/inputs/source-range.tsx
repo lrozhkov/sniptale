@@ -1,4 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
+import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import {
   areProjectClipsEditable,
@@ -42,6 +43,7 @@ export function ClipSourceRangeControls(props: SourceRangeProps) {
 }
 
 function SourceBoundaryField(props: SourceRangeProps & { edge: Edge; disabled: boolean }) {
+  const inspector = useInspectorLayout();
   const value = sourceBoundary(props.clip, props.edge);
   const normalizeValue = (requested: number) => {
     if (!Number.isFinite(requested)) return value;
@@ -62,7 +64,7 @@ function SourceBoundaryField(props: SourceRangeProps & { edge: Edge; disabled: b
   return (
     <NumericRow
       appearance="plain"
-      className="py-0! grid-cols-[minmax(0,1fr)_auto]!"
+      {...(inspector ? {} : { className: 'py-0! grid-cols-[minmax(0,1fr)_auto]!' })}
       label={translate(
         props.edge === 'start' ? 'videoEditor.sidebar.sourceIn' : 'videoEditor.sidebar.sourceOut'
       )}
@@ -79,10 +81,21 @@ function SourceBoundaryField(props: SourceRangeProps & { edge: Edge; disabled: b
 }
 
 function sourceBoundary(clip: SourceTimedClip, edge: Edge): number {
-  return clip.sourceStart + (edge === 'end' ? clip.sourceDuration : 0);
+  if (!clip.playbackWindow) return clip.sourceStart + (edge === 'end' ? clip.sourceDuration : 0);
+  const offset = clip.playbackWindow.offset + (edge === 'end' ? clip.duration : 0);
+  return (
+    clip.sourceStart +
+    Math.min(clip.sourceDuration, offset * normalizeClipPlaybackRate(clip.playbackRate ?? 1))
+  );
 }
 
 function projectBoundary(clip: SourceTimedClip, edge: Edge, sourceTime: number): number {
+  if (clip.playbackWindow)
+    return (
+      clip.startTime +
+      (sourceTime - clip.sourceStart) / normalizeClipPlaybackRate(clip.playbackRate ?? 1) -
+      clip.playbackWindow.offset
+    );
   const current = clip.startTime + (edge === 'end' ? clip.duration : 0);
   return (
     current +

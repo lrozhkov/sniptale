@@ -1,4 +1,8 @@
-import { AUDIO_INPUT_MAX_BYTES, AUDIO_INPUT_MAX_SECONDS } from '../../contracts/ai/audio';
+import {
+  AUDIO_INPUT_MAX_BYTES,
+  AUDIO_INPUT_MAX_SECONDS,
+  validAudioInputDuration,
+} from '../../contracts/ai/audio';
 import { resolveReviewAssetBytes } from './asset-bytes';
 
 const RATE = 16_000;
@@ -69,7 +73,7 @@ export async function extractReviewSpeechWav(
     !Number.isFinite(end) ||
     start < 0 ||
     end <= start ||
-    end - start > AUDIO_INPUT_MAX_SECONDS
+    !validAudioInputDuration(end - start)
   )
     throw new Error('invalid-request');
   signal.throwIfAborted();

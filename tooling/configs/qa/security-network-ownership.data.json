@@ -18,8 +18,8 @@
     {
       "file": "apps/extension/src/background/ai/audio/request.ts",
       "owner": "background-gallery-audio-transport",
-      "justification": "Gallery explicitly requests bounded transcription or speech using its configured provider connection.",
-      "reviewNote": "Only this owner constructs bearer headers. Require Gallery operation ticket, durable scope and phrase admission, optional host access, credentials omit, redirect error, bounded body and deadline. No retries, provider response logs or binary IPC."
+      "justification": "Gallery requests bounded transcription or speech. The full video editor requests transcription of a saved clip native audio interval.",
+      "reviewNote": "Only this owner constructs bearer headers. Bind each operation ticket to its editor, durable scope, approved provider and source interval. Recheck project or Gallery authority before POST. Speech requires admitted saved phrase text and revision. Require optional host access, credentials omit, redirect error, bounded bodies and a deadline. Never retry paid requests or log provider responses. Never send binary IPC."
     }
   ],
   "credentialedFetchOwners": [

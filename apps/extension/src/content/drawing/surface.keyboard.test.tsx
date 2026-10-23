@@ -58,57 +58,60 @@ it('rejects synthetic drawing keyboard commands', () => {
   act(() => root.unmount());
 });
 
-it('owns Escape and Delete while focus remains on content toolbar chrome', () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-  const session = createDrawingSession({ onDocumentCommit: () => true });
-  session.setActiveTool('arrow');
-  const deleteSelected = vi.spyOn(session, 'deleteSelected');
-  const controller: ContentDrawingController = {
-    session,
-    applyPalette: vi.fn(),
-    finalizeInteraction: vi.fn(),
-    getPalette: () => ['#ef4444'],
-    getScrollRoot: () => ({ kind: 'viewport', element: null }),
-    prepareActivation: () => true,
-    registerInteractionFinalizer: vi.fn(),
-  };
-  const contentHost = document.createElement('div');
-  contentHost.setAttribute('role', 'dialog');
-  contentHost.setAttribute('aria-expanded', 'true');
-  document.body.append(contentHost);
-  const { appContainer } = initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
-  const root = createRoot(appContainer);
-  act(() =>
-    root.render(
-      <>
-        <DrawingSurface active chromeHidden={false} controller={controller} />
-        <div data-ui="shared.ui.content-toolbar">
-          <button data-ui="test.drawing-toolbar-button" />
-        </div>
-      </>
-    )
-  );
-  const toolbarButton = appContainer.querySelector<HTMLButtonElement>(
-    '[data-ui="test.drawing-toolbar-button"]'
-  )!;
-  toolbarButton.focus();
+it.each(['shared.ui.content-toolbar', 'content.toolbar.root'])(
+  'owns Escape and Delete while focus remains on %s',
+  (toolbarDataUi) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.setActiveTool('arrow');
+    const deleteSelected = vi.spyOn(session, 'deleteSelected');
+    const controller: ContentDrawingController = {
+      session,
+      applyPalette: vi.fn(),
+      finalizeInteraction: vi.fn(),
+      getPalette: () => ['#ef4444'],
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+    };
+    const contentHost = document.createElement('div');
+    contentHost.setAttribute('role', 'dialog');
+    contentHost.setAttribute('aria-expanded', 'true');
+    document.body.append(contentHost);
+    const { appContainer } = initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
+    const root = createRoot(appContainer);
+    act(() =>
+      root.render(
+        <>
+          <DrawingSurface active chromeHidden={false} controller={controller} />
+          <div data-ui={toolbarDataUi}>
+            <button data-ui="test.drawing-toolbar-button" />
+          </div>
+        </>
+      )
+    );
+    const toolbarButton = appContainer.querySelector<HTMLButtonElement>(
+      '[data-ui="test.drawing-toolbar-button"]'
+    )!;
+    toolbarButton.focus();
 
-  act(() =>
-    toolbarButton.dispatchEvent(
-      new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Delete' })
-    )
-  );
-  act(() =>
-    toolbarButton.dispatchEvent(
-      new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Escape' })
-    )
-  );
+    act(() =>
+      toolbarButton.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Delete' })
+      )
+    );
+    act(() =>
+      toolbarButton.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Escape' })
+      )
+    );
 
-  expect(deleteSelected).toHaveBeenCalledOnce();
-  expect(session.getSnapshot().activeTool).toBe('select');
-  act(() => root.unmount());
-});
+    expect(deleteSelected).toHaveBeenCalledOnce();
+    expect(session.getSnapshot().activeTool).toBe('select');
+    act(() => root.unmount());
+  }
+);
 
 it('defers Escape to an active floating toolbar layer', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -263,4 +266,70 @@ it('returns recording drawing directly to navigation on the first Escape', () =>
   expect(onExit).toHaveBeenCalledOnce();
   act(() => root.unmount());
   controller.session.dispose();
+});
+
+it.each([false, true])('honors Escape from the dock positioner with dragging %s', (dragging) => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const { appContainer } = initializeContentUiRoots(host.attachShadow({ mode: 'open' }));
+  const root = createRoot(appContainer);
+  const controller = createContentDrawingController(
+    createDrawingSession({ onDocumentCommit: () => true })
+  );
+  controller.session.setActiveTool('arrow');
+  const dockCancel = vi.fn();
+  const onExit = vi.fn();
+  try {
+    act(() =>
+      root.render(
+        <>
+          <DrawingSurface
+            active
+            chromeHidden={false}
+            controller={controller}
+            escapeImmediately
+            onExit={onExit}
+          />
+          <div
+            className="sniptale-toolbar-positioner"
+            data-dragging={String(dragging)}
+            tabIndex={-1}
+          >
+            <div
+              data-ui="content.toolbar.root"
+              data-dock-dragging={dragging ? 'true' : undefined}
+              inert={dragging}
+            />
+          </div>
+        </>
+      )
+    );
+    window.addEventListener('keydown', dockCancel, { capture: true });
+    const positioner = appContainer.querySelector<HTMLElement>('.sniptale-toolbar-positioner')!;
+    positioner.focus();
+    act(() =>
+      positioner.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Escape' })
+      )
+    );
+    if (dragging) {
+      expect(dockCancel).toHaveBeenCalledOnce();
+      expect(controller.session.getSnapshot().activeTool).toBe('arrow');
+      expect(onExit).not.toHaveBeenCalled();
+    } else {
+      expect(dockCancel).not.toHaveBeenCalled();
+      expect(controller.session.getSnapshot().activeTool).toBe('select');
+      expect(onExit).toHaveBeenCalledOnce();
+      const contentRoot = appContainer.getRootNode();
+      expect(contentRoot instanceof ShadowRoot && contentRoot.activeElement === positioner).toBe(
+        false
+      );
+    }
+  } finally {
+    window.removeEventListener('keydown', dockCancel, { capture: true });
+    act(() => root.unmount());
+    controller.session.dispose();
+  }
 });

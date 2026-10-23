@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { observationFactory } = vi.hoisted(() => ({ observationFactory: vi.fn() }));
+vi.mock('../stream/microphone-activity', () => ({
+  createMicrophoneActivityObserver: observationFactory,
+}));
+
 const { loggerDebugMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
   loggerDebugMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
@@ -20,6 +25,43 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 import { recordingContext } from '.';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
+import { createAudioStream } from '../multi-source/media-stream.test-support';
+
+it('binds microphone progress and disposal to the recording session', () => {
+  resetRecordingContextForTest();
+  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  const observation = {
+    current: { status: 'ready' as const, level: 0.5, warning: false },
+    dispose: vi.fn(),
+    setEnabled: vi.fn(),
+    setSource: vi.fn(),
+    setPhase: vi.fn(),
+  };
+  observationFactory.mockReturnValue(observation);
+  recordingContext.beginRecordingSession('old-recording');
+  recordingContext.configureMicrophoneObservation(true);
+  const publish = observationFactory.mock.calls.at(-1)?.[0];
+  const borrowed = createAudioStream();
+  const observe = recordingContext.createMicrophoneObservationCallback();
+  observe(borrowed, 2);
+  expect(observation.setSource).toHaveBeenCalledWith(borrowed, 2);
+  recordingContext.pauseMicrophoneObservation();
+  recordingContext.resumeMicrophoneObservation();
+  expect(observation.setPhase.mock.calls).toEqual([['paused'], ['recording']]);
+  publish(observation.current);
+  expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
+    type: VideoMessageType.RECORDING_DURATION_UPDATED,
+    recordingId: 'old-recording',
+    microphoneActivity: observation.current,
+  });
+  recordingContext.resetRecordingSession();
+  expect(observation.dispose).toHaveBeenCalledOnce();
+  recordingContext.beginRecordingSession('next-recording');
+  sendRuntimeMessageMock.mockClear();
+  publish({ status: 'ready', level: 0, warning: true });
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+  resetRecordingContextForTest();
+});
 
 async function flushPromises() {
   await Promise.resolve();

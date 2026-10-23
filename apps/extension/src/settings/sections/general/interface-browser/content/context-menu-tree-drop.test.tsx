@@ -134,6 +134,13 @@ function over(element: Element | null, y = 120) {
 function drop(y = 120) {
   act(() => pointer(window, 'pointerup', 100, y));
 }
+it('keeps the insertion gap visible at the original position without saving a no-op', () => {
+  start('section:a');
+  over(row('section:a'), 101);
+  expect(host.querySelector('[data-drop-edge="before"]')).not.toBeNull();
+  drop(101);
+  expect(changed).not.toHaveBeenCalled();
+});
 it('draws after the last visible child and inserts beside the whole expanded section', () => {
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Expand: A"]')!.click());
   start();

@@ -1,3 +1,10 @@
+import { createVideoPreviewCompositionJoinRenderer } from './joins';
+import { createVideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
+import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
+import {
+  createReviewSpatialRenderer,
+  type ReviewSpatialRenderer,
+} from '../../../../features/video/composition/canvas/spatial-renderer';
 import { usePreviewFrameRate } from '../frame-rate';
 import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 
@@ -11,6 +18,7 @@ import type { PreviewSceneRenderJob } from './render-scheduler';
 import type { PreviewStageCanvasSceneParams } from './types';
 import { createVideoPreviewRenderRevision } from '../../cache/revision';
 import { renderPreviewSceneWithExactCache } from '../../cache/render';
+import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
 
 export function usePreviewStageCanvasRender(
   params: PreviewStageCanvasSceneParams & {
@@ -33,7 +41,11 @@ export function usePreviewStageCanvasRender(
   const renderSchedulerRef = usePreviewRenderSchedulerRef(
     params.effectRuntimeFeedback.onFailure,
     params.effectRuntimeFeedback.onRecovery,
-    params.previewExactFrameCache
+    params.previewExactFrameCache,
+    params.effectRuntimeFeedback.retryVersion,
+    params.project,
+    params.previewRasterSize,
+    params.assetUrls
   );
 
   usePreviewStageRenderEffect(params, effectRuntimeRef, renderRevision, renderSchedulerRef);
@@ -55,6 +67,7 @@ function usePreviewStageRenderEffect(
       createPreviewStageCanvasRenderJob({
         canvas,
         currentTime: params.currentTime,
+        ...(params.assetUrls ? { assetUrls: params.assetUrls } : {}),
         effectRuntimeRef,
         imageBank: params.imageBank,
         isPlaying: params.isPlaying === true,
@@ -70,6 +83,7 @@ function usePreviewStageRenderEffect(
     );
   }, [
     params.canvasRef,
+    params.assetUrls,
     params.currentTime,
     effectRuntimeRef,
     params.imageBank,
@@ -105,6 +119,7 @@ function usePreviewEffectRuntimeRetry(
 function createPreviewStageCanvasRenderJob(args: {
   canvas: HTMLCanvasElement;
   currentTime: number;
+  assetUrls?: Record<string, string>;
   effectRuntimeRef: MutableRefObject<VideoEditorEffectRuntime | null>;
   imageBank: PreviewStageCanvasSceneParams['imageBank'];
   isPlaying: boolean;
@@ -122,6 +137,7 @@ function createPreviewStageCanvasRenderJob(args: {
     canvas: args.canvas,
     controller,
     currentTime: args.currentTime,
+    ...(args.assetUrls ? { assetUrls: args.assetUrls } : {}),
     effectRuntimeExecutor: () =>
       resolvePreviewEffectRuntime(args.effectRuntimeRef, args.canvas.ownerDocument).executor,
     imageBank: args.imageBank,
@@ -144,7 +160,11 @@ function createPreviewStageCanvasRenderJob(args: {
 function usePreviewRenderSchedulerRef(
   onFailure: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onFailure'],
   onRecovery: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onRecovery'],
-  exactFrameCache: PreviewStageCanvasSceneParams['previewExactFrameCache']
+  exactFrameCache: PreviewStageCanvasSceneParams['previewExactFrameCache'],
+  retryVersion: number,
+  project: PreviewStageCanvasSceneParams['project'],
+  rasterSize: PreviewStageCanvasSceneParams['previewRasterSize'],
+  assetUrls: PreviewStageCanvasSceneParams['assetUrls']
 ): MutableRefObject<ReturnType<typeof createPreviewSceneRenderScheduler>> {
   const frameRate = usePreviewFrameRate();
   const frameRateRef = useRef(frameRate);
@@ -152,27 +172,103 @@ function usePreviewRenderSchedulerRef(
   const feedbackRef = useRef({ onFailure, onRecovery });
   feedbackRef.current = { onFailure, onRecovery };
   const schedulerRef = useRef<ReturnType<typeof createPreviewSceneRenderScheduler> | null>(null);
+  const captionsRef = useRef<ReturnType<typeof createVideoProjectCaptionRenderer> | null>(null);
+  const watermarkRef = useRef<ReturnType<typeof createVideoProjectWatermarkRenderer> | null>(null);
+  const joinsRef = useRef<ReturnType<typeof createVideoPreviewCompositionJoinRenderer> | null>(
+    null
+  );
+  const stagingRef = useRef<HTMLCanvasElement | null>(null);
+  const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
+  const retryRef = useRef(retryVersion);
   if (!schedulerRef.current) {
+    const captionRenderer = createVideoProjectCaptionRenderer();
+    captionsRef.current = captionRenderer;
+    const watermarkRenderer = createVideoProjectWatermarkRenderer(loadVideoEditorAssetBlob);
+    watermarkRef.current = watermarkRenderer;
     schedulerRef.current = createPreviewSceneRenderScheduler({
-      onError: (error) => feedbackRef.current.onFailure('visual', error),
+      onError: (error) => {
+        joinsRef.current?.clear();
+        watermarkRenderer.clear();
+        const spatial = spatialRef.current;
+        spatialRef.current = null;
+        spatial?.dispose();
+        feedbackRef.current.onFailure('visual', error);
+      },
       onSuccess: (job) => {
         feedbackRef.current.onRecovery('visual');
         if (job.isPlaybackFrame && job.previewMode !== 'cache') frameRateRef.current?.record();
       },
       render: (job) => {
-        if (!exactFrameCache) return renderPreviewScene(job);
+        const render = (input: Parameters<typeof renderPreviewScene>[0]) => {
+          joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(renderPreviewScene);
+          return joinsRef.current.render({
+            ...input,
+            captionRenderer,
+            watermarkRenderer,
+            spatialRenderer: () => {
+              input.signal?.throwIfAborted();
+              if (spatialRef.current) return spatialRef.current;
+              const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+                if (spatialRef.current !== renderer) return;
+                spatialRef.current = null;
+                renderer.dispose();
+                feedbackRef.current.onFailure('visual', new Error('Perspective context was lost.'));
+              });
+              spatialRef.current = renderer;
+              return renderer;
+            },
+            stagingCanvas: () => {
+              if (stagingRef.current?.ownerDocument === input.canvas.ownerDocument)
+                return stagingRef.current;
+              if (stagingRef.current) {
+                stagingRef.current.width = 0;
+                stagingRef.current.height = 0;
+              }
+              stagingRef.current = input.canvas.ownerDocument.createElement('canvas');
+              stagingRef.current.width = 0;
+              stagingRef.current.height = 0;
+              return stagingRef.current;
+            },
+          });
+        };
+        if (!exactFrameCache) return render(job);
         return renderPreviewSceneWithExactCache({
           cache: exactFrameCache,
           job,
-          render: renderPreviewScene,
+          render,
         });
       },
     });
   }
+  useLayoutEffect(
+    () => () => joinsRef.current?.clear(),
+    [project, rasterSize?.width, rasterSize?.height, assetUrls]
+  );
+  useLayoutEffect(() => {
+    if (retryRef.current === retryVersion) return;
+    retryRef.current = retryVersion;
+    watermarkRef.current?.clear();
+    joinsRef.current?.clear();
+    const spatial = spatialRef.current;
+    spatialRef.current = null;
+    spatial?.dispose();
+  }, [retryVersion]);
   useEffect(() => {
     const scheduler = schedulerRef.current;
     return () => {
       scheduler?.dispose();
+      joinsRef.current?.dispose();
+      joinsRef.current = null;
+      captionsRef.current?.clear();
+      watermarkRef.current?.clear();
+      const spatial = spatialRef.current;
+      spatialRef.current = null;
+      spatial?.dispose();
+      if (stagingRef.current) {
+        stagingRef.current.width = 0;
+        stagingRef.current.height = 0;
+        stagingRef.current = null;
+      }
     };
   }, []);
   return schedulerRef as MutableRefObject<ReturnType<typeof createPreviewSceneRenderScheduler>>;

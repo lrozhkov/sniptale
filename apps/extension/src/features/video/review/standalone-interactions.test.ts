@@ -1,3 +1,5 @@
+import { evaluateProjectGestureFeedback } from './project-action-audio';
+import { resolveVideoProjectActionPresentations } from '../project/action-presentation';
 import { createCameraFollowSettings } from '../project/camera/cursor-policy';
 import { expect, it } from 'vitest';
 import { normalizeVideoProjectCursorSkin } from '../project/cursor';
@@ -234,4 +236,136 @@ it('retains camera defaults through a settings-only Gallery-to-Montage handoff a
   content.cameraFollowDefaults.zoneSize = 0.25;
   expect(result.cameraFollowDefaults?.zoneSize).toBe(0.55);
   expect(project).toEqual(before);
+});
+
+it('retains the complete ordinary click style through Gallery handoff and project reload', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'click.webm',
+    width: 160,
+    height: 90,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 100,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK',
+        time: 1,
+        duration: 0.1,
+        point: { x: 0.4, y: 0.6 },
+        label: '',
+        data: {},
+        preset: 'NONE',
+      },
+    ],
+  });
+  const content = createQuickEditAdvancedContent();
+  content.clickAnimations = [
+    {
+      id: 'click',
+      effect: 'magnify',
+      color: '#123456cc',
+      radius: 40,
+      stroke: 4,
+      opacity: 0.75,
+      before: 0.2,
+      after: 0.8,
+      offset: 0.15,
+      x: 0.1,
+      y: -0.1,
+      pulses: 3,
+      easing: 'linear',
+      magnification: 2,
+      lensShape: 'rounded',
+      lensShadow: 60,
+    },
+  ];
+  const before = structuredClone(project),
+    accepted = structuredClone(content.clickAnimations);
+  const result = applyRecordingReviewInteractions(project, 'recording', content);
+  const restored = parseHydratableVideoProject(JSON.parse(JSON.stringify(result)));
+  expect(restored).not.toBeNull();
+  if (!restored) throw new Error('Expected a valid project after reload');
+  expect(restored.actionFeedback![0]!.gestureStyles).toEqual(accepted);
+  expect(restored.actionEvents).toEqual(before.actionEvents);
+  expect(resolveVideoProjectActionPresentations(restored)[0]).toMatchObject({
+    preset: 'DWELL_ZOOM',
+    duration: 1,
+    offset: 0.15,
+    point: { x: 0.5, y: 0.5 },
+  });
+  const frame = evaluateProjectGestureFeedback(restored, 1.55)[0]!.frame;
+  expect(frame).toMatchObject({
+    effect: 'magnify',
+    color: '#123456cc',
+    stroke: 4,
+    point: { x: 0.5, y: 0.5 },
+    lens: { shape: 'rounded' },
+  });
+  expect(frame.radius).toBeCloseTo(60, 12);
+  expect(frame.opacity).toBeCloseTo(0.375, 12);
+  expect(frame.lens!.scale).toBeCloseTo(1.5, 12);
+  expect(frame.lens!.shadow).toBeCloseTo(30, 12);
+  content.clickAnimations[0]!.radius = 99;
+  expect(result.actionFeedback![0]!.gestureStyles).toEqual(accepted);
+  expect(project).toEqual(before);
+});
+
+it('keeps full-source movement controls stable when the handoff is retried', () => {
+  const project = recording();
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) throw new Error('Expected source instance');
+  const samples = [0, 4, 8].map((time, index) => ({
+    id: `raw:${index}`,
+    time,
+    x: [0.2, 0.7, 0.6][index]! * project.width,
+    y: 0.5 * project.height,
+    visible: true,
+    recordingPoint: { x: [0.2, 0.7, 0.6][index]!, y: 0.5 },
+    observation: 'observed' as const,
+    captureSegment: 0,
+  }));
+  const rawTrack: VideoProjectCursorTrack = {
+    captureMode: 'embedded-fallback',
+    skin: { ...normalizeVideoProjectCursorSkin(undefined), hidden: true },
+    samples,
+  };
+  project.version = 33;
+  project.cursorTrack = {
+    ...rawTrack,
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'recording',
+        sourceInstanceId: clip.sourceInstanceId,
+        samples: structuredClone(samples),
+      },
+    ],
+  };
+  const original = structuredClone(project);
+  const path = updateCursorFocusKey(
+    deriveReviewCursorFocusPath({ cursorTrack: rawTrack, actionEvents: [], signals: [] }, project),
+    'raw:1',
+    { outgoing: { x: 0.75, y: 0.65 } }
+  );
+  const content = {
+    ...createQuickEditAdvancedContent(),
+    cursorFocusPath: authoredCursorFocusPath(path),
+  };
+  const first = applyRecordingReviewInteractions(project, 'recording', content);
+  const retried = applyRecordingReviewInteractions(first, 'recording', content);
+  expect(retried.cursorFocusPath).toEqual(first.cursorFocusPath);
+  expect(retried.cursorFocusPath?.segments[0]?.id).toBe(`segment:${clip.sourceInstanceId}:raw:0`);
+  expect(
+    resolveProjectCursorFocusPath(retried).segments.flatMap((segment) => segment.keys)
+  ).toContainEqual(
+    expect.objectContaining({
+      id: `${clip.sourceInstanceId}:raw:1`,
+      outgoing: { x: 0.75, y: 0.65 },
+      authored: true,
+    })
+  );
+  expect(retried.cursorTrack?.sourceObservations).toEqual(original.cursorTrack?.sourceObservations);
+  expect(project).toEqual(original);
 });

@@ -1,3 +1,14 @@
+import { editMotionTransitionPhase } from '../../../features/video/project/motion/timing';
+import { editMotionFocus } from '../../../features/video/project/motion/focus-appearance';
+import { editMotionSpatialSettings } from '../../../features/video/project/motion/spatial';
+import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project/utility-lanes';
+import type { VideoProject } from '../../../features/video/project/types';
+import type {
+  VideoEditorWatermarkPreview,
+  VideoEditorSceneEdgesPreview,
+  VideoEditorMotionPreview,
+} from '../../contracts/workspace';
+import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import { useWorkspacePreference } from './workspace-preferences';
 import type { VideoEditorAudioRecordingTarget } from '../../contracts/insertion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -31,8 +42,16 @@ interface VideoEditorWorkspaceConfirmState {
 }
 
 interface VideoEditorWorkspaceInspectorState {
+  sceneEdgesPreview: VideoEditorSceneEdgesPreview | null;
+  previewSceneEdges: (preview: VideoEditorSceneEdgesPreview | null) => void;
+  watermarkPreview: VideoEditorWatermarkPreview | null;
+  previewWatermark: (preview: VideoEditorWatermarkPreview | null) => void;
+  registerWatermarkAbort: (abort: () => void) => () => void;
+  cancelWatermarkAcquisition: () => void;
   mode: VideoEditorInspectorMode;
   openSelection: () => void;
+  motionPreview: VideoEditorMotionPreview | null;
+  previewMotion: (preview: VideoEditorMotionPreview | null) => void;
 }
 
 export interface VideoEditorWorkspaceState {
@@ -44,6 +63,7 @@ export interface VideoEditorWorkspaceState {
   audioRecordingTarget: VideoEditorAudioRecordingTarget | null;
   openTrackAudioRecordingDialog: (target: VideoEditorAudioRecordingTarget) => void;
   confirm: VideoEditorWorkspaceConfirmState;
+  voiceRecording: ReturnType<typeof useVoiceRecordingAdmission>;
   inspector: VideoEditorWorkspaceInspectorState;
   libraryPanelOpen: boolean;
   leftSidebarCollapsed: boolean;
@@ -192,14 +212,71 @@ function useSceneBackgroundColorState(): VideoEditorWorkspaceColorState {
 function useVideoEditorInspectorState(
   setCollapsed: (collapsed: boolean) => void
 ): VideoEditorWorkspaceInspectorState {
+  const [sceneEdgesPreview, previewSceneEdges] = useState<VideoEditorSceneEdgesPreview | null>(
+    null
+  );
+  const [watermarkPreview, previewWatermark] = useState<VideoEditorWatermarkPreview | null>(null);
+  const watermarkAbort = useRef<(() => void) | null>(null);
+  const registerWatermarkAbort = useCallback((abort: () => void) => {
+    watermarkAbort.current = abort;
+    return () => {
+      if (watermarkAbort.current === abort) watermarkAbort.current = null;
+    };
+  }, []);
+  const cancelWatermarkAcquisition = useCallback(() => {
+    const abort = watermarkAbort.current;
+    watermarkAbort.current = null;
+    abort?.();
+    previewWatermark(null);
+  }, []);
   const [mode, setMode] = useState<VideoEditorInspectorMode>('selection');
+  const [motionPreview, previewMotion] = useState<VideoEditorMotionPreview | null>(null);
 
   const openSelection = useCallback(() => {
     setMode('selection');
     setCollapsed(false);
   }, [setCollapsed]);
 
-  return useMemo(() => ({ mode, openSelection }), [mode, openSelection]);
+  return useMemo(
+    () => ({
+      mode,
+      openSelection,
+      motionPreview,
+      previewMotion,
+      sceneEdgesPreview,
+      previewSceneEdges,
+      watermarkPreview,
+      previewWatermark,
+      registerWatermarkAbort,
+      cancelWatermarkAcquisition,
+    }),
+    [
+      mode,
+      openSelection,
+      motionPreview,
+      sceneEdgesPreview,
+      watermarkPreview,
+      registerWatermarkAbort,
+      cancelWatermarkAcquisition,
+    ]
+  );
+}
+
+/** The mounted recorder owns the take; the workspace only admits leaving its project. */
+function useVoiceRecordingAdmission(obscured: boolean) {
+  const guard = useRef<(() => Promise<boolean>) | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const register = useCallback((request: () => Promise<boolean>) => {
+    guard.current = request;
+    return () => {
+      if (guard.current === request) guard.current = null;
+    };
+  }, []);
+  const request = useCallback(async () => (guard.current ? guard.current() : true), []);
+  return useMemo(
+    () => ({ register, request, capturing, setCapturing, obscured }),
+    [register, request, capturing, obscured]
+  );
 }
 
 /**
@@ -211,6 +288,13 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
   const confirmDialog = useVideoEditorConfirmDialogState();
   const libraryPanel = useVideoEditorLibraryPanelState();
   const audioRecordingDialog = useAudioRecordingDialogState();
+  const voiceRecording = useVoiceRecordingAdmission(
+    projectDialogOpen ||
+      autoProcessingModalOpen ||
+      libraryPanel.libraryPanelOpen ||
+      audioRecordingDialog.audioRecordingDialogOpen ||
+      confirmDialog.confirmDialog !== null
+  );
   const sceneBackgroundColors = useSceneBackgroundColorState();
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] =
     useWorkspacePreference('inspectorCollapsed');
@@ -249,6 +333,7 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
       audioRecordingTarget: audioRecordingDialog.audioRecordingTarget,
       openTrackAudioRecordingDialog: audioRecordingDialog.openTrackAudioRecordingDialog,
       confirm,
+      voiceRecording,
       inspector,
       libraryPanelOpen: libraryPanel.libraryPanelOpen,
       leftSidebarCollapsed,
@@ -275,6 +360,7 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
       audioRecordingDialog.openAudioRecordingDialog,
       clearPlaybackRange,
       confirm,
+      voiceRecording,
       grid,
       inspector,
       leftSidebarCollapsed,
@@ -288,4 +374,82 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
       toggleSidebarCollapsed,
     ]
   );
+}
+
+/** Project identity invalidates a draft after Undo, restore, replacement or accepted edits. */
+export function presentWorkspaceMotionPreview(
+  project: VideoProject,
+  selection: VideoEditorSelection,
+  preview: VideoEditorMotionPreview | null
+): VideoProject {
+  if (
+    !preview ||
+    preview.project !== project ||
+    selection.kind !== VideoEditorSelectionKind.MOTION_REGION ||
+    selection.motionRegionId !== preview.regionId ||
+    isVideoProjectUtilityLaneLocked(project, 'camera')
+  )
+    return project;
+  const region = project.motionRegions?.find((item) => item.id === preview.regionId);
+  if (!region) return project;
+  if (preview.kind === 'focus') {
+    const focus = editMotionFocus(project, region, preview.edit);
+    if (!focus) return project;
+    const edited = preview.transition
+      ? editMotionTransitionPhase(focus, preview.transition)
+      : focus;
+    if (!edited || edited === region) return project;
+    const version = edited.spotlight ? 22 : 21;
+    return {
+      ...project,
+      version: project.version >= version ? project.version : version,
+      motionRegions: project.motionRegions!.map((item) => (item === region ? edited : item)),
+    };
+  }
+  const edited = editMotionSpatialSettings(region, preview.edit);
+  if (!edited || edited === region) return project;
+  const { spatialReference: _reference, ...retained } = region;
+  return {
+    ...project,
+    version: project.version >= 19 ? project.version : 19,
+    motionRegions: project.motionRegions!.map((item) =>
+      item === region ? { ...retained, ...edited } : item
+    ),
+  };
+}
+
+/** Present a scene gesture without changing the source document or its history. */
+export function presentWorkspaceWatermarkPreview(
+  project: VideoProject,
+  selection: VideoEditorSelection,
+  preview: VideoEditorWatermarkPreview | null
+): VideoProject {
+  if (!preview || preview.project !== project || selection.kind !== VideoEditorSelectionKind.SCENE)
+    return project;
+  return {
+    ...project,
+    version: project.version >= 20 ? project.version : 20,
+    watermark: preview.settings,
+  };
+}
+
+/** Only the current accepted scene can present a disposable final-output gesture. */
+export function presentWorkspaceSceneEdgesPreview(
+  project: VideoProject,
+  selection: VideoEditorSelection,
+  preview: VideoEditorSceneEdgesPreview | null
+): VideoProject {
+  if (!preview || preview.project !== project || selection.kind !== VideoEditorSelectionKind.SCENE)
+    return project;
+  return preview.compositionJoins !== undefined
+    ? {
+        ...project,
+        version: project.version >= 26 ? project.version : 26,
+        compositionJoins: preview.compositionJoins,
+      }
+    : {
+        ...project,
+        version: project.version >= 24 ? project.version : 24,
+        sceneEdges: preview.settings,
+      };
 }

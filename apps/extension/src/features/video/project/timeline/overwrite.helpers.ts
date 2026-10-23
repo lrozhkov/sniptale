@@ -1,3 +1,4 @@
+import { isProjectOriginalAudioTarget } from './original-audio';
 import { getClipById, getClipEndTime } from './basics';
 import { resolveAnchorPlacementClips } from './anchor-clips';
 import { applyVideoProjectClipsPatch } from '../mutation';
@@ -126,7 +127,13 @@ export function applyOverwritePlacement(
       return [clip];
     }
 
-    return splitClipAfterOverwrite(clip, removals, multiSegmentGroupIds);
+    const source =
+      (clip.type === 'AUDIO' || clip.type === 'VIDEO') &&
+      !clip.sourceInstanceId &&
+      isProjectOriginalAudioTarget(project, clip)
+        ? { ...clip, sourceInstanceId: clip.id }
+        : clip;
+    return splitClipAfterOverwrite(source, removals, multiSegmentGroupIds);
   });
 
   return applyVideoProjectClipsPatch(project, nextClips);

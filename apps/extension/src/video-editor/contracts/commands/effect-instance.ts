@@ -1,3 +1,4 @@
+import type { VideoProjectEffectClip } from '../../../features/video/project/types';
 import type { VideoEditorEffectApplicationTarget } from '../effect-document-drag';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
@@ -20,5 +21,10 @@ export interface VideoEditorEffectInstanceActions {
   deleteEffectInstance(instanceId: string): void;
   duplicateEffectInstance(instanceId: string): string | null;
   moveEffectInstance(instanceId: string, direction: 'down' | 'up'): void;
+  restoreEffectSourceRange(instanceId: string): boolean;
+  updateEffectAttachment(
+    instanceId: string,
+    attachment: NonNullable<VideoProjectEffectClip['attachment']>
+  ): boolean;
   updateEffectInstance(instanceId: string, patch: VideoProjectEffectInstancePatch): void;
 }

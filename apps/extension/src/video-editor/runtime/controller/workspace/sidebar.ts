@@ -52,6 +52,7 @@ import { requestTrackDeletion } from './timeline-track-actions';
 import { createWorkspaceSidebarPlacementActions } from './sidebar-placement-actions';
 
 interface CreateWorkspaceSidebarArgs {
+  watermarkImagePreviewUrl?: string | undefined;
   actions: SidebarCommandHandlers;
   libraries: VideoEditorLibrariesState;
   selections: VideoEditorSelections;
@@ -124,6 +125,8 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
     onUpdateMediaClipFitScalePercent: store.updateMediaClipFitScalePercent,
     onUpdateMediaClipShadowIntensity: store.updateMediaClipShadowIntensity,
     onUpdateMediaClipShadowMode: store.updateMediaClipShadowMode,
+    onUpdateMediaClipShadowColor: store.updateMediaClipShadowColor,
+    onEditMediaClip: store.editMediaClip,
     onUpdateMediaClipWindowHeader: store.updateMediaClipWindowHeader,
     onUpdateShapeStyle: store.updateShapeClipStyle,
     onUpdateSubtitleTrackStyle: store.updateSubtitleTrackStyle,
@@ -167,6 +170,7 @@ function createWorkspaceSidebarProjectActions(args: {
     onUpdateActionEventDetails: args.projectUpdaters.updateActionEventDetails,
     onDeleteMotionRegion: args.projectUpdaters.deleteMotionRegion,
 
+    onPreviewMotion: args.workspace.inspector.previewMotion,
     onUpdateMotionRegion: args.projectUpdaters.updateMotionRegion,
     onUpdateTransitionDuration: args.projectUpdaters.updateTransitionDuration,
     onUpdateTransitionEasing: args.projectUpdaters.updateTransitionEasing,
@@ -230,6 +234,7 @@ function createWorkspaceSidebarBackgroundActions(args: {
 }
 
 function createWorkspaceSidebarState(args: {
+  watermarkImagePreviewUrl?: string | undefined;
   libraries: VideoEditorLibrariesState;
   project: NonNullable<EditorStore['project']>;
   selections: VideoEditorSelections;
@@ -237,6 +242,12 @@ function createWorkspaceSidebarState(args: {
   workspace: SidebarWorkspace;
 }) {
   return {
+    sceneEdges: { onPreview: args.workspace.inspector.previewSceneEdges },
+    watermark: {
+      onPreview: args.workspace.inspector.previewWatermark,
+      registerAbort: args.workspace.inspector.registerWatermarkAbort,
+      ...(args.watermarkImagePreviewUrl ? { imagePreviewUrl: args.watermarkImagePreviewUrl } : {}),
+    },
     activeProjectId: args.project.id,
     collapsed: args.workspace.leftSidebarCollapsed,
     gridSettings: {
@@ -286,6 +297,7 @@ export function createWorkspaceSidebarController(
       workspace: args.workspace,
     }),
     state: createWorkspaceSidebarState({
+      watermarkImagePreviewUrl: args.watermarkImagePreviewUrl,
       libraries: args.libraries,
       project,
       selections: args.selections,

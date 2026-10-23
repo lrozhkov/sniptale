@@ -1,18 +1,13 @@
+import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interactions/ownership';
 import { useVideoExportSizeEstimate } from '../../../ui/video-export/use-size-estimate';
 import { VideoExportSizeHint } from '../../../ui/video-export/size-estimate';
 import { estimateProjectExportSize } from '../estimate-size';
 import type { VideoProject } from '../../../features/video/project/types';
-import React, { useId, useRef } from 'react';
-import { Download, FileOutput } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { FileOutput } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import {
-  ProductModal,
-  ProductModalBody,
-  ProductModalFooter,
-  ProductModalHeader,
-} from '@sniptale/ui/product-modal';
-import { OptionRow } from '../../../ui/compact-inspector-controls';
+import { CheckboxField } from '../../../ui/compact-inspector-controls';
 import { VideoExportFormat } from '../../../features/video/project/types';
 import type {
   VideoExportCapabilities,
@@ -21,9 +16,9 @@ import type {
 } from '../../../features/video/project/types';
 import { useExportDialogCapabilities } from './capability-state';
 import { ExportDialogFields } from './fields';
-import { useExportDialogFocus } from './focus';
+import { ProjectSubtitles } from './subtitles';
 
-interface ExportDialogProps {
+interface ExportSettingsPanelProps {
   estimateContext?: { project: VideoProject; assetUrls: Record<string, string> } | undefined;
   selectedClipAvailable?: boolean;
   selectedRangeAvailable?: boolean;
@@ -66,34 +61,6 @@ function ExportDialogHintCard(props: {
   );
 }
 
-function ExportDialogBooleanToggle({
-  checked,
-  icon,
-  label,
-  onClick,
-}: {
-  checked: boolean;
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <OptionRow
-      active={checked}
-      label={
-        <span
-          className="inline-flex min-w-0 items-center gap-2 text-[13px] leading-[18px] font-medium
-            text-[var(--sniptale-color-text-primary)]"
-        >
-          {icon}
-          {label}
-        </span>
-      }
-      onToggle={onClick}
-    />
-  );
-}
-
 function ExportDialogDownloadToggle({
   settings,
   onChange,
@@ -102,11 +69,10 @@ function ExportDialogDownloadToggle({
   onChange: (patch: VideoProjectExportSettingsPatch) => void;
 }) {
   return (
-    <ExportDialogBooleanToggle
-      checked={settings.downloadAfterExport}
-      icon={<Download size={16} strokeWidth={2} />}
+    <CheckboxField
+      value={settings.downloadAfterExport}
       label={translate('videoEditor.exportDialog.downloadAfterExport')}
-      onClick={() => onChange({ downloadAfterExport: !settings.downloadAfterExport })}
+      onChange={(downloadAfterExport) => onChange({ downloadAfterExport })}
     />
   );
 }
@@ -118,7 +84,7 @@ function ExportDialogActions(props: {
 }) {
   const { disabled = false, onClose, onExport } = props;
   return (
-    <div className="ml-auto flex items-center gap-2">
+    <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
       <ProductActionButton tone="secondary" onClick={onClose}>
         {translate('videoEditor.exportDialog.cancel')}
       </ProductActionButton>
@@ -132,7 +98,8 @@ function ExportDialogActions(props: {
   );
 }
 
-export const ExportDialog: React.FC<ExportDialogProps> = ({
+/** Export settings share the workspace inspector without a modal input boundary. */
+export const ExportSettingsPanel: React.FC<ExportSettingsPanelProps> = ({
   estimateContext,
   selectedClipAvailable = false,
   selectedRangeAvailable = false,
@@ -147,8 +114,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   });
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  useExportDialogFocus(rootRef);
+  useExportInspectorFocus(rootRef);
   const canExport =
     !capabilitiesPending &&
     !capabilityError &&
@@ -161,51 +127,52 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   const estimate = useExportSizeEstimate(estimateContext, settings, canExport);
 
   return (
-    <div ref={rootRef} className="contents">
-      <ProductModal
-        labelledBy={titleId}
-        onClose={onClose}
-        closeOnBackdrop
-        width="min(480px, calc(100vw - 32px))"
-      >
-        <ProductModalHeader
-          compact
-          title={<span id={titleId}>{translate('videoEditor.exportDialog.title')}</span>}
-          closeTitle={translate('common.actions.close')}
-          onClose={onClose}
-        />
-        <ProductModalBody compact className="min-h-0 gap-3 overflow-y-auto">
-          <ExportDialogFields
-            capabilities={capabilities}
-            settings={settings}
-            sourceDimensions={sourceDimensions}
-            onChange={onChange}
-            selectedClipAvailable={selectedClipAvailable}
-            selectedRangeAvailable={selectedRangeAvailable}
-          />
-          <ExportDialogHintCard
-            capabilities={capabilities}
-            capabilitiesPending={capabilitiesPending}
-            capabilityError={capabilityError}
-            settings={settings}
-          />
-          <ExportDialogDownloadToggle settings={settings} onChange={onChange} />
-        </ProductModalBody>
-        <ExportDialogFooter
+    <div
+      ref={rootRef}
+      role="region"
+      aria-label={translate('videoEditor.exportDialog.title')}
+      tabIndex={-1}
+      data-ui="video-editor.export.inspector"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden outline-none"
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || event.defaultPrevented) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }}
+    >
+      <div className="grid min-h-0 min-w-0 flex-1 content-start gap-3 overflow-y-auto p-3">
+        <ExportDialogFields
+          capabilities={capabilities}
           settings={settings}
-          estimate={estimate}
-          disabled={!canExport}
-          onClose={onClose}
-          onExport={onExport}
+          sourceDimensions={sourceDimensions}
+          onChange={onChange}
+          selectedClipAvailable={selectedClipAvailable}
+          selectedRangeAvailable={selectedRangeAvailable}
         />
-      </ProductModal>
+        <ExportDialogHintCard
+          capabilities={capabilities}
+          capabilitiesPending={capabilitiesPending}
+          capabilityError={capabilityError}
+          settings={settings}
+        />
+        <ExportDialogDownloadToggle settings={settings} onChange={onChange} />
+        {estimateContext ? <ProjectSubtitles project={estimateContext.project} /> : null}
+      </div>
+      <ExportDialogFooter
+        settings={settings}
+        estimate={estimate}
+        disabled={!canExport}
+        onClose={onClose}
+        onExport={onExport}
+      />
     </div>
   );
 };
 
 /** The cache identity includes only content and settings that change encoded bytes. */
 function useExportSizeEstimate(
-  estimateContext: ExportDialogProps['estimateContext'],
+  estimateContext: ExportSettingsPanelProps['estimateContext'],
   settings: VideoProjectExportSettings,
   canExport: boolean
 ) {
@@ -251,7 +218,7 @@ function ExportDialogFooter({
   onExport(): void;
 }) {
   return (
-    <ProductModalFooter compact className="shrink-0 flex-col !items-stretch gap-3">
+    <div className="flex shrink-0 flex-col gap-3 border-t border-[var(--sniptale-color-border-soft)] px-3 py-2">
       <VideoExportSizeHint status={estimate.status} />
       <div className="flex flex-wrap items-center gap-3">
         <span className="mr-auto text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
@@ -270,6 +237,54 @@ function ExportDialogFooter({
           }}
         />
       </div>
-    </ProductModalFooter>
+    </div>
   );
+}
+
+/** Inspector focus enters once and restores only while the closing panel still owns it. */
+function useExportInspectorFocus(rootRef: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const opener = document.activeElement;
+    root.focus();
+    const handleTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || event.defaultPrevented) return;
+      const layers = getOwnedFloatingInteractionLayers(root, document);
+      const layer = layers.find((item) => item.contains(document.activeElement));
+      if (!layer) return;
+      const controls = [
+        ...document.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]'
+        ),
+      ].filter(
+        (item) =>
+          !item.closest('[hidden], [inert]') &&
+          item.getAttribute('type') !== 'hidden' &&
+          !layers.some((popup) => popup.contains(item))
+      );
+      const ownerIndex = controls.findIndex(
+        (item) => item.getAttribute('aria-controls') === layer.id
+      );
+      if (ownerIndex < 0) return;
+      const next = controls[ownerIndex + (event.shiftKey ? -1 : 1)];
+      if (next) {
+        event.preventDefault();
+        next.focus();
+      }
+    };
+    document.addEventListener('keydown', handleTab);
+    return () => {
+      document.removeEventListener('keydown', handleTab);
+      if (!root.contains(document.activeElement) && document.activeElement !== document.body)
+        return;
+      const target =
+        opener instanceof HTMLElement && opener.isConnected
+          ? opener
+          : document.querySelector<HTMLElement>(
+              '[data-ui="video-editor.timeline.toolbar.project-menu"]'
+            );
+      target?.focus();
+    };
+  }, [rootRef]);
 }

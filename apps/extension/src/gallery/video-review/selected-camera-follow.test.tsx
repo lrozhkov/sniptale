@@ -1,3 +1,7 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -6,8 +10,6 @@ import { ReviewSelectedProperties } from './selected-properties';
 import { ReviewZoomPreview } from './zoom-preview';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
 
 const preview = vi.hoisted(() => vi.fn());
 vi.mock('./zoom-preview', () => ({

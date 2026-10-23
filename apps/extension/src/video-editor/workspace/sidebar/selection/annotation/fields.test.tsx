@@ -15,7 +15,7 @@ import {
   VideoTrackKind,
   VideoOverlayTemplateKind,
 } from '../../../../../features/video/project/types';
-import { AnnotationFields } from './fields';
+import { AnnotationFields, createAnnotationGroups } from './fields';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -73,7 +73,7 @@ function registerModernAnnotationFieldTests() {
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupContent');
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupStyle');
     expect(markup).not.toContain('videoEditor.sidebar.annotationIntroLabel');
-    expect(markup).not.toContain('Headline');
+    expect(markup).not.toContain('>Headline<');
   });
 
   it('renders modern Cursor Ops controls without stale legacy groups', () => {
@@ -102,9 +102,9 @@ function registerLegacyAnnotationFieldTests() {
     expect(markup).toContain('videoEditor.sidebar.inspectorGroupContent');
     expect(markup).toContain('videoEditor.sidebar.inspectorGroupTarget');
     expect(markup).toContain('videoEditor.sidebar.inspectorGroupMotion');
-    expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupStyle');
-    expect(markup).toContain('videoEditor.sidebar.annotationHeadlineColorLabel');
-    expect(markup).toContain('videoEditor.sidebar.annotationPaddingLabel');
+    expect(markup).toContain('videoEditor.sidebar.inspectorGroupStyle');
+    expect(markup).not.toContain('videoEditor.sidebar.annotationHeadlineColorLabel');
+    expect(markup).not.toContain('videoEditor.sidebar.annotationPaddingLabel');
     expect(markup).not.toContain('videoEditor.sidebar.annotationDirectionLabel');
     expect(markup).not.toContain('videoEditor.sidebar.annotationTargetLabel');
   });
@@ -155,3 +155,27 @@ function createModernProps(pack: VideoAnnotationPack, template: VideoAnnotationT
     onUpdateAnnotationClipTemplate: vi.fn(),
   } as const;
 }
+
+it('keeps target annotation appearance out of General and reset commands after parameter groups', () => {
+  const groups = createAnnotationGroups(createProps(), true);
+  const general = renderToStaticMarkup(groups.find((group) => group.id === 'general')!.content);
+  const appearance = renderToStaticMarkup(groups.find((group) => group.id === 'style')!.content);
+  expect(general).not.toContain('videoEditor.sidebar.annotationHeadlineColorLabel');
+  expect(general).not.toContain('videoEditor.sidebar.annotationResetStyleAction');
+  expect(appearance).toContain('videoEditor.sidebar.annotationHeadlineColorLabel');
+  expect(appearance).toContain('videoEditor.sidebar.annotationPaddingLabel');
+  expect(groups.at(-1)!.id).toBe('reset');
+});
+
+it('defaults modern annotation editing to Content and classifies template metadata as Info', () => {
+  const props = createModernProps(
+    APPLE_GLASS_ANNOTATION_PACK,
+    APPLE_GLASS_ANNOTATION_PACK.templates.callout[0]!
+  );
+  const groups = createAnnotationGroups(props, true);
+  expect(groups.find((group) => group.id === 'basic')!.semantic).toBe('info');
+  const markup = renderToStaticMarkup(<AnnotationFields {...props} />);
+  expect(markup).toContain('data-section="content"');
+  expect(markup).toContain('videoEditor.sidebar.annotationHeadlineLabel');
+  expect(markup).not.toContain('videoEditor.sidebar.annotationTemplateThemeLabel');
+});

@@ -1,3 +1,10 @@
+import { createShapeClip } from '../../../../features/video/project/factories/overlay-clip';
+import {
+  isExportReadyVideoProject,
+  parseHydratableVideoProject,
+} from '../../../../features/video/project/validation/root';
+import { getMediaClipSourceTime } from '../../../../features/video/project/timeline/rate';
+import { syncProjectDuration } from '../../../../features/video/project/timeline/basics';
 import { describe, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -346,4 +353,166 @@ it('keeps each linked video and audio name when cutting the group', () => {
   const project = splitProjectClipsAtTime(original, 'video-1', 3);
   expect(project.clips).toHaveLength(4);
   for (const clip of project.clips) expect(clip.name).toBe(originalNames.get(clip.type));
+});
+
+it('preserves independent text after trimming the last media placement', () => {
+  const project = createTimelineProject();
+  project.clips = [project.clips[0]!];
+  project.duration = 12;
+  project.textDocuments = [
+    {
+      id: 'manual',
+      binding: { kind: 'project' },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text',
+            text: 'After the video',
+            originalText: '',
+            start: 6,
+            end: 12,
+            timeDomain: 'result',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const trimmed = syncProjectDuration(trimProjectClipEnd(project, 'clip-1', 3));
+  expect(trimmed.clips[0]!.duration).toBe(2);
+  expect(trimmed.duration).toBe(12);
+  expect(trimmed.textDocuments).toEqual(project.textDocuments);
+});
+
+it('extends bounded camera trims in authored time without shortening retained uncovered content', () => {
+  const project = createTimelineProject();
+  project.clips = [project.clips[0]!];
+  const clip = project.clips[0]!;
+  if (clip.type !== VideoProjectClipType.VIDEO) throw new Error('Expected video');
+  clip.cameraTiming = { offsetSeconds: 3, transitions: 'bounded' };
+  const asset = createVideoProjectAsset(
+    'Camera',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: clip.assetId },
+    {
+      duration: 4,
+      width: 1280,
+      height: 720,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  asset.id = clip.assetId;
+  project.assets = [asset];
+  expect(trimProjectClipEnd(project, clip.id, 20).clips[0]!.duration).toBe(7);
+  clip.duration = 10;
+  clip.sourceDuration = 10;
+  expect(trimProjectClipEnd(project, clip.id, 20).clips[0]!.duration).toBe(10);
+});
+
+it('moves retained camera settings to an ordinary primary track, reopens and moves back', () => {
+  const project = createTimelineProject();
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  project.version = 32;
+  project.clips = [clip];
+  project.tracks[0]!.role = 'CAMERA';
+  const ordinary = createVideoProjectTrack('Ordinary', 2, VideoTrackKind.PRIMARY);
+  project.tracks.push(ordinary);
+  const asset = createVideoProjectAsset(
+    'Camera',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'camera' },
+    {
+      duration: 8,
+      width: 640,
+      height: 360,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  asset.id = clip.assetId;
+  project.assets = [asset];
+  clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  clip.cameraAppearance = { shape: 'rounded', roundness: 20, zoom: 2, panX: 0.5, panY: -0.5 };
+  clip.cameraMirrored = true;
+  clip.cameraHiddenRanges = [{ id: 'hidden', start: 1, end: 2 }];
+  clip.cameraPositions = [
+    {
+      id: 'position',
+      sourceTime: 1,
+      fitMode: clip.fitMode,
+      transform: { ...clip.transform, x: 30 },
+      transition: { kind: 'smooth', duration: 10 },
+      crop: { zoom: 3, panX: 0, panY: 0 },
+    },
+  ];
+  const original = structuredClone(clip);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const moved = moveProjectClip(project, clip.id, 5, ordinary.id);
+  expect(moved.clips[0]).toMatchObject({ ...original, trackId: ordinary.id, startTime: 5 });
+  expect(isExportReadyVideoProject(moved)).toBe(true);
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(moved)));
+  if (!reopened) throw new Error('Moved camera must reopen');
+  const media = reopened.clips[0];
+  if (media?.type !== 'VIDEO') throw new Error('Expected video');
+  expect(getMediaClipSourceTime(media, 8)).toBe(1);
+  const returned = moveProjectClip(reopened, clip.id, original.startTime, original.trackId);
+  expect(returned.clips[0]).toMatchObject(original);
+  expect(isExportReadyVideoProject(returned)).toBe(true);
+  expect(clip).toEqual(original);
+});
+
+it('keeps a linked audio edge inside its media when a timed camera can extend farther', () => {
+  const project = createLinkedTimelineProject();
+  const camera = project.clips[0]!;
+  if (camera.type !== 'VIDEO') throw new Error('Expected camera');
+  camera.cameraTiming = { offsetSeconds: 3, transitions: 'bounded' };
+  const asset = createVideoProjectAsset(
+    'Camera',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: camera.assetId },
+    {
+      duration: 4,
+      width: 1280,
+      height: 720,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  asset.id = camera.assetId;
+  project.assets = [asset];
+  expect(trimProjectClipEnd(project, camera.id, 8)).toBe(project);
+  expect(project.clips.map((clip) => clip.duration)).toEqual([4, 4]);
+});
+
+it('trims visual overlays without applying camera media bounds and preserves unchanged edges', () => {
+  const project = createEmptyVideoProject('Overlay');
+  const shape = createShapeClip(
+    project.tracks[0]!.id,
+    project.width,
+    project.height,
+    2,
+    'RECTANGLE'
+  );
+  shape.duration = 4;
+  project.clips = [shape];
+  expect(trimProjectClipEnd(project, shape.id, 6)).toBe(project);
+  const extended = trimProjectClipEnd(project, shape.id, 10);
+  expect(extended.clips[0]).toMatchObject({ startTime: 2, duration: 8, type: 'SHAPE' });
+  expect(trimProjectClipStart(extended, shape.id, 1).clips[0]).toMatchObject({
+    startTime: 1,
+    duration: 9,
+    type: 'SHAPE',
+  });
 });

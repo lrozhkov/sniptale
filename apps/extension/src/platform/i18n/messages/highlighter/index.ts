@@ -146,7 +146,7 @@ export const highlighterMessages = defineMessageSource({
       en: 'Customize, hide, and reorder reusable frame numbering styles.',
     },
     newSession: {
-      sectionTitle: { ru: 'Для новых сессий', en: 'For new sessions' },
+      sectionTitle: { ru: 'Значения по умолчанию', en: 'Default values' },
       sectionDescription: {
         ru: 'Эти параметры применятся при следующем запуске режима выделения.',
         en: 'These settings apply the next time Highlight mode starts.',
@@ -219,7 +219,7 @@ export const highlighterMessages = defineMessageSource({
       en: 'Customize, hide, and reorder reusable callout designs.',
     },
     newSession: {
-      sectionTitle: { ru: 'Для новых сессий', en: 'For new sessions' },
+      sectionTitle: { ru: 'Значения по умолчанию', en: 'Default values' },
       sectionDescription: {
         ru: 'Эти параметры применятся при следующем запуске режима выделения.',
         en: 'These settings apply the next time Highlight mode starts.',

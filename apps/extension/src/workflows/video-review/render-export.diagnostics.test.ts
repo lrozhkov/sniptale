@@ -89,8 +89,8 @@ function audioArgs(kind: 'processed' | 'copy', add: ReturnType<typeof vi.fn>) {
 }
 
 const decoration = vi.hoisted(() => ({ dispose: vi.fn() }));
-vi.mock('./render-watermark', () => ({
-  createReviewWatermarkRenderer: async () => ({
+vi.mock('../../features/video/composition/canvas/watermark', () => ({
+  createWatermarkRenderer: async () => ({
     draw() {},
     bounds: null,
     dispose: decoration.dispose,

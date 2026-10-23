@@ -44,6 +44,8 @@ export type PreviewStageRootSurfaceProps = Pick<
   | 'onUpdateAnnotationClipTemplate'
   | 'onUpdateActionEventDetails'
   | 'onUpdateMotionRegion'
+  | 'onPreviewMotion'
+  | 'motionProject'
   | 'onUpsertObjectTrackCorrectionAnchor'
   | 'placementMode'
   | 'previewCacheBypass'

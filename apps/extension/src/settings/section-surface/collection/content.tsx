@@ -40,18 +40,27 @@ export function SettingsCollectionContent(props: {
     <div
       ref={collectionRootRef}
       data-settings-collection-root
+      data-settings-collection-layout={collection.layout ?? 'rows'}
       data-settings-collection-pointer-dragging={pointerDragging || undefined}
+      data-ui="settings.collection.list-scroll"
       className={[
         pointerDragging
-          ? 'overflow-visible cursor-grabbing select-none [&_*]:!cursor-grabbing [&_button]:pointer-events-none'
-          : 'overflow-hidden',
-        'rounded-[4px] border',
+          ? 'cursor-grabbing select-none [&_*]:!cursor-grabbing [&_button]:pointer-events-none'
+          : '',
+        collection.layout === 'tiles' ? '!border-0 !bg-transparent' : 'rounded-[4px] border',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface)]',
       ].join(' ')}
     >
       {groups.map((group) => (
-        <div key={group.id ?? 'ungrouped'}>
+        <div
+          key={group.id ?? 'ungrouped'}
+          className={
+            collection.layout === 'tiles'
+              ? 'grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2'
+              : undefined
+          }
+        >
           {group.label === undefined && group.description === undefined ? null : (
             <div className="border-b border-[var(--sniptale-color-border-subtle)] px-3 py-2">
               {group.label === undefined ? null : (

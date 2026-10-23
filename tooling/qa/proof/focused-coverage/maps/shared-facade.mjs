@@ -1,5 +1,47 @@
 export const SHARED_FACADE_OWNER_MAPPINGS = [
   {
+    owner: 'shared-audio-jobs-client',
+    productionFile: 'apps/extension/src/workflows/audio-jobs/client.ts',
+    reason:
+      'The shared audio transport must retain Scenario and Gallery speech, transcription and cancellation behavior.',
+    testFiles: [
+      'apps/extension/src/workflows/audio-jobs/client.test.ts',
+      'apps/extension/src/workflows/video/project-recognition.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/video-editor/runtime/session/recognition.test.tsx',
+      'apps/extension/src/workflows/scenario-narration/generation.test.ts',
+      'apps/extension/src/workflows/video-review/speech-publication.test.ts',
+      'apps/extension/src/workflows/video-review/speech-transcription.test.ts',
+      'apps/extension/src/workflows/video-review/recognition.test.ts',
+      'apps/extension/src/workflows/video-review/recognition-multimodal.test.ts',
+      'apps/extension/src/workflows/video-review/text-voice.test.ts',
+      'apps/extension/src/gallery/video-review/recognition-recovery.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-audio-jobs-port-helper',
+    productionFile: 'apps/extension/src/workflows/audio-jobs/remote-job-port.ts',
+    reason: 'Both audio and review-text transports consume the relocated Port lifetime helper.',
+    testFiles: [
+      'apps/extension/src/workflows/audio-jobs/client.test.ts',
+      'apps/extension/src/workflows/video-review/text-rewrite-client.test.ts',
+    ],
+  },
+  {
+    owner: 'window-header-contract',
+    productionFile: 'packages/runtime-contracts/src/window-header.ts',
+    reason:
+      'The shared contract admits existing header data for every editor without application imports.',
+    testFiles: [
+      'packages/runtime-contracts/src/window-header.test.ts',
+      'packages/runtime-contracts/src/scenario/tour-parser.test.ts',
+      'apps/extension/src/features/browser-frame/appearance.test.ts',
+      'apps/extension/src/workflows/browser-frame/settings.test.tsx',
+      'apps/extension/src/workflows/media-hub-backup/v6/metadata-transport.test.ts',
+    ],
+  },
+  {
     owner: 'sf-editor-floating-workspace',
     productionPrefix: 'apps/extension/src/editor/workspace/floating/',
     exclusive: true,

@@ -1,4 +1,4 @@
-import { patchReviewKeys } from '../../features/video/review/advanced/key-animation';
+import { patchReviewKeys } from '../../features/video/project/action-feedback/key-animation';
 import { expect, it } from 'vitest';
 import { createReviewExportFixture } from './export-lifecycle.test-support';
 import { exportReviewedVideo } from './export-lifecycle';

@@ -1,3 +1,4 @@
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { expect, it } from 'vitest';
 import { createTourImageSlide } from '../project/factories';
 import { resolveTourCamera, resolveTourEditingCamera, resolveTourFullViewCamera } from './camera';
@@ -14,17 +15,19 @@ function fixture() {
     editDocumentId: null,
     source: { kind: 'import', filename: 'image.png' },
   };
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: '',
-      text: '',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: '',
+        text: '',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   return slide;
 }
@@ -40,9 +43,15 @@ it('automatically zooms only one reviewed target and respects global/slide overr
   slide.requiresTargetReview = true;
   expect(resolveTourCamera(slide, viewport, true)?.zoom).toBe(1);
   slide.requiresTargetReview = false;
-  slide.hotspots.push({ ...slide.hotspots[0]!, id: 'other' });
+  slide.actions.push({
+    type: 'hotspot' as const,
+    object: { ...getTourHotspots(slide)[0]!, id: 'other' },
+  });
   expect(resolveTourCamera(slide, viewport, true)?.zoom).toBe(1);
-  slide.hotspots = [];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[].map((object) => ({ type: 'hotspot' as const, object })),
+  ];
   expect(resolveTourCamera(slide, viewport, true)?.zoom).toBe(1);
 });
 it.each([
@@ -59,7 +68,7 @@ it.each([
   expect(box.x + box.width).toBeGreaterThanOrEqual(viewport.stageWidth);
   expect(box.y + box.height).toBeGreaterThanOrEqual(viewport.stageHeight);
   slide.camera.mode = 'auto';
-  slide.hotspots[0]!.point = point;
+  getTourHotspots(slide)[0]!.point = point;
   const automatic = resolveTourCamera(slide, viewport, true)!;
   const projected = {
     x: automatic.x + point.x * automatic.width,
@@ -93,8 +102,8 @@ it('preserves letterboxing for a narrow image and resolves cover against the sam
 });
 it('fits a large recorded target and separately authored point together', () => {
   const slide = fixture();
-  slide.hotspots[0]!.targetRect = { x: 0.05, y: 0.05, width: 0.8, height: 0.8 };
-  slide.hotspots[0]!.point = { x: 0.95, y: 0.95 };
+  getTourHotspots(slide)[0]!.targetRect = { x: 0.05, y: 0.05, width: 0.8, height: 0.8 };
+  getTourHotspots(slide)[0]!.point = { x: 0.95, y: 0.95 };
   expect(resolveTourCamera(slide, viewport, true)?.zoom).toBe(1);
   expect(resolveTourCamera(slide, { stageWidth: 0, stageHeight: 0 }, true)).toBeNull();
   slide.image = null;
@@ -105,14 +114,14 @@ it('backs out of cover cropping to include the recorded rectangle and separate c
   const slide = fixture();
   slide.fit = 'cover';
   slide.image!.width = 100;
-  slide.hotspots[0]!.targetRect = { x: 0.1, y: 0.05, width: 0.8, height: 0.8 };
-  slide.hotspots[0]!.point = { x: 0.5, y: 0.95 };
+  getTourHotspots(slide)[0]!.targetRect = { x: 0.1, y: 0.05, width: 0.8, height: 0.8 };
+  getTourHotspots(slide)[0]!.point = { x: 0.5, y: 0.95 };
   const box = resolveTourCamera(slide, viewport, true)!;
-  const target = slide.hotspots[0]!.targetRect;
+  const target = getTourHotspots(slide)[0]!.targetRect!;
   for (const point of [
     { x: target.x, y: target.y },
     { x: target.x + target.width, y: target.y + target.height },
-    slide.hotspots[0]!.point,
+    getTourHotspots(slide)[0]!.point,
   ]) {
     const x = box.x + point.x * box.width;
     const y = box.y + point.y * box.height;
@@ -134,7 +143,7 @@ it('uses the authored auto zoom percentage without changing source or hotspot co
   slide.camera.targetZoom = 2.5;
   expect(resolveTourCamera(slide, viewport, true)?.zoom).toBe(2.5);
   expect(resolveTourEditingCamera(slide, viewport)?.zoom).toBe(1);
-  expect(slide.hotspots[0]!.point).toEqual({ x: 0.5, y: 0.5 });
+  expect(getTourHotspots(slide)[0]!.point).toEqual({ x: 0.5, y: 0.5 });
 });
 
 it('fits the entire source in temporary full view without changing authored cover or camera', () => {

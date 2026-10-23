@@ -10,10 +10,68 @@ import { getSourceSnapshot } from '../../source/source-snapshot.mjs';
 const DECLARATION_FILE_PATTERN = /\.d\.[cm]?ts$/u;
 const JS_LIKE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?|mjs|cjs)$/u;
 
-function normalizeModuleSpecifierExpressions(sourceText) {
-  return sourceText
-    .replace(/\bimport\s*\(\s*(['"])[^'"]+\1\s*\)/gu, "import('')")
-    .replace(/\b(vi\.(?:doMock|doUnmock|mock|unmock))\s*\(\s*(['"])[^'"]+\2/gu, "$1(''");
+function normalizeModuleSpecifierExpressions(relativePath, sourceText) {
+  const source = ts.createSourceFile(relativePath, sourceText, ts.ScriptTarget.Latest, true);
+  const comments = new Map();
+  const collectComments = (node) => {
+    for (const range of [
+      ...(ts.getLeadingCommentRanges(sourceText, node.pos) ?? []),
+      ...(ts.getTrailingCommentRanges(sourceText, node.end) ?? []),
+    ])
+      comments.set(range.pos, sourceText.slice(range.pos, range.end));
+    ts.forEachChild(node, collectComments);
+  };
+  collectComments(source);
+  const specifiers = [];
+  const collectSpecifiers = (node) => {
+    if (
+      ts.isCallExpression(node) &&
+      node.arguments.length > 0 &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
+      const expression = node.expression;
+      const dynamicImport =
+        expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments.length === 1;
+      const mock =
+        ts.isPropertyAccessExpression(expression) &&
+        ts.isIdentifier(expression.expression) &&
+        expression.expression.text === 'vi' &&
+        ['doMock', 'doUnmock', 'mock', 'unmock'].includes(expression.name.text);
+      if (dynamicImport || mock) specifiers.push(node.arguments[0]);
+    }
+    ts.forEachChild(node, collectSpecifiers);
+  };
+  collectSpecifiers(source);
+  let normalizedText = sourceText;
+  for (const specifier of specifiers.sort((a, b) => b.getStart(source) - a.getStart(source))) {
+    normalizedText =
+      normalizedText.slice(0, specifier.getStart(source)) +
+      "''" +
+      normalizedText.slice(specifier.end);
+  }
+  const normalized = ts.createSourceFile(
+    relativePath,
+    normalizedText,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  // Concrete children include operators and export punctuation omitted by forEachChild.
+  // Preserve every token's spelling, including raw templates and meaningful JSX whitespace.
+  const syntax = (node) => {
+    const children = node.getChildren(normalized);
+    return [
+      node.kind,
+      children.length
+        ? children.map(syntax)
+        : ts.isJsxText(node)
+          ? node.text
+          : node.getText(normalized),
+    ];
+  };
+  return JSON.stringify({
+    syntax: syntax(normalized),
+    comments: [...comments].sort(([a], [b]) => a - b).map(([, value]) => value),
+  });
 }
 
 function runGitShowRevision(relativePath, revision = 'HEAD') {
@@ -284,9 +342,11 @@ function isDiffOnlyAfterStripping(file, predicate, options = {}) {
 
   return (
     normalizeModuleSpecifierExpressions(
+      relativePath,
       stripTopLevelStatements(relativePath, previousSource, predicate, 'HEAD')
     ) ===
     normalizeModuleSpecifierExpressions(
+      relativePath,
       stripTopLevelStatements(relativePath, currentSource, predicate, 'current')
     )
   );

@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useId } from 'react';
+import { InspectorParameterRow } from '../../../../../ui/compact-inspector-controls/layout';
 import { InspectorActionButton } from '../shared/actions';
 import { translate } from '../../../../../platform/i18n';
 import type { VideoProject } from '../../../../../features/video/project/types';
@@ -21,16 +22,26 @@ export function ClipOrderControls(props: {
   const descriptionId = useId();
   const left = planClipSwap(props.project, props.clipId, 'left');
   const right = planClipSwap(props.project, props.clipId, 'right');
+  if (
+    left.status === 'unavailable' &&
+    left.reason === 'no-neighbor' &&
+    right.status === 'unavailable' &&
+    right.reason === 'no-neighbor'
+  )
+    return null;
   return (
-    <div data-ui="video-editor.inspector.clip-order" className="group/clip-order space-y-1">
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        <span
-          className="shrink-0 text-xs text-[var(--sniptale-color-text-secondary)]"
+    <div data-ui="video-editor.inspector.clip-order" className="space-y-1">
+      <InspectorParameterRow
+        label={translate('videoEditor.app.clipOrder')}
+        valueOptions={[
+          translate('videoEditor.app.clipEarlier'),
+          translate('videoEditor.app.clipLater'),
+        ]}
+      >
+        <div
+          className="flex min-w-0 flex-wrap justify-end gap-1"
           title={translate('videoEditor.app.clipSwapLinkedHint')}
         >
-          {translate('videoEditor.app.clipOrder')}
-        </span>
-        <div className="ml-auto flex shrink-0 gap-1">
           {(['left', 'right'] as const).map((direction) => {
             const plan = direction === 'left' ? left : right;
             const label = translate(
@@ -42,7 +53,7 @@ export function ClipOrderControls(props: {
                 <InspectorActionButton
                   compact
                   tone="secondary"
-                  className="!h-7 !min-w-7 !px-1.5"
+                  className="!min-w-0 !px-1.5"
                   disabled={plan.status !== 'ready'}
                   aria-describedby={`${descriptionId}-${direction}`}
                   onClick={() => props.onSwapClip(props.clipId, direction)}
@@ -54,14 +65,8 @@ export function ClipOrderControls(props: {
             );
           })}
         </div>
-      </div>
-      <div
-        data-ui="video-editor.inspector.clip-order.descriptions"
-        className={[
-          'sr-only text-[11px] leading-relaxed text-[var(--sniptale-color-text-muted)]',
-          'group-focus-within/clip-order:not-sr-only',
-        ].join(' ')}
-      >
+      </InspectorParameterRow>
+      <div data-ui="video-editor.inspector.clip-order.descriptions" className="sr-only">
         <p id={`${descriptionId}-left`}>
           {translate('videoEditor.app.clipEarlier')}: {planHint(left)}
         </p>
@@ -69,11 +74,6 @@ export function ClipOrderControls(props: {
           {translate('videoEditor.app.clipLater')}: {planHint(right)}
         </p>
       </div>
-      {left.status === 'unavailable' && right.status === 'unavailable' ? (
-        <p className="text-[11px] leading-relaxed text-[var(--sniptale-color-text-muted)]">
-          {planHint(left.reason === 'no-neighbor' ? right : left)}
-        </p>
-      ) : null}
     </div>
   );
 }

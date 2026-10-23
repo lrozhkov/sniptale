@@ -102,8 +102,11 @@ it.each(['html', 'svg', 'missing'])(
     const blur = document.createElement('div');
     blur.setAttribute('data-sniptale-drawing-object-id', 'blur');
     blur.style.cssText =
-      'position:fixed;left:310px;top:110px;width:20px;height:100px;transform:rotate(90deg)';
+      'position:fixed;left:0px;top:0px;width:1px;height:1px;clip-path:polygon(0px 0px, 1px 0px, 1px 1px)';
     surface.append(blur);
+    const liveInk = document.createElement('canvas');
+    liveInk.dataset['ui'] = 'content.drawing.ink-layer';
+    surface.append(liveInk);
     root.getRootNode().appendChild(surface);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
       setTransform: vi.fn(),
@@ -156,6 +159,9 @@ it.each(['html', 'svg', 'missing'])(
           );
           expect(rotated?.style.left).toBe('40px');
           expect(rotated?.style.transform).toBe('rotate(90deg)');
+          expect(rotated?.style.width).toBe('20px');
+          expect(rotated?.style.height).toBe('100px');
+          expect(rotated?.style.clipPath).toBe('');
         }
       }
       if (hasAnchor) expect(result.html).toContain('anchor(');
@@ -166,6 +172,12 @@ it.each(['html', 'svg', 'missing'])(
       );
       expect(layer?.style.width).toBe('100%');
       expect(layer?.style.overflowX).toBe('clip');
+      expect(
+        Array.from(result.document.querySelectorAll('[data-sniptale-drawing-object-id]')).map(
+          (node) => node.getAttribute('data-sniptale-drawing-object-id')
+        )
+      ).toEqual(['one', 'two', 'blur']);
+      expect(result.html).not.toContain('content.drawing.ink-layer');
       expect(target.style.getPropertyValue('anchor-name')).toBe('');
     } finally {
       unregister();

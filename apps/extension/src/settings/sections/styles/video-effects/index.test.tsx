@@ -54,6 +54,26 @@ afterEach(() => {
   container.remove();
   vi.unstubAllGlobals();
 });
+it('keeps readonly filters enabled and mounted while an effect update is pending', async () => {
+  list.mockResolvedValue(catalogRows());
+  let release!: () => void;
+  toggle.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      })
+  );
+  await act(async () => root.render(<VideoEffectsSection />));
+  const filters = container.querySelector('[data-ui="effect-catalog.filters"]')!;
+  const categories = [
+    ...filters.querySelectorAll<HTMLButtonElement>('button.effect-catalog-category'),
+  ];
+  const row = container.querySelector('[data-settings-collection-item="pack-0/effect-0"]')!;
+  await act(async () => row.querySelector<HTMLButtonElement>('[role=switch]')!.click());
+  expect(container.querySelector('[data-ui="effect-catalog.filters"]')).toBe(filters);
+  for (const button of categories) expect(button.disabled).toBe(false);
+  await act(async () => release());
+});
 it('accepts multiple files and shows partial success without hiding the catalog', async () => {
   const files = [new File(['{}'], 'good.json'), new File(['!'], 'bad.json')];
   importFiles.mockResolvedValue([

@@ -1,39 +1,40 @@
-import { parseCutTransition, type ReviewCutTransition } from '../cut-transition';
+import {
+  parseCompositionJoinSettings,
+  type CompositionJoinSettings,
+} from '../../project/scene/composition-join';
+import {
+  parseBookendImagePresentation,
+  parseBookendVideoPresentation,
+  type BookendImagePresentation,
+  type BookendVideoPresentation,
+} from '../../project/scene/bookend-media';
+import {
+  createPresentationFade,
+  parsePresentationEdgeControl as edgeControl,
+  type PresentationEdgeControl,
+  parsePresentationFade as fade,
+  type PresentationFade as Fade,
+} from '../../project/scene/edge-fades';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isBoundedNumber } from '../../project/validation/primitives';
 
-type Framing = {
-  fit: 'contain' | 'cover';
-  fillColor: string;
-  /** Object-position convention: -1 exposes start, +1 exposes end. */
-  crop: { panX: number; panY: number };
-};
-type Image = Framing & {
+type Image = BookendImagePresentation & {
   filename?: string;
   assetId: string;
   width: number;
   height: number;
-  duration: number;
 };
-type Video = Framing & {
+type Video = BookendVideoPresentation & {
   filename?: string;
   assetId: string;
   source: NonNullable<ReturnType<typeof source>>;
-  trim: { start: number; end: number };
-  audio: { muted: boolean; gain: number };
 };
 type Slot =
   | { mode: 'none'; image?: Image; video?: Video }
   | { mode: 'image'; image: Image; video?: Video }
   | { mode: 'video'; image?: Image; video: Video };
-type Fade = { enabled: boolean; duration: number; color?: string; audioFade?: boolean };
-/** Independent authored edge; legacy scalar fields are fallback only when this is absent. */
-export interface PresentationEdgeControl {
-  mode: 'none' | 'fade' | 'media';
-  plain: Fade;
-  media: Fade;
-}
+export type { PresentationEdgeControl } from '../../project/scene/edge-fades';
 
 /** Authored seconds and immutable references; dormant slot variants remain retained. */
 export interface QuickEditPresentationSettings {
@@ -46,15 +47,15 @@ export interface QuickEditPresentationSettings {
   audioFade: boolean;
   intro: Slot;
   outro: Slot;
-  introTransition?: ReviewCutTransition;
-  outroTransition?: ReviewCutTransition;
+  introTransition?: CompositionJoinSettings;
+  outroTransition?: CompositionJoinSettings;
 }
 
 /** Legacy omission is processing-neutral, including when advanced mode is selected. */
 export function createNeutralPresentationSettings(): QuickEditPresentationSettings {
   return {
-    fadeIn: { enabled: false, duration: 0.4 },
-    fadeOut: { enabled: false, duration: 0.4 },
+    fadeIn: createPresentationFade(),
+    fadeOut: createPresentationFade(),
     color: '#000000ff',
     audioFade: false,
     intro: { mode: 'none' },
@@ -100,20 +101,6 @@ function dimensions(width: unknown, height: unknown, axis: number, area: number)
     width * height <= area
   );
 }
-function framing(value: Record<string, unknown>): Framing | null {
-  const crop = value['crop'];
-  const fillColor = opaqueColor(value['fillColor']);
-  if (
-    (value['fit'] !== 'contain' && value['fit'] !== 'cover') ||
-    !fillColor ||
-    !isRecord(crop) ||
-    !fields(crop, ['panX', 'panY']) ||
-    !isBoundedNumber(crop['panX'], -1, 1) ||
-    !isBoundedNumber(crop['panY'], -1, 1)
-  )
-    return null;
-  return { fit: value['fit'], fillColor, crop: { panX: crop['panX'], panY: crop['panY'] } };
-}
 function image(value: unknown): Image | null {
   if (
     !isRecord(value) ||
@@ -132,11 +119,10 @@ function image(value: unknown): Image | null {
     !identity(value['assetId']) ||
     !isBoundedNumber(value['width'], 1, 4096) ||
     !isBoundedNumber(value['height'], 1, 4096) ||
-    !dimensions(value['width'], value['height'], 4096, 16_000_000) ||
-    !isBoundedNumber(value['duration'], 0.1, 60)
+    !dimensions(value['width'], value['height'], 4096, 16_000_000)
   )
     return null;
-  const frame = framing(value);
+  const frame = parseBookendImagePresentation(value);
   return frame
     ? {
         ...frame,
@@ -144,7 +130,6 @@ function image(value: unknown): Image | null {
         ...(typeof value['filename'] === 'string' ? { filename: value['filename'] } : {}),
         width: value['width'],
         height: value['height'],
-        duration: value['duration'],
       }
     : null;
 }
@@ -191,32 +176,16 @@ function video(value: unknown): Video | null {
   )
     return null;
   const media = source(value['source']);
-  const frame = framing(value);
-  const trim = value['trim'];
-  const audio = value['audio'];
-  if (
-    !media ||
-    !frame ||
-    !isRecord(trim) ||
-    !fields(trim, ['start', 'end']) ||
-    !isBoundedNumber(trim['start'], 0, media.duration) ||
-    !isBoundedNumber(trim['end'], 0, media.duration) ||
-    trim['end'] <= trim['start'] ||
-    !isRecord(audio) ||
-    !fields(audio, ['muted', 'gain']) ||
-    typeof audio['muted'] !== 'boolean' ||
-    !isBoundedNumber(audio['gain'], 0, 2)
-  )
-    return null;
+  const frame = media ? parseBookendVideoPresentation(value, media.duration) : null;
+  if (!media || !frame) return null;
   return {
     ...frame,
     assetId: value['assetId'],
     ...(typeof value['filename'] === 'string' ? { filename: value['filename'] } : {}),
     source: media,
-    trim: { start: trim['start'], end: trim['end'] },
-    audio: { muted: audio['muted'], gain: audio['gain'] },
   };
 }
+
 function slot(value: unknown): Slot | null {
   if (!isRecord(value) || !fields(value, ['mode', 'image', 'video'])) return null;
   const rememberedImage = value['image'] === undefined ? undefined : image(value['image']);
@@ -233,24 +202,6 @@ function slot(value: unknown): Slot | null {
     return { ...variants, mode: 'video', video: rememberedVideo };
   return null;
 }
-function fade(value: unknown): Fade | null {
-  if (
-    !isRecord(value) ||
-    !fields(value, ['enabled', 'duration', 'color', 'audioFade']) ||
-    typeof value['enabled'] !== 'boolean' ||
-    !isBoundedNumber(value['duration'], 0, 60) ||
-    (value['color'] !== undefined && !opaqueColor(value['color'])) ||
-    (value['audioFade'] !== undefined && typeof value['audioFade'] !== 'boolean')
-  )
-    return null;
-  return {
-    enabled: value['enabled'],
-    duration: value['duration'],
-    ...(value['color'] === undefined ? {} : { color: opaqueColor(value['color'])! }),
-    ...(typeof value['audioFade'] === 'boolean' ? { audioFade: value['audioFade'] } : {}),
-  };
-}
-
 /** Rejects malformed active or remembered fields; absence alone receives neutral defaults. */
 export function parseQuickEditPresentationSettings(
   value: unknown
@@ -287,11 +238,11 @@ export function parseQuickEditPresentationSettings(
   const introTransition =
     value['introTransition'] === undefined
       ? undefined
-      : parseCutTransition(value['introTransition']);
+      : parseCompositionJoinSettings(value['introTransition']);
   const outroTransition =
     value['outroTransition'] === undefined
       ? undefined
-      : parseCutTransition(value['outroTransition']);
+      : parseCompositionJoinSettings(value['outroTransition']);
   if (introTransition === null || outroTransition === null) return null;
   return {
     ...(introControl ? { introControl } : {}),
@@ -305,18 +256,6 @@ export function parseQuickEditPresentationSettings(
     ...(introTransition ? { introTransition } : {}),
     ...(outroTransition ? { outroTransition } : {}),
   };
-}
-
-function edgeControl(value: unknown): PresentationEdgeControl | null {
-  if (
-    !isRecord(value) ||
-    !fields(value, ['mode', 'plain', 'media']) ||
-    (value['mode'] !== 'none' && value['mode'] !== 'fade' && value['mode'] !== 'media')
-  )
-    return null;
-  const plain = fade(value['plain']);
-  const media = fade(value['media']);
-  return plain && media ? { mode: value['mode'], plain, media } : null;
 }
 
 /** Projects legacy combinations without mutating history or inventing authored operations. */

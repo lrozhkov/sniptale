@@ -27,7 +27,7 @@ type ExportSelectionSectionShellProps = {
 const shellClassName = 'flex min-h-0 flex-col overflow-hidden';
 
 const triggerClassName = [
-  'group flex min-w-0 flex-1 items-center gap-1 rounded-[9px] px-2 py-1.5 text-left outline-none',
+  'group flex min-w-0 flex-1 items-center gap-1 rounded-[6px] px-2 py-1.5 text-left outline-none',
   'transition-colors hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
   'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
 ].join(' ');
@@ -188,7 +188,7 @@ export function ExportSelectionSectionShell({
         >
           <span
             className={[
-              'min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
+              'min-w-0 flex-1 text-[12px] font-medium',
               'text-[var(--sniptale-color-text-muted-strong)]',
             ].join(' ')}
             data-ui="popup.export.selection-heading"
@@ -208,7 +208,7 @@ export function ExportSelectionSectionShell({
             type="button"
             aria-label={settingsAriaLabel ?? translate('popup.export.pageSettingsTitle')}
             className={[
-              'shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-medium',
+              'shrink-0 rounded-[6px] px-2 py-1 text-[11px] font-medium',
               'text-[var(--sniptale-color-text-secondary)] transition-colors',
               'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_70%,transparent)]',
               'hover:text-[var(--sniptale-color-text-primary)]',

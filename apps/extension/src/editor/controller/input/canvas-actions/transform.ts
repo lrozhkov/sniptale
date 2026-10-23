@@ -1,4 +1,5 @@
 import type { TPointerEvent } from 'fabric';
+import { cancelEditorDrawingArrowBend } from '../../../drawing/object/controls/arrow';
 
 export interface EditorTransformCanvas {
   readonly _currentTransform: unknown;
@@ -10,6 +11,7 @@ export function endEditorCanvasTransform(
   canvas: EditorTransformCanvas | null,
   event?: TPointerEvent
 ): boolean {
+  if (cancelEditorDrawingArrowBend(canvas)) return true;
   if (!canvas?._currentTransform) return false;
   canvas.endCurrentTransform(event);
   return true;

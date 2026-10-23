@@ -58,6 +58,9 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     applyTypingCompression: state.applyTypingCompression,
     placeMaterial: state.placeMaterial,
     appendMaterial: state.appendMaterial,
+    placeBookendMaterial: state.placeBookendMaterial,
+    updateBookendPresets: state.updateBookendPresets,
+    updateCompositionJoins: state.updateCompositionJoins,
     insertMaterial: state.insertMaterial,
     overlayMaterial: state.overlayMaterial,
     addAssetClip: state.addAssetClip,
@@ -69,6 +72,9 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     clearUtilityLane: state.clearUtilityLane,
     closeTrackGap: state.closeTrackGap,
     deleteActionEvent: state.deleteActionEvent,
+    editSourceVoiceover: state.editSourceVoiceover,
+    deleteSourceVoiceover: state.deleteSourceVoiceover,
+    duplicateSourceVoiceover: state.duplicateSourceVoiceover,
     deleteClip: state.deleteClip,
     deleteCursorSample: state.deleteCursorSample,
     deleteMotionRegion: state.deleteMotionRegion,
@@ -106,6 +112,8 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     updateMediaClipFitScalePercent: state.updateMediaClipFitScalePercent,
     updateMediaClipShadowIntensity: state.updateMediaClipShadowIntensity,
     updateMediaClipShadowMode: state.updateMediaClipShadowMode,
+    updateMediaClipShadowColor: state.updateMediaClipShadowColor,
+    editMediaClip: state.editMediaClip,
     updateMediaClipWindowHeader: state.updateMediaClipWindowHeader,
     updateMotionRegion: state.updateMotionRegion,
     updateProject: state.updateProject,
@@ -128,6 +136,7 @@ function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
     selection: state.selection,
     selectHistorySpan: state.selectHistorySpan,
     selectActionOccurrence: state.selectActionOccurrence,
+    selectSourceVoiceover: state.selectSourceVoiceover,
     selectClip: state.selectClip,
     selectCursorSegment: state.selectCursorSegment,
     selectMotionRegion: state.selectMotionRegion,
@@ -135,6 +144,7 @@ function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
     selectMotionLane: state.selectMotionLane,
     selectObjectTrack: state.selectObjectTrack,
     selectScene: state.selectScene,
+    selectComment: state.selectComment,
     selectTrack: state.selectTrack,
     selectTransition: state.selectTransition,
   };
@@ -150,11 +160,15 @@ function selectEffectEditingPort(state: VideoEditorState): EffectEditingPort {
     duplicateEffectInstance: state.duplicateEffectInstance,
     moveEffectInstance: state.moveEffectInstance,
     updateEffectInstance: state.updateEffectInstance,
+    updateEffectAttachment: state.updateEffectAttachment,
+    restoreEffectSourceRange: state.restoreEffectSourceRange,
   };
 }
 
 function selectAnnotationEditingPort(state: VideoEditorState): AnnotationEditingPort {
   return {
+    addCommentDocument: state.addCommentDocument,
+    editCommentDocument: state.editCommentDocument,
     addAnnotationOverlay: state.addAnnotationOverlay,
     addShapeOverlay: state.addShapeOverlay,
     addSubtitleOverlay: state.addSubtitleOverlay,

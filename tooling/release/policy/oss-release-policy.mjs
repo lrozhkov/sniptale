@@ -12,6 +12,14 @@ export const DOCUMENT_FONT_SHA256 =
   'ee021f497d8f5b323b9dc5653b88380be86a176de08cbe74d6fe721cafe9c843';
 
 export const OSS_RELEASE_POLICY_PATH = 'tooling/configs/qa/oss-release.data.json';
+const FONT_ARCHIVE_PATHS = new Map([
+  [INTERFACE_FONT_LICENSE_PATH, 'LICENSES/fonts/golos-ui.txt'],
+  [DOCUMENT_FONT_LICENSE_PATH, 'LICENSES/fonts/golos-text.txt'],
+]);
+
+export function releaseLegalArchivePath(source) {
+  return FONT_ARCHIVE_PATHS.get(source) ?? source;
+}
 export const REQUIRED_RELEASE_LEGAL_PATHS = [
   'LICENSE',
   'LICENSES/OFL-1.1.txt',
@@ -25,6 +33,10 @@ export const CANONICAL_LICENSE_DIGESTS = new Map([
   ['LICENSE', 'e9df4c4e4e64b8168a71c3c67668dcffabbe8fca11d4ac4a7d5482562cd1679c'],
   ['LICENSES/OFL-1.1.txt', 'd826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30'],
 ]);
+
+for (const [source, target] of FONT_ARCHIVE_PATHS) {
+  CANONICAL_LICENSE_DIGESTS.set(target, CANONICAL_LICENSE_DIGESTS.get(source));
+}
 
 export function sha256(contents) {
   return createHash('sha256').update(contents).digest('hex');
@@ -44,28 +56,49 @@ export function readOssReleasePolicy(repoRoot = process.cwd()) {
     ? [...REQUIRED_RELEASE_LEGAL_PATHS, DOCUMENT_FONT_LICENSE_PATH]
     : REQUIRED_RELEASE_LEGAL_PATHS;
   for (const requiredPath of requiredPaths) {
-    if (!archivePaths.includes(requiredPath) || !sourcePaths.includes(requiredPath)) {
+    const distributedPath = releaseLegalArchivePath(requiredPath);
+    if (!archivePaths.includes(distributedPath) || !sourcePaths.includes(distributedPath)) {
       throw new Error(`OSS release policy is missing canonical legal file: ${requiredPath}`);
     }
   }
   return policy;
 }
 
-export async function collectReleaseLegalSourceFiles(repoRoot = process.cwd()) {
+export function dependencySourceArchiveIdentity(repoRoot = process.cwd()) {
+  const metadata = JSON.parse(readFileSync(path.resolve(repoRoot, 'package.json'), 'utf8'));
+  if (
+    typeof metadata?.version !== 'string' ||
+    !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(metadata.version)
+  ) {
+    throw new Error('Dependency source distribution requires an exact release version.');
+  }
+  const file = `sniptale-dependency-source-${metadata.version}.zip`;
+  return {
+    file,
+    url: `https://github.com/lrozhkov/sniptale/releases/download/v${metadata.version}/${file}`,
+  };
+}
+
+export async function collectReleaseLegalSourceFiles(
+  repoRoot = process.cwd(),
+  { includeSource = false } = {}
+) {
   const policy = readOssReleasePolicy(repoRoot);
   return Promise.all(
-    policy.legalFiles.map(async (entry) => {
-      const absolutePath = path.resolve(repoRoot, entry.source);
-      const contents = await fs.readFile(absolutePath);
-      if (sha256(contents) !== entry.sha256) {
-        throw new Error(`Release legal source digest drift: ${entry.source}`);
-      }
-      const canonicalDigest = CANONICAL_LICENSE_DIGESTS.get(entry.source);
-      if (canonicalDigest && entry.sha256 !== canonicalDigest) {
-        throw new Error(`Canonical release license digest drift: ${entry.source}`);
-      }
-      return { absolutePath, contents, relativePath: entry.archivePath };
-    })
+    policy.legalFiles
+      .filter((entry) => includeSource || entry.distribution !== 'source')
+      .map(async (entry) => {
+        const absolutePath = path.resolve(repoRoot, entry.source);
+        const contents = await fs.readFile(absolutePath);
+        if (sha256(contents) !== entry.sha256) {
+          throw new Error(`Release legal source digest drift: ${entry.source}`);
+        }
+        const canonicalDigest = CANONICAL_LICENSE_DIGESTS.get(entry.source);
+        if (canonicalDigest && entry.sha256 !== canonicalDigest) {
+          throw new Error(`Canonical release license digest drift: ${entry.source}`);
+        }
+        return { absolutePath, contents, relativePath: entry.archivePath };
+      })
   );
 }
 
@@ -73,6 +106,11 @@ export function assertReleaseLegalPayload(files, repoRoot = process.cwd()) {
   const filesByPath = new Map(files.map((file) => [file.relativePath, file]));
   const policy = readOssReleasePolicy(repoRoot);
   for (const entry of policy.legalFiles) {
+    if (entry.distribution === 'source') {
+      if (filesByPath.has(entry.archivePath))
+        throw new Error(`Source-only file in installer: ${entry.archivePath}`);
+      continue;
+    }
     const canonicalDigest = CANONICAL_LICENSE_DIGESTS.get(entry.archivePath);
     if (canonicalDigest && entry.sha256 !== canonicalDigest) {
       throw new Error(`Canonical release license digest drift: ${entry.archivePath}`);

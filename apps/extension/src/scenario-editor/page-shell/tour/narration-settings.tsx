@@ -1,4 +1,3 @@
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { Mic, Unlink } from 'lucide-react';
 import type {
   TourAudioResource,
@@ -26,6 +25,7 @@ export function TourNarrationSettings({
   disabled,
   importDisabled,
   onImport,
+  onGenerate,
   onChange,
   t,
 }: {
@@ -35,14 +35,14 @@ export function TourNarrationSettings({
   disabled: boolean;
   importDisabled: boolean;
   onImport: (input: ImportInput) => Promise<boolean>;
+  onGenerate?: (() => void) | undefined;
   onChange: (slide: TourSlide, group?: string | null) => boolean;
   t: Translate;
 }) {
   const target = getTourNarrationTarget(slide, objectId);
   if (!target) return null;
   const narration = target.narration ?? null;
-  const trigger =
-    narration && 'trigger' in narration && narration.trigger === 'enter' ? 'enter' : 'activation';
+  const trigger = 'enter' as const;
   const update = (value: TourNarration | TourObjectNarration | null, group?: string) => {
     const next = structuredClone(slide);
     const destination = getTourNarrationTarget(next, objectId);
@@ -52,13 +52,26 @@ export function TourNarrationSettings({
   };
   const change = (patch: Partial<TourObjectNarration>) => {
     if (narration)
-      update({ ...narration, ...patch }, `narration:${slide.id}${objectId ? `:${objectId}` : ''}`);
+      return update(
+        { ...narration, ...patch },
+        `narration:${slide.id}${objectId ? `:${objectId}` : ''}`
+      );
+    return false;
   };
   const title = t(
     objectId ? 'scenario.editor.tourObjectNarration' : 'scenario.editor.tourSlideNarration'
   );
   return (
     <GuideInspectorGroup id="narration" icon={Mic} title={title}>
+      {onGenerate && (
+        <ScenarioInspectorActionButton
+          disabled={importDisabled}
+          data-ai-single
+          onClick={onGenerate}
+        >
+          {t('scenario.editor.tourNarrationAI')}
+        </ScenarioInspectorActionButton>
+      )}
       {narration && (
         <>
           <div className="tour-audio-binding">
@@ -76,7 +89,13 @@ export function TourNarrationSettings({
               <Unlink size={15} />
             </ScenarioInspectorActionButton>
           </div>
-          <TourNarrationPreview key={narration.assetId} narration={narration} t={t} />
+          <TourNarrationPreview
+            key={narration.assetId}
+            narration={narration}
+            disabled={disabled}
+            onTrimChange={change}
+            t={t}
+          />
         </>
       )}
       <TourNarrationAcquisition
@@ -95,24 +114,7 @@ export function TourNarrationSettings({
       />
       {narration && (
         <>
-          {objectId ? (
-            <div className="tour-text-field">
-              <SelectField
-                label={t('scenario.editor.tourAudioTrigger')}
-                disabled={disabled}
-                value={trigger}
-                options={[
-                  { value: 'activation', label: t('scenario.editor.tourAudioOnActivation') },
-                  { value: 'enter', label: t('scenario.editor.tourAudioOnEnter') },
-                ]}
-                onChange={(value) => {
-                  if (value === 'activation' || value === 'enter') change({ trigger: value });
-                }}
-              />
-            </div>
-          ) : (
-            <p className="guide-inspector-hint">{t('scenario.editor.tourAudioSlideHint')}</p>
-          )}
+          <p className="guide-inspector-hint">{t('scenario.editor.tourAudioSlideHint')}</p>
           <NarrationFields narration={narration} locked={disabled} change={change} t={t} />
         </>
       )}
@@ -133,28 +135,6 @@ function NarrationFields({
 }) {
   return (
     <>
-      <TourInspectorNumericRow
-        label={t('scenario.editor.tourAudioStart')}
-        value={narration.trimStart}
-        min={0}
-        max={narration.trimEnd - Math.min(0.01, narration.duration / 2)}
-        step={0.1}
-        precision={2}
-        disabled={locked}
-        onPreview={(trimStart) => change({ trimStart })}
-        onChange={(trimStart) => change({ trimStart })}
-      />
-      <TourInspectorNumericRow
-        label={t('scenario.editor.tourAudioEnd')}
-        value={narration.trimEnd}
-        min={narration.trimStart + Math.min(0.01, narration.duration / 2)}
-        max={narration.duration}
-        step={0.1}
-        precision={2}
-        disabled={locked}
-        onPreview={(trimEnd) => change({ trimEnd })}
-        onChange={(trimEnd) => change({ trimEnd })}
-      />
       <TourInspectorNumericRow
         label={t('scenario.editor.tourAudioGain')}
         value={narration.gain * 100}

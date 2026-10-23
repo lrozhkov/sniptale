@@ -223,7 +223,7 @@ describe('CalloutSettingsPopover', () => {
     expect(document.querySelector('[data-ui="content.callout-settings.popover"]')).not.toBeNull();
   });
 
-  it('keeps comment settings open while selecting a dropdown option', () => {
+  it('keeps comment settings open while selecting a font segment', () => {
     const onClose = vi.fn();
 
     act(() => {
@@ -238,14 +238,10 @@ describe('CalloutSettingsPopover', () => {
       );
     });
 
-    const fontSelect = document.querySelector<HTMLButtonElement>('[aria-label="Шрифт"]');
-    expect(fontSelect).not.toBeNull();
-    act(() => fontSelect?.click());
-
-    const serifOption = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
-      (option) => option.textContent?.includes('Serif')
+    const serifOption = document.querySelector<HTMLButtonElement>(
+      '[role="group"][aria-label="Шрифт"] button[title="Serif"]'
     );
-    expect(serifOption).toBeDefined();
+    expect(serifOption).not.toBeNull();
     act(() => {
       serifOption?.click();
       document.dispatchEvent(

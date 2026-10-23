@@ -1,6 +1,6 @@
 import { getDrawingSelectionBounds, type DrawingObject } from '../../features/drawing/public';
 import type { PageScrollRoot } from '../platform/page-scroll';
-import type { PointerDraft } from './interaction';
+import type { PointerDraft, DrawingArrowHover } from './interaction';
 import { getDrawingViewportProjection } from './interaction';
 import {
   renderDrawingMarquee,
@@ -17,8 +17,11 @@ export function drawDrawingFrame(args: {
   selectedIds: readonly string[];
   root: PageScrollRoot;
   showChrome: boolean;
+  bendOnly?: boolean;
+  hoverBend?: DrawingArrowHover | null;
   renderObjects?: boolean;
   suppressText?: boolean;
+  pixelBudget?: number;
   getObjectOpacity?: (objectId: string) => number;
 }): void {
   const {
@@ -31,9 +34,12 @@ export function drawDrawingFrame(args: {
     renderObjects = true,
     suppressText = false,
   } = args;
-  const ratio = Math.max(1, window.devicePixelRatio || 1);
   const width = window.innerWidth;
   const height = window.innerHeight;
+  const ratio = Math.min(
+    Math.max(1, window.devicePixelRatio || 1),
+    Math.sqrt((args.pixelBudget ?? 16_777_216) / Math.max(1, width * height))
+  );
   const cssWidth = `${width}px`;
   const cssHeight = `${height}px`;
   if (canvas.style.width !== cssWidth) canvas.style.width = cssWidth;
@@ -62,15 +68,28 @@ export function drawDrawingFrame(args: {
         });
     });
   }
-  if (showChrome && draft?.kind === 'marquee') {
+  if (showChrome && !args.bendOnly && draft?.kind === 'marquee') {
     renderDrawingMarquee(context, draft.start, draft.current, projection);
   }
   if (showChrome && selectedIds.length > 0) {
     const selected = resolveDrawingFrameRenderables(objects, draft)
       .map(({ object }) => object)
       .filter((object) => selectedIds.includes(object.id));
-    if (selected.length === 1) renderDrawingSelection(context, selected[0]!, projection);
-    else renderDrawingMultiSelection(context, selected, projection);
+    if (selected.length === 1) {
+      const hoverPoint =
+        args.hoverBend && args.hoverBend.object === selected[0]
+          ? args.hoverBend.target.point
+          : draft?.kind === 'bend'
+            ? (draft.object.bendPoints?.[draft.target.index] ?? draft.target.point)
+            : undefined;
+      renderDrawingSelection(context, selected[0]!, projection, hoverPoint, args.bendOnly);
+    } else if (!args.bendOnly)
+      renderDrawingMultiSelection(
+        context,
+        selected,
+        projection,
+        draft?.kind === 'rotate-selection' ? draft : undefined
+      );
   }
   context.restore();
 }
@@ -114,8 +133,12 @@ export function captureDrawingObjects(canvas: HTMLCanvasElement) {
       : 1;
   });
   const area = areas.reduce((sum, value) => sum + value, 0);
+  const projection = getDrawingViewportProjection(source.root);
+  const clip = source.root.kind === 'element' ? source.root.element.getBoundingClientRect() : null;
   return source.objects.map((object, index) => ({
     object,
+    projection,
+    clip,
     anchor: source.getObjectAnchor?.(object) ?? null,
     canvas:
       object.kind === 'text' || object.kind === 'blur'

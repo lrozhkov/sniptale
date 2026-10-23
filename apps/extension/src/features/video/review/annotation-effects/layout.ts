@@ -8,7 +8,7 @@ import {
   invertQuickEditProjection,
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../advanced/spatial-geometry';
+} from '../../composition/motion/spatial-geometry';
 import type { ReviewAnnotationEffect, ReviewAnnotationEffectTransform } from './types';
 
 type Size = { width: number; height: number };

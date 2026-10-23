@@ -1,3 +1,4 @@
+import type { VideoEditorAnnotationActions } from '../../contracts/commands/annotation';
 import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type { VideoProject, VideoProjectClip } from '../../../features/video/project/types/index';
 import type {
@@ -31,10 +32,13 @@ export interface PlaybackLatestState {
 }
 
 export interface PlaybackHandlers {
+  editCommentDocument: VideoEditorAnnotationActions['editCommentDocument'];
   clearPlacementMode: () => void;
   deleteActionEvent: (actionEventId: string) => void;
   deleteClip: (clipId: string | readonly string[]) => void;
   deleteCursorSample: (sampleId: string) => void;
+  deleteSourceVoiceover: (documentId: string) => void;
+  duplicateSourceVoiceover: (documentId: string) => string | null;
   deleteEffectInstance: (effectInstanceId: string) => void;
   deleteMotionRegion: (motionRegionId: string) => void;
   deleteObjectTrack: (objectTrackId: string) => void;

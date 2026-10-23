@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { setup } from '../../../../project/state/insertion/material.test-support';
 import { resetVideoEditorProjectHistory } from '../../../../project/history';
 import { isSourceTimedClip } from '../../../../project/operations/source-timed-clips';
+import { InspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { ClipSourceRangeControls } from './source-range';
 
 function harness() {
@@ -24,14 +25,16 @@ function harness() {
     if (!isSourceTimedClip(clip)) throw new Error('Expected source timed fixture');
     act(() =>
       root.render(
-        <ClipSourceRangeControls
-          key={clip.id}
-          project={project}
-          clip={clip}
-          locked={false}
-          onTrimClipStart={store.getState().trimClipStart}
-          onTrimClipEnd={store.getState().trimClipEnd}
-        />
+        <InspectorLayout>
+          <ClipSourceRangeControls
+            key={clip.id}
+            project={project}
+            clip={clip}
+            locked={false}
+            onTrimClipStart={store.getState().trimClipStart}
+            onTrimClipEnd={store.getState().trimClipEnd}
+          />
+        </InspectorLayout>
       )
     );
   };
@@ -48,6 +51,7 @@ function harness() {
   render();
   return {
     store,
+    container,
     id,
     asset,
     render,
@@ -170,3 +174,62 @@ it.each([1, 4 / 3])(
     }
   }
 );
+
+it('keeps source boundaries in the canonical inspector value column', () => {
+  const h = harness();
+  try {
+    const rows = [...h.container.querySelectorAll('.sniptale-parameter-row')];
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => !row.className.includes('grid-cols-[minmax(0,1fr)_auto]!'))).toBe(
+      true
+    );
+  } finally {
+    h.dispose();
+  }
+});
+
+it('shows the empty physical source range and restores a retained subframe with one accepted edit', () => {
+  const h = harness();
+  try {
+    const project = h.store.getState().project!;
+    h.store.setState({
+      project: {
+        ...project,
+        version: 43,
+        duration: 2,
+        clips: project.clips.map((clip) =>
+          isSourceTimedClip(clip)
+            ? {
+                ...clip,
+                startTime: 2,
+                duration: 0,
+                sourceStart: 1,
+                sourceDuration: 0.005,
+                playbackRate: 2,
+                playbackWindow: { offset: 0, extent: 0.0025 },
+              }
+            : clip
+        ),
+      },
+    });
+    h.render();
+    expect(h.inputs().map((input) => input.value)).toEqual(['1', '1']);
+    const before = h.store.getState().project!;
+    h.type(1, '1.005', 'Escape');
+    expect(h.store.getState().project).toBe(before);
+    h.type(1, '1.005');
+    h.render();
+    const restored = h.store.getState().project!.clips.find((clip) => clip.id === h.id)!;
+    expect(restored).toMatchObject({
+      duration: 0.0025,
+      sourceStart: 1,
+      sourceDuration: 0.005,
+      playbackRate: 2,
+    });
+    expect(h.inputs().map((input) => input.value)).toEqual(['1', '1.005']);
+    expect(h.store.getState().projectHistory.past).toHaveLength(1);
+    expect(h.store.getState().projectHistory.past[0]!.project.clips).toEqual(before.clips);
+  } finally {
+    h.dispose();
+  }
+});

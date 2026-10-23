@@ -12,6 +12,7 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type { VideoEditorInsertionActions } from './insertion';
 
 interface VideoEditorTimelineState {
+  canDuplicateSelection: boolean;
   canDeleteSelectedClip: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
@@ -69,6 +70,7 @@ interface VideoEditorTimelineActions {
   onClearPlaybackRange: () => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
+  onSelectComment?: VideoEditorSessionActions['selectComment'];
   onSelectHistorySpan?: VideoEditorSessionActions['selectHistorySpan'];
   onSelectActionOccurrence: VideoEditorSessionActions['selectActionOccurrence'];
   onSelectClip: VideoEditorSessionActions['selectClip'];
@@ -78,6 +80,7 @@ interface VideoEditorTimelineActions {
   onSelectHistoryLane: VideoEditorSessionActions['selectHistoryLane'];
   onSelectMotionLane: VideoEditorSessionActions['selectMotionLane'];
   onSelectObjectTrack: VideoEditorSessionActions['selectObjectTrack'];
+  onSelectSourceVoiceover: VideoEditorSessionActions['selectSourceVoiceover'];
   onSelectScene: VideoEditorSessionActions['selectScene'];
   onSelectTrack: VideoEditorSessionActions['selectTrack'];
   onSelectTransition: VideoEditorSessionActions['selectTransition'];

@@ -1,9 +1,10 @@
-import { createQuickEditBorder } from './border';
+import { createQuickEditBorder } from '../../project/scene/focus-appearance';
+
 import { reviewSpeechTextSignature } from '../speech-transcript';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { reviewAdvancedContentBaseline } from '../document';
 import { createQuickEditWebcam } from './webcam';
-import { createQuickEditWatermark } from './watermark';
+import { createQuickEditWatermark } from '../../project/scene/watermark';
 import { expect, it } from 'vitest';
 import { buildReviewTimeMap } from '../timeline';
 import { migrateQuickEditAdvancedV1 } from './migration';

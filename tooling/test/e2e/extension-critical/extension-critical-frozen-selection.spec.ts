@@ -1,5 +1,63 @@
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
+import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`Crop restores native cursors after Escape at ${viewport.width}x${viewport.height}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+    await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+    await page.locator('[data-ui="content.toolbar.timer-button"]').click();
+    await page
+      .locator('[data-ui="content.toolbar.timer-menu"]')
+      .getByText('No delay', { exact: true })
+      .click();
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty('--sniptale-color-accent', '#f97316');
+    });
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
+      await expect(page.locator('.sniptale-selection-container')).toBeVisible();
+      await expect(page.locator('body')).toHaveCSS('cursor', 'crosshair');
+      await page.mouse.move(500, 350);
+      await page.mouse.down();
+      await page.mouse.move(750, 450, { steps: 4 });
+      await page.mouse.up();
+      await expect(page.locator('.sniptale-selection-size-confirm-button')).toBeVisible();
+      await expect(page.locator('.sniptale-selection-final-frame')).toHaveCSS('cursor', 'move');
+      await expect(page.locator('.sniptale-resize-handle[data-direction="nw"]')).toHaveCSS(
+        'cursor',
+        'nwse-resize'
+      );
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
+      await expect(page.locator('#sniptale-crosshair-cursor')).toHaveCount(0);
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const target = document.elementFromPoint(600, 400);
+            return target ? getComputedStyle(target).cursor : null;
+          })
+        )
+        .toBe('auto');
+      await expect(page.locator('body')).toHaveCSS('cursor', 'auto');
+    }
+    await page.screenshot({
+      path: info.outputPath('crop-escape-native-cursor.png'),
+      fullPage: false,
+    });
+    await popup.close();
+    await page.close();
+  });
+}
 
 test('timed selection freezes a busy large page and leaves annotation frames responsive', async ({
   context,
@@ -140,7 +198,7 @@ test('timed selection freezes a busy large page and leaves annotation frames res
   };
 
   await capture(true);
-  await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCSS('cursor', /crosshair/u);
+  await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCSS('cursor', 'crosshair');
   await expect(page.locator('.sniptale-selection-cancel-button')).toHaveCSS('cursor', 'pointer');
   await expect(page.locator('.sniptale-selection-area-only-hint')).toHaveCount(0);
   await page.mouse.move(650, 550);
@@ -173,7 +231,7 @@ test('timed selection freezes a busy large page and leaves annotation frames res
   });
   expect(await enableMode()).toMatchObject({ success: true });
   await capture();
-  await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCSS('cursor', /crosshair/u);
+  await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCSS('cursor', 'crosshair');
   await expect(page.locator('.sniptale-selection-area-only-hint')).toBeVisible();
   await expect(page.locator('.sniptale-selection-area-only-hint')).toContainText(
     /(?:Drag to select an area|Потяните, чтобы выделить область)/u

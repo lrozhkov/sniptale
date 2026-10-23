@@ -93,6 +93,7 @@ beforeEach(() => {
     revokeObjectURL: vi.fn(),
   });
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -103,6 +104,87 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   FakeRecorder.instances = [];
+  vi.restoreAllMocks();
+});
+
+async function recordTestAudio() {
+  renderRecorder();
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="popup.video.microphoneTestRecord"]')
+      ?.click();
+  });
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="popup.video.microphoneTestStop"]')
+      ?.click();
+  });
+}
+
+it('toggles sound check playback and restores Play when playback ends or errors', async () => {
+  await recordTestAudio();
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="popup.video.microphoneTestPlay"]')
+      ?.click();
+  });
+  expect(container?.querySelector('[aria-label="popup.video.microphoneTestPause"]')).not.toBeNull();
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="popup.video.microphoneTestPause"]')
+      ?.click();
+  });
+  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalledOnce();
+  expect(container?.querySelector('[aria-label="popup.video.microphoneTestPlay"]')).not.toBeNull();
+  for (const eventName of ['ended', 'error']) {
+    await act(async () => {
+      container
+        ?.querySelector<HTMLButtonElement>('[aria-label="popup.video.microphoneTestPlay"]')
+        ?.click();
+    });
+    await act(async () => {
+      container?.querySelector('audio')?.dispatchEvent(new Event(eventName));
+    });
+    expect(
+      container?.querySelector('[aria-label="popup.video.microphoneTestPlay"]')
+    ).not.toBeNull();
+  }
+});
+
+it('restores Play and shows the playback failure when play rejects', async () => {
+  await recordTestAudio();
+  vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('blocked'));
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="popup.video.microphoneTestPlay"]')
+      ?.click();
+  });
+  expect(container?.querySelector('[aria-label="popup.video.microphoneTestPlay"]')).not.toBeNull();
+  expect(container?.textContent).toContain('popup.video.microphoneTestPlaybackError');
+});
+
+it('ignores a previous playback rejection after a new recording starts', async () => {
+  await recordTestAudio();
+  let rejectPlayback: ((reason: Error) => void) | undefined;
+  vi.mocked(HTMLMediaElement.prototype.play).mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        rejectPlayback = reject;
+      })
+  );
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="popup.video.microphoneTestPlay"]')
+      ?.click();
+  });
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="popup.video.microphoneTestRecord"]')
+      ?.click();
+    rejectPlayback?.(new Error('interrupted'));
+  });
+  expect(FakeRecorder.instances[1]?.state).toBe('recording');
+  expect(container?.textContent).not.toContain('popup.video.microphoneTestPlaybackError');
 });
 
 it('starts, stops, plays, and revokes a microphone test recording on close', () => {

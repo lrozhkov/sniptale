@@ -1,5 +1,7 @@
+import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import {
   renderEffectRuntimeComposition,
+  disposeEffectRuntimeComposition,
   type EffectRuntimeRenderedComposition,
 } from '../../../features/video/composition/effect-runtime';
 import type { VideoCompositionMediaSource } from '../../../features/video/composition/draw/media-source';
@@ -16,7 +18,9 @@ export interface RenderOffscreenProjectEffectFramesInput {
   currentTime: number;
   loadedImages: LoadedImagesMap;
   ownerDocument?: Document;
+  spatialRenderer?: () => ReviewSpatialRenderer;
   project: VideoProject;
+  signal?: AbortSignal;
 }
 
 export interface OffscreenProjectEffectRuntime {
@@ -49,11 +53,15 @@ export function createOffscreenProjectEffectRuntime(
           : {}),
       });
       return renderEffectRuntimeComposition({
+        project: projectArgs.project,
+        streamVisualPasses: true,
+        ...(projectArgs.signal ? { signal: projectArgs.signal } : {}),
         clipMediaElements: projectArgs.clipMediaElements,
         executor,
         imageBank: projectArgs.loadedImages,
         overlayFrame: renderPasses.overlayFrame,
         overlayTime: projectArgs.currentTime,
+        ...(projectArgs.spatialRenderer ? { spatialRenderer: projectArgs.spatialRenderer } : {}),
         ...(projectArgs.ownerDocument ? { ownerDocument: projectArgs.ownerDocument } : {}),
         visualPasses: renderPasses.visualPasses,
       });
@@ -68,9 +76,27 @@ export async function renderOffscreenProjectEffectFrames(
     ...(args.ownerDocument ? { ownerDocument: args.ownerDocument } : {}),
   });
   try {
-    return await runtime.renderProjectFrames(args);
-  } finally {
+    const frames = await runtime.renderProjectFrames(args);
+    if (!frames) {
+      runtime.dispose();
+      return undefined;
+    }
+    let disposed = false;
+    return {
+      ...frames,
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        try {
+          disposeEffectRuntimeComposition(frames);
+        } finally {
+          runtime.dispose();
+        }
+      },
+    };
+  } catch (error) {
     runtime.dispose();
+    throw error;
   }
 }
 

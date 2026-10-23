@@ -70,6 +70,10 @@ export type EffectRuntimeRenderedFrameMap = ReadonlyMap<string, EffectRuntimeRen
 export interface EffectRuntimeRenderedComposition {
   framesByTime: ReadonlyMap<number, EffectRuntimeRenderedFrameMap>;
   overlayFrames: EffectRuntimeRenderedFrameMap;
+  /** Prepare the requested exposure and release the previously consumed sampled rasters. */
+  prepareVisualPass?(time: number): Promise<void>;
+  /** Close retained rasters and refuse subsequent preparation, including late results. */
+  dispose?(): void;
 }
 
 export function isSameEffectTarget(

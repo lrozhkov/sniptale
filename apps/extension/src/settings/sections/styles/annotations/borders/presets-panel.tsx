@@ -116,7 +116,7 @@ export function HighlighterPresetsPanel({ presets, settings }: HighlighterPreset
         }
         onAction={onAction}
         onMove={(intent: SettingsCollectionMoveIntent) =>
-          void presets.handleMoveBefore(intent.itemId, intent.beforeItemId)
+          presets.handleMoveBefore(intent.itemId, intent.beforeItemId)
         }
       />
     </div>

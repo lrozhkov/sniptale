@@ -8,7 +8,6 @@ import {
   resolveCameraFollowPolicy,
   type CameraFollowSettings,
 } from '../../../../../features/video/project/camera/cursor-policy';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { SliderField } from '../shared/sliders';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
 import {
@@ -37,7 +36,8 @@ import type { VideoProject } from '../../../../../features/video/project/types';
 import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
 import { translate, formatNumber } from '../../../../../platform/i18n';
 import { NumberInput } from '../inputs/number';
-import { SelectInput } from '../shared/controls';
+import { SelectInput, ToggleField } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { InspectorActionButton } from '../shared/actions';
 import { InspectorDetails } from '../shared/details';
 import { SlidersHorizontal } from 'lucide-react';
@@ -206,29 +206,25 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
       className="sniptale-parameter-stack m-0 min-w-0 border-0 p-0"
       data-ui="cursorFocusPath.settings"
     >
-      <div className="sniptale-parameter-stack min-w-0 space-y-1.5">
-        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {translate('videoEditor.sidebar.cursorFocusMode')}
-        </span>
-        <SegmentedRow
-          columns={2}
-          ariaLabel={translate('videoEditor.sidebar.cursorFocusMode')}
-          value={path.mode}
-          options={[
-            {
-              value: 'fixed',
-              label: translate('videoEditor.sidebar.cursorFocusFixed'),
-              disabled: locked,
-            },
-            {
-              value: 'follow',
-              label: translate('videoEditor.sidebar.cursorFocusFollow'),
-              disabled: locked,
-            },
-          ]}
-          onChange={(mode) => change({ ...path, mode })}
-        />
-      </div>
+      <SegmentedRow
+        label={translate('videoEditor.sidebar.cursorFocusMode')}
+        columns={2}
+        ariaLabel={translate('videoEditor.sidebar.cursorFocusMode')}
+        value={path.mode}
+        options={[
+          {
+            value: 'fixed',
+            label: translate('videoEditor.sidebar.cursorFocusFixed'),
+            disabled: locked,
+          },
+          {
+            value: 'follow',
+            label: translate('videoEditor.sidebar.cursorFocusFollow'),
+            disabled: locked,
+          },
+        ]}
+        onChange={(mode) => change({ ...path, mode })}
+      />
       <InspectCameraFollowSettings
         global
         settings={
@@ -305,7 +301,7 @@ function CursorInspectorGeometry({ state }: { state: CursorInspectorState }) {
         disabled={!editable}
         onChange={(y) => patch({ y })}
       />
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.cursorFocusCurve')}
         value={key.interpolation}
         options={[
@@ -450,43 +446,31 @@ export function InspectCameraFollowSettings(props: {
     name: 'preservePointer' | 'allowExpansion',
     key: Parameters<typeof translate>[0]
   ) => (
-    <div className="flex min-w-0 items-center justify-between gap-2" key={name}>
-      <span className="text-xs">{label(key)}</span>
-      <ProductGlassSwitch
-        role="switch"
-        aria-label={label(key)}
-        aria-checked={settings[name]}
-        on={settings[name]}
-        disabled={props.disabled}
-        onClick={() => update({ [name]: !settings[name] })}
-      />
-    </div>
+    <ToggleField
+      key={name}
+      label={label(key)}
+      checked={settings[name]}
+      disabled={props.disabled ?? false}
+      onChange={(value) => update({ [name]: value })}
+    />
   );
   return (
     <fieldset
       className="sniptale-parameter-stack m-0 min-w-0 space-y-2 border-0 p-0"
       data-ui="cameraFollow.settings"
     >
-      <div className="sniptale-parameter-stack min-w-0 space-y-1.5">
-        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {label('videoEditor.sidebar.cameraZoneSize')}
-        </span>
-        <CameraFollowZoneChoice
-          settings={settings}
-          disabled={props.disabled}
-          onChange={props.onChange}
-        />
-      </div>
-      <div className="sniptale-parameter-stack min-w-0 space-y-1.5">
-        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {label('videoEditor.sidebar.cameraMovement')}
-        </span>
-        <CameraFollowMovementChoice
-          settings={settings}
-          disabled={props.disabled}
-          onChange={props.onChange}
-        />
-      </div>
+      <CameraFollowZoneChoice
+        showLabel
+        settings={settings}
+        disabled={props.disabled}
+        onChange={props.onChange}
+      />
+      <CameraFollowMovementChoice
+        showLabel
+        settings={settings}
+        disabled={props.disabled}
+        onChange={props.onChange}
+      />
       <InspectorDetails
         label={label('videoEditor.sidebar.framingFineTune')}
         icon={SlidersHorizontal}

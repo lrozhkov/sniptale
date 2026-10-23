@@ -897,7 +897,11 @@ it('lists every lane with aligned settings, retains unavailable streams off, and
     await fixture.fill('Note after track configuration');
     await fixture.click('save');
     await act(async () =>
-      vi.waitFor(() => expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation'))
+      vi.waitFor(() =>
+        expect(committedEditorFixtureProjection(fixture.snapshot).document.annotations).toEqual([
+          expect.objectContaining({ text: 'Note after track configuration' }),
+        ])
+      )
     );
   } finally {
     await fixture.cleanup();

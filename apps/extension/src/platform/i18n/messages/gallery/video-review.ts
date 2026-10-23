@@ -467,6 +467,20 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Расширенный режим',
     en: 'Advanced editing',
   },
+  modeChoiceTitle: { ru: 'Как хотите редактировать видео?', en: 'How would you like to edit?' },
+  modeChoiceBasic: { ru: 'Простой режим', en: 'Simple editing' },
+  modeChoiceBasicDescription: {
+    ru: 'Обрезайте видео по ключевым кадрам, ускоряйте отдельные участки и экспортируйте без повторного сжатия видео. Для быстрой подготовки записи с сохранением качества.',
+    en: 'Trim at keyframes, speed up selected sections, and export without re-encoding the video. A quick way to prepare a recording while preserving its quality.',
+  },
+  modeChoiceAdvancedDescription: {
+    ru: 'Обрезайте видео с точностью до кадра, добавляйте фон, текст и эффекты. Работайте со звуком, распознаванием речи и субтитрами — для более детального монтажа.',
+    en: 'Trim with frame-level precision and add backgrounds, text, and effects. Work with audio, speech recognition, and subtitles for more detailed control over your edit.',
+  },
+  modeChoiceSwitchHint: {
+    ru: 'Режим можно переключить в любой момент на панели редактора.',
+    en: 'You can switch modes at any time in the editor toolbar.',
+  },
   advancedEditingHint: {
     ru: 'Фокусировка, оформление сцены и звуковые дорожки',
     en: 'Focus effects, scene styling, and audio tracks',

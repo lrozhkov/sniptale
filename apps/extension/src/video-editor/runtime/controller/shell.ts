@@ -72,7 +72,14 @@ export function createVideoEditorCommandPaletteController(args: {
   runtime: Pick<VideoEditorRuntimeController, 'togglePlayback'>;
   store: Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
     Pick<ClipSelectionPort, 'selectedClipId'> &
-    Pick<TimelineEditingPort, 'deleteClip' | 'duplicateClip' | 'splitClipAt'> &
+    Pick<
+      TimelineEditingPort,
+      | 'deleteClip'
+      | 'duplicateClip'
+      | 'splitClipAt'
+      | 'deleteSourceVoiceover'
+      | 'duplicateSourceVoiceover'
+    > &
     Pick<AnnotationEditingPort, 'addShapeOverlay' | 'addTextOverlay'> &
     Pick<ExportPort, 'openExportDialog'>;
   workspace: Pick<VideoEditorWorkspaceState, 'leftSidebarCollapsed' | 'toggleSidebarCollapsed'>;

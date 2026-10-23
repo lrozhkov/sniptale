@@ -60,8 +60,12 @@ function TimerDropdownItems(props: {
   );
 }
 
-export function TimerDropdown(props: TimerDropdownProps) {
-  const adopted = React.useContext(CommandPressScope);
+export function resolveTimerMenuLayout(
+  props: Pick<
+    TimerDropdownProps,
+    'timerButtonRef' | 'displayMode' | 'getMenuPosition' | 'viewportRightInset'
+  >
+) {
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.timerButtonRef,
     displayMode: props.displayMode,
@@ -72,6 +76,13 @@ export function TimerDropdown(props: TimerDropdownProps) {
       ? {}
       : { viewportRightInset: props.viewportRightInset }),
   });
+
+  return { placement: menuPlacement, style };
+}
+
+export function TimerDropdown(props: TimerDropdownProps) {
+  const adopted = React.useContext(CommandPressScope);
+  const { placement: menuPlacement, style } = resolveTimerMenuLayout(props);
 
   if (!style) {
     return null;

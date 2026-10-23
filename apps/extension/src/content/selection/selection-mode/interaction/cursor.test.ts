@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 describe('selection-mode cursor', () => {
-  it('replaces an existing cursor style cleanup and mounts accent-aware cursor css', () => {
+  it('replaces an existing cursor style cleanup and mounts native cursor css', () => {
     const previousCleanup = vi.fn();
     const nextCleanup = vi.fn();
     mountStyleInAccessibleDocumentsMock.mockReturnValue(nextCleanup);
@@ -35,7 +35,7 @@ describe('selection-mode cursor', () => {
       })
     );
     expect(mountStyleInAccessibleDocumentsMock.mock.calls[0]?.[0]?.textContent).toContain(
-      '%2322c55e'
+      'cursor: crosshair !important'
     );
     expect(state.cursorStyleCleanup).toBe(nextCleanup);
   });
@@ -50,13 +50,15 @@ describe('selection-mode cursor', () => {
     expect(state.cursorStyleCleanup).toBeNull();
   });
 
-  it('uses the fallback cursor color when the page has no accent token', () => {
+  it('uses a native cursor when the page has no accent token', () => {
     mountStyleInAccessibleDocumentsMock.mockReturnValue(vi.fn());
 
     enableSelectionModeCursor({ cursorStyleCleanup: null });
 
     expect(mountStyleInAccessibleDocumentsMock).toHaveBeenCalledWith(
-      expect.objectContaining({ textContent: expect.stringContaining('%233b82f6') })
+      expect.objectContaining({
+        textContent: expect.stringContaining('cursor: crosshair !important'),
+      })
     );
   });
 });

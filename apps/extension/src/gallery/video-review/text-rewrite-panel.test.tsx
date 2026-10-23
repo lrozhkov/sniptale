@@ -161,12 +161,7 @@ it('lets the user correct, add and remove captured phrase mappings before Apply'
     },
   }));
   await mountForm(true, true);
-  await click('textRewriteMode');
-  await act(async () =>
-    [...document.querySelectorAll<HTMLElement>('[role="option"]')]
-      .find((entry) => entry.textContent?.includes('gallery.videoReview.textRewriteScript'))!
-      .click()
-  );
+  await click('textRewriteScript');
   await click('textRewriteTiming');
   await click('textRewriteStructure');
   await click('textRewriteStart');
@@ -202,12 +197,7 @@ it('lets the user correct, add and remove captured phrase mappings before Apply'
 
 it('requires script permissions, pages and edits the proposal, and creates a hidden variant', async () => {
   await mountForm(true);
-  await click('textRewriteMode');
-  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((entry) =>
-    entry.textContent?.includes('gallery.videoReview.textRewriteScript')
-  );
-  expect(option).toBeDefined();
-  await act(async () => option!.click());
+  await click('textRewriteScript');
   await click('textRewriteTiming');
   await click('textRewriteStructure');
   await click('textRewriteStart');

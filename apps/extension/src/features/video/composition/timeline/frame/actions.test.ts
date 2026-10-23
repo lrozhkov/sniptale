@@ -244,3 +244,87 @@ it.each(['halo', 'path', 'area'] as const)(
     expect(resolveVideoCompositionActions(project, 1.5)).toEqual([]);
   }
 );
+
+it('evaluates a partial rate-two camera position and its circle crop at project time', async () => {
+  const { project, clip } = capturedProject();
+  project.tracks[0]!.role = 'CAMERA';
+  clip.transform = { x: 20, y: 20, width: 80, height: 40, rotation: 0, opacity: 1 };
+  clip.sourceStart = 1;
+  clip.sourceDuration = 3;
+  clip.playbackRate = 2;
+  clip.duration = 1.5;
+  project.duration = 1.5;
+  clip.cameraAppearance = { shape: 'circle', roundness: 61, zoom: 1, panX: 0, panY: 0 };
+  clip.cameraPositions = [
+    {
+      id: 'move',
+      sourceTime: 2,
+      crop: { zoom: 2, panX: 0.4, panY: -0.2 },
+      transform: { ...clip.transform, x: 100, width: 160, height: 80 },
+      fitMode: 'CONTAIN',
+      transition: { kind: 'smooth', duration: 1 },
+    },
+  ];
+  const occurrence = resolveVideoCompositionActions(project, 0.75)[0]?.occurrence;
+  if (!occurrence) throw new Error('Missing camera action');
+  const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, 0.75);
+  expect(mapping).toMatchObject({
+    frame: { x: 60, y: 20, width: 120, height: 60 },
+    fitMode: 'COVER',
+    cameraAppearance: { ...clip.cameraAppearance, zoom: 1.5, panX: 0.2, panY: -0.1 },
+  });
+  if (!mapping) throw new Error('Expected source mapping');
+  const { mapSourceNormalizedPointToVisualLayer, mapVisualLayerPointToSourceNormalized } =
+    await import('../../draw/fitted-media');
+  const point = mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: 0.5, y: 0.5 } });
+  expect(point?.x).toBeCloseTo(114.75, 8);
+  expect(point?.y).toBeCloseTo(51.5, 8);
+  if (!point) throw new Error('Expected visible source point');
+  const source = mapVisualLayerPointToSourceNormalized({ ...mapping, point });
+  expect(source?.x).toBeCloseTo(0.5, 8);
+  expect(source?.y).toBeCloseTo(0.5, 8);
+  expect(clip.transform).toEqual({ x: 20, y: 20, width: 80, height: 40, rotation: 0, opacity: 1 });
+  expect(clip.sourceStart).toBe(1);
+  expect(clip.playbackRate).toBe(2);
+});
+
+it('removes captured camera source editing while hidden and restores it at the source endpoint', () => {
+  const { project, clip } = capturedProject();
+  project.tracks = project.tracks.map((track) => ({ ...track, role: 'CAMERA' }));
+  clip.cameraHiddenRanges = [{ id: 'hidden', start: 2, end: 2.5 }];
+  const occurrence = resolveVideoCompositionActions(project, 2.2)[0]!.occurrence;
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 1.99)).not.toBeNull();
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2)).toBeNull();
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.4999)).toBeNull();
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.5)).not.toBeNull();
+  project.actionEvents.push({ ...manualEvent(), anchor: { kind: 'project', time: 2 } });
+  const frame = resolveVideoCompositionFrame(project, 2.2);
+  expect(frame.visualLayers).toEqual([]);
+  expect(frame.actions.map((action) => action.event.id)).toEqual(['manual']);
+  project.tracks = project.tracks.map(({ role: _role, ...track }) => track);
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.2)).not.toBeNull();
+});
+
+it('shares normal rounded source admission with action editing and leaves camera radius dormant', async () => {
+  const { project, clip } = capturedProject();
+  clip.windowCornerRadius = 50;
+  clip.fitMode = 'STRETCH';
+  clip.transform = { ...clip.transform, x: 0, y: 0, width: 100, height: 100, rotation: 0 };
+  const occurrence = resolveVideoCompositionActions(project, 2.2)[0]!.occurrence;
+  const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, 2.2);
+  expect(mapping?.windowCornerRadius).toBe(50);
+  const { mapSourceNormalizedPointToVisualLayer } = await import('../../draw/fitted-media');
+  if (!mapping) throw new Error('Expected source mapping');
+  expect(
+    mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: 0.01, y: 0.01 } })
+  ).toBeNull();
+  expect(mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: 0.5, y: 0.5 } })).toEqual({
+    x: 50,
+    y: 50,
+  });
+  project.tracks = project.tracks.map((track) => ({ ...track, role: 'CAMERA' }));
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.2)).not.toHaveProperty(
+    'windowCornerRadius'
+  );
+  expect(clip.windowCornerRadius).toBe(50);
+});

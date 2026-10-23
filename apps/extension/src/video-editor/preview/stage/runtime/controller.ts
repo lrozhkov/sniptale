@@ -44,6 +44,7 @@ function usePreviewStageSurfaceState(params: {
   previewZoom: PreviewStageProps['previewZoom'];
   project: VideoProject;
   selectedClipId: string | null;
+  selectedEffectInstanceId?: string | null | undefined;
 }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const interactionRef = useRef<InteractionState | null>(null);
@@ -54,6 +55,7 @@ function usePreviewStageSurfaceState(params: {
     activeClips,
     project: params.project,
     selectedClipId: params.selectedClipId,
+    selectedEffectInstanceId: params.selectedEffectInstanceId,
   });
   const camera = React.useMemo(
     () => resolveVideoCompositionFrame(params.project, params.currentTime).camera,
@@ -64,6 +66,7 @@ function usePreviewStageSurfaceState(params: {
     activeClips,
     beginInteraction: createPreviewStageInteraction({
       camera,
+      currentTime: params.currentTime,
       ...(params.gestureHooks ? { gestureHooks: params.gestureHooks } : {}),
       interactionCleanupRef,
       interactionRef,
@@ -130,6 +133,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     previewZoom: params.previewZoom,
     project: transient.previewProject,
     selectedClipId: params.selectedClipId,
+    selectedEffectInstanceId: params.selectedEffectInstanceId,
   });
   const previewRasterSize = useMemo(
     () => resolveVideoEditorPreviewRasterSize(previewProject, params.previewRasterPreset),

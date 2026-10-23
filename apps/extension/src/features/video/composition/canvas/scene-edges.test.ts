@@ -1,0 +1,141 @@
+// @vitest-environment jsdom
+import { afterEach, expect, it, vi } from 'vitest';
+import { createVideoProjectSceneEdges } from '../../project/scene/edge-fades';
+import { drawVideoProjectSceneEdges, drawCompositionColorOverlay } from './scene-edges';
+
+afterEach(() => vi.restoreAllMocks());
+function fixture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 360;
+  const context = canvas.getContext('2d')!;
+  const sceneEdges = createVideoProjectSceneEdges();
+  sceneEdges.intro = { enabled: true, duration: 2, color: '#ff0000ff' };
+  sceneEdges.outro = { enabled: true, duration: 2, color: '#0000ffff' };
+  return { context, project: { duration: 10, sceneEdges } };
+}
+
+it('keeps missing and disabled scene edges neutral without touching the output context', () => {
+  const { context } = fixture();
+  const fill = vi.spyOn(context, 'fillRect');
+  const save = vi.spyOn(context, 'save');
+  drawVideoProjectSceneEdges(context, { duration: 10 }, 0);
+  drawVideoProjectSceneEdges(
+    context,
+    { duration: 10, sceneEdges: createVideoProjectSceneEdges() },
+    10
+  );
+  expect(fill).not.toHaveBeenCalled();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it('paints independent colors in backing space after camera and shadow state', () => {
+  const { context, project } = fixture();
+  const states: unknown[] = [];
+  const fill = vi.spyOn(context, 'fillRect').mockImplementation((...bounds) => {
+    states.push({
+      bounds,
+      alpha: context.globalAlpha,
+      color: context.fillStyle,
+      filter: context.filter,
+      shadow: context.shadowBlur,
+      composite: context.globalCompositeOperation,
+    });
+  });
+  const transform = vi.spyOn(context, 'setTransform');
+  context.shadowBlur = 20;
+  context.filter = 'blur(8px)';
+  drawVideoProjectSceneEdges(context, project, 1, { x: 10, y: 20, width: 200, height: 100 });
+  drawVideoProjectSceneEdges(context, project, 9);
+  expect(transform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
+  expect(fill).toHaveBeenCalledTimes(2);
+  expect(states).toEqual([
+    {
+      bounds: [10, 20, 200, 100],
+      alpha: 0.5,
+      color: '#ff0000',
+      filter: 'none',
+      shadow: 0,
+      composite: 'source-over',
+    },
+    {
+      bounds: [0, 0, 640, 360],
+      alpha: expect.closeTo(0.5166665, 6),
+      color: '#0000ff',
+      filter: 'none',
+      shadow: 0,
+      composite: 'source-over',
+    },
+  ]);
+});
+
+it('restores the owning context when final painting fails', () => {
+  const { context, project } = fixture();
+  const restore = vi.spyOn(context, 'restore');
+  vi.spyOn(context, 'fillRect').mockImplementation(() => {
+    throw new Error('Context lost');
+  });
+  expect(() => drawVideoProjectSceneEdges(context, project, 0)).toThrow('Context lost');
+  expect(restore).toHaveBeenCalledOnce();
+});
+
+it('uses the same final-canvas color paint for joins without inheriting caller camera or effect state', () => {
+  const { context } = fixture();
+  context.globalAlpha = 0.2;
+  context.globalCompositeOperation = 'multiply';
+  context.filter = 'blur(2px)';
+  context.shadowBlur = 12;
+  const savedAlpha = context.globalAlpha;
+  const fill = vi.spyOn(context, 'fillRect').mockImplementation(() => {
+    expect(context.globalAlpha).toBe(0.75);
+    expect(context.globalCompositeOperation).toBe('source-over');
+    expect(context.filter).toBe('none');
+    expect(context.shadowBlur).toBe(0);
+    expect(context.fillStyle).toBe('#ffffff');
+  });
+  drawCompositionColorOverlay(context, 0.75, '#ffffff');
+  expect(fill).toHaveBeenCalledWith(0, 0, 640, 360);
+  expect(context.globalAlpha).toBe(savedAlpha);
+  expect(context.globalCompositeOperation).toBe('multiply');
+  expect(context.shadowBlur).toBe(12);
+});
+
+it('uses the export cadence instead of project fps and leaves a single output frame neutral', () => {
+  const { context, project } = fixture();
+  const opacity: number[] = [];
+  const fill = vi.spyOn(context, 'fillRect').mockImplementation(() => {
+    opacity.push(context.globalAlpha);
+  });
+  project.sceneEdges.intro.enabled = false;
+  drawVideoProjectSceneEdges(context, { ...project, duration: 2.13, fps: 60 }, 2.1, undefined, 10);
+  expect(context.globalAlpha).toBe(1);
+  expect(fill).toHaveBeenCalledOnce();
+  expect(opacity).toEqual([1]);
+  fill.mockClear();
+  drawVideoProjectSceneEdges(context, { ...project, duration: 0.1, fps: 1 }, 0);
+  expect(fill).not.toHaveBeenCalled();
+});
+
+it('keeps the preceding low-rate Native frame visible and fades only the normalized final frame', () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 8;
+  canvas.height = 4;
+  const context = canvas.getContext('2d')!;
+  const sceneEdges = createVideoProjectSceneEdges();
+  sceneEdges.outro = { enabled: true, duration: 0.4 };
+  const project = { duration: 4, fps: 0.5, sceneEdges };
+  for (const [time, expected] of [
+    [2, 255],
+    [3, 0],
+  ] as const) {
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 8, 4);
+    drawVideoProjectSceneEdges(context, project, time);
+    expect(Array.from(context.getImageData(0, 0, 1, 1).data)).toEqual([
+      expected,
+      expected,
+      expected,
+      255,
+    ]);
+  }
+});

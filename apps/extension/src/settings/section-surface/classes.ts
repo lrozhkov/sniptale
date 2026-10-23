@@ -47,8 +47,9 @@ export const settingsEmptyStateClassName = [
 export const settingsToggleRowClassName = 'flex min-h-8 items-center justify-between gap-2 py-0';
 
 export const settingsAddButtonClassName = [
-  'flex w-full',
-  getControlSecondaryButtonClassName({ density: 'default' }),
+  'inline-flex w-fit',
+  getControlSecondaryButtonClassName({ density: 'compact' }),
+  '!min-h-8 !h-8 !rounded-[4px] !px-2 !py-0 gap-1.5',
 ].join(' ');
 
 export const settingsNeutralBadgeClassName = [
@@ -66,6 +67,7 @@ export const settingsSuccessBadgeClassName = [
 export const settingsModalFieldSurfaceClassName = '';
 
 export const settingsModalClassName = [
+  'sniptale-settings-workspace sniptale-compact-workspace',
   '!rounded-[8px]',
   '[&_.sniptale-modal-header-sm]:px-4 [&_.sniptale-modal-header-sm]:py-3',
   '[&_.sniptale-modal-body-sm]:px-4 [&_.sniptale-modal-body-sm]:py-3',
@@ -77,3 +79,4 @@ export const settingsMetaLabelClassName =
 
 export const settingsDividerClassName =
   'h-px bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_64%,transparent)]';
+export const settingsPendingControlClassName = 'disabled:!opacity-100';

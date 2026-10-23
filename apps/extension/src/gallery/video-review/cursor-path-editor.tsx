@@ -24,7 +24,7 @@ import {
 import { evaluateReviewCursorFocus } from '../../features/video/review/advanced/cursor-focus-path';
 import { Clock3, MousePointer2, SlidersHorizontal } from 'lucide-react';
 import { SegmentedRow, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
-import { ReviewNumberRow } from './number-row';
+import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import {
   ReviewButton,

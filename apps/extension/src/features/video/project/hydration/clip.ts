@@ -22,7 +22,7 @@ function normalizeClipPlayback(clip: VideoProject['clips'][number]) {
   return {
     playbackRate,
     sourceDuration,
-    duration: sourceDuration / playbackRate,
+    duration: clip.playbackWindow ? clip.duration : sourceDuration / playbackRate,
   };
 }
 
@@ -60,7 +60,7 @@ function normalizeMediaShadowIntensity(value: number | undefined): number {
     return 0;
   }
 
-  return Math.max(0, Math.min(100, Math.round(value)));
+  return Math.max(0, Math.min(100, value));
 }
 
 function normalizeMediaShadowMode(value: unknown): VideoMediaShadowMode {

@@ -76,24 +76,6 @@
       }
     },
     {
-      "id": "0453e3bf4d36765459f0751aaf6e376595a25b7c34a40aea89c9da81e5bf9345",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/speech-profile.tsx",
-      "reason": "Same audio format literals update distinct authoritative review profile and provider model parameters.",
-      "removalCondition": "Remove when a common audio-format field contract replaces both or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/speech-profile.tsx",
-        "start": 102,
-        "end": 110
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/ai/connections/forms/model-audio-fields.tsx",
-        "start": 213,
-        "end": 221
-      }
-    },
-    {
       "id": "04fedfa75986e5a0b1ceb9c8f7c4975e114ed313250e374d21368ff91c75452e",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/product-form-controls",

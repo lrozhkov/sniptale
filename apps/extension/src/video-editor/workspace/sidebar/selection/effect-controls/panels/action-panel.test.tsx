@@ -1,3 +1,4 @@
+import { REVIEW_CLICK_DEFAULT } from '../../../../../../features/video/project/action-feedback/validation';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -115,4 +116,136 @@ it('respects a locked history lane for both inheritance and point editing', () =
   expect(button('resetPointToCenter').disabled).toBe(true);
   expect(button('selectPointOnStage').disabled).toBe(true);
   expect(props.onUpdateActionEventDetails).not.toHaveBeenCalled();
+});
+
+it('groups gesture appearance without legacy timing or placement and keeps event admission', () => {
+  const props = fixture();
+  const base = props.project.actionEvents[0]!;
+  const project = {
+    ...props.project,
+    version: 3 as const,
+    actionEvents: [
+      {
+        ...base,
+        data: {
+          gestureType: 'hold',
+          gestureId: 'hold',
+          button: 0,
+          downTime: 1,
+          upTime: 2,
+          completion: 'released',
+        },
+        presentation: { enabled: false, preset: 'NONE' as const },
+      },
+    ],
+    actionFeedback: [
+      { recordingId: 'rec-asset-video', sourceInstanceId: 'instance', settings: [], signals: [] },
+    ],
+  };
+  const selected = resolveVideoProjectActionOccurrences(project).find(
+    (row) => row.clipId === 'repeat'
+  )!;
+  act(() =>
+    root.render(
+      <InspectActionPanel {...props} project={project} selectedActionOccurrence={selected} />
+    )
+  );
+  expect(button('historyForceOff').getAttribute('aria-pressed')).toBe('true');
+  const labels = [...container.querySelectorAll('button')].map((node) =>
+    node.getAttribute('aria-label')
+  );
+  expect(labels).not.toContain('videoEditor.sidebar.historyTransitions');
+  expect(labels).not.toContain('videoEditor.sidebar.inspectorGroupPlacement');
+  const style = container.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.clickAppearance"]'
+  )!;
+  expect(style).not.toBeNull();
+  act(() => style.click());
+  expect(
+    container.querySelector('input[aria-label="gallery.videoReview.clickRadius"]')
+  ).not.toBeNull();
+  expect(container.querySelector('[aria-label="videoEditor.sidebar.actionSize"]')).toBeNull();
+  expect(props.onUpdateActionEventDetails).not.toHaveBeenCalled();
+});
+
+it('groups ordinary source click controls with common timing and offsets and hides dormant sections', () => {
+  const props = fixture();
+  props.project.actionFeedback = [
+    {
+      recordingId: 'rec-asset-video',
+      sourceInstanceId: 'instance',
+      settings: [],
+      signals: [],
+      gestureStyles: [
+        {
+          id: 'raw-click',
+          effect: 'magnify',
+          color: '#123456ff',
+          opacity: 1,
+          radius: 40,
+          stroke: 2,
+          before: 0.2,
+          after: 0.6,
+          offset: 0.1,
+          x: 0.1,
+          y: 0,
+          pulses: 1,
+          easing: 'linear',
+          magnification: 2,
+        },
+      ],
+    },
+  ];
+  const render = () => act(() => root.render(<InspectActionPanel {...props} />));
+  render();
+  expect(container.querySelector('[aria-label="gallery.videoReview.clickEffect"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="videoEditor.sidebar.actionPreset"]')).toBeNull();
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('nav [aria-label="gallery.videoReview.clickTiming"]')!
+      .click()
+  );
+  expect(container.querySelector('[aria-label="gallery.videoReview.clickBefore"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="videoEditor.sidebar.actionDuration"]')).toBeNull();
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('nav [aria-label="gallery.videoReview.clickPosition"]')!
+      .click()
+  );
+  expect(container.querySelector('[aria-label="gallery.videoReview.clickX"]')).not.toBeNull();
+  expect(button('selectPointOnStage').disabled).toBe(false);
+  props.project.actionFeedback[0]!.gestureStyles![0]!.effect = 'off';
+  render();
+  expect(container.querySelector('nav [aria-label="gallery.videoReview.clickTiming"]')).toBeNull();
+  expect(props.project.actionFeedback[0]!.gestureStyles![0]!.magnification).toBe(2);
+});
+
+it('disables source position commands when the capture has no point', () => {
+  const props = fixture();
+  props.project.actionEvents[0]!.point = null;
+  props.project.actionFeedback = [
+    {
+      recordingId: 'rec-asset-video',
+      sourceInstanceId: 'instance',
+      settings: [],
+      signals: [],
+      gestureStyles: [{ ...REVIEW_CLICK_DEFAULT, id: 'raw-click', effect: 'press' }],
+    },
+  ];
+  act(() => root.render(<InspectActionPanel {...props} />));
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('nav [aria-label="gallery.videoReview.clickPosition"]')!
+      .click()
+  );
+  expect(button('selectPointOnStage').disabled).toBe(true);
+  expect(button('resetPointToCenter').disabled).toBe(true);
+  expect(
+    container
+      .querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.clickX"]')!
+      .matches(':disabled')
+  ).toBe(true);
+  act(() => button('selectPointOnStage').click());
+  expect(props.onStartActionPointPlacement).not.toHaveBeenCalled();
+  expect(props.project.actionEvents[0]!.point).toBeNull();
 });

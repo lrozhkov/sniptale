@@ -1,0 +1,360 @@
+import { expect, it } from 'vitest';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+  createVideoProjectTrack,
+} from '../factories/creation';
+import { createAudioClipFromAsset, createVideoClipFromAsset } from '../factories/clip';
+import { applyVideoProjectMutationPatch } from '../mutation';
+import { hydrateVideoProject } from '../hydration';
+import { parseHydratableVideoProject } from '../validation/root';
+import { resolveSceneBackgroundAudioEnvelope } from '../scene/background-audio';
+import { getClipAudioGain, getClipCompositeAudioGain } from './presentation.gain';
+import {
+  getProjectOriginalAudioRanges,
+  listProjectOriginalAudioTargets,
+  hasCurrentOriginalAudioTargets,
+  updateProjectOriginalAudioVolume,
+  isProjectOriginalAudioTarget,
+} from './original-audio';
+
+function fixture() {
+  const project = createEmptyVideoProject('Original audio');
+  const track = createVideoProjectTrack('Audio', 1, 'AUDIO');
+  project.tracks.push(track);
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'local-source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 8,
+      mimeType: 'audio/wav',
+      size: 100,
+      hasAudio: true,
+      audioPeaks: [1, 1, 1, 1],
+    }
+  );
+  const source = createAudioClipFromAsset(track.id, asset);
+  source.sourceInstanceId = 'source-instance';
+  source.volume = 0.8;
+  source.audioGainStart = 0.8;
+  source.audioGainEnd = 0.4;
+  source.volumeEnvelopeEnd = 0.5;
+  const voiceAsset = { ...asset, id: 'voice-asset', name: 'Voice' };
+  const take = createAudioClipFromAsset(track.id, voiceAsset, 2);
+  take.duration = 2;
+  take.sourceDuration = 2;
+  take.volume = 0;
+  take.audioGainStart = take.audioGainEnd = 0;
+  take.volumeEnvelopeStart = take.volumeEnvelopeEnd = 0;
+  take.originalAudioMute = {
+    volume: 0.25,
+    targets: [{ assetId: source.assetId, sourceInstanceId: source.sourceInstanceId }],
+  };
+  project.duration = 8;
+  project.assets = [asset, voiceAsset];
+  project.clips = [source, take];
+  return { project: applyVideoProjectMutationPatch(project, {}), source, take };
+}
+
+it('fences new authored metadata at version six and preserves JSON and hydration round trips', () => {
+  const { project, take } = fixture();
+  expect(project.version).toBe(6);
+  const serialized: unknown = JSON.parse(JSON.stringify(project));
+  const parsed = parseHydratableVideoProject(serialized);
+  expect(parsed).not.toBeNull();
+  if (!parsed) throw new Error('Expected admitted project');
+  expect(hydrateVideoProject(parsed).clips.find((clip) => clip.id === take.id)).toMatchObject({
+    originalAudioMute: take.originalAudioMute,
+  });
+  for (const version of [2, 3, 4, 5] as const) {
+    expect(parseHydratableVideoProject({ ...project, version })).toBeNull();
+    const legacy = {
+      ...project,
+      version,
+      clips: project.clips.filter((clip) => clip.id !== take.id),
+    };
+    expect(parseHydratableVideoProject(legacy)).not.toBeNull();
+    expect(applyVideoProjectMutationPatch(legacy, {}).version).toBe(version);
+  }
+  const restored = applyVideoProjectMutationPatch(project, {
+    clips: project.clips.filter((clip) => clip.id !== take.id),
+  });
+  expect(restored.version).toBe(6);
+  expect(parseHydratableVideoProject(restored)).not.toBeNull();
+});
+
+it('matches both asset and instance and leaves missing or recreated identities inert', () => {
+  const { project, source } = fixture();
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([
+    { start: 2, end: 4, volume: 0.25 },
+  ]);
+  for (const clip of [
+    { ...source, sourceInstanceId: 'new-instance' },
+    { ...source, assetId: 'new-asset' },
+  ]) {
+    expect(getProjectOriginalAudioRanges(project, clip)).toEqual([]);
+  }
+  const before = structuredClone(project);
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual(
+    getProjectOriginalAudioRanges(project, source)
+  );
+  expect(project).toEqual(before);
+});
+
+it('follows current take geometry independently of its mute, gain and source speed', () => {
+  const { project, source, take } = fixture();
+  take.startTime = 3;
+  take.duration = 1;
+  take.playbackRate = 2;
+  take.muted = true;
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([
+    { start: 3, end: 4, volume: 0.25 },
+  ]);
+  expect(
+    getProjectOriginalAudioRanges(project, { ...source, startTime: 3.5, duration: 0.25 })
+  ).toEqual([{ start: 3.5, end: 3.75, volume: 0.25 }]);
+});
+
+it('uses minimum overlap once and restores only the removed layer without changing manual gain', () => {
+  const { project, source, take } = fixture();
+  const before = structuredClone(source);
+  const second = {
+    ...take,
+    id: 'second',
+    startTime: 3,
+    originalAudioMute: { ...take.originalAudioMute!, volume: 0.5 },
+  };
+  project.clips.push(second, { ...second, id: 'third' });
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([
+    { start: 2, end: 4, volume: 0.25 },
+    { start: 4, end: 5, volume: 0.5 },
+  ]);
+  expect(getClipCompositeAudioGain(project, source, 3)).toBeCloseTo(
+    getClipAudioGain(source, 3) * 0.25,
+    12
+  );
+  expect(resolveSceneBackgroundAudioEnvelope(project, 3)).toBeCloseTo(
+    getClipAudioGain(source, 3) * 0.25,
+    12
+  );
+  delete take.originalAudioMute;
+  expect(getClipCompositeAudioGain(project, source, 3)).toBeCloseTo(
+    getClipAudioGain(source, 3) * 0.5,
+    12
+  );
+  project.clips = [source];
+  expect(getClipCompositeAudioGain(project, source, 3)).toBe(getClipAudioGain(source, 3));
+  expect(source).toEqual(before);
+});
+
+it('multiplies attenuation with fades and leaves half-open tails at manual gain', () => {
+  const { project, source } = fixture();
+  source.fadeInMs = 4000;
+  source.fadeOutMs = 1000;
+  expect(getClipCompositeAudioGain(project, source, 2)).toBeCloseTo(
+    getClipAudioGain(source, 2) * 0.25,
+    12
+  );
+  expect(getClipCompositeAudioGain(project, source, 4)).toBe(getClipAudioGain(source, 4));
+});
+
+it('retains the existing crossfade multiplier as a separate gain factor', () => {
+  const { project, source, take } = fixture();
+  take.startTime = 6;
+  take.duration = 2;
+  const incoming = {
+    ...source,
+    id: 'incoming',
+    sourceInstanceId: 'incoming-instance',
+    startTime: 7,
+    duration: 2,
+    sourceDuration: 2,
+    muted: true,
+  };
+  project.clips.push(incoming);
+  project.duration = 9;
+  project.transitions = [
+    {
+      id: 'crossfade',
+      leadingClipId: source.id,
+      trailingClipId: incoming.id,
+      duration: 1,
+      kind: 'CROSSFADE',
+      easing: 'LINEAR',
+    },
+  ];
+  const time = 7.5;
+  const withoutOverride = {
+    ...project,
+    clips: project.clips.filter((clip) => clip.id !== take.id),
+  };
+  expect(getClipCompositeAudioGain(withoutOverride, source, time)).toBeCloseTo(
+    getClipAudioGain(source, time) * 0.5,
+    12
+  );
+  expect(getClipCompositeAudioGain(project, source, time)).toBeCloseTo(
+    getClipCompositeAudioGain(withoutOverride, source, time) * 0.25,
+    12
+  );
+});
+
+it('lists distinct exact source identities and rejects a missing, duplicated or replaced target for new Apply', () => {
+  const { project, source, take } = fixture();
+  project.clips.push({ ...source, id: 'source-tail', startTime: 4 });
+  const sources = listProjectOriginalAudioTargets(project);
+  expect(sources.filter((target) => target.assetId === source.assetId)).toEqual([
+    { assetId: source.assetId, sourceInstanceId: source.sourceInstanceId },
+  ]);
+  const mute = take.originalAudioMute!;
+  expect(hasCurrentOriginalAudioTargets(project, mute)).toBe(true);
+  expect(hasCurrentOriginalAudioTargets(project, { ...mute, targets: [] })).toBe(false);
+  expect(
+    hasCurrentOriginalAudioTargets(project, {
+      ...mute,
+      targets: [...mute.targets, ...mute.targets],
+    })
+  ).toBe(false);
+  expect(hasCurrentOriginalAudioTargets(project, { ...mute, volume: NaN })).toBe(false);
+  expect(
+    hasCurrentOriginalAudioTargets(project, {
+      ...mute,
+      targets: [{ assetId: source.assetId, sourceInstanceId: 'replacement' }],
+    })
+  ).toBe(false);
+  project.clips = [take];
+  expect(hasCurrentOriginalAudioTargets(project, mute)).toBe(false);
+});
+
+it('restores only the selected override and preserves manual gain, targets and other takes', () => {
+  const { project, source, take } = fixture();
+  const other = { ...take, id: 'other' };
+  project.clips.push(other);
+  const before = structuredClone(project);
+  const changed = updateProjectOriginalAudioVolume(project, take.id, 0.5);
+  expect(changed.clips.find((clip) => clip.id === take.id)).toEqual({
+    ...take,
+    originalAudioMute: { ...take.originalAudioMute, volume: 0.5 },
+  });
+  expect(changed.clips.find((clip) => clip.id === source.id)).toBe(source);
+  expect(changed.clips.find((clip) => clip.id === other.id)).toBe(other);
+  const restored = updateProjectOriginalAudioVolume(changed, take.id, undefined);
+  expect(restored.clips.find((clip) => clip.id === take.id)).not.toHaveProperty(
+    'originalAudioMute'
+  );
+  expect(getProjectOriginalAudioRanges(restored, source)).toEqual([
+    { start: 2, end: 4, volume: 0.25 },
+  ]);
+  expect(project).toEqual(before);
+  expect(updateProjectOriginalAudioVolume(project, take.id, Infinity)).toBe(project);
+  project.tracks.find((track) => track.id === take.trackId)!.locked = true;
+  expect(updateProjectOriginalAudioVolume(project, take.id, undefined)).toBe(project);
+});
+
+it('restores hidden track overrides and preserves source identity and individual mute', () => {
+  const { project, source, take } = fixture();
+  const track = createVideoProjectTrack('Voice', 2, 'AUDIO');
+  project.tracks.push(track);
+  take.trackId = track.id;
+  take.muted = true;
+  const before = structuredClone(take.originalAudioMute);
+  expect(getProjectOriginalAudioRanges(project, source)).toHaveLength(1);
+  track.visible = false;
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([]);
+  expect(isProjectOriginalAudioTarget(project, source)).toBe(true);
+  expect(getClipCompositeAudioGain(project, source, 3)).toBe(getClipAudioGain(source, 3));
+  track.visible = true;
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([
+    { start: 2, end: 4, volume: 0.25 },
+  ]);
+  expect(take.originalAudioMute).toEqual(before);
+});
+
+it('offers the sound track rather than the muted video half of a demuxed source pair', () => {
+  const { project, source } = fixture();
+  const asset = { ...project.assets[0]!, id: 'paired-source', type: 'VIDEO' as const };
+  project.assets.push(asset);
+  source.assetId = asset.id;
+  const video = createVideoClipFromAsset(project.tracks[0]!.id, asset, 640, 360, 0, {
+    muted: true,
+  });
+  project.clips.push(video);
+  expect(
+    listProjectOriginalAudioTargets(project).filter((target) => target.assetId === asset.id)
+  ).toEqual([{ assetId: source.assetId, sourceInstanceId: source.sourceInstanceId }]);
+});
+
+it('multiplies manual source gain by minimum static and live attenuation with separate masters', () => {
+  const { project, source } = fixture();
+  const track = project.tracks.find((item) => item.id === source.trackId);
+  if (!track) throw new Error('Missing audio track');
+  track.audioVolume = 2;
+  source.audioGainStart = source.audioGainEnd = 2;
+  project.sourceAudioDocuments = [
+    {
+      id: 'source-envelope',
+      binding: {
+        kind: 'source',
+        assetId: source.assetId,
+        sourceInstanceId: source.sourceInstanceId!,
+      },
+      ranges: [{ id: 'manual', start: 0, end: 8, volume: 2 }],
+      mutes: [
+        { id: 'static', start: 1, end: 5, volume: 0.5 },
+        { id: 'overlap', start: 3, end: 6, volume: 0.125 },
+      ],
+    },
+  ];
+  expect(
+    [0, 1, 2, 3, 4, 5, 6].map((time) => getClipCompositeAudioGain(project, source, time))
+  ).toEqual([8, 4, 2, 1, 1, 1, 8]);
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([
+    { start: 1, end: 2, volume: 0.5 },
+    { start: 2, end: 3, volume: 0.25 },
+    { start: 3, end: 6, volume: 0.125 },
+  ]);
+  expect(isProjectOriginalAudioTarget(project, source)).toBe(true);
+});
+
+it('recognizes the legacy paired target before its first split even when the whole take is inactive', () => {
+  const { project, source, take } = fixture();
+  delete source.sourceInstanceId;
+  delete take.originalAudioMute;
+  project.sourceVoiceoverDocuments = [
+    {
+      id: 'whole-document',
+      trackId: take.trackId,
+      binding: { kind: 'source', assetId: source.assetId, sourceInstanceId: 'separate-video' },
+      originalAudioSourceInstanceId: source.id,
+      enabled: false,
+      reference: [
+        { kind: 'keep', sourceStart: 0, sourceEnd: 8, resultStart: 0, resultEnd: 8, rate: 1 },
+      ],
+      take: {
+        id: 'whole-take',
+        assetId: take.assetId,
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 2,
+        volume: 1,
+        muted: true,
+        fadeIn: 0,
+        fadeOut: 0,
+        dormant: true,
+      },
+    },
+  ];
+  expect(isProjectOriginalAudioTarget(project, source)).toBe(true);
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([]);
+  expect(isProjectOriginalAudioTarget(project, { ...source, sourceInstanceId: 'other' })).toBe(
+    false
+  );
+  expect(isProjectOriginalAudioTarget(project, { ...source, assetId: take.assetId })).toBe(false);
+  const video = createVideoClipFromAsset(project.tracks[0]!.id, project.assets[0]!, 640, 360);
+  if (video.type !== 'VIDEO') throw new Error('Expected video target');
+  expect(isProjectOriginalAudioTarget(project, { ...video, sourceInstanceId: source.id })).toBe(
+    false
+  );
+});

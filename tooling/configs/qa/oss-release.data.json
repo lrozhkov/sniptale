@@ -128,23 +128,26 @@
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/README.md",
-      "sha256": "1b1ccd436594b1bbcf231e78d1f2b46f01b9d095579c0f6937a92e5fbc978b10",
+      "sha256": "c3a87c3784618c36512562995abacccdf5bdc09511e7ff5f87548d72f317341a",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/README.md"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json",
       "sha256": "f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json"
+      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json",
+      "distribution": "source"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz",
       "sha256": "7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz"
+      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz",
+      "distribution": "source"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch",
       "sha256": "9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch"
+      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch",
+      "distribution": "source"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3.txt",
@@ -232,29 +235,29 @@
       "source": "LICENSES/dependencies/zustand-5.0.15.txt"
     },
     {
+      "archivePath": "LICENSES/fonts/golos-text.txt",
+      "sha256": "2c7e44f733787b9d9fe9ee3f857e24bed455523b14804ebf73480c125e4b6784",
+      "source": "LICENSES/fonts/golos-text.txt"
+    },
+    {
+      "archivePath": "LICENSES/fonts/golos-ui.txt",
+      "sha256": "c8e985ff79ce19d0c8029ef5d772c18044cdcafb5294e629722c979d169820a9",
+      "source": "LICENSES/fonts/golos-ui.txt"
+    },
+    {
       "archivePath": "NOTICE",
       "sha256": "ca04f3ab3cfdb979c94ad3adb04bc07d2a3b8db1cca680ebf3663422102a5d9a",
       "source": "NOTICE"
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "b9c983c82a6c58efd74e4bcdc78e054fc3f64b9e20e807365c4e7b22dacb763a",
+      "sha256": "875f2d0b13c70fbaa6d7ba890f71862d85bfde56207e88d0375f802ea0e58a8d",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "cf33237720d1846ed5e2c65d13c906940ddbe3f44dc56e7bab245b81fe67ed40",
+      "sha256": "9c3043151b254726875ff437e455f81f821f8978a9444559259ec9f05670034c",
       "source": "THIRD_PARTY_NOTICES.md"
-    },
-    {
-      "archivePath": "packages/ui/src/styles/golos-text/LICENSE.txt",
-      "sha256": "2c7e44f733787b9d9fe9ee3f857e24bed455523b14804ebf73480c125e4b6784",
-      "source": "packages/ui/src/styles/golos-text/LICENSE.txt"
-    },
-    {
-      "archivePath": "packages/ui/src/styles/golos-ui/LICENSE.txt",
-      "sha256": "c8e985ff79ce19d0c8029ef5d772c18044cdcafb5294e629722c979d169820a9",
-      "source": "packages/ui/src/styles/golos-ui/LICENSE.txt"
     }
   ],
   "bundledAssets": [

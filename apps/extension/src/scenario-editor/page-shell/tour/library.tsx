@@ -440,7 +440,7 @@ function TourIncomingLinks({
       {tour.slides.flatMap((slide, index) => {
         if (slide.id === targetId) return [];
         const source = `${index + 1}. ${slide.title || t('scenario.editor.tourUntitled')}`;
-        const objects = slide.kind === 'image' ? slide.hotspots : slide.buttons;
+        const objects = slide.kind === 'image' ? [] : slide.buttons;
         return [
           ...(incoming.has(slide.id)
             ? [

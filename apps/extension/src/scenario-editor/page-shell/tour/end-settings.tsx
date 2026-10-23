@@ -3,7 +3,7 @@ import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/to
 import { useEffect, useState } from 'react';
 import { Flag } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { TextField } from '../../../ui/compact-inspector-controls/text-field';
 import { GuideInspectorGroup } from '../inspector';
 import { TourTextField } from './fields';
 import type { Translate } from '../../../platform/i18n';
@@ -107,19 +107,20 @@ function TourEndButton({
               if (value) onChange({ ...value, label: next });
             }}
           />
-          <ProductInput
-            aria-label={t('scenario.editor.tourActionUrl')}
+          <TextField
+            label={t('scenario.editor.tourActionUrl')}
             value={url}
             disabled={disabled}
             placeholder="https://"
             maxLength={4000}
-            aria-invalid={invalid}
+            invalid={invalid}
             onChange={(event) => {
               setUrl(event.target.value);
               setInvalid(false);
             }}
             onBlur={commit}
             onKeyDown={(event) => {
+              if (event.key === 'Escape') event.preventDefault();
               if (event.key === 'Enter') {
                 event.preventDefault();
                 commit();
@@ -153,9 +154,7 @@ function TourEndToggle({
 }) {
   const [confirm, setConfirm] = useState(false);
   const linked = tour.slides.some((slide) =>
-    (slide.kind === 'image' ? slide.hotspots : slide.buttons).some(
-      (object) => object.action.kind === 'end'
-    )
+    (slide.kind === 'image' ? [] : slide.buttons).some((object) => object.action.kind === 'end')
   );
   const disable = () =>
     onChange({
@@ -163,14 +162,7 @@ function TourEndToggle({
       endScreen: { ...tour.endScreen, enabled: false },
       slides: tour.slides.map((slide) =>
         slide.kind === 'image'
-          ? {
-              ...slide,
-              hotspots: slide.hotspots.map((object) =>
-                object.action.kind === 'end'
-                  ? { ...object, action: { kind: 'none' as const } }
-                  : object
-              ),
-            }
+          ? slide
           : {
               ...slide,
               buttons: slide.buttons.map((object) =>

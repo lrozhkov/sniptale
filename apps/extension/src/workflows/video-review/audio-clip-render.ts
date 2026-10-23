@@ -2,6 +2,9 @@ import { readReviewAudioClipRange, type ReviewAudioClipInput } from './audio-cli
 import { createTempoProcessor } from '../../features/video/audio/tempo';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
 
+/** Fixed renderer overlap; consumers skip these padded frames when scheduling output. */
+export const REVIEW_AUDIO_CLIP_PADDING_SECONDS = 0.02;
+
 /** Job-local external audio processing; spans are output seconds relative to the clip. */
 export interface ReviewAudioClipRenderer {
   render(
@@ -23,7 +26,7 @@ export function createReviewAudioClipRenderer(): ReviewAudioClipRenderer {
   return {
     async render(entry, buffer, from, to, signal) {
       signal.throwIfAborted();
-      const padding = Math.round(buffer.sampleRate * 0.02);
+      const padding = Math.round(buffer.sampleRate * REVIEW_AUDIO_CLIP_PADDING_SECONDS);
       const start = Math.round(from * buffer.sampleRate) - padding;
       const end = Math.round(to * buffer.sampleRate) + padding;
       let state = states.get(entry);

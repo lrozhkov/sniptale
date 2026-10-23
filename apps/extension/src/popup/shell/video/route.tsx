@@ -24,9 +24,11 @@ import { useVideoRouteRuntime } from './runtime';
 
 export function VideoRoute({ startup }: { startup: PopupStartupDescriptor }) {
   const initialStartup = useRef(startup).current;
-  const capabilities = useActiveTabCapabilities();
+  const launch = initialStartup.page === 'video' ? initialStartup.videoLaunch : undefined;
+  const capabilities = useActiveTabCapabilities(launch?.tabId);
   const state = useVideoRouteRuntime({
     capabilities,
+    ...(launch ? { persistUiSelection: false, initialPresetId: launch.viewportPresetId } : {}),
     ...(initialStartup.page === 'video' && initialStartup.videoMode
       ? { initialMode: initialStartup.videoMode }
       : {}),
@@ -85,7 +87,11 @@ function useVideoRouteBootstrap(
       if (!active) return;
       if (video) {
         setViewportPresets(video.viewportPresets);
-        setSelectedPresetId(video.selectedPresetId);
+        setSelectedPresetId(
+          initialStartup.page === 'video' && initialStartup.videoLaunch
+            ? initialStartup.videoLaunch.viewportPresetId
+            : video.selectedPresetId
+        );
         if (!(initialStartup.page === 'video' && initialStartup.videoMode)) {
           setVideoCaptureMode(video.captureMode);
         }

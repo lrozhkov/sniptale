@@ -6,6 +6,32 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
 }
 
+/** Adapts a delay accessory to the existing toolbar button size. */
+export function ContentToolbarDelayIndicator({
+  children,
+  value,
+  dataUi,
+}: {
+  children: ReactNode;
+  value: number;
+  dataUi?: string;
+}) {
+  return (
+    <span
+      className="sniptale-toolbar-delay"
+      data-has-value={value > 0 ? 'true' : undefined}
+      aria-hidden="true"
+    >
+      <span className="sniptale-toolbar-delay-icon">{children}</span>
+      {value > 0 ? (
+        <span className="sniptale-toolbar-delay-value" data-ui={dataUi}>
+          {value}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export interface ContentToolbarShellProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   dragging?: boolean;
@@ -112,7 +138,7 @@ export interface ContentToolbarButtonProps extends ButtonHTMLAttributes<HTMLButt
   active?: boolean;
   menuIndicator?: boolean;
   tone?: 'default' | 'danger' | 'close' | 'utility' | 'outline' | 'property';
-  size?: 'default' | 'compact';
+  size?: 'default' | 'compact' | 'narrow';
   dataUi?: string;
 }
 
@@ -170,6 +196,7 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
           (tone === 'utility' || tone === 'close') && 'sniptale-btn-utility',
           tone === 'outline' && 'sniptale-btn-outline',
           size === 'compact' && 'sniptale-btn-compact',
+          size === 'narrow' && 'sniptale-btn-narrow',
           className
         )}
       >

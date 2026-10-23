@@ -34,6 +34,7 @@ export async function estimateProjectExportSize(args: {
         : 'vp9';
   const materializer = createVideoPreviewFrameMaterializer({
     project,
+    sampleFps: settings.fps,
     assetUrls: args.assetUrls,
     ownerDocument: document,
     rasterSize: settings,

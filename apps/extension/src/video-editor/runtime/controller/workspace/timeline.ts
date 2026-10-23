@@ -1,3 +1,4 @@
+import { isProjectSourceVoiceoverEditable } from '../../../../features/video/project/source-voiceover';
 import type { VideoProjectActionPreset } from '../../../../features/video/project/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorRuntimeController } from '../../session';
@@ -84,9 +85,19 @@ function createWorkspaceTimelineState(
   project: NonNullable<ProjectLifecyclePort['project']>,
   workspace: TimelineStateWorkspace
 ) {
+  const selection = store.selection;
+  const voice =
+    selection.kind === 'source-voiceover'
+      ? project.sourceVoiceoverDocuments?.find((document) => document.id === selection.documentId)
+      : undefined;
+  const voiceEditable = !!voice && isProjectSourceVoiceoverEditable(project, voice);
   return {
-    canDeleteSelectedClip:
-      store.selection.kind === 'clip-group'
+    canDuplicateSelection: voice
+      ? voiceEditable
+      : store.selectedClipId !== null && canEditProjectClip(project, store.selectedClipId),
+    canDeleteSelectedClip: voice
+      ? voiceEditable
+      : store.selection.kind === 'clip-group'
         ? store.selection.clipIds.length > 0 &&
           areProjectClipsEditable(project, store.selection.clipIds)
         : store.selectedClipId !== null && areProjectClipsEditable(project, [store.selectedClipId]),

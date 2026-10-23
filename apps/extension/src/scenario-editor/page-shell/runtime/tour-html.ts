@@ -1,3 +1,4 @@
+import { buildTourPlaybackPlan } from '../../../features/scenario/project/tour-playback-plan';
 import { createOutputFilename } from '../../../workflows/file-naming/index';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourDocument, TourMask } from '@sniptale/runtime-contracts/scenario/types/tour';
@@ -23,6 +24,101 @@ export interface PreparedTourHtml {
 }
 const MEDIA_BUDGET = 128 * 1024 * 1024;
 
+type TourHtmlBlockerCode =
+  | 'invalid'
+  | 'unsupported'
+  | 'noActions'
+  | 'invalidOptions'
+  | 'missingImage'
+  | 'targetReview'
+  | 'missingTarget'
+  | 'missingImageMedia'
+  | 'missingAudioMedia'
+  | 'conflictingMedia'
+  | 'rasterFailed'
+  | 'mediaBudget';
+
+/** Disposable author-facing context; never enters diagnostics or persistence. */
+export interface TourHtmlBlocker {
+  code: TourHtmlBlockerCode;
+  slideTitle?: string;
+  slideNumber?: number;
+  actionNumber?: number;
+  buttonLabel?: string;
+}
+
+/** Fixed reason codes separate actionable preparation failures from raw browser errors. */
+export class TourHtmlPreparationError extends Error {
+  constructor(readonly blocker: TourHtmlBlocker) {
+    super(blocker.code);
+    this.name = 'TourHtmlPreparationError';
+  }
+}
+
+function checkTour(tour: TourDocument) {
+  const plan = buildTourPlaybackPlan(tour);
+  if (!plan.actionCount) throw new TourHtmlPreparationError({ code: 'noActions' });
+  const actions = new Set(plan.entries.map((entry) => entry.actionId));
+  const slides = new Set(plan.entries.map((entry) => entry.sourceSlideId));
+  for (const [index, slide] of tour.slides.entries()) {
+    const context = { slideNumber: index + 1, slideTitle: slide.title };
+    if (slide.kind === 'image' && slide.actions.length) {
+      if (
+        !slide.image &&
+        (slide.actions.some((entry) => entry.type === 'hotspot') ||
+          slide.masks.some((mask) => mask.kind === 'redact'))
+      ) {
+        const action = plan.entries.find(
+          (entry) =>
+            entry.sourceSlideId === slide.id &&
+            entry.slide.kind === 'image' &&
+            entry.slide.actions[0]?.type === 'hotspot'
+        );
+        throw new TourHtmlPreparationError({
+          code: 'missingImage',
+          ...context,
+          ...(action?.ordinal ? { actionNumber: action.ordinal } : {}),
+        });
+      }
+      if (slide.requiresTargetReview)
+        throw new TourHtmlPreparationError({ code: 'targetReview', ...context });
+    }
+    if (slide.kind === 'navigation') {
+      for (const button of slide.buttons) {
+        const target = button.action;
+        if (
+          (target.kind === 'action' && !actions.has(target.actionId)) ||
+          (target.kind === 'slide' && !slides.has(target.slideId))
+        )
+          throw new TourHtmlPreparationError({
+            code: 'missingTarget',
+            ...context,
+            buttonLabel: button.label,
+          });
+      }
+    }
+  }
+}
+
+function mediaContext(tour: TourDocument, id: string): Omit<TourHtmlBlocker, 'code'> {
+  const plan = buildTourPlaybackPlan(tour);
+  for (const [index, slide] of tour.slides.entries()) {
+    const context = { slideNumber: index + 1, slideTitle: slide.title };
+    const image = slide.kind === 'image' ? slide.image : slide.background.image;
+    if (image?.assetId === id) return context;
+    for (const target of getTourNarrationTargets(slide)) {
+      if (target.narration?.assetId !== id) continue;
+      const action = plan.entries.find((entry) => entry.actionId === target.id);
+      return {
+        ...context,
+        ...(action?.ordinal ? { actionNumber: action.ordinal } : {}),
+        ...('label' in target ? { buttonLabel: target.label } : {}),
+      };
+    }
+  }
+  return {};
+}
+
 /** Reads immutable media sequentially; shared sources receive the union of privacy redactions. */
 export async function prepareTourHtml(args: {
   project: GuideProject;
@@ -33,7 +129,11 @@ export async function prepareTourHtml(args: {
   readAsset?: (id: string) => Promise<Blob | undefined>;
 }): Promise<PreparedTourHtml> {
   const parsed = parseTourDocument(args.project.tour);
-  if (parsed.status !== 'ok' || !parsed.document.slides.length) throw new Error('Invalid tour');
+  if (parsed.status !== 'ok')
+    throw new TourHtmlPreparationError({
+      code: parsed.status === 'unsupported' ? 'unsupported' : 'invalid',
+    });
+  checkTour(parsed.document);
   if (
     !Number.isFinite(args.options.maxEdge) ||
     args.options.maxEdge < 320 ||
@@ -42,39 +142,55 @@ export async function prepareTourHtml(args: {
     args.options.quality < 0.5 ||
     args.options.quality > 1
   )
-    throw new Error('Invalid export options');
+    throw new TourHtmlPreparationError({ code: 'invalidOptions' });
   const tour = structuredClone(parsed.document);
-  if (
-    tour.slides.some(
-      (slide) => slide.kind === 'image' && (!slide.image || slide.requiresTargetReview)
-    )
-  )
-    throw new Error('Incomplete tour');
   const { redactions, roles } = collectTourMedia(tour);
+  tour.slides = tour.slides.filter((slide) => slide.kind === 'navigation' || slide.actions.length);
   const assets: { id: string; mime: string; blob: Blob }[] = [];
   let inputSize = 0,
     outputSize = 0;
   args.onProgress?.(0, roles.size);
   for (const [id, kind] of roles) {
     args.signal.throwIfAborted();
-    const source = await (args.readAsset ?? getScenarioAssetBlob)(id);
+    const context = mediaContext(parsed.document, id);
+    let source: Blob | undefined;
+    try {
+      source = await (args.readAsset ?? getScenarioAssetBlob)(id);
+    } catch {
+      args.signal.throwIfAborted();
+      throw new TourHtmlPreparationError({
+        code: kind === 'image' ? 'missingImageMedia' : 'missingAudioMedia',
+        ...context,
+      });
+    }
     args.signal.throwIfAborted();
-    if (!source?.size) throw new Error('Missing tour media');
+    if (!source?.size)
+      throw new TourHtmlPreparationError({
+        code: kind === 'image' ? 'missingImageMedia' : 'missingAudioMedia',
+        ...context,
+      });
     inputSize += source.size;
-    if (inputSize > MEDIA_BUDGET) throw new Error('Tour media budget exceeded');
+    if (inputSize > MEDIA_BUDGET)
+      throw new TourHtmlPreparationError({ code: 'mediaBudget', ...context });
     let blob = source;
     if (kind === 'image') {
-      const prepared = await prepareTourRaster(
-        source,
-        redactions.get(id) ?? [],
-        args.options,
-        args.signal
-      );
-      blob = prepared.blob;
+      try {
+        const prepared = await prepareTourRaster(
+          source,
+          redactions.get(id) ?? [],
+          args.options,
+          args.signal
+        );
+        blob = prepared.blob;
+      } catch {
+        args.signal.throwIfAborted();
+        throw new TourHtmlPreparationError({ code: 'rasterFailed', ...context });
+      }
       markBakedRedactions(tour, id);
     }
     outputSize += blob.size;
-    if (outputSize > MEDIA_BUDGET) throw new Error('Tour media budget exceeded');
+    if (outputSize > MEDIA_BUDGET)
+      throw new TourHtmlPreparationError({ code: 'mediaBudget', ...context });
     assets.push({ id, blob, mime: blob.type.toLowerCase().split(';', 1)[0]!.trim() });
     args.onProgress?.(assets.length, roles.size);
   }
@@ -132,7 +248,11 @@ export async function saveTourHtml(
 function collectTourMedia(tour: TourDocument) {
   const redactions = new Map<string, TourMask[]>();
   const roles = new Map<string, 'image' | 'audio'>();
-  for (const image of getTourImages(tour)) roles.set(image.assetId, 'image');
+  for (const image of getTourImages({
+    ...tour,
+    slides: tour.slides.filter((slide) => slide.kind === 'navigation' || slide.actions.length),
+  }))
+    roles.set(image.assetId, 'image');
   for (const slide of tour.slides) {
     if (slide.kind === 'image' && slide.image) {
       const masks = redactions.get(slide.image.assetId) ?? [];
@@ -141,13 +261,14 @@ function collectTourMedia(tour: TourDocument) {
     }
     for (const { narration } of getTourNarrationTargets(slide)) {
       if (!narration) continue;
-      if (roles.get(narration.assetId) === 'image') throw new Error('Conflicting media');
+      if (roles.get(narration.assetId) === 'image')
+        throw new TourHtmlPreparationError({ code: 'conflictingMedia' });
       roles.set(narration.assetId, 'audio');
     }
   }
   if (tour.backgroundMusic) {
     const id = tour.backgroundMusic.assetId;
-    if (roles.get(id) === 'image') throw new Error('Conflicting media');
+    if (roles.get(id) === 'image') throw new TourHtmlPreparationError({ code: 'conflictingMedia' });
     roles.set(id, 'audio');
   }
   return { redactions, roles };
@@ -155,17 +276,7 @@ function collectTourMedia(tour: TourDocument) {
 
 function markBakedRedactions(tour: TourDocument, id: string) {
   for (const slide of tour.slides) {
-    const image = slide.kind === 'image' ? slide.image : slide.background.image;
-    if (image?.assetId !== id) continue;
-    if (slide.kind === 'image') {
-      for (const mask of slide.masks) {
-        // Preserve mask identity and narration, but the pixels are already irreversible.
-        if (mask.kind === 'redact') {
-          mask.kind = 'highlight';
-          mask.opacity = 0;
-          delete mask.paint;
-        }
-      }
-    }
+    if (slide.kind === 'image' && slide.image?.assetId === id)
+      slide.masks = slide.masks.filter((mask) => mask.kind !== 'redact');
   }
 }

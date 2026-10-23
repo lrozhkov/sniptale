@@ -1,4 +1,4 @@
-import { uncropQuickEditVideoRect } from '../../features/video/review/advanced/canvas';
+import { uncropMediaSourceRect } from '../../features/video/project/media-crop';
 import { createReviewAnnotationGeometry } from './annotation-effects-geometry';
 import { useEffect, useState, type RefObject } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
@@ -6,7 +6,7 @@ import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/t
 import { resolveVideoExportDimensions } from '../../features/video/project/export/output-dimensions';
 import { fitVideoRect } from '../../features/video/review/geometry';
 import type { ReviewRegion, ReviewSource } from '../../features/video/review/types';
-import { quickEditPlaneProjection } from '../../features/video/review/advanced/spatial-geometry';
+import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import {
@@ -39,7 +39,7 @@ export type ReviewStageScene = {
 export type ReviewStageCommentGeometry = {
   output: { width: number; height: number };
   projection?:
-    | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+    | import('../../features/video/composition/motion/spatial-geometry').QuickEditHomography
     | undefined;
   videoTransform: { x: number; y: number; width: number; height: number } | null;
 };
@@ -93,7 +93,7 @@ function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout
   if (layout.sourceCrop && layout.visibleVideoRect) {
     const visibleVideoRect = snapPreviewRect(layout.visibleVideoRect);
     const crop = layout.sourceCrop;
-    const videoRect = uncropQuickEditVideoRect(visibleVideoRect, crop);
+    const videoRect = uncropMediaSourceRect(visibleVideoRect, crop);
     const windowRect = {
       ...visibleVideoRect,
       y: Math.round(layout.windowRect.y),

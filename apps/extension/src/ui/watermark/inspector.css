@@ -1,0 +1,15 @@
+.sniptale-watermark-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 256px), 1fr));
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.sniptale-watermark-columns > * {
+  min-width: 0;
+}
+
+.sniptale-compact-workspace .sniptale-watermark-columns {
+  row-gap: 4px;
+}

@@ -1,3 +1,9 @@
+import { listProjectOriginalAudioTargets } from '../../../../../features/video/project/timeline/original-audio';
+import { ProjectSourceAudioEditor } from '../inputs/source-audio';
+import { SceneEdgesFields } from './scene-edges';
+import { InspectProjectCommentsPanel } from './comments';
+import { SceneWatermarkFields } from './watermark';
+import { InspectProjectTextPanel } from './text';
 import { InspectCursorPathSettings } from './cursor-path';
 import { GridSettingsPanel } from '../../settings';
 import { translate } from '../../../../../platform/i18n';
@@ -44,6 +50,7 @@ function createSceneGroups(
       content: (
         <SceneCanvasFields
           height={props.project.height}
+          rememberedCanvas={props.project.rememberedCanvas}
           onResizeProject={props.onResizeProject}
           width={props.project.width}
         />
@@ -65,6 +72,60 @@ function createSceneGroups(
           sceneBackground={sceneBackground}
         />
       ),
+    },
+    {
+      id: 'watermark',
+      semantic: 'watermark' as const,
+      label: translate('gallery.videoReview.watermark'),
+      visible: Boolean(props.watermark && props.onImportImage),
+      content:
+        props.watermark && props.onImportImage ? (
+          <SceneWatermarkFields
+            project={props.typingProject ?? props.project}
+            runtime={props.watermark}
+            onImportImage={props.onImportImage}
+          />
+        ) : null,
+    },
+    {
+      id: 'scene-edges',
+      semantic: 'transition' as const,
+      label: translate('videoEditor.sidebar.sceneEdges'),
+      visible: Boolean(props.sceneEdges),
+      content: props.sceneEdges ? (
+        <SceneEdgesFields
+          project={props.typingProject ?? props.project}
+          runtime={props.sceneEdges}
+        />
+      ) : null,
+    },
+    {
+      id: 'text',
+      semantic: 'content' as const,
+      label: translate('videoEditor.sidebar.textDocuments'),
+      content: (
+        <InspectProjectTextPanel
+          key={props.project.id}
+          project={props.project}
+          {...(props.textRewrite ? { rewrite: props.textRewrite } : {})}
+          {...(props.textVoice ? { voice: props.textVoice } : {})}
+        />
+      ),
+    },
+    {
+      id: 'audio',
+      semantic: 'audio' as const,
+      label: translate('videoEditor.sidebar.sourceAudio'),
+      visible:
+        listProjectOriginalAudioTargets(props.project).length > 0 ||
+        Boolean(props.project.sourceAudioDocuments?.length),
+      content: <ProjectSourceAudioEditor project={props.project} />,
+    },
+    {
+      id: 'comments',
+      semantic: 'comments' as const,
+      label: translate('videoEditor.sidebar.comments'),
+      content: <InspectProjectCommentsPanel project={props.typingProject ?? props.project} />,
     },
     {
       id: 'grid',

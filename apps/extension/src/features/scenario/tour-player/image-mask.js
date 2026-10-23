@@ -27,7 +27,7 @@ export function renderTourMask(
       mask.kind === 'highlight' && mask.paint ? serializePaintToCss(mask.paint) : mask.color;
     effect.style.opacity = String(mask.kind === 'redact' ? 1 : mask.opacity);
   }
-  if (!authoring && mask.kind === 'highlight' && animation) {
+  if (!authoring && (mask.kind === 'highlight' || mask.kind === 'spotlight') && animation) {
     effect.dataset.tourHighlight = '';
     effect.dataset.baseOpacity = String(mask.opacity);
     effect.dataset.enterMs = String(

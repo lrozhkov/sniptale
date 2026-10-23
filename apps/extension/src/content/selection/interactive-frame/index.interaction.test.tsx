@@ -514,8 +514,13 @@ describe('InteractiveFrame toolbar and size interactions', () => {
 
     expect(titles).toEqual([
       translate('content.interactiveFrame.effectBorder'),
-      translate('content.interactiveFrame.stepBadgeEnable'),
-      translate('content.interactiveFrame.calloutAdd'),
+      translate('content.interactiveFrame.effectBlur'),
+      translate('content.interactiveFrame.effectFocus'),
+      translate('content.interactiveFrame.frameSettings'),
+      translate('content.stepBadge.settingsTitle'),
+      translate('content.interactiveFrame.stepBadgeSettings'),
+      translate('content.callout.settingsTitle'),
+      translate('content.interactiveFrame.calloutSettings'),
       translate('content.interactiveFrame.decreaseFrame'),
       translate('content.interactiveFrame.increaseFrame'),
       translate('content.interactiveFrame.editButton'),
@@ -556,7 +561,7 @@ describe('InteractiveFrame toolbar and size interactions', () => {
     };
 
     act(() => {
-      findToolbarButton(/Border|Рамка/).click();
+      findToolbarButton(/^Frame settings$|^Настройки рамки$/).click();
     });
 
     expect(queryContentUiElement('.sniptale-frame-settings-popover')).toBeInstanceOf(HTMLElement);
@@ -571,19 +576,19 @@ describe('InteractiveFrame toolbar and size interactions', () => {
     const { frame } = renderFrame();
     act(() => useFrameUIStore.getState().selectFrame(frame.id));
 
-    act(() => findToolbarButton(/Border|Рамка/).click());
+    act(() => findToolbarButton(/^Frame settings$|^Настройки рамки$/).click());
     expect(queryContentUiElement('.sniptale-frame-settings-popover')).not.toBeNull();
 
-    act(() => findToolbarButton(/Border|Рамка/).click());
+    act(() => findToolbarButton(/^Frame settings$|^Настройки рамки$/).click());
     expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
     expect(queryContentUiElement('.sniptale-frame-settings-popover')).toBeNull();
 
     act(() => useFrameUIStore.getState().selectFrame(frame.id));
-    act(() => findToolbarButton(/Border|Рамка/).click());
+    act(() => findToolbarButton(/^Frame settings$|^Настройки рамки$/).click());
     expect(useFrameUIStore.getState().selectedFrameId).toBe(frame.id);
     expect(queryContentUiElement('.sniptale-frame-settings-popover')).not.toBeNull();
 
-    act(() => findToolbarButton(/Border|Рамка/).click());
+    act(() => findToolbarButton(/^Frame settings$|^Настройки рамки$/).click());
     expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
   });
 
@@ -592,7 +597,7 @@ describe('InteractiveFrame toolbar and size interactions', () => {
     act(() => useFrameUIStore.getState().selectFrame(frame.id));
 
     act(() => {
-      findToolbarButton(/Border|Рамка/).click();
+      findToolbarButton(/^Frame settings$|^Настройки рамки$/).click();
     });
 
     expect(useFrameUIStore.getState().activePopover).toEqual({

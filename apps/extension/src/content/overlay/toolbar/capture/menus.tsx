@@ -2,8 +2,9 @@ import type { ScreenshotWindowSizeControls } from '../types';
 import React from 'react';
 
 import { ViewportSelector, type ViewportSelectorRef } from '../../viewport-selector';
-import { CaptureActionDropdown } from './action-dropdown';
-import { TimerDropdown } from './timer-dropdown';
+import { CaptureActionDropdown, resolveCaptureActionMenuLayout } from './action-dropdown';
+import { TimerDropdown, resolveTimerMenuLayout } from './timer-dropdown';
+import { useToolbarMenuDirection } from '../menu/direction';
 import { ToolbarTimerToggle } from './timer-toggle';
 import { ToolbarCaptureActionToggle } from './toggle';
 import type { ToolbarCapturePopoverMenu } from '../state/menu';
@@ -34,6 +35,7 @@ type ToolbarCaptureActionMenuProps = {
 };
 
 export function ToolbarCaptureActionMenu(props: ToolbarCaptureActionMenuProps) {
+  const menuSide = useToolbarMenuDirection(() => resolveCaptureActionMenuLayout(props));
   const {
     showCaptureMenu,
     captureMenuRef,
@@ -53,6 +55,7 @@ export function ToolbarCaptureActionMenu(props: ToolbarCaptureActionMenuProps) {
   return (
     <div
       className="sniptale-capture-action-wrapper"
+      data-menu-side={menuSide}
       ref={captureMenuRef as React.Ref<HTMLDivElement>}
     >
       <ToolbarCaptureActionToggle
@@ -102,6 +105,7 @@ type ToolbarTimerMenuProps = {
 };
 
 export function ToolbarTimerMenu(props: ToolbarTimerMenuProps) {
+  const menuSide = useToolbarMenuDirection(() => resolveTimerMenuLayout(props));
   const {
     showTimerMenu,
     timerMenuRef,
@@ -118,7 +122,11 @@ export function ToolbarTimerMenu(props: ToolbarTimerMenuProps) {
   } = props;
 
   return (
-    <div className="sniptale-timer-wrapper" ref={timerMenuRef as React.Ref<HTMLDivElement>}>
+    <div
+      className="sniptale-timer-wrapper"
+      data-menu-side={menuSide}
+      ref={timerMenuRef as React.Ref<HTMLDivElement>}
+    >
       <ToolbarTimerToggle
         buttonRef={timerButtonRef}
         showTimerMenu={showTimerMenu}

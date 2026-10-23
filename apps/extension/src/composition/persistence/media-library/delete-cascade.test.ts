@@ -1,3 +1,5 @@
+import { createSceneGradientBackground } from '../../../features/video/project/scene/background-gradient';
+import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
 import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
 import { expect, it } from 'vitest';
 import { harness, mediaId, physicalId, mediaEntry, rows } from './delete-cascade.test-support';
@@ -554,4 +556,226 @@ it.each([
   rows.get('video_projects')!.set(entry.id, { ...entry, project });
   await deleteMediaAssetWithProjectCascade(mediaId, []);
   expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+});
+
+it('purges a secondary source from a text-capable project and retains independent authored text', async () => {
+  const project = createVideoProjectEntryWithMediaClip({ version: 5 });
+  const asset = project.project.assets[0]!;
+  project.project.textDocuments = [
+    {
+      id: 'source-text',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'source-placement' },
+      document: { version: 1, fragments: [] },
+    },
+    {
+      id: 'independent-text',
+      binding: { kind: 'project' },
+      document: { version: 1, fragments: [] },
+    },
+  ];
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(project.id, project);
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: project.id, kind: 'video', name: project.project.name, primary: false },
+  ]);
+  const saved = rows.get('video_projects')!.get(project.id) as typeof project;
+  expect(saved.project.textDocuments?.map(({ id }) => id)).toEqual(['independent-text']);
+  expect(saved.project.assets).toEqual([]);
+  expect(saved.project.clips).toEqual([]);
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+  expect(harness.complete).toHaveBeenCalledTimes(1);
+});
+
+it.each(
+  ([undefined, 18] as const).flatMap((blur) =>
+    (['dormant', 'active'] as const).map((mode) => ({ mode, blur }))
+  )
+)(
+  'purges a confirmed %s background source without losing unrelated variants',
+  async ({ mode, blur }) => {
+    const entry = createVideoProjectEntryWithMediaClip({ version: blur === undefined ? 14 : 16 });
+    const originalAsset = entry.project.assets[0]!;
+    const image = {
+      ...originalAsset,
+      type: 'IMAGE' as const,
+      metadata: {
+        ...originalAsset.metadata,
+        duration: null,
+        hasAudio: false,
+        mimeType: 'image/png',
+      },
+    };
+    const solid = { kind: 'solid' as const, color: '#abcdef' };
+    const gradient = {
+      ...createSceneGradientBackground('#123456ff'),
+      animation: { mode: 'breathe' as const, speed: 42, intensity: 61 },
+    };
+    const remembered = {
+      solid,
+      gradient,
+      image: { kind: 'image' as const, assetId: image.id, imageFit: 'contain' as const },
+    };
+    entry.project.assets = [image];
+    entry.project.clips = [];
+    entry.project.sceneBackground =
+      mode === 'dormant'
+        ? { ...gradient, remembered }
+        : { kind: 'image', assetId: image.id, remembered };
+    if (blur !== undefined) entry.project.sceneBackground.blur = blur;
+    rows.get('video_projects')!.clear();
+    rows.get('video_projects')!.set(entry.id, entry);
+    rows.get('media_library')!.set(mediaId, {
+      ...mediaEntry(),
+      kind: 'image',
+      mimeType: 'image/png',
+      filename: 'background.png',
+      originalFilename: 'background.png',
+      duration: null,
+    });
+    rows.get('project_assets')!.set('project-asset-1', {
+      id: 'project-asset-1',
+      assetId: physicalId,
+      createdAt: 1,
+      size: 5,
+      mimeType: 'image/png',
+    });
+    rows.get('asset_refs')!.set(physicalId, {
+      assetId: physicalId,
+      createdAt: 1,
+      size: 5,
+      mimeType: 'image/png',
+      storagePath: 'object',
+    });
+    expect(isExportReadyVideoProject(entry.project)).toBe(true);
+    await deleteMediaAssetWithProjectCascade(mediaId, [
+      { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+    ]);
+    const saved = rows.get('video_projects')!.get(entry.id) as typeof entry;
+    expect(saved.workspaceRevision).toBe(1);
+    expect(saved.project.version).toBe(blur === undefined ? 14 : 16);
+    expect(saved.project.sceneBackground?.blur).toBe(blur);
+    expect(saved.project.assets).toEqual([]);
+    expect(saved.project.sceneBackground).toMatchObject({ remembered: { solid, gradient } });
+    expect(saved.project.sceneBackground?.remembered?.image).toBeUndefined();
+    expect(saved.project.sceneBackground).toMatchObject(mode === 'dormant' ? gradient : solid);
+    expect(isExportReadyVideoProject(saved.project)).toBe(true);
+    expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+    expect(rows.get('project_assets')?.has('project-asset-1')).toBe(false);
+    expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+    expect(harness.complete).toHaveBeenCalledOnce();
+  }
+);
+
+it('purges deleted comment sources through the cascade and preserves independent notes', async () => {
+  const entry = createVideoProjectEntryWithMediaClip({ version: 23 });
+  const asset = entry.project.assets[0]!;
+  entry.project.commentDocuments = [
+    {
+      id: 'bound',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'placement' },
+      annotations: [],
+      canvasComments: [],
+    },
+    {
+      id: 'independent',
+      binding: { kind: 'project' },
+      annotations: [{ id: 'note', text: 'Independent note', anchor: { kind: 'point', time: 0 } }],
+      canvasComments: [],
+    },
+  ];
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, entry);
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+  ]);
+  const saved = rows.get('video_projects')!.get(entry.id);
+  expect(saved).toMatchObject({
+    project: {
+      version: 23,
+      commentDocuments: [entry.project.commentDocuments[1]],
+      assets: [],
+      clips: [],
+    },
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+  expect(harness.complete).toHaveBeenCalledTimes(1);
+});
+
+it('purges dormant source audio documents in the same root as their deleted source', async () => {
+  const entry = createVideoProjectEntryWithMediaClip({ version: 28 });
+  const asset = entry.project.assets[0]!;
+  entry.project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+      ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+      mutes: [],
+    },
+  ];
+  entry.project.clips = [];
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, entry);
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+  ]);
+  expect(rows.get('video_projects')!.get(entry.id)).toMatchObject({
+    project: { version: 28, sourceAudioDocuments: [], assets: [], clips: [] },
+  });
+  expect(harness.complete).toHaveBeenCalledOnce();
+});
+
+it('purges dormant whole source voice documents atomically with their source Library material', async () => {
+  const { createVideoProjectTrack } =
+    await import('../../../features/video/project/factories/creation');
+  const entry = createVideoProjectEntryWithMediaClip({ version: 31 });
+  const source = entry.project.assets[0]!;
+  const audio = {
+    ...source,
+    id: 'retained-native-take',
+    type: 'AUDIO' as const,
+    source: { kind: 'project-asset' as const, projectAssetId: 'voice-private' },
+  };
+  const track = createVideoProjectTrack('Voice', 1, 'AUDIO');
+  entry.project.assets.push(audio);
+  entry.project.tracks.push(track);
+  entry.project.clips = [];
+  entry.project.sourceVoiceoverDocuments = [
+    {
+      id: 'voice',
+      trackId: track.id,
+      enabled: false,
+      binding: { kind: 'source', assetId: source.id, sourceInstanceId: 'dormant-source' },
+      reference: [
+        { kind: 'keep', rate: 1, sourceStart: 0, sourceEnd: 10, resultStart: 0, resultEnd: 10 },
+      ],
+      take: {
+        id: 'take',
+        assetId: audio.id,
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 4,
+        volume: 1,
+        muted: true,
+        dormant: true,
+        fadeIn: 0,
+        fadeOut: 0,
+        sourceAnchor: [{ start: 0, end: 4, offset: 0, duration: 4 }],
+      },
+    },
+  ];
+  expect(isExportReadyVideoProject(entry.project)).toBe(true);
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, entry);
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+  ]);
+  expect(rows.get('video_projects')!.get(entry.id)).toMatchObject({
+    workspaceRevision: 1,
+    project: { version: 31, sourceVoiceoverDocuments: [], assets: [audio], clips: [] },
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+  expect(harness.complete).toHaveBeenCalledOnce();
 });

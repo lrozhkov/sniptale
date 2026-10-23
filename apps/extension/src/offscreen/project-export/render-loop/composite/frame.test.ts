@@ -1,6 +1,7 @@
+import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 // @vitest-environment jsdom
 
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const {
   drawProjectFrameMock,
@@ -137,7 +138,7 @@ it('renders a composite frame and returns the next progress timestamp', async ()
     0.25,
     expect.anything(),
     expect.any(Map),
-    {}
+    { spatialRenderer: expect.any(Function) }
   );
   expect(renderOffscreenProjectEffectFramesMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -188,7 +189,7 @@ it('renders effect frames through the reusable runtime when one is provided', as
     expect.anything(),
     expect.anything(),
     expect.any(Map),
-    { effectRuntimeFrames }
+    { effectRuntimeFrames, spatialRenderer: expect.any(Function) }
   );
   expect(disposeEffectRuntimeCompositionMock).toHaveBeenCalledWith(effectRuntimeFrames);
 });
@@ -239,4 +240,140 @@ it('rejects cancelled composite frames before touching playback', async () => {
   expect(syncClipPlaybackMock).not.toHaveBeenCalled();
   expect(drawProjectFrameMock).not.toHaveBeenCalled();
   expect(sendCompositeRenderProgressMock).not.toHaveBeenCalled();
+});
+
+afterEach(() => {
+  Reflect.deleteProperty(document, 'fonts');
+});
+
+it('burns authored captions after normal composite frames and reuses the prepared layout', async () => {
+  const project = createProject(1);
+  project.textDocuments = [
+    {
+      id: 'doc',
+      binding: { kind: 'project' },
+      captions: {
+        enabled: true,
+        style: { position: 'bottom', fontSize: 0.04, color: '#ffffff', background: '#000000' },
+      },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text',
+            text: 'Burned in',
+            originalText: '',
+            start: 0,
+            end: 1,
+            timeDomain: 'result',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const load = vi.fn(async () => [{ status: 'loaded' }]);
+  Object.defineProperty(document, 'fonts', { configurable: true, value: { load } });
+  const context = createRenderContext();
+  const fillText = vi.spyOn(context, 'fillText');
+  const args = {
+    context,
+    currentTime: 0.25,
+    frameIndex: 0,
+    job: createJob(),
+    loadedImages: createLoadedImages(),
+    lastProgressSent: 0,
+    project,
+    settings: createSettings(),
+    totalFrames: 4,
+  };
+  await renderCompositeFrame(args);
+  await renderCompositeFrame({ ...args, currentTime: 0.5, frameIndex: 1 });
+  expect(load).toHaveBeenCalledOnce();
+  expect(fillText).toHaveBeenCalledWith('Burned in', expect.any(Number), expect.any(Number));
+  expect(drawProjectFrameMock.mock.invocationCallOrder[0]).toBeLessThan(
+    fillText.mock.invocationCallOrder[0]!
+  );
+  fillText.mockRestore();
+  load.mockResolvedValue([]);
+  await expect(renderCompositeFrame({ ...args, job: createJob() })).rejects.toThrow(
+    'Caption font is unavailable'
+  );
+  expect(drawProjectFrameMock).toHaveBeenCalledTimes(2);
+  expect(sendCompositeRenderProgressMock).toHaveBeenCalledTimes(2);
+});
+it('rejects unsafe caption layout before drawing or progress', async () => {
+  const assertExportable = vi.fn(() => {
+    throw new Error('unsafe captions');
+  });
+  const draw = vi.fn();
+  await expect(
+    renderCompositeFrame({
+      context: createRenderContext(),
+      currentTime: 0.25,
+      frameIndex: 0,
+      job: {
+        ...createJob(),
+        captionRenderer: {
+          prepare: vi.fn().mockResolvedValue({ assertExportable, draw }),
+          clear: vi.fn(),
+        },
+      },
+      loadedImages: {},
+      lastProgressSent: 0,
+      project: createProject(1),
+      settings: createSettings(),
+      totalFrames: 4,
+    })
+  ).rejects.toThrow('unsafe captions');
+  expect(assertExportable).toHaveBeenCalledWith({ start: 0, end: 1, duration: 1 });
+  expect(drawProjectFrameMock).not.toHaveBeenCalled();
+  expect(draw).not.toHaveBeenCalled();
+  expect(sendCompositeRenderProgressMock).not.toHaveBeenCalled();
+});
+
+it('paints the final watermark after captions and refuses preparation failures before drawing', async () => {
+  const project = createProject();
+  project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  const order: string[] = [];
+  const draw = vi.fn(() => {
+    order.push('watermark');
+  });
+  const prepare = vi.fn(async () => ({ bounds: { x: 0, y: 0, width: 20, height: 10 }, draw }));
+  const job = createJob();
+  job.watermarkRenderer = { prepare, clear: vi.fn() };
+  const captionDraw = vi.fn(() => {
+    order.push('captions');
+  });
+  const { createVideoProjectCaptionRenderer } =
+    await import('../../../../workflows/video-review/project-captions');
+  const captions = await createVideoProjectCaptionRenderer().prepare(project, createSettings());
+  job.captionRenderer = {
+    prepare: vi.fn(async () => ({ ...captions, draw: captionDraw })),
+    clear: vi.fn(),
+  };
+  drawProjectFrameMock.mockImplementation(() => {
+    order.push('scene');
+  });
+  const args = {
+    context: createRenderContext(),
+    currentTime: 0,
+    frameIndex: 0,
+    job,
+    loadedImages: createLoadedImages(),
+    project,
+    settings: createSettings(),
+    lastProgressSent: 0,
+    totalFrames: 4,
+  };
+  await renderCompositeFrame(args);
+  expect(order).toEqual(['scene', 'captions', 'watermark']);
+  expect(prepare).toHaveBeenCalledWith(project, args.settings, undefined);
+  prepare.mockRejectedValueOnce(new Error('Logo unavailable'));
+  await expect(renderCompositeFrame(args)).rejects.toThrow('Logo unavailable');
+  expect(drawProjectFrameMock).toHaveBeenCalledTimes(1);
+  expect(draw).toHaveBeenCalledTimes(1);
 });

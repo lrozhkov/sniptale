@@ -1,3 +1,4 @@
+import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
 import {
   drawSceneBackground,
   getProjectSceneBackground,
@@ -19,13 +20,22 @@ function getStaticBackgroundCacheKey(project: VideoProject, width: number, heigh
     case VideoSceneBackgroundKind.SOLID:
       return `solid:${width}x${height}:${background.color}`;
     case VideoSceneBackgroundKind.IMAGE:
-      return `image:${width}x${height}:${background.assetId}`;
+      return JSON.stringify([
+        'image',
+        width,
+        height,
+        project.width,
+        background.assetId,
+        background.imageFit ?? 'cover',
+        background.blur ?? 0,
+      ]);
     case VideoSceneBackgroundKind.GRADIENT:
       return null;
   }
 }
 
 function drawExportSceneBackgroundUncached(params: {
+  backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   context: CanvasRenderingContext2D;
   currentTime: number;
   height: number;
@@ -34,6 +44,8 @@ function drawExportSceneBackgroundUncached(params: {
   width: number;
 }) {
   drawSceneBackground({
+    ...(params.backgroundCamera ? { camera: params.backgroundCamera } : {}),
+    projectScale: params.width / params.project.width,
     context: params.context,
     currentTime: params.currentTime,
     audioEnvelope: resolveSceneBackgroundAudioEnvelope(params.project, params.currentTime),
@@ -45,6 +57,7 @@ function drawExportSceneBackgroundUncached(params: {
 }
 
 export function drawExportSceneBackground(params: {
+  backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   cache?: ExportSceneBackgroundCache | undefined;
   context: CanvasRenderingContext2D;
   currentTime: number;
@@ -53,9 +66,10 @@ export function drawExportSceneBackground(params: {
   project: VideoProject;
   width: number;
 }) {
-  const cacheKey = params.cache
-    ? getStaticBackgroundCacheKey(params.project, params.width, params.height)
-    : null;
+  const cacheKey =
+    params.cache && !params.backgroundCamera
+      ? getStaticBackgroundCacheKey(params.project, params.width, params.height)
+      : null;
   if (!params.cache || !cacheKey) {
     drawExportSceneBackgroundUncached(params);
     return;
@@ -67,7 +81,7 @@ export function drawExportSceneBackground(params: {
       params.height,
       params.context.canvas?.ownerDocument
     );
-    params.cache.key = cacheKey;
+    params.cache.key = null;
     const bufferContext = params.cache.buffer?.getContext('2d') ?? null;
     if (!params.cache.buffer || !bufferContext) {
       drawExportSceneBackgroundUncached(params);
@@ -78,6 +92,7 @@ export function drawExportSceneBackground(params: {
       ...params,
       context: bufferContext as CanvasRenderingContext2D,
     });
+    params.cache.key = cacheKey;
   }
 
   params.context.drawImage(params.cache.buffer, 0, 0, params.width, params.height);

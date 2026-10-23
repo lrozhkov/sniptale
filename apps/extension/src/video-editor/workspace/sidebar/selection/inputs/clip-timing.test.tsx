@@ -12,7 +12,7 @@ import {
   VideoProjectClipType,
   type VideoProjectVideoClip,
 } from '../../../../../features/video/project/types';
-import { ClipTimingControls } from './clip-timing';
+import { ClipTimingControls, ClipFadeFields } from './clip-timing';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -107,6 +107,7 @@ function createPanelActionProps(onUpdateClipPlaybackRate: UpdatePlaybackRate) {
     onUpdateMediaClipFitScalePercent: vi.fn(),
     onUpdateMediaClipShadowIntensity: vi.fn(),
     onUpdateMediaClipShadowMode: vi.fn(),
+    onUpdateMediaClipShadowColor: vi.fn(),
     onUpdateMotionRegion: vi.fn(),
     onUpdateShapeStyle: vi.fn(),
     onUpdateTextContent: vi.fn(),
@@ -183,7 +184,67 @@ describe('workspace-sidebar/selection/clip-timing', () => {
       setInputValue(playbackRateInput!, '0');
     });
 
-    expect(mapSliderValueToPlaybackRate(0)).toBe(0.1);
-    expect(onUpdateClipPlaybackRateMock).toHaveBeenCalledWith('clip-1', 0.1);
+    expect(mapSliderValueToPlaybackRate(0)).toBe(0.0625);
+    expect(onUpdateClipPlaybackRateMock).toHaveBeenCalledWith('clip-1', 0.0625);
   });
+});
+
+it.each([
+  [true, 80, 60],
+  [true, 2, 2],
+  [false, 80, 5],
+] as const)(
+  'uses the duration and media-specific fade limit %s %s',
+  async (audio, duration, maximum) => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const update = vi.fn();
+    await act(async () =>
+      root?.render(
+        <ClipFadeFields
+          audio={audio}
+          duration={duration}
+          clipId="clip"
+          fadeInMs={12000}
+          fadeOutMs={0}
+          locked={false}
+          onUpdateClipFades={update}
+        />
+      )
+    );
+    const inputs = [...container.querySelectorAll<HTMLInputElement>('input[type="text"]')];
+    const ranges = [...container.querySelectorAll<HTMLInputElement>('input[type="range"]')];
+    expect(ranges.map((input) => input.max)).toEqual([
+      String(Math.min(5, duration)),
+      String(Math.min(5, duration)),
+    ]);
+    await act(async () => {
+      inputs[0]!.focus();
+      inputs[0]!.blur();
+    });
+    expect(update).not.toHaveBeenCalled();
+    await act(async () => setInputValue(inputs[0]!, '90'));
+    await act(async () => inputs[0]!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(update).toHaveBeenLastCalledWith('clip', { fadeInMs: maximum * 1000 });
+  }
+);
+
+it('displays 1/16 exactly and retains it when the value is focused and left without editing', async () => {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  const update = vi.fn();
+  const clip = { ...createClip(), playbackRate: 0.0625, duration: 160 };
+  await act(async () =>
+    root?.render(<ClipTimingControls {...createPanelProps(clip, update)} locked={false} />)
+  );
+  const input = [...container.querySelectorAll<HTMLInputElement>('input[type="text"]')].find(
+    (input) => input.value === '0.0625'
+  );
+  expect(input).toBeDefined();
+  await act(async () => input!.focus());
+  await act(async () => input!.blur());
+  expect(input!.value).toBe('0.0625');
+  expect(update).not.toHaveBeenCalled();
 });

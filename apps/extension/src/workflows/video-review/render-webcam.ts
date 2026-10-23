@@ -60,7 +60,6 @@ export function drawReviewWebcam(
   const appearance = {
     ...webcam.appearance,
     ...cropSettings,
-    shape: webcam.appearance.shape === 'circle' ? ('ellipse' as const) : webcam.appearance.shape,
   };
   const width = placement.width * output.width;
   const height = placement.height * output.height;
@@ -146,7 +145,11 @@ export async function createReviewWebcamRenderer(
     )
       throw new QuickEditExportUnavailable(['asset-missing']);
     signal.throwIfAborted();
-    const sink = createReviewDecodedSampleSink(new VideoSampleSink(track), signal);
+    const sink = createReviewDecodedSampleSink(
+      new VideoSampleSink(track),
+      signal,
+      await track.getDecoderConfig()
+    );
     async function* sourceFrames(
       sourceTimes: readonly number[]
     ): AsyncGenerator<ReviewWebcamSourceFrame | null> {

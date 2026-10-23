@@ -2,6 +2,31 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { SegmentedSwitch } from './index';
 
+it.each([false, true])(
+  'renders an explicit neutral selection without accent styling (wrap=%s)',
+  (wrap) => {
+    const markup = renderToStaticMarkup(
+      <SegmentedSwitch
+        activeId="tabs"
+        appearance="neutral"
+        ariaLabel="Pages"
+        density="compact"
+        wrap={wrap}
+        options={[
+          { id: 'tabs', label: 'Tabs' },
+          { id: 'urls', label: 'Addresses', disabled: true },
+        ]}
+        onChange={vi.fn()}
+      />
+    );
+    expect(markup).not.toContain('--sniptale-color-accent');
+    expect(markup).toContain('rounded-[6px]');
+    expect(markup).not.toContain('font-semibold');
+    expect(markup).toContain('focus-visible:outline-2');
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*title="Addresses"/);
+  }
+);
+
 it('keeps long segmented labels clipped inside their own cell', () => {
   const markup = renderToStaticMarkup(
     <SegmentedSwitch
@@ -18,6 +43,7 @@ it('keeps long segmented labels clipped inside their own cell', () => {
   );
 
   expect(markup).toContain('overflow-hidden');
+  expect(markup).toContain('--sniptale-color-accent');
   expect(markup).toContain('max-w-full truncate');
 });
 

@@ -20,11 +20,11 @@ export function VideoActiveDisplay({
   return (
     <div className="flex min-h-[132px] flex-col items-center justify-start pt-7 text-center">
       <div
-        className={`text-5xl font-semibold tabular-nums ${getVideoActiveValueClassName(recordingState.status)}`}
+        className={`text-5xl font-normal tabular-nums ${getVideoActiveValueClassName(recordingState.status)}`}
       >
         {value}
       </div>
-      <div className="mt-4 max-w-full truncate text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+      <div className="mt-4 max-w-full truncate text-sm font-normal text-[var(--sniptale-color-text-primary)]">
         {sourceLabel}
       </div>
       {viewportPresetLabel ? (

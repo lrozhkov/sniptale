@@ -153,11 +153,11 @@ async function verifyTimingFields() {
     setInputValue(playbackRateInput!, '63');
   });
 
-  expect(onUpdateClipPlaybackRate).toHaveBeenCalledWith('video-1', 2.45);
+  expect(onUpdateClipPlaybackRate).toHaveBeenCalledWith('video-1', 2.06);
   const exactRate = container?.querySelector<HTMLInputElement>('input[type="text"]');
   expect(playbackRateInput?.valueAsNumber).toBe(getPlaybackRateSliderProps(1).value);
-  expect(getPlaybackRateSliderProps(2.4).value).toBeGreaterThan(62);
-  expect(getPlaybackRateSliderProps(2.4).value).toBeLessThan(63);
+  expect(getPlaybackRateSliderProps(2.4).value).toBeGreaterThan(65);
+  expect(getPlaybackRateSliderProps(2.4).value).toBeLessThan(66);
   await act(async () => {
     setInputValue(exactRate!, '2.4');
     exactRate!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
@@ -168,8 +168,8 @@ async function verifyTimingFields() {
     setInputValue(playbackRateInput!, '0');
   });
 
-  expect(mapSliderValueToPlaybackRate(0)).toBe(0.1);
-  expect(onUpdateClipPlaybackRate).toHaveBeenCalledWith('video-1', 0.1);
+  expect(mapSliderValueToPlaybackRate(0)).toBe(0.0625);
+  expect(onUpdateClipPlaybackRate).toHaveBeenCalledWith('video-1', 0.0625);
 }
 
 async function verifyAudioControls() {

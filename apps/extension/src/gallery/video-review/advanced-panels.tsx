@@ -1,7 +1,7 @@
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
-import { ReviewButton } from './controls';
+import { ReviewButton, ReviewDetails } from './controls';
 import { ReviewPresentationBinding } from './presentation-binding';
-import { ReviewWatermarkInspector } from './watermark-inspector';
+import { WatermarkInspector } from '../../ui/watermark/inspector';
 import type { ComponentProps } from 'react';
 import {
   Scan,
@@ -115,7 +115,7 @@ export function ReviewSceneProperties(props: {
   captions?: QuickEditAdvancedState['captions'];
   onCaptions?(settings: NonNullable<QuickEditAdvancedState['captions']>): void;
   presentation?: ComponentProps<typeof ReviewPresentationBinding>;
-  watermark?: ComponentProps<typeof ReviewWatermarkInspector>;
+  watermark?: Omit<ComponentProps<typeof WatermarkInspector>, 'Disclosure' | 'dataUi'>;
   windowHeader?: QuickEditAdvancedState['windowHeader'];
   onWindowHeader?(header: QuickEditAdvancedState['windowHeader']): void;
   source: { width: number; height: number };
@@ -207,7 +207,13 @@ export function ReviewSceneProperties(props: {
                     id: 'watermark',
                     label: translate('gallery.videoReview.watermark'),
                     icon: Stamp,
-                    content: <ReviewWatermarkInspector {...props.watermark} />,
+                    content: (
+                      <WatermarkInspector
+                        {...props.watermark}
+                        Disclosure={ReviewDetails}
+                        dataUi="gallery.videoReview.watermarkInspector"
+                      />
+                    ),
                   },
                 ]
               : []),

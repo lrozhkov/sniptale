@@ -2,6 +2,7 @@ import {
   AUDIO_INPUT_MAX_BYTES,
   AUDIO_OUTPUT_MAX_BYTES,
   isAudioSourceJobScope,
+  isProjectAudioJobScope,
   type AudioJobStart,
 } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
@@ -15,6 +16,8 @@ interface AudioRequest {
   input?: File;
   signal: AbortSignal;
   onReceiving(): void;
+  /** The coordinator rechecks source and provider authority after asynchronous body preparation. */
+  beforeSend?(): Promise<void>;
 }
 
 async function readBounded(
@@ -194,12 +197,16 @@ async function decodeResponse(response: Response, args: AudioRequest) {
 
 /** Only this owner constructs bearer headers; requests are never redirected or retried. */
 export async function requestAudio(args: AudioRequest) {
+  if (isProjectAudioJobScope(args.request.scope) && !args.beforeSend)
+    throw new Error('unauthorized');
   const headers: Record<string, string> = { Authorization: `Bearer ${args.config.apiKey}` };
   const body =
     args.request.operation === 'transcription'
       ? await encodeTranscription(args, headers)
       : encodeSpeech(args);
   if (args.request.operation === 'speech') headers['Content-Type'] = 'application/json';
+  args.signal.throwIfAborted();
+  await args.beforeSend?.();
   args.signal.throwIfAborted();
   const response = await fetch(args.config.url, {
     method: 'POST',

@@ -4,6 +4,7 @@ import { createAiPrivacyProof } from '../privacy';
 import {
   canonicalizeScenarioEditorEgressPayload,
   createContentAiEgressAuthority,
+  createReviewTextEgressAuthority,
   createScenarioEditorEgressAuthority,
 } from './index';
 
@@ -90,4 +91,67 @@ it('binds whole-document authority separately from selecting the same steps', as
     canonicalizeScenarioEditorEgressPayload({ ...input, scope: { ...input.scope, document: true } })
       .scope.document
   ).toBe(true);
+});
+
+it('binds project text consent to the exact placements document revision and destination', async () => {
+  const input = {
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    approvedModelCode: 'code',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+    scope: {
+      kind: 'project-text' as const,
+      projectId: 'project',
+      projectRevision: 2,
+      projectUpdatedAt: 100,
+      documentId: 'document',
+    },
+    context: {
+      version: 1 as const,
+      prompt: 'Shorten',
+      mode: 'phrases' as const,
+      wholeDocument: true,
+      changeIntervals: false,
+      resegment: false,
+      window: { start: 1, end: 8 },
+      fragments: [
+        {
+          id: 'phrase',
+          text: 'Authored words',
+          start: 1,
+          end: 8,
+          ranges: [
+            { start: 1, end: 2 },
+            { start: 6, end: 8 },
+          ],
+        },
+      ],
+    },
+  };
+  const authority = await createReviewTextEgressAuthority(input);
+  for (const changed of [
+    { ...input, scope: { ...input.scope, documentId: 'another' } },
+    { ...input, scope: { ...input.scope, projectRevision: 3 } },
+    { ...input, scope: { ...input.scope, projectUpdatedAt: 101 } },
+    { ...input, approvedDestination: `sha256:${'b'.repeat(64)}` },
+    { ...input, approvedModelCode: 'another' },
+    {
+      ...input,
+      context: {
+        ...input.context,
+        fragments: [
+          {
+            ...input.context.fragments[0]!,
+            ranges: [
+              { start: 1, end: 3 },
+              { start: 6, end: 8 },
+            ],
+          },
+        ],
+      },
+    },
+  ])
+    expect((await createReviewTextEgressAuthority(changed)).payloadHash).not.toBe(
+      authority.payloadHash
+    );
 });

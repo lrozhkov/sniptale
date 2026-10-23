@@ -45,9 +45,9 @@ it('opens the toolbar directly or with each supported working mode selected', ()
   expect(container.textContent).toContain('content.toolbar.designReviewEnable');
   expect(container.textContent).toContain('popup.home.toolsEditingGroup');
   expect(container.textContent).toContain('popup.home.toolsWorkflowGroup');
-  expect(buttons[4]?.title).toBe('content.toolbar.designReviewEnable');
+  expect(buttons[4]?.getAttribute('data-popup-hint')).toBe('content.toolbar.designReviewEnable');
   expect(buttons[4]?.querySelector('svg')?.getAttribute('class')).toContain('lucide-swatch-book');
-  expect(buttons[5]?.title).toBe('content.toolbar.videoRecordingEnable');
+  expect(buttons[5]?.getAttribute('data-popup-hint')).toBe('content.toolbar.videoRecordingEnable');
   expect(buttons.every((button) => button.className.includes('shrink-0'))).toBe(true);
   expect(buttons.every((button) => button.className.includes('border-0'))).toBe(true);
   expect(buttons.every((button) => button.className.includes('group'))).toBe(true);
@@ -75,5 +75,9 @@ it('disables every tools action when page preparation is unavailable', () => {
   act(() => root.render(<PopupToolsPanel disabledReason="blocked" onOpen={vi.fn()} />));
 
   const buttons = [...container.querySelectorAll('button')];
-  expect(buttons.every((button) => button.disabled && button.title === 'blocked')).toBe(true);
+  expect(
+    buttons.every(
+      (button) => button.disabled && button.getAttribute('data-popup-hint') === 'blocked'
+    )
+  ).toBe(true);
 });

@@ -20,7 +20,49 @@ vi.mock('../gradients/view', () => ({
   GradientPresetsSettings: () => <div>gradient-presets</div>,
 }));
 import { PalettesSettings } from './view';
+it.each([
+  ['distinct', ['#123456', '#654321']],
+  ['duplicate', ['#123456', '#123456']],
+] as const)(
+  'retains the moved %s color handle after successful publication',
+  async (_name, colors) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    state.value.colors = [...colors];
+    let finish!: () => void;
+    state.value.moveColor.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const node = document.createElement('div');
+    document.body.append(node);
+    const root = createRoot(node);
+    try {
+      await act(async () => root.render(<PalettesSettings />));
+      const handles = () =>
+        node.querySelectorAll<HTMLButtonElement>('[aria-label="settings.collection.dragHandle"]');
+      const source = handles()[0]!;
+      act(() => source.focus());
+      for (const key of ['Enter', 'ArrowDown', 'Enter'])
+        act(() => source.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+      await act(async () => {
+        state.value.colors = [colors[1], colors[0]];
+        root.render(<PalettesSettings />);
+        finish();
+      });
+      expect(handles()[1]).toBe(source);
+      expect(document.activeElement).toBe(source);
+    } finally {
+      await act(async () => root.unmount());
+      node.remove();
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
 it('renders each palette color once as a picker without a duplicate heading or visible index', () => {
+  state.value.colors = ['#123456'];
   const node = document.createElement('div');
   const root = createRoot(node);
   act(() => root.render(<PalettesSettings />));
@@ -31,6 +73,46 @@ it('renders each palette color once as a picker without a duplicate heading or v
   expect(node.textContent).not.toContain('gradient-presets');
   expect(node.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(1);
   act(() => root.unmount());
+});
+
+it('keeps a color editor mounted through value edits and authoritative list changes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  state.value.colors = ['#123456', '#654321'];
+  const node = document.createElement('div');
+  document.body.append(node);
+  const root = createRoot(node);
+  const rows = () => [...node.querySelectorAll('[data-settings-collection-item]')];
+  try {
+    await act(async () => root.render(<PalettesSettings />));
+    const original = rows();
+    await act(async () => {
+      state.value.colors = ['#abcdef', '#654321'];
+      root.render(<PalettesSettings />);
+    });
+    expect(rows()).toEqual(original);
+    await act(async () => {
+      state.value.colors = ['#654321', '#abcdef', '#abcdef'];
+      root.render(<PalettesSettings />);
+    });
+    expect(rows()[0]).toBe(original[1]);
+    expect(rows()[1]).toBe(original[0]);
+    expect(
+      new Set(rows().map((row) => row.getAttribute('data-settings-collection-item'))).size
+    ).toBe(3);
+    await act(async () => {
+      state.value.colors = ['#abcdef'];
+      root.render(<PalettesSettings />);
+    });
+    expect(rows()).toHaveLength(1);
+    state.value.key = 'sceneBackground';
+    await act(async () => root.render(<PalettesSettings />));
+    expect(rows()[0]).not.toBe(original[0]);
+  } finally {
+    await act(async () => root.unmount());
+    node.remove();
+    state.value.key = 'drawing';
+    vi.unstubAllGlobals();
+  }
 });
 
 it('forwards palette selection, reorder, and picker updates', async () => {

@@ -16,6 +16,7 @@ import {
 const logger = createLogger({ namespace: 'PopupVideoPersistence' });
 
 type VideoPersistenceState = {
+  persistUiSelection?: boolean;
   isReady: boolean;
   selectedPresetId: string | null;
   setSelectedPresetId: Dispatch<SetStateAction<string | null>>;
@@ -100,6 +101,7 @@ function useVideoSettingsPersistenceEffect(state: VideoPersistenceState): void {
 }
 
 function useVideoUiStatePersistenceEffect(state: VideoPersistenceState): void {
+  const { persistUiSelection } = state;
   const { isReady, selectedPresetId, setSelectedPresetId, setVideoCaptureMode, videoCaptureMode } =
     state;
   const committedRef = useRef({
@@ -109,7 +111,7 @@ function useVideoUiStatePersistenceEffect(state: VideoPersistenceState): void {
   const restoringRef = useRef(false);
 
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || persistUiSelection === false) return;
     if (restoringRef.current) {
       restoringRef.current = false;
       return;
@@ -135,5 +137,12 @@ function useVideoUiStatePersistenceEffect(state: VideoPersistenceState): void {
     return () => {
       guard.cancelled = true;
     };
-  }, [isReady, selectedPresetId, setSelectedPresetId, setVideoCaptureMode, videoCaptureMode]);
+  }, [
+    isReady,
+    persistUiSelection,
+    selectedPresetId,
+    setSelectedPresetId,
+    setVideoCaptureMode,
+    videoCaptureMode,
+  ]);
 }

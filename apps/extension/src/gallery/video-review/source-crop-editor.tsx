@@ -6,7 +6,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 import { translate } from '../../platform/i18n';
 import { ReviewButton } from './controls';
-import { ReviewNumberRow } from './number-row';
+import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { useZoomPreviewFrame, useZoomPreviewSource } from './use-zoom-preview-source';
 
 /** One local crop draft uses the existing source decoder and commits through the scene owner. */

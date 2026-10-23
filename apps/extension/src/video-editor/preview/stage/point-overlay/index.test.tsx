@@ -1,4 +1,10 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
+
+import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
@@ -19,6 +25,7 @@ import {
 import { VideoMotionFocusMode } from '../../../../features/video/project/types';
 import {
   createActionPointPlacementMode,
+  createMotionFocusPlacementMode,
   createObjectTrackAnchorPlacementMode,
 } from '../../../project/selection/placement';
 import { PreviewStagePointOverlay, handleStagePointPlacement } from './index';
@@ -488,3 +495,203 @@ it('drags the selected repeated occurrence in source coordinates and preserves i
     clipId: repeat.id,
   });
 });
+
+it.each([
+  { role: 'CAMERA' as const, mirrored: true, displayedX: 84 },
+  { role: 'CAMERA' as const, mirrored: false, displayedX: 36 },
+  { role: 'PRIMARY' as const, mirrored: true, displayedX: 36 },
+])(
+  'keeps the $role mirrored=$mirrored action handle and point picker on painted coordinates',
+  ({ role, mirrored, displayedX }) => {
+    const { project, clip, occurrences } = createCapturedOverlayFixture();
+    if (role === 'CAMERA') project.tracks[0]!.role = role;
+    else delete project.tracks[0]!.role;
+    project.clips = [clip];
+    clip.cameraMirrored = mirrored;
+    clip.fitMode = 'STRETCH';
+    project.actionEvents[0]!.point = { x: 0.2, y: 0.5 };
+    const occurrence = occurrences()[0]!;
+    const onUpdateActionEventDetails = vi.fn();
+    const params = {
+      camera: createCamera(),
+      currentTime: 1,
+      project,
+      stageRef: { current: createStage() },
+      placementMode: createActionPointPlacementMode('fact', clip.id),
+      selectedActionOccurrence: occurrence,
+      selectedMotionRegion: null,
+      onClearPlacementMode: vi.fn(),
+      onUpdateActionEventDetails,
+      onUpdateMotionRegion: vi.fn(),
+    };
+    act(() => root?.render(<PreviewStagePointOverlay {...params} placementMode={null} />));
+    const handle = container?.querySelector<HTMLButtonElement>(
+      '[data-preview-stage-point-handle="true"]'
+    );
+    expect(handle).toBeTruthy();
+    expect(parseFloat(handle!.style.left)).toBeCloseTo(displayedX / 2, 8);
+    expect(parseFloat(handle!.style.top)).toBeCloseTo(40, 8);
+    expect(handleStagePointPlacement(createPointEvent(displayedX, 40), params)).toBe(true);
+    expect(onUpdateActionEventDetails).toHaveBeenCalledWith('fact', {
+      point: { x: expect.closeTo(0.2, 8), y: 0.5 },
+      clipId: clip.id,
+    });
+    expect(project.actionEvents[0]!.point).toEqual({ x: 0.2, y: 0.5 });
+  }
+);
+
+it.each(['crop', 'destination', 'circle', 'dormant'] as const)(
+  'keeps the camera action handle and picker aligned with its %s',
+  (kind) => {
+    const { project, clip, occurrences } = createCapturedOverlayFixture();
+    if (kind === 'dormant') delete project.tracks[0]!.role;
+    else project.tracks[0]!.role = 'CAMERA';
+    project.clips = [clip];
+    clip.fitMode = 'STRETCH';
+    project.actionEvents[0]!.point = { x: 0.6, y: 0.5 };
+    if (kind === 'crop') clip.cameraAppearance = { ...DEFAULT_CAMERA_APPEARANCE, zoom: 2, panX: 1 };
+    else if (kind === 'circle' || kind === 'dormant')
+      clip.cameraAppearance = { ...DEFAULT_CAMERA_APPEARANCE, shape: 'circle' };
+    else
+      clip.cameraPositions = [
+        {
+          id: 'destination',
+          sourceTime: 0.5,
+          transform: { ...clip.transform, x: 120 },
+          fitMode: 'STRETCH',
+          transition: { kind: 'instant', duration: 0 },
+        },
+      ];
+    const displayedX =
+      kind === 'crop' ? 36 : kind === 'circle' ? 64 : kind === 'dormant' ? 68 : 168;
+    const onUpdateActionEventDetails = vi.fn();
+    const params = {
+      camera: createCamera(),
+      currentTime: 1,
+      project,
+      stageRef: { current: createStage() },
+      placementMode: createActionPointPlacementMode('fact', clip.id),
+      selectedActionOccurrence: occurrences()[0]!,
+      selectedMotionRegion: null,
+      onClearPlacementMode: vi.fn(),
+      onUpdateActionEventDetails,
+      onUpdateMotionRegion: vi.fn(),
+    };
+    act(() => root?.render(<PreviewStagePointOverlay {...params} placementMode={null} />));
+    const handle = container!.querySelector<HTMLButtonElement>(
+      '[data-preview-stage-point-handle="true"]'
+    );
+    expect(handle).not.toBeNull();
+    expect(parseFloat(handle!.style.left)).toBeCloseTo(displayedX / 2, 8);
+    expect(handleStagePointPlacement(createPointEvent(displayedX, 40), params)).toBe(true);
+    expect(onUpdateActionEventDetails).toHaveBeenCalledWith('fact', {
+      point: { x: expect.closeTo(0.6, 8), y: 0.5 },
+      clipId: clip.id,
+    });
+  }
+);
+
+it.each(['border', 'spotlight'] as const)(
+  'does not expose dormant camera handles for a selected %s interval',
+  (kind) => {
+    const project = createPointOverlayProject();
+    const region = project.motionRegions![0]!;
+    if (kind === 'border') {
+      region.border = createQuickEditBorder();
+      region.borderTarget = 'viewport';
+    } else {
+      region.spotlight = createQuickEditSpotlight();
+      region.spotlightTarget = 'viewport';
+    }
+    act(() =>
+      root?.render(
+        <PreviewStagePointOverlay
+          camera={createCamera()}
+          currentTime={1}
+          onClearPlacementMode={vi.fn()}
+          onUpdateActionEventDetails={vi.fn()}
+          onUpdateMotionRegion={vi.fn()}
+          placementMode={null}
+          project={project}
+          selectedActionOccurrence={null}
+          selectedMotionRegion={region}
+          stageRef={{ current: createStage(220, 140) }}
+        />
+      )
+    );
+    expect(container?.querySelector('[data-preview-stage-point-handle="true"]')).toBeNull();
+  }
+);
+
+it.each(['available', 'rotated', 'outside', 'missing'] as const)(
+  'edits source-window focus only with an active target: %s',
+  async (target) => {
+    const { createVideoProjectMotionRegion } =
+      await import('../../../../features/video/project/motion');
+    const { project, clip } = createCapturedOverlayFixture();
+    clip.sourceCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+    if (target === 'rotated') clip.transform.rotation = 90;
+    const region = {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 3,
+      focusMode: VideoMotionFocusMode.MANUAL,
+      focusPoint: { x: 100, y: 50 },
+      sourceBinding: {
+        clipId: target === 'missing' ? 'missing' : clip.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: 0,
+        sourceEnd: 3,
+        animation: { start: 0, end: 3, duration: 3 },
+      },
+    };
+    project.motionRegions = [region];
+    const before = structuredClone(project);
+    const onUpdateMotionRegion = vi.fn();
+    act(() =>
+      root?.render(
+        <PreviewStagePointOverlay
+          camera={createCamera()}
+          currentTime={target === 'outside' ? 4 : 1}
+          onClearPlacementMode={vi.fn()}
+          onUpdateActionEventDetails={vi.fn()}
+          onUpdateMotionRegion={onUpdateMotionRegion}
+          placementMode={null}
+          project={project}
+          selectedActionOccurrence={null}
+          selectedMotionRegion={region}
+          stageRef={{ current: createStage() }}
+        />
+      )
+    );
+    const handle = container?.querySelector<HTMLElement>(
+      '[data-preview-stage-point-handle="true"]'
+    );
+    if (target !== 'available' && target !== 'rotated') {
+      expect(handle).toBeNull();
+      expect(
+        handleStagePointPlacement(createPointEvent(80, 50), {
+          camera: createCamera(),
+          currentTime: target === 'outside' ? 4 : 1,
+          onClearPlacementMode: vi.fn(),
+          onUpdateActionEventDetails: vi.fn(),
+          onUpdateMotionRegion,
+          placementMode: createMotionFocusPlacementMode(region.id),
+          project,
+          selectedActionOccurrence: null,
+          selectedMotionRegion: region,
+          stageRef: { current: createStage() },
+        })
+      ).toBe(true);
+      expect(onUpdateMotionRegion).not.toHaveBeenCalled();
+      expect(project).toEqual(before);
+      return;
+    }
+    expect(parseFloat(handle!.style.left)).toBeCloseTo(30, 8);
+    expect(parseFloat(handle!.style.top)).toBeCloseTo(40, 8);
+    dragRenderedPointHandle(60, 40, 80, 50);
+    expect(onUpdateMotionRegion).toHaveBeenLastCalledWith(region.id, {
+      focusPoint: target === 'rotated' ? { x: 120, y: 10 } : { x: 140, y: 70 },
+    });
+    expect(project).toEqual(before);
+  }
+);

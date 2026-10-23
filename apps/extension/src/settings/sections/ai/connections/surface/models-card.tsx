@@ -32,7 +32,7 @@ export function AIProvidersModelsCard(props: { state: AiProvidersSectionState })
         setDefault:
           getAIModelOperation(model) === 'text' && props.state.defaultModelId !== model.id,
         delete: true,
-        reorder: movingModelId === null,
+        reorder: true,
       },
     };
   });
@@ -73,7 +73,7 @@ export function AIProvidersModelsCard(props: { state: AiProvidersSectionState })
       onMove={(intent) => {
         if (movingModelId !== null) return;
         setMovingModelId(intent.itemId);
-        void props.state.catalogActions
+        return props.state.catalogActions
           .moveModel(intent.itemId, intent.beforeItemId)
           .finally(() => setMovingModelId(null));
       }}

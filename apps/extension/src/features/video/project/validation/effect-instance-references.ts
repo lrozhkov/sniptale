@@ -1,3 +1,4 @@
+import { isEffectHostTimingValid } from '../effect-instance/timing';
 import { isVideoEffectTrack } from '../effect-instance/owner';
 import type {
   VideoProjectEffectInstance,
@@ -8,6 +9,7 @@ import { VideoProjectClipType } from '../types';
 
 export interface VideoProjectEffectReferenceModel {
   clips: VideoProjectClip[];
+  assets?: import('../types').VideoProjectAsset[];
   tracks?: import('../types').VideoProjectTrack[];
   effectInstances?: VideoProjectEffectInstance[];
   effectSnapshots?: Array<Pick<VideoProjectEffectSnapshot, 'id' | 'kind'>>;
@@ -29,7 +31,8 @@ export function hasValidEffectProjectReferences(
     (clip): clip is VideoProjectEffectClip => clip.type === VideoProjectClipType.EFFECT
   );
   const hostByInstanceId = collectEffectHosts(effectHosts);
-  if (!hostByInstanceId) return false;
+  if (!hostByInstanceId || !effectHosts.every((host) => hasValidAttachment(host, project)))
+    return false;
   const context: EffectReferenceContext = {
     hostByInstanceId,
     instanceIds: new Set(),
@@ -79,10 +82,7 @@ function isValidStandaloneInstance(
 ): boolean {
   const host = context.hostByInstanceId.get(instance.id);
   return (
-    instance.kind === 'standalone' &&
-    host !== undefined &&
-    nearlyEqual(host.startTime, instance.startTime) &&
-    nearlyEqual(host.duration, instance.duration)
+    instance.kind === 'standalone' && host !== undefined && isEffectHostTimingValid(host, instance)
   );
 }
 
@@ -120,6 +120,23 @@ function isValidTransitionInstance(
   return true;
 }
 
-function nearlyEqual(left: number, right: number): boolean {
-  return Math.abs(left - right) <= 1e-7;
+/** Removed source placements are dormant; an attachment cannot select another material. */
+function hasValidAttachment(
+  host: VideoProjectEffectClip,
+  project: VideoProjectEffectReferenceModel
+): boolean {
+  const bindings = [
+    host.attachment?.kind === 'source' ? host.attachment : undefined,
+    host.sourceRange,
+  ].filter((binding) => binding !== undefined);
+  return bindings.every((binding) => {
+    const asset = project.assets?.find((entry) => entry.id === binding.assetId);
+    if (!asset || (asset.type !== 'VIDEO' && asset.type !== 'RECORDING')) return false;
+    return project.clips.every(
+      (clip) =>
+        !('sourceInstanceId' in clip) ||
+        clip.sourceInstanceId !== binding.sourceInstanceId ||
+        clip.assetId === binding.assetId
+    );
+  });
 }

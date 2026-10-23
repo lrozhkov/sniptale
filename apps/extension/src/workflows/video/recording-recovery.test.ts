@@ -69,6 +69,29 @@ beforeEach(() => {
   mocks.publish.mockResolvedValue(undefined);
 });
 afterEach(() => installPersistenceLockManagerForTests(null));
+it('reports preparation before reading and publication only after validated remux', async () => {
+  const observer = vi.fn();
+  mocks.read.mockImplementation(async () => {
+    expect(observer).toHaveBeenLastCalledWith({ stage: 'preparing', completed: 0 });
+    return { file: original, release: mocks.releaseOriginal };
+  });
+  mocks.publish.mockImplementation(async () => {
+    expect(observer).toHaveBeenLastCalledWith({ stage: 'publishing', completed: 0 });
+  });
+  await recoverRecording(entry, observer);
+  expect(mocks.remux).toHaveBeenCalledWith(original, expect.any(Object), observer);
+});
+it('does not report publication after validation fails and can retry with an unavailable observer', async () => {
+  const observer = vi.fn();
+  mocks.remux.mockRejectedValueOnce(new Error('decode'));
+  await expect(recoverRecording(entry, observer)).rejects.toThrow('decode');
+  expect(observer).toHaveBeenCalledExactlyOnceWith({ stage: 'preparing', completed: 0 });
+  await expect(
+    recoverRecording(entry, () => {
+      throw new Error('UI gone');
+    })
+  ).resolves.toBe('recovered');
+});
 it('publishes a separate validated prefix with the source incarnation and retains original bytes', async () => {
   expect(await recoverRecording(entry)).toBe('recovered');
   expect(mocks.publish).toHaveBeenCalledWith([

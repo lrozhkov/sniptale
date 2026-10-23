@@ -1,3 +1,4 @@
+import { resolveVideoProjectCompositionJoinPlans } from '../../../../features/video/project/scene/joins';
 import { isMimeTypeCompatibleWithFormat } from '../../persistence';
 import {
   getAssetById,
@@ -56,6 +57,8 @@ function canUseDecodedFrameProvider(
   const asset = getAssetById(project, clip.assetId);
   return Boolean(
     asset &&
+    // Playback windows require the shared bounded scene decoder, including held-only descendants.
+    !clip.playbackWindow &&
     settings.format === VideoExportFormat.MP4 &&
     (isMimeTypeCompatibleWithFormat(asset.metadata.mimeType, VideoExportFormat.WEBM) ||
       isMimeTypeCompatibleWithFormat(asset.metadata.mimeType, VideoExportFormat.MP4)) &&
@@ -69,6 +72,12 @@ export function createAcceleratedCompositeSpan(
   start: number,
   end: number
 ): Mp4VideoRenderSpan | null {
+  if (
+    resolveVideoProjectCompositionJoinPlans(project).some(
+      (plan) => start < plan.seam + plan.after && end > plan.seam - plan.before
+    )
+  )
+    return null;
   let hasVideoClip = false;
   for (const time of getSampleTimes(start, end)) {
     const clips = getVisibleVideoClipsAtTime(project, time);

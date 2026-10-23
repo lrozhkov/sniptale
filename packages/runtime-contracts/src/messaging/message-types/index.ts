@@ -200,6 +200,7 @@ export type TabModeMessage =
     }
   | {
       type: typeof MessageType.DISABLE_SCREENSHOT_MODE;
+      quickActionTransactionId?: string;
       leaseGeneration?: number;
       operationGeneration?: number;
       surfaceCapabilityToken?: string;

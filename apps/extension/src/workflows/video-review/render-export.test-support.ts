@@ -2,7 +2,9 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewEdit } from '../../features/video/review/types';
 
-vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
+vi.mock('../../features/video/composition/draw/spotlight', () => ({
+  drawSceneSpotlights: vi.fn(),
+}));
 vi.mock('./window-header', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./window-header')>()),
   loadReviewWindowHeader: vi.fn(async () => ({ width: 1904, height: 86, close: vi.fn() })),
@@ -69,6 +71,7 @@ vi.mock('mediabunny', async (importOriginal) => {
     async getPrimaryVideoTrack() {
       return {
         codec: 'vp9',
+        getDecoderConfig: async () => ({ codec: 'vp09.00.10.08' }),
         getTimeResolution: async () => 1000,
         canDecode: async () => true,
         getDisplayWidth: async () => state.sourceWidth,

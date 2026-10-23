@@ -36,7 +36,7 @@ for (const locale of SCENARIO_VISUAL_LOCALES) {
     const header = page.locator('.guide-page-header');
     const appearance = header.getByRole('button', { name: labels.appearance, exact: true });
     await expect(appearance).toBeVisible();
-    await expect(appearance.locator('span')).toHaveText(labels.appearance);
+    await expect(appearance.locator('[data-command-caption]')).toHaveText(labels.appearance);
     await appearance.click();
     const panel = page.locator('#guide-inspector-panel');
     await expect(panel.locator('h2')).toHaveText(labels.document);
@@ -146,7 +146,9 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   // representation switch instead of overlaying the slide canvas.
   const controls = header.locator('.tour-header-controls');
   await expect(controls).toBeVisible();
-  await expect(controls.getByRole('button', { name: 'Просмотр', exact: true })).toBeVisible();
+  await expect(
+    controls.getByRole('button', { name: 'Просмотреть отсюда', exact: true })
+  ).toBeVisible();
   const geometry = await page.evaluate(() => {
     const controls = document.querySelector('.tour-header-controls')!;
     const representation = document.querySelector('.tour-representation-switch')!;
@@ -214,7 +216,7 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   await expect.soft(panel.locator('[data-tour-edit-image]')).toHaveCount(0);
 
   // Object creation uses the heading-level Add menu once objects exist.
-  await panel.getByRole('button', { name: 'Объекты слайда', exact: true }).click();
+  await panel.getByRole('button', { name: 'Действия', exact: true }).click();
   const emptyActions = panel.locator('.tour-object-actions > button');
   if (await emptyActions.count()) {
     await emptyActions.filter({ hasText: 'Точка действия' }).click();
@@ -225,7 +227,7 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   expect((await add.boundingBox())!.width).toBeLessThanOrEqual(32);
   await expect(add).toHaveText('');
   await add.click();
-  for (const label of ['Точка действия', 'Пояснение к слайду', 'Выделение']) {
+  for (const label of ['Точка действия', 'Текстовое действие']) {
     await expect
       .soft(
         page.locator('.guide-action-menu').getByRole('button', { name: label, exact: true }),
@@ -233,6 +235,9 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
       )
       .toBeVisible();
   }
+  await expect(
+    page.locator('.guide-action-menu').getByRole('button', { name: 'Выделение', exact: true })
+  ).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   const objects = panel.locator('.tour-object-item');

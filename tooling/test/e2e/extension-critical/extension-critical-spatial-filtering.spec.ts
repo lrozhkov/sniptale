@@ -1,10 +1,13 @@
+import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
+import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
+import { applyVideoProjectMutationPatch } from '../../../../apps/extension/src/features/video/project/mutation';
 import { build } from 'esbuild';
 import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type {
-  QuickEditDepthOfField,
-  SpatialQuaternion,
-} from '../../../../apps/extension/src/features/video/review/advanced/spatial';
+  CameraDepthOfField as QuickEditDepthOfField,
+  SpatialQuaternion as SpatialQuaternion,
+} from '../../../../apps/extension/src/features/video/project/motion/spatial';
 
 test('perspective filters subpixel rules and depth blur without moving line copies', async ({
   page,
@@ -12,8 +15,7 @@ test('perspective filters subpixel rules and depth blur without moving line copi
   const bundle = await build({
     stdin: {
       contents:
-        "export { createReviewSpatialRenderer } from './apps/extension/src/workflows/" +
-        "video-review/spatial-renderer';",
+        "export { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer';",
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -193,10 +195,8 @@ test('visual focus contours bound the real WebGL sharp and fully blurred regions
   const bundle = await build({
     stdin: {
       contents:
-        "export { createReviewSpatialRenderer } from './apps/extension/src/workflows/" +
-        "video-review/spatial-renderer';\n        export { quickEditPlaneProjection, p" +
-        "rojectQuickEditPoint } from './apps/extension/src/features/video/review/adva" +
-        "nced/spatial-geometry';\n        export { resolveReviewSpatialFocusGeometry, " +
+        "export { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer';\n        export { quickEditPlaneProjection, p" +
+        "rojectQuickEditPoint } from './apps/extension/src/features/video/composition/motion/spatial-geometry';\n        export { resolveReviewSpatialFocusGeometry, " +
         "unprojectReviewSpatialPoint } from './apps/extension/src/gallery/video-revie" +
         "w/spatial-control-geometry'; export { measureSpatialFocusPixels } from '" +
         "./tooling/test/e2e/support/spatial-focus-probe';",
@@ -437,10 +437,8 @@ test('a straight faint rule keeps its center across a spatially varying depth bl
   const bundle = await build({
     stdin: {
       contents:
-        "export { createReviewSpatialRenderer } from './apps/extension/src/workflows/" +
-        "video-review/spatial-renderer'; export {quickEditPlaneProjection, projectQui" +
-        "ckEditPoint} from './apps/extension/src/features/video/review/advanced/spati" +
-        "al-geometry';",
+        "export { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer'; export {quickEditPlaneProjection, projectQui" +
+        "ckEditPoint} from './apps/extension/src/features/video/composition/motion/spatial-geometry';",
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -602,5 +600,163 @@ test('padded tilted blur agrees with an oversized reference and refuses one byte
     // Different odd mip grids shift the approximation by a texel; exterior shadow remains smooth.
     expect(result.mean).toBeLessThanOrEqual(3);
     expect(result.maximum).toBeLessThanOrEqual(6);
+  }
+});
+
+test('rotated source-window perspective and local depth match the same GPU plane before rotation', async ({
+  page,
+}, info) => {
+  test.setTimeout(90000);
+  const base = createVideoProjectFromRecording({
+    recordingId: 'rotated-gpu-plane',
+    filename: 'Plane.webm',
+    width: 256,
+    height: 256,
+    duration: 2,
+    mimeType: 'video/webm',
+    size: 1,
+    hasAudio: false,
+  });
+  const clip = base.clips.find((item) => item.type === 'VIDEO')!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.fitMode = 'STRETCH';
+  clip.transform = { x: 48, y: 68, width: 160, height: 120, rotation: 0, opacity: 1 };
+  const project = applyVideoProjectMutationPatch(base, {
+    motionRegions: [
+      {
+        ...createVideoProjectMotionRegion(base, 0, { enter: 'none', exit: 'none' }),
+        duration: 2,
+        zoomInDuration: 0,
+        zoomOutDuration: 0,
+        scale: 1.25,
+        focusMode: 'MANUAL',
+        focusPoint: { x: 128, y: 128 },
+        sourceBinding: {
+          clipId: clip.id,
+          coordinateSpace: 'source-window',
+          sourceStart: 0,
+          sourceEnd: 2,
+          animation: { start: 0, end: 2, duration: 2 },
+        },
+        perspective: { enabled: true, rotateX: 26, rotateY: -21, rotateZ: 11, strength: 0.8 },
+        depthOfField: {
+          enabled: true,
+          mode: 'area',
+          x: 0.27,
+          y: 0.62,
+          width: 0.22,
+          softness: 0.15,
+          strength: 0.9,
+        },
+      },
+    ],
+  });
+  const bundle = await build({
+    stdin: {
+      contents:
+        "export { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer';" +
+        "export { drawSpatialCameraGroup } from './apps/extension/src/features/video/composition/canvas/spatial-group';" +
+        "export { resolveVideoCompositionCamera } from './apps/extension/src/features/video/composition/motion';",
+      resolveDir: process.cwd(),
+    },
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+  });
+  const results = await page.evaluate(
+    async ({ text, project }) => {
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+      const { createReviewSpatialRenderer, drawSpatialCameraGroup, resolveVideoCompositionCamera } =
+        await import(url);
+      URL.revokeObjectURL(url);
+      const renderer = createReviewSpatialRenderer();
+      const output = document.createElement('canvas');
+      document.body.append(output);
+      const results = [];
+      try {
+        for (const rasterScale of [1, 0.5])
+          for (const mode of ['area', 'depth'] as const) {
+            const size = 256 * rasterScale;
+            output.width = size;
+            output.height = size;
+            const context = output.getContext('2d')!;
+            const draw = (rotation: number) => {
+              const current = structuredClone(project);
+              const clip = current.clips.find((item) => item.type === 'VIDEO')!;
+              clip.transform.rotation = rotation;
+              current.motionRegions![0]!.depthOfField!.mode = mode;
+              const camera = resolveVideoCompositionCamera({
+                project: current,
+                currentTime: 1,
+                actions: [],
+                cursorSample: null,
+              });
+              context.clearRect(0, 0, size, size);
+              const drawn = drawSpatialCameraGroup({
+                camera,
+                context,
+                destination: { x: 0, y: 0, width: size, height: size },
+                output: { width: size, height: size },
+                rasterScale,
+                renderer,
+                sourceRect: { x: 0, y: 0, width: 256, height: 256 },
+                paint(paint: CanvasRenderingContext2D, scale: number) {
+                  paint.clearRect(0, 0, size, size);
+                  paint.save();
+                  paint.scale(scale, scale);
+                  paint.translate(128, 128);
+                  paint.rotate((rotation * Math.PI) / 180);
+                  paint.translate(-128, -128);
+                  paint.fillStyle = 'white';
+                  paint.fillRect(48, 68, 160, 120);
+                  paint.fillStyle = 'black';
+                  for (let x = 48; x < 208; x += 8) paint.fillRect(x, 68, 5, 120);
+                  paint.fillStyle = '#f03b28';
+                  paint.fillRect(48, 68, 24, 120);
+                  paint.fillStyle = '#00cfff';
+                  paint.fillRect(178, 150, 24, 24);
+                  paint.restore();
+                },
+              });
+              if (!drawn) throw new Error('Missing spatial group');
+              return context.getImageData(0, 0, size, size).data;
+            };
+            const baseline = draw(0),
+              rotated = draw(90);
+            let sum = 0,
+              count = 0;
+            for (let y = 0; y < size; y++)
+              for (let x = 0; x < size; x++) {
+                const from = (y * size + x) * 4,
+                  to = (x * size + size - 1 - y) * 4;
+                if (baseline[from + 3]! > 16) count++;
+                for (let c = 0; c < 4; c++) sum += Math.abs(baseline[from + c]! - rotated[to + c]!);
+              }
+            const reset = draw(0);
+            let resetSum = 0;
+            for (let i = 0; i < baseline.length; i++)
+              resetSum += Math.abs(baseline[i]! - reset[i]!);
+            results.push({
+              mode,
+              rasterScale,
+              mean: sum / baseline.length,
+              resetMean: resetSum / baseline.length,
+              count,
+            });
+          }
+      } finally {
+        renderer.dispose();
+      }
+      return results;
+    },
+    { text: bundle.outputFiles[0]!.text, project }
+  );
+  await writeFile(info.outputPath('rotated-source-plane.json'), JSON.stringify(results, null, 2));
+  await page.screenshot({ path: info.outputPath('rotated-source-plane.png'), fullPage: false });
+  for (const result of results) {
+    expect(result.count).toBeGreaterThan(1000);
+    expect(result.mean).toBeLessThanOrEqual(1);
+    expect(result.resetMean).toBeLessThanOrEqual(0.01);
   }
 });

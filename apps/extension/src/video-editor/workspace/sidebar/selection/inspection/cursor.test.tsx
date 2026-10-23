@@ -294,3 +294,44 @@ it('opens recorded focus geometry before legacy appearance and keeps embedded gu
     'videoEditor.sidebar.cursorFocusPathTitle'
   );
 });
+
+it('shows one visibility control for a recording sample and retains separate ordinary sample visibility', () => {
+  const props = createProps();
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'take.webm',
+    width: 640,
+    height: 360,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 10,
+    cursorTrack: {
+      ...props.project.cursorTrack!,
+      samples: props.project.cursorTrack!.samples.map((sample) => ({
+        ...sample,
+        recordingPoint: { x: 0.125, y: 1 / 3 },
+      })),
+    },
+  });
+  renderInspectPanel({ ...props, project, selectedCursorSample: project.cursorTrack!.samples[0]! });
+  clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
+  const selector =
+    'button[aria-label="videoEditor.sidebar.cursorVisibleLabel"], ' +
+    'button[aria-label="videoEditor.sidebar.inspectorSampleVisible"]';
+  expect(container!.querySelectorAll(selector)).toHaveLength(1);
+  act(() => container!.querySelector<HTMLButtonElement>(selector)!.click());
+  expect(props.onUpdateCursorSampleVisibility).toHaveBeenCalledWith('sample-1', false);
+  expect(props.onUpdateCursorSkin).not.toHaveBeenCalled();
+  renderInspectPanel(props);
+  clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
+  expect(container!.querySelectorAll(selector)).toHaveLength(2);
+  props.project.cursorTrack!.samples[0]!.sourceAnchor = {
+    kind: 'recording-source',
+    recordingId: 'recording',
+    sourceClipId: 'source',
+    sourceTime: 1.2,
+  };
+  renderInspectPanel(props);
+  clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
+  expect(container!.querySelectorAll(selector)).toHaveLength(1);
+});

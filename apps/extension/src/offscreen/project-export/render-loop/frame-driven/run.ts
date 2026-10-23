@@ -73,7 +73,7 @@ function getLoopCurrentTime(
 
 function createFrameDrivenLoopModel(project: VideoProject, settings: VideoProjectExportSettings) {
   const exportRange = resolveProjectExportRange(project, settings);
-  const timing = getFrameDrivenRenderTiming(exportRange.duration, settings.fps);
+  const timing = getFrameDrivenRenderTiming(exportRange.end - exportRange.start, settings.fps);
   if (settings.frameRateMode === 'adaptive') {
     timing.duration = exportRange.end - exportRange.start;
     // Include only lattice timestamps strictly before the rounded microsecond end.
@@ -194,17 +194,11 @@ async function renderFrameDrivenLoopFrame(args: FrameDrivenLoopFrameArgs): Promi
     compositionIndex: args.compositionIndex,
     currentTime: getLoopCurrentTime(args.exportStart, args.frameIndex, args.fps, args.duration),
     effectRuntime: args.effectRuntime,
-    frameDurationUs: args.adaptiveFrameWriter
-      ? Math.round(Math.min(args.duration, (args.frameIndex + 1) / args.fps) * 1_000_000) -
-        Math.round((args.frameIndex / args.fps) * 1_000_000)
-      : args.frameDurationUs,
-    ...(args.adaptiveFrameWriter === undefined
-      ? {}
-      : {
-          adaptiveFrameWriter: args.adaptiveFrameWriter,
-          frameTimestampUs:
-            args.timestampOffsetUs + Math.round((args.frameIndex / args.fps) * 1_000_000),
-        }),
+    frameDurationUs:
+      Math.round(Math.min(args.duration, (args.frameIndex + 1) / args.fps) * 1_000_000) -
+      Math.round((args.frameIndex / args.fps) * 1_000_000),
+    frameTimestampUs: args.timestampOffsetUs + Math.round((args.frameIndex / args.fps) * 1_000_000),
+    ...(args.adaptiveFrameWriter ? { adaptiveFrameWriter: args.adaptiveFrameWriter } : {}),
     frameIndex: args.frameIndex,
     job: args.job,
     keyframeInterval: args.keyframeInterval,

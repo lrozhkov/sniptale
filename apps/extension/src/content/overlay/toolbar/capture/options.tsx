@@ -1,6 +1,7 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import React from 'react';
 import { AppWindow, Copy, Crop, Download, FolderInput, Library, Save } from 'lucide-react';
+import { PageControlVisibility } from '../controls/control-visibility';
 import { translate } from '../../../../platform/i18n';
 import type { CaptureActionType } from '../../../../contracts/settings';
 import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
@@ -127,28 +128,40 @@ export function ToolbarCaptureButtons(props: {
 
   return (
     <>
-      <ToolbarViewportCaptureButton
-        dataUi="content.toolbar.capture-visible-button"
-        icon={<AppWindow size={20} strokeWidth={2} />}
-        onClick={handleTakeScreenshotClick('visible')}
-        title={translate('content.toolbar.visibleArea')}
-        disabled={props.isLoading}
-      />
-      <ToolbarSelectionCaptureButton
-        disabled={props.isLoading}
-        onClick={handleTakeScreenshotClick('selection')}
-      />
-      <FullPageCaptureSplitButton
-        compactMenus={props.compactMenus}
-        currentViewport={props.currentViewport}
-        disabled={props.isLoading}
-        displayMode={props.displayMode}
-        onPrimaryClick={handleTakeScreenshotClick('full')}
-        onUpdate={fullPage.updatePreferences}
-        preferences={fullPage.preferences}
-        saving={fullPage.saving}
-        toolbarMenuState={props.toolbarMenuState}
-      />
+      <PageControlVisibility
+        control="capture-visible"
+        label={translate('content.toolbar.visibleArea')}
+      >
+        <ToolbarViewportCaptureButton
+          dataUi="content.toolbar.capture-visible-button"
+          icon={<AppWindow size={20} strokeWidth={2} />}
+          onClick={handleTakeScreenshotClick('visible')}
+          title={translate('content.toolbar.visibleArea')}
+          disabled={props.isLoading}
+        />
+      </PageControlVisibility>
+      <PageControlVisibility
+        control="capture-selection"
+        label={translate('content.toolbar.selectionArea')}
+      >
+        <ToolbarSelectionCaptureButton
+          disabled={props.isLoading}
+          onClick={handleTakeScreenshotClick('selection')}
+        />
+      </PageControlVisibility>
+      <PageControlVisibility control="capture-full" label={translate('content.toolbar.fullPage')}>
+        <FullPageCaptureSplitButton
+          compactMenus={props.compactMenus}
+          currentViewport={props.currentViewport}
+          disabled={props.isLoading}
+          displayMode={props.displayMode}
+          onPrimaryClick={handleTakeScreenshotClick('full')}
+          onUpdate={fullPage.updatePreferences}
+          preferences={fullPage.preferences}
+          saving={fullPage.saving}
+          toolbarMenuState={props.toolbarMenuState}
+        />
+      </PageControlVisibility>
     </>
   );
 }

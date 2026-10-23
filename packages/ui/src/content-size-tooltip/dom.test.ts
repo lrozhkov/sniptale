@@ -54,7 +54,7 @@ function expectMountedTooltipStructure(
 ) {
   expect(mountInto.contains(tooltip.root)).toBe(true);
   expect(tooltip.root.style.getPropertyValue('backdrop-filter')).toBe('');
-  expect(tooltip.root.style.getPropertyValue('border-radius')).toBe('12px');
+  expect(tooltip.root.style.getPropertyValue('border-radius')).toBe('4px');
   expect(tooltip.widthInput.id).toBe('sniptale-width-input');
   expect(tooltip.heightInput.id).toBe('sniptale-height-input');
   expect(tooltip.widthInput.min).toBe('120');
@@ -117,7 +117,7 @@ function registerFrameEditVariantTest() {
 
     expect(tooltip.root.dataset['variant']).toBe('frame-edit');
     expect(tooltip.root.style.getPropertyValue('min-width')).toBe('296px');
-    expect(tooltip.root.style.getPropertyValue('border-radius')).toBe('var(--sniptale-radius-md)');
+    expect(tooltip.root.style.getPropertyValue('border-radius')).toBe('4px');
     expect(tooltip.cancelButton.textContent).toBe('');
     expect(tooltip.confirmButton.textContent).toBe('');
     expect(tooltip.cancelButton.querySelector('svg')).not.toBeNull();
@@ -195,9 +195,7 @@ function registerAspectRatioButtonStateTest() {
     expect(button.getAttribute('aria-pressed')).toBe('true');
     expect(button.disabled).toBe(false);
     expect(button.style.getPropertyValue('background')).toBe(String(activeStyle['background']));
-    expect(button.style.getPropertyValue('background')).toContain(
-      'var(--sniptale-color-accent) 9%'
-    );
+    expect(button.style.getPropertyValue('background')).toBe('var(--sniptale-color-surface-hover)');
 
     syncContentSizeTooltipAspectRatioButtonState(button, {
       canToggleAspectRatio: false,
@@ -216,7 +214,9 @@ function registerAspectRatioButtonStateTest() {
       maintainAspectRatio: true,
     });
 
-    expect(tooltip.aspectRatioButton.style.getPropertyValue('background')).toBe('transparent');
+    expect(tooltip.aspectRatioButton.style.getPropertyValue('background')).toBe(
+      'var(--sniptale-color-surface-hover)'
+    );
     expect(tooltip.aspectRatioButton.style.getPropertyValue('border-color')).toBe('transparent');
   });
 }

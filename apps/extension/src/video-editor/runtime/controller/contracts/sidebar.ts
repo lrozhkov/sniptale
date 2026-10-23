@@ -1,3 +1,4 @@
+import type { VideoEditorSceneBackgroundEdit } from '../../../contracts/commands/patches';
 import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type {
@@ -12,7 +13,6 @@ import type {
   VideoProject,
   VideoProjectActionPreset,
   VideoProjectCursorTrack,
-  VideoProjectSceneBackground,
 } from '../../../../features/video/project/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorSelections } from '../selections';
@@ -22,6 +22,8 @@ import type { VideoEditorLibrariesState } from '../../app-model/types';
 interface VideoEditorSidebarCommands extends VideoEditorProjectActions, VideoEditorSessionActions {}
 
 interface VideoEditorSidebarState {
+  sceneEdges?: import('../../../contracts/workspace').VideoEditorSceneEdgesInspectorRuntime;
+  watermark?: import('../../../contracts/workspace').VideoEditorWatermarkInspectorRuntime;
   typingProject?: VideoProject;
   recordingTelemetry?: readonly RecordingTelemetryEntry[];
   activeProjectId: string;
@@ -88,7 +90,7 @@ interface VideoEditorSidebarProjectActions {
   onToggleTrackVisibility: VideoEditorSidebarCommands['toggleTrackVisibility'];
   onResizeProject: (width: number, height: number) => void;
   onSetCursorCaptureMode: (captureMode: VideoProjectCursorTrack['captureMode']) => void;
-  onSetSceneBackground: (sceneBackground: VideoProjectSceneBackground) => void;
+  onSetSceneBackground: (sceneBackground: VideoEditorSceneBackgroundEdit) => void;
   onPreviewSceneBackground: VideoEditorWorkspaceState['sceneBackgroundColors']['setPreview'];
   onRememberRecentColor: VideoEditorWorkspaceState['sceneBackgroundColors']['rememberRecentColor'];
   onResetSceneBackgroundPreview: VideoEditorWorkspaceState['sceneBackgroundColors']['resetPreview'];
@@ -104,6 +106,7 @@ interface VideoEditorSidebarProjectActions {
   onUpdateCursorSampleSkinOverride: VideoEditorSidebarCommands['updateCursorSampleSkinOverride'];
   onUpdateCursorSampleVisibility: VideoEditorSidebarCommands['updateCursorSampleVisibility'];
   onUpdateCursorSkin: (patch: Partial<NonNullable<VideoProjectCursorTrack['skin']>>) => void;
+  onPreviewMotion: VideoEditorWorkspaceState['inspector']['previewMotion'];
   onUpdateMotionRegion: VideoEditorSidebarCommands['updateMotionRegion'];
   onUpdateTransitionDuration: VideoEditorSidebarCommands['updateTransitionDuration'];
   onUpdateTransitionEasing: VideoEditorSidebarCommands['updateTransitionEasing'];
@@ -138,6 +141,8 @@ interface VideoEditorSidebarClipActions {
   onUpdateMediaClipFitScalePercent: VideoEditorSidebarCommands['updateMediaClipFitScalePercent'];
   onUpdateMediaClipShadowIntensity: VideoEditorSidebarCommands['updateMediaClipShadowIntensity'];
   onUpdateMediaClipShadowMode: VideoEditorSidebarCommands['updateMediaClipShadowMode'];
+  onUpdateMediaClipShadowColor: VideoEditorSidebarCommands['updateMediaClipShadowColor'];
+  onEditMediaClip: VideoEditorSidebarCommands['editMediaClip'];
   onUpdateMediaClipWindowHeader: VideoEditorSidebarCommands['updateMediaClipWindowHeader'];
   onUpdateAnnotationClipContent: VideoEditorSidebarCommands['updateAnnotationClipContent'];
   onUpdateAnnotationClipStyle: VideoEditorSidebarCommands['updateAnnotationClipStyle'];

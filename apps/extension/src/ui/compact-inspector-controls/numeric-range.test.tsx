@@ -400,3 +400,62 @@ it('finishes a changed pointer gesture once when capture is cancelled', () => {
   expect(onCommitValue).toHaveBeenCalledOnce();
   expect(onCommitValue).toHaveBeenCalledWith(72);
 });
+
+it('explains an accepted value outside the practical scale without committing on idle blur', () => {
+  const { onCommitValue, onPreviewValue } = renderNumericRow({
+    value: 750,
+    max: 10000,
+    scrub: { min: 10, max: 400 },
+  });
+  const row = getRow();
+  const range = getRange();
+  expect(row.getAttribute('data-out-of-scale')).toBe('true');
+  const note = document.getElementById(range.getAttribute('aria-describedby') ?? '');
+  expect(note?.textContent).toMatch(/Outside slider range|Вне шкалы/);
+  act(() => {
+    range.focus();
+    range.blur();
+  });
+  expect(onPreviewValue).not.toHaveBeenCalled();
+  expect(onCommitValue).not.toHaveBeenCalled();
+  expect(container?.querySelector<HTMLInputElement>('input[type="text"]')?.value).toBe('750');
+});
+
+it('compares mapped scrub coordinates rather than the authored numeric value', () => {
+  renderNumericRow({
+    value: 750,
+    max: 10000,
+    scrub: { min: 0, max: 10, value: 5, toValue: (index) => index * 150 },
+  });
+  expect(getRow().getAttribute('data-out-of-scale')).not.toBe('true');
+  expect(getRange().getAttribute('aria-describedby')).toBeNull();
+});
+
+it('returns to the practical scale only after a deliberate range edit', () => {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  const commit = vi.fn();
+  function Field() {
+    const [value, setValue] = useState(750);
+    return (
+      <NumericRow
+        label="Opacity"
+        value={value}
+        min={0}
+        max={10000}
+        scrub={{ min: 10, max: 400 }}
+        onPreviewValue={setValue}
+        onCommitValue={commit}
+      />
+    );
+  }
+  act(() => root?.render(<Field />));
+  expect(getRow().getAttribute('data-out-of-scale')).toBe('true');
+  act(() => getRange().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
+  expect(getRow().getAttribute('data-out-of-scale')).toBeNull();
+  expect(container.querySelector('.sniptale-numeric-scale-note')).toBeNull();
+  expect(commit).not.toHaveBeenCalled();
+  act(() => getRange().dispatchEvent(new KeyboardEvent('keyup', { key: 'Home', bubbles: true })));
+  expect(commit).toHaveBeenCalledExactlyOnceWith(10);
+});

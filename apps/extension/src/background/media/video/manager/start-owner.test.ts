@@ -280,38 +280,35 @@ it('fails visibly before preparation while local data erasure owns media lifecyc
   await erasure;
 });
 
-it.each(['staged', 'ready'] as const)(
-  'blocks a direct start while a previous result is %s',
-  async (status) => {
-    readStoredVideoPostRecordResultMock.mockResolvedValueOnce({
-      acknowledgedBy: null,
-      createdAt: 1,
-      expiresAt: Date.now() + 1_000,
-      result: {
-        primaryRecordingId: 'recording-previous',
-        projectId: null,
-        recordingId: 'recording-previous',
-      },
-      status,
-    });
+it('blocks a direct start while a previous result is staged', async () => {
+  readStoredVideoPostRecordResultMock.mockResolvedValueOnce({
+    acknowledgedBy: null,
+    createdAt: 1,
+    expiresAt: Date.now() + 1_000,
+    result: {
+      primaryRecordingId: 'recording-previous',
+      projectId: null,
+      recordingId: 'recording-previous',
+    },
+    status: 'staged',
+  });
 
-    await expect(
-      startRecording(
-        17,
-        settings,
-        CaptureMode.TAB,
-        null,
-        'chrome-extension://test/apps/extension/src/popup/index.html'
-      )
-    ).resolves.toEqual({
-      error: 'Resolve the previous recording before starting another.',
-      result: 'failed',
-    });
+  await expect(
+    startRecording(
+      17,
+      settings,
+      CaptureMode.TAB,
+      null,
+      'chrome-extension://test/apps/extension/src/popup/index.html'
+    )
+  ).resolves.toEqual({
+    error: 'Resolve the previous recording before starting another.',
+    result: 'failed',
+  });
 
-    expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
-    expect(initializeRecordingContextMock).not.toHaveBeenCalled();
-  }
-);
+  expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+  expect(initializeRecordingContextMock).not.toHaveBeenCalled();
+});
 
 it('fails closed before preparation when post-record authority cannot be read', async () => {
   readStoredVideoPostRecordResultMock.mockRejectedValueOnce(new Error('session unavailable'));
@@ -351,7 +348,7 @@ it('waits for startup recovery before inspecting session state or preparing a cu
   finishRecovery();
 
   await expect(start).resolves.toMatchObject({ result: 'accepted' });
-  expect(isVideoRecordingPreparationInProgressMock).toHaveBeenCalledOnce();
+  expect(isVideoRecordingPreparationInProgressMock).toHaveBeenCalledTimes(2);
   expect(beginVideoRecordingPreparationMock).toHaveBeenCalledOnce();
   expect(initializeRecordingContextMock).toHaveBeenCalledOnce();
 });

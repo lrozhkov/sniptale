@@ -130,3 +130,28 @@ describe('video editor clip audio property guardrails', () => {
     );
   });
 });
+
+describe('transferred audio envelope editing', () => {
+  it.each(['volume', 'envelope'] as const)('replaces only the gain phase through %s', (action) => {
+    const store = createAudioPropertyStore();
+    const project = createProjectWithEditableClip();
+    const window = {
+      offset: 0.5,
+      holdAt: 3,
+      fadePhase: { offset: 0.5, duration: 4 },
+      gainPhase: { offset: 0.5, duration: 4 },
+    };
+    project.version = 43;
+    project.clips[0]!.playbackWindow = window;
+    store.getState().setProject(project);
+    if (action === 'volume') store.getState().updateClipVolume('clip-1', 0.4);
+    else store.getState().updateClipAudioEnvelope('clip-1', { volumeEnvelopeEnd: 0.4 });
+    expect(store.getState().project?.clips[0]?.playbackWindow).toEqual({
+      offset: 0.5,
+      holdAt: 3,
+      fadePhase: window.fadePhase,
+    });
+    expect(store.getState().project?.clips[0]?.audioGainEnd).toBe(0.4);
+    expect(project.clips[0]?.playbackWindow).toEqual(window);
+  });
+});

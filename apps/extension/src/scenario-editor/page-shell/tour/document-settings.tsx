@@ -1,7 +1,9 @@
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
+import { useState } from 'react';
 import { createSolidPaint, getRepresentativeColor } from '@sniptale/foundation/paint';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
-import { GuideImageUpload } from '../image-upload';
+import { BackgroundImagePicker } from '../../../composition/background-resources/picker';
+import type { AcquiredBackground } from '../../../composition/background-resources/acquisition';
+import { WindowHeaderSettings } from '../../../workflows/browser-frame/settings';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { DEFAULT_DRAWING_COLORS } from '../../../features/drawing/public';
 import {
@@ -13,7 +15,7 @@ import { Palette, MessageSquare, Trash2 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { GuideInspectorGroup } from '../inspector';
 import { TourMarkerFields } from './object-settings';
-import { TourTextPresentation } from './fields';
+import { TourTextPresentation, TourChoiceField } from './fields';
 import type { Translate } from '../../../platform/i18n';
 
 /** Central appearance edits freeze the legacy hotspot fallback before separating categories. */
@@ -30,7 +32,9 @@ export function TourDocumentSettings({
   tour: TourDocument;
   disabled: boolean;
   onChange: (tour: TourDocument) => boolean;
-  onUploadStage?: ((file: File, signal: AbortSignal) => Promise<boolean>) | undefined;
+  onUploadStage?:
+    | ((file: File, signal: AbortSignal, originMediaId?: string) => Promise<boolean>)
+    | undefined;
   importDisabled?: boolean | undefined;
   t: Translate;
 }) {
@@ -49,7 +53,7 @@ export function TourDocumentSettings({
       {section === 'appearance' && (
         <>
           <div className="tour-text-field">
-            <SelectField
+            <TourChoiceField
               label={t('scenario.editor.tourAspect')}
               value={tour.stage.aspect}
               disabled={disabled}
@@ -69,6 +73,15 @@ export function TourDocumentSettings({
             onChange={(stage) => onChange({ ...tour, stage })}
             t={t}
           />
+          <WindowHeaderSettings
+            header={tour.stage.windowHeader}
+            disabled={disabled}
+            onChange={(windowHeader) => {
+              const { windowHeader: _previousHeader, ...stage } = tour.stage;
+              if (!onChange({ ...tour, stage: windowHeader ? { ...stage, windowHeader } : stage }))
+                throw new Error('Window header edit refused');
+            }}
+          />
           {(
             [
               { key: 'accent', label: t('scenario.editor.tourInteractionAccent') },
@@ -78,7 +91,6 @@ export function TourDocumentSettings({
             <ColorField
               triggerVariant="swatch"
               floatingPlacement="side"
-              layout="stacked"
               palette={DEFAULT_DRAWING_COLORS}
               key={key}
               label={label}
@@ -140,10 +152,14 @@ function TourStageBackgroundSettings({
   stage: TourDocument['stage'];
   disabled: boolean;
   importDisabled: boolean;
-  onUploadStage?: ((file: File, signal: AbortSignal) => Promise<boolean>) | undefined;
+  onUploadStage?:
+    | ((file: File, signal: AbortSignal, originMediaId?: string) => Promise<boolean>)
+    | undefined;
   onChange: (stage: TourDocument['stage']) => boolean;
   t: Translate;
 }) {
+  const [pickerKey, setPickerKey] = useState(0);
+  const [applying, setApplying] = useState(false);
   return (
     <>
       <CompactPaintSelector
@@ -163,17 +179,33 @@ function TourStageBackgroundSettings({
         }
       />
       {onUploadStage && (
-        <GuideImageUpload
-          compact
-          placement={{ kind: 'tour-stage-background' }}
-          disabled={importDisabled}
-          onUpload={onUploadStage}
-          t={t}
+        <BackgroundImagePicker
+          key={pickerKey}
+          pending={importDisabled}
+          onSelect={async ({ file, originMediaId }: AcquiredBackground, signal) => {
+            setApplying(true);
+            try {
+              if (!(await onUploadStage(file, signal, originMediaId)))
+                throw new Error('Stage background import refused');
+            } finally {
+              if (!signal.aborted) setApplying(false);
+            }
+          }}
         />
+      )}
+      {applying && (
+        <ScenarioInspectorActionButton
+          onClick={() => {
+            setApplying(false);
+            setPickerKey((value) => value + 1);
+          }}
+        >
+          {t('scenario.editor.guideImportCancel')}
+        </ScenarioInspectorActionButton>
       )}
       {stage.image && (
         <>
-          <SelectField
+          <TourChoiceField
             label={t('scenario.editor.tourFit')}
             value={stage.imageFit ?? 'cover'}
             disabled={disabled}

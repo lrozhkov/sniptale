@@ -1,3 +1,4 @@
+import { isHydratableVideoProject } from '../../../features/video/project/validation/root';
 import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { hydrateVideoProject } from '../../../features/video/project/hydration';
@@ -94,4 +95,201 @@ it('rejects an occupied zoom insertion and fits the next free gap', () => {
   expect(project.motionRegions).toHaveLength(1);
   actions.addMotionRegion(1);
   expect(project.motionRegions?.at(-1)).toMatchObject({ startTime: 1, duration: 1 });
+});
+
+it('uses current variants for independent edits and refuses invalid, equal and missing-resource updates', async () => {
+  const project = createEmptyVideoProject('Background');
+  const store = createStore(project),
+    actions = createWorkspaceProjectUpdaters(store);
+  actions.setSceneBackground({ kind: 'solid', color: '#123456' });
+  const gradient = (
+    await import('../../../features/video/project/scene/background-gradient')
+  ).createSceneGradientBackground('#abcdef');
+  actions.setSceneBackground({
+    ...gradient,
+    animation: { mode: 'breathe', speed: 42, intensity: 72 },
+  });
+  project.name = 'Unrelated edit';
+  const before = structuredClone(project.sceneBackground);
+  const observed: VideoProject[] = [];
+  store.updateProject = (updater) => {
+    const next = updater(project);
+    observed.push(next);
+    Object.assign(project, next);
+  };
+  actions.setSceneBackground({ kind: 'image', assetId: 'missing' });
+  expect(observed.at(-1)).toBe(project);
+  actions.setSceneBackground(project.sceneBackground!);
+  expect(observed.at(-1)).toBe(project);
+  const invalid = { kind: 'image', assetId: 'missing', imageFit: 'stretch' };
+  expect(() => Reflect.apply(actions.setSceneBackground, actions, [invalid])).not.toThrow();
+  expect(project.sceneBackground).toEqual(before);
+  expect(project.name).toBe('Unrelated edit');
+  actions.setSceneBackground({
+    ...gradient,
+    animation: { mode: 'rotate', speed: 20, intensity: 30 },
+    remembered: {},
+  });
+  expect(project.sceneBackground?.remembered?.solid?.color).toBe('#123456');
+});
+
+it('records variant and fit edits through actual history and keeps retries as no-ops', async () => {
+  const store = useVideoEditorStore;
+  const project = createEmptyVideoProject('History');
+  store.setState(store.getInitialState(), true);
+  store.getState().setProject(project);
+  const actions = createWorkspaceProjectUpdaters({
+    ...store.getState(),
+    getCurrentTime: () => store.getState().currentTime,
+  });
+  actions.setSceneBackground({ kind: 'solid', color: '#123456' });
+  const solid = store.getState().project!;
+  actions.setSceneBackground(
+    (
+      await import('../../../features/video/project/scene/background-gradient')
+    ).createSceneGradientBackground()
+  );
+  const gradient = store.getState().project!;
+  expect(gradient.version).toBe(14);
+  expect(gradient.sceneBackground?.remembered?.solid?.color).toBe('#123456');
+  const history = store.getState().projectHistory;
+  actions.setSceneBackground(gradient.sceneBackground!);
+  expect(store.getState().project).toBe(gradient);
+  expect(store.getState().projectHistory).toBe(history);
+  store.getState().undoProject();
+  expect(store.getState().project?.sceneBackground).toEqual(solid.sceneBackground);
+  store.getState().redoProject();
+  expect(store.getState().project?.sceneBackground).toEqual(gradient.sceneBackground);
+  store.setState(store.getInitialState(), true);
+});
+
+it('merges scalar blur with latest paint and image settings under the project updater', async () => {
+  const project = createEmptyVideoProject('Latest background');
+  const store = createStore(project);
+  let pending: ((current: VideoProject) => VideoProject) | undefined;
+  store.updateProject = (updater) => {
+    pending = updater;
+  };
+  const actions = createWorkspaceProjectUpdaters(store);
+  actions.setSceneBackground({ blur: 12.5 });
+  project.sceneBackground = {
+    ...(
+      await import('../../../features/video/project/scene/background-gradient')
+    ).createSceneGradientBackground('#111111ff'),
+    animation: { mode: 'drift', speed: 72, intensity: 61 },
+    remembered: { solid: { kind: 'solid', color: '#123456' } },
+  };
+  project.name = 'Latest unrelated edit';
+  const latest = structuredClone(project);
+  const next = pending!(project);
+  expect(next.sceneBackground).toEqual({ ...latest.sceneBackground, blur: 12.5 });
+  expect(next.name).toBe(latest.name);
+  expect(project).toEqual(latest);
+  project.sceneBackground = { kind: 'image', assetId: 'image', imageFit: 'contain' };
+  project.assets = [
+    { ...createProject([createVideoClip()]).assets[0]!, id: 'image', type: 'IMAGE' },
+  ];
+  expect(pending!(project).sceneBackground).toMatchObject({
+    kind: 'image',
+    assetId: 'image',
+    imageFit: 'contain',
+    blur: 12.5,
+  });
+});
+
+it('records blur through actual history, refuses invalid edits and keeps retries as no-ops', () => {
+  const store = useVideoEditorStore;
+  store.setState(store.getInitialState(), true);
+  store.getState().setProject(createEmptyVideoProject('Blur history'));
+  const actions = createWorkspaceProjectUpdaters({ ...store.getState(), getCurrentTime: () => 0 });
+  actions.setSceneBackground({ blur: 12.5 });
+  const accepted = store.getState().project!,
+    history = store.getState().projectHistory;
+  expect(accepted.version).toBe(16);
+  for (const value of [
+    { blur: 12.5 },
+    { blur: -1 },
+    { blur: 26 },
+    { blur: NaN },
+    { blur: null },
+    { blur: 4, extra: true },
+    null,
+  ])
+    Reflect.apply(actions.setSceneBackground, actions, [value]);
+  expect(store.getState().project).toBe(accepted);
+  expect(store.getState().projectHistory).toBe(history);
+  actions.setSceneBackground({ blur: 0 });
+  expect(store.getState().project?.sceneBackground?.blur).toBe(0);
+  expect(store.getState().project?.version).toBe(16);
+  store.getState().undoProject();
+  expect(store.getState().project?.sceneBackground?.blur).toBe(12.5);
+  store.getState().redoProject();
+  expect(store.getState().project?.sceneBackground?.blur).toBe(0);
+  store.setState(store.getInitialState(), true);
+});
+
+it('creates new phase curves through the actual project mutation and history', () => {
+  const store = useVideoEditorStore;
+  store.setState(store.getInitialState(), true);
+  store.getState().setProject(createProject([createVideoClip({ duration: 8, sourceDuration: 8 })]));
+  const actions = createWorkspaceProjectUpdaters({ ...store.getState(), getCurrentTime: () => 0 });
+  actions.addMotionRegion(1);
+  const project = store.getState().project!;
+  expect(project.version).toBe(18);
+  expect(project.motionRegions?.[0]?.phaseTransitions).toEqual({
+    enter: 'ease-in-out',
+    exit: 'ease-in-out',
+  });
+  expect(isHydratableVideoProject(project)).toBe(true);
+  store.getState().undoProject();
+  expect(store.getState().project?.motionRegions ?? []).toHaveLength(0);
+  store.getState().redoProject();
+  expect(store.getState().project?.motionRegions).toEqual(project.motionRegions);
+  store.setState(store.getInitialState(), true);
+});
+
+it('merges a camera mode with the latest scene paint and suppression', () => {
+  const project = createEmptyVideoProject('Latest camera mode');
+  const store = createStore(project);
+  let pending: ((current: VideoProject) => VideoProject) | undefined;
+  store.updateProject = (updater) => {
+    pending = updater;
+  };
+  createWorkspaceProjectUpdaters(store).setSceneBackground({ zoomBehavior: 'content' });
+  project.sceneBackground = {
+    kind: 'solid',
+    color: '#abcdef',
+    enabled: false,
+    blur: 2,
+    rememberedBlur: 9,
+  };
+  project.name = 'Accepted unrelated edit';
+  const latest = structuredClone(project);
+  expect(pending!(project).sceneBackground).toEqual({
+    ...latest.sceneBackground,
+    zoomBehavior: 'content',
+  });
+  expect(pending!(project).name).toBe(latest.name);
+  expect(project).toEqual(latest);
+});
+
+it('changes camera mode in one history operation and keeps equal retries as no-ops', () => {
+  const store = useVideoEditorStore;
+  store.setState(store.getInitialState(), true);
+  store.getState().setProject(createEmptyVideoProject('Mode history'));
+  const actions = createWorkspaceProjectUpdaters({ ...store.getState(), getCurrentTime: () => 0 });
+  actions.setSceneBackground({ zoomBehavior: 'content' });
+  const accepted = store.getState().project!;
+  const history = store.getState().projectHistory;
+  expect(accepted.version).toBe(37);
+  expect(accepted.sceneBackground?.zoomBehavior).toBe('content');
+  expect(history.past).toHaveLength(1);
+  actions.setSceneBackground({ zoomBehavior: 'content' });
+  expect(store.getState().project).toBe(accepted);
+  expect(store.getState().projectHistory).toBe(history);
+  store.getState().undoProject();
+  expect(store.getState().project?.sceneBackground?.zoomBehavior).toBeUndefined();
+  store.getState().redoProject();
+  expect(store.getState().project?.sceneBackground?.zoomBehavior).toBe('content');
+  store.setState(store.getInitialState(), true);
 });

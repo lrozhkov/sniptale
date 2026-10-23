@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 import { createMicrophoneRecorder } from './recorders';
@@ -20,6 +20,19 @@ class MediaRecorderMock {
 
 beforeEach(() => {
   vi.stubGlobal('MediaRecorder', MediaRecorderMock);
+  vi.stubGlobal(
+    'AudioContext',
+    class {
+      createMediaStreamSource = () => ({ connect: vi.fn(), disconnect: vi.fn() });
+      createGain = () => ({ connect: vi.fn(), disconnect: vi.fn(), gain: { value: 1 } });
+      createMediaStreamDestination = () => ({ stream: createAudioStream() });
+      close = vi.fn().mockResolvedValue(undefined);
+    }
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 it('uses the supported WebM MIME for a separately staged microphone artifact', async () => {
@@ -31,7 +44,8 @@ it('uses the supported WebM MIME for a separately staged microphone artifact', a
   const recorder = await createMicrophoneRecorder(
     'rec',
     { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true },
-    createRecordingStagingCoordinatorTestDouble()
+    createRecordingStagingCoordinatorTestDouble(),
+    { sendRuntimeMessage: vi.fn().mockResolvedValue(undefined) }
   );
   expect(recorder?.recorder.mimeType).toBe('video/webm');
   expect(recorder?.artifactSession).toBeDefined();

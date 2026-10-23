@@ -1,15 +1,21 @@
+import { motionTransitionSettings } from '../../../../../features/video/project/motion/timing';
+import type {
+  CameraTransitionPhase,
+  CameraTransitionType,
+} from '../../../../../features/video/project/motion/transitions';
+import {
+  motionBlurPhaseSetting,
+  type MotionBlurPhase,
+} from '../../../../../features/video/project/motion/blur';
+import { ToggleField } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
 import {
   VideoMotionFocusMode,
   VideoMotionOverlayZoomMode,
 } from '../../../../../features/video/project/types';
-import type { VideoTemporalEasing } from '../../../../../features/video/project/types';
 import { resolveVideoProjectActionOccurrences } from '../../../../../features/video/project/action-occurrences';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import {
-  getMotionOverlayZoomModeOptions,
-  getTemporalEasingOptions,
-} from '../effect-controls/options';
+import { getMotionOverlayZoomModeOptions } from '../effect-controls/options';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { SelectInput } from '../shared/controls';
 import { SliderField } from '../shared/sliders';
@@ -42,7 +48,7 @@ export function MotionFocusModeField(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <SelectInput
+    <OptionButtonsField
       label={translate('videoEditor.sidebar.motionFocusLabel')}
       value={props.motionRegion.focusMode}
       onChange={(value) => handleMotionFocusModeChange(props.panel, props.motionRegion, value)}
@@ -68,40 +74,75 @@ export function MotionFocusModeField(props: {
   );
 }
 
-export function MotionEasingField(props: {
-  motionRegionId: string;
+export function MotionTransitionTypeField(props: {
+  motionRegion: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedMotionRegion']>;
+  phase: CameraTransitionPhase;
   panel: WorkspaceSidebarSelectionPanelProps;
-  value: VideoTemporalEasing;
 }) {
+  const setting = motionTransitionSettings(props.motionRegion, props.phase);
+  const labels = {
+    none: 'gallery.videoReview.transitionNone',
+    linear: 'gallery.videoReview.transitionLinear',
+    'ease-in-out': 'gallery.videoReview.transitionSmooth',
+    'ease-out': 'videoEditor.sidebar.temporalEasingEaseOut',
+    instant: 'videoEditor.sidebar.temporalEasingInstant',
+  } as const;
   return (
-    <SelectInput
-      label={translate('videoEditor.sidebar.motionEasingLabel')}
-      value={props.value}
-      onChange={(value) =>
-        props.panel.onUpdateMotionRegion(props.motionRegionId, { easing: value })
+    <OptionButtonsField<CameraTransitionType>
+      label={translate('gallery.videoReview.zoomTransitionType')}
+      layout="stacked"
+      value={setting.type}
+      options={(['none', 'linear', 'ease-in-out', 'ease-out', 'instant'] as const).map((type) => ({
+        value: type,
+        label: translate(labels[type]),
+      }))}
+      onChange={(type) =>
+        props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+          motionTransitionPhase: { phase: props.phase, type },
+        })
       }
-      options={getTemporalEasingOptions()}
     />
   );
 }
 
 export function MotionBlurField(props: {
-  motionRegionId: string;
+  motionRegion: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedMotionRegion']>;
+  phase: MotionBlurPhase;
   panel: WorkspaceSidebarSelectionPanelProps;
-  value: number;
 }) {
+  const setting = motionBlurPhaseSetting(
+    props.motionRegion.motionBlur,
+    props.phase,
+    props.motionRegion.motionBlurAmount ?? 0
+  );
+  const edit = (patch: { enabled?: boolean; strength?: number }) =>
+    props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+      motionBlurPhase: { phase: props.phase, ...patch },
+    });
   return (
-    <SliderField
-      label={translate('videoEditor.sidebar.motionBlurLabel')}
-      value={props.value}
-      min={0}
-      max={1}
-      step={0.05}
-      onChange={(value) =>
-        props.panel.onUpdateMotionRegion(props.motionRegionId, { motionBlurAmount: value })
-      }
-      formatValue={(value) => `${Math.round(value * 100)}%`}
-    />
+    <div
+      className="sniptale-parameter-stack space-y-1"
+      data-ui="video-editor.motion.blur"
+      data-phase={props.phase}
+    >
+      <ToggleField
+        label={translate('gallery.videoReview.motionBlur')}
+        value={setting.enabled}
+        onChange={(enabled) => edit({ enabled })}
+      />
+      {setting.enabled ? (
+        <SliderField
+          label={translate('gallery.videoReview.motionBlurStrength')}
+          value={setting.strength * 100}
+          min={0}
+          max={100}
+          step={0.01}
+          scrubStep={1}
+          onChange={(strength) => edit({ strength: strength / 100 })}
+          formatValue={(value) => `${value}%`}
+        />
+      ) : null}
+    </div>
   );
 }
 

@@ -1,19 +1,24 @@
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../features/video/project/scene/focus-appearance';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,
 } from '../../features/video/review/advanced/scene';
 import { renderRenderWindowFrames } from './render-export';
-import { drawReviewSpotlights } from './render-spotlight';
-import { drawReviewBorders } from './render-border';
+import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
+import { drawSceneBorders } from '../../features/video/composition/draw/border';
 
-vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
-vi.mock('./render-border', () => ({ drawReviewBorders: vi.fn() }));
+vi.mock('../../features/video/composition/draw/spotlight', () => ({
+  drawSceneSpotlights: vi.fn(),
+}));
+vi.mock('../../features/video/composition/draw/border', () => ({ drawSceneBorders: vi.fn() }));
 vi.mock('mediabunny', async (importOriginal) => ({
   ...(await importOriginal<typeof import('mediabunny')>()),
   VideoSample: class {
@@ -61,8 +66,8 @@ it.each(['fixed', 'follow-video'] as const)(
       exit: { type: 'none' as const, duration: 0 },
     };
     for (const scale of [1, 2]) {
-      vi.mocked(drawReviewSpotlights).mockClear();
-      vi.mocked(drawReviewBorders).mockClear();
+      vi.mocked(drawSceneSpotlights).mockClear();
+      vi.mocked(drawSceneBorders).mockClear();
       const camera = { scale, centerX: 0.25, centerY: 0.25 };
       const layout = computeQuickEditSceneLayout({
         source: sourceSize,
@@ -108,11 +113,11 @@ it.each(['fixed', 'follow-video'] as const)(
         onProgress: undefined,
         signal: new AbortController().signal,
       });
-      const opening = vi.mocked(drawReviewSpotlights).mock.calls[0]![3][0]!.opening;
+      const opening = vi.mocked(drawSceneSpotlights).mock.calls[0]![3][0]!.opening;
       expect(opening.y).toBeCloseTo(layout.videoTransform.y - canvas.headerHeight * scale);
       expect(opening.height).toBeCloseTo(layout.windowRect.height * scale * area.height);
       expect(opening.y + opening.height).toBeLessThan(layout.videoTransform.y);
-      const border = vi.mocked(drawReviewBorders).mock.calls[0]![2][0]!;
+      const border = vi.mocked(drawSceneBorders).mock.calls[0]![2][0]!;
       expect(border.width).toBe(3 * scale);
       const start = border.path.match(/^M([\d.-]+) ([\d.-]+)/)!;
       expect(Number(start[1])).toBeCloseTo(opening.x + opening.width / 2);

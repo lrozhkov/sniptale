@@ -1,6 +1,13 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
+import {
+  useVideoProjectTextRewrite,
+  type VideoProjectTextRewriteController,
+} from '../../../../runtime/session/text-rewrite';
 
 const { inspectPanelMock } = vi.hoisted(() => ({
   inspectPanelMock: vi.fn(() => (
@@ -50,6 +57,7 @@ describe('workspace-sidebar/selection/body', () => {
         ...createProps(),
         onApplyCameraLayout: vi.fn(),
         onEditCameraPosition: vi.fn(),
+        onPreviewMotion: vi.fn(),
         canAddCameraPosition,
       };
       inspectPanelMock.mockClear();
@@ -60,6 +68,7 @@ describe('workspace-sidebar/selection/body', () => {
         expect.objectContaining({
           onApplyCameraLayout: props.onApplyCameraLayout,
           onEditCameraPosition: props.onEditCameraPosition,
+          onPreviewMotion: props.onPreviewMotion,
           canAddCameraPosition,
         }),
         undefined
@@ -100,4 +109,42 @@ describe('workspace-sidebar/selection/body', () => {
       undefined
     );
   });
+
+  it('forwards the actual mounted rewrite controller through the intermediate body projection', async () => {
+    const props = createProps();
+    let controller: VideoProjectTextRewriteController | undefined;
+    function MountedBody() {
+      const textRewrite = useVideoProjectTextRewrite(props.project);
+      controller = textRewrite;
+      return <WorkspaceSidebarSelectionBody {...props} textRewrite={textRewrite} />;
+    }
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<MountedBody />));
+      expect(controller).toBeDefined();
+      expect(inspectPanelMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ textRewrite: controller }),
+        undefined
+      );
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+it('forwards scene edge preview through the selection body to the scene inspector', () => {
+  const sceneEdges = { onPreview: vi.fn() };
+  inspectPanelMock.mockClear();
+  renderToStaticMarkup(
+    <WorkspaceSidebarSelectionBody {...createProps()} sceneEdges={sceneEdges} />
+  );
+  expect(inspectPanelMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ sceneEdges }),
+    undefined
+  );
 });

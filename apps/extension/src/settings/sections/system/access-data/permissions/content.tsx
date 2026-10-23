@@ -4,7 +4,7 @@ import { AlertCircle, Check } from 'lucide-react';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 
 import { translate } from '../../../../../platform/i18n';
-import { settingsSectionClassName, SettingsSubpageTabs } from '../../../../section-surface';
+import { settingsSectionClassName } from '../../../../section-surface';
 import { getPermissionContent, type PermissionInfo, type PermissionState } from './permissions-lib';
 import { RequiredManifestPermissionDisclosureList } from './required-disclosure-list';
 import { DISABLED_PERMISSION_BORDER_CLASS_NAME } from './content.constants.ts';
@@ -26,7 +26,7 @@ const revokeButtonClassName = getControlSecondaryButtonClassName({
 
 const permissionIconClassName = [
   'flex h-7 w-7 flex-shrink-0 items-center justify-center',
-  'text-[var(--sniptale-color-success)]',
+  'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 function StatusBadge({ state }: { state: PermissionState }) {
@@ -152,7 +152,65 @@ function OptionalPermissionControl(props: {
   );
 }
 
+function PermissionControl(props: {
+  permission: PermissionInfo;
+  content: ReturnType<typeof getPermissionContent>;
+  onRequestPermission: (id: string) => void;
+  onRevokePermission: (id: string) => void;
+  onOpenMediaSettings?: ((permission: 'microphone' | 'camera') => void) | undefined;
+}) {
+  const permission = props.permission;
+  if (permission.type === 'file' || permission.type === 'chrome') {
+    return (
+      <OptionalPermissionControl
+        content={props.content}
+        state={permission.state}
+        onRequest={() => props.onRequestPermission(permission.id)}
+        onRevoke={() => props.onRevokePermission(permission.id)}
+      />
+    );
+  }
+  if (permission.type === 'origin') {
+    return (
+      <SiteAccessModeSelector
+        permission={permission}
+        onRequestPermission={props.onRequestPermission}
+        onRevokePermission={props.onRevokePermission}
+      />
+    );
+  }
+  const mediaPermission =
+    permission.type === 'web' && (permission.id === 'microphone' || permission.id === 'camera')
+      ? permission.id
+      : null;
+  if (mediaPermission && permission.state === 'denied') {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge state={permission.state} />
+        <ProductActionButton
+          compact
+          tone="secondary"
+          type="button"
+          className={requestButtonClassName}
+          data-ui={`settings.permissions.${mediaPermission}.open-browser-settings`}
+          onClick={() => props.onOpenMediaSettings?.(mediaPermission)}
+        >
+          {translate('settings.permissions.openBrowserSettingsButton')}
+        </ProductActionButton>
+      </div>
+    );
+  }
+  if (permission.state === 'granted' || permission.state === 'denied') {
+    return <StatusBadge state={permission.state} />;
+  }
+  if (mediaPermission || permission.state === 'prompt') {
+    return <RequestButton onClick={() => props.onRequestPermission(permission.id)} />;
+  }
+  return <PermissionStateText content={props.content} />;
+}
+
 function PermissionCard(props: {
+  onOpenMediaSettings?: ((permission: 'microphone' | 'camera') => void) | undefined;
   onRequestPermission: (id: string) => void;
   onRevokePermission: (id: string) => void;
   permission: PermissionInfo;
@@ -161,7 +219,10 @@ function PermissionCard(props: {
   const PermissionIcon = props.permission.icon;
 
   return (
-    <div className={permissionCardClassName}>
+    <div
+      className={permissionCardClassName}
+      data-ui={`settings.permissions.${props.permission.id}`}
+    >
       <div className="flex min-w-[min(100%,20rem)] flex-1 items-center gap-3">
         <div className={permissionIconClassName}>
           <PermissionIcon size={16} />
@@ -177,32 +238,14 @@ function PermissionCard(props: {
       </div>
 
       <div className="flex-shrink-0">
-        {props.permission.type === 'file' || props.permission.type === 'chrome' ? (
-          <OptionalPermissionControl
-            content={content}
-            state={props.permission.state}
-            onRequest={() => props.onRequestPermission(props.permission.id)}
-            onRevoke={() => props.onRevokePermission(props.permission.id)}
-          />
-        ) : props.permission.type === 'origin' ? (
-          <SiteAccessModeSelector
-            permission={props.permission}
-            onRequestPermission={props.onRequestPermission}
-            onRevokePermission={props.onRevokePermission}
-          />
-        ) : props.permission.state === 'granted' || props.permission.state === 'denied' ? (
-          <StatusBadge state={props.permission.state} />
-        ) : props.permission.state === 'prompt' ? (
-          <RequestButton onClick={() => props.onRequestPermission(props.permission.id)} />
-        ) : (
-          <PermissionStateText content={content} />
-        )}
+        <PermissionControl {...props} content={content} />
       </div>
     </div>
   );
 }
 
 function PermissionStatusChecks(props: {
+  onOpenMediaSettings?: ((permission: 'microphone' | 'camera') => void) | undefined;
   onRequestPermission: (id: string) => void;
   onRevokePermission: (id: string) => void;
   permissions: PermissionInfo[];
@@ -219,6 +262,7 @@ function PermissionStatusChecks(props: {
             permission={permission}
             onRequestPermission={props.onRequestPermission}
             onRevokePermission={props.onRevokePermission}
+            onOpenMediaSettings={props.onOpenMediaSettings}
           />
         ))}
       </div>
@@ -226,9 +270,21 @@ function PermissionStatusChecks(props: {
   );
 }
 
-function RefreshPermissionStatusesButton(props: { onRefresh: () => void }) {
+function PermissionFooterActions(props: {
+  onRefresh: () => void;
+  onOpenBrowserSettings: () => void;
+}) {
   return (
-    <div className="mt-3 flex justify-end">
+    <div className="mt-3 flex flex-wrap justify-end gap-2">
+      <ProductActionButton
+        compact
+        tone="secondary"
+        onClick={props.onOpenBrowserSettings}
+        className={requestButtonClassName}
+        data-ui="settings.permissions.open-browser-settings"
+      >
+        {translate('settings.permissions.openBrowserSettingsButton')}
+      </ProductActionButton>
       <ProductActionButton
         compact
         tone="secondary"
@@ -245,34 +301,57 @@ function RefreshPermissionStatusesButton(props: { onRefresh: () => void }) {
 }
 
 export function PermissionsSectionContent(props: {
+  onOpenBrowserSettings: () => void;
+  onOpenMediaSettings?: ((permission: 'microphone' | 'camera') => void) | undefined;
+  mediaNavigationFailed?: boolean;
+  mediaEnableFailed?: boolean;
+  mediaRecordingReady?: boolean;
+  mediaSessionFailed?: boolean;
   onRefresh: () => void;
   onRequestPermission: (id: string) => void;
   onRevokePermission?: (id: string) => void;
   permissions: PermissionInfo[];
   view?: 'optional' | 'required';
-  onViewChange?: (view: 'optional' | 'required') => void;
 }) {
   const view = props.view ?? 'optional';
   return (
     <div className={`${settingsSectionClassName} max-w-4xl`}>
-      <SettingsSubpageTabs
-        placement="inline"
-        activeId={view}
-        ariaLabel={translate('settings.permissions.permissionKindTabsLabel')}
-        items={[
-          { id: 'optional', label: translate('settings.permissions.statusChecksTitle') },
-          { id: 'required', label: translate('settings.permissions.requiredGrantsTitle') },
-        ]}
-        onChange={(nextView) => props.onViewChange?.(nextView as 'optional' | 'required')}
-      />
       {view === 'optional' ? (
         <>
           <PermissionStatusChecks
             permissions={props.permissions}
             onRequestPermission={props.onRequestPermission}
             onRevokePermission={props.onRevokePermission ?? (() => undefined)}
+            onOpenMediaSettings={props.onOpenMediaSettings}
           />
-          <RefreshPermissionStatusesButton onRefresh={props.onRefresh} />
+          {props.mediaRecordingReady ? (
+            <p
+              role="status"
+              data-ui="settings.permissions.recording-ready"
+              className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]"
+            >
+              {translate('settings.permissions.recordingDeviceReady')}
+            </p>
+          ) : null}
+          {props.mediaNavigationFailed ? (
+            <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
+              {translate('settings.permissions.openBrowserSettingsFailed')}
+            </p>
+          ) : null}
+          {props.mediaEnableFailed ? (
+            <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
+              {translate('settings.permissions.enableRecordingDeviceFailed')}
+            </p>
+          ) : null}
+          {props.mediaSessionFailed ? (
+            <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
+              {translate('settings.permissions.recordingAccessSessionFailed')}
+            </p>
+          ) : null}
+          <PermissionFooterActions
+            onRefresh={props.onRefresh}
+            onOpenBrowserSettings={props.onOpenBrowserSettings}
+          />
         </>
       ) : (
         <RequiredManifestPermissionDisclosureList />

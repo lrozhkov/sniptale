@@ -4,14 +4,14 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../features/video/review/advanced/spatial';
+import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../features/video/project/motion/spatial';
 import {
   computeQuickEditSceneLayout,
   evaluateQuickEditCameraAtTime,
 } from '../../features/video/review/advanced/scene';
 import { quickEditMotionBlurCameras } from '../../features/video/review/advanced/motion-blur';
 import { drawReviewSceneFrame } from '../../workflows/video-review/scene-frame';
-vi.mock('../../workflows/video-review/spatial-renderer', () => ({
+vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({
   createReviewSpatialRenderer: () => {
     throw new Error('GPU unavailable');
   },

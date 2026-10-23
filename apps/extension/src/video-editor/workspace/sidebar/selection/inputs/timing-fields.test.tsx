@@ -1,3 +1,5 @@
+import { createAudioClipFromAsset } from '../../../../../features/video/project/factories/clip';
+import { createVideoProjectAsset } from '../../../../../features/video/project/factories/creation';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -54,4 +56,25 @@ describe('timing-fields', () => {
     expect(markup).not.toContain('videoEditor.sidebar.fitModeCover');
     expect(markup).not.toContain('videoEditor.sidebar.fitModeStretch');
   });
+});
+
+it('retains the AUDIO numeric limit separately from the contextual scrub in legacy composition', () => {
+  const asset = createVideoProjectAsset(
+    'Music',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'music' },
+    {
+      width: 0,
+      height: 0,
+      duration: 80,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const audio = createAudioClipFromAsset('track', asset);
+  const markup = renderToStaticMarkup(renderClipTimingFields(audio, false, vi.fn(), vi.fn()));
+  expect(markup).toContain('videoEditor.sidebar.fadeInLabel');
+  expect(markup).toContain('max="5"');
 });

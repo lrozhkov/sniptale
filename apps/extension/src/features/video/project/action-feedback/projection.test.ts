@@ -1,7 +1,11 @@
+import {
+  evaluateProjectGestureFeedback,
+  buildProjectActionAudioPlan,
+} from '../../review/project-action-audio';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../factories/creation';
 import { getVideoProjectUtilityLanes } from '../utility-lanes';
-import { patchVideoProjectActionFeedback } from './projection';
+import { getVideoProjectFeedbackRuns, patchVideoProjectActionFeedback } from './projection';
 import { parseVideoProjectActionFeedback, REVIEW_CLICK_DEFAULT } from './validation';
 
 function fixture() {
@@ -142,4 +146,139 @@ it('rejects duplicate source groups and returns independent snapshots on admissi
   restored[0]!.settings[0]!.volume = 0.1;
   expect(groups[0]!.signals[0]!.data['activity']).toBe('input');
   expect(groups[0]!.settings[0]!.volume).toBe(0.5);
+});
+
+it('keeps the text-capable project schema when editing captured feedback', () => {
+  const { project } = fixture();
+  project.version = 5;
+  project.textDocuments = [];
+  const group = project.actionFeedback![0]!;
+  const changed = patchVideoProjectActionFeedback(project, group, { settings: [] });
+  expect(changed.version).toBe(5);
+  expect(changed.textDocuments).toEqual([]);
+});
+
+it('joins continuous feedback across tracks and separates source gaps and identities', () => {
+  const { project, identity } = fixture();
+  const first = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (first.type !== 'VIDEO') throw new Error('Expected a video clip');
+  const track = { ...project.tracks[0]!, id: 'other-track', visible: true };
+  project.tracks.push(track);
+  project.clips = [
+    {
+      ...first,
+      id: 'a',
+      startTime: 0,
+      duration: 0.5,
+      sourceStart: 0,
+      sourceDuration: 1,
+      playbackRate: 2,
+    },
+    {
+      ...first,
+      id: 'b',
+      trackId: track.id,
+      startTime: 0.5,
+      duration: 1,
+      sourceStart: 1,
+      sourceDuration: 1,
+      playbackRate: 1,
+    },
+    { ...first, id: 'gap', startTime: 1.5, duration: 1, sourceStart: 3, sourceDuration: 1 },
+    { ...first, id: 'independent', startTime: 0, sourceInstanceId: 'duplicate' },
+  ];
+  expect(
+    getVideoProjectFeedbackRuns(project, identity).map((run) => ({
+      ids: run.clips.map((clip) => clip.id),
+      segments: run.segments,
+    }))
+  ).toEqual([
+    {
+      ids: ['a', 'b'],
+      segments: [
+        { sourceStart: 0, sourceEnd: 1, resultStart: 0, resultEnd: 0.5, kind: 'speed', rate: 2 },
+        { sourceStart: 1, sourceEnd: 2, resultStart: 0.5, resultEnd: 1.5, kind: 'keep', rate: 1 },
+      ],
+    },
+    {
+      ids: ['gap'],
+      segments: [
+        { sourceStart: 3, sourceEnd: 4, resultStart: 1.5, resultEnd: 2.5, kind: 'keep', rate: 1 },
+      ],
+    },
+  ]);
+  track.visible = false;
+  expect(
+    getVideoProjectFeedbackRuns(project, identity).flatMap((run) =>
+      run.clips.map((clip) => clip.id)
+    )
+  ).toEqual(['a', 'gap']);
+});
+
+it('retains feedback mapping after source media becomes a project asset', () => {
+  const { project, identity } = fixture();
+  project.assets[0]!.source = {
+    kind: 'project-asset',
+    projectAssetId: 'owned-source',
+    originRecordingId: identity.recordingId,
+  };
+  expect(getVideoProjectFeedbackRuns(project, identity)).toHaveLength(1);
+  expect(getVideoProjectFeedbackRuns(project, { ...identity, recordingId: 'different' })).toEqual(
+    []
+  );
+});
+
+it('retains a Gallery gesture phase across split windows without repeating its sound', () => {
+  const { project } = fixture();
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  project.actionFeedback = project.actionFeedback!.slice(0, 1);
+  project.clips = [{ ...clip, duration: 1.2, sourceDuration: 1.2 }];
+  project.duration = 1.2;
+  const expected = evaluateProjectGestureFeedback(project, 1.1).map((item) => item.frame);
+  expect(expected).toHaveLength(1);
+  const audio = buildProjectActionAudioPlan(project);
+  const candidate = {
+    ...project,
+    version: 43 as const,
+    duration: 1.4,
+    clips: [
+      {
+        ...clip,
+        id: 'left',
+        duration: 0.8,
+        sourceDuration: 1.2,
+        playbackWindow: { offset: 0, extent: 1.4, holdAt: 1.1 },
+      },
+      {
+        ...clip,
+        id: 'right',
+        startTime: 0.8,
+        duration: 0.6,
+        sourceDuration: 1.2,
+        playbackWindow: { offset: 0.8, extent: 1.4, holdAt: 1.1 },
+      },
+    ],
+  };
+  const before = structuredClone(candidate);
+  expect(evaluateProjectGestureFeedback(candidate, 1.3).map((item) => item.frame)).toEqual(
+    expected
+  );
+  const withoutIdentity = (plan: ReturnType<typeof buildProjectActionAudioPlan>) =>
+    plan.descriptors.map(({ id: _id, ...descriptor }) => descriptor);
+  expect(withoutIdentity(buildProjectActionAudioPlan(candidate))).toEqual(withoutIdentity(audio));
+  const heldOnly = {
+    ...candidate,
+    clips: [
+      {
+        ...candidate.clips[1]!,
+        startTime: 1.2,
+        duration: 0.2,
+        playbackWindow: { offset: 1.2, extent: 1.4, holdAt: 1.1 },
+      },
+    ],
+  };
+  expect(evaluateProjectGestureFeedback(heldOnly, 1.3).map((item) => item.frame)).toEqual(expected);
+  expect(buildProjectActionAudioPlan(heldOnly).descriptors).toEqual([]);
+  expect(candidate).toEqual(before);
 });

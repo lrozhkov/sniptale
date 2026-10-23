@@ -1,24 +1,28 @@
 import { expect, it, vi } from 'vitest';
 
-import { createTemplateSourceAction } from './template-source';
+import { createTemplateSourceHeaderControl } from './template-source';
 
 const copy = {
   forcedDescription: 'Switch to default',
-  forcedLabel: 'Use default',
+  forcedLabel: 'Default',
   frameDescription: 'Switch to frame',
-  frameLabel: 'Use frame',
+  frameLabel: 'Frame',
 };
 
-it('labels the template source button with the action it will perform', () => {
+it('exposes both template sources and preserves the accepted source', () => {
   const onChange = vi.fn();
 
-  const useFrame = createTemplateSourceAction({ onChange, value: 'forced' }, copy);
-  expect(useFrame).toMatchObject({ description: 'Switch to frame', label: 'Use frame' });
-  useFrame.onClick();
+  const control = createTemplateSourceHeaderControl({ onChange, value: 'forced' }, copy);
+  expect(control.value).toBe('forced');
+  expect(control.options).toEqual([
+    { value: 'frame-default', description: 'Switch to frame', label: 'Frame' },
+    { value: 'forced', description: 'Switch to default', label: 'Default' },
+  ]);
+  control.onChange('frame-default');
   expect(onChange).toHaveBeenLastCalledWith('frame-default');
 
-  const useDefault = createTemplateSourceAction({ onChange, value: 'frame-default' }, copy);
-  expect(useDefault).toMatchObject({ description: 'Switch to default', label: 'Use default' });
-  useDefault.onClick();
+  const fromFrame = createTemplateSourceHeaderControl({ onChange, value: 'frame-default' }, copy);
+  expect(fromFrame.value).toBe('frame-default');
+  fromFrame.onChange('forced');
   expect(onChange).toHaveBeenLastCalledWith('forced');
 });

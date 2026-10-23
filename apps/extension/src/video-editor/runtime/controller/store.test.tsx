@@ -22,6 +22,8 @@ import {
 
 const expectedKeys = {
   annotation: [
+    'addCommentDocument',
+    'editCommentDocument',
     'addAnnotationOverlay',
     'addShapeOverlay',
     'addSubtitleOverlay',
@@ -44,6 +46,8 @@ const expectedKeys = {
     'selectEffectInstance',
     'setClipEffectsBypassed',
     'setEffectTargetBypassed',
+    'restoreEffectSourceRange',
+    'updateEffectAttachment',
     'updateEffectInstance',
   ],
   export: [
@@ -94,6 +98,7 @@ const expectedKeys = {
   ],
   selection: [
     'selectActionOccurrence',
+    'selectSourceVoiceover',
     'selectClip',
     'selectCursorSegment',
     'selectHistoryLane',
@@ -102,6 +107,7 @@ const expectedKeys = {
     'selectMotionRegion',
     'selectObjectTrack',
     'selectScene',
+    'selectComment',
     'selectTrack',
     'selectTransition',
     'selectedClipId',
@@ -111,6 +117,9 @@ const expectedKeys = {
   timeline: [
     'placeMaterial',
     'appendMaterial',
+    'placeBookendMaterial',
+    'updateBookendPresets',
+    'updateCompositionJoins',
     'insertMaterial',
     'overlayMaterial',
     'addAssetClip',
@@ -123,6 +132,9 @@ const expectedKeys = {
     'clearUtilityLane',
     'closeTrackGap',
     'deleteActionEvent',
+    'editSourceVoiceover',
+    'deleteSourceVoiceover',
+    'duplicateSourceVoiceover',
     'deleteClip',
     'deleteCursorSample',
     'deleteMotionRegion',
@@ -160,6 +172,8 @@ const expectedKeys = {
     'updateMediaClipFitScalePercent',
     'updateMediaClipShadowIntensity',
     'updateMediaClipShadowMode',
+    'updateMediaClipShadowColor',
+    'editMediaClip',
     'updateMediaClipWindowHeader',
     'updateMotionRegion',
     'updateProject',

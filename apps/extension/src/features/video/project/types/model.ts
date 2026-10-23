@@ -1,4 +1,12 @@
-import type { CameraAppearance } from '../camera/appearance';
+import type { ReviewOriginalSpeech } from '../../review/original-speech';
+import type { SourceAudioGainRange } from '../../audio/source-envelope';
+import type { QuickEditAudioClip } from '../../review/advanced/types';
+import type { ReviewTimeSegment } from '../../review/time-segment';
+import type { VideoProjectTextBinding } from '../text/types';
+import type { ReviewSpeechTranscript } from '../../review/speech-transcript';
+import type { CameraHiddenRange } from '../camera/visibility';
+import type { CameraAppearance, CameraCrop } from '../camera/appearance';
+import type { VideoProjectVoiceTextSnapshot } from '../text/types';
 import type { VideoMediaFitMode } from './media';
 import type {
   VideoProjectActionEvent,
@@ -10,6 +18,7 @@ import type {
 import type { VideoObjectTrack } from '../object-tracks/types';
 import type { VideoProjectAnnotationFields } from './annotation';
 import type {
+  VideoProjectDurationMode,
   VideoProjectSceneBackground,
   VideoProjectShapeStyle,
   VideoProjectTextStyle,
@@ -28,7 +37,32 @@ import type {
   VideoProjectEffectSnapshot,
 } from '../effect-instance/types';
 
+/** Source content survives cuts and missing placements without extending the composition. */
+export interface VideoProjectSourceAudioDocument {
+  id: string;
+  binding: { kind: 'source'; assetId: string; sourceInstanceId: string };
+  ranges: SourceAudioGainRange[];
+  mutes: SourceAudioGainRange[];
+  /** Retained recognition metadata never schedules replacement audio or implicit gain. */
+  speech?: ReviewOriginalSpeech;
+}
+
+/** Whole accepted samples and capture clock survive all current montage placements. */
+export interface VideoProjectSourceVoiceoverDocument {
+  id: string;
+  binding: Extract<VideoProjectTextBinding, { kind: 'source' }>;
+  trackId: string;
+  reference: ReviewTimeSegment[];
+  take: QuickEditAudioClip;
+  enabled: boolean;
+  originalAudioMuteVolume?: number;
+  /** Original sound may occupy a separate instance of this same media asset. */
+  originalAudioSourceInstanceId?: string;
+}
+
 interface CameraPosition {
+  /** An absent destination crop inherits the clip-wide source framing. */
+  crop?: CameraCrop;
   id: string;
   /** Source seconds keep the trajectory continuous across trims, splits and rate changes. */
   sourceTime: number;
@@ -165,6 +199,17 @@ interface VideoProjectBaseClip {
   linkMode: VideoClipLinkMode;
   startTime: number;
   duration: number;
+  /** Physical placement can differ from the retained content and envelope clocks. */
+  playbackWindow?: {
+    /** Elapsed content seconds at placement start, at the current playback rate. */
+    offset: number;
+    /** Original physical extent retained when an edge is trimmed or split. */
+    extent?: number;
+    /** Last valid visual content time. Audio continues on its independent source clock. */
+    holdAt?: number;
+    fadePhase?: { offset: number; duration: number };
+    gainPhase?: { offset: number; duration: number };
+  };
   muted: boolean;
   volume: number;
   audioGainStart?: number;
@@ -214,8 +259,14 @@ export interface VideoProjectUtilityLanes {
 }
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
+  /** Camera-native source seconds survive cuts, rates and project moves. */
+  cameraHiddenRanges?: CameraHiddenRange[];
+  /** Authored camera anchors use main-source seconds; media seconds subtract the offset. */
+  cameraTiming?: { offsetSeconds: number; transitions: 'bounded' };
   cameraPositions?: CameraPosition[];
   cameraAppearance?: CameraAppearance;
+  /** Reflect camera pixels within their window; the source clock and placement stay unchanged. */
+  cameraMirrored?: boolean;
   type: typeof VideoProjectClipType.VIDEO;
   assetId: string;
   /** A placement's identity survives cuts and timing edits; a duplicate gets a new identity. */
@@ -226,6 +277,19 @@ export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjec
 }
 
 export interface VideoProjectAudioClip extends VideoProjectBaseClip {
+  /** Retain the full take without extending the montage when set to project. */
+  durationMode?: VideoProjectDurationMode;
+  /** Independent attenuation follows this take; targets confer no resource ownership. */
+  originalAudioMute?: {
+    volume: number;
+    targets: { assetId: string; sourceInstanceId: string }[];
+  };
+  /** Accepted speech keeps its original text even after that text or source is removed. */
+  textSnapshot?: VideoProjectVoiceTextSnapshot;
+  /** Passive legacy recognition metadata never schedules replacement playback. */
+  transcript?: ReviewSpeechTranscript;
+  /** Stable text/speech placement identity; split retains it and duplicate replaces it. */
+  sourceInstanceId?: string;
   type: typeof VideoProjectClipType.AUDIO;
   assetId: string;
   playbackRate?: number;
@@ -257,6 +321,16 @@ export interface VideoProjectAnnotationClip
 export interface VideoProjectEffectClip extends VideoProjectBaseClip {
   type: typeof VideoProjectClipType.EFFECT;
   effectInstanceId: string;
+  /** Original authoring interval; dormant content is retained without contributing output time. */
+  sourceRange?: {
+    assetId: string;
+    sourceInstanceId: string;
+    start: number;
+    end: number;
+    dormant?: true;
+  };
+  /** Omission retains Native camera policy; explicit placement uses the selected coordinate plane. */
+  attachment?: { kind: 'viewport' } | { kind: 'source'; assetId: string; sourceInstanceId: string };
 }
 
 export interface VideoProjectSubtitleClip extends VideoProjectBaseClip {
@@ -287,7 +361,55 @@ export type VideoProjectClip =
 
 export interface VideoProject {
   videoEffectsBypassed?: boolean;
-  version: 2 | 3 | 4;
+  version:
+    | 2
+    | 3
+    | 4
+    | 5
+    | 6
+    | 7
+    | 8
+    | 9
+    | 10
+    | 11
+    | 12
+    | 13
+    | 14
+    | 15
+    | 16
+    | 17
+    | 18
+    | 19
+    | 20
+    | 21
+    | 22
+    | 23
+    | 24
+    | 25
+    | 26
+    | 27
+    | 28
+    | 29
+    | 30
+    | 31
+    | 32
+    | 33
+    | 34
+    | 35
+    | 36
+    | 37
+    | 38
+    | 39
+    | 40
+    | 41
+    | 42
+    | 43
+    | 44
+    | 45;
+  sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
+  sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
+  commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
+  textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;
   name: string;
@@ -295,9 +417,23 @@ export interface VideoProject {
   baseRecordingId: string | null;
   width: number;
   height: number;
+  /** Inactive authored canvas offered as an ordinary resolution choice. */
+  rememberedCanvas?: { width: number; height: number };
   fps: number;
   backgroundColor: string;
   sceneBackground?: VideoProjectSceneBackground;
+  /** Final-canvas watermark; image references name a declared project material. */
+  watermark?: import('../scene/watermark-types').QuickEditWatermarkSettings;
+  /** Suppress the authored watermark without rewriting its selected mode. */
+  watermarkEnabled?: false;
+  /** Passive experimental metadata retained for recovery. Watermarks render on the final canvas. */
+  watermarkSource?: { assetId: string; sourceInstanceId: string };
+  /** Project-clock presentation after the complete visual and audio composition. */
+  sceneEdges?: import('../scene/edge-fades').VideoProjectSceneEdges;
+  /** Authored insertion recipes; existing timeline instances remain independent. */
+  bookendPresets?: import('../scene/bookend-presets-types').VideoProjectBookendPresets;
+  /** Whole-frame joins retain explicit ordinary media clip-edge anchors. */
+  compositionJoins?: import('../scene/joins-types').VideoProjectCompositionJoin[];
   timelinePlacementMode: VideoTimelinePlacementMode;
   duration: number;
   createdAt: number;

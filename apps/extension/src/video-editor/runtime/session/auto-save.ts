@@ -2,6 +2,10 @@ import { useEffect, useRef } from 'react';
 import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getVideoProject } from '../../../composition/persistence/projects/index';
+import {
+  captureVideoProjectHydrationOptions,
+  hydrateVideoProject,
+} from '../../../features/video/project/hydration';
 import { resolveVideoProjectReadResult } from '../../../composition/persistence/projects/contracts';
 import { commitVideoProjectWorkspaceMutation } from '../../../composition/persistence/projects/index-mutations';
 import type { VideoProject } from '../../../features/video/project/types/index';
@@ -27,8 +31,8 @@ type ProjectContext = {
   generation: symbol;
   project: VideoProject;
   savedProject: VideoProject;
-  initialUpdatedAt: number;
-  workspaceRevision: number | null | undefined;
+  initialHydrationOptions: ReturnType<typeof captureVideoProjectHydrationOptions>;
+  canonicalBase: Parameters<typeof commitVideoProjectWorkspaceMutation>[1] | undefined;
   requestedVersion: number;
   savedVersion: number;
   conflict: boolean;
@@ -121,8 +125,8 @@ function createProjectContext(project: VideoProject | null): ProjectContext | nu
         generation: Symbol(),
         project,
         savedProject: project,
-        initialUpdatedAt: project.updatedAt,
-        workspaceRevision: undefined,
+        initialHydrationOptions: captureVideoProjectHydrationOptions(),
+        canonicalBase: undefined,
         requestedVersion: 0,
         savedVersion: 0,
         conflict: false,
@@ -152,6 +156,19 @@ function isSyncedProjectRevision(project: VideoProject, synced: ProjectContext['
 function scheduleDocumentAutosave(callback: () => void, delay: number) {
   const timer = window.setTimeout(callback, delay);
   return () => window.clearTimeout(timer);
+}
+
+function acknowledgeProjectSave(
+  captured: CapturedSave,
+  saved: Awaited<ReturnType<typeof commitVideoProjectWorkspaceMutation>>
+): void {
+  const current = captured.context;
+  current.canonicalBase = {
+    expectedWorkspaceRevision: saved.workspaceRevision,
+    expectedProject: saved.project,
+  };
+  current.savedProject = captured.project;
+  current.savedVersion = captured.version;
 }
 
 function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }) {
@@ -185,9 +202,7 @@ function createVideoEditorAutosave(deps: { persist: typeof persistVideoProject }
           () => !disposed && context === current && (captured.explicit || Boolean(input?.enabled))
         );
         if (!saved || disposed || context !== current) return;
-        current.workspaceRevision = saved.workspaceRevision;
-        current.savedProject = captured.project;
-        current.savedVersion = captured.version;
+        acknowledgeProjectSave(captured, saved);
         if (current.requestedVersion === captured.version && input?.enabled) {
           const sync = captured.input.syncProjectRevision;
           if (sync && saved.project.updatedAt !== current.savedProject.updatedAt) {
@@ -302,26 +317,29 @@ async function persistVideoProject(
   const project = captured.project;
   if (!isCurrent()) return null;
   const context = captured.context;
-  const expectedWorkspaceRevision =
-    context.workspaceRevision === undefined
-      ? await resolveInitialWorkspaceRevision(project, context.initialUpdatedAt)
-      : context.workspaceRevision;
+  const base =
+    context.canonicalBase ??
+    (await resolveInitialWorkspaceBase(context.savedProject, context.initialHydrationOptions));
   if (!isCurrent()) return null;
-  return commitVideoProjectWorkspaceMutation(project, { expectedWorkspaceRevision });
+  return commitVideoProjectWorkspaceMutation(project, base);
 }
 
-async function resolveInitialWorkspaceRevision(
+async function resolveInitialWorkspaceBase(
   project: VideoProject,
-  initialProjectUpdatedAt: number | null
-): Promise<number | null> {
+  hydration: ReturnType<typeof captureVideoProjectHydrationOptions>
+): Promise<Parameters<typeof commitVideoProjectWorkspaceMutation>[1]> {
   const stored = await getVideoProject(project.id);
-  if (stored.status === 'notFound') return null;
-  if (stored.status !== 'ready') throw new Error(`Video project ${project.id} is unavailable`);
   const storedProject = resolveVideoProjectReadResult(stored);
-  if (!storedProject || storedProject.updatedAt !== initialProjectUpdatedAt) {
+  if (
+    stored.status !== 'ready' ||
+    stored.lifecycle?.trashedAt !== undefined ||
+    !storedProject ||
+    JSON.stringify(hydrateVideoProject(storedProject, hydration)) !==
+      JSON.stringify(hydrateVideoProject(project, hydration))
+  ) {
     const error = new Error(`Video project ${project.id} changed in another editor`);
     error.name = 'StaleVideoProjectSaveError';
     throw error;
   }
-  return stored.workspaceRevision;
+  return { expectedWorkspaceRevision: stored.workspaceRevision, expectedProject: storedProject };
 }

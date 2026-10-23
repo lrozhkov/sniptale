@@ -22,6 +22,7 @@ export type RegionOverlayMessage = Extract<
   {
     type:
       | VideoMessageType.SHOW_REGION_SELECTOR
+      | VideoMessageType.GET_REGION_SELECTOR_STATE
       | VideoMessageType.HIDE_REGION_SELECTOR
       | VideoMessageType.REGION_SELECTED
       | VideoMessageType.SHOW_RECORDING_OVERLAY
@@ -61,6 +62,7 @@ export function isRegionOverlayMessage(
 ): message is RegionOverlayMessage {
   return (
     message.type === VideoMessageType.SHOW_REGION_SELECTOR ||
+    message.type === VideoMessageType.GET_REGION_SELECTOR_STATE ||
     message.type === VideoMessageType.HIDE_REGION_SELECTOR ||
     message.type === VideoMessageType.REGION_SELECTED ||
     message.type === VideoMessageType.SHOW_RECORDING_OVERLAY ||

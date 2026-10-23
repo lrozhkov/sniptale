@@ -1,55 +1,18 @@
+import { getVideoClipPresentationTime } from '../project/timeline/rate';
 import { REVIEW_CLICK_DEFAULT } from '../project/action-feedback/validation';
 import { getVideoProjectActionPresentation } from '../project/action-presentation';
-import type { VideoProject, RecordingActionEvent, VideoProjectVideoClip } from '../project/types';
-import type { VideoProjectActionFeedback } from '../project/action-feedback/types';
+import type { VideoProject, RecordingActionEvent } from '../project/types';
+import type {
+  VideoProjectActionFeedback,
+  ReviewActionAudioTarget,
+  ReviewActionAudioStyle,
+  ReviewClickStyle,
+} from '../project/action-feedback/types';
 import { buildReviewActionAudioPlan, type ReviewActionAudioPlan } from './action-audio';
 import { scheduleReviewClicks, evaluateReviewClicks } from './click-animation';
 import { projectReviewTelemetry } from './telemetry';
-import type { ReviewTimeSegment } from './timeline';
+import { getVideoProjectFeedbackRuns } from '../project/action-feedback/projection';
 
-function sourceClips(project: VideoProject, group: VideoProjectActionFeedback) {
-  return project.clips
-    .filter((clip): clip is VideoProjectVideoClip => {
-      if (clip.type !== 'VIDEO' || clip.sourceInstanceId !== group.sourceInstanceId) return false;
-      const asset = project.assets.find((item) => item.id === clip.assetId);
-      const recordingId =
-        asset?.source.kind === 'recording'
-          ? asset.source.recordingId
-          : asset?.source.kind === 'project-asset'
-            ? asset.source.originRecordingId
-            : null;
-      return (
-        recordingId === group.recordingId &&
-        project.tracks.some((track) => track.id === clip.trackId && track.visible)
-      );
-    })
-    .sort((a, b) => a.startTime - b.startTime || a.id.localeCompare(b.id));
-}
-function clipRuns(clips: readonly VideoProjectVideoClip[]): VideoProjectVideoClip[][] {
-  const runs: VideoProjectVideoClip[][] = [];
-  for (const clip of clips) {
-    const run = runs.at(-1),
-      previous = run?.at(-1);
-    if (
-      previous &&
-      Math.abs(previous.startTime + previous.duration - clip.startTime) < 1e-6 &&
-      Math.abs(previous.sourceStart + previous.sourceDuration - clip.sourceStart) < 1e-6
-    )
-      run!.push(clip);
-    else runs.push([clip]);
-  }
-  return runs;
-}
-function segments(clips: readonly VideoProjectVideoClip[]): ReviewTimeSegment[] {
-  return clips.map((clip) => ({
-    sourceStart: clip.sourceStart,
-    sourceEnd: clip.sourceStart + clip.sourceDuration,
-    resultStart: clip.startTime,
-    resultEnd: clip.startTime + clip.duration,
-    kind: (clip.playbackRate ?? 1) === 1 ? 'keep' : 'speed',
-    rate: clip.playbackRate ?? 1,
-  }));
-}
 /** Projects the original source gesture for presentation editing and rendering. */
 export function projectActionFeedbackMarkers(
   project: VideoProject,
@@ -81,14 +44,20 @@ export function projectActionFeedbackMarkers(
   });
   const cursorIdentities = new Set<string>();
   const rawTrack = geometry ? project.cursorTrack : null;
+  const captured = rawTrack?.sourceObservations?.find(
+    (item) =>
+      item.recordingId === group.recordingId && item.sourceInstanceId === group.sourceInstanceId
+  );
   const cursorTrack = rawTrack
     ? {
         ...rawTrack,
-        samples: rawTrack.samples.flatMap((sample) => {
+        samples: (captured?.samples ?? rawTrack.samples).flatMap((sample) => {
           const anchor = sample.sourceAnchor;
-          if (!anchor || anchor.recordingId !== group.recordingId) return [];
+          const sourceTime = captured ? sample.time : anchor?.sourceTime;
+          if (sourceTime === undefined || (!captured && anchor?.recordingId !== group.recordingId))
+            return [];
           const identity = JSON.stringify([
-            anchor.sourceTime,
+            sourceTime,
             sample.captureSegment,
             sample.visible,
             sample.observation,
@@ -100,7 +69,7 @@ export function projectActionFeedbackMarkers(
           return [
             {
               ...sample,
-              time: anchor.sourceTime,
+              time: sourceTime,
               x: sample.recordingPoint?.x ?? sample.x,
               y: sample.recordingPoint?.y ?? sample.y,
             },
@@ -112,7 +81,9 @@ export function projectActionFeedbackMarkers(
     0,
     ...actionEvents.map((event) => event.time + event.duration),
     ...group.signals.map((signal) => signal.endTime),
-    ...sourceClips(project, group).map((clip) => clip.sourceStart + clip.sourceDuration)
+    ...getVideoProjectFeedbackRuns(project, group).flatMap((run) =>
+      run.clips.map((clip) => clip.sourceStart + clip.sourceDuration)
+    )
   );
   return projectReviewTelemetry({ actionEvents, signals: group.signals, cursorTrack }, duration)
     .markers;
@@ -124,11 +95,11 @@ export function buildProjectActionAudioPlan(project: VideoProject): ReviewAction
     return { duration: project.duration, descriptors };
   for (const group of project.actionFeedback ?? []) {
     const facts = projectActionFeedbackMarkers(project, group, false);
-    for (const clips of clipRuns(sourceClips(project, group))) {
+    for (const { clips, segments } of getVideoProjectFeedbackRuns(project, group)) {
       const plan = buildReviewActionAudioPlan({
         markers: facts,
         settings: group.settings,
-        segments: segments(clips),
+        segments,
         applied: true,
       });
       for (const descriptor of plan.descriptors)
@@ -145,6 +116,50 @@ export function buildProjectActionAudioPlan(project: VideoProject): ReviewAction
   }
   return { duration: project.duration, descriptors };
 }
+/** A read-only audition uses the selected instance and the existing source-to-project time map. */
+export function buildProjectActionAudioAuditionPlan(
+  project: VideoProject,
+  identity: Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>,
+  target: ReviewActionAudioTarget,
+  style: ReviewActionAudioStyle
+): ReviewActionAudioPlan {
+  const group = project.actionFeedback?.find(
+    (item) =>
+      item.recordingId === identity.recordingId &&
+      item.sourceInstanceId === identity.sourceInstanceId
+  );
+  if (
+    !group ||
+    (target.ref.kind === 'signal' &&
+      group.signals.some(
+        (signal) => signal.id === target.ref.id && signal.data['privacy'] === 'protected'
+      ))
+  )
+    return { duration: project.duration, descriptors: [] };
+  return buildProjectActionAudioPlan({
+    ...project,
+    actionPresentation: { ...getVideoProjectActionPresentation(project), enabled: true },
+    actionFeedback: [{ ...group, settings: [{ ...style, enabled: true, ref: { ...target.ref } }] }],
+  });
+}
+
+/** Gesture authoring and rendering inherit one project appearance without changing captured source facts. */
+export function getProjectGestureFeedbackDefaults(project: VideoProject): ReviewClickStyle {
+  const defaults = getVideoProjectActionPresentation(project);
+  return {
+    ...REVIEW_CLICK_DEFAULT,
+    effect: defaults.enabled ? 'press' : 'off',
+    ...(defaults.clickStyle
+      ? {
+          color: defaults.clickStyle.color,
+          radius: defaults.clickStyle.size,
+          stroke: defaults.clickStyle.strokeWidth,
+          opacity: defaults.clickStyle.opacity,
+        }
+      : {}),
+  };
+}
+
 const gesturePlans = new WeakMap<VideoProject, ReturnType<typeof prepareProjectGestureFeedback>>();
 
 /** Both surfaces query one source/run plan per immutable project revision. */
@@ -161,7 +176,7 @@ export function evaluateProjectGestureFeedback(project: VideoProject, time: numb
     );
     if (!clip) return [];
     return cues.flatMap((cue) =>
-      evaluateReviewClicks([cue], time).map((frame) => ({
+      evaluateReviewClicks([cue], getVideoClipPresentationTime(clip, time)).map((frame) => ({
         frame,
         clipId: clip.id,
         eventId: cue.id!,
@@ -194,22 +209,14 @@ function prepareProjectGestureFeedback(project: VideoProject) {
         return [];
       return [
         {
-          ...REVIEW_CLICK_DEFAULT,
+          ...getProjectGestureFeedbackDefaults(project),
           id: marker.ref.id,
-          effect: 'press' as const,
-          ...(defaults.clickStyle
-            ? {
-                color: defaults.clickStyle.color,
-                radius: defaults.clickStyle.size,
-                stroke: defaults.clickStyle.strokeWidth,
-                opacity: defaults.clickStyle.opacity,
-              }
-            : {}),
         },
       ];
     });
-    return clipRuns(sourceClips(project, group)).flatMap((clips) => {
-      return [{ clips, cues: scheduleReviewClicks(facts, styles, segments(clips)) }];
-    });
+    return getVideoProjectFeedbackRuns(project, group).map(({ clips, visualSegments }) => ({
+      clips,
+      cues: scheduleReviewClicks(facts, styles, visualSegments),
+    }));
   });
 }

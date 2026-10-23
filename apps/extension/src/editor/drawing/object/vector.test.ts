@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { Path, Textbox } from 'fabric';
+import { Path, StaticCanvas, Textbox } from 'fabric';
 import type { DrawingObject } from '../../../features/drawing/public';
 import { readEditorDrawingObject } from './metadata';
 import {
@@ -14,7 +14,420 @@ import {
   updateEditorDrawingShapeDraft,
 } from './vector';
 
+it('bounds zoomed scratch allocation to the visible destination and skips offscreen text', () => {
+  const object = createEditorDrawingFabricObject(
+    {
+      id: 'clipped-stencil',
+      kind: 'text',
+      bounds: { x: -20.25, y: -10.45, width: 300, height: 100 },
+      text: 'Stencil TEST\nSecond line',
+      color: '#00000000',
+      backgroundColor: '#f97316',
+      fontFamily: 'serif',
+      fontSize: 32,
+    },
+    1
+  ) as Textbox;
+  object.set({ fontFamily: 'serif' });
+  applyEditorDrawingTextVisuals(object);
+  const render = (width: number, height: number) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#235b92';
+    context.fillRect(0, 0, width, height);
+    context.scale(4, 4);
+    const composite = vi.spyOn(context, 'drawImage');
+    object.render(context);
+    return { context, composite };
+  };
+  const reference = render(1600, 1200).context.getImageData(0, 0, 240, 180).data;
+  const visible = render(240, 180);
+  const actual = visible.context.getImageData(0, 0, 240, 180).data;
+  expect(actual.every((channel, index) => Math.abs(channel - reference[index]!) <= 16)).toBe(true);
+  let solidPixels = 0;
+  let changedSolidPixels = 0;
+  for (let offset = 0; offset < reference.length; offset += 4) {
+    const solid = [
+      [35, 91, 146],
+      [249, 115, 22],
+    ].some((color) => color.every((channel, index) => reference[offset + index] === channel));
+    if (!solid) continue;
+    solidPixels += 1;
+    if (
+      !actual
+        .subarray(offset, offset + 4)
+        .every((channel, index) => channel === reference[offset + index])
+    ) {
+      changedSolidPixels += 1;
+    }
+  }
+  expect(solidPixels).toBeGreaterThan(100);
+  expect(changedSolidPixels).toBe(0);
+  expect(visible.composite).toHaveBeenCalledTimes(1);
+  const scratch = visible.composite.mock.calls[0]![0];
+  if (!(scratch instanceof HTMLCanvasElement)) throw new Error('Expected stencil canvas');
+  expect(scratch.width).toBeLessThanOrEqual(240);
+  expect(scratch.height).toBeLessThanOrEqual(180);
+  object.set({ left: 1000, top: 1000 });
+  const glyphs = vi.spyOn(object, '_renderTextFill');
+  const allocate = vi.spyOn(document, 'createElement');
+  const offscreen = render(240, 180);
+  expect(offscreen.composite).not.toHaveBeenCalled();
+  expect(glyphs).not.toHaveBeenCalled();
+  expect(allocate).toHaveBeenCalledTimes(1);
+  expect(scratch.width).toBeLessThanOrEqual(240);
+  expect(scratch.height).toBeLessThanOrEqual(180);
+  allocate.mockRestore();
+});
+
+it.each([0, 17])(
+  'preserves native glyph cores on a fractional raster grid at %s degrees',
+  (angle) => {
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'fractional-stencil',
+        kind: 'text',
+        bounds: { x: 57.35, y: 71.65, width: 300, height: 100 },
+        text: 'Stencil TEST\nSecond line',
+        color: '#111827',
+        backgroundColor: '#f97316',
+        fontFamily: 'serif',
+        fontSize: 32,
+      },
+      1
+    ) as Textbox;
+    object.set({ angle, fontFamily: 'serif' });
+    applyEditorDrawingTextVisuals(object);
+    const render = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 500;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#235b92';
+      context.fillRect(0, 0, 500, 500);
+      context.translate(0.3, 0.45);
+      context.scale(1.25, 1.25);
+      object.render(context);
+      return context.getImageData(0, 0, 500, 500).data;
+    };
+    const normal = render();
+    object.set({ fill: '#00000000' });
+    const stencil = render();
+    let cores = 0;
+    let covered = 0;
+    for (let offset = 0; offset < normal.length; offset += 4) {
+      if (
+        ![17, 24, 39].every((channel, index) => Math.abs(normal[offset + index]! - channel) <= 1)
+      ) {
+        continue;
+      }
+      cores += 1;
+      if (
+        [35, 91, 146].some((channel, index) => Math.abs(stencil[offset + index]! - channel) > 5)
+      ) {
+        covered += 1;
+      }
+    }
+    expect(cores).toBeGreaterThan(100);
+    expect(covered / cores).toBeLessThan(0.01);
+  }
+);
+
+it.each([
+  { angle: 0, zoom: 1, backgroundColor: '#ff8800' },
+  { angle: 45, zoom: 2, backgroundColor: '#ff880080' },
+])('cuts glyphs only through their own fill at $angle degrees and zoom $zoom', (options) => {
+  const object = createEditorDrawingFabricObject(
+    {
+      id: 'stencil',
+      kind: 'text',
+      bounds: { x: 100, y: 100, width: 160, height: 80 },
+      text: 'Hole\nText',
+      color: '#00000000',
+      backgroundColor: options.backgroundColor,
+      fontFamily: 'sans',
+      fontSize: 48,
+    },
+    1
+  ) as Textbox;
+  object.set({ angle: options.angle, fontFamily: 'sans-serif' });
+  applyEditorDrawingTextVisuals(object);
+  const source = object.sniptaleDrawingJson;
+  const render = (draw: boolean) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 600;
+    const context = canvas.getContext('2d')!;
+    for (let top = 0; top < 600; top += 10) {
+      for (let left = 0; left < 600; left += 10) {
+        context.fillStyle = (top + left) % 20 === 0 ? '#215b92' : '#e5d4b3';
+        context.fillRect(left, top, 10, 10);
+      }
+    }
+    context.fillStyle = '#1d8753';
+    context.fillRect(180, 0, 60, 600);
+    context.scale(options.zoom, options.zoom);
+    if (draw) object.render(context);
+    expect(context.globalCompositeOperation).toBe('source-over');
+    return context.getImageData(0, 0, 600, 600).data;
+  };
+  const scene = render(false);
+  const stencil = render(true);
+  applyEditorDrawingTextVisuals(object);
+  expect(render(true).every((channel, index) => channel === stencil[index])).toBe(true);
+  expect(object.fill).toBe('#00000000');
+  expect(object.objectCaching).toBe(false);
+  expect(object.sniptaleDrawingJson).toBe(source);
+  object.set({ fill: '#000000' });
+  const fillRender = vi.spyOn(object, '_renderTextFill').mockImplementationOnce(() => {});
+  const background = render(true);
+  fillRender.mockRestore();
+  const normal = render(true);
+  object.set({ fill: '#00000080' });
+  const partial = render(true);
+  let holes = 0;
+  let filled = 0;
+  let partialGlyphs = 0;
+  let damagedScenePixels = 0;
+  for (let offset = 0; offset < normal.length; offset += 4) {
+    if (stencil[offset + 3] !== 255) damagedScenePixels += 1;
+    const reference = normal.subarray(offset, offset + 3);
+    if (reference.every((channel) => channel < 24)) {
+      const original = scene.subarray(offset, offset + 3);
+      const actual = stencil.subarray(offset, offset + 3);
+      if (actual.every((channel, index) => Math.abs(channel - original[index]!) <= 16)) {
+        holes += 1;
+      }
+      if (
+        partial
+          .subarray(offset, offset + 3)
+          .every((channel, index) => Math.abs(channel - background[offset + index]! / 2) <= 16)
+      ) {
+        partialGlyphs += 1;
+      }
+    } else if (
+      reference.some((channel, index) => Math.abs(channel - scene[offset + index]!) > 20) &&
+      reference.every((channel, index) => Math.abs(channel - stencil[offset + index]!) <= 2)
+    ) {
+      filled += 1;
+    }
+  }
+  expect(holes).toBeGreaterThan(100);
+  expect(filled).toBeGreaterThan(100);
+  expect(partialGlyphs).toBeGreaterThan(100);
+  expect(damagedScenePixels).toBe(0);
+  object.set({ fill: '#00000000', textBackgroundColor: '' });
+  expect(render(true).every((channel, index) => channel === scene[index])).toBe(true);
+  object.set({ textBackgroundColor: options.backgroundColor });
+  expect(render(true).every((channel, index) => channel === stencil[index])).toBe(true);
+});
+
+it.each(['#000000', '#00000080', '#00000000'])(
+  'preserves normal glyph rendering for %s without a background',
+  (color) => {
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'unfilled-text',
+        kind: 'text',
+        bounds: { x: 20, y: 20, width: 160, height: 60 },
+        text: 'Text',
+        color,
+        backgroundColor: null,
+        fontFamily: 'sans',
+        fontSize: 32,
+      },
+      1
+    ) as Textbox;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 240;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 240, 240);
+    object.render(context);
+    const pixels = context.getImageData(0, 0, 240, 240).data;
+    const minimum = pixels.reduce((lowest, channel) => Math.min(lowest, channel), 255);
+    if (color === '#00000000') expect(minimum).toBe(255);
+    else {
+      const solid = color === '#000000' ? 0 : 127;
+      expect(minimum).toBeGreaterThanOrEqual(solid);
+      expect(minimum).toBeLessThanOrEqual(solid + 16);
+    }
+    expect(object.fill).toBe(color);
+  }
+);
+
+it('restores the transparent glyph color when a stencil render fails', () => {
+  const object = createEditorDrawingFabricObject(
+    {
+      id: 'failed-stencil',
+      kind: 'text',
+      bounds: { x: 20, y: 20, width: 160, height: 60 },
+      text: 'Text',
+      color: '#00000000',
+      backgroundColor: '#ff8800',
+      fontFamily: 'sans',
+      fontSize: 32,
+    },
+    1
+  ) as Textbox;
+  vi.spyOn(object, '_renderTextCommon').mockImplementationOnce(() => {
+    throw new Error('Glyph render failed');
+  });
+  const context = document.createElement('canvas').getContext('2d')!;
+  expect(() => object._render(context)).toThrow('Glyph render failed');
+  expect(object.fill).toBe('#00000000');
+  expect(context.globalCompositeOperation).toBe('source-over');
+  expect(() => object._render(context)).not.toThrow();
+  expect(object.fill).toBe('#00000000');
+});
+
+it.each([0, 5, 10, 45])('has continuous Fabric background pixels at %s degrees', (angle) => {
+  for (const color of ['#ff8800', '#ff880080']) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 400;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#808080';
+    context.fillRect(0, 0, 400, 400);
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'pixel-proof',
+        kind: 'text',
+        bounds: { x: 0, y: 0, width: 180, height: 100 },
+        text: 'Longer first line\nShort\nLast',
+        color: '#00000000',
+        backgroundColor: color,
+        fontFamily: 'sans',
+        fontSize: 24,
+      },
+      1
+    ) as Textbox;
+    vi.spyOn(object, 'getLineWidth').mockImplementation((index) => [150, 80, 50][index] ?? 0);
+    const radians = (angle * Math.PI) / 180;
+    context.save();
+    context.translate(200, 200);
+    context.rotate(radians);
+    renderEditorDrawingTextBackground(object, context);
+    context.restore();
+    context.fillStyle = color;
+    context.fillRect(0, 0, 5, 5);
+    const expected = context.getImageData(1, 1, 1, 1).data;
+    let edge = object._getTopOffset();
+    for (let line = 0; line < 2; line += 1) {
+      edge += object.getHeightOfLine(line);
+      for (let offset = 20; offset <= 30; offset += 1) {
+        for (const delta of [-0.75, -0.25, 0.25, 0.75]) {
+          const localX = object._getLeftOffset() + offset;
+          const localY = edge + delta;
+          const pixel = context.getImageData(
+            Math.floor(200 + localX * Math.cos(radians) - localY * Math.sin(radians)),
+            Math.floor(200 + localX * Math.sin(radians) + localY * Math.cos(radians)),
+            1,
+            1
+          ).data;
+          expect(
+            Array.from(pixel).every((channel, index) => Math.abs(channel - expected[index]!) <= 2),
+            `${color} line=${line} offset=${offset}`
+          ).toBe(true);
+        }
+      }
+    }
+  }
+});
+it.each(['#00000000', '#00000080', '#111827'])(
+  'keeps the editing caret opaque without changing glyph color %s',
+  (color) => {
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'text-caret',
+        kind: 'text',
+        bounds: { x: 0, y: 0, width: 160, height: 40 },
+        text: 'Caret',
+        color,
+        backgroundColor: '#f97316',
+        fontFamily: 'sans',
+        fontSize: 24,
+      },
+      1
+    ) as Textbox;
+    expect(object.cursorColor).toBe('#2563eb');
+    expect(object.fill).toBe(color);
+    expect(readEditorDrawingObject(object)).toMatchObject({ color, text: 'Caret' });
+  }
+);
+describe.each(['ltr', 'rtl'] as const)('editing caret geometry in %s text', (direction) => {
+  it.each([0.5, 1, 2])('keeps the caret quiet and precise at zoom %s', (zoom) => {
+    const canvas = new StaticCanvas(document.createElement('canvas'), { renderOnAddRemove: false });
+    const object = new Textbox('First\nNext\n', { fontSize: 24, fontFamily: 'serif', direction });
+    canvas.setZoom(zoom);
+    canvas.add(object);
+    object.set({ scaleX: 1.5, scaleY: 1.5 });
+    applyEditorDrawingTextVisuals(object);
+    applyEditorDrawingTextVisuals(object);
+    for (const index of [0, 2, 5, 6, 10, 11]) {
+      const boundaries = object._getCursorBoundaries(index, true);
+      const baseline = Textbox.prototype.getCursorRenderingData.call(object, index, boundaries);
+      const actual = object.getCursorRenderingData(index, boundaries);
+      const multiplier = zoom * 1.5;
+      const edge = index === 0 || index === 6 ? -2 : index === 5 || index === 10 ? 2 : 0;
+      const shift = edge * (direction === 'rtl' ? -1 : 1);
+      expect(actual.width * multiplier).toBeCloseTo(1.5, 6);
+      expect(actual.height).toBeCloseTo(baseline.height * 0.8, 6);
+      expect(actual.top + actual.height / 2).toBeCloseTo(baseline.top + baseline.height / 2, 6);
+      expect(
+        (actual.left + actual.width / 2 - baseline.left - baseline.width / 2) * multiplier
+      ).toBeCloseTo(shift, 6);
+      expect(actual.color).toBe('#2563eb');
+    }
+    expect(object.text).toBe('First\nNext\n');
+    void canvas.dispose();
+  });
+});
+
 describe('Fabric drawing adapter', () => {
+  it.each([
+    { fontSize: 16, text: 'One', color: '#111' },
+    { fontSize: 24, text: 'One\nTwo', color: '#00000000' },
+    { fontSize: 36, text: 'One\nTwo\nThree', color: '#111' },
+  ])(
+    'keeps the text fill within selection bounds: $fontSize $color',
+    ({ fontSize, text, color }) => {
+      const object = createEditorDrawingFabricObject(
+        {
+          id: 'background-bounds',
+          kind: 'text',
+          bounds: { x: 5, y: 6, width: 280, height: 30 },
+          text,
+          color,
+          backgroundColor: '#f97316',
+          fontFamily: 'serif',
+          fontSize,
+        },
+        1
+      ) as Textbox;
+      synchronizeEditorDrawingTextLayout(object);
+      const originalWidth = object.width;
+      const context = {
+        beginPath: vi.fn(),
+        fill: vi.fn(),
+        fillStyle: '#000',
+        moveTo: vi.fn(),
+        arcTo: vi.fn(),
+        closePath: vi.fn(),
+      };
+      renderEditorDrawingTextBackground(object, context);
+      const coordinates = context.arcTo.mock.calls.flatMap(([firstX, firstY, secondX, secondY]) => [
+        { x: firstX, y: firstY },
+        { x: secondX, y: secondY },
+      ]);
+      expect(coordinates.length).toBeGreaterThan(0);
+      for (const point of coordinates) {
+        expect(point.y).toBeGreaterThanOrEqual(-object.height / 2);
+        expect(point.y).toBeLessThanOrEqual(object.height / 2);
+      }
+      expect(object.width).toBe(originalWidth);
+    }
+  );
+
   it('maps shared objects to current editor types and metadata', () => {
     const shape: DrawingObject = {
       id: 'shape-1',
@@ -35,7 +448,7 @@ describe('Fabric drawing adapter', () => {
       id: 'text-1',
       kind: 'text',
       bounds: { x: 5, y: 6, width: 120, height: 40 },
-      text: 'One\nTwo',
+      text: 'One\nOne',
       color: '#111',
       backgroundColor: '#ff08',
       fontFamily: 'handwritten',
@@ -51,18 +464,23 @@ describe('Fabric drawing adapter', () => {
       beginPath: vi.fn(),
       fill: vi.fn(),
       fillStyle: '#000000',
-      roundRect: vi.fn(),
+      moveTo: vi.fn(),
+      arcTo: vi.fn(),
+      closePath: vi.fn(),
     };
     renderEditorDrawingTextBackground(object as Textbox, context);
-    expect(context.roundRect).toHaveBeenCalledTimes(2);
-    expect(context.roundRect.mock.calls[0]?.[0]).toBe((object as Textbox)._getLeftOffset());
+    expect(context.beginPath).toHaveBeenCalledTimes(1);
+    expect(context.fill).toHaveBeenCalledTimes(1);
+    expect(context.moveTo).toHaveBeenCalledTimes(1);
+    expect(context.closePath).toHaveBeenCalledTimes(1);
+    expect(context.arcTo).toHaveBeenCalled();
     expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
     const topOffset = (object as Textbox)._getTopOffset();
     applyEditorDrawingTextVisuals(object as Textbox);
     (object as Textbox)._renderTextLinesBackground(context as unknown as CanvasRenderingContext2D);
     expect((object as Textbox)._getTopOffset()).toBe(topOffset);
     expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
-    expect(context.fill).toHaveBeenCalledTimes(4);
+    expect(context.fill).toHaveBeenCalledTimes(2);
   });
 
   it('removes invisible Fabric stroke geometry from a prepared saved text box', () => {

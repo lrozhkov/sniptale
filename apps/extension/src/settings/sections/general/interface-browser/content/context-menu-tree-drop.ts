@@ -85,12 +85,6 @@ function resolveTarget(
       isContextMenuDescendant(tree, `section:${target.parentId}`, moving.id))
   )
     return null;
-  const position = contextMenuNodePosition(tree, source.key);
-  if (
-    position?.parentId === target.parentId &&
-    (target.index === position.index || target.index === position.index + 1)
-  )
-    return null;
   return target;
 }
 
@@ -155,6 +149,13 @@ export function useContextMenuTreeDrop(props: DropProps) {
           state.remove(source.key);
           return;
         }
+        const position =
+          source.origin === 'tree' ? contextMenuNodePosition(state.tree, source.key) : null;
+        if (
+          position?.parentId === latest.parentId &&
+          (latest.index === position.index || latest.index === position.index + 1)
+        )
+          return;
         const next =
           source.origin === 'tree'
             ? moveContextMenuNode(state.tree, source.key, latest)

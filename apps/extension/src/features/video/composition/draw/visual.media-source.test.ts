@@ -168,3 +168,149 @@ it('video fitting projects physical gesture points, paths and authored areas onc
   expect(layer.actions![0]!.point).toEqual({ x: 0.2, y: 0.3 });
   expect(drawActionCompositionState).toHaveBeenCalledOnce();
 });
+
+it('reflects decoded camera pixels without reflecting normal video or action glyphs', () => {
+  for (const trackRole of ['CAMERA', undefined] as const) {
+    const context = createContext();
+    const draw = vi.fn();
+    vi.mocked(drawActionCompositionState).mockClear();
+    const layer = {
+      ...createVideoLayer(),
+      actions: gestureLayer().actions,
+      trackRole,
+      clip: { fitMode: 'STRETCH', cameraMirrored: true },
+    };
+    drawCompositionVisualLayer(
+      context,
+      layer as never,
+      1,
+      1,
+      {},
+      new Map([['video-1', { draw, sourceWidth: 80, sourceHeight: 50 }]])
+    );
+    expect(draw).toHaveBeenCalledWith(context, 10, 12, 80, 50);
+    if (trackRole !== 'CAMERA') expect(context.scale).not.toHaveBeenCalled();
+    else expect(context.scale).toHaveBeenCalledWith(-1, 1);
+    if (trackRole === 'CAMERA') {
+      expect(context.translate).toHaveBeenCalledWith(100, 0);
+      const reflect = vi
+        .mocked(context.scale)
+        .mock.invocationCallOrder.find(
+          (_, i) => vi.mocked(context.scale).mock.calls[i]?.[0] === -1
+        )!;
+      const pixel = draw.mock.invocationCallOrder[0]!;
+      const action = vi.mocked(drawActionCompositionState).mock.invocationCallOrder.at(-1)!;
+      expect(pixel).toBeGreaterThan(reflect);
+      expect(action).toBeGreaterThan(pixel);
+      expect(
+        vi
+          .mocked(context.restore)
+          .mock.invocationCallOrder.some((order) => order > pixel && order < action)
+      ).toBe(true);
+      const painted = vi.mocked(drawActionCompositionState).mock.lastCall![1];
+      expect(painted.point).toEqual({ x: 74, y: 27 });
+      expect(painted.gestureFeedback!.path![0]).toEqual({ x: 82, y: 22 });
+      expect(painted.gestureFeedback!.area).toEqual({ x: 58, y: 22, width: 24, height: 20 });
+    }
+  }
+});
+
+it('uses the same authored shadow color for decoded video and image windows', () => {
+  for (const kind of ['video', 'image'] as const) {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'shadow',
+      filename: 'source.webm',
+      width: 160,
+      height: 90,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 100,
+    });
+    const original = project.clips.find((clip) => clip.type === 'VIDEO');
+    if (!original) throw new Error('Missing video');
+    const styled = { ...original, shadowIntensity: 70, shadowColor: '#00ff0080' };
+    project.clips = [kind === 'video' ? styled : { ...styled, type: 'IMAGE' }];
+    const layer = resolveVideoCompositionFrame(project, 0).visualLayers[0];
+    if (!layer) throw new Error('Missing visual layer');
+    const context = createVisualTestContext();
+    const draw = vi.fn();
+    drawCompositionVisualLayer(
+      context,
+      layer,
+      1,
+      1,
+      { [styled.assetId]: { naturalWidth: 160, naturalHeight: 90 } as HTMLImageElement },
+      new Map([[styled.id, { draw, sourceWidth: 160, sourceHeight: 90 }]])
+    );
+    expect(Reflect.get(context.__maskContext, 'shadowColor')).toBe('#00ff0080');
+    if (kind === 'video') expect(draw).toHaveBeenCalledOnce();
+    else expect(context.drawImage).toHaveBeenCalled();
+  }
+});
+
+it.each([false, true])(
+  'uses circle on decoded frames only for camera=%s without changing source geometry',
+  (camera) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'circle',
+      filename: 'source.webm',
+      width: 160,
+      height: 90,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 100,
+    });
+    const clip = project.clips.find((clip) => clip.type === 'VIDEO');
+    if (!clip) throw new Error('Missing video');
+    clip.cameraAppearance = { shape: 'circle', roundness: 0, zoom: 1, panX: 0, panY: 0 };
+    if (camera) project.tracks[0]!.role = 'CAMERA';
+    const layer = resolveVideoCompositionFrame(project, 0).visualLayers.find(
+      (layer) => layer.kind === 'video'
+    );
+    if (!layer) throw new Error('Missing layer');
+    const context = createVisualTestContext(),
+      draw = vi.fn();
+    drawCompositionVisualLayer(
+      context,
+      layer,
+      1,
+      1,
+      {},
+      new Map([[clip.id, { draw, sourceWidth: 160, sourceHeight: 90 }]])
+    );
+    expect(draw).toHaveBeenCalledWith(context, 0, 0, 160, 90);
+    if (camera) expect(context.moveTo).toHaveBeenCalledWith(125, 45);
+    else expect(context.moveTo).not.toHaveBeenCalled();
+    expect(clip.transform).toMatchObject({ width: 160, height: 90 });
+  }
+);
+
+it('provides original decoded window pixels to lenses without recursively drawing action overlays', () => {
+  vi.mocked(drawActionCompositionState).mockClear();
+  const layer = gestureLayer(),
+    draw = vi.fn(),
+    context = createVisualTestContext();
+  drawCompositionVisualLayer(
+    context,
+    layer,
+    1,
+    1,
+    {},
+    new Map([[layer.clipId, { draw, sourceWidth: 100, sourceHeight: 100 }]])
+  );
+  expect(draw).toHaveBeenCalledOnce();
+  const [, originalX, originalY, originalWidth, originalHeight] = draw.mock.lastCall!;
+  const source = vi.mocked(drawActionCompositionState).mock.lastCall![5]!;
+  expect(source).toBeDefined();
+  const rect = source.rect;
+  source.draw(context, rect.x - 20, rect.y - 30, rect.width * 2, rect.height * 2);
+  expect(draw).toHaveBeenLastCalledWith(
+    context,
+    rect.x - 20 + (originalX - rect.x) * 2,
+    rect.y - 30 + (originalY - rect.y) * 2,
+    originalWidth * 2,
+    originalHeight * 2
+  );
+  expect(draw).toHaveBeenCalledTimes(2);
+  expect(drawActionCompositionState).toHaveBeenCalledOnce();
+});

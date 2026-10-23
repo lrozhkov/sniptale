@@ -1,3 +1,4 @@
+import type { ReviewKeyAnimation } from './key-animation';
 import type { RecordingTelemetrySignal } from '../types/interaction';
 
 /** Recorded identity is scoped by kind; an action and signal may share their opaque ID. */
@@ -69,4 +70,5 @@ export interface VideoProjectActionFeedback {
   settings: ReviewActionAudioSetting[];
   signals: RecordingTelemetrySignal[];
   gestureStyles?: ReviewClickAnimation[];
+  keyStyles?: ReviewKeyAnimation[];
 }

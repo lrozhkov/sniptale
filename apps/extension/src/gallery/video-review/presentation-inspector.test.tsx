@@ -95,19 +95,6 @@ function accept(node: HTMLInputElement) {
     node.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
   });
 }
-async function select(index: number, option: string, parent: ParentNode = host) {
-  act(() =>
-    parent.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]')[index]!.click()
-  );
-  const choice = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-    (node) => node.textContent === option
-  )!;
-  expect(choice).toBeDefined();
-  await act(async () => {
-    choice.click();
-    await Promise.resolve();
-  });
-}
 function retained(mode: 'image' | 'video' = 'image') {
   props.settings.intro = {
     mode,
@@ -223,7 +210,7 @@ it('preserves both variants when requesting None and changes only cover framing'
   const disabled = vi.mocked(props.onChange).mock.calls.at(-1)![0];
   expect(disabled.introControl?.mode).toBe('none');
   expect(disabled.intro).toEqual(props.settings.intro);
-  await select(0, 'Fill', section());
+  act(() => button('Fill', section()).click());
   expect(props.onChange).toHaveBeenCalledWith(
     expect.objectContaining({
       intro: expect.objectContaining({
@@ -303,11 +290,11 @@ it.each([
   }
 );
 
-it('uses an independent 1–10 slider and previews before one keyboard commit', async () => {
+it('uses an independent 0.1–10 slider and previews before one keyboard commit', async () => {
   retained();
   await render();
   const range = field('Duration range');
-  expect(range.min).toBe('1');
+  expect(range.min).toBe('0.1');
   expect(range.max).toBe('10');
   act(() =>
     range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
@@ -420,8 +407,8 @@ it('configures and removes a join independently of the opposite edge and media',
   props.settings.outroTransition = { type: 'dissolve', before: 0.1, after: 0.3 };
   await render();
   async function choose(option: string) {
-    act(() => button('Transition to video', section()).click());
-    const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    const group = section().querySelector('[role="group"][aria-label="Transition to video"]')!;
+    const node = [...group.querySelectorAll<HTMLButtonElement>('button')].find(
       (item) => item.textContent === option
     )!;
     await act(async () => node.click());

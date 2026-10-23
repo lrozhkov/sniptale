@@ -2,7 +2,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import type { RecoveryRecording } from '../../workflows/video/recording-recovery';
+import type {
+  RecoveryRecording,
+  RecordingRecoveryProgress,
+} from '../../workflows/video/recording-recovery';
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -238,5 +241,58 @@ it('keeps recovery actions in a collapsible section without changing accepted en
   await act(async () => summary.click());
   expect(details!.open).toBe(true);
   await click(translate('gallery.recordingRecovery.recover'));
-  expect(mocks.recover).toHaveBeenCalledWith(entry);
+  expect(mocks.recover).toHaveBeenCalledWith(entry, expect.any(Function));
+});
+
+it('shows measured progress for the active row, locks actions, and clears progress on success', async () => {
+  let finish!: (id: string) => void;
+  let progress!: (value: RecordingRecoveryProgress) => void;
+  mocks.recover.mockImplementation((_entry, observer) => {
+    progress = observer;
+    observer({ stage: 'preparing', completed: 0 });
+    return new Promise<string>((resolve) => {
+      finish = resolve;
+    });
+  });
+  await mount();
+  await click(translate('gallery.recordingRecovery.recover'));
+  expect(container.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow')).toBeNull();
+  expect(button(translate('gallery.recordingRecovery.delete')).disabled).toBe(true);
+  await act(async () => progress({ stage: 'validatingVideo', completed: 240 }));
+  expect(container.textContent).toContain(
+    translate('gallery.recordingRecovery.validatingVideoCount').replace('{count}', '240')
+  );
+  await act(async () => progress({ stage: 'publishing', completed: 0 }));
+  expect(container.textContent).toContain(entry.filename);
+  await act(async () => finish('restored'));
+  await act(async () => progress({ stage: 'remuxing', completed: 999 }));
+  expect(container.querySelector('[role=progressbar]')).toBeNull();
+  expect(container.textContent).toBe('');
+});
+
+it('retains source on failure, resets retry progress, and ignores previous observers and unmount', async () => {
+  const observers: ((value: RecordingRecoveryProgress) => void)[] = [];
+  let reject!: (error: Error) => void;
+  mocks.recover.mockImplementation((_entry, observer) => {
+    observers.push(observer);
+    observer({ stage: 'preparing', completed: 0 });
+    return new Promise<string>((_resolve, refuse) => {
+      reject = refuse;
+    });
+  });
+  await mount();
+  await click(translate('gallery.recordingRecovery.recover'));
+  await act(async () => observers[0]!({ stage: 'remuxing', completed: 800 }));
+  await act(async () => reject(new Error('decode')));
+  expect(container.querySelector('[role=progressbar]')).toBeNull();
+  expect(container.querySelector('[role=alert]')).not.toBeNull();
+  await click(translate('gallery.recordingRecovery.recover'));
+  await act(async () => observers[0]!({ stage: 'validatingVideo', completed: 999 }));
+  expect(container.querySelector('[role=progressbar]')?.getAttribute('aria-label')).toBe(
+    translate('gallery.recordingRecovery.preparing')
+  );
+  await act(async () => root.unmount());
+  await act(async () => observers[1]!({ stage: 'validatingAudio', completed: 100 }));
+  await act(async () => reject(new Error('read')));
+  root = createRoot(container);
 });

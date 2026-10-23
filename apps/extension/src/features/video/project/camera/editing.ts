@@ -1,7 +1,14 @@
-import { isCameraAppearance } from './appearance';
+import { isCameraHiddenRange, MAX_CAMERA_HIDDEN_RANGES } from './visibility';
+import {
+  isCameraAppearance,
+  isCameraCrop,
+  DEFAULT_CAMERA_APPEARANCE,
+  type CameraCrop,
+} from './appearance';
 import { applyVideoProjectClipsPatch } from '../mutation';
 import type { VideoProject, VideoProjectVideoClip } from '../types';
 import {
+  effectiveCameraTransitionDuration,
   activeCameraPosition,
   cameraSourceTime,
   canAddCameraPosition,
@@ -25,8 +32,48 @@ export function editCameraPosition(
     )
   )
     return project;
+  if (edit.kind === 'offset') {
+    const timing = clip.cameraTiming;
+    if (
+      !timing ||
+      !Number.isFinite(edit.offsetSeconds) ||
+      Math.abs(edit.offsetSeconds) > 86400 ||
+      timing.offsetSeconds === edit.offsetSeconds
+    )
+      return project;
+    return applyVideoProjectClipsPatch(
+      project,
+      project.clips.map((item) =>
+        item.id === clipId
+          ? { ...clip, cameraTiming: { ...timing, offsetSeconds: edit.offsetSeconds } }
+          : item
+      )
+    );
+  }
+  if (edit.kind === 'mirror') {
+    if (typeof edit.mirrored !== 'boolean' || (clip.cameraMirrored ?? false) === edit.mirrored)
+      return project;
+    return applyVideoProjectClipsPatch(
+      project,
+      project.clips.map((item) =>
+        item.id === clipId ? { ...clip, cameraMirrored: edit.mirrored } : item
+      )
+    );
+  }
+  if (edit.kind === 'crop') return editCameraCrop(project, clip, time, edit.crop);
+  if (edit.kind === 'hide' || edit.kind === 'show')
+    return editCameraVisibility(project, clip, edit);
   if (edit.kind === 'appearance') {
     if (!isCameraAppearance(edit.appearance)) return project;
+    const current = clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
+    if (
+      current.shape === edit.appearance.shape &&
+      current.roundness === edit.appearance.roundness &&
+      current.zoom === edit.appearance.zoom &&
+      current.panX === edit.appearance.panX &&
+      current.panY === edit.appearance.panY
+    )
+      return project;
     return applyVideoProjectClipsPatch(
       project,
       project.clips.map((item) =>
@@ -38,6 +85,7 @@ export function editCameraPosition(
   if (edit.kind === 'add') {
     if (!canAddCameraPosition(project, clipId, time)) return project;
     const visual = resolveCameraClip(clip, time);
+    const crop = visual.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
     const duration =
       Math.max(0, Math.min(0.5, clip.startTime + clip.duration - 1 / project.fps - time)) *
       (clip.playbackRate ?? 1);
@@ -45,6 +93,9 @@ export function editCameraPosition(
       ...positions,
       {
         id: crypto.randomUUID(),
+        ...(positions.some((position) => position.crop !== undefined)
+          ? { crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY } }
+          : {}),
         sourceTime: cameraSourceTime(clip, time),
         transform: { ...visual.transform },
         fitMode: visual.fitMode,
@@ -85,8 +136,7 @@ export function cameraPositionSeekTime(
   if (!position) return clip.startTime;
   const next = clip.cameraPositions?.find((item) => item.sourceTime > position.sourceTime);
   const end = Math.min(
-    position.sourceTime +
-      (position.transition.kind === 'instant' ? 0 : position.transition.duration),
+    position.sourceTime + effectiveCameraTransitionDuration(clip, position),
     (next?.sourceTime ?? Infinity) - (clip.playbackRate ?? 1) / project.fps
   );
   return Math.max(
@@ -131,11 +181,105 @@ function updatePositionTiming(
             ? {
                 transition: {
                   ...edit.transition,
-                  duration: Math.min(clip.sourceDuration, edit.transition.duration),
+                  duration: Math.min(
+                    clip.cameraTiming ? 86400 : clip.sourceDuration,
+                    edit.transition.duration
+                  ),
                 },
               }
             : {}),
         }
       : item
+  );
+}
+
+function editCameraCrop(
+  project: VideoProject,
+  clip: VideoProjectVideoClip,
+  time: number,
+  crop: CameraCrop | null
+): VideoProject {
+  const position = activeCameraPosition(clip, time);
+  const current = position?.crop ?? clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
+  if (
+    crop === null
+      ? !position?.crop
+      : !isCameraCrop(crop) ||
+        (current.zoom === crop.zoom && current.panX === crop.panX && current.panY === crop.panY)
+  )
+    return project;
+  const acceptedCrop =
+    crop === null ? undefined : { zoom: crop.zoom, panX: crop.panX, panY: crop.panY };
+  const next = position
+    ? {
+        ...clip,
+        cameraPositions:
+          clip.cameraPositions?.map((item) => {
+            if (item.id !== position.id) return item;
+            const changed = { ...item };
+            if (acceptedCrop === undefined) delete changed.crop;
+            else changed.crop = acceptedCrop;
+            return changed;
+          }) ?? [],
+      }
+    : {
+        ...clip,
+        cameraAppearance: {
+          ...(clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE),
+          ...acceptedCrop,
+        },
+      };
+  return applyVideoProjectClipsPatch(
+    project,
+    project.clips.map((item) => (item.id === clip.id ? next : item))
+  );
+}
+
+function editCameraVisibility(
+  project: VideoProject,
+  clip: VideoProjectVideoClip,
+  edit: Extract<CameraPositionEdit, { kind: 'hide' | 'show' }>
+): VideoProject {
+  const ranges = clip.cameraHiddenRanges ?? [];
+  let next: VideoProjectVideoClip;
+  if (edit.kind === 'show') {
+    if (!ranges.some((range) => range.id === edit.id)) return project;
+    const remaining = ranges.filter((range) => range.id !== edit.id);
+    next = { ...clip };
+    if (remaining.length) next.cameraHiddenRanges = remaining;
+    else delete next.cameraHiddenRanges;
+  } else {
+    const current =
+      edit.id === undefined ? undefined : ranges.find((range) => range.id === edit.id);
+    const duration = Math.max(
+      project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
+        clip.sourceStart + clip.sourceDuration,
+      clip.cameraTiming ? clip.sourceStart + clip.sourceDuration : 0,
+      ranges.at(-1)?.end ?? 0
+    );
+    if (
+      (edit.id !== undefined && !current) ||
+      !isCameraHiddenRange({ id: edit.id ?? 'candidate', start: edit.start, end: edit.end }) ||
+      edit.end > duration ||
+      (!current && ranges.length >= MAX_CAMERA_HIDDEN_RANGES) ||
+      ranges.some(
+        (range) => range.id !== current?.id && range.start < edit.end && range.end > edit.start
+      )
+    )
+      return project;
+    if (current?.start === edit.start && current.end === edit.end) return project;
+    const id = current?.id ?? crypto.randomUUID();
+    if (!current && ranges.some((range) => range.id === id)) return project;
+    next = {
+      ...clip,
+      cameraHiddenRanges: [
+        ...ranges.filter((range) => range.id !== current?.id),
+        { id, start: edit.start, end: edit.end },
+      ].sort((a, b) => a.start - b.start),
+    };
+  }
+  return applyVideoProjectClipsPatch(
+    project,
+    project.clips.map((item) => (item.id === clip.id ? next : item))
   );
 }

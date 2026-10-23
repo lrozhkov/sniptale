@@ -1,9 +1,6 @@
+import { parseSourceAudioGainRanges } from '../../audio/source-envelope';
 import { describe, expect, it } from 'vitest';
-import {
-  canPlaceOriginalAudioRange,
-  originalAudioGainAt,
-  parseOriginalAudioRanges,
-} from './original-audio';
+import { canPlaceOriginalAudioRange, originalAudioGainAt } from './original-audio';
 import { createQuickEditAdvancedState } from './defaults';
 import { loadQuickEditAdvancedState } from './validation';
 import { resolveQuickEditExportPlan } from './effective';
@@ -33,14 +30,16 @@ describe('source audio automation', () => {
     expect(originalAudioGainAt({ ...original, muted: true }, 4)).toBe(0);
   });
   it('rejects corrupt/overlapping ranges but accepts adjacent ranges and preserves parse roundtrip', () => {
-    expect(parseOriginalAudioRanges([range, { ...range, id: 'other' }])).toBeNull();
+    expect(parseSourceAudioGainRanges([range, { ...range, id: 'other' }])).toBeNull();
     for (const volume of [-1, 3, NaN, Infinity])
-      expect(parseOriginalAudioRanges([{ ...range, volume }])).toBeNull();
+      expect(parseSourceAudioGainRanges([{ ...range, volume }])).toBeNull();
     expect(
-      parseOriginalAudioRanges(Array.from({ length: 513 }, (_, i) => ({ ...range, id: String(i) })))
+      parseSourceAudioGainRanges(
+        Array.from({ length: 513 }, (_, i) => ({ ...range, id: String(i) }))
+      )
     ).toBeNull();
     const ranges = [range, { ...range, id: 'next', start: 8, end: 9, volume: 0 }];
-    expect(parseOriginalAudioRanges(ranges)).toEqual(ranges);
+    expect(parseSourceAudioGainRanges(ranges)).toEqual(ranges);
     const state = createQuickEditAdvancedState();
     state.audio.original.ranges = ranges;
     expect(loadQuickEditAdvancedState(state)).toEqual(state);

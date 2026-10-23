@@ -9,6 +9,7 @@
   --sniptale-font-weight-interface: 400;
   --sniptale-font-weight-interface-heading: 500;
   --sniptale-font-weight-interface-emphasis: 500;
+  --sniptale-interface-label-ink-strength: 100%;
   --sniptale-control-font-weight: var(--sniptale-font-weight-interface);
   --sniptale-control-font-weight-hover: 450;
   --sniptale-control-font-weight-active: var(--sniptale-font-weight-interface-emphasis);
@@ -180,6 +181,13 @@
 
 :host([data-theme='light']) {
   color-scheme: light;
+}
+
+[data-ui-platform='windows'][data-theme='dark'],
+[data-ui-platform='windows'] [data-theme='dark'],
+:host([data-ui-platform='windows'][data-theme='dark']),
+:host([data-ui-platform='windows']) [data-theme='dark'] {
+  --sniptale-interface-label-ink-strength: 82%;
 }
 
 @media (prefers-reduced-motion: reduce) {

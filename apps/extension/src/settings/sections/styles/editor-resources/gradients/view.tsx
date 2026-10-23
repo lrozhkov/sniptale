@@ -45,7 +45,7 @@ export function GradientPresetsSettings() {
         onMove={(intent: SettingsCollectionMoveIntent) => {
           const ids = movePresetOrder(resources.presets, intent);
           if (!ids) return;
-          void resources.actions.onReorder(ids);
+          return resources.actions.onReorder(ids);
         }}
         state={resources.presets.length > 0 ? 'ready' : 'loading'}
       />

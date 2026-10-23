@@ -56,6 +56,7 @@ it('enters PREPARING state for a new start', () => {
     captureSource: null,
     cropRegion: null,
     viewportPresetId: 'wide',
+    outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
     liveMedia: expect.any(Object),
     error: null,
   });

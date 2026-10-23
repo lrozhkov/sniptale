@@ -3,7 +3,7 @@ import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { InspectorLayout, InspectorParameterRow } from './layout';
+import { InspectorLayout, InspectorParameterRow, InspectorSurface } from './layout';
 import { CheckboxField, ColorField, SelectField, ToggleField } from './controls';
 import { TextField } from './text-field';
 import { NumericRow } from './numeric';
@@ -22,6 +22,27 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+});
+
+it('owns canonical inspector styling and switches focus paint without replacing native focus', () => {
+  act(() =>
+    root.render(
+      <InspectorSurface aria-label="Cursor settings">
+        <ToggleField label="Enabled" value={false} onChange={vi.fn()} />
+      </InspectorSurface>
+    )
+  );
+  const surface = host.querySelector<HTMLElement>('.sniptale-inspector-surface')!;
+  const button = surface.querySelector<HTMLButtonElement>('button')!;
+  expect(surface.classList.contains('sniptale-compact-workspace')).toBe(true);
+  expect(surface.dataset['focusModality']).toBe('pointer');
+  act(() => button.focus());
+  act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+  expect(surface.dataset['focusModality']).toBe('keyboard');
+  act(() => button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  expect(surface.dataset['focusModality']).toBe('pointer');
+  expect(document.activeElement).toBe(button);
+  expect(surface.querySelector('.sniptale-parameter-row')).not.toBeNull();
 });
 
 it('keeps color names and padding inert while its value edits and selects all text', () => {
@@ -412,4 +433,65 @@ it('presents a scoped static value without an editable or disabled control', () 
   expect(row?.querySelector('[title]')?.textContent).toBe('Selected object');
   expect(row?.querySelector('.sniptale-parameter-value')?.textContent).toBe(value);
   expect(row?.querySelector('input,textarea,button,[aria-disabled]')).toBeNull();
+});
+
+it('defers a blurred row resize until the command press ends', async () => {
+  let width = 140;
+  let held = false;
+  let frame: FrameRequestCallback | undefined;
+  const query = document.querySelector.bind(document);
+  const selector = vi
+    .spyOn(document, 'querySelector')
+    .mockImplementation((value) =>
+      value === ':active' ? (held ? document.body : null) : query(value)
+    );
+  const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frame = callback;
+    return 1;
+  });
+  const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  const metric = vi
+    .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+    .mockImplementation(() => width);
+  const canvas = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null);
+  // The layout owner needs only font assignment and text advance from this browser boundary.
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: () => ({ font: '', measureText: (text: string) => ({ width: text.length * 8 }) }),
+  });
+  try {
+    act(() =>
+      root.render(
+        <>
+          <InspectorParameterRow label="Title">
+            <input />
+          </InspectorParameterRow>
+          <button>None</button>
+        </>
+      )
+    );
+    const row = host.querySelector<HTMLElement>('.sniptale-parameter-row')!;
+    const input = host.querySelector('input')!;
+    expect(row.dataset['layout']).toBe('stacked');
+    act(() => input.focus());
+    width = 500;
+    held = true;
+    await act(async () => {
+      host.querySelector('button')!.focus();
+      await Promise.resolve();
+    });
+    expect(row.dataset['layout']).toBe('stacked');
+    expect(frame).toBeDefined();
+    act(() => frame!(0));
+    expect(row.dataset['layout']).toBe('stacked');
+    held = false;
+    act(() => frame!(1));
+    expect(row.dataset['layout']).toBe('inline');
+  } finally {
+    canvas.mockRestore();
+    metric.mockRestore();
+    selector.mockRestore();
+    request.mockRestore();
+    cancel.mockRestore();
+  }
 });

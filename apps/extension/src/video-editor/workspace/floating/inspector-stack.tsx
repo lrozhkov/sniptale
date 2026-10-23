@@ -1,10 +1,16 @@
-import { List, PanelLeft } from 'lucide-react';
+import { RecordingDiscardConfirmation } from '../../../composition/audio-recording/dialog/dismissal';
+import { useVideoProjectTextVoice } from '../../runtime/session/text-voice';
+import { useVideoProjectTextRewrite } from '../../runtime/session/text-rewrite';
+import { ExportSettingsPanel } from '../../export/dialog';
+import { useVideoProjectRecognition } from '../../runtime/session/recognition';
+import { FileOutput, List, PanelLeft } from 'lucide-react';
 import { WorkspacePanelButton, WorkspacePanelHeader } from './panel-header';
 import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
 import { WorkspacePanelCloseButton } from './index';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import {
   useVideoEditorSidebarController,
+  useVideoEditorOverlaysController,
   useWorkspaceLayoutContext,
 } from '../../runtime/controller/composition/hooks';
 import { getWorkspaceSidebarProps } from '../surface/sidebar-props';
@@ -37,6 +43,7 @@ export function VideoEditorFloatingInspectorStack({
   resize,
 }: VideoEditorInspectorStackProps) {
   const controller = useVideoEditorSidebarController();
+  const { exportDialog } = useVideoEditorOverlaysController();
   const layout = useWorkspaceLayoutContext();
   if (!controller) return null;
 
@@ -44,6 +51,7 @@ export function VideoEditorFloatingInspectorStack({
     <VideoEditorFloatingInspectorContent
       onClose={onClose}
       controller={controller}
+      exportDialog={exportDialog}
       leftSidebarCollapsed={layout.leftSidebarCollapsed}
       resize={resize}
       fullHeight={fullHeight}
@@ -58,11 +66,13 @@ type VideoEditorFloatingInspectorContentProps = {
   onToggleFullHeight?: () => void;
   controller: NonNullable<ReturnType<typeof useVideoEditorSidebarController>>;
   leftSidebarCollapsed: boolean;
+  exportDialog: ReturnType<typeof useVideoEditorOverlaysController>['exportDialog'];
   resize: WorkspacePanelResize;
 };
 
 function VideoEditorFloatingInspectorContent({
   controller,
+  exportDialog,
   onClose,
   fullHeight,
   onToggleFullHeight,
@@ -70,6 +80,12 @@ function VideoEditorFloatingInspectorContent({
   resize,
 }: VideoEditorFloatingInspectorContentProps) {
   const sidebarProps = getWorkspaceSidebarProps(controller);
+  const recognition = useVideoProjectRecognition(sidebarProps.project);
+  const textRewrite = useVideoProjectTextRewrite(sidebarProps.project);
+  const textVoice = useVideoProjectTextVoice(
+    sidebarProps.project,
+    !leftSidebarCollapsed && !exportDialog.isOpen
+  );
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
     sidebarProps.selectedClip,
@@ -77,12 +93,19 @@ function VideoEditorFloatingInspectorContent({
     sidebarProps.project
   );
 
-  if (leftSidebarCollapsed) {
-    return null;
-  }
+  const exportSettings =
+    exportDialog.isOpen && exportDialog.settings && exportDialog.sourceDimensions
+      ? { settings: exportDialog.settings, sourceDimensions: exportDialog.sourceDimensions }
+      : null;
+
+  const recordingConfirmation = (
+    <RecordingDiscardConfirmation portal value={textVoice.recording.confirmation} />
+  );
+  if (leftSidebarCollapsed) return recordingConfirmation;
 
   return (
     <>
+      {recordingConfirmation}
       <WorkspacePanelResizeHandle
         resize={resize}
         label={translate('videoEditor.sidebar.resizeInspector')}
@@ -96,7 +119,7 @@ function VideoEditorFloatingInspectorContent({
         <WorkspacePanelHeader
           actions={
             <>
-              <InspectorPresentationToggle />
+              {!exportSettings ? <InspectorPresentationToggle /> : null}
               {onToggleFullHeight && (
                 <WorkspacePanelDockToggle
                   fullHeight={fullHeight}
@@ -105,28 +128,64 @@ function VideoEditorFloatingInspectorContent({
                 />
               )}
               <WorkspacePanelCloseButton
-                onClose={onClose}
+                onClose={() => {
+                  if (exportSettings) exportDialog.onClose();
+                  onClose();
+                }}
                 dataUi="video-editor.inspector.close"
                 title={translate('videoEditor.app.collapseInspector')}
               />
             </>
           }
         >
-          <WorkspaceSidebarHeader
-            inspectorMode={sidebarProps.inspectorMode}
-            selectionIcon={sidebarState.selectionIcon}
-            selectionTitle={sidebarState.selectionTitle}
-            selectedTrack={sidebarProps.selectedTrack}
-          />
+          {exportSettings ? (
+            <span
+              className={[
+                'inline-flex items-center gap-2 text-sm font-medium',
+                'text-[var(--sniptale-color-text-primary)]',
+              ].join(' ')}
+            >
+              <FileOutput size={16} aria-hidden="true" />
+              {translate('videoEditor.exportDialog.title')}
+            </span>
+          ) : (
+            <WorkspaceSidebarHeader
+              inspectorMode={sidebarProps.inspectorMode}
+              selectionIcon={sidebarState.selectionIcon}
+              selectionTitle={sidebarState.selectionTitle}
+              selectedTrack={sidebarProps.selectedTrack}
+            />
+          )}
         </WorkspacePanelHeader>
-        <WorkspaceSidebarPanelContent
-          {...sidebarProps}
-          inputRefs={sidebarState.inputRefs}
-          projectsOpen={sidebarState.projectsOpen}
-          recordingsOpen={sidebarState.recordingsOpen}
-          onToggleProjectsOpen={sidebarState.toggleProjectsOpen}
-          onToggleRecordingsOpen={sidebarState.toggleRecordingsOpen}
-        />
+        <div
+          hidden={Boolean(exportSettings)}
+          inert={Boolean(exportSettings)}
+          className={exportSettings ? 'hidden' : 'flex min-h-0 flex-1 flex-col overflow-hidden'}
+        >
+          <WorkspaceSidebarPanelContent
+            {...sidebarProps}
+            recognition={recognition}
+            textRewrite={textRewrite}
+            textVoice={textVoice}
+            inputRefs={sidebarState.inputRefs}
+            projectsOpen={sidebarState.projectsOpen}
+            recordingsOpen={sidebarState.recordingsOpen}
+            onToggleProjectsOpen={sidebarState.toggleProjectsOpen}
+            onToggleRecordingsOpen={sidebarState.toggleRecordingsOpen}
+          />
+        </div>
+        {exportSettings ? (
+          <ExportSettingsPanel
+            estimateContext={exportDialog.estimateContext}
+            settings={exportSettings.settings}
+            sourceDimensions={exportSettings.sourceDimensions}
+            selectedClipAvailable={exportDialog.selectedClipId != null}
+            selectedRangeAvailable={exportDialog.selectedRangeAvailable ?? false}
+            onClose={exportDialog.onClose}
+            onChange={exportDialog.onChange}
+            onExport={exportDialog.onExport}
+          />
+        ) : null}
       </FloatingChromePanel>
     </>
   );

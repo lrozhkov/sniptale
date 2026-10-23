@@ -169,6 +169,16 @@ async function verifyAutoStartContextBranch() {
 }
 
 describe('screenshot-controller-action-capture', () => {
+  it('ignores a queued popup start after explicit Close invalidates its generation', async () => {
+    const { args } = createArgs();
+    args.runtime.session.runGeneration = 2;
+    const staleContext = { navigationLockBaseline: false, runGeneration: 1 };
+    await createHandleTakeScreenshot(args)('visible', undefined, staleContext);
+    expect(syncCaptureActionMock).not.toHaveBeenCalled();
+    expect(prepareScreenshotModeMock).not.toHaveBeenCalled();
+    expect(runImmediateScreenshotMock).not.toHaveBeenCalled();
+    expect(startCountdownMock).not.toHaveBeenCalled();
+  });
   it(
     'starts countdown instead of immediate capture when timerDelay is configured',
     verifyCountdownStartBranch

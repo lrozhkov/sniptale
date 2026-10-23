@@ -4,6 +4,30 @@ import { appendDrawingSample, appendDrawingSamples, buildDrawingStrokeOutline } 
 import { createDefaultDrawingToolDefaults } from './model';
 import { createDrawingSession, type DrawingDocumentCommit } from './session';
 
+it('preserves selection and document if a commit without automatic selection is refused', () => {
+  let accepted = true;
+  const session = createDrawingSession({
+    autoSelectCreatedObjects: false,
+    onDocumentCommit: () => accepted,
+  });
+  const object = {
+    id: 'old',
+    kind: 'blur' as const,
+    bounds: { x: 0, y: 0, width: 20, height: 20 },
+  };
+  session.commitObject(object);
+  expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+  session.setActiveTool('select');
+  session.select(object.id);
+  accepted = false;
+  session.commitObject({ ...object, id: 'refused' }, { select: true });
+  expect(session.getSnapshot()).toMatchObject({
+    selectedObjectIds: [object.id],
+    document: { objects: [object] },
+  });
+  session.dispose();
+});
+
 describe('drawing session', () => {
   it('keeps the drawing tool active while selecting a newly committed object', () => {
     const session = createDrawingSession({ onDocumentCommit: () => true });

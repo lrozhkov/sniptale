@@ -29,9 +29,8 @@ function fixtureProject() {
       targetRect: null,
       label: 'Hotspot proof',
       text: 'Hotspot explanation',
-      action: { kind: 'none' },
       appearance: null,
-      pulse: false,
+      visual: { kind: 'point' as const, pulse: false },
     },
   ];
   slide.annotations = [

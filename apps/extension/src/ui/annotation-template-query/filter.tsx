@@ -9,15 +9,15 @@ import { translate } from '../../platform/i18n';
 import { FloatingFilterMenu, useFloatingFilterMenu } from './floating-filter-menu';
 
 const FILTER_TRIGGER_BASE_CLASS_NAME = [
-  'inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg',
+  'inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-[4px]',
   'border px-2 text-xs transition-colors',
   'focus-visible:outline-none focus-visible:ring-2',
   'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
 const FILTER_TRIGGER_ACTIVE_CLASS_NAME = [
-  'border-[var(--sniptale-color-border-accent-strong)]',
-  'bg-[var(--sniptale-color-accent-soft)]',
-  'text-[var(--sniptale-color-accent-emphasis)]',
+  'border-[var(--sniptale-color-border-strong)]',
+  'bg-[var(--sniptale-color-surface-hover)]',
+  'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const FILTER_TRIGGER_IDLE_CLASS_NAME = [
   'border-[var(--sniptale-color-border-soft)]',
@@ -50,7 +50,7 @@ export function AnnotationTemplateQueryControls(props: {
     <div className="flex items-center gap-2" data-ui="shared.annotation-template-query.controls">
       <label
         className={[
-          'flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border px-2.5',
+          'flex h-8 min-w-0 flex-1 items-center gap-2 rounded-[4px] border px-2.5',
           'border-[var(--sniptale-color-border-soft)]',
           'bg-[var(--sniptale-color-surface-input)]',
         ].join(' ')}

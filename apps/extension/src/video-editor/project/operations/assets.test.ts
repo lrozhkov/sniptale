@@ -1,3 +1,4 @@
+import type { LibraryProjectBinding } from '../../../composition/persistence/projects/known-library-source';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { translate } from '../../../platform/i18n';
@@ -20,6 +21,7 @@ const publishLibraryProjectBindingMock = vi.fn();
 vi.mock('../../../composition/persistence/projects/library-project-binding', () => ({
   readLibraryProjectBindingSource: readLibraryProjectBindingSourceMock,
   prepareLibraryProjectBinding: prepareLibraryProjectBindingMock,
+  prepareLibraryProjectBindingForCommit: (source: unknown, id: string) => ({ source, id }),
 }));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
@@ -780,4 +782,30 @@ it('creates no ready claim when decoding a known recording fails', async () => {
   );
   expect(prepareLibraryProjectBindingMock).not.toHaveBeenCalled();
   expect(saveProjectAssetSafelyMock).not.toHaveBeenCalled();
+});
+
+it('keeps a transfer export binding unpublished until its destination commit', async () => {
+  const file = createWebmFile();
+  getMediaLibraryEntryMock.mockResolvedValue({
+    id: 'export',
+    kind: 'export',
+    mimeType: file.type,
+    source: { kind: 'project-export', exportId: 'one', projectId: 'origin' },
+  });
+  readLibraryProjectBindingSourceMock.mockResolvedValue({
+    mediaId: 'export',
+    file,
+    filename: file.name,
+  });
+  const pendingBindings: LibraryProjectBinding[] = [];
+  const { ensureLibraryMediaAssets } = await import('./assets');
+  const assets = await ensureLibraryMediaAssets(
+    createEmptyVideoProject(),
+    'export',
+    pendingBindings
+  );
+  expect(assets).toHaveLength(1);
+  expect(publishLibraryProjectBindingMock).not.toHaveBeenCalled();
+  expect(prepareLibraryProjectBindingMock).not.toHaveBeenCalled();
+  expect(pendingBindings).toHaveLength(1);
 });

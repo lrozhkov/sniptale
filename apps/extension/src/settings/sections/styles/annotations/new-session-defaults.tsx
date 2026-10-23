@@ -2,6 +2,7 @@ import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/high
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { SettingsControlRow } from '../../../section-surface';
 import { SettingsSwitch } from '../../../section-surface/panel-controls';
+import { settingsPendingControlClassName } from '../../../section-surface/classes';
 
 export function AnnotationNewSessionDefaults(props: {
   copy: {
@@ -16,6 +17,7 @@ export function AnnotationNewSessionDefaults(props: {
   };
   defaults: AnnotationSessionDefaults;
   disabled: boolean;
+  pending?: boolean;
   onEnabledChange: (enabled: boolean) => void;
   onTemplateSourceChange: (source: AnnotationSessionDefaults['templateSource']) => void;
 }) {
@@ -23,26 +25,21 @@ export function AnnotationNewSessionDefaults(props: {
     <section className="mb-3 space-y-1 border-b border-[var(--sniptale-color-border-subtle)] pb-3">
       <div className="mb-1">
         <h2 className="text-[14px] leading-5 font-semibold">{props.copy.sectionTitle}</h2>
-        <p className="mt-1 text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
-          {props.copy.sectionDescription}
-        </p>
       </div>
-      <SettingsControlRow
-        label={props.copy.enabledLabel}
-        description={props.copy.enabledDescription}
-        valueClassName="flex justify-end"
-      >
+      <SettingsControlRow label={props.copy.enabledLabel} valueClassName="flex justify-end">
         <SettingsSwitch
           aria-label={props.copy.enabledLabel}
           checked={props.defaults.enabled}
           disabled={props.disabled}
+          className={props.pending ? settingsPendingControlClassName : undefined}
           onClick={() => props.onEnabledChange(!props.defaults.enabled)}
         />
       </SettingsControlRow>
-      <SettingsControlRow label={props.copy.sourceLabel} description={props.copy.sourceDescription}>
+      <SettingsControlRow label={props.copy.sourceLabel}>
         <ProductSelect<AnnotationSessionDefaults['templateSource']>
           aria-label={props.copy.sourceLabel}
           disabled={props.disabled}
+          className={props.pending ? settingsPendingControlClassName : undefined}
           onChange={props.onTemplateSourceChange}
           options={[
             { label: props.copy.frameTemplate, value: 'frame-default' },

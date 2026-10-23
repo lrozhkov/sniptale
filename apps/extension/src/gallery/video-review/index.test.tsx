@@ -12,12 +12,15 @@ import type { useReviewEditorState } from './use-editor-state';
 import type { ReviewHistoryControls } from './timeline-chrome';
 import type { ReviewTimelineBinding } from './timeline-binding';
 import { VideoReview } from './index';
+import { inspectReviewMedia } from '../../workflows/video-review/media-index';
+import type { usePresentationPreview } from './use-presentation-preview';
 
 const observed: {
+  preview: Parameters<typeof usePresentationPreview>[0];
   loaded: LoadedReview | null;
   state: ReturnType<typeof useReviewEditorState> | null;
   history: ComponentProps<typeof ReviewHistoryControls> | null;
-} = vi.hoisted(() => ({ loaded: null, state: null, history: null }));
+} = vi.hoisted(() => ({ preview: null, loaded: null, state: null, history: null }));
 vi.mock('./use-session', async (original) => ({
   ...(await original<typeof import('./use-session')>()),
   useLoadedReview: () => ({ resource: observed.loaded, failed: null, retry: vi.fn() }),
@@ -39,6 +42,16 @@ vi.mock('../../workflows/video-review/media-index', async (original) => ({
     throw new Error('Synthetic media fixture');
   }),
 }));
+vi.mock('./use-presentation-preview', async (original) => {
+  const actual = await original<typeof import('./use-presentation-preview')>();
+  return {
+    ...actual,
+    usePresentationPreview(...args: Parameters<typeof usePresentationPreview>) {
+      observed.preview = args[0];
+      return actual.usePresentationPreview(...args);
+    },
+  };
+});
 vi.mock('./review-dialog', () => ({
   ReviewDialog: ({ children }: { children: ReactNode }) => children,
 }));
@@ -184,6 +197,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   await loaded.session.dispose();
+  observed.preview = null;
   observed.loaded = null;
   observed.state = null;
   observed.history = null;
@@ -230,4 +244,28 @@ it('preserves the disposable text and storage recovery state when the actual roo
   expect(state().annotationEffects.previewLane?.instances[0]?.controls['title']).toBe(
     'Persisted title'
   );
+});
+
+it('passes the coherent EffectV1 snapshots into the Gallery presentation preview', async () => {
+  setup();
+  vi.mocked(inspectReviewMedia).mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 4],
+    videoCodec: 'vp9',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+    frameRate: 30,
+    width: 640,
+    height: 360,
+  });
+  await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={vi.fn()} />));
+  await act(async () => {
+    await vi.waitFor(() => expect(state().editing.exporter.index).not.toBeNull());
+  });
+  expect(observed.preview).not.toBeNull();
+  expect(observed.preview?.effectSnapshots).toBe(
+    state().snapshot.snapshot.workspace.effectSnapshots
+  );
+  expect(observed.preview?.effectSnapshots?.[0]?.documentId).toBe('sniptale-title');
 });

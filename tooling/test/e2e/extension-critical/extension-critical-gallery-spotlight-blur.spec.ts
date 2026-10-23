@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { readFile, writeFile } from 'node:fs/promises';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
@@ -19,7 +20,7 @@ test('Spotlight export blur suppresses detail uniformly at canvas edges', async 
     format: 'esm',
     platform: 'browser',
     write: false,
-    loader: { '.svg': 'text' },
+    loader: { '.svg': 'text', '.woff2': 'dataurl' },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const samples = await page.evaluate(async (text) => {
@@ -68,19 +69,22 @@ test('quick editor exports a small left-edge blur with browser header and shadow
     };
     await button('gallery.videoReview.advancedEditing').click();
     await button('gallery.videoReview.scene').click();
-    await button('gallery.videoReview.windowHeader').click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.windowHeaderBrowser'), exact: true })
-      .click();
+    await button('gallery.videoReview.windowHeaderBrowser').click();
+    await expect(button('gallery.videoReview.windowHeaderBrowser')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     await button('gallery.videoReview.backgroundSolid').click();
     await number('gallery.videoReview.backgroundPadding', '8');
     await number('gallery.videoReview.backgroundShadow', '80');
     await addReviewFocus(page);
     await button('gallery.videoReview.focusSpotlight').click();
-    await button('gallery.videoReview.focusOutside').click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.focusBlur'), exact: true })
-      .click();
+    await chooseInspectorValue(
+      page,
+      dialog,
+      label('gallery.videoReview.focusOutside'),
+      label('gallery.videoReview.focusBlur')
+    );
     await dialog
       .getByRole('heading', { name: label('gallery.videoReview.preciseArea'), exact: true })
       .click();

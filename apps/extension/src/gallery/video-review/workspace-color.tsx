@@ -7,7 +7,8 @@ import type { QuickEditUiState } from '../../features/video/review/advanced/type
 export function useReviewWorkspaceColor(
   container: RefObject<HTMLDivElement | null>,
   colors: QuickEditUiState['workspaceColors'],
-  change: (theme: 'light' | 'dark', color: string | null) => void
+  change: (theme: 'light' | 'dark', color: string | null) => void,
+  ready = true
 ) {
   const theme = useResolvedPortalTheme(container.current);
   const saved = theme ? colors?.[theme] : undefined;
@@ -18,6 +19,7 @@ export function useReviewWorkspaceColor(
     color: string;
   } | null>(null);
   useLayoutEffect(() => {
+    if (!ready) return;
     const node = container.current;
     setAutomatic(
       node
@@ -27,7 +29,7 @@ export function useReviewWorkspaceColor(
         : null
     );
     setPreview(null);
-  }, [container, theme]);
+  }, [container, theme, ready]);
   const style: CSSProperties & { '--sniptale-review-workspace-color'?: string | undefined } = {
     '--sniptale-review-workspace-color':
       preview?.theme === theme && preview.base === saved ? preview.color : saved,

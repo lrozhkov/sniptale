@@ -34,6 +34,7 @@ function createToolbarLeadingControlsProps({
   historyVisible,
   hasHistory,
   canAddMotionRegion,
+  canDuplicateSelection,
   canDeleteSelectedClip,
   canEditSelectedClip,
   insertion,
@@ -49,6 +50,7 @@ function createToolbarLeadingControlsProps({
   | 'historyVisible'
   | 'hasHistory'
   | 'canAddMotionRegion'
+  | 'canDuplicateSelection'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
   | 'insertion'
@@ -64,6 +66,7 @@ function createToolbarLeadingControlsProps({
     historyVisible: historyVisible ?? false,
     hasHistory: hasHistory ?? false,
     canAddMotionRegion,
+    canDuplicateSelection,
     canDeleteSelectedClip,
     canEditSelectedClip,
     insertion,

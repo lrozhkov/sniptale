@@ -1,3 +1,7 @@
+import { drawCompositionColorOverlay } from '../../features/video/composition/canvas/scene-edges';
+import { createCompositionJoinEndpoints } from '../../features/video/composition/canvas/join-endpoints';
+import { evaluateCompositionJoin } from '../../features/video/project/scene/composition-join';
+import { reviewWatermarkAssets } from './asset-bytes';
 import type { InputAudioTrack } from 'mediabunny';
 import type { QuickEditPresentationSettings } from '../../features/video/review/advanced/presentation';
 import {
@@ -17,12 +21,12 @@ import {
   type ReviewPresentationMainInput,
 } from './presentation-main';
 import { createReviewPresentationMedia } from './presentation-media';
-import { createReviewWatermarkRenderer } from './render-watermark';
+import { createWatermarkRenderer } from '../../features/video/composition/canvas/watermark';
 import { createPreviewRenderResources } from './preview-render-resources';
 
 type Main = Awaited<ReturnType<typeof createReviewPresentationMain>>;
 type Media = Awaited<ReturnType<typeof createReviewPresentationMedia>>;
-type Watermark = Awaited<ReturnType<typeof createReviewWatermarkRenderer>>;
+type Watermark = Awaited<ReturnType<typeof createWatermarkRenderer>>;
 
 /** Frozen planner output and the matching main composition snapshot. */
 export interface ReviewPresentationRendererInput {
@@ -110,11 +114,7 @@ class PresentationRenderer {
   private readonly media: Partial<Record<'intro' | 'outro', Media>> = {};
   private watermark: Watermark | null = null;
   private front: RenderCanvasLease | null = null;
-  private endpoints: {
-    join: PresentationJoin;
-    outgoing: RenderCanvasLease;
-    incoming: RenderCanvasLease;
-  } | null = null;
+  private readonly joinEndpoints;
   private disposed = false;
   private busy = false;
 
@@ -126,6 +126,11 @@ class PresentationRenderer {
     this.resources = createPreviewRenderResources({
       maximumCanvases: plan.joins?.length ? 4 : 1,
       maximumManagedBytes: backing.width * backing.height * (plan.joins?.length ? 16 : 4),
+    });
+    this.joinEndpoints = createCompositionJoinEndpoints({
+      resources: this.resources,
+      size: backing,
+      renderSample: (tick) => this.sampleEndpoint(tick),
     });
     this.holdTime = presentationMainHoldTime(plan);
     args.main.signal.addEventListener('abort', this.dispose, { once: true });
@@ -168,11 +173,11 @@ class PresentationRenderer {
     }
     if (Object.keys(this.media).length)
       this.watermark = this.adopt(
-        await createReviewWatermarkRenderer(
+        await createWatermarkRenderer(
           this.args.main.effective.watermark,
           this.args.main.dimensions.canonical,
-          signal,
-          this.args.main.readAsset
+          reviewWatermarkAssets(this.args.main.readAsset),
+          signal
         )
       );
     this.assertLive();
@@ -185,20 +190,14 @@ class PresentationRenderer {
     this.busy = true;
     let output: RenderCanvasLease | undefined;
     try {
-      const join = this.plan.joins?.find(
-        (entry) =>
-          candidate.timestampUs >= entry.seamUs - entry.beforeUs &&
-          candidate.timestampUs < entry.seamUs + entry.afterUs
-      );
-      if (this.endpoints?.join !== join) this.releaseEndpoints();
-      if (join?.type === 'dissolve') output = await this.dissolve(join, candidate.timestampUs);
+      const selected = this.joinAt(candidate.timestampUs);
+      const join = selected?.join;
+      if (join?.type !== 'dissolve') this.joinEndpoints.clear();
+      if (selected?.join.type === 'dissolve')
+        output = await this.dissolve(selected.join, selected.blend.incoming);
       else {
         output = await this.renderContent(candidate);
-        if (join) {
-          const distance = candidate.timestampUs - join.seamUs;
-          const alpha = distance < 0 ? 1 + distance / join.beforeUs : 1 - distance / join.afterUs;
-          this.drawColor(output.context, Math.max(0, Math.min(1, alpha)), join.color);
-        }
+        if (selected) this.drawColor(output.context, selected.blend.black, selected.join.color);
       }
       this.assertLive();
       this.drawFade(output.context, candidate.timestampUs);
@@ -225,6 +224,14 @@ class PresentationRenderer {
     }
   }
 
+  private joinAt(timeUs: number) {
+    for (const join of this.plan.joins ?? []) {
+      const blend = evaluateCompositionJoin(timeUs, join.seamUs, join.beforeUs, join.afterUs);
+      if (blend) return { join, blend };
+    }
+    return null;
+  }
+
   private async renderContent(candidate: PresentationCandidate): Promise<RenderCanvasLease> {
     if (candidate.segment === 'main')
       return this.main!.render(candidate, { heldMainLocalTime: this.holdTime });
@@ -245,7 +252,7 @@ class PresentationRenderer {
     }
   }
 
-  private async endpoint(tick: number, name: string): Promise<RenderCanvasLease> {
+  private async sampleEndpoint(tick: number): Promise<RenderCanvasLease> {
     const candidate = iteratePresentationCandidates(this.plan, {
       startTick: tick,
       endTick: tick + 1,
@@ -253,59 +260,29 @@ class PresentationRenderer {
       [Symbol.iterator]()
       .next();
     if (candidate.done) throw new Error('Missing presentation transition endpoint');
-    const content = await this.renderContent(candidate.value);
-    let copy: RenderCanvasLease | undefined;
-    try {
-      this.assertLive();
-      copy = this.resources.canvas(name, this.args.main.dimensions.backing);
-      copy.context.drawImage(content.canvas, 0, 0);
-      return copy;
-    } catch (error) {
-      copy?.release();
-      throw error;
-    } finally {
-      content.release();
-    }
+    return this.renderContent(candidate.value);
   }
 
-  private async dissolve(join: PresentationJoin, timeUs: number): Promise<RenderCanvasLease> {
-    if (!this.endpoints) {
-      const outgoing = await this.endpoint(join.outgoingTick, 'presentation-join-outgoing');
-      try {
-        const incoming = await this.endpoint(join.incomingTick, 'presentation-join-incoming');
-        this.endpoints = { join, outgoing, incoming };
-      } catch (error) {
-        outgoing.release();
-        throw error;
-      }
-    }
+  private async dissolve(join: PresentationJoin, incoming: number): Promise<RenderCanvasLease> {
     this.assertLive();
     const output = this.resources.canvas('presentation-join', this.args.main.dimensions.backing);
     try {
-      const context = output.context;
-      context.save();
-      try {
-        const incoming = (timeUs - join.seamUs + join.beforeUs) / (join.beforeUs + join.afterUs);
-        context.globalAlpha = 1 - incoming;
-        context.drawImage(this.endpoints.outgoing.canvas, 0, 0);
-        // Add premultiplied contributions so transparent corners also dissolve away.
-        context.globalCompositeOperation = 'lighter';
-        context.globalAlpha = incoming;
-        context.drawImage(this.endpoints.incoming.canvas, 0, 0);
-      } finally {
-        context.restore();
-      }
+      await this.joinEndpoints.draw(
+        output.context,
+        {
+          key: join,
+          outgoingTime: join.outgoingTick,
+          incomingTime: join.incomingTick,
+          incomingWeight: incoming,
+        },
+        this.controller.signal
+      );
+      this.assertLive();
       return output;
     } catch (error) {
       output.release();
       throw error;
     }
-  }
-
-  private releaseEndpoints() {
-    this.endpoints?.outgoing.release();
-    this.endpoints?.incoming.release();
-    this.endpoints = null;
   }
 
   private drawWatermark(context: CanvasRenderingContext2D) {
@@ -335,22 +312,13 @@ class PresentationRenderer {
   }
 
   private drawColor(context: CanvasRenderingContext2D, alpha: number, color: string) {
-    if (alpha === 0) return;
     const { backing } = this.args.main.dimensions;
-    context.save();
-    try {
-      context.setTransform(1, 0, 0, 1, 0, 0);
-      context.globalAlpha = alpha;
-      context.globalCompositeOperation = 'source-over';
-      context.filter = 'none';
-      context.shadowColor = 'transparent';
-      context.shadowBlur = 0;
-      context.shadowOffsetX = context.shadowOffsetY = 0;
-      context.fillStyle = color;
-      context.fillRect(0, 0, backing.width, backing.height);
-    } finally {
-      context.restore();
-    }
+    drawCompositionColorOverlay(context, alpha, color, {
+      x: 0,
+      y: 0,
+      width: backing.width,
+      height: backing.height,
+    });
   }
 
   dispose = () => {
@@ -360,7 +328,7 @@ class PresentationRenderer {
     this.controller.abort();
     this.front?.release();
     this.front = null;
-    this.releaseEndpoints();
+    this.joinEndpoints.dispose();
     for (const owner of this.owned.splice(0).reverse()) owner.dispose();
     this.resources.dispose();
   };

@@ -1,3 +1,10 @@
+import { applyProjectUpdate } from '../state/helpers';
+import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
+import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
+import { createVideoEditorProjectTestStore } from '../state/test-store.test-support';
+import { undoVideoEditorProjectHistory } from '../history';
+import { createAutoProcessingActions } from '../../runtime/controller/workspace/timeline-auto-transform';
+import { isHydratableVideoProject } from '../../../features/video/project/validation/root';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createProject,
@@ -219,6 +226,12 @@ it.each([false, true])(
     expect(off.project).toBe(project);
     const on = await prepareAutoProcessing(project, { ...cameraRequest, camera: true });
     expect(on.status).toBe('ready');
+    expect(on.project?.version).toBe(18);
+    expect(on.project?.motionRegions?.[0]?.phaseTransitions).toEqual({
+      enter: 'ease-in-out',
+      exit: 'ease-in-out',
+    });
+    expect(isHydratableVideoProject(on.project)).toBe(true);
     expect(on.suggestions).toHaveLength(1);
     expect(on.project?.motionRegions?.[0]?.targetAction).toEqual({
       eventId: 'click',
@@ -352,4 +365,78 @@ it('derives nonzero and resumed observation phases before auto processing and fr
     },
   });
   expect(await isAutoProcessingTelemetryCurrent(preview)).toBe(false);
+});
+
+it('preserves a converted auto-camera border when regenerating and applying camera suggestions', async () => {
+  const project = fixture();
+  project.actionEvents = [
+    {
+      id: 'click',
+      kind: 'CLICK',
+      label: 'Click',
+      data: {},
+      point: { x: 0.5, y: 0.5 },
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'rec-asset-video',
+        sourceInstanceId: 'instance',
+        sourceEventId: 'raw',
+        sourceTime: 1,
+      },
+    },
+  ];
+  const cameraRequest = {
+    ...request,
+    camera: true,
+    settings: {
+      ...request.settings,
+      stableSegments: { ...request.settings.stableSegments, action: 'skip' as const },
+    },
+  };
+  const first = await prepareAutoProcessing(project, cameraRequest);
+  expect(first.status).toBe('ready');
+  const generated = first.project!.motionRegions![0]!;
+  const converted = applyVideoProjectMutationPatch(first.project!, {
+    motionRegions: [
+      {
+        ...generated,
+        border: { ...createQuickEditBorder(), style: 'dotted', loop: true, motion: 'pulse' },
+        borderTarget: 'window',
+      },
+    ],
+  });
+  const store = createVideoEditorProjectTestStore();
+  store.getState().setProject(converted);
+  const before = store.getState().project!;
+  const actions = createAutoProcessingActions(
+    {
+      updateProject: (updater) => store.setState((state) => applyProjectUpdate(state, updater)),
+    },
+    () => store.getState().project
+  );
+  const preview = await actions.prepare(cameraRequest);
+  expect(preview.status).toBe('ready');
+  if (preview.status !== 'ready')
+    throw new Error('Expected a new camera suggestion beside the retained border.');
+  expect(preview.project?.motionRegions?.find((region) => region.id === generated.id)).toEqual(
+    before.motionRegions?.[0]
+  );
+  expect(new Set(preview.project!.motionRegions!.map((region) => region.id)).size).toBe(
+    preview.project!.motionRegions!.length
+  );
+  expect(await actions.apply(preview)).toBe('applied');
+  const accepted = store.getState();
+  expect(accepted.project!.motionRegions).toHaveLength(2);
+  expect(accepted.project!.motionRegions!.find((region) => region.id === generated.id)).toEqual(
+    before.motionRegions?.[0]
+  );
+  expect(isHydratableVideoProject(accepted.project)).toBe(true);
+  expect(await actions.apply(preview)).toBe('stale');
+  const undo = undoVideoEditorProjectHistory(accepted.projectHistory, accepted.project!);
+  if (undo?.status !== 'applied')
+    throw new Error('Expected undo of the accepted camera suggestion.');
+  expect(undo.project.motionRegions).toEqual(before.motionRegions);
+  const repeated = await prepareAutoProcessing(accepted.project!, cameraRequest);
+  expect(repeated.status).toBe('unchanged');
+  expect(repeated.project).toBe(accepted.project);
 });

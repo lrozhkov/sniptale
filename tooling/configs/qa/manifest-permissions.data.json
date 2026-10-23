@@ -206,6 +206,17 @@
       "justification": "Bundled fonts preserve content UI rendering. The cursor avoids Windows XOR bitmap loss during tab capture and host CSP rejection of inline images.",
       "reviewNote": "Keep exact resources and dynamic URLs. Keep the cursor self-contained, without scripts, external references, or animation. Expose no injected bundles.",
       "userFacingDisclosure": "settings.permissions.sitesDescription"
+    },
+    {
+      "name": "web_accessible_resources:{\"resources\":[\"apps/extension/src/media-permission/index.html\"],\"matches\":[\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
+      "owner": "apps/extension/src/media-permission/index.html",
+      "feature": "Extension-owned recording device permission request on the current page",
+      "runtimeRoute": "Content mounts the exact permission frame after an explicit microphone or camera action. The private MessageChannel bootstrap targets the canonical extension origin and carries a read-only recording surface request. Chrome shows the native prompt without additional pending UI. Only a failure makes the frame's error card visible.",
+      "capabilityPolicy": "The frame validates the sender-owned recording surface lease through the existing read-only list-media-devices command before requesting the selected device. Mutating commands and unbound child documents remain denied.",
+      "failureBehavior": "Denial, cancellation, host policy restrictions, and invalid authority leave the device disabled without opening another tab or starting a recording. Disposal releases permission tracks and the private port.",
+      "justification": "Requests browser media permission for the extension without navigating away from the user's current page or granting the host site device access.",
+      "reviewNote": "Expose only this exact HTML entry with dynamic URLs on HTTP/HTTPS. Keep source bundles and Settings non-web-accessible. Retain one-time access only for the owning toolbar session until recording acquires its sources or the device is disabled.",
+      "userFacingDisclosure": "content.toolbar.videoRecordingMicrophone"
     }
   ]
 }

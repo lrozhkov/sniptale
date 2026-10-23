@@ -93,6 +93,7 @@ function renderSurface(
       onClearPlaybackRange={vi.fn()}
       onStepToNextFrame={vi.fn()}
       onStepToPreviousFrame={vi.fn()}
+      canDuplicateSelection={false}
       canDeleteSelectedClip={false}
       canEditSelectedClip={false}
       canSplitSelectedClip={false}

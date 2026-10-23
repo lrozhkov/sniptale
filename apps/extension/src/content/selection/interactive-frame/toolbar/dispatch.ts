@@ -56,6 +56,20 @@ export function createSharedToolbarClickHandlers(
   captureVisibilityToggle?: () => void
 ) {
   return {
+    handleToggleStepBadgeClick: (event: ToolbarClickEvent) => {
+      stopToolbarEvent(event);
+      dispatchFrameStepBadgeChanged({
+        frameId: props.frame.id,
+        settings: { enabled: props.frame.stepBadge?.enabled !== true },
+      });
+    },
+    handleToggleCalloutClick: (event: ToolbarClickEvent) => {
+      stopToolbarEvent(event);
+      dispatchFrameCalloutChanged({
+        frameId: props.frame.id,
+        settings: { enabled: props.frame.callout?.enabled !== true },
+      });
+    },
     handleEffectClick:
       (mode: InteractiveFrameToolbarProps['effectMode']) => (event: ToolbarClickEvent) => {
         stopToolbarEvent(event);

@@ -615,3 +615,13 @@ describe('optional GitHub-hosted canonical execution', () => {
     }
   );
 });
+
+it('attests the separately distributed dependency source archive', () => {
+  const finalizer = readWorkflow(FINALIZE);
+  const attestation = finalizer.jobs.finalize.steps?.find((step) =>
+    step.uses?.startsWith('actions/attest@')
+  );
+  expect(attestation?.with?.['subject-path']).toContain(
+    'build/release-proof/release-assets/sniptale-dependency-source-*.zip'
+  );
+});

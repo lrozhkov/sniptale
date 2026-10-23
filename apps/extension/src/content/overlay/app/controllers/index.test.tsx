@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 type ScreenshotControllerMockArgs = {
   editingModes: Record<'disableAiPickMode' | 'disableQuickEditMode', () => void> & {
-    restoreEditingMode: (mode: 'ai-pick' | 'drawing') => void;
+    restoreEditingMode: (mode: 'ai-pick' | 'drawing' | 'quick-edit-document') => void;
   };
 };
 type ToolbarModeControllerMockArgs = { disableAiPickMode: () => void };
@@ -249,6 +249,7 @@ function expectScreenshotControllerArgs(modeState: ReturnType<typeof createModeS
     navigationLockEnabled: true,
     quickActionOverlayRef: modeState.quickActionOverlayRef,
     timerDelay: 5,
+    setCurrentViewport: modeState.setCurrentViewport,
     capturePersistence: {
       sessionActivePresetId: 'preset-1',
       setSaveDialogState: modeState.setSaveDialogState,
@@ -394,6 +395,24 @@ async function expectAiModeRestorationUsesEnableAction() {
   expect(mocks.handleEnableAiPickMode).toHaveBeenCalledOnce();
   expect(mocks.handleAiPickContentStart).not.toHaveBeenCalled();
 }
+
+it('restores QuickEdit document interaction after a suspended selection', async () => {
+  await renderHarness();
+  const handleToggleQuickEditMode = vi.fn();
+  const handleToggleQuickEditDocumentMode = vi.fn();
+  Object.assign(latestControllers!.modeController, {
+    handleToggleQuickEditMode,
+    handleToggleQuickEditDocumentMode,
+  });
+  mocks.useScreenshotController.mock.calls[0]?.[0].editingModes.restoreEditingMode(
+    'quick-edit-document'
+  );
+  expect(handleToggleQuickEditMode).toHaveBeenCalledWith(true);
+  expect(handleToggleQuickEditDocumentMode).toHaveBeenCalledWith(true);
+  expect(handleToggleQuickEditMode.mock.invocationCallOrder[0]).toBeLessThan(
+    handleToggleQuickEditDocumentMode.mock.invocationCallOrder[0]!
+  );
+});
 
 it(
   'groups controller ownership seams from mode-state into canonical controller hooks',

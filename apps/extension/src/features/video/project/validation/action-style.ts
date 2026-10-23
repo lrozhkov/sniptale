@@ -1,4 +1,4 @@
-import type { VideoActionKeyStyle } from '../types';
+import type { VideoActionKeyStyle } from '../types/interaction';
 import { parseColor } from '@sniptale/foundation/color';
 import { isRecord, isColorString, isBoundedNumber, isEnumValue } from './primitives';
 

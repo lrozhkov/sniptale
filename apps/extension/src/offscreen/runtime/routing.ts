@@ -4,6 +4,11 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import { parseOffscreenRuntimeMessage } from '../../contracts/messaging/parsers/boundary';
 import {
+  answerCountdownCameraOffer,
+  closeCountdownCameraPeer,
+  retireCountdownCameraPeers,
+} from '../recording/countdown-preview';
+import {
   disposeMultiSourceDesktopMedia,
   requestDesktopMedia,
 } from '../recording/setup/desktop-media';
@@ -226,12 +231,20 @@ export async function handleOffscreenRuntimeMessage(
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
       return probeOffscreenRuntimeReadiness(message);
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER:
+      if (message.source.kind === 'countdown') {
+        return answerCountdownCameraOffer({
+          binding: message.source,
+          peerId: message.peerId,
+          sdp: message.sdp,
+        });
+      }
       return answerCameraSourceOffer({
         peerId: message.peerId,
         offer: { type: 'offer', sdp: message.sdp },
-        settings: message.settings,
+        settings: message.source.settings,
       });
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE:
+      closeCountdownCameraPeer(message.peerId);
       closeCameraSourcePeer(message.peerId);
       return;
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH:
@@ -290,6 +303,7 @@ export async function handleOffscreenRuntimeMessage(
       return;
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
       assertRecordingBegin(message);
+      retireCountdownCameraPeers(message);
       try {
         allowRecordingBegin(message);
       } catch (error) {

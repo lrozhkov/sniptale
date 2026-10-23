@@ -81,7 +81,13 @@ function resolveInstanceFramePlan(args: {
   if (!snapshot || snapshot.kind !== instance.kind) fail('effectPlanIntegrityFailure');
   const document = parseSnapshotDocument(snapshot);
   assertSnapshotDocument(instance, snapshot, document);
-  const timing = resolveEffectInstanceTime(instance, document.duration, args.projectTime);
+  const host =
+    instance.kind === 'standalone'
+      ? args.project.clips.find(
+          (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
+        )
+      : undefined;
+  const timing = resolveEffectInstanceTime(instance, document.duration, args.projectTime, host);
   if (!timing) return null;
   const target = resolveEffectRuntimeFrameTarget(
     args.project,
@@ -142,7 +148,12 @@ function resolveInstanceFramePlan(args: {
     duration: document.duration,
     effectInstanceId: instance.id,
     fps: args.project.fps,
-    frameIndex: Math.max(0, Math.round(timing.effectTime * args.project.fps)),
+    frameIndex: Math.max(
+      0,
+      instance.kind === 'standalone'
+        ? Math.floor(timing.effectTime * args.project.fps)
+        : Math.round(timing.effectTime * args.project.fps)
+    ),
     kind: instance.kind,
     progress: timing.progress,
     renderDimensions,

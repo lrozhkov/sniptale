@@ -1,3 +1,18 @@
+import { createVideoProjectAsset } from '../../../features/video/project/factories/creation';
+import { createBookendImagePresentation } from '../../../features/video/project/scene/bookend-media';
+import { createNeutralPresentationSettings } from '../../../features/video/review/advanced/presentation';
+import { resolveEffectRuntimeFramePlans } from '../../../features/video/composition/effect-runtime/frame/plan';
+import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
+import { hydrateVideoProject } from '../../../features/video/project/hydration';
+import { readFileSync } from 'node:fs';
+import {
+  sha256EffectV1Bytes,
+  resolveEffectV1ControlDefault,
+} from '@sniptale/runtime-contracts/effect-v1';
+import { readReviewAnnotationEffectDocument } from '../../../features/video/review/annotation-effects/validation';
+import { initializeReviewAnnotationEffectAnchors } from '../../../features/video/review/annotation-effects/layout';
+import { fixture } from '../../../features/video/review/project-conversion.test-support';
+import { planReviewProjectConversion } from '../../../features/video/review/project-conversion';
 import { undoVideoEditorProjectHistory, redoVideoEditorProjectHistory } from '../history';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -294,4 +309,312 @@ it('selects FX without seeking and bypasses a clip without rewriting individual 
   expect(getEffectInstanceLabel(project, 'missing')).toBeTruthy();
   expect(getEffectInstanceLabel({ ...project, effectSnapshots: [] }, 'clip')).toBeTruthy();
   expect(getEffectInstanceLabel(project, 'clip')).toBeTruthy();
+});
+
+async function attachmentStoreFixture(lateAnnotation = false) {
+  const input = fixture();
+  input.document.edits = [];
+  input.document.advancedContent.canvas = { width: 320, height: 180 };
+  const source = readFileSync(
+    'apps/extension/public/video-effects/effects/annotations/sniptale-callout/effect.sniptale-effect.json',
+    'utf8'
+  );
+  const document = readReviewAnnotationEffectDocument(source)!;
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const controls = Object.fromEntries(
+    document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+  );
+  const transform = { x: 0.1, y: 0.2, width: 0.5, height: 0.2, rotation: 0.1 };
+  const anchors = initializeReviewAnnotationEffectAnchors(
+    document,
+    transform,
+    controls,
+    input.source
+  )!;
+  for (const handle of document.objectLayout?.handles ?? []) {
+    delete controls[handle.xControl];
+    delete controls[handle.yControl];
+  }
+  const snapshot = {
+    id: `effect:${sha256}`,
+    sha256,
+    source,
+    documentId: document.id,
+    schemaVersion: 'sniptale.effect.v1' as const,
+    kind: 'standalone' as const,
+    retainedByteLength: new TextEncoder().encode(source).byteLength,
+    assets: [],
+  };
+  input.document.advancedContent.annotationEffects = {
+    enabled: true,
+    instances: [
+      {
+        id: 'annotation',
+        snapshotId: snapshot.id,
+        enabled: true,
+        start: 1,
+        end: 7,
+        order: 0,
+        attachment: 'content',
+        transform,
+        controls,
+        anchors,
+      },
+    ],
+  };
+  const card = lateAnnotation
+    ? createVideoProjectAsset(
+        'Tail card',
+        'IMAGE',
+        { kind: 'project-asset', projectAssetId: 'tail-card' },
+        {
+          width: 32,
+          height: 16,
+          duration: null,
+          hasAudio: false,
+          audioPeaks: null,
+          size: 100,
+          mimeType: 'image/png',
+        }
+      )
+    : undefined;
+  if (lateAnnotation) {
+    input.document.edits = [
+      { id: 'cut', kind: 'cut', start: 3, end: 3.87, requestedStart: 3, requestedEnd: 3.87 },
+    ];
+    input.document.advancedContent.annotationEffects.instances[0]!.start = 7.995;
+    input.document.advancedContent.annotationEffects.instances[0]!.end = 8;
+    const presentation = createNeutralPresentationSettings();
+    presentation.outro = {
+      mode: 'image',
+      image: {
+        ...createBookendImagePresentation(),
+        assetId: 'project-asset:tail-card',
+        width: 32,
+        height: 16,
+        duration: 0.14,
+      },
+    };
+    input.document.advancedContent.presentation = presentation;
+  }
+  const result = planReviewProjectConversion({
+    ...input,
+    annotationSnapshots: [snapshot],
+    ...(card ? { bookendAssets: [{ reviewAssetId: 'project-asset:tail-card', asset: card }] } : {}),
+  });
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  const store = createVideoEditorProjectTestStore();
+  store.getState().setProject(result.project);
+  store.getState().setCurrentTime(2);
+  const host = store.getState().project!.clips.find((clip) => clip.type === 'EFFECT')!;
+  if (host.type !== 'EFFECT' || host.attachment?.kind !== 'source')
+    throw new Error('Expected source effect');
+  return { store, host, binding: host.attachment };
+}
+
+it('changes a transferred source attachment without moving its visible body or handles and owns one Undo', async () => {
+  const { store, host, binding } = await attachmentStoreFixture();
+  const before = structuredClone(store.getState().project!);
+  const instanceId = host.effectInstanceId;
+  const original = before.effectInstances!.find((entry) => entry.id === instanceId)!;
+  const history = store.getState().projectHistory.past.length;
+  expect(store.getState().updateEffectAttachment(instanceId, { kind: 'viewport' })).toBe(true);
+  const after = store.getState().project!;
+  const changed = after.clips.find((entry) => entry.id === host.id)!;
+  expect(changed.transform.x).toBeCloseTo(host.transform.x / 2, 7);
+  expect(changed.transform.y).toBeCloseTo(host.transform.y / 2, 7);
+  expect(changed.transform.width).toBeCloseTo(host.transform.width / 2, 7);
+  expect(changed.transform.rotation).toBeCloseTo(host.transform.rotation, 7);
+  for (const [id, anchor] of Object.entries(original.sceneAnchors!)) {
+    const next = after.effectInstances!.find((entry) => entry.id === instanceId)!.sceneAnchors![
+      id
+    ]!;
+    expect(next.x).toBeCloseTo(anchor.x / 2, 7);
+    expect(next.y).toBeCloseTo(anchor.y / 2, 7);
+  }
+  expect(store.getState().projectHistory.past).toHaveLength(history + 1);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, after);
+  if (!undo || undo.status !== 'applied') throw new Error('Expected attachment undo');
+  expect(undo.project.clips).toEqual(before.clips);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (!redo || redo.status !== 'applied') throw new Error('Expected attachment redo');
+  expect(redo.project.clips).toEqual(after.clips);
+  expect(store.getState().updateEffectAttachment(instanceId, binding)).toBe(true);
+  const restored = store.getState().project!.clips.find((entry) => entry.id === host.id)!;
+  for (const key of ['x', 'y', 'width', 'height', 'rotation'] as const)
+    expect(restored.transform[key]).toBeCloseTo(host.transform[key], 7);
+  expect(before.clips.find((entry) => entry.id === host.id)).toEqual(host);
+});
+
+it('refuses same, missing, inactive and locked attachment changes without history or source mutation', async () => {
+  const { store, host, binding } = await attachmentStoreFixture();
+  const before = store.getState().project;
+  const history = store.getState().projectHistory;
+  expect(store.getState().updateEffectAttachment(host.effectInstanceId, binding)).toBe(false);
+  expect(
+    store
+      .getState()
+      .updateEffectAttachment(host.effectInstanceId, { ...binding, sourceInstanceId: 'missing' })
+  ).toBe(false);
+  store.getState().setCurrentTime(0);
+  expect(store.getState().updateEffectAttachment(host.effectInstanceId, { kind: 'viewport' })).toBe(
+    false
+  );
+  expect(store.getState().project).toBe(before);
+  expect(store.getState().projectHistory).toBe(history);
+  store.getState().setCurrentTime(2);
+  store.setState({
+    project: {
+      ...before!,
+      tracks: before!.tracks.map((track) =>
+        track.id === host.trackId ? { ...track, locked: true } : track
+      ),
+    },
+  });
+  const locked = store.getState().project;
+  expect(store.getState().updateEffectAttachment(host.effectInstanceId, { kind: 'viewport' })).toBe(
+    false
+  );
+  expect(store.getState().project).toBe(locked);
+  expect(store.getState().projectHistory).toBe(history);
+});
+
+it('restores source annotation intervals once and keeps Native timing free', async () => {
+  const { store, host } = await attachmentStoreFixture();
+  const original = store.getState().project!;
+  const source = original.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (source.type !== 'VIDEO') throw new Error('Expected video source');
+  const retained = {
+    ...host,
+    startTime: 0,
+    duration: 6,
+    sourceRange: {
+      assetId: source.assetId,
+      sourceInstanceId: source.sourceInstanceId!,
+      start: 1,
+      end: 7,
+      dormant: true as const,
+    },
+  };
+  const instanceId = host.effectInstanceId;
+  store.getState().setProject({
+    ...original,
+    clips: original.clips.map((clip) =>
+      clip.id === host.id
+        ? retained
+        : clip.type === 'VIDEO'
+          ? { ...clip, sourceStart: 7, sourceDuration: 1, startTime: 0, duration: 1 }
+          : clip
+    ),
+    effectInstances: original.effectInstances!.map((instance) =>
+      instance.id === instanceId
+        ? { ...instance, startTime: 0, duration: 6, playbackRate: 4 / 6, sourceStart: 0 }
+        : instance
+    ),
+  });
+  const dormant = store.getState().project!;
+  const beforeHistory = store.getState().projectHistory;
+  expect(store.getState().restoreEffectSourceRange(instanceId)).toBe(false);
+  expect(store.getState().projectHistory).toBe(beforeHistory);
+  store.getState().setProject({
+    ...dormant,
+    clips: dormant.clips.map((clip) =>
+      clip.type === 'VIDEO'
+        ? { ...clip, sourceStart: 0, sourceDuration: 8, startTime: 0, duration: 8 }
+        : clip
+    ),
+  });
+  const before = structuredClone(store.getState().project!);
+  expect(store.getState().restoreEffectSourceRange(instanceId)).toBe(true);
+  const restored = store.getState().project!;
+  const active = restored.clips.find((clip) => clip.id === host.id)!;
+  expect(active).toMatchObject({ startTime: 1, duration: 6, sourceRange: { start: 1, end: 7 } });
+  if (active.type !== 'EFFECT') throw new Error('Expected effect host');
+  expect(active.sourceRange).not.toHaveProperty('dormant');
+  expect(active.transform).toEqual(host.transform);
+  expect(
+    restored.effectInstances!.find((instance) => instance.id === instanceId)!.controls
+  ).toEqual(original.effectInstances!.find((instance) => instance.id === instanceId)!.controls);
+  const history = store.getState().projectHistory;
+  expect(store.getState().restoreEffectSourceRange(instanceId)).toBe(false);
+  expect(store.getState().projectHistory).toBe(history);
+  const undo = undoVideoEditorProjectHistory(history, restored);
+  if (!undo || undo.status !== 'applied') throw new Error('Expected restore undo');
+  expect(undo.project.clips).toEqual(before.clips);
+  store.getState().setProject(before);
+  store.getState().moveClip(host.id, 2);
+  const manuallyPlaced = store.getState().project!.clips.find((clip) => clip.id === host.id)!;
+  expect(manuallyPlaced).toMatchObject({ startTime: 2, duration: 6 });
+  if (manuallyPlaced.type !== 'EFFECT') throw new Error('Expected effect host');
+  expect(manuallyPlaced.sourceRange).toEqual({
+    assetId: source.assetId,
+    sourceInstanceId: source.sourceInstanceId,
+    start: 1,
+    end: 7,
+  });
+  expect(store.getState().project!.duration).toBe(8);
+});
+
+it('reopens a late retained annotation and edits it through Native move attachment Undo and Redo', async () => {
+  const { store, host } = await attachmentStoreFixture(true);
+  const before = structuredClone(store.getState().project!);
+  expect(host.sourceRange?.dormant).toBe(true);
+  expect(before.duration).toBeCloseTo(7.27, 12);
+  expect(resolveEffectRuntimeFramePlans(before, 7.12)).toEqual([]);
+  const instance = before.effectInstances!.find(({ id }) => id === host.effectInstanceId)!;
+  store.getState().moveClip(host.id, 2);
+  const moved = store.getState().project!;
+  const active = moved.clips.find(({ id }) => id === host.id)!;
+  expect(active).toMatchObject({
+    startTime: 2,
+    duration: host.duration,
+    transform: host.transform,
+  });
+  if (active.type !== 'EFFECT') throw new Error('Expected retained effect');
+  const { dormant: _dormant, ...retainedSourceRange } = host.sourceRange!;
+  expect(active.sourceRange).toEqual(retainedSourceRange);
+  expect(active.sourceRange).not.toHaveProperty('dormant');
+  expect(moved.effectInstances!.find(({ id }) => id === instance.id)!.controls).toEqual(
+    instance.controls
+  );
+  expect(moved.effectSnapshots).toEqual(before.effectSnapshots);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, moved);
+  if (!undo || undo.status !== 'applied') throw new Error('Expected retained annotation move undo');
+  expect(undo.project.clips).toEqual(before.clips);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (!redo || redo.status !== 'applied') throw new Error('Expected retained annotation move redo');
+  expect(redo.project.clips).toEqual(moved.clips);
+  expect(store.getState().updateEffectAttachment(host.effectInstanceId, { kind: 'viewport' })).toBe(
+    true
+  );
+  const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(store.getState().project)));
+  expect(isExportReadyVideoProject(reopened)).toBe(true);
+  expect(resolveEffectRuntimeFramePlans(reopened, 2.001)).toHaveLength(1);
+  expect(reopened.effectSnapshots).toEqual(before.effectSnapshots);
+});
+
+it('keeps the held EffectV1 document phase through a real Native split and JSON reopen', async () => {
+  const { store, host } = await attachmentStoreFixture();
+  const project = store.getState().project!;
+  const duration = host.duration;
+  Object.assign(host, {
+    duration: duration + 0.3,
+    playbackWindow: { offset: 0, extent: duration + 0.3, holdAt: duration - 0.1 },
+  });
+  project.version = 43;
+  store.getState().setProject(project);
+  const before = store.getState().project!;
+  const time = host.startTime + duration + 0.2;
+  const expected = resolveEffectRuntimeFramePlans(before, time);
+  expect(expected).toHaveLength(1);
+  const split = splitStandaloneEffectHost(before, host.id, host.startTime + duration + 0.1)!;
+  expect(split).not.toBeNull();
+  const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(split)));
+  expect(isExportReadyVideoProject(reopened)).toBe(true);
+  expect(reopened.effectSnapshots).toEqual(before.effectSnapshots);
+  const actual = resolveEffectRuntimeFramePlans(reopened, time);
+  expect(actual).toHaveLength(1);
+  expect(actual[0]!.time).toBeCloseTo(expected[0]!.time, 12);
+  expect(actual[0]!.effectInstanceId).not.toBe(expected[0]!.effectInstanceId);
+  expect(reopened.effectInstances).toHaveLength(2);
 });

@@ -25,12 +25,12 @@ export function resolveExportEffectDrawState(
   return created;
 }
 
-export function drawExportTransitionOverlayPasses(
+export async function drawExportTransitionOverlayPasses(
   context: CanvasRenderingContext2D,
   passes: VisualPasses,
   settings: VideoProjectExportSettings,
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined
-): void {
+): Promise<void> {
   const ownerDocument =
     typeof HTMLCanvasElement !== 'undefined' && context.canvas instanceof HTMLCanvasElement
       ? context.canvas.ownerDocument
@@ -49,6 +49,8 @@ export function drawExportTransitionOverlayPasses(
   const drawContext = passBuffer?.context ?? context;
   try {
     for (const pass of passes) {
+      if (!pass.transitionOverlays?.length) continue;
+      await effectRuntimeFrames?.prepareVisualPass?.(pass.time);
       for (const overlay of pass.transitionOverlays ?? []) {
         const frames = getEffectRuntimeVisualPassFrames(effectRuntimeFrames, pass.time);
         if (hasEffectRuntimeTransitionFrame(frames, overlay.transitionId)) continue;

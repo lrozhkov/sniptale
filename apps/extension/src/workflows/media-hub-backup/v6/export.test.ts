@@ -4,7 +4,7 @@ import { createArchiveMemorySink } from '../../../composition/archive-transfer/t
 import { inspectMediaHubBackupV6 } from './inspect';
 import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from './export';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
-import { DEFAULT_WINDOW_HEADER } from '../../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { MAX_ROOT_METADATA_BYTES } from './contracts';
 import { assertMetadataJson } from './codec';
 import { parseBackupRootEnvelope } from './shared-object-envelope';

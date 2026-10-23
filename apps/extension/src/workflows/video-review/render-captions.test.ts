@@ -203,3 +203,15 @@ it('admits fragment exports by their global range while retaining full-document 
     prepared.plan.cues.find((cue) => cue.fragmentId === 'first')!.y
   );
 });
+
+it('refuses a conflicting held sample outside the selected export range with exact half-open bounds', async () => {
+  const fixture = setup([phrase('conflict', 0, 1, 'One')]);
+  const prepared = await prepareReviewCaptions({
+    ...fixture.args,
+    reservations: () => [{ x: 0, y: 300, width: 640, height: 60, start: 0, end: 1 }],
+  });
+  expect(() => prepared.assertExportable({ start: 1.1, end: 1.2 })).not.toThrow();
+  expect(() => prepared.assertExportable({ time: 0 })).toThrow(QuickEditExportUnavailable);
+  expect(() => prepared.assertExportable({ time: 0.975 })).toThrow(QuickEditExportUnavailable);
+  expect(() => prepared.assertExportable({ time: 1 })).not.toThrow();
+});

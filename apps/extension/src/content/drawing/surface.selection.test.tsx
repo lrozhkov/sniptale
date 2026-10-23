@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createDrawingSession } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
+import { DrawingBlurLayer } from './surface-visual-layers';
 
 function createCanvasContextFixture(): CanvasRenderingContext2D {
   const fixture: Partial<CanvasRenderingContext2D> = {
@@ -31,6 +32,70 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
 }
 
 const context = createCanvasContextFixture();
+
+it('clips a rotated projected blur to its scroll root and retains offscreen object identity', () => {
+  const host = document.createElement('div');
+  const scroller = document.createElement('section');
+  vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(new DOMRect(20, 30, 400, 300));
+  document.body.append(host);
+  const root = createRoot(host);
+  const objects = [
+    {
+      id: 'rotated',
+      kind: 'blur' as const,
+      rotation: 45,
+      bounds: { x: 120, y: 220, width: 800, height: 500 },
+    },
+    { id: 'outside', kind: 'blur' as const, bounds: { x: 2000, y: 100, width: 100, height: 100 } },
+  ];
+  act(() =>
+    root.render(
+      <DrawingBlurLayer
+        objects={objects}
+        projection={{ x: 120, y: 200 }}
+        root={{ kind: 'element', element: scroller }}
+      />
+    )
+  );
+  const nodes = host.querySelectorAll<HTMLElement>('[data-sniptale-drawing-object-id]');
+  expect(nodes).toHaveLength(2);
+  const visible = nodes[0]!;
+  expect(parseFloat(visible.style.left)).toBeGreaterThanOrEqual(20);
+  expect(parseFloat(visible.style.top)).toBeGreaterThanOrEqual(30);
+  expect(parseFloat(visible.style.left) + parseFloat(visible.style.width)).toBeLessThanOrEqual(420);
+  expect(parseFloat(visible.style.top) + parseFloat(visible.style.height)).toBeLessThanOrEqual(330);
+  expect(visible.style.clipPath).toMatch(/^polygon\(/);
+  expect(nodes[1]!.style.width).toBe('0px');
+  expect(objects[0]!.bounds).toEqual({ x: 120, y: 220, width: 800, height: 500 });
+  act(() => root.unmount());
+});
+
+it.each([
+  { x: 780, y: 100, width: 100, height: 30 },
+  { x: -30, y: 100, width: 100, height: 30 },
+  { x: 100, y: -30, width: 100, height: 60 },
+  { x: 100, y: 580, width: 100, height: 60 },
+])('bounds live blur before filtering at the viewport edge %j', (bounds) => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <DrawingBlurLayer
+        objects={[{ id: 'edge', kind: 'blur', bounds }]}
+        projection={{ x: 0, y: 0 }}
+        root={{ kind: 'viewport', element: null }}
+      />
+    )
+  );
+  const node = host.querySelector<HTMLElement>('[data-sniptale-drawing-object-id]')!;
+  expect(parseFloat(node.style.left)).toBeGreaterThanOrEqual(0);
+  expect(parseFloat(node.style.top)).toBeGreaterThanOrEqual(0);
+  expect(parseFloat(node.style.left) + parseFloat(node.style.width)).toBeLessThanOrEqual(800);
+  expect(parseFloat(node.style.top) + parseFloat(node.style.height)).toBeLessThanOrEqual(600);
+  expect(node.style.clipPath).toMatch(/^polygon\(/);
+  act(() => root.unmount());
+});
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

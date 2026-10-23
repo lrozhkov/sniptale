@@ -17,6 +17,8 @@ import {
   getContentActionCapabilityIssuanceSenderBinding,
 } from '../../../routing-contracts/owned-route-context';
 import type { ContentPrivilegedActionType } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { VideoRecordingSurfaceCommandMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
@@ -159,6 +161,41 @@ beforeEach(() => {
 afterEach(() => {
   resetContentPrivilegedActionCapabilitiesForTests();
   vi.unstubAllGlobals();
+});
+
+it('authorizes only read-only surface validation from the recording permission frame', () => {
+  vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+  const frameSender = {
+    ...sender({
+      documentId: 'permission-document-7',
+      frameId: 3,
+      tabId: 7,
+      url: 'chrome-extension://test/apps/extension/src/media-permission/index.html',
+    }),
+    id: 'test',
+  };
+  const message: VideoRecordingSurfaceCommandMessage = {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    surfaceSessionId: 'surface-1',
+    surfaceToken: 'token-1',
+    capabilityEpoch: 2,
+    documentGeneration: 3,
+    recordingId: null,
+    command: { kind: 'list-media-devices', deviceKind: 'audioinput', requestPermission: false },
+  };
+  const authorization = {
+    family: 'video-recording-surface',
+    kind: 'privileged-tab-route',
+    resolvedTabId: 7,
+    sender: frameSender,
+  } as const;
+  expect(authorizeIPCMessage({ ...authorization, message })).toEqual({ authorized: true });
+  expect(
+    authorizeIPCMessage({
+      ...authorization,
+      message: { ...message, command: { kind: 'set-microphone-enabled', enabled: true } },
+    })
+  ).toEqual({ authorized: false, reason: 'Unauthorized video recording surface sender' });
 });
 
 it('rejects content capture routes without a content action capability', () => {

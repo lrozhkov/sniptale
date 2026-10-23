@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { composeWindowHeaderSvg } from './appearance';
-import { DEFAULT_WINDOW_HEADER, parseWindowHeader } from './header';
+import {
+  DEFAULT_WINDOW_HEADER,
+  parseWindowHeader,
+} from '@sniptale/runtime-contracts/window-header';
 
 describe('window artwork', () => {
   it('embeds fonts and escapes project text without remote resources', () => {

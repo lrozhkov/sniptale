@@ -1,3 +1,10 @@
+import { parseHydratableVideoProject } from '../../../../features/video/project/validation/root';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import { createAudioClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { expect, it, vi } from 'vitest';
 
 const { getAssetByIdMock } = vi.hoisted(() => ({
@@ -102,13 +109,14 @@ it('clips audio render ranges and interpolates gain envelopes for partial export
       audioGainEnd: 0.625,
       audioGainStart: 0.875,
       duration: 2,
-      fadeInMs: 0,
-      fadeOutMs: 0,
+      fadeInMs: 900,
+      fadeOutMs: 800,
+      audioFadePhase: { offset: 1, duration: 4 },
       sourceDuration: 4,
       sourceStart: 12,
       startTime: 0,
-      volumeEnvelopeEnd: 0.4375,
-      volumeEnvelopeStart: 0.8125,
+      volumeEnvelopeEnd: 0.625,
+      volumeEnvelopeStart: 0.875,
     }),
   ]);
 });
@@ -202,4 +210,411 @@ it('retains crossfade phase when exporting a range inside the audio overlap', ()
   expect(clips[1]?.audioTransitions).toEqual([
     { start: -0.25, end: 0.75, easing: 'LINEAR', incoming: true },
   ]);
+});
+
+it('collects independent original attenuation and crops cells without changing authored gain', () => {
+  const project = createEmptyVideoProject('Original mix');
+  project.version = 6;
+  const track = createVideoProjectTrack('Audio', 2, 'AUDIO');
+  project.tracks.push(track);
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 8,
+      mimeType: 'audio/wav',
+      size: 100,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const source = createAudioClipFromAsset(track.id, asset);
+  source.volume = 0.8;
+  source.audioGainStart = 0.8;
+  source.audioGainEnd = 0.4;
+  source.volumeEnvelopeEnd = 0.5;
+  const take = {
+    ...createAudioClipFromAsset(track.id, asset, 2),
+    id: 'voice',
+    duration: 2,
+    sourceDuration: 2,
+    muted: true,
+    originalAudioMute: {
+      volume: 0.25,
+      targets: [{ assetId: source.assetId, sourceInstanceId: source.id }],
+    },
+  };
+  project.assets = [asset];
+  project.clips = [source, take];
+  project.duration = 8;
+  const before = structuredClone(project);
+  getAssetByIdMock.mockReturnValue(asset);
+  const collected = collectRenderableAudioClips(project);
+  expect(collected).toHaveLength(1);
+  expect(collected[0]).toMatchObject({
+    volume: 1,
+    volumeEnvelopeStart: 0.8,
+    volumeEnvelopeEnd: 0.4,
+    originalAudioRanges: [{ start: 2, end: 4, volume: 0.25 }],
+  });
+  const partial = collectRenderableAudioClips(project, {
+    rangeStartSeconds: 3,
+    rangeEndSeconds: 5,
+  });
+  expect(partial[0]).toMatchObject({
+    startTime: 0,
+    duration: 2,
+    sourceStart: 3,
+    originalAudioRanges: [{ start: 0, end: 1, volume: 0.25 }],
+  });
+  const tail = collectRenderableAudioClips(project, { rangeStartSeconds: 5, rangeEndSeconds: 7 });
+  expect(tail[0]?.originalAudioRanges).toEqual([]);
+  expect(project).toEqual(before);
+});
+
+it.each([{}, [{ start: 0, end: 8, volume: 0 }], [{ start: 0, end: 8, volume: 'invalid' }]])(
+  'ignores imported export-local attenuation metadata %j',
+  (injected) => {
+    const project = createEmptyVideoProject('Imported original audio');
+    const track = createVideoProjectTrack('Audio', 2, 'AUDIO');
+    project.tracks.push(track);
+    const asset = createVideoProjectAsset(
+      'Source',
+      'AUDIO',
+      { kind: 'project-asset', projectAssetId: 'source' },
+      {
+        width: 0,
+        height: 0,
+        duration: 8,
+        mimeType: 'audio/wav',
+        size: 100,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const source = createAudioClipFromAsset(track.id, asset);
+    project.duration = 8;
+    project.assets = [asset];
+    const serialized: unknown = JSON.parse(
+      JSON.stringify({ ...project, clips: [{ ...source, originalAudioRanges: injected }] })
+    );
+    const imported = parseHydratableVideoProject(serialized);
+    if (!imported) throw new Error('Expected supported project');
+    getAssetByIdMock.mockReturnValue(asset);
+    expect(collectRenderableAudioClips(imported)[0]?.originalAudioRanges).toEqual([]);
+    expect(
+      collectRenderableAudioClips(imported, { rangeStartSeconds: 2, rangeEndSeconds: 4 })[0]
+        ?.originalAudioRanges
+    ).toEqual([]);
+  }
+);
+
+it('projects AUDIO masters once for full and partial export while preserving clips', () => {
+  const project = createEmptyVideoProject('Track export');
+  project.duration = 8;
+  const track = createVideoProjectTrack('Music', 1, 'AUDIO');
+  track.audioVolume = 2;
+  const asset = createVideoProjectAsset(
+    'Music',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'music' },
+    {
+      width: 0,
+      height: 0,
+      duration: 8,
+      mimeType: 'audio/wav',
+      size: 10,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(track.id, asset);
+  clip.volume = 1;
+  clip.audioGainStart = clip.audioGainEnd = 1.5;
+  clip.volumeEnvelopeStart = clip.volumeEnvelopeEnd = 1.5;
+  const neighbor = { ...clip, id: 'neighbor', trackId: project.tracks[0]!.id };
+  project.assets = [asset];
+  project.tracks.push(track);
+  project.clips = [clip, neighbor];
+  getAssetByIdMock.mockReturnValue(asset);
+  const before = structuredClone(project);
+  expect(
+    collectRenderableAudioClips(project).map(
+      (clip) => clip.volume * (clip.volumeEnvelopeStart ?? 1)
+    )
+  ).toEqual([3, 1.5]);
+  const partial = collectRenderableAudioClips(project, {
+    rangeStartSeconds: 2,
+    rangeEndSeconds: 4,
+  });
+  expect(
+    partial.map((clip) => [
+      clip.volume * (clip.volumeEnvelopeStart ?? 1),
+      clip.startTime,
+      clip.duration,
+    ])
+  ).toEqual([
+    [3, 0, 2],
+    [1.5, 0, 2],
+  ]);
+  expect(project).toEqual(before);
+  track.audioVolume = 0;
+  expect(
+    collectRenderableAudioClips(project).map(
+      (clip) => clip.volume * (clip.volumeEnvelopeStart ?? 1)
+    )
+  ).toEqual([0, 1.5]);
+});
+
+it.each([null, 'invalid', { offset: -200, duration: 1 }, { offset: 0, duration: 10000 }])(
+  'replaces imported export-only fade phase %j',
+  (injected) => {
+    const project = createEmptyVideoProject('Imported fade');
+    const asset = createVideoProjectAsset(
+      'Music',
+      'AUDIO',
+      { kind: 'project-asset', projectAssetId: 'music' },
+      {
+        width: 0,
+        height: 0,
+        duration: 8,
+        mimeType: 'audio/wav',
+        size: 10,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const clip = createAudioClipFromAsset(project.tracks[0]!.id, asset);
+    project.assets = [asset];
+    project.duration = 8;
+    const serialized: unknown = JSON.parse(
+      JSON.stringify({
+        ...project,
+        clips: [{ ...clip, fadeInMs: 6000, audioFadePhase: injected, audioGainPhase: injected }],
+      })
+    );
+    const imported = parseHydratableVideoProject(serialized);
+    if (!imported) throw new Error('Expected supported project');
+    getAssetByIdMock.mockReturnValue(asset);
+    const before = JSON.stringify(imported);
+    const full = collectRenderableAudioClips(imported)[0];
+    expect(full?.audioFadePhase).toEqual({ offset: 0, duration: 8 });
+    expect(full).not.toHaveProperty('audioGainPhase');
+    const partial = full && clipAudioClipToExportRange(full, { start: 1, end: 7 });
+    const nested = partial && clipAudioClipToExportRange(partial, { start: 1, end: 4 });
+    expect(nested).toMatchObject({
+      audioFadePhase: { offset: 2, duration: 8 },
+      fadeInMs: 6000,
+      sourceStart: 2,
+      duration: 3,
+    });
+    expect(JSON.stringify(imported)).toBe(before);
+  }
+);
+
+it.each([
+  { volume: 4, volumeEnvelopeStart: 0.5, volumeEnvelopeEnd: 0.5, expected: 1 },
+  {
+    volume: 4,
+    volumeEnvelopeStart: 0.5,
+    volumeEnvelopeEnd: 0.5,
+    audioGainStart: 0.3,
+    audioGainEnd: 0.3,
+    expected: 0.3,
+  },
+  {
+    volume: 3,
+    volumeEnvelopeStart: 0.25,
+    volumeEnvelopeEnd: 0.75,
+    audioGainStart: 1.5,
+    expected: 1.5,
+  },
+  { volume: 0.5, volumeEnvelopeStart: 4, volumeEnvelopeEnd: 4, expected: 1 },
+  {
+    volume: 4,
+    volumeEnvelopeStart: 0.5,
+    volumeEnvelopeEnd: 0.5,
+    audioGainStart: 3,
+    audioGainEnd: 4,
+    expected: 2,
+  },
+])('derives canonical media gain without rewriting admitted fields: %j', (values) => {
+  const project = createEmptyVideoProject('Legacy render');
+  project.version = 7;
+  project.duration = 2;
+  const track = createVideoProjectTrack('Audio', 1, 'AUDIO');
+  track.audioVolume = 1.5;
+  const asset = createVideoProjectAsset(
+    'Audio',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 2,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(track.id, asset);
+  delete clip.audioGainStart;
+  delete clip.audioGainEnd;
+  const { expected, ...gain } = values;
+  Object.assign(clip, gain);
+  project.tracks.push(track);
+  project.assets = [asset];
+  project.clips = [clip];
+  const serialized: unknown = JSON.parse(JSON.stringify(project));
+  const imported = parseHydratableVideoProject(serialized);
+  if (!imported) throw new Error('Expected admitted project');
+  getAssetByIdMock.mockReturnValue(asset);
+  const before = JSON.stringify(imported);
+  for (const settings of [undefined, { rangeStartSeconds: 0.25, rangeEndSeconds: 1.25 }]) {
+    const prepared = collectRenderableAudioClips(imported, settings);
+    expect(prepared[0]).toMatchObject({
+      volume: 1.5,
+      audioGainStart: expected,
+      audioGainEnd: expected,
+      volumeEnvelopeStart: expected,
+      volumeEnvelopeEnd: expected,
+    });
+  }
+  expect(JSON.stringify(imported)).toBe(before);
+});
+
+it('prepares amplified source cells once and clips their clock for selected export', () => {
+  const project = createEmptyVideoProject('Source audio export');
+  const track = createVideoProjectTrack('Audio', 1, 'AUDIO');
+  track.audioVolume = 2;
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 8,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(track.id, asset);
+  clip.audioGainStart = clip.audioGainEnd = 2;
+  project.tracks = [track];
+  project.assets = [asset];
+  project.clips = [clip];
+  project.duration = 8;
+  project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: {
+        kind: 'source',
+        assetId: asset.id,
+        sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+      },
+      ranges: [{ id: 'boost', start: 0, end: 8, volume: 2 }],
+      mutes: [
+        { id: 'static', start: 2, end: 4, volume: 0.5 },
+        { id: 'overlap', start: 3, end: 5, volume: 0.25 },
+      ],
+    },
+  ];
+  getAssetByIdMock.mockReturnValue(asset);
+  const before = structuredClone(project);
+  expect(collectRenderableAudioClips(project)[0]).toMatchObject({
+    volume: 2,
+    audioGainStart: 2,
+    audioGainEnd: 2,
+    originalAudioRanges: [
+      { start: 0, end: 2, volume: 2 },
+      { start: 3, end: 5, volume: 0.5 },
+      { start: 5, end: 8, volume: 2 },
+    ],
+  });
+  expect(
+    collectRenderableAudioClips(project, { rangeStartSeconds: 1, rangeEndSeconds: 6 })[0]
+  ).toMatchObject({
+    volume: 2,
+    audioGainStart: 2,
+    audioGainEnd: 2,
+    sourceStart: 1,
+    duration: 5,
+    originalAudioRanges: [
+      { start: 0, end: 1, volume: 2 },
+      { start: 2, end: 4, volume: 0.5 },
+      { start: 4, end: 5, volume: 2 },
+    ],
+  });
+  expect(project).toEqual(before);
+});
+
+it('exports only bounded audio from a split held placement with its original gain and fade', () => {
+  const project = createEmptyVideoProject('Held audio');
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 3,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(project.tracks[0]!.id, asset, 2);
+  Object.assign(clip, {
+    sourceStart: 1,
+    sourceDuration: 0.15,
+    playbackRate: 0.1,
+    duration: 5 / 3 - 0.4,
+    audioGainStart: 0.2,
+    audioGainEnd: 0.8,
+    fadeOutMs: 1000,
+    playbackWindow: {
+      offset: 0.4,
+      holdAt: 1.4,
+      fadePhase: { offset: 0.4, duration: 1.5 },
+      gainPhase: { offset: 0.4, duration: 1.5 },
+    },
+  });
+  project.version = 43;
+  project.assets = [asset];
+  project.clips = [clip];
+  project.duration = 4;
+  getAssetByIdMock.mockReturnValue(asset);
+  const before = structuredClone(project);
+  const prepared = collectRenderableAudioClips(project)[0];
+  expect(prepared).toMatchObject({
+    sourceStart: expect.closeTo(1.04, 12),
+    sourceDuration: expect.closeTo(0.11, 12),
+    duration: expect.closeTo(1.1, 12),
+    audioGainStart: expect.closeTo(0.36, 12),
+    audioGainEnd: 0.8,
+    audioFadePhase: { offset: 0.4, duration: 1.5 },
+  });
+  const partial = collectRenderableAudioClips(project, {
+    rangeStartSeconds: 2.2,
+    rangeEndSeconds: 2.7,
+  })[0];
+  expect(partial).toMatchObject({
+    sourceStart: expect.closeTo(1.06, 12),
+    sourceDuration: expect.closeTo(0.05, 12),
+    duration: expect.closeTo(0.5, 12),
+    audioGainStart: expect.closeTo(0.44, 12),
+    audioGainEnd: expect.closeTo(0.64, 12),
+    audioFadePhase: { offset: expect.closeTo(0.6, 12), duration: 1.5 },
+  });
+  expect(project).toEqual(before);
+  clip.playbackWindow = { offset: 1.57, holdAt: 1.4 };
+  expect(collectRenderableAudioClips(project)).toEqual([]);
 });

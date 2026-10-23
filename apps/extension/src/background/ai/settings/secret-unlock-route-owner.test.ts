@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 
 import type { StoredAISecretUnlockRequest } from '../../../composition/persistence/ai-settings/secret-unlock-requests.store.ts';
+import type { LlmSessionPurpose } from '../../../contracts/messaging/llm';
 
 const { resolveLlmSessionSenderKeyMock } = vi.hoisted(() => ({
   resolveLlmSessionSenderKeyMock: vi.fn(),
@@ -13,25 +14,29 @@ vi.mock('../llm/session-tokens', async (importOriginal) => ({
 
 import { isUnlockRequestOwner } from './secret-unlock-route-owner';
 
-function createRecord(senderKey: string): StoredAISecretUnlockRequest {
+function createRecord(senderKey: string, purpose: LlmSessionPurpose): StoredAISecretUnlockRequest {
   return {
     createdAt: 1,
     expiresAt: 2,
     operation: 'ai-secret-unlock',
-    purpose: 'content-ai-pick',
+    purpose,
     requestId: 'request-1',
     senderKey,
     status: 'pending',
   };
 }
 
-it('matches content and scenario sender ownership keys', () => {
-  resolveLlmSessionSenderKeyMock.mockReturnValueOnce('content-owner');
-  expect(isUnlockRequestOwner(createRecord('content-owner'), {})).toBe(true);
+it.each(['content-ai-pick', 'scenario-editor', 'review-text'] as const)(
+  'resolves ownership using the recorded %s purpose',
+  (purpose) => {
+    resolveLlmSessionSenderKeyMock.mockReset();
+    const sender: chrome.runtime.MessageSender = {};
+    resolveLlmSessionSenderKeyMock.mockReturnValueOnce('owner-key');
+    expect(isUnlockRequestOwner(createRecord('owner-key', purpose), sender)).toBe(true);
+    expect(resolveLlmSessionSenderKeyMock).toHaveBeenCalledExactlyOnceWith(purpose, sender);
 
-  resolveLlmSessionSenderKeyMock.mockReturnValueOnce(null).mockReturnValueOnce('scenario-owner');
-  expect(isUnlockRequestOwner(createRecord('scenario-owner'), {})).toBe(true);
-
-  resolveLlmSessionSenderKeyMock.mockReturnValue(null);
-  expect(isUnlockRequestOwner(createRecord('other-owner'), {})).toBe(false);
-});
+    resolveLlmSessionSenderKeyMock.mockReset().mockReturnValue(null);
+    expect(isUnlockRequestOwner(createRecord('other-owner', purpose), sender)).toBe(false);
+    expect(resolveLlmSessionSenderKeyMock).toHaveBeenCalledExactlyOnceWith(purpose, sender);
+  }
+);

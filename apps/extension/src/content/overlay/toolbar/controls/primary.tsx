@@ -1,6 +1,8 @@
 import { ToolbarModeButtons } from './modes';
 import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarPageEditingMode, ToolbarProps } from '../types';
+import { useContext } from 'react';
+import { RecordingToolbarControlsContext } from '../state/recording-controls';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -9,6 +11,8 @@ export function ToolbarPrimaryControls(props: {
   viewModel: ToolbarViewModel;
 }) {
   const { toolbarProps, viewModel } = props;
+  const visibility = useContext(RecordingToolbarControlsContext);
+  if (visibility?.active) return null;
   const modeButtonProps = {
     isCursorMode: toolbarProps.isCursorMode ?? true,
     aiPickMode: toolbarProps.aiPickMode ?? false,
@@ -51,5 +55,11 @@ export function ToolbarPrimaryControls(props: {
       ),
   };
 
-  return <ToolbarModeButtons {...modeButtonProps} />;
+  return visibility?.editing ? (
+    <fieldset disabled className="contents">
+      <ToolbarModeButtons {...modeButtonProps} />
+    </fieldset>
+  ) : (
+    <ToolbarModeButtons {...modeButtonProps} />
+  );
 }

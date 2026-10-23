@@ -1,3 +1,17 @@
+import type { SourceAudioGainRange } from '../../audio/source-envelope';
+import type {
+  CameraPerspective as QuickEditPerspective,
+  CameraDepthOfField as QuickEditDepthOfField,
+  CameraSpatialFrame as QuickEditSpatialFrame,
+} from '../../project/motion/spatial';
+export type {
+  CameraPerspective as QuickEditPerspective,
+  CameraDepthOfField as QuickEditDepthOfField,
+  CameraSpatialFrame as QuickEditSpatialFrame,
+  SpatialQuaternion,
+} from '../../project/motion/spatial';
+import type { CameraTransition } from '../../project/motion/transitions';
+import type { MotionBlurPhases } from '../../project/motion/blur';
 import type { Gradient, Paint } from '@sniptale/foundation/paint';
 import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
@@ -35,6 +49,7 @@ export interface QuickEditUiState {
   /** Project workspace appearance, independent of authored scene and history. */
   workspaceColors?: Partial<Record<'light' | 'dark', string>>;
   mode: 'basic' | 'advanced';
+  modeSelectionPending?: boolean;
   /** First entry reveals editing lanes; later mode switches preserve their settings. */
   advancedTracksInitialized?: boolean;
   tracks: QuickEditTrackVisibility;
@@ -44,41 +59,10 @@ export interface QuickEditUiState {
   overlaysVisible: boolean;
 }
 
-export interface QuickEditZoomTransition {
-  type: 'none' | 'linear' | 'ease-in-out';
-  duration: number;
-}
+export type QuickEditZoomTransition = CameraTransition<'none' | 'linear' | 'ease-in-out'>;
 
 /** Easing of an outgoing zoom link; absent on legacy documents means the smooth default. */
 export type QuickEditZoomLinkEasing = 'linear' | 'ease-in-out';
-
-export interface QuickEditPerspective {
-  enabled: boolean;
-  rotateX: number;
-  rotateY: number;
-  rotateZ: number;
-  strength: number;
-}
-
-export interface QuickEditDepthOfField {
-  enabled: boolean;
-  mode: 'area' | 'depth';
-  x: number;
-  y: number;
-  width: number;
-  softness: number;
-  strength: number;
-}
-
-export type SpatialQuaternion = readonly [number, number, number, number];
-/** Disposable evaluated pose; never admitted from persisted camera objects. */
-export interface QuickEditSpatialFrame {
-  rotation: SpatialQuaternion;
-  perspective: number;
-  windowMotion: number;
-  lockBackground: boolean;
-  focus: readonly { settings: QuickEditDepthOfField; weight: number }[];
-}
 
 export interface QuickEditRect {
   x: number;
@@ -109,32 +93,6 @@ export interface QuickEditCameraTransform {
  * Zoom interval on the quick-editor timeline. `start`/`end` are timeline seconds,
  * matching the shared ReviewTimeMap coordinate domain.
  */
-/** An opening normalized over the decorated window; outside effects cover the composed scene. */
-export interface QuickEditSpotlight {
-  area: { x: number; y: number; width: number; height: number };
-  effect: 'dim' | 'blur';
-  strength: number;
-  blur: number;
-  roundness: number;
-  reveal: 'fade' | 'contract';
-  exitReveal: 'fade' | 'contract';
-}
-
-/** Window-normalized annotation, including decoration; transitions own immediate entrance/exit. */
-export interface QuickEditBorder {
-  area: { x: number; y: number; width: number; height: number };
-  color: string;
-  width: number;
-  roundness: number;
-  style: 'solid' | 'dashed' | 'dotted';
-  reveal: 'fade' | 'draw' | 'draw-ccw';
-  exitReveal: 'fade' | 'erase' | 'erase-ccw';
-  loop: boolean;
-  motion: 'clockwise' | 'counterclockwise' | 'pulse' | 'ripple';
-  period: number;
-  segmentPercent: number;
-}
-
 export interface QuickEditZoomRegion {
   cameraFollow?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   /** Explicit local camera policy; absence inherits the scene cursor-focus mode. */
@@ -151,8 +109,8 @@ export interface QuickEditZoomRegion {
   perspective?: QuickEditPerspective;
   depthOfField?: QuickEditDepthOfField;
   /** Optional camera exposure; absent or disabled leaves legacy rendering unchanged. */
-  motionBlur?: Partial<Record<'enter' | 'exit' | 'link', { enabled: boolean; strength: number }>>;
-  border?: QuickEditBorder;
+  motionBlur?: MotionBlurPhases;
+  border?: import('../../project/scene/focus-appearance').QuickEditBorder;
   /** Derived only; parser drops this projection clock before persistence admission. */
   borderClock?: {
     offset: number;
@@ -161,7 +119,7 @@ export interface QuickEditZoomRegion {
     enter: QuickEditZoomTransition;
     exit: QuickEditZoomTransition;
   };
-  spotlight?: QuickEditSpotlight;
+  spotlight?: import('../../project/scene/focus-appearance').QuickEditSpotlight;
   id: string;
   start: number;
   end: number;
@@ -256,12 +214,7 @@ export interface QuickEditAudioClip {
   fadeOut: number;
 }
 
-export interface QuickEditOriginalAudioRange {
-  id: string;
-  start: number;
-  end: number;
-  volume: number;
-}
+export type QuickEditOriginalAudioRange = SourceAudioGainRange;
 
 /** Source attenuation follows an ordinary take until its first manual range edit. */
 export type QuickEditOriginalAudioMute =
@@ -278,7 +231,8 @@ export interface QuickEditOriginalAudio {
 }
 
 /** Source coordinates remain independent of the decorated window. */
-export type QuickEditWindowHeader = import('../../../browser-frame/header').WindowHeader;
+export type QuickEditWindowHeader =
+  import('@sniptale/runtime-contracts/window-header').WindowHeader;
 
 /** An explicit base canvas size; absence means native source dimensions. */
 export interface QuickEditCanvasSize {
@@ -320,9 +274,9 @@ export interface QuickEditAdvancedContent {
   annotationEffects?: import('../annotation-effects/types').ReviewAnnotationEffects;
   /** Missing on older projects means enabled. */
   actionsEnabled?: boolean;
-  keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
-  clickAnimations?: import('./click-animation').ReviewClickAnimation[];
-  actionAudio?: import('./action-audio').ReviewActionAudioSetting[];
+  keyAnimations?: import('../../project/action-feedback/key-animation').ReviewKeyAnimation[];
+  clickAnimations?: import('../../project/action-feedback/types').ReviewClickAnimation[];
+  actionAudio?: import('../../project/action-feedback/types').ReviewActionAudioSetting[];
   /** Version travels with each history payload so persisted operations are fixed-point parseable. */
   schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
   zoom: QuickEditZoomState;
@@ -330,7 +284,7 @@ export interface QuickEditAdvancedContent {
   canvas?: QuickEditCanvasSize;
   windowHeader?: QuickEditWindowHeader;
   webcam?: QuickEditWebcam;
-  watermark?: import('./watermark').QuickEditWatermarkSettings;
+  watermark?: import('../../project/scene/watermark-types').QuickEditWatermarkSettings;
   presentation?: import('./presentation').QuickEditPresentationSettings;
   audio: QuickEditAudioState;
 }

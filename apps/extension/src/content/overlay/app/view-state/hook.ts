@@ -42,11 +42,9 @@ export function useContentAppViewModel(params: {
     viewportState: buildContentViewportState(modeState),
   };
   const frameManager = useContentAppBindings({
-    countdownActive: controllers.screenshotController.countdown !== null,
     InteractiveFrameComponent: params.InteractiveFrameComponent,
     modeControls,
     modeFlags,
-    visibilityState,
   });
   const { setPinToTab } = modeState;
   const ensurePinned = useCallback(

@@ -1,9 +1,10 @@
+import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
 // @vitest-environment jsdom
 import { act, type ComponentProps, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ReviewSelectedProperties, reviewSelectionLabel } from './selected-properties';
-import type { ReviewCutTransition, ReviewEdit } from '../../features/video/review/types';
+import type { ReviewEdit } from '../../features/video/review/types';
 
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -64,7 +65,7 @@ afterEach(() => {
   cleanup = undefined;
   vi.unstubAllGlobals();
 });
-function mount(transition?: ReviewCutTransition) {
+function mount(transition?: CompositionJoinSettings) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const edit: Extract<ReviewEdit, { kind: 'cut' }> = {
     id: 'cut',
@@ -75,11 +76,13 @@ function mount(transition?: ReviewCutTransition) {
     requestedEnd: 4,
     ...(transition ? { transition } : {}),
   };
-  const change = vi.fn<(value: ReviewCutTransition | null) => Promise<boolean>>(async (value) => {
-    if (value) edit.transition = value;
-    else delete edit.transition;
-    return true;
-  });
+  const change = vi.fn<(value: CompositionJoinSettings | null) => Promise<boolean>>(
+    async (value) => {
+      if (value) edit.transition = value;
+      else delete edit.transition;
+      return true;
+    }
+  );
   const props = {
     selection: { kind: 'edit', id: edit.id },
     advanced: { ui: { mode: 'advanced' } },

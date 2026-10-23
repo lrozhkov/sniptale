@@ -152,7 +152,7 @@ describe('quick actions editor output', () => {
     expect(state.updateFormField).toHaveBeenCalledWith('imageFormat', 'png');
     expect(state.updateFormField).toHaveBeenCalledWith('imageQuality', 80);
     expect(state.updateFormField).toHaveBeenCalledWith('imageQuality', null);
-    expect(state.updateFormField).toHaveBeenCalledWith('status', false);
+    expect(state.updateFormField).not.toHaveBeenCalledWith('status', false);
     expect(state.updateFormField).toHaveBeenCalledWith('exitAfterCapture', true);
   });
 
@@ -175,7 +175,7 @@ describe('quick actions editor output', () => {
     );
 
     expect(selects[2]?.disabled).toBe(true);
-    expect(checkboxes).toHaveLength(1);
+    expect(checkboxes).toHaveLength(0);
   });
 
   it('does not offer clipboard delivery for window or screen capture', async () => {

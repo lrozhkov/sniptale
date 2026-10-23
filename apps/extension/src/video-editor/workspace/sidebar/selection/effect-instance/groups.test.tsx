@@ -227,10 +227,12 @@ it('preserves an off-scene handle coordinate when committing its existing value'
     [...container.querySelectorAll('[data-semantic]')].map((node) =>
       node.getAttribute('data-semantic')
     )
-  ).toEqual(['effects', 'content', 'typography', 'appearance', 'animation']);
+  ).toEqual(['effects', 'content', 'typography', 'appearance', 'geometry', 'animation']);
   const input = [...container.querySelectorAll<HTMLInputElement>('input')].find((node) =>
     node.getAttribute('aria-label')?.endsWith('· X')
   )!;
+  expect(input.closest('[data-semantic]')?.getAttribute('data-semantic')).toBe('geometry');
+  expect(container.querySelectorAll('input[aria-label$="· X"]')).toHaveLength(1);
   act(() => input.focus());
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '-150');

@@ -1,3 +1,4 @@
+import { REVIEW_KEY_VIEWPORT_WIDTH } from '../../features/video/project/action-feedback/key-animation';
 import { measureKeystroke } from '../../features/video/composition/draw/effects/keystrokes';
 import { resolveVideoMediaShadowParams } from '../../features/video/composition/canvas/media-shadow';
 import { canvasCommentBubble } from '../../features/video/review/comments';
@@ -9,7 +10,7 @@ import {
   quickEditWebcamBounds,
   quickEditWebcamFrameAt,
 } from '../../features/video/review/advanced/webcam';
-import { resolveQuickEditWatermarkTile } from '../../features/video/review/advanced/watermark';
+import { resolveQuickEditWatermarkTile } from '../../features/video/project/scene/watermark';
 import type { ReviewCaptionReservation } from '../../features/video/review/caption-plan';
 import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
 import type { PreviewScene } from './preview-scene';
@@ -92,7 +93,7 @@ function reserveCaptionKeys(args: ReservationInput, add: AddReservation) {
     const measured = measureKeystroke(
       context,
       { event: { label: cue.label }, keyStyle: cue.settings.style },
-      output.width / 1920,
+      output.width / REVIEW_KEY_VIEWPORT_WIDTH,
       { x: 0, y: 0, ...output }
     );
     if (measured)

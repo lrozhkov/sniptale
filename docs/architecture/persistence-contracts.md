@@ -398,3 +398,265 @@ Crop edits use the existing content operation and workspace queue. Revision and 
 Gallery workspace colors belong to project UI settings, outside content history and export. Optional `ui.workspaceColors` stores independent light and dark values. Missing values use the resolved theme token without a default write. Advanced schema22, mediaLibrary26 and database31 prevent older writers from dropping the map. The additive migration preserves existing rows and immutable media. The existing UI autosave queue owns changes and retry.
 
 Gallery track controls use advanced schema23, mediaLibrary27 and database32. The additive migration preserves existing rows and immutable media. Optional UI gates separate original audio, voiceover, music and text. Legacy voiceover and music gates use the grouped audio value. Legacy lock flags remain admitted and retained, but no longer restrict Gallery editing. The editor exposes no lock command. The review session orders master control changes after accepted field captures. Notes, history commands and accepted receipt recovery retain their existing behavior. Master changes preserve instance settings and update legacy enable flags atomically. Undo, Redo and return to history start restore these gates with the history cursor in one candidate. Local and durable history use the same cursor transition. Legacy lock data remains outside history. Reload discards failed control requests and invalidates queued continuations.
+
+## Tour image-window appearance
+
+Tour Appearance owns the optional global `stage.windowHeader`. Every image slide uses this header. Optional `imagePlacement` retains the bitmap center and scale independently from timed cameras. Original source dimensions and normalized targets remain unchanged.
+
+Database34 and scenarioProjects8 admit these fields through a metadata-only upgrade. The upgrade preserves current projects, saved history, media and editor documents. Earlier writers refuse the newer contract before mutation. Ordinary reads do not write missing defaults. The existing Scenario aggregate writer owns saves, revision refusal and recovery. Portable Scenario JSON retains header PNG data and source placement through the existing codec.
+
+## Montage original audio
+
+Montage stores original-audio attenuation in project JSON version 6. Each attenuation override belongs to one audio take. The take records a volume from 0 to 1 and exact project-local asset and source-instance targets. These targets do not acquire resource ownership or storage access. Unresolved targets remain inert.
+
+Preview and export multiply this attenuation separately from the manual gain envelope. Overlapping overrides use their minimum volume. Each override follows the current result interval of its audio take. Hiding the owning audio track temporarily excludes its override. Showing the track restores the same binding. Individual take volume and mute settings do not remove the binding.
+
+Splitting a target preserves its source-instance identity. Duplicating a linked group remaps targets in its copied takes. Duplicating only a take retains its explicit targets. Removing one override leaves other overrides and manual gains unchanged.
+
+Content mutations promote the project to version 6 when an override is present. Later mutations retain version 6 after removal of the last override. Versions 2–5 remain readable when this field is absent. Older project readers refuse version 6 before publication. This change does not require a physical database migration.
+
+
+## Montage audio track masters
+
+Project JSON version 7 admits optional `audioVolume` from 0 to 2 on AUDIO tracks. Omission means 1. Versions 2–6 remain readable without this field. Older readers refuse version 7. Content mutations promote the project to version 7 when a track has this field. Later mutations retain version 7 after field or track removal.
+
+Preview and export multiply the track master separately from clip gain, fades, transitions, and original attenuation. Master edits preserve authored clip fields. A zero master does not remove original attenuation bindings. Track visibility remains a separate gate. Independent EffectV1 audio retains its own gain.
+
+The existing project mutation, history, and save owners control these edits. Opening a project does not write a default master. This change does not require a physical database migration.
+
+
+## Audio fade authoring and export phase
+
+Gallery and Montage share the audio fade limit and linear envelope geometry. Audio fields accept up to 60 seconds, bounded by clip duration. Visual fade commands retain their five-second limit. An AUDIO fade command changes only its selected clip. Visual commands retain their existing linked operation.
+
+Gallery adapters preserve source-time phases. Montage adapters preserve result-time phases. Overlapping fades use the minimum of both ramps. Independent gain stages multiply manual envelopes, fades, original attenuation, and transitions.
+
+The offscreen collector derives `audioFadePhase` for each renderable media clip. It replaces imported properties with canonical phase data. Partial exports retain authored fade durations and advance the phase offset. This field belongs only to the export plan. It adds no durable field or persistence writer.
+
+
+## Montage media gain interpretation
+
+Preview and export use the existing `getClipGainRange` rule for media clips. Each explicit absolute endpoint takes priority over legacy multiplier fields. An absent endpoint uses the legacy volume and envelope. The existing rule bounds each legacy factor and final endpoint from 0 to 2.
+
+Export derives canonical endpoints in a temporary media plan before range cropping. The plan multiplies track volume once, separately from fades, original attenuation and transitions. Opening and direct export interpret admitted legacy projects consistently. Rendering does not rewrite the supplied project or its durable gain fields. EffectV1 audio plans retain their independent gain semantics.
+
+
+## Camera reflection in Montage
+
+Project JSON version 8 admits optional `cameraMirrored` on VIDEO clips. The value must be a boolean. Omission means false. Versions 2–7 remain readable without this field. Older readers refuse version 8. Mutations retain version 8 after removal of the field or clip. Opening does not write a default.
+
+Only clips on CAMERA tracks apply reflection. Other VIDEO clips retain the setting without applying it. Reflection changes camera pixels inside the cropped window. It preserves source clocks, placement, masks, shadows and window decoration. Source-bound action positions follow reflected pixels. Their glyphs remain upright.
+
+The existing camera command, project mutation, history and save owners control these edits. This change adds no resource writer or physical database migration.
+
+
+### Media window shadow colors
+
+Video-project schema 9 admits `shadowColor` on VIDEO and IMAGE clips. The field contains a bounded color that the foundation parser supports. Versions 2–8 refuse this field. Readers refuse future versions. Mutations retain schema 9 after removal. Opening does not write default colors.
+
+Color belongs to each media window. It does not change source bytes, placement, source time, or EffectV1 settings. Zero intensity retains the color. Mode changes retain authored colors. A missing color uses the existing mode default. Track application copies the source color and removes a target color when the source uses the default. Existing mutation, history, save, and export owners retain authority.
+
+
+### Camera circle windows
+
+Video-project schema 10 admits the circle shape on VIDEO camera appearances. Versions 2–9 refuse this shape. Readers refuse future versions. Mutations retain schema 10 after removal. Opening does not write default appearances. Non-camera VIDEO clips retain dormant settings.
+
+The visible circle fits inside the authored pixel frame. The original frame and source clock remain unchanged. Gallery and Montage use the same frame and shape parser. Camera drawing, shadows, crops, and action editing use this geometry. Action editing evaluates the current camera position before source projection. Crop and mirror apply before rotation and transition scaling. Existing history, save, resource, and export owners retain authority.
+
+
+### Camera position crops
+
+Video-project schema 11 admits an optional crop on VIDEO camera positions. Versions 2–10 refuse this field. Readers refuse future versions. Mutations retain schema 11 after removal. An absent crop inherits the clip crop. Opening does not write defaults.
+
+Crop values follow source time and the existing position transition. Cuts and rates do not rewrite these anchors. Shape, roundness, reflection, and shadow remain clip settings. Position reset removes its crop override. Existing commands, history, save, and resource owners retain authority. Gallery and Montage share crop validation and interpolation arithmetic. Each editor retains its transition scheduling.
+
+
+### Camera hidden intervals
+
+Video-project schema 12 admits optional `cameraHiddenRanges` on VIDEO clips. Versions 2–11 refuse this field, including an empty list. Readers refuse future versions. Mutations retain schema 12 after removal. Opening does not write defaults.
+
+Each clip retains at most 512 ordered intervals with unique IDs. Source times are finite seconds from 0 to 86400. The start is less than the end. Intervals can touch but cannot overlap. Visibility includes the start and excludes the end.
+
+Only CAMERA tracks apply these intervals. Other VIDEO clips retain dormant intervals. Montage uses camera source time. Gallery uses main source time before its camera offset. Both editors share interval validation and membership. Conversion must adapt these clocks.
+
+Hidden intervals preserve camera trajectories, crops, source bytes, and audio. The inspector continues to edit hidden cameras. Cuts, rates, movement, and duplication retain source anchors. Existing commands, history, save, resource, and export owners retain authority. This change adds no writer or physical database migration.
+
+
+### Montage source crop
+
+Video-project schema 13 admits optional `sourceCrop` on VIDEO and IMAGE clips. Versions 2–12 refuse this field. Readers refuse future versions. Mutations retain schema 13 after removal. Opening does not write defaults.
+
+The crop uses normalized coordinates in the original source. Both editors share crop validation and inverse rectangle geometry. Each clip retains its own crop. Crop edits preserve clip placement, scene dimensions, source clocks, audio, and immutable media. Explicit fitting uses the cropped source dimensions. Applying visual settings to a track preserves each target crop.
+
+Drawing and source-point projection use the same fitted geometry. Headers join the cropped media plane. Source points outside the crop do not project into the scene. Manual scene points remain independent. Recorded separate cursors retain their source points and easing. Camera containment uses the original source binding and exact eased interval bounds.
+
+The existing command, history, save, and resource owners retain authority. Preview seeks do not reload the source. A preview failure preserves editable metadata. This change adds no persistence writer or physical database migration.
+
+## Montage scene background variants
+
+Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–19 without these fields and refuse future versions.
+
+The remembered object contains at most one solid, gradient and image variant. Variants cannot contain another remembered object. Gradient variants retain authored animation. Image variants retain their asset identity and optional fit mode. Missing `imageFit` retains legacy cover rendering without a write.
+
+Background changes retain the outgoing variant through the existing project updater, history and save authority. The current project supplies remembered values when another edit uses stale UI data. Undo and redo restore complete snapshots. Later mutations retain schema 14 after field removal.
+
+Dormant image assets remain in the project asset graph. Existing save, backup and deletion owners retain their bytes. Export admission checks active and dormant image references. Preview loads only the active image. Failed decoding retains the authored settings and existing fallback paint.
+
+These settings apply to the project canvas. They do not resize clips, change source clocks or define source window layout. No database store, resource authority or asynchronous writer changes.
+
+Source deletion with user approval removes matching active and remembered image references. It preserves other variants. Active image removal restores the remembered solid variant or uses the legacy fallback.
+
+## Montage rounded media windows
+
+Project schema 15 admits `windowCornerRadius` on VIDEO and IMAGE clips. The value is a finite number from zero through 4096 in logical project pixels. An absent value keeps the rectangular window. Older schemas refuse this field. Reset retains schema 15. Reading does not add defaults or change source data.
+
+The radius applies to the visible decorated window, including its header. Rendering limits the radius to half the smaller window dimension. Source crop precedes fitting. Preview and export use the same mask. Source-point admission and continuous cursor containment use shared rounded-window geometry. Gallery retains its coordinate adapter and uses the same clearance calculation.
+
+Camera tracks retain this field without applying it. Their camera appearance remains authoritative. Ordinary track style application copies or removes the radius while retaining each target source crop. Existing project mutation, history, save, revision and resource owners retain authority. This field adds no writer, queued operation, database store or physical migration.
+
+
+## Montage scene background blur
+
+Project schema 16 admits optional `sceneBackground.blur`. The value is finite and ranges from zero through 25 logical project pixels. Older schemas refuse the field. Readers accept schemas 2–19 without the field and refuse future versions. Reading adds no defaults. Reset and removal retain schema 16.
+
+Blur applies to the complete gradient or image background after fitting and animation. Solid backgrounds retain the value without applying it. Kind changes, image replacement and source deletion preserve this common value. Remembered paint variants cannot contain blur. Clips, headers, shadows, actions and transitions retain their own rendering semantics.
+
+The existing project updater applies scalar blur edits to the current background. Undo, redo and save use existing snapshots and revision authority. Invalid edits and repeated equal edits preserve project identity and history. This field adds no writer, queued operation, store or physical database migration.
+
+Both editors use the same edge-padded Canvas filter. Montage converts project pixels to output pixels once. Its temporary raster limits each side to 2048 pixels and the filter radius to 128 pixels. Three exclusive surfaces require less than 64 MiB. The existing pool owns allocation and release. Failed filtering releases surfaces and fails only the affected rendering operation. Export publishes static cache entries only after successful drawing.
+
+Static background rasters retain one exclusive pool lease for at most one second. Cache identity includes paint, output dimensions, blur scale and decoded image identity and size. Changes release the previous lease before allocation. Animated gradients bypass this cache. Expiry clears the image reference. Failed drawing does not publish a cache entry.
+
+## Montage media padding and decorated fitting
+
+Padding is an explicit framing command for one ordinary VIDEO or IMAGE clip. The existing transform owns its placement. The command adds no persisted padding field or schema version. It preserves source crop, header, opacity, timing, effects and other clips. Explicit fitting centers the window and resets rotation. Later placement remains free.
+
+The inspector measures the decorated window after rotation. Its editable inset leaves at least one available canvas pixel. Impossible values fail without changing history. Unchanged rounded input preserves exact placement. Invalid, locked, missing-source and CAMERA edits retain the current project. Repeated equal commands add no history entry.
+
+Ordinary fitting uses the cropped source and its header as one plane. Camera fitting keeps its existing adapter and dormant header behavior. Ordinary scale controls accept 1–300 percent. Camera scale controls retain 10–300 percent. Existing readers already admit these values. Fit percentage remains a preset hint beside freely editable transforms.
+
+Gallery and Montage share the inset calculation. Gallery retains its enabled-background policy and extra-header output size. This command uses existing mutation, history and save owners. It adds no writer, resource owner or database migration.
+
+
+## Montage motion blur phases
+
+Project schema 17 admits optional `motionBlur` on a `MotionRegion`. The shared Gallery parser validates the `enter`, `exit` and `link` settings. Each setting contains a boolean `enabled` and a finite `strength` from zero through one. Unknown phase keys do not enter the admitted model. Earlier schemas refuse the field. Readers accept schemas 2–19 and refuse future versions.
+
+Reading adds no defaults. Absent phase settings retain the legacy `motionBlurAmount` behavior. An explicit phase map overrides that scalar. A missing phase in an explicit map stays disabled. Disabled settings retain their strength. The first phase edit preserves the other legacy strengths.
+
+Entrance and exit use the retained animation clock. An outgoing source region owns link blur, including edits through the selected connection. Connected entrance and exit phases do not blur. Explicit phases do not blur during a hold or an instantaneous transition. Exposure cannot sample a different camera across a hard boundary. Continuous source-bound split parts retain their shared exposure when their clocks and camera geometry agree.
+
+The existing project updater merges scalar phase edits into its current region. Invalid, repeated, missing-target and locked edits preserve project identity and history. Undo, redo, save and portable restore retain authored settings. Clip duplication copies bound motion regions with independent identities and maps connections between copied regions. It removes connections to sources outside the copied selection. Unbound scene regions remain unchanged.
+
+Mutation and clearing retain schema 17. This field adds no writer, queued operation, store or physical database migration. The existing save revision owner remains authoritative.
+
+
+## Montage camera phase transitions
+
+Project schema 18 admits optional `phaseTransitions` on a `MotionRegion`. The partial map contains `enter` and `exit` types. Valid types are `none`, `linear`, `ease-in-out`, `ease-out` and `instant`. Earlier schemas refuse the map. Readers accept schemas 2–19 and refuse future versions. Unknown map keys do not enter the model.
+
+The existing `zoomInDuration` and `zoomOutDuration` fields remain authoritative. Reading adds no defaults. An absent phase retains its scalar easing curve and endpoint behavior. Explicit `ease-in-out` uses the Gallery smoothstep curve. Legacy scalar `EASE_IN_OUT` retains its two-piece cubic curve.
+
+An explicit `none` consumes no transition time. An exit with this type holds the camera target until the region ends. `instant` remains a separate mode. Editing one phase reserves the other active duration. Two explicit phases fit their active durations proportionally into the retained animation interval. An explicit duration is finite and ranges from zero through 60 seconds.
+
+New manual and automatic camera regions use explicit Gallery smooth defaults. The existing project mutation owner promotes these projects to schema 18. Factory calls without phase settings retain their legacy contract. Mutation and clearing retain schema 18.
+
+The existing updater merges each scalar command into the current region. Invalid, equal, missing-target and locked edits preserve identity and history. Undo, redo, save and portable restore retain the settings. Source-bound split parts retain their animation clock. Clip duplication copies bound settings into independent region identities.
+
+Connected regions retain their phase settings. Existing connection topology suppresses connected entrance and exit phases. Connection easing retains its existing owner. The shared transition math adds no writer, store, resource or physical database migration.
+
+
+## Montage spatial camera settings
+
+Project schema 19 admits optional `perspective`, `depthOfField` and `spatialReference` fields on a `MotionRegion`. Earlier schemas refuse these fields. Readers accept schemas 2–19 and refuse future versions. Reading adds no defaults. Mutations retain schema 19 after removal.
+
+Both editors use the same perspective and depth parsers. Perspective angles X and Y range from −60 through 60 degrees. Angle Z ranges from −180 through 180 degrees. Perspective strength ranges from zero through one. Depth mode is `area` or `depth`. Depth position, width and strength range from zero through one. Softness ranges from 0.01 through one. Disabling a setting retains its values.
+
+The reference rectangle uses normalized project-canvas coordinates. Omission means the whole canvas. Coordinates range from zero through one. Dimensions are positive and do not exceed one. Each far edge must not exceed one by more than 1e-9. This tolerance covers floating-point addition. Source binding retains its timing and lifecycle meaning. Clip placement does not move the reference.
+
+The existing project updater merges spatial scalar commands into the current settings. Invalid, equal, missing-target and locked commands preserve project identity and history. Reset removes only the reference rectangle. Undo, redo, save, hydration and portable restore retain authored settings. Source split, rate changes and duplication retain the settings. Duplicate regions have independent identities.
+
+Evaluated poses and GPU resources do not enter these fields. The change adds no store, writer or physical database migration.
+
+
+## Montage bookend presets
+
+Project schema 25 admits optional `bookendPresets`. Each intro and outro slot retains image and video variants independently of its active mode. Earlier schemas refuse this field. Readers refuse future schemas. Reading adds no defaults. Mutation and removal retain schema 25 or a later version.
+
+Each variant references a project material by its exact `assetId`. The reference does not contain a private resource identity. Inactive variants retain their references. Material use counts protect all retained variants from unused cleanup. Confirmed source removal clears only matching variants. Copy and portable restore preserve settings and material identities. The existing restore owner remaps private source identities separately.
+
+Both editors share media framing, image duration, video trim and audio settings. Each editor retains its source admission limits. Native trim uses source seconds and cannot exceed the accepted material duration. Explicit insertion refuses a range shorter than one project frame.
+
+A preset edit changes the recipe for future insertions. It never rebuilds existing clips. Insertion creates ordinary media clips and an editable opaque shape behind them. The linked shape follows splitting, trimming and movement. A speed edit from a source clip also retimes linked shapes with identical bounds. All affected tracks retain their lock and neighbor constraints.
+
+Recipe edits require the exact accepted project snapshot and an idle history owner. Invalid references, stale snapshots and history failures preserve the project and history. The existing mutation, history, save and revision owners retain authority. This field adds no writer, queue, store or physical database migration.
+
+## Montage composition joins
+
+Project schema 26 admits optional `compositionJoins` and transition settings in `bookendPresets`. Earlier schemas refuse these fields. Reading adds no defaults. Mutation never reduces the schema version.
+
+A join descriptor references the start or end of one ordinary image or video clip. The project accepts at most 128 descriptors. Descriptor identities and clip-edge pairs must be unique. Hydration retains valid descriptor shapes with missing clips. Export admission refuses missing anchors.
+
+Insertion records a boundary even when its transition is None. These boundaries limit adjacent composition regions. An intro boundary follows the trailing descendant after a split. An outro boundary follows the original leading clip. Movement, trim and rate changes follow the referenced edge. Deletion removes the exact anchor descriptor. Clip duplication does not copy its boundary. Project duplication preserves clip and descriptor identities.
+
+The anchor edge selects the boundary time. Adjacent explicit boundaries, including None, and the project limits define each complete composition region. Splitting a clip preserves the region and transition window. The anchor clip length does not limit them.
+
+A preset transition configures future insertions. Editing a preset never changes existing instances. Instance edits require the exact accepted project and an idle history owner. Invalid proposals, stale projects and history failures preserve the project and history. Accepted edits create one history step.
+
+Dissolve samples two complete compositions around the boundary. Samples include all tracks, camera settings, effects, captions and watermark. Samples exclude recursive joins and outer fades. The renderer applies outer fades once after the mix. Color transitions cover the current complete frame. Joins never change montage duration or crossfade audio.
+
+Native preview uses the project frame rate. Export and size estimation use the selected output frame rate. Fractional rates remain fractional. The Native cadence normalizes rates below one to one. Gallery retains its rational microsecond clock. An unavailable dissolve endpoint fails the affected render request without partial publication. Other timestamps remain available.
+
+The shared canvas owner retains at most two immutable endpoint copies. Native adapters use independent paused media with borrowed source URLs. The existing job or preview scheduler owns cancellation and disposal. Cleanup releases samplers before it revokes borrowed URLs. No new source reader, writer, store or physical database migration exists.
+
+Caption admission checks each held sample at its exact time, including samples outside the selected export range.
+
+Selected-clip export removes whole-composition joins from a temporary subset. A complete selection retains the original project. Project and selected-range exports retain joins. None of these projections changes the accepted root. Hybrid MP4 uses complete composition rendering inside active join windows. Existing fast paths remain available outside those windows.
+
+Both editors share controlled fields and transition settings. Each editor retains timing, resource admission, preview and history ownership. The removed on-video notes interface remains absent.
+
+
+## Montage camera media clocks
+
+Montage schema 32 admits optional `cameraTiming` on VIDEO clips. A camera placement retains this field after a move to another compatible video track. Earlier schemas refuse this field. Readers retain legacy camera behavior when the field is absent.
+
+`offsetSeconds` ranges from -86400 through 86400. The clip source clock owns positions, hidden intervals, and edits. Media decoders subtract `offsetSeconds` from that clock. They skip timestamps outside `[0, mediaDuration)`. Missing coverage does not repeat an endpoint frame.
+
+The `bounded` transition policy caps effective position transitions at the next position. Interpolation starts at the previous authored destination and crop. Stored transition durations remain unchanged. Legacy cameras retain continuous interruption.
+
+Gallery conversion creates a linked camera placement for each retained source slice. It retains camera settings when no camera pixels overlap that slice. Disabled tracks retain their placements and immutable media references. Camera offsets do not change montage duration.
+
+Preview, export, thumbnails, and crop previews use the media clock. Source text and camera controls use the authored clock. Unmuted camera audio uses only the covered media interval. Project audio scopes retain authored intervals. Recognition maps those intervals to media time for decoding. Recognized text retains authored time. Existing gain and fade phases retain their authored times.
+
+The existing project mutation owner promotes edits that contain `cameraTiming` to schema 32. Existing history, resource admission, retention, and guarded publication owners retain authority. This field adds no writer, store, or physical database migration.
+
+
+## Montage cursor source observations
+
+Montage schema 33 admits optional `cursorTrack.sourceObservations`. Earlier schemas refuse this field. Each group names one recording and one live video source instance. Its samples retain native source time, normalized recording points, capture segments, observation clocks, and observation gaps.
+
+Raw recording observations follow the existing recording admission policy. The group collection and manual timeline samples retain the existing project item limits. Complete source observations can exceed the manual sample limit. Admission bounds projected samples by the retained source count and the number of owning clips. Missing instances, conflicting assets, invalid source times, duplicate identities, and malformed observation fields refuse admission.
+
+The existing cursor owner materializes ordinary project-time samples for each retained clip. It interpolates cut boundaries from the full source observations. Trim, rate, move, split, and hydration repeat this projection without deleting source facts. Stable sample identities retain explicit Native appearance and interpolation edits. Duplication gives the copied group a new source instance. Removal of the last owning clip removes only that instance. History retains the previous snapshot for Undo.
+
+Both editors use the same captured focus derivation. Full-source movement, click, release, and dwell facts determine the preferred trajectory before montage projection. Sparse manual geometry and Bezier controls remain separate authored state. Trusted observations use their complete source coverage and linear captured geometry. A cursor skin or focus edit cannot create an observation inside a capture gap.
+
+Gallery conversion retains every observation, including observations inside cuts. It maps authored focus identities to the destination source instance. Gallery paints no independent cursor. The destination retains captured appearance controls with a hidden skin until the user changes them.
+
+Recording observations can extend beyond the encoded media duration. Source groups retain these observations with their original times within the existing finite 0–86400 second limit. Projection limits timeline samples and source anchors to the owning clip. It can use a later observation to interpolate the final visible position. This corrects schema 33 admission without changing its stored fields or the original recording.
+
+The existing immutable project revision owns derived focus caches. Preview cache signatures include complete retained source observations. A source fact outside the visible clip can affect its inferred trajectory. This field adds no storage writer, resource store, or deletion authority. Existing guarded publication and source retention contracts remain authoritative.
+
+## Gallery transfer preservation
+
+Montage schema 45 admits optional `resultEndLimits` on project-bound text documents. Each entry identifies an existing fragment and its visible result-time end. Earlier schemas refuse this field. Mutation retains schema 45 after field removal.
+
+Gallery transfer records limits for result fragments that extend beyond the retained main composition. Caption projection applies these limits before bookends can extend visibility. Original fragments, words, and authored times remain stored. Intro insertion shifts limits with their fragments.
+
+Text and style edits retain the limits. An explicit timing edit releases only the affected fragment limit. Deletion removes its limit. New fragments have no inherited limit. Existing rewrite admission refuses excluded or partially excluded fragments before disclosure.
+
+Recording-source actions and signals retain all admitted source facts. Their counts do not use the authored-event limit. Authored events retain that limit. Shape, identity, and reference checks remain mandatory.
+
+Transfer preparation keeps new private Library bindings in memory. The destination transaction rechecks source authority and publishes the binding, byte ownership, and project together. Refusal or transaction failure publishes none of them. Retry creates a new candidate. No compensating deletion can remove another accepted destination or shared source bytes.
+
+Audio acquisition reconciles an insufficient metadata duration through the existing bounded Gallery decoder. It uses the retained take and replacement endpoints. It never extends duration to an unsupported requested endpoint. Source bytes and authored edits remain unchanged.

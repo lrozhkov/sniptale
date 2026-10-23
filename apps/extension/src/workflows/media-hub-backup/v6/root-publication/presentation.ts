@@ -11,15 +11,20 @@ export async function preparePortableAggregatePresentation(args: {
 }): Promise<AggregatePresentationEntry | null> {
   if (!args.metadata) return null;
 
-  const thumbnailBlob = await readAssetFile(
+  const thumbnailFile = await readAssetFile(
     args.getObjectRef(args.metadata.thumbnailObjectId),
     `${args.targetId}-presentation-thumbnail`
   );
-  const previewBlob = args.metadata.previewObjectId
+  const thumbnailBlob = new Blob([await thumbnailFile.arrayBuffer()], { type: thumbnailFile.type });
+  const previewFile = args.metadata.previewObjectId
     ? await readAssetFile(
         args.getObjectRef(args.metadata.previewObjectId),
         `${args.targetId}-preview`
       )
+    : undefined;
+  // Restore cleanup removes staging files after publication.
+  const previewBlob = previewFile
+    ? new Blob([await previewFile.arrayBuffer()], { type: previewFile.type })
     : undefined;
   const presentation = parseAggregatePresentationEntry({
     ...args.metadata.entry,

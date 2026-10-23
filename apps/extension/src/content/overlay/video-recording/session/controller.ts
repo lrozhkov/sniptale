@@ -1,15 +1,21 @@
 import {
+  applyWebcamPresentationPatch,
+  type WebcamPresentationPatch,
+} from '../../../../features/video/recording/webcam-presentation';
+import {
   useCallback,
   useEffect,
   useMemo,
   useReducer,
   useRef,
+  useState,
   type Dispatch,
   type MutableRefObject,
 } from 'react';
 import type {
   VideoRecordingMediaDevice,
   VideoRecordingSurfaceSnapshot,
+  StartSavedTabVideoRecordingMessage,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import {
   INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
@@ -18,7 +24,8 @@ import {
   type VideoRecordingToolbarState,
   type VideoRecordingToolbarStateAction,
 } from './state';
-import { pickEmbeddedCameraGeometry } from '../camera/geometry';
+import { constrainEmbeddedCameraGeometry, pickEmbeddedCameraGeometry } from '../camera/geometry';
+import { resolveToolbarDockViewport } from '../../toolbar/shell/docking';
 import {
   activateVideoRecordingSurface,
   releaseVideoRecordingSurface,
@@ -36,6 +43,10 @@ import { projectVideoRecordingSurfaceSnapshot } from './snapshot-projection';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../../../platform/i18n';
+import {
+  createRecordingPermissionFrameOwner,
+  RecordingPermissionFrameError,
+} from './permission-frame';
 import {
   isVideoRecordingStartFailureCode,
   type VideoRecordingStartFailureCode,
@@ -77,6 +88,16 @@ function classifyRecordingStartError(error: unknown): VideoRecordingStartFailure
 }
 
 type ApplySurfaceSnapshot = (snapshot: VideoRecordingSurfaceSnapshot, token?: string) => void;
+
+function requiresMediaPermission(value: unknown): boolean {
+  return (
+    typeof value === 'object' && value !== null && Reflect.get(value, 'permissionRequired') === true
+  );
+}
+
+function isAcceptedMediaResult(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && Reflect.get(value, 'result') === 'accepted';
+}
 
 function parseMediaDevicesResult(value: unknown): VideoRecordingMediaDevice[] {
   if (typeof value !== 'object' || value === null || !('mediaDevices' in value)) {
@@ -125,7 +146,7 @@ function useSurfaceRuntimeSubscriptions(
     () =>
       subscribeToVideoRecordingRuntimeState((runtimeState) => {
         const identity = identityRef.current;
-        if (!identity) return;
+        if (!identity || identity.recordingId === null) return;
         const state = stateRef.current;
         const recordingId =
           runtimeState.status === VideoRecordingStatus.IDLE ? null : identity.recordingId;
@@ -135,6 +156,7 @@ function useSurfaceRuntimeSubscriptions(
           cursorSpotlightEnabled: state.spotlightEnabled,
           cursorDimmingEnabled: state.spotlightDimmingEnabled,
           cursorClickAnimationEnabled: state.spotlightClickAnimationEnabled,
+          ...(state.cursorEffects ? { cursorEffects: state.cursorEffects } : {}),
           documentGeneration: identity.documentGeneration,
           duration: runtimeState.duration,
           entry: 'manual',
@@ -218,13 +240,23 @@ function useSurfaceStart(
 ) {
   const startAttemptRef = useRef(0);
   const start = useCallback(
-    async (event?: Event) => {
+    async (
+      event?: Event,
+      confirmation: Pick<
+        StartSavedTabVideoRecordingMessage,
+        'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+      > = {}
+    ) => {
       if (!event) return;
       const attempt = ++startAttemptRef.current;
       dispatch({ type: 'starting' });
       try {
-        const response = await startSavedTabVideoRecording(event);
+        const response = await startSavedTabVideoRecording(event, confirmation);
         if (attempt !== startAttemptRef.current) return;
+        if (response?.success && response.confirmationRequired === true) {
+          dispatch({ type: 'idle' });
+          return 'confirmation-required' as const;
+        }
         if (!response?.success || !response.snapshot) {
           const code = isVideoRecordingStartFailureCode(response?.failureCode)
             ? response.failureCode
@@ -240,14 +272,16 @@ function useSurfaceStart(
           } else {
             dispatch({ type: 'failed', error: recordingStartError(code) });
           }
-          return;
+          return 'failed' as const;
         }
         applySnapshot(response.snapshot, response.surfaceToken);
+        return 'started' as const;
       } catch (error) {
         if (attempt !== startAttemptRef.current) return;
         const code = classifyRecordingStartError(error);
         logger.warn('Saved tab recording start failed', { code });
         dispatch({ type: 'failed', error: recordingStartError(code) });
+        return 'failed' as const;
       }
     },
     [applySnapshot, dispatch]
@@ -260,6 +294,7 @@ function useSurfaceCommandController(args: {
   dispatch: Dispatch<VideoRecordingToolbarStateAction>;
   identityRef: MutableRefObject<SurfaceIdentity | null>;
   stateRef: MutableRefObject<VideoRecordingToolbarState>;
+  permissionOwner: ReturnType<typeof createRecordingPermissionFrameOwner>;
 }) {
   const commandWithResult = useCallback(
     async (value: Parameters<typeof sendVideoRecordingSurfaceCommand>[1], projectError = true) => {
@@ -298,27 +333,54 @@ function useSurfaceCommandController(args: {
     },
     [commandWithResult]
   );
-  const setMediaEnabled = useCallback(
-    async (kind: 'camera' | 'microphone', enabled: boolean) => {
-      const state = args.stateRef.current;
-      const previous = kind === 'camera' ? state.cameraEnabled : state.microphoneEnabled;
-      if (kind === 'microphone') args.dispatch({ type: kind, enabled });
+  const runMediaCommand = useCallback(
+    async (
+      value: Parameters<typeof sendVideoRecordingSurfaceCommand>[1],
+      deviceKind: 'audioinput' | 'videoinput',
+      requestPermission: boolean
+    ): Promise<unknown> => {
+      const result = await commandWithResult(value, false);
+      if (!requestPermission || !requiresMediaPermission(result)) return result;
+      const identity = args.identityRef.current;
+      if (!identity) throw new Error('Recording surface is unavailable');
       try {
-        await command(
-          {
-            kind: kind === 'camera' ? 'set-webcam-enabled' : 'set-microphone-enabled',
-            enabled,
-          },
-          false
-        );
+        await args.permissionOwner.request(identity, deviceKind);
       } catch (error) {
-        if (kind === 'microphone') args.dispatch({ type: kind, enabled: previous });
+        if (error instanceof RecordingPermissionFrameError && error.presented)
+          return { mediaDevices: [] };
+        throw error;
+      }
+      if (args.identityRef.current?.surfaceSessionId !== identity.surfaceSessionId)
+        return { mediaDevices: [] };
+      try {
+        const retryCommand =
+          value.kind === 'list-media-devices' ? { ...value, requestPermission: false } : value;
+        const retry = await commandWithResult(retryCommand, false);
+        if (requiresMediaPermission(retry)) throw new Error(recordingActionError());
+        return retry;
+      } catch (error) {
+        args.permissionOwner.release(deviceKind);
         throw error;
       }
     },
-    [args, command]
+    [args, commandWithResult]
   );
-  return { command, commandWithResult, setMediaEnabled };
+  const setMediaEnabled = useCallback(
+    async (kind: 'camera' | 'microphone', enabled: boolean) => {
+      const deviceKind = kind === 'camera' ? 'videoinput' : 'audioinput';
+      const live =
+        args.stateRef.current.phase === 'recording' || args.stateRef.current.phase === 'paused';
+      const result = await runMediaCommand(
+        { kind: kind === 'camera' ? 'set-webcam-enabled' : 'set-microphone-enabled', enabled },
+        deviceKind,
+        enabled
+      );
+      if (!enabled || (live && isAcceptedMediaResult(result)))
+        args.permissionOwner.release(deviceKind);
+    },
+    [args.permissionOwner, args.stateRef, runMediaCommand]
+  );
+  return { command, runMediaCommand, setMediaEnabled };
 }
 
 type VideoRecordingSurfaceControllerArgs = {
@@ -331,13 +393,16 @@ function useVideoRecordingSurfaceState(args: VideoRecordingSurfaceControllerArgs
   const toolbarRequestedCallbackRef = useRef(args.onToolbarRequested);
   modeRequestedRef.current = args.onModeRequested;
   toolbarRequestedCallbackRef.current = args.onToolbarRequested;
-  const [state, dispatch] = useReducer(
+  const [state, dispatchReducer] = useReducer(
     reduceVideoRecordingToolbarState,
     INITIAL_VIDEO_RECORDING_TOOLBAR_STATE
   );
   const identityRef = useRef<SurfaceIdentity | null>(null);
   const stateRef = useRef(state);
-  stateRef.current = state;
+  const dispatch = useCallback((action: VideoRecordingToolbarStateAction) => {
+    stateRef.current = reduceVideoRecordingToolbarState(stateRef.current, action);
+    dispatchReducer(action);
+  }, []);
   const toolbarRequestedRef = useRef(false);
   const releasedSurfaceSessionIdRef = useRef<string | null>(null);
   const drawingOwner = useMemo(() => createRecordingDrawingOwner(), []);
@@ -365,7 +430,7 @@ function useVideoRecordingSurfaceState(args: VideoRecordingSurfaceControllerArgs
         toolbarRequestedCallbackRef.current();
       }
     },
-    [drawingOwner]
+    [dispatch, drawingOwner]
   );
 
   return {
@@ -420,6 +485,7 @@ function useVideoRecordingSurfaceDeactivation(args: {
 }
 
 type SurfaceControllerProjectionArgs = {
+  stateRef: MutableRefObject<VideoRecordingToolbarState>;
   activate: ReturnType<typeof useSurfaceActivation>;
   cameraOffer: ReturnType<typeof useCameraPeerActions>['cameraOffer'];
   cameraPeerClose: ReturnType<typeof useCameraPeerActions>['cameraPeerClose'];
@@ -428,7 +494,8 @@ type SurfaceControllerProjectionArgs = {
   dispatch: Dispatch<VideoRecordingToolbarStateAction>;
   drawingOwner: ReturnType<typeof createRecordingDrawingOwner>;
   loadMediaDevices: (
-    deviceKind: 'audioinput' | 'videoinput'
+    deviceKind: 'audioinput' | 'videoinput',
+    requestPermission?: boolean
   ) => Promise<VideoRecordingMediaDevice[]>;
   setMediaEnabled: ReturnType<typeof useSurfaceCommandController>['setMediaEnabled'];
   start: ReturnType<typeof useSurfaceStart>['start'];
@@ -443,12 +510,17 @@ function createSurfaceMediaActions(args: SurfaceControllerProjectionArgs) {
     onCameraPeerClose: args.cameraPeerClose,
     onCameraDeviceChange: (deviceId: string) =>
       args.command({ kind: 'select-webcam-device', deviceId }, false),
+    onCameraPresentationModeChange: (
+      mode: VideoRecordingToolbarState['webcamPresentation']['mode']
+    ) => args.command({ kind: 'set-webcam-presentation-mode', mode }, false),
     onCameraGeometryChange: (appearance: EmbeddedCameraGeometry) =>
       args.command({
         kind: 'update-embedded-camera',
         appearance: pickEmbeddedCameraGeometry(appearance),
       }),
     onMicrophoneEnabledChange: (enabled: boolean) => args.setMediaEnabled('microphone', enabled),
+    onMicrophoneGainChange: (gain: number) =>
+      args.command({ kind: 'set-microphone-gain', gain }, false),
     onMicrophoneDeviceChange: (deviceId: string) =>
       args.command({ kind: 'select-microphone-device', deviceId }, false),
     onLoadMediaDevices: args.loadMediaDevices,
@@ -467,17 +539,66 @@ function createSurfaceDrawingActions(args: SurfaceControllerProjectionArgs) {
       cursorHaloEnabled: boolean;
       cursorDimmingEnabled: boolean;
       clickAnimationEnabled: boolean;
+      cursorEffects?: NonNullable<VideoRecordingToolbarState['cursorEffects']>;
     }) => args.command({ kind: 'set-spotlight-settings', ...settings }),
   };
 }
 
 function useSurfaceControllerProjection(args: SurfaceControllerProjectionArgs) {
-  return useMemo(
-    () => ({
+  const [cameraPreview, setCameraPreview] = useState<{
+    sessionId: string | null;
+    geometry: EmbeddedCameraGeometry;
+  } | null>(null);
+  const previewRevision = useRef(0);
+  const onCameraGeometryPreview = useCallback(
+    (geometry: EmbeddedCameraGeometry | null) => {
+      previewRevision.current += 1;
+      setCameraPreview(
+        geometry
+          ? {
+              sessionId: args.state.surfaceSessionId,
+              geometry: pickEmbeddedCameraGeometry(geometry),
+            }
+          : null
+      );
+    },
+    [args.state.surfaceSessionId]
+  );
+  return useMemo(() => {
+    const media = createSurfaceMediaActions(args);
+    const preview = cameraPreview?.sessionId === args.state.surfaceSessionId ? cameraPreview : null;
+    return {
       drawingOwner: args.drawingOwner,
-      state: args.state,
+      state: preview
+        ? {
+            ...args.state,
+            webcamPresentation: { ...args.state.webcamPresentation, ...preview.geometry },
+          }
+        : args.state,
       ...createSurfaceDrawingActions(args),
-      ...createSurfaceMediaActions(args),
+      ...media,
+      onCameraGeometryPreview,
+      onCameraGeometryChange: async (patch: Omit<WebcamPresentationPatch, 'mode'>) => {
+        const revision = previewRevision.current;
+        try {
+          await media.onCameraGeometryChange(
+            pickEmbeddedCameraGeometry(
+              applyWebcamPresentationPatch(
+                {
+                  ...args.stateRef.current.webcamPresentation,
+                  ...constrainEmbeddedCameraGeometry(
+                    args.stateRef.current.webcamPresentation,
+                    resolveToolbarDockViewport(1)
+                  ),
+                },
+                patch
+              )
+            )
+          );
+        } finally {
+          if (revision === previewRevision.current) setCameraPreview(null);
+        }
+      },
       onActivate: args.activate,
       onCancelStart: async () => {
         await args.command({ kind: 'cancel-start' });
@@ -488,9 +609,8 @@ function useSurfaceControllerProjection(args: SurfaceControllerProjectionArgs) {
       onResume: () => args.command({ kind: 'resume' }),
       onStart: args.start,
       onStop: () => args.command({ kind: 'stop' }),
-    }),
-    [args]
-  );
+    };
+  }, [args, cameraPreview, onCameraGeometryPreview]);
 }
 
 export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceControllerArgs) {
@@ -516,20 +636,52 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
 
   const activate = useSurfaceActivation(applySnapshot);
   const { start, startAttemptRef } = useSurfaceStart(applySnapshot, dispatch);
+  const permissionOwner = useMemo(() => createRecordingPermissionFrameOwner(), []);
+  const recordingOwnsSourcesRef = useRef(false);
+  useEffect(() => () => permissionOwner.release(), [permissionOwner, state.surfaceSessionId]);
+  useEffect(() => {
+    const active = state.phase === 'recording' || state.phase === 'paused';
+    if (active !== recordingOwnsSourcesRef.current) permissionOwner.release();
+    recordingOwnsSourcesRef.current = active;
+  }, [permissionOwner, state.phase]);
 
   const commandControllerArgs = useMemo(
-    () => ({ applySnapshot, dispatch, identityRef, stateRef }),
-    [applySnapshot, dispatch, identityRef, stateRef]
+    () => ({ applySnapshot, dispatch, identityRef, stateRef, permissionOwner }),
+    [applySnapshot, dispatch, identityRef, stateRef, permissionOwner]
   );
-  const { command, commandWithResult, setMediaEnabled } =
+  const { command, runMediaCommand, setMediaEnabled } =
     useSurfaceCommandController(commandControllerArgs);
   const loadMediaDevices = useCallback(
-    async (deviceKind: 'audioinput' | 'videoinput'): Promise<VideoRecordingMediaDevice[]> => {
-      const result = await commandWithResult({ kind: 'list-media-devices', deviceKind }, false);
+    async (
+      deviceKind: 'audioinput' | 'videoinput',
+      requestPermission = true
+    ): Promise<VideoRecordingMediaDevice[]> => {
+      const result = await runMediaCommand(
+        { kind: 'list-media-devices', deviceKind, requestPermission },
+        deviceKind,
+        requestPermission
+      );
       return parseMediaDevicesResult(result);
     },
-    [commandWithResult]
+    [runMediaCommand]
   );
+  useEffect(() => {
+    const refresh = () => {
+      if (
+        document.visibilityState !== 'visible' ||
+        !identityRef.current ||
+        stateRef.current.phase !== 'idle'
+      )
+        return;
+      void loadMediaDevices('audioinput', false).catch(() => undefined);
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [identityRef, loadMediaDevices, stateRef]);
   const deactivationArgs = useMemo(
     () => ({
       command,
@@ -550,7 +702,12 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
       state.phase,
     ]
   );
-  const deactivate = useVideoRecordingSurfaceDeactivation(deactivationArgs);
+  const deactivateSurface = useVideoRecordingSurfaceDeactivation(deactivationArgs);
+  const deactivate = useCallback(async () => {
+    const accepted = await deactivateSurface();
+    if (accepted) permissionOwner.release();
+    return accepted;
+  }, [deactivateSurface, permissionOwner]);
   const { cameraOffer, cameraPeerClose } = useCameraPeerActions(
     identityRef,
     state.peerGeneration,
@@ -570,6 +727,7 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
       start,
       startAttemptRef,
       state,
+      stateRef,
     }),
     [
       activate,
@@ -584,6 +742,7 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
       start,
       startAttemptRef,
       state,
+      stateRef,
     ]
   );
   return useSurfaceControllerProjection(projectionArgs);

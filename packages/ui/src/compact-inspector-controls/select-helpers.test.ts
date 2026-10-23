@@ -55,6 +55,13 @@ it('positions compact select menus below, above, and clamped to the viewport', (
   expect(aboveStyle.maxHeight).toBeGreaterThanOrEqual(96);
 });
 
+it('uses available viewport space instead of forcing short option lists to scroll', () => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 560 });
+  const style = resolveCompactSelectMenuStyle(anchorRect({ top: 140, bottom: 172 }));
+  expect(style.maxHeight).toBe(375);
+});
+
 it('uses the nearest opted-in settings width without moving the menu below its section', () => {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1000 });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });

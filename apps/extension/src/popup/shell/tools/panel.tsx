@@ -3,7 +3,7 @@ import {
   Pencil,
   SwatchBook,
   TextCursorInput,
-  Touchpad,
+  PanelTop,
   Video,
   type LucideIcon,
 } from 'lucide-react';
@@ -18,7 +18,7 @@ const tools: ReadonlyArray<{
   dataUi: string;
 }> = [
   {
-    icon: Touchpad,
+    icon: PanelTop,
     labelKey: 'popup.home.toolsOpenLabel',
     hintKey: 'popup.home.toolsOpenHint',
     dataUi: 'popup.home.tools.open',
@@ -61,8 +61,8 @@ const tools: ReadonlyArray<{
 ];
 
 const TOOL_BUTTON_CLASS_NAME = [
-  'group flex h-12 min-h-12 w-full min-w-0 shrink-0 flex-row items-center gap-2.5 rounded-[12px] border-0',
-  'bg-[var(--sniptale-color-surface-input)] px-3 py-1 text-left transition-colors',
+  'group flex h-12 min-h-12 w-full min-w-0 shrink-0 flex-row items-center gap-2.5 rounded-[6px] border-0',
+  'bg-transparent px-3 py-1 text-left transition-colors',
   'hover:bg-[var(--sniptale-color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-45',
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
@@ -92,14 +92,19 @@ function ToolButton(props: {
       className={props.tool.mode ? TOOL_BUTTON_CLASS_NAME : OPEN_TOOLBAR_CLASS_NAME}
       data-ui={props.tool.dataUi}
       disabled={Boolean(props.disabledReason)}
-      title={props.disabledReason ?? hint}
+      data-popup-hint={props.disabledReason ?? hint}
       onClick={() => props.onOpen(props.tool.mode)}
     >
       <span className={TOOL_ICON_CLASS_NAME}>
         <Icon className={TOOL_GLYPH_CLASS_NAME} />
       </span>
       <span className="min-w-0">
-        <span className="block text-[11px] font-semibold leading-tight text-[var(--sniptale-color-text-primary)]">
+        <span
+          className={[
+            'block text-xs font-normal leading-tight text-[var(--sniptale-color-text-primary)]',
+            'group-hover:font-medium',
+          ].join(' ')}
+        >
           {label}
         </span>
         <span className="mt-0.5 line-clamp-2 block text-[10px] leading-3 text-[var(--sniptale-color-text-muted)]">
@@ -115,7 +120,7 @@ export function PopupToolsPanel(props: {
   onOpen(mode?: ToolbarWorkingMode): void;
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-hidden pb-1" data-ui="popup.tools.actions">
+    <div className="min-h-0 flex-1 overflow-y-auto pb-1" data-ui="popup.tools.actions">
       <ToolButton tool={tools[0]!} disabledReason={props.disabledReason} onOpen={props.onOpen} />
       <section className="mt-2" aria-labelledby="popup-tools-editing">
         <h2 id="popup-tools-editing" className={TOOL_GROUP_HEADING_CLASS_NAME}>

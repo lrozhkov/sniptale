@@ -1,10 +1,31 @@
+import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../project/types/export';
+import type { VideoProjectRenderScope } from '../../project/export/render-scope';
+import { hasCameraPerspective, resolveCameraWindowWeight } from '../../project/motion/spatial';
+import { motionFocusAreaPoint } from '../../project/motion/focus-area';
+import { resolveManualMotionFocusPoint, resolveMotionTargetScale } from './focus-target';
+import { motionTransitionTypeForEasing } from '../../project/motion/timing';
+import { resolveProjectOutputTransform } from '../../project/export/output-dimensions';
+import {
+  createWindowCameraLinkGeometry,
+  proveWindowCameraGap,
+  cropWindowCameraObservations,
+} from './window-camera-geometry';
+import { resolveMotionSourceWindow, motionWindowFocusToWindow } from './source-window';
+import { projectMotionSourcePhases } from '../../project/motion/source-binding';
+import { resolveMotionSourcePlayback } from '../../project/motion/source-playback';
+import { isCameraMotionRegion } from '../../project/motion/normalization';
+import { cameraSourceGeometryBreaks } from './camera-source-geometry';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import {
   resolveProjectCursorFocusPath,
   resolveProjectCursorFocus,
   resolveProjectCursorFocusSamples,
 } from '../../project/cursor-focus-path/projection';
-import { resolveMotionConnectionSource } from '../../project/motion';
+import {
+  resolveMotionConnectionSource,
+  resolveMotionConnectionVideo,
+  resolveMotionConnectionEdges,
+} from '../../project/motion';
 import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
 import { VideoCursorCaptureMode } from '../../project/types';
 import { cursorFocusPreferenceWeight } from '../../project/cursor-focus-path/evaluator';
@@ -16,7 +37,10 @@ import {
   resolveCursorSample,
   resolveVideoCompositionCursor,
 } from '../timeline/frame/cursor';
-import { createProjectWorkingZoneCameraGeometry } from './camera-geometry';
+import {
+  createProjectWorkingZoneCameraGeometry,
+  createProjectWindowPlaneProjection,
+} from './camera-geometry';
 import type { ProjectCameraSourceBinding } from './camera-geometry';
 import {
   planWorkingZoneCamera,
@@ -42,19 +66,78 @@ const plans = new WeakMap<VideoProject, Map<string, ProjectCameraPlanEntry>>();
 
 /** Split animation parts share the existing camera-connection topology. */
 export function resolveProjectCameraEdges(project: VideoProject, region: VideoProjectMotionRegion) {
-  const group = region.sourceBinding?.animationGroupId;
-  const parts = group
-    ? (project.motionRegions ?? [])
-        .filter((item) => item.duration > 0 && item.sourceBinding?.animationGroupId === group)
-        .toSorted((a, b) => (a.animation?.start ?? 0) - (b.animation?.start ?? 0))
-    : [region];
-  const first = parts[0] ?? region,
-    last = parts.at(-1) ?? region;
+  return resolveMotionConnectionEdges(project, region);
+}
+
+function windowCameraParts(project: VideoProject, region: VideoProjectMotionRegion) {
+  const binding = region.sourceBinding;
+  if (
+    binding?.coordinateSpace !== 'source-window' ||
+    !binding.animationGroupId ||
+    !region.animation
+  )
+    return [region];
+  const clip = project.clips.find((item) => item.id === binding.clipId);
+  if (clip?.type !== 'VIDEO') return [region];
+  const controls = (item: VideoProjectMotionRegion) => {
+    const {
+      id: _id,
+      startTime: _start,
+      duration: _duration,
+      animation: _animation,
+      sourceBinding: _binding,
+      incomingConnection: _connection,
+      ...settings
+    } = item;
+    return JSON.stringify(settings);
+  };
+  const geometry = (id: string) => {
+    const item = project.clips.find((entry) => entry.id === id);
+    return item?.type === 'VIDEO'
+      ? JSON.stringify({
+          asset: item.assetId,
+          instance: item.sourceInstanceId,
+          track: item.trackId,
+          transform: item.transform,
+          crop: item.sourceCrop,
+          header: item.windowHeader,
+          fit: item.fitMode,
+          corner: item.windowCornerRadius,
+        })
+      : null;
+  };
+  const signature = controls(region),
+    plane = geometry(clip.id);
+  const origin = region.startTime - region.animation.start;
+  return (project.motionRegions ?? [])
+    .filter(
+      (item) =>
+        item.duration > 0 &&
+        item.sourceBinding?.coordinateSpace === 'source-window' &&
+        item.sourceBinding.animationGroupId === binding.animationGroupId &&
+        item.animation?.duration === region.animation!.duration &&
+        Math.abs(item.startTime - item.animation.start - origin) < 1e-9 &&
+        controls(item) === signature &&
+        geometry(item.sourceBinding.clipId) === plane
+    )
+    .toSorted((a, b) => a.startTime - b.startTime);
+}
+
+function windowCameraPlanRegion(project: VideoProject, region: VideoProjectMotionRegion) {
+  if (region.sourceBinding?.coordinateSpace !== 'source-window' || !region.animation) return region;
+  const parts = windowCameraParts(project, region);
+  const first = parts[0] ?? region;
+  for (let i = 1; i < parts.length; i++)
+    if (Math.abs(parts[i - 1]!.startTime + parts[i - 1]!.duration - parts[i]!.startTime) > 1e-9)
+      return region;
+  const clock = first.animation!;
+  const clockScale = first.duration / (clock.end - clock.start);
+  const startTime = first.startTime - clock.start * clockScale;
   return {
-    connectedIn: resolveMotionConnectionSource(project, first) !== null,
-    connectedOut: (project.motionRegions ?? []).some(
-      (item) => resolveMotionConnectionSource(project, item)?.id === last.id
-    ),
+    ...first,
+    startTime,
+    duration: clock.duration * clockScale,
+    animation: { start: 0, end: clock.duration, duration: clock.duration },
   };
 }
 
@@ -64,19 +147,25 @@ function projectCameraFrameAtTime(
   region: VideoProjectMotionRegion,
   path: ReturnType<typeof resolveProjectCursorFocusPath>,
   time: number,
-  previousFocus: ProjectCameraPreference | undefined
+  previousFocus: ProjectCameraPreference | undefined,
+  clipId = region.sourceBinding?.clipId
 ) {
-  const focus = resolveProjectCursorFocus(project, time, path, region.sourceBinding?.clipId);
+  const focus = resolveProjectCursorFocus(project, time, path, clipId);
   const rendered = project.cursorTrack?.captureMode === VideoCursorCaptureMode.SEPARATE;
   const cursor = rendered ? resolveVideoCompositionCursor(project, time, []) : null;
-  const sample = rendered
-    ? resolveCursorSample(project, time)
-    : resolveObservedCursorPosition(project, time, region.sourceBinding?.clipId);
-  const actual = cursor
-    ? { x: cursor.x / project.width, y: cursor.y / project.height }
-    : !rendered && sample
-      ? (sample.recordingPoint ?? { x: sample.x / project.width, y: sample.y / project.height })
-      : undefined;
+  const renderedSample = rendered ? resolveCursorSample(project, time) : null;
+  const nativeCursor = renderedSample?.sourceAnchor !== undefined;
+  const sample = rendered ? renderedSample : resolveObservedCursorPosition(project, time, clipId);
+  const actual =
+    rendered && nativeCursor
+      ? cursor && sample?.recordingPoint
+        ? sample.recordingPoint
+        : undefined
+      : cursor
+        ? { x: cursor.x / project.width, y: cursor.y / project.height }
+        : !rendered && sample
+          ? (sample.recordingPoint ?? { x: sample.x / project.width, y: sample.y / project.height })
+          : undefined;
   const heldClipId = previousFocus?.sourceClipId;
   const owner = heldClipId && project.clips.find((clip) => clip.id === heldClipId);
   const held =
@@ -88,20 +177,27 @@ function projectCameraFrameAtTime(
     ? {
         x: focus.x / project.width,
         y: focus.y / project.height,
-        segmentId: focus.segmentId,
+        segmentId:
+          region.sourceBinding?.coordinateSpace === 'source-window' ? focus.id : focus.segmentId,
         ...(focus.sourceClipId ? { sourceClipId: focus.sourceClipId } : {}),
       }
     : held;
   if (!preferred && !actual) return null;
   const point = preferred ?? { ...actual!, segmentId: 'rendered' };
   const actualClipId = sample?.sourceAnchor?.sourceClipId;
-  const sourceSegment = `${actualClipId ?? 'canvas'}:${sample?.captureSegment ?? ''}`;
+  const actualOwner = project.clips.find((clip) => clip.id === actualClipId);
+  const sourceOwner =
+    region.sourceBinding?.coordinateSpace === 'source-window' && actualOwner?.type === 'VIDEO'
+      ? (actualOwner.sourceInstanceId ?? actualClipId)
+      : actualClipId;
+  const sourceSegment = `${sourceOwner ?? 'canvas'}:${sample?.captureSegment ?? ''}`;
   const observation = actual ? 'observed' : 'unobserved';
   const segmentId = `${point.segmentId}:${sourceSegment}:${observation}`;
   const binding: ProjectCameraSourceBinding = {
     ...('sourceClipId' in point && point.sourceClipId ? { focusClipId: point.sourceClipId } : {}),
-    ...(!rendered && actualClipId ? { actualClipId } : {}),
-    ...(rendered ? { renderedCursor: true } : {}),
+    ...((!rendered || nativeCursor) && actualClipId ? { actualClipId } : {}),
+    ...(rendered && !nativeCursor ? { renderedCursor: true } : {}),
+    ...(rendered && nativeCursor ? { sourceCursor: true } : {}),
   };
   const authoredSegment = focus && path.segments.find((segment) => segment.id === focus.id);
   const frame: FollowCursorFrame = {
@@ -124,7 +220,7 @@ function retainClosingProjectFrames(
   bindings: Map<string, ProjectCameraSourceBinding>
 ) {
   const closingFrames: FollowCursorFrame[] = [];
-  if (project.cursorTrack?.captureMode !== VideoCursorCaptureMode.SEPARATE) {
+  {
     for (const clip of project.clips) {
       const time = clip.startTime + clip.duration;
       if (time <= region.startTime || time > region.startTime + region.duration) continue;
@@ -132,11 +228,19 @@ function retainClosingProjectFrames(
         (frame) => frame.time < time && bindings.get(frame.segmentId)?.actualClipId === clip.id
       );
       if (!previous) continue;
-      const sample = resolveObservedCursorPosition(project, time, clip.id, {
-        includeSourceEnd: true,
-      });
-      if (!sample) continue;
-      const precedingSample = resolveObservedCursorPosition(project, previous.time, clip.id);
+      const separate = project.cursorTrack?.captureMode === VideoCursorCaptureMode.SEPARATE;
+      const sample = separate
+        ? resolveCursorSample(project, time, clip.id, { includeSourceEnd: true })
+        : resolveObservedCursorPosition(project, time, clip.id, { includeSourceEnd: true });
+      if (
+        !sample?.visible ||
+        (sample.observation && sample.observation !== 'observed') ||
+        !sample.recordingPoint
+      )
+        continue;
+      const precedingSample = separate
+        ? resolveCursorSample(project, previous.time, clip.id)
+        : resolveObservedCursorPosition(project, previous.time, clip.id);
       const segmentId =
         precedingSample?.captureSegment === sample.captureSegment
           ? previous.segmentId
@@ -160,7 +264,11 @@ function retainClosingProjectFrames(
   return [...closingFrames, ...retained].sort((a, b) => a.time - b.time);
 }
 
-function collectProjectCameraFrames(project: VideoProject, region: VideoProjectMotionRegion) {
+function collectProjectCameraFrames(
+  project: VideoProject,
+  region: VideoProjectMotionRegion,
+  connection?: { source: VideoProjectMotionRegion; destination: VideoProjectMotionRegion }
+) {
   const path = resolveProjectCursorFocusPath(project);
   const end = region.startTime + region.duration;
   const times = new Set([region.startTime, end]);
@@ -169,20 +277,55 @@ function collectProjectCameraFrames(project: VideoProject, region: VideoProjectM
   for (const time of [
     ...(project.cursorTrack?.samples ?? []).map((sample) => sample.time),
     ...resolveProjectCursorFocusSamples(project, true).map((sample) => sample.time),
-    ...project.clips.flatMap((clip) => [clip.startTime, clip.startTime + clip.duration]),
+    ...project.clips.flatMap((clip) => [
+      clip.startTime,
+      clip.startTime + clip.duration,
+      ...(clip.type === 'VIDEO' &&
+      project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+        ? cameraSourceGeometryBreaks(clip, project)
+        : []),
+    ]),
   ])
     if (time >= region.startTime && time <= end) times.add(time);
   const frames: FollowCursorFrame[] = [];
   const bindings = new Map<string, ProjectCameraSourceBinding>();
+  const parts = windowCameraParts(project, region);
+  let continuity = 0;
+  let previousClipId: string | undefined;
   let previousFocus: { x: number; y: number; segmentId: string; sourceClipId?: string } | undefined;
   for (const time of [...times].sort((a, b) => a - b)) {
-    const result = projectCameraFrameAtTime(project, region, path, time, previousFocus);
+    const part = parts.find(
+      (item) => time >= item.startTime && time < item.startTime + item.duration
+    );
+    const clipId = connection
+      ? resolveMotionConnectionVideo(project, connection.source, connection.destination, time)?.id
+      : (part?.sourceBinding?.clipId ?? region.sourceBinding?.clipId);
+    if (clipId && previousClipId && clipId !== previousClipId) {
+      const left = project.clips.find((clip) => clip.id === previousClipId);
+      const right = project.clips.find((clip) => clip.id === clipId);
+      if (
+        left?.type !== 'VIDEO' ||
+        right?.type !== 'VIDEO' ||
+        Math.abs(left.sourceStart + left.sourceDuration - right.sourceStart) > 1e-9
+      )
+        continuity++;
+    }
+    if (clipId) previousClipId = clipId;
+    const result = projectCameraFrameAtTime(project, region, path, time, previousFocus, clipId);
     if (!result) continue;
+    if (region.sourceBinding?.coordinateSpace === 'source-window')
+      result.frame.segmentId += `:run:${continuity}`;
     if (result.preferred) previousFocus = result.preferred;
     frames.push(result.frame);
     bindings.set(result.frame.segmentId, result.binding);
   }
-  return { frames: retainClosingProjectFrames(project, region, frames, bindings), bindings, path };
+  const retained = retainClosingProjectFrames(project, region, frames, bindings);
+  const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
+  const crop =
+    region.sourceBinding?.coordinateSpace === 'source-window' && clip?.type === 'VIDEO'
+      ? clip.sourceCrop
+      : undefined;
+  return { frames: crop ? cropWindowCameraObservations(retained, crop) : retained, bindings, path };
 }
 
 function resolveProvisionalPlanEntry(
@@ -190,6 +333,7 @@ function resolveProvisionalPlanEntry(
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
 ) {
+  region = windowCameraPlanRegion(project, region);
   const viewport = output ?? { width: project.width, height: project.height };
   const key = `${region.id}:${viewport.width}:${viewport.height}:${output?.resolution ?? 'SOURCE'}`;
   const signature = JSON.stringify({
@@ -220,6 +364,17 @@ function resolveProvisionalPlanEntry(
     ...(output ? { output } : {}),
   });
   const center = region.focusPoint ?? { x: project.width / 2, y: project.height / 2 };
+  const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
+  const sampleTime = Math.max(region.startTime, clip?.startTime ?? region.startTime);
+  const window = resolveMotionSourceWindow(project, region, sampleTime);
+  const point = window && motionWindowFocusToWindow(project, region, center, sampleTime);
+  const normalized =
+    window && point
+      ? {
+          x: (point.x - window.window.x) / window.window.width,
+          y: (point.y - window.window.y) / window.window.height,
+        }
+      : { x: center.x / project.width, y: center.y / project.height };
   const input = {
     frames,
     geometry,
@@ -228,8 +383,8 @@ function resolveProvisionalPlanEntry(
     end: region.startTime + region.duration,
     targetScale: region.scale,
     fallback: {
-      x: ((center.x / project.width) * region.scale - 0.5) * geometry.window.width,
-      y: ((center.y / project.height) * region.scale - 0.5) * geometry.window.height,
+      x: (normalized.x * region.scale - 0.5) * geometry.window.width,
+      y: (normalized.y * region.scale - 0.5) * geometry.window.height,
     },
   };
   const plan = planWorkingZoneCamera(input);
@@ -239,18 +394,7 @@ function resolveProvisionalPlanEntry(
 }
 
 function projectCameraTargetScale(project: VideoProject, item: VideoProjectMotionRegion) {
-  return item.focusMode === VideoMotionFocusMode.MANUAL_AREA && item.focusArea
-    ? Math.min(
-        4,
-        Math.max(
-          1,
-          Math.min(
-            project.width / Math.max(1, item.focusArea.width),
-            project.height / Math.max(1, item.focusArea.height)
-          )
-        )
-      )
-    : item.scale;
+  return resolveMotionTargetScale(project, item);
 }
 
 function compatibleProjectCameraPhases(
@@ -274,6 +418,8 @@ function compatibleProjectCameraPhases(
           (right.animation.end - right.animation.start) / right.duration
       ) <= 1e-9 &&
       left.easing === right.easing &&
+      left.phaseTransitions?.enter === right.phaseTransitions?.enter &&
+      left.phaseTransitions?.exit === right.phaseTransitions?.exit &&
       left.zoomInDuration === right.zoomInDuration &&
       left.zoomOutDuration === right.zoomOutDuration
     );
@@ -349,10 +495,7 @@ function sharedProjectCameraBoundary(
     return undefined;
   const point =
     owner.focusMode === VideoMotionFocusMode.MANUAL_AREA && owner.focusArea
-      ? {
-          x: owner.focusArea.x + owner.focusArea.width / 2,
-          y: owner.focusArea.y + owner.focusArea.height / 2,
-        }
+      ? motionFocusAreaPoint(owner.focusArea, 0.5, 0.5)
       : (owner.focusPoint ?? { x: project.width / 2, y: project.height / 2 });
   const viewport = resolveCameraViewportFrame(project, point, region.scale);
   return {
@@ -370,11 +513,12 @@ function resolvePlanEntry(
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
 ) {
+  region = windowCameraPlanRegion(project, region);
   const provisional = resolveProvisionalPlanEntry(project, region, output);
   const boundaries: WorkingZoneCameraBoundaries = {};
-  const neighbors = (project.motionRegions ?? []).filter(
-    (item) => item.duration > 0 && item.id !== region.id
-  );
+  const neighbors = (project.motionRegions ?? [])
+    .filter(isCameraMotionRegion)
+    .filter((item) => item.duration > 0 && item.id !== region.id);
   const previous = neighbors.find((item) => item.startTime + item.duration === region.startTime);
   const next = neighbors.find((item) => item.startTime === region.startTime + region.duration);
   const key = [
@@ -425,6 +569,19 @@ export function resolveProjectCursorCameraPlan(
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
 ) {
+  const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
+  const playback = clip && resolveMotionSourcePlayback(project, clip.startTime, clip.id);
+  if (playback) {
+    const sourceRegion = playback.geometryProject.motionRegions?.find(
+      (item) => item.id === (playback.regionIds.get(region.id) ?? region.id)
+    );
+    if (sourceRegion) {
+      project = playback.geometryProject;
+      region = sourceRegion;
+    }
+  }
+  project = projectMotionSourcePhases(project);
+  region = project.motionRegions?.find((item) => item.id === region.id) ?? region;
   return resolvePlanEntry(project, region, output).plan;
 }
 
@@ -446,14 +603,143 @@ export class ProjectCameraConflictError extends Error {
   }
 }
 
+/** Resolve a frozen window target once for link rendering and fragment admission. */
+export function resolveProjectWindowCameraEndpoint(
+  project: VideoProject,
+  region: VideoProjectMotionRegion,
+  time: number,
+  output?: CameraOutputViewport
+) {
+  if (region.focusMode === VideoMotionFocusMode.CURSOR) {
+    const following = resolveProjectFollowingCamera(project, region, time, output);
+    return {
+      scale: following.targetScale,
+      pan: {
+        x: following.pan.x / following.geometry.window.width,
+        y: following.pan.y / following.geometry.window.height,
+      },
+      conflict: following.plan.status === 'conflict' ? following.plan : null,
+    };
+  }
+  const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
+  if (!clip) return null;
+  const sampleTime = Math.max(
+    clip.startTime,
+    Math.min(time, clip.startTime + clip.duration - 1e-9)
+  );
+  const window = resolveMotionSourceWindow(project, region, sampleTime);
+  if (!window) return null;
+  const point = motionWindowFocusToWindow(
+    project,
+    region,
+    resolveManualMotionFocusPoint(project, region, sampleTime),
+    sampleTime
+  );
+  const scale = resolveMotionTargetScale(project, region);
+  const offset = (value: number) => Math.max(0, Math.min(scale - 1, scale * value - 0.5));
+  return {
+    scale,
+    pan: {
+      x: offset((point.x - window.window.x) / window.window.width),
+      y: offset((point.y - window.window.y) / window.window.height),
+    },
+    conflict: null,
+  };
+}
+
+function resolveProjectWindowLinkConflict(
+  project: VideoProject,
+  source: VideoProjectMotionRegion,
+  destination: VideoProjectMotionRegion,
+  output?: CameraOutputViewport
+): ProjectCameraConflict | null {
+  const start = source.startTime + source.duration,
+    end = destination.startTime;
+  const interval = { start, end };
+  const failure = (
+    reason: ProjectCameraConflict['reason'],
+    time = start
+  ): ProjectCameraConflict => ({ regionId: source.id, interval, reason, time });
+  const from = resolveProjectWindowCameraEndpoint(project, source, start, output);
+  const to = resolveProjectWindowCameraEndpoint(project, destination, end, output);
+  if (!from || !to) return failure('unproven');
+  if (from.conflict || to.conflict) {
+    const conflict = from.conflict ?? to.conflict!;
+    return failure(conflict.reason, conflict.time);
+  }
+  const clip = resolveMotionConnectionVideo(project, source, destination, start);
+  if (!clip || !source.sourceBinding) return failure('unproven');
+  const target = { ...source, sourceBinding: { ...source.sourceBinding, clipId: clip.id } };
+  const layout = resolveMotionSourceWindow(project, target, start);
+  if (!layout) return failure('unproven');
+  const size = output ?? { width: project.width, height: project.height };
+  const transform = resolveProjectOutputTransform(project, size);
+  const mapRect = (rect: typeof layout.window) => ({
+    x: rect.x * transform.scale + transform.offsetX,
+    y: rect.y * transform.scale + transform.offsetY,
+    width: rect.width * transform.scale,
+    height: rect.height * transform.scale,
+  });
+  const window = mapRect(layout.window);
+  const context = source.focusMode === VideoMotionFocusMode.CURSOR ? source : destination;
+  const path = resolveProjectCursorFocusPath(project);
+  const policy = resolveCameraFollowPolicy({
+    legacySensitivity: path.sensitivity,
+    ...(project.cameraFollowDefaults ? { defaults: project.cameraFollowDefaults } : {}),
+    ...(context.cameraFollow ? { override: context.cameraFollow } : {}),
+  });
+  const adapter = createWindowCameraLinkGeometry({
+    output: size,
+    window,
+    ...createProjectWindowPlaneProjection(project, target, size),
+    video: mapRect(layout.video),
+    cornerRadius: (clip.windowCornerRadius ?? 0) * transform.scale,
+    windowWeight: resolveCameraWindowWeight(
+      project.sceneBackground?.zoomBehavior ?? 'window',
+      project.sceneBackground?.enabled !== false &&
+        project.sceneBackground?.zoomBehavior === 'follow-video' &&
+        !hasCameraPerspective(source.perspective) &&
+        !hasCameraPerspective(destination.perspective),
+      hasCameraPerspective(source.perspective) || hasCameraPerspective(destination.perspective)
+    ),
+    type: motionTransitionTypeForEasing(destination.incomingConnection?.easing ?? 'EASE_IN_OUT'),
+    from: {
+      end: start,
+      scale: from.scale,
+      pan: { x: from.pan.x * window.width, y: from.pan.y * window.height },
+      ...(source.perspective ? { perspective: source.perspective } : {}),
+    },
+    to: {
+      start: end,
+      scale: to.scale,
+      pan: { x: to.pan.x * window.width, y: to.pan.y * window.height },
+      ...(destination.perspective ? { perspective: destination.perspective } : {}),
+    },
+    policy,
+  });
+  const gap = { ...context, startTime: start, duration: end - start };
+  const observations = collectProjectCameraFrames(project, gap, { source, destination }).frames;
+  const proof = proveWindowCameraGap({
+    adapter,
+    start,
+    end,
+    targetScale: to.scale,
+    toPan: { x: to.pan.x * window.width, y: to.pan.y * window.height },
+    policy,
+    observations,
+  });
+  return proof.status === 'conflict' ? failure(proof.reason, proof.time) : null;
+}
+
 /** Refuse only exports that use an unresolved active follow camera. This check acquires no resources. */
 export function resolveProjectCameraConflicts(
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   output?: CameraOutputViewport,
   interval = { start: 0, end: project.duration }
 ): ProjectCameraConflict[] {
+  project = projectMotionSourcePhases(project[VIDEO_PROJECT_ATTACHMENT_GEOMETRY] ?? project);
   if (!isVideoProjectUtilityLaneVisible(project, 'camera')) return [];
-  return (project.motionRegions ?? []).flatMap((region) => {
+  const conflicts = (project.motionRegions ?? []).filter(isCameraMotionRegion).flatMap((region) => {
     if (
       region.focusMode !== VideoMotionFocusMode.CURSOR ||
       region.duration <= 0 ||
@@ -466,6 +752,26 @@ export function resolveProjectCameraConflicts(
       ? [{ regionId: region.id, time: plan.time, interval: plan.interval, reason: plan.reason }]
       : [];
   });
+  for (const destination of (project.motionRegions ?? []).filter(isCameraMotionRegion)) {
+    if (destination.sourceBinding?.coordinateSpace !== 'source-window') continue;
+    const source = resolveMotionConnectionSource(project, destination);
+    if (
+      !source ||
+      (source.focusMode !== VideoMotionFocusMode.CURSOR &&
+        destination.focusMode !== VideoMotionFocusMode.CURSOR)
+    )
+      continue;
+    const start = source.startTime + source.duration;
+    if (
+      start >= destination.startTime ||
+      start >= interval.end ||
+      destination.startTime <= interval.start
+    )
+      continue;
+    const conflict = resolveProjectWindowLinkConflict(project, source, destination, output);
+    if (conflict) conflicts.push(conflict);
+  }
+  return conflicts;
 }
 
 /** Convert admitted output-pixel pan to the existing project-space camera contract without late clamps. */
@@ -475,6 +781,20 @@ export function resolveProjectFollowingCamera(
   time: number,
   output?: CameraOutputViewport
 ) {
+  const playback =
+    region.sourceBinding && resolveMotionSourcePlayback(project, time, region.sourceBinding.clipId);
+  if (playback) {
+    const sourceRegion = playback.geometryProject.motionRegions?.find(
+      (item) => item.id === (playback.regionIds.get(region.id) ?? region.id)
+    );
+    if (sourceRegion) {
+      project = playback.geometryProject;
+      region = sourceRegion;
+      time = playback.time;
+    }
+  }
+  project = projectMotionSourcePhases(project);
+  region = project.motionRegions?.find((item) => item.id === region.id) ?? region;
   const { plan, geometry } = resolvePlanEntry(project, region, output);
   const pan = evaluateWorkingZoneCamera(plan, time);
   const targetScale = plan.status === 'ready' ? plan.targetScale : region.scale;

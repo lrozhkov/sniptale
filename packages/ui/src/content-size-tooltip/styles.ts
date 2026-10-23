@@ -60,16 +60,28 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
     .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME} {
     border-color: transparent;
     background: transparent;
-    color: var(--sniptale-color-text-primary);
+    color: var(--sniptale-color-text-secondary);
     box-shadow: none;
   }
 
   .sniptale-content-size-tooltip[data-variant='frame-edit']
-    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:hover:not(:disabled) {
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:hover:not(:disabled),
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:focus-visible:not(:disabled) {
     border-color: transparent;
     background: transparent;
-    color: var(--sniptale-color-accent-emphasis);
+    color: var(--sniptale-color-text-primary-strong);
     box-shadow: none;
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME} svg {
+    stroke-width: var(--sniptale-control-icon-stroke);
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:is(:hover, :focus-visible):not(:disabled) svg {
+    stroke-width: var(--sniptale-control-icon-stroke-hover);
   }
 
   .sniptale-content-size-tooltip[data-variant='frame-edit']
@@ -91,8 +103,8 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
   .sniptale-content-size-tooltip[data-variant='frame-edit']
     .${CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_CLASS_NAME}[aria-pressed='true'] {
     border-color: transparent;
-    background: transparent;
-    color: var(--sniptale-color-accent-emphasis);
+    background: var(--sniptale-color-surface-hover);
+    color: var(--sniptale-color-text-primary);
     box-shadow: none;
   }
 
@@ -112,12 +124,16 @@ const CONTENT_SIZE_TOOLTIP_SURFACE_STYLE: StyleRecord = {
   flexWrap: 'nowrap',
   gap: '6px',
   whiteSpace: 'nowrap',
+  fontFamily: 'var(--sniptale-font-interface)',
+  fontSize: '13px',
+  fontWeight: 400,
+  lineHeight: '18px',
   minWidth: `${CONTENT_SIZE_TOOLTIP_DIMENSIONS.width}px`,
   maxWidth: 'calc(100vw - 24px)',
   padding: '6px',
   border: '1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 88%, transparent)',
-  borderRadius: '12px',
-  background: 'color-mix(in srgb, var(--sniptale-color-surface-panel) 96%, transparent)',
+  borderRadius: '4px',
+  background: 'rgb(from var(--sniptale-color-surface-panel) r g b / 1)',
   boxShadow: [
     '0 14px 28px color-mix(in srgb, var(--sniptale-color-shadow-strong) 14%, transparent)',
     'inset 0 1px 0 color-mix(in srgb, var(--sniptale-color-border-strong) 18%, transparent)',
@@ -140,9 +156,9 @@ export function getContentSizeTooltipSurfaceStyle(
     minHeight: `${CONTENT_SIZE_TOOLTIP_FRAME_EDIT_DIMENSIONS.height}px`,
     gap: '4px',
     padding: '5px',
-    background: 'var(--sniptale-color-surface-panel)',
+    background: 'rgb(from var(--sniptale-color-surface-panel) r g b / 1)',
     border: '1px solid var(--sniptale-color-border-soft)',
-    borderRadius: 'var(--sniptale-radius-md)',
+    borderRadius: '4px',
     boxShadow: [
       '0 18px 40px -22px color-mix(in srgb, var(--sniptale-color-shadow-strong) 36%, transparent)',
       '0 8px 18px -12px color-mix(in srgb, var(--sniptale-color-shadow-strong) 22%, transparent)',
@@ -178,11 +194,10 @@ const CONTENT_SIZE_TOOLTIP_BUTTON_BASE_STYLE: StyleRecord = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: '8px',
-  border: '1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 86%, transparent)',
-  borderTopColor: 'color-mix(in srgb, var(--sniptale-color-border-strong) 42%, transparent)',
+  borderRadius: '4px',
+  border: '1px solid transparent',
   color: 'var(--sniptale-color-text-muted)',
-  background: 'color-mix(in srgb, var(--sniptale-color-surface-panel) 82%, transparent)',
+  background: 'transparent',
   cursor: 'pointer',
   lineHeight: 0,
   transition:
@@ -201,15 +216,17 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE: StyleRecord = {
   height: '32px',
   padding: '0 34px 0 10px',
   border: '1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 86%, transparent)',
-  borderRadius: '10px',
+  borderRadius: '4px',
   background: [
     'linear-gradient(180deg,',
     'color-mix(in srgb, var(--sniptale-color-surface-input) 96%, transparent),',
     'color-mix(in srgb, var(--sniptale-color-surface-input) 82%, transparent))',
   ].join(' '),
   color: 'var(--sniptale-color-text-primary)',
-  fontSize: '12px',
-  fontWeight: 650,
+  fontFamily: 'var(--sniptale-font-interface)',
+  fontSize: '13px',
+  fontWeight: 400,
+  lineHeight: '18px',
   textAlign: 'left',
   fontVariantNumeric: 'tabular-nums',
   outline: 'none',
@@ -233,10 +250,12 @@ const CONTENT_SIZE_TOOLTIP_ACTION_BUTTON_STYLE: StyleRecord = {
   minWidth: '72px',
   height: '32px',
   padding: '0 10px',
-  borderRadius: '10px',
-  fontSize: '12px',
-  fontWeight: 650,
-  border: '1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 88%, transparent)',
+  borderRadius: '4px',
+  fontFamily: 'var(--sniptale-font-interface)',
+  fontSize: '13px',
+  fontWeight: 400,
+  lineHeight: '18px',
+  border: '1px solid transparent',
   cursor: 'pointer',
   transition: 'background 120ms ease, color 120ms ease, border-color 120ms ease',
 };
@@ -271,10 +290,9 @@ export function getContentSizeTooltipActionButtonStyle(
 
     return {
       ...baseStyle,
-      border: '1px solid color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent)',
-      background:
-        'color-mix(in srgb, var(--sniptale-color-accent) 9%, var(--sniptale-color-surface-hover) 91%)',
-      color: 'var(--sniptale-color-text-primary-strong)',
+      border: '1px solid transparent',
+      background: 'transparent',
+      color: 'var(--sniptale-color-text-primary)',
     };
   }
 
@@ -283,7 +301,7 @@ export function getContentSizeTooltipActionButtonStyle(
     ...(variant === 'frame-edit'
       ? { border: '0', background: 'transparent' }
       : {
-          background: 'color-mix(in srgb, var(--sniptale-color-surface-hover) 58%, transparent)',
+          background: 'transparent',
         }),
     color:
       variant === 'frame-edit'
@@ -307,17 +325,16 @@ export function getContentSizeTooltipRatioButtonStyle(params: {
   if (params.active) {
     if (params.variant !== 'frame-edit') {
       return mergeStyleRecords(CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_STYLE, {
-        border: '1px solid color-mix(in srgb, var(--sniptale-color-accent) 30%, transparent)',
-        background:
-          'color-mix(in srgb, var(--sniptale-color-accent) 9%, var(--sniptale-color-surface-hover) 91%)',
-        color: 'var(--sniptale-color-text-primary-strong)',
+        borderColor: 'transparent',
+        background: 'var(--sniptale-color-surface-hover)',
+        color: 'var(--sniptale-color-text-primary)',
       });
     }
 
     return mergeStyleRecords(CONTENT_SIZE_TOOLTIP_RATIO_BUTTON_STYLE, {
       borderColor: 'transparent',
-      background: 'transparent',
-      color: 'var(--sniptale-color-accent-emphasis)',
+      background: 'var(--sniptale-color-surface-hover)',
+      color: 'var(--sniptale-color-text-primary)',
     });
   }
 

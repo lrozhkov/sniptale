@@ -8,6 +8,27 @@ const defaults = createDefaultDrawingToolDefaults();
 const start = { x: 100, y: 80 };
 
 describe('shared drawing creation', () => {
+  it.each([2, 43, 88, 137, 178, -2, -43, -88, -137, -178])(
+    'keeps an unmodified arrow at its actual %s degree endpoint by default',
+    (angle) => {
+      const arrow = createDrawingObject('arrow', start, 10, defaults)!;
+      const point = {
+        x: start.x + 200 * Math.cos((angle * Math.PI) / 180),
+        y: start.y + 200 * Math.sin((angle * Math.PI) / 180),
+      };
+      for (const ctrlKey of [false, true]) {
+        expect(
+          updateCreatedDrawingObject({
+            modifiers: { ctrlKey, shiftKey: false },
+            object: arrow,
+            point,
+            start,
+            timestamp: 20,
+          })
+        ).toMatchObject({ end: point });
+      }
+    }
+  );
   it.each(['pencil', 'marker', 'shape', 'arrow', 'blur'] as const)(
     'creates %s through one model factory',
     (tool) => {

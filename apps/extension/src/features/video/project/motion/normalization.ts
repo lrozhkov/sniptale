@@ -37,3 +37,8 @@ export function resolveMotionStartTime(
     Math.max(0, projectDuration - duration)
   );
 }
+
+/** Camera occupancy and sampling exclude authored appearance intervals. */
+export function isCameraMotionRegion(region: VideoProjectMotionRegion): boolean {
+  return region.border === undefined && region.spotlight === undefined;
+}

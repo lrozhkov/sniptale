@@ -1,13 +1,13 @@
 import {
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../../../apps/extension/src/features/video/review/advanced/spatial-geometry';
+} from '../../../../apps/extension/src/features/video/composition/motion/spatial-geometry';
 import {
   unprojectReviewSpatialPoint,
   type resolveReviewSpatialFocusGeometry,
 } from '../../../../apps/extension/src/gallery/video-review/spatial-control-geometry';
 import type { QuickEditRect } from '../../../../apps/extension/src/features/video/review/advanced/scene';
-import type { QuickEditDepthOfField } from '../../../../apps/extension/src/features/video/review/advanced/spatial';
+import type { CameraDepthOfField as QuickEditDepthOfField } from '../../../../apps/extension/src/features/video/project/motion/spatial';
 
 function errorAt(
   a: Uint8ClampedArray,

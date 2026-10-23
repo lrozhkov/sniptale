@@ -126,7 +126,7 @@ it('builds preview clip geometry as stage-relative percentages', () => {
       transform: 'rotate(15deg)',
       transformOrigin: 'center center',
       width: '50%',
-      boxShadow: '0px 0px 24px rgba(0, 0, 0, 0.28)',
+      boxShadow: '0px 0px 37.5px rgba(0, 0, 0, 0.5)',
       overflow: 'visible',
       zIndex: 1,
     })

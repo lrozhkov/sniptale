@@ -1,4 +1,9 @@
 import {
+  constrainPresentationEnvelope,
+  presentationEnvelopeOpacity as opacity,
+  type PresentationEnvelope as Envelope,
+} from '../project/scene/edge-fades';
+import {
   constrainPresentationTiming,
   parseQuickEditPresentationSettings,
   resolvePresentationSettings,
@@ -45,7 +50,6 @@ export interface PresentationJoin {
   outgoingTick: number;
   incomingTick: number;
 }
-type Envelope = { span: number; fadeIn: number; fadeOut: number };
 /** Derived placement only; authored trim and main clocks are never retimed. */
 export interface PresentationSequencePlan {
   /** Retains omission intent even when a full sequence has no media bookends. */
@@ -163,11 +167,11 @@ function envelope(
     enabled && settings.fadeOut.enabled
       ? Math.min(settings.fadeOut.duration, edgeSpan('outro'))
       : 0;
-  const scale = fadeIn + fadeOut > span ? span / (fadeIn + fadeOut) : 1;
+  const limited = constrainPresentationEnvelope(span, fadeIn, fadeOut);
   return {
     span,
-    fadeIn: !audio || (settings.fadeIn.audioFade ?? settings.audioFade) ? fadeIn * scale : 0,
-    fadeOut: !audio || (settings.fadeOut.audioFade ?? settings.audioFade) ? fadeOut * scale : 0,
+    fadeIn: !audio || (settings.fadeIn.audioFade ?? settings.audioFade) ? limited.fadeIn : 0,
+    fadeOut: !audio || (settings.fadeOut.audioFade ?? settings.audioFade) ? limited.fadeOut : 0,
   };
 }
 function rawSegments(input: PresentationSequenceInput, settings: QuickEditPresentationSettings) {
@@ -426,14 +430,6 @@ export function presentationMainHoldTime(plan: PresentationSequencePlan): number
   return (tickTime(low - 1, plan.rate) - segment.startUs) / 1_000_000;
 }
 
-function opacity(envelope: Envelope, position: number) {
-  if (Number.isNaN(position)) throw new Error('Invalid presentation envelope position.');
-  const time = Math.max(0, Math.min(envelope.span, position));
-  const incoming = envelope.fadeIn > 0 ? Math.max(0, 1 - time / envelope.fadeIn) : 0;
-  const outgoing =
-    envelope.fadeOut > 0 ? Math.max(0, 1 - (envelope.span - time) / envelope.fadeOut) : 0;
-  return Math.max(incoming, outgoing);
-}
 /** Overlay applies after complete composition; queries beyond emitted endpoints clamp to them. */
 export function presentationColorOpacity(
   plan: PresentationSequencePlan,

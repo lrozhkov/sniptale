@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { DrawingTextEditor, useDrawingTextEditor, type DrawingTextDraft } from './text-editor';
 import { createContentDrawingController } from './controller';
 import { createDrawingSession } from '../../features/drawing/public';
+import { DrawingTextBackgrounds } from './text-content';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -16,6 +17,134 @@ afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it.each(['#00000000', '#00000080', '#111827'])(
+  'keeps the insertion caret independent of glyph color %s',
+  (color) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() =>
+        root.render(
+          <DrawingTextEditor
+            draft={{ id: null, point: { x: 20, y: 30 }, value: 'Caret', width: 160 }}
+            projection={{ x: 0, y: 0 }}
+            style={{ backgroundColor: '#f97316', color, fontFamily: 'sans', fontSize: 24 }}
+            onCancel={vi.fn()}
+            onChange={vi.fn()}
+            onCommit={vi.fn()}
+          />
+        )
+      );
+      const input = host.querySelector('textarea')!;
+      expect(input.style.caretColor).toBe('rgb(37, 99, 235)');
+      expect(input.value).toBe('Caret');
+      expect(input.selectionStart).toBe(5);
+    } finally {
+      act(() => root.unmount());
+    }
+  }
+);
+
+it.each(['#ff8800', '#ff880080'])(
+  'uses one background paint for adjacent lines with %s',
+  (color) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() =>
+        root.render(
+          <DrawingTextBackgrounds
+            color={color}
+            rects={[
+              { left: 0, top: 2, width: 100, height: 25 },
+              { left: 0, top: 27, width: 60, height: 25 },
+            ]}
+          />
+        )
+      );
+      const paths = host.querySelectorAll('svg > path');
+      expect(paths).toHaveLength(1);
+      expect(paths[0]?.getAttribute('fill')).toBe('currentColor');
+      expect(host.querySelector('svg')?.style.color).not.toBe('');
+      const path = paths[0]?.getAttribute('d');
+      expect(path?.match(/M /g)).toHaveLength(1);
+      expect(path).toContain('L 100 24 A 3 3 0 0 1 97 27');
+      expect(path).toContain('L 60 27 A 0 0 0 0 1 60 27');
+      expect(path).toContain('L 60 49 A 3 3 0 0 1 57 52');
+    } finally {
+      act(() => root.unmount());
+    }
+  }
+);
+
+it('does not interpret a background color as an SVG paint server', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <DrawingTextBackgrounds
+          color="url(https://example.invalid/paint.svg#fill)"
+          rects={[{ left: 0, top: 2, width: 100, height: 25 }]}
+        />
+      )
+    );
+    expect(host.querySelector('path')?.getAttribute('fill')).toBe('currentColor');
+    expect(host.querySelector('svg')?.style.color).toBe('');
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+it('uses fractional local dimensions for a rotated text draft without another line wrap', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+    height: '94px',
+    width: '210.390625px',
+  } as CSSStyleDeclaration);
+  const onChange = vi.fn();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <DrawingTextEditor
+        draft={{
+          autoWidth: true,
+          height: 40,
+          id: null,
+          maxWidth: 640,
+          point: { x: 20, y: 30 },
+          rotation: 45,
+          value: 'A longer first line\nShort\nA final line',
+          width: 80,
+        }}
+        layoutRevision={0}
+        projection={{ x: 0, y: 0 }}
+        style={{ backgroundColor: '#fef08a', color: '#111827', fontFamily: 'sans', fontSize: 24 }}
+        onCancel={vi.fn()}
+        onChange={onChange}
+        onCommit={vi.fn()}
+      />
+    )
+  );
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ height: 94, width: 211 }));
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="content.drawing.text-editor"]')?.style.transform
+  ).toBe('rotate(45deg)');
+  act(() => root.unmount());
 });
 
 it('publishes a changed text draft before it enters shared Drawing history', () => {
@@ -136,12 +265,11 @@ it('keeps the first line visible while Shift+Enter creates an empty trailing lin
   expect(host.querySelector('[data-ui="content.drawing.text-mirror"]')?.textContent).toBe(
     'Stable text\n\u200b'
   );
-  const backgrounds = Array.from(
-    host.querySelectorAll<HTMLElement>('[data-ui="content.drawing.text-background"]')
-  );
-  expect(backgrounds).toHaveLength(2);
-  expect(backgrounds.map((background) => background.style.top)).toEqual(['2px', '27px']);
-  expect(backgrounds.map((background) => background.style.height)).toEqual(['25px', '25px']);
+  const backgrounds = host.querySelectorAll('[data-ui="content.drawing.text-background"]');
+  expect(backgrounds).toHaveLength(1);
+  expect(backgrounds[0]?.getAttribute('d')?.match(/M /g)).toHaveLength(1);
+  expect(backgrounds[0]?.getAttribute('d')).toContain(' 27 ');
+  expect(backgrounds[0]?.getAttribute('d')).toContain(' 52 ');
 
   const zoomKey = new KeyboardEvent('keydown', {
     bubbles: true,

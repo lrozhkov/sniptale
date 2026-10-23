@@ -28,6 +28,7 @@ it.each([true, false])(
     const alternatives: VideoEditorSelection[] = [
       { kind: 'motion-connection', motionRegionId: region.id },
       { kind: 'scene' },
+      { kind: 'comment', documentId: 'doc', commentId: 'note' },
       { kind: 'track', trackId: project.tracks[0]!.id },
     ];
     try {

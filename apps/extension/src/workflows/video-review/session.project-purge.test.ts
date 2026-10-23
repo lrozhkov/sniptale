@@ -32,7 +32,7 @@ vi.mock('../../composition/persistence/assets/opfs-store', async (original) => (
 }));
 afterEach(() => vi.unstubAllGlobals());
 
-it.each(['text', 'crop', 'workspace color', 'track controls'] as const)(
+it.each(['text', 'crop', 'workspace color', 'track controls', 'initial mode'] as const)(
   'no deleted %s returns: delayed editor write, purge retry, and same-identity recreation',
   async (kind) => {
     vi.stubGlobal('chrome', undefined);
@@ -79,7 +79,7 @@ it.each(['text', 'crop', 'workspace color', 'track controls'] as const)(
         return reviewSessionPersistence.saveVideoWorkspaceSnapshot(args);
       },
       saveVideoWorkspaceAdvanced: async (args) => {
-        if (kind === 'workspace color') await waitForRelease();
+        if (kind === 'workspace color' || kind === 'initial mode') await waitForRelease();
         return reviewSessionPersistence.saveVideoWorkspaceAdvanced(args);
       },
       saveVideoWorkspaceDraft: async (args) => {
@@ -116,7 +116,14 @@ it.each(['text', 'crop', 'workspace color', 'track controls'] as const)(
             ? oldEditor.setTrackControl('zoom', { enabled: false })
             : oldEditor.saveAdvanced({
                 ...initial.workspace.advanced,
-                ui: { ...initial.workspace.advanced.ui, workspaceColors: { dark: '#123456ff' } },
+                ui:
+                  kind === 'initial mode'
+                    ? {
+                        ...initial.workspace.advanced.ui,
+                        mode: 'advanced',
+                        modeSelectionPending: false,
+                      }
+                    : { ...initial.workspace.advanced.ui, workspaceColors: { dark: '#123456ff' } },
               });
     const delayedWrite = write();
     await started;
@@ -152,6 +159,7 @@ it.each(['text', 'crop', 'workspace color', 'track controls'] as const)(
       expect(recreated.workspace.advanced.canvas).toBeUndefined();
       expect(recreated.workspace.advanced.ui.workspaceColors).toBeUndefined();
       expect(recreated.workspace.advanced.ui.lockedTracks).toBeUndefined();
+      expect(recreated.workspace.advanced.ui.modeSelectionPending).toBe(true);
     } finally {
       resume();
       await delayedWrite.catch(() => undefined);

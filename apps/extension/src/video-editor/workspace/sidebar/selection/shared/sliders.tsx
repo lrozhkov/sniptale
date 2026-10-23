@@ -27,6 +27,7 @@ type SliderFieldProps = {
   scrubValue?: number;
   scrubValueToDisplayValue?: (value: number) => number;
   step?: number;
+  precision?: number;
   value: number;
 };
 
@@ -194,7 +195,7 @@ export function SliderField(props: SliderFieldProps) {
       label={props.label}
       max={display.max}
       min={display.min}
-      precision={display.precision}
+      precision={props.precision ?? display.precision}
       scrub={resolveSliderScrub(props, display, step)}
       step={display.step}
       unit={resolveSliderUnit(props.value, props.formatValue) || display.unit}

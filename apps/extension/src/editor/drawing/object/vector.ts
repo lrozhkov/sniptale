@@ -1,4 +1,5 @@
 import { Ellipse, Path, Point, Polygon, Rect, Textbox, Triangle, type FabricObject } from 'fabric';
+import { DEFAULT_COLOR_INFO_STRONG } from '@sniptale/ui/default-colors/constants';
 import {
   buildDrawingArrowOutline,
   buildDrawingFreehandArrowLines,
@@ -8,10 +9,12 @@ import {
   getDrawingEllipsePoints,
   getDrawingObjectBounds,
   getDrawingShapePoints,
+  isDrawingTextStencil,
   DRAWING_TEXT_LINE_HEIGHT_FACTOR,
   DRAWING_TEXT_VERTICAL_PADDING,
   resolveDrawingTextMeasuredNaturalWidth,
   resolveDrawingTextHeight,
+  traceDrawingTextBackground,
   resolveDrawingTextFontFamily,
   type DrawingObject,
   type DrawingPoint,
@@ -20,9 +23,13 @@ import { createObjectLabel } from '../../document/model';
 import { stageEditorDrawingObject, writeEditorDrawingObject } from './metadata';
 
 type TextboxVisualAdapter = {
+  getCursorRenderingData: Textbox['getCursorRenderingData'];
   getLineLeftOffset: Textbox['_getLineLeftOffset'];
   getTopOffset: Textbox['_getTopOffset'];
   wrapText: Textbox['_wrapText'];
+  render: Textbox['_render'];
+  renderTextFill: Textbox['_renderTextFill'];
+  stencilContext: CanvasRenderingContext2D | null;
 };
 
 const textboxVisualAdapters = new WeakMap<Textbox, TextboxVisualAdapter>();
@@ -165,37 +172,142 @@ function createTextObject(drawing: Extract<DrawingObject, { kind: 'text' }>): Fa
 
 export function renderEditorDrawingTextBackground(
   textbox: Textbox,
-  context: Pick<CanvasRenderingContext2D, 'beginPath' | 'fill' | 'fillStyle' | 'roundRect'>
+  context: Pick<
+    CanvasRenderingContext2D,
+    'beginPath' | 'fill' | 'fillStyle' | 'moveTo' | 'arcTo' | 'closePath'
+  >
 ): void {
   if (!textbox.textBackgroundColor) return;
   const previousFill = context.fillStyle;
   context.fillStyle = textbox.textBackgroundColor;
   const left = textbox._getLeftOffset();
   let top = textbox._getTopOffset();
-  textbox._textLines.forEach((_line, index) => {
-    const height = textbox.getHeightOfLine(index);
+  const lines = textbox._textLines.map((_line, index) => {
+    const advance = textbox.getHeightOfLine(index);
+    const height = index === textbox._textLines.length - 1 ? advance / textbox.lineHeight : advance;
     const width = Math.min(textbox.width, Math.max(12, textbox.getLineWidth(index) + 12));
-    context.beginPath();
-    context.roundRect(left, top, width, height, 3);
-    context.fill();
-    top += height;
+    const rect = { left, top, width, height };
+    top += advance;
+    return rect;
   });
+  context.beginPath();
+  traceDrawingTextBackground(context, lines);
+  context.fill();
   context.fillStyle = previousFill;
 }
 
+function renderEditorDrawingTextStencil(
+  textbox: Textbox,
+  adapter: TextboxVisualAdapter,
+  context: CanvasRenderingContext2D
+): void {
+  if (
+    typeof textbox.fill !== 'string' ||
+    !isDrawingTextStencil(textbox.fill, textbox.textBackgroundColor || null)
+  ) {
+    adapter.render(context);
+    return;
+  }
+  const transform = context.getTransform();
+  const halfWidth = textbox.width / 2 + textbox.fontSize;
+  const halfHeight = textbox.height / 2 + textbox.fontSize;
+  const corners = [
+    { x: -halfWidth, y: -halfHeight },
+    { x: halfWidth, y: -halfHeight },
+    { x: halfWidth, y: halfHeight },
+    { x: -halfWidth, y: halfHeight },
+  ].map((point) => ({
+    x: transform.a * point.x + transform.c * point.y + transform.e,
+    y: transform.b * point.x + transform.d * point.y + transform.f,
+  }));
+  const left = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.x))));
+  const top = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.y))));
+  const right = Math.min(
+    context.canvas.width,
+    Math.ceil(Math.max(...corners.map((point) => point.x)))
+  );
+  const bottom = Math.min(
+    context.canvas.height,
+    Math.ceil(Math.max(...corners.map((point) => point.y)))
+  );
+  if (right <= left || bottom <= top) return;
+  const canvas = adapter.stencilContext?.canvas ?? document.createElement('canvas');
+  const layer = adapter.stencilContext ?? canvas.getContext('2d');
+  if (!layer) {
+    adapter.render(context);
+    return;
+  }
+  adapter.stencilContext = layer;
+  canvas.width = right - left;
+  canvas.height = bottom - top;
+  layer.setTransform(
+    transform.a,
+    transform.b,
+    transform.c,
+    transform.d,
+    transform.e - left,
+    transform.f - top
+  );
+  adapter.render(layer);
+  context.save();
+  try {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.drawImage(canvas, left, top);
+  } finally {
+    context.restore();
+  }
+}
+
 export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
+  textbox.cursorColor = DEFAULT_COLOR_INFO_STRONG;
+  textbox.cursorWidth = 1.5;
   if (!textboxVisualAdapters.has(textbox)) {
-    const adapter = {
+    const adapter: TextboxVisualAdapter = {
+      getCursorRenderingData: textbox.getCursorRenderingData.bind(textbox),
       getLineLeftOffset: textbox._getLineLeftOffset.bind(textbox),
       getTopOffset: textbox._getTopOffset.bind(textbox),
       wrapText: textbox._wrapText.bind(textbox),
+      render: textbox._render.bind(textbox),
+      renderTextFill: textbox._renderTextFill.bind(textbox),
+      stencilContext: null,
     };
     textboxVisualAdapters.set(textbox, adapter);
+    textbox.getCursorRenderingData = (selectionStart = textbox.selectionStart, boundaries) => {
+      const cursor = adapter.getCursorRenderingData(selectionStart, boundaries);
+      const { lineIndex, charIndex } = textbox.get2DCursorLocation(selectionStart);
+      const lineLength = textbox._textLines[lineIndex]?.length ?? 0;
+      const edge = lineLength === 0 ? 0 : charIndex === 0 ? -1 : charIndex === lineLength ? 1 : 0;
+      const direction = textbox.direction === 'rtl' ? -1 : 1;
+      const gap = (cursor.width / textbox.cursorWidth) * 2;
+      return {
+        ...cursor,
+        left: cursor.left + edge * direction * gap,
+        top: cursor.top + cursor.height * 0.1,
+        height: cursor.height * 0.8,
+      };
+    };
     textbox._getLineLeftOffset = (lineIndex) =>
       adapter.getLineLeftOffset(lineIndex) + DRAWING_TEXT_HORIZONTAL_PADDING / 2;
     textbox._getTopOffset = () => adapter.getTopOffset() + DRAWING_TEXT_VERTICAL_PADDING;
     textbox._wrapText = (lines, width) =>
       adapter.wrapText(lines, Math.max(1, width - DRAWING_TEXT_HORIZONTAL_PADDING));
+    textbox._render = (context) => renderEditorDrawingTextStencil(textbox, adapter, context);
+    textbox._renderTextFill = (context) => {
+      if (context !== adapter.stencilContext) {
+        adapter.renderTextFill(context);
+        return;
+      }
+      const previousFill = textbox.fill;
+      context.save();
+      try {
+        textbox.fill = '#000000';
+        context.globalCompositeOperation = 'destination-out';
+        adapter.renderTextFill(context);
+      } finally {
+        textbox.fill = previousFill;
+        context.restore();
+      }
+    };
   }
   textbox.set({ lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR, strokeWidth: 0 });
   textbox._renderTextLinesBackground = (context) =>

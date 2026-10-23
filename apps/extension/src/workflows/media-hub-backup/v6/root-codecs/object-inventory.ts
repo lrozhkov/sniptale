@@ -38,7 +38,7 @@ function createRoleInventory(
     if (
       typeof mime !== 'string' ||
       typeof size !== 'number' ||
-      object.mimeType.toLowerCase() !== mime.toLowerCase() ||
+      object.mimeType.toLowerCase() !== mime.split(';', 1)[0]!.trim().toLowerCase() ||
       object.size !== size
     )
       throw new Error('Media backup typed resource size or MIME does not match.');

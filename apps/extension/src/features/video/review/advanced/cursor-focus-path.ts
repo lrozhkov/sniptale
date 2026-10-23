@@ -1,14 +1,10 @@
+import { cropWindowCameraObservations as cropCameraObservations } from '../../composition/motion/window-camera-geometry';
+import { resolveAuthoredCursorFocusPath } from '../../project/cursor-focus-path/authoring';
 import {
-  simplifyCursorFocusPath,
-  finishCapturedCursorSegment,
-  resolveAuthoredCursorFocusPath,
-} from '../../project/cursor-focus-path/authoring';
-import type {
-  RecordingActionEvent,
-  RecordingTelemetrySignal,
-  VideoProjectCursorTrack,
-} from '../../project/types';
-import type { CursorFocusPath, CursorFocusSegment } from '../../project/cursor-focus-path/types';
+  deriveRecordedCursorFocusPath as deriveReviewCursorFocusPath,
+  type RecordedCursorFacts,
+} from '../../project/cursor-focus-path/recorded';
+import type { CursorFocusPath } from '../../project/cursor-focus-path/types';
 import {
   cursorFocusPreferenceWeight,
   evaluateCursorFocusSegment,
@@ -22,38 +18,11 @@ import {
   type WorkingZoneCameraBoundaries,
 } from '../../composition/motion/follow-cursor';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
-import type { QuickEditCameraTransform, QuickEditZoomRegion, QuickEditRect } from './types';
+import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
 import { fitQuickEditSourceCrop } from './canvas';
 
-export interface ReviewCursorFacts {
-  cursorTrack: VideoProjectCursorTrack | null;
-  actionEvents: readonly RecordingActionEvent[];
-  signals: readonly RecordingTelemetrySignal[];
-}
-
-/** Source-time authoring adapter. Coverage markers cut the path; exact click/dwell anchors survive. */
-export function deriveReviewCursorFocusPath(
-  facts: ReviewCursorFacts | null,
-  source: { width: number; height: number; duration: number },
-  observed = false
-): CursorFocusPath {
-  const segments = deriveReviewCapturedSegments(facts, source, observed);
-  const anchors = deriveReviewFocusAnchors(facts);
-  appendReviewFocusAnchors(segments, anchors, facts, observed);
-  const path: CursorFocusPath = {
-    version: 1,
-    smoothing: 0.5,
-    sensitivity: 0.5,
-    mode: 'fixed',
-    gapPolicy: 'hold',
-    segments,
-  };
-  if (observed) {
-    for (const segment of path.segments)
-      for (const key of segment.keys) key.interpolation = 'linear';
-  }
-  return observed ? path : simplifyCursorFocusPath(path);
-}
+export type ReviewCursorFacts = RecordedCursorFacts;
+export { deriveReviewCursorFocusPath };
 
 export function evaluateReviewCursorFocus(path: CursorFocusPath, sourceTime: number) {
   for (const segment of path.segments) {
@@ -161,57 +130,6 @@ export function reviewCameraPlanObservations(region: QuickEditZoomRegion): Follo
     : frames;
 }
 
-/** Clip native linear observations without joining separate visible visits across discarded pixels. */
-function cropCameraObservations(frames: readonly FollowCursorFrame[], crop: QuickEditRect) {
-  const result: FollowCursorFrame[] = [];
-  let visit = 0;
-  let previousEnd = -Infinity;
-  let previousSegment = '';
-  for (let index = 0; index < frames.length; index++) {
-    const a = frames[index]!;
-    const next = frames[index + 1];
-    const b = next?.segmentId === a.segmentId ? next : a;
-    const from = a.actual ?? a;
-    const to = b.actual ?? b;
-    let low = 0,
-      high = 1;
-    for (const axis of ['x', 'y'] as const) {
-      const start = crop[axis];
-      const end = start + (axis === 'x' ? crop.width : crop.height);
-      const delta = to[axis] - from[axis];
-      if (delta === 0) {
-        if (from[axis] < start || from[axis] > end) high = -1;
-      } else {
-        const left = (start - from[axis]) / delta;
-        const right = (end - from[axis]) / delta;
-        low = Math.max(low, Math.min(left, right));
-        high = Math.min(high, Math.max(left, right));
-      }
-    }
-    if (low > high) continue;
-    const startTime = a.time + (b.time - a.time) * low;
-    if (previousSegment !== a.segmentId || Math.abs(previousEnd - startTime) > 1e-9) visit++;
-    const segmentId = `${a.segmentId}:crop:${visit}`;
-    for (const fraction of [low, high]) {
-      const mix = (left: number, right: number) => left + (right - left) * fraction;
-      const time = mix(a.time, b.time);
-      if (result.at(-1)?.time === time && result.at(-1)?.segmentId === segmentId) continue;
-      const { actual: _actual, ...base } = a;
-      result.push({
-        ...base,
-        time,
-        segmentId,
-        x: mix(a.x, b.x),
-        y: mix(a.y, b.y),
-        ...(a.actual && b.actual ? { actual: { x: mix(from.x, to.x), y: mix(from.y, to.y) } } : {}),
-      });
-    }
-    previousEnd = a.time + (b.time - a.time) * high;
-    previousSegment = a.segmentId;
-  }
-  return result;
-}
-
 /** Admit native facts and sparse authoring against the exact consuming renderer geometry. */
 export function resolveReviewCursorCameraPlan(
   region: QuickEditZoomRegion,
@@ -306,130 +224,6 @@ export function resolveReviewCursorFocusPath(
   authored: CursorFocusPath | undefined
 ) {
   return resolveAuthoredCursorFocusPath(deriveReviewCursorFocusPath(facts, source), authored);
-}
-
-function deriveReviewCapturedSegments(
-  facts: ReviewCursorFacts | null,
-  source: { width: number; height: number; duration: number },
-  observed: boolean
-): CursorFocusSegment[] {
-  const segments: CursorFocusSegment[] = [];
-  let active: CursorFocusSegment | undefined;
-  let captureSegment: number | undefined;
-  for (const sample of facts?.cursorTrack?.samples ?? []) {
-    const point =
-      sample.recordingPoint === undefined ||
-      sample.recordingPoint === null ||
-      !sample.visible ||
-      (sample.observation && sample.observation !== 'observed')
-        ? null
-        : (sample.recordingPoint ?? { x: sample.x / source.width, y: sample.y / source.height });
-    if (!point) {
-      if (active) active.end = active.keys.at(-1)!.time;
-      active = undefined;
-      continue;
-    }
-    if (!active || captureSegment !== sample.captureSegment) {
-      if (active) active.end = active.keys.at(-1)!.time;
-      active = {
-        id: `segment:${sample.id}`,
-        binding: { kind: 'project' },
-        start: sample.time,
-        end: source.duration,
-        keys: [],
-      };
-      segments.push(active);
-      captureSegment = sample.captureSegment;
-    }
-    active.keys.push({
-      id: sample.id,
-      time: sample.time,
-      ...point,
-      anchor: active.keys.length ? 'movement' : 'boundary',
-      interpolation: observed ? 'linear' : 'smooth',
-    });
-  }
-  return segments;
-}
-
-function deriveReviewFocusAnchors(facts: ReviewCursorFacts | null) {
-  const anchors = [
-    ...(facts?.actionEvents ?? []).flatMap((event) =>
-      event.kind === 'CLICK' && event.recordingPoint
-        ? [
-            {
-              id: `click:${event.id}`,
-              time: event.time,
-              ...event.recordingPoint,
-              anchor: 'click' as const,
-              interpolation: 'smooth' as const,
-            },
-            ...(event.data['completion'] === 'released' &&
-            typeof event.data['upTime'] === 'number' &&
-            typeof event.data['recordingUpX'] === 'number' &&
-            typeof event.data['recordingUpY'] === 'number'
-              ? [
-                  {
-                    id: `release:${event.id}`,
-                    time: event.data['upTime'],
-                    x: event.data['recordingUpX'],
-                    y: event.data['recordingUpY'],
-                    anchor: 'click' as const,
-                    interpolation: 'smooth' as const,
-                  },
-                ]
-              : []),
-          ]
-        : []
-    ),
-    ...(facts?.signals ?? []).flatMap((signal) =>
-      signal.kind === 'cursor-idle' && signal.recordingPoint
-        ? [
-            {
-              id: `dwell-start:${signal.id}`,
-              time: signal.startTime,
-              ...signal.recordingPoint,
-              anchor: 'dwell' as const,
-              interpolation: 'hold' as const,
-            },
-            {
-              id: `dwell-end:${signal.id}`,
-              time: signal.endTime,
-              ...signal.recordingPoint,
-              anchor: 'dwell' as const,
-              interpolation: 'smooth' as const,
-            },
-          ]
-        : []
-    ),
-  ];
-  return anchors;
-}
-
-function appendReviewFocusAnchors(
-  segments: CursorFocusSegment[],
-  anchors: CursorFocusSegment['keys'],
-  facts: ReviewCursorFacts | null,
-  observed: boolean
-): void {
-  for (const segment of segments) {
-    if (!observed)
-      segment.keys = segment.keys.filter(
-        (key) =>
-          key.anchor !== 'movement' ||
-          !(facts?.signals ?? []).some(
-            (signal) =>
-              signal.kind === 'cursor-idle' &&
-              signal.recordingPoint &&
-              key.time > signal.startTime &&
-              key.time < signal.endTime
-          )
-      );
-    segment.keys.push(
-      ...anchors.filter((key) => key.time >= segment.start && key.time <= segment.end)
-    );
-    finishCapturedCursorSegment(segment);
-  }
 }
 
 /** Test the same captured source clock and coverage runs that feed camera observations. */

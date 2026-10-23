@@ -1,8 +1,17 @@
+import {
+  parseCameraHiddenRanges,
+  isCameraHiddenAt,
+  type CameraHiddenRange,
+} from '../../project/camera/visibility';
 import { parseQuickEditShadow } from './shadow-validation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   DEFAULT_CAMERA_APPEARANCE,
+  cameraWindowFrame,
   isCameraAppearance,
+  isCameraCrop,
+  interpolateCameraCrop,
+  type CameraCrop,
   type CameraAppearance,
 } from '../../project/camera/appearance';
 import { isBoundedNumber } from '../../project/validation/primitives';
@@ -15,7 +24,7 @@ export interface QuickEditWebcamPlacement {
   height: number;
 }
 
-export type QuickEditWebcamCrop = Pick<CameraAppearance, 'zoom' | 'panX' | 'panY'>;
+export type QuickEditWebcamCrop = CameraCrop;
 
 interface QuickEditWebcamPosition {
   id: string;
@@ -26,17 +35,6 @@ interface QuickEditWebcamPosition {
   transition: { type: 'none' | 'ease-in-out' | 'shrink'; duration: number };
 }
 
-interface QuickEditWebcamHiddenRange {
-  id: string;
-  start: number;
-  end: number;
-}
-
-/** Quick review additionally offers a true circle; full-editor appearance remains unchanged. */
-type WebcamAppearance = Omit<CameraAppearance, 'shape'> & {
-  shape: CameraAppearance['shape'] | 'circle';
-};
-
 /** Authored camera content. Disabled content still retains its immutable source. */
 export interface QuickEditWebcam {
   assetId: string;
@@ -44,11 +42,11 @@ export interface QuickEditWebcam {
   /** Positive values delay the camera: cameraTime = mainSourceTime - offsetSeconds. */
   offsetSeconds: number;
   mirrored: boolean;
-  appearance: WebcamAppearance;
+  appearance: CameraAppearance;
   shadow?: { intensity: number; color: string };
   placement: QuickEditWebcamPlacement;
   positions: QuickEditWebcamPosition[];
-  hiddenRanges: QuickEditWebcamHiddenRange[];
+  hiddenRanges: CameraHiddenRange[];
 }
 
 const MAX_TIME = 86_400;
@@ -89,7 +87,7 @@ function parsePosition(value: unknown): QuickEditWebcamPosition | null {
   )
     return null;
   const crop = value['crop'];
-  if (crop !== undefined && !isWebcamCrop(crop)) return null;
+  if (crop !== undefined && !isCameraCrop(crop)) return null;
   return {
     ...(crop === undefined ? {} : { crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY } }),
     id: value['id'],
@@ -97,18 +95,6 @@ function parsePosition(value: unknown): QuickEditWebcamPosition | null {
     placement,
     transition: { type: transition['type'], duration: transition['duration'] },
   };
-}
-
-function parseHiddenRange(value: unknown): QuickEditWebcamHiddenRange | null {
-  if (
-    !isRecord(value) ||
-    !identity(value['id']) ||
-    !isBoundedNumber(value['start'], 0, MAX_TIME) ||
-    !isBoundedNumber(value['end'], 0, MAX_TIME) ||
-    value['start'] >= value['end']
-  )
-    return null;
-  return { id: value['id'], start: value['start'], end: value['end'] };
 }
 
 function parseItems<T extends { id: string }>(
@@ -139,18 +125,14 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
     typeof value['enabled'] !== 'boolean' ||
     typeof value['mirrored'] !== 'boolean' ||
     !isBoundedNumber(value['offsetSeconds'], -MAX_TIME, MAX_TIME) ||
-    !parseWebcamAppearance(value['appearance'])
+    !isCameraAppearance(value['appearance'])
   )
     return null;
   const placement = parsePlacement(value['placement']);
   const positions = parseItems(value['positions'], parsePosition, (a, b) => a.time < b.time);
-  const hiddenRanges = parseItems(
-    value['hiddenRanges'],
-    parseHiddenRange,
-    (a, b) => a.end <= b.start
-  );
+  const hiddenRanges = parseCameraHiddenRanges(value['hiddenRanges']);
   if (!placement || !positions || !hiddenRanges) return null;
-  const appearance = parseWebcamAppearance(value['appearance'])!;
+  const appearance = value['appearance'];
   const shadow = value['shadow'];
   let parsedShadow: QuickEditWebcam['shadow'];
   if (shadow !== undefined) {
@@ -246,7 +228,7 @@ export function quickEditWebcamFrameAt(
     !Number.isFinite(cameraDuration) ||
     time < 0 ||
     time >= cameraDuration ||
-    webcam.hiddenRanges.some((range) => sourceTime >= range.start && sourceTime < range.end)
+    isCameraHiddenAt(webcam.hiddenRanges, sourceTime)
   )
     return null;
   return {
@@ -256,40 +238,28 @@ export function quickEditWebcamFrameAt(
   };
 }
 
-function parseWebcamAppearance(value: unknown): WebcamAppearance | null {
-  if (!isRecord(value)) return null;
-  const circle = value['shape'] === 'circle';
-  const candidate = circle ? { ...value, shape: 'ellipse' } : value;
-  if (!isCameraAppearance(candidate)) return null;
-  return { ...candidate, shape: circle ? 'circle' : candidate.shape };
-}
-
 /** Resolve a centered, inscribed pixel circle without rewriting authored scene-relative positions. */
 export function quickEditWebcamBounds(
   placement: QuickEditWebcamPlacement,
   output: { width: number; height: number },
-  shape: WebcamAppearance['shape']
+  shape: CameraAppearance['shape']
 ): QuickEditWebcamPlacement {
   if (shape !== 'circle') return placement;
-  const diameter = Math.min(placement.width * output.width, placement.height * output.height);
-  const width = diameter / output.width;
-  const height = diameter / output.height;
-  return {
-    x: placement.x + (placement.width - width) / 2,
-    y: placement.y + (placement.height - height) / 2,
-    width,
-    height,
-  };
-}
-
-/** Optional per-position framing inherits the base crop in existing projects. */
-function isWebcamCrop(value: unknown): value is QuickEditWebcamCrop {
-  return (
-    isRecord(value) &&
-    isBoundedNumber(value['zoom'], 1, 4) &&
-    isBoundedNumber(value['panX'], -1, 1) &&
-    isBoundedNumber(value['panY'], -1, 1)
+  const frame = cameraWindowFrame(
+    {
+      x: placement.x * output.width,
+      y: placement.y * output.height,
+      width: placement.width * output.width,
+      height: placement.height * output.height,
+    },
+    shape
   );
+  return {
+    x: frame.x / output.width,
+    y: frame.y / output.height,
+    width: frame.width / output.width,
+    height: frame.height / output.height,
+  };
 }
 
 /** Crop follows the same source-clock transition as the camera's scene placement. */
@@ -313,11 +283,7 @@ export function quickEditWebcamCropAt(webcam: QuickEditWebcam, time: number): Qu
       ? 1
       : Math.min(1, Math.max(0, (time - current.time) / duration));
   const eased = progress * progress * (3 - 2 * progress);
-  return {
-    zoom: previous.zoom + (next.zoom - previous.zoom) * eased,
-    panX: previous.panX + (next.panX - previous.panX) * eased,
-    panY: previous.panY + (next.panY - previous.panY) * eased,
-  };
+  return interpolateCameraCrop(previous, next, eased);
 }
 
 /** Move one anchor without crossing adjacent anchors or changing its content. */

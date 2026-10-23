@@ -92,6 +92,8 @@ export function PreviewStageOverlayLayer(
     | 'onUpdateAnnotationClipTemplate'
     | 'onUpdateActionEventDetails'
     | 'onUpdateMotionRegion'
+    | 'motionProject'
+    | 'onPreviewMotion'
     | 'onUpsertObjectTrackCorrectionAnchor'
     | 'placementMode'
     | 'project'
@@ -123,6 +125,9 @@ function PreviewStageInteractiveOverlays(params: Parameters<typeof PreviewStageO
   return (
     <>
       <PreviewStageMotionAreaOverlay
+        currentTime={params.currentTime}
+        motionProject={params.motionProject}
+        onPreviewMotion={params.onPreviewMotion}
         camera={params.camera}
         onClearPlacementMode={params.onClearPlacementMode}
         onUpdateMotionRegion={params.onUpdateMotionRegion}

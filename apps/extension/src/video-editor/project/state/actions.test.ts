@@ -149,6 +149,8 @@ function expectProjectActionSurface(store: ReturnType<typeof createVideoEditorTe
     'convertTextClipToAnnotation',
     'updateMediaClipShadowIntensity',
     'updateMediaClipShadowMode',
+    'updateMediaClipShadowColor',
+    'editMediaClip',
     'updateSubtitleTrackStyle',
     'updateTransitionDuration',
     'updateTransitionEasing',
@@ -430,4 +432,147 @@ it('restores removed source authoring through editor Undo and Redo', async () =>
   store.getState().removeUnusedAssets();
   expect(store.getState().project?.assets).toEqual([]);
   expect(store.getState().project?.cursorFocusPath).toEqual(deleted.cursorFocusPath);
+});
+
+it('retains dormant source text when removing unused materials through the project command', async () => {
+  const { isExportReadyVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const project = createEmptyVideoProject('Dormant text');
+  const retained = createVideoAsset('text-source');
+  const unused = createVideoAsset('unused');
+  project.version = 5;
+  project.assets = [retained, unused];
+  project.textDocuments = [
+    {
+      id: 'speech',
+      binding: { kind: 'source', assetId: retained.id, sourceInstanceId: 'hidden' },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'phrase',
+            text: 'Retained under a cut',
+            originalText: '',
+            revision: 0,
+            timingRevision: 0,
+            start: 1,
+            end: 2,
+            alignment: 'manual',
+            timeDomain: 'source',
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const store = createVideoEditorTestStore();
+  store.getState().setProject(project);
+  store.getState().removeUnusedAssets();
+  const cleaned = store.getState().project!;
+  expect(cleaned.assets).toEqual([retained]);
+  expect(cleaned.textDocuments).toEqual(project.textDocuments);
+  expect(isExportReadyVideoProject(cleaned)).toBe(true);
+});
+
+it('keeps a dormant background image through unused cleanup and history', () => {
+  const store = createVideoEditorTestStore();
+  const source = createVideoAsset('Background');
+  const retained = {
+    ...source,
+    type: 'IMAGE' as const,
+    metadata: { ...source.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+  };
+  const unused = { ...retained, id: 'unused-image' };
+  store.getState().setProject({
+    ...createEmptyVideoProject('Retained background'),
+    version: 14,
+    assets: [retained, unused],
+    sceneBackground: {
+      kind: 'solid',
+      color: '#123456',
+      remembered: { image: { kind: 'image', assetId: retained.id, imageFit: 'contain' } },
+    },
+  });
+  const before = store.getState().project!;
+  store.getState().removeUnusedAssets();
+  const after = store.getState().project!;
+  expect(after.assets).toEqual([retained]);
+  expect(after.sceneBackground).toEqual(before.sceneBackground);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, after);
+  expect(undo?.status).toBe('applied');
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.assets).toEqual([retained, unused]);
+});
+
+it.each(['none', 'text', 'image'] as const)(
+  'protects the %s watermark logo from unused cleanup and restores it with history',
+  async (mode) => {
+    const { createQuickEditWatermark } =
+      await import('../../../features/video/project/scene/watermark');
+    const store = createVideoEditorTestStore();
+    const source = createVideoAsset('Logo');
+    const logo = {
+      ...source,
+      type: 'IMAGE' as const,
+      metadata: { ...source.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+    };
+    const unused = { ...logo, id: 'unused-logo' };
+    const watermark = {
+      ...createQuickEditWatermark('Saved'),
+      mode,
+      image: {
+        assetId: `project-asset:${logo.id}`,
+        width: 400,
+        height: 200,
+        size: 0.2,
+        opacity: 1,
+      },
+    };
+    store.getState().setProject({
+      ...createEmptyVideoProject('Watermark'),
+      version: 20,
+      assets: [logo, unused],
+      watermark,
+    });
+    store.getState().removeUnusedAssets();
+    const after = store.getState().project!;
+    expect(after.assets).toEqual([logo]);
+    expect(after.watermark).toEqual(watermark);
+    const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, after);
+    expect(undo?.status).toBe('applied');
+    if (undo?.status !== 'applied') throw new Error('Expected undo');
+    expect(undo.project.assets).toEqual([logo, unused]);
+    expect(undo.project.watermark).toEqual(watermark);
+  }
+);
+
+it('protects dormant comment source bytes through the real unused-material command and repeated cleanup', async () => {
+  const { isExportReadyVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const project = createEmptyVideoProject('Dormant comments');
+  const retained = createVideoAsset('comment-source');
+  const unused = createVideoAsset('unused');
+  project.version = 23;
+  project.assets = [retained, unused];
+  project.commentDocuments = [
+    {
+      id: 'notes',
+      binding: { kind: 'source', assetId: retained.id, sourceInstanceId: 'removed-placement' },
+      annotations: [
+        { id: 'note', text: 'Retained under a cut', anchor: { kind: 'point', time: 0 } },
+      ],
+      canvasComments: [],
+    },
+  ];
+  const store = createVideoEditorTestStore();
+  store.getState().setProject(project);
+  store.getState().removeUnusedAssets();
+  const cleaned = store.getState().project!;
+  expect(cleaned.assets).toEqual([retained]);
+  expect(cleaned.commentDocuments).toEqual(project.commentDocuments);
+  expect(isExportReadyVideoProject(cleaned)).toBe(true);
+  const history = store.getState().projectHistory;
+  store.getState().removeUnusedAssets();
+  expect(store.getState().project).toBe(cleaned);
+  expect(store.getState().projectHistory).toBe(history);
 });

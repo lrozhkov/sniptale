@@ -1,3 +1,8 @@
+import {
+  motionWindowFocusToComposition,
+  resolveMotionSourceWindow,
+} from '../../../../features/video/composition/motion/source-window';
+import { isCameraMotionRegion } from '../../../../features/video/project/motion/normalization';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import type React from 'react';
 
@@ -81,9 +86,22 @@ export function updatePlacementPoint(
         });
       return;
     }
-    case VideoEditorPlacementModeKind.MOTION_FOCUS:
-      params.onUpdateMotionRegion(placementMode.motionRegionId, { focusPoint: point });
+    case VideoEditorPlacementModeKind.MOTION_FOCUS: {
+      const region = params.project.motionRegions?.find(
+        (item) => item.id === placementMode.motionRegionId
+      );
+      if (
+        !region ||
+        (region.sourceBinding?.coordinateSpace === 'source-window' &&
+          !resolveMotionSourceWindow(params.project, region, params.currentTime))
+      )
+        return;
+      const focusPoint = region
+        ? motionWindowFocusToComposition(params.project, region, point, params.currentTime, true)
+        : point;
+      params.onUpdateMotionRegion(placementMode.motionRegionId, { focusPoint });
       return;
+    }
     case VideoEditorPlacementModeKind.MOTION_AREA:
       return;
     case VideoEditorPlacementModeKind.OBJECT_TRACK_ANCHOR:
@@ -117,9 +135,20 @@ export function getPointHandleStyle(
 export function getSelectedPoint(params: PointOverlayParams): StagePoint | null {
   if (
     params.selectedMotionRegion &&
+    isCameraMotionRegion(params.selectedMotionRegion) &&
     params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
   ) {
-    return params.selectedMotionRegion.focusPoint ?? getProjectCenter(params.project);
+    if (
+      params.selectedMotionRegion.sourceBinding?.coordinateSpace === 'source-window' &&
+      !resolveMotionSourceWindow(params.project, params.selectedMotionRegion, params.currentTime)
+    )
+      return null;
+    return motionWindowFocusToComposition(
+      params.project,
+      params.selectedMotionRegion,
+      params.selectedMotionRegion.focusPoint ?? getProjectCenter(params.project),
+      params.currentTime
+    );
   }
 
   if (params.selectedActionOccurrence) {
@@ -139,6 +168,7 @@ export function getSelectedPointTarget(
 ): VideoEditorPlacementMode | null {
   if (
     params.selectedMotionRegion &&
+    isCameraMotionRegion(params.selectedMotionRegion) &&
     params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
   ) {
     return createMotionFocusPlacementMode(params.selectedMotionRegion.id);
@@ -173,7 +203,10 @@ export function getPlacementHint(placementMode: VideoEditorPlacementMode | null)
 
 export function canRenderSelectedPoint(params: PointOverlayParams): boolean {
   if (params.selectedMotionRegion) {
-    return params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL;
+    return (
+      isCameraMotionRegion(params.selectedMotionRegion) &&
+      params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
+    );
   }
 
   return params.selectedActionOccurrence !== null;

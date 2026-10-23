@@ -90,6 +90,11 @@ function useCalloutEditingEffects(args: {
     isEditing: calloutArgs.isEditing,
     pendingHtmlContentRef: args.pendingHtmlContentRef,
   });
+  useCalloutEditingFocusEffect({
+    contentEditableRef,
+    htmlContent: calloutArgs.htmlContent,
+    isEditing: calloutArgs.isEditing,
+  });
   useCalloutMeasureEffect({
     containerRef,
     ...(calloutArgs.measurementScale === undefined
@@ -97,11 +102,6 @@ function useCalloutEditingEffects(args: {
       : { measurementScale: calloutArgs.measurementScale }),
     setDimensions: args.setDimensions,
     settingsKey: calloutArgs.settingsKey,
-  });
-  useCalloutEditingFocusEffect({
-    contentEditableRef,
-    htmlContent: calloutArgs.htmlContent,
-    isEditing: calloutArgs.isEditing,
   });
   useCalloutEscapeCaptureEffect({
     contentEditableRef,

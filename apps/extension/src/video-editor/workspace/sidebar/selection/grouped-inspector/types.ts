@@ -1,6 +1,10 @@
 import type React from 'react';
 
 export type InspectorSectionSemantic =
+  | 'actions'
+  | 'source-audio'
+  | 'comments'
+  | 'watermark'
   | 'info'
   | 'timing'
   | 'placement'
@@ -19,9 +23,12 @@ export type InspectorSectionSemantic =
   | 'tracking'
   | 'effects'
   | 'content'
+  | 'keyboard'
   | 'history'
   | 'track'
-  | 'transition';
+  | 'transition'
+  | 'perspective'
+  | 'depth';
 
 export interface InspectorGroupDefinition<TId extends string> {
   content: React.ReactNode;

@@ -295,3 +295,46 @@ it('rejects content tokens when the payload-bound authority changes', () => {
     })
   ).toBe(false);
 });
+it('binds review-text tokens separately to owned Gallery and editor documents', () => {
+  vi.stubGlobal('chrome', {
+    runtime: {
+      id: 'extension-id',
+      getURL: (path: string) => `chrome-extension://extension-id/${path}`,
+    },
+  });
+  const egressAuthority: AiEgressAuthority = {
+    contractVersion: 1,
+    purpose: 'review-text',
+    payloadHash: CONTENT_HASH,
+  };
+  const gallery = {
+    id: 'extension-id',
+    frameId: 0,
+    documentId: 'same-document',
+    url: 'chrome-extension://extension-id/apps/extension/src/gallery/index.html',
+  };
+  const editor = { ...gallery, url: gallery.url.replace('gallery', 'video-editor') };
+  const issue = (sender: chrome.runtime.MessageSender) =>
+    issueLlmSessionToken({ purpose: 'review-text', sender, egressAuthority });
+  const consume = (token: string, sender: chrome.runtime.MessageSender) =>
+    consumeLlmSessionToken({ purpose: 'review-text', sender, egressAuthority, token });
+  for (const sender of [gallery, editor]) {
+    const token = issue(sender);
+    expect(token).toBeTruthy();
+    expect(consume(token!, sender)).toBe(true);
+    expect(consume(token!, sender)).toBe(false);
+  }
+  const token = issue(editor)!;
+  expect(consume(token, gallery)).toBe(false);
+  expect(consume(token, editor)).toBe(false);
+  for (const patch of [
+    { id: 'other' },
+    { frameId: 1 },
+    { url: 'https://extension-id/apps/extension/src/video-editor/index.html' },
+    { url: editor.url.replace('video-editor', 'settings') },
+  ])
+    expect(issue({ ...editor, ...patch })).toBeNull();
+  const { documentId: omittedDocumentId, ...missingDocument } = editor;
+  expect(omittedDocumentId).toBe('same-document');
+  expect(issue(missingDocument)).toBeNull();
+});

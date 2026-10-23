@@ -15,6 +15,21 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it.each(['parser', 'store'])(
+  'selects unlock persistence and protected-provider route proof for the %s owner',
+  async (owner) => {
+    const module = await importOwnerMap();
+    expect(
+      module.resolveMappedCoverageOwnerTests(
+        `apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.${owner}.ts`
+      )
+    ).toEqual([
+      'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+    ]);
+  }
+);
+
 it('includes conditional locale initialization without dropping preference IO owner proof', async () => {
   const module = await importOwnerMap();
   const root = 'apps/extension/src/composition/persistence/infrastructure/preference-service';
@@ -434,4 +449,22 @@ it('executes real tour library and workspace proof when the page test substitute
     `${root}/tour/library.test.tsx`,
     `${root}/tour/workspace.test.tsx`,
   ]);
+});
+
+it('includes linked clip proof in the exclusive duration owner scope', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/features/video/project/timeline/basics.ts'
+    )
+  ).toContain('apps/extension/src/features/video/project/timeline/basics.waveforms.test.ts');
+});
+
+it('keeps concurrent project publication proof in root contract validation selection', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/features/video/project/validation/root.ts'
+    )
+  ).toContain('apps/extension/src/composition/persistence/projects/index.stale-save.test.ts');
 });

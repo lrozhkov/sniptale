@@ -32,6 +32,7 @@ import {
   type LiveEncoderContentHint,
 } from './live-video-encoder-config';
 import { LiveNativeVideoEncoderSource } from './live-native-video-encoder-source';
+import { createLiveAudioTimestampTransform } from './live-audio-timeline';
 import { LiveVideoSessionDiagnostics } from './live-video-session-diagnostics';
 import type { RecordingFrameClockAnchor } from '../../../contracts/video/recording-frame-clock';
 import type { RecordingFrameClockObserver } from './recording-frame-clock';
@@ -217,7 +218,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
           ? { fullCodecString: input.encoding.videoCodecString }
           : {}),
         onEncodedPacket: observeEncodedPacket,
-        sizeChangeBehavior: 'deny',
+        sizeChangeBehavior: 'contain',
         onEncoderConfig: (config) => this.assertEncoderConfig(config),
       });
     }
@@ -232,7 +233,11 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     this.audioSources = input.stream.getAudioTracks().map((track) => {
       const source = new MediaStreamAudioTrackSource(
         track,
-        { bitrate: input.encoding.audioBitrate, codec: input.encoding.audioCodec },
+        {
+          bitrate: input.encoding.audioBitrate,
+          codec: input.encoding.audioCodec,
+          transform: { process: createLiveAudioTimestampTransform() },
+        },
         { timestampBase: 'synced-zero' }
       );
       this.output.addAudioTrack(source);

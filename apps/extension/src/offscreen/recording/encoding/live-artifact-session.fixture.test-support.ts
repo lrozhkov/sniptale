@@ -1,8 +1,26 @@
+import type { AudioEncodingConfig, MediaStreamAudioTrackSourceOptions } from 'mediabunny';
 import { vi } from 'vitest';
 import { createRecordingStagingCoordinatorTestDouble } from './artifact-session.test-support';
 import { createConfigurableVideoStream } from '../multi-source/media-stream.test-support';
 
 const processorInits = vi.hoisted(() => [] as MediaStreamTrackProcessorInit[]);
+
+const MediaStreamAudioTrackSource = vi.hoisted(
+  () =>
+    class MediaStreamAudioTrackSource {
+      static instances: MediaStreamAudioTrackSource[] = [];
+      readonly errorPromise = new Promise<never>(() => undefined);
+      readonly pause = vi.fn();
+      readonly resume = vi.fn();
+      constructor(
+        readonly track: MediaStreamTrack,
+        readonly config: AudioEncodingConfig,
+        readonly options: MediaStreamAudioTrackSourceOptions
+      ) {
+        MediaStreamAudioTrackSource.instances.push(this);
+      }
+    }
+);
 
 const mediabunny = vi.hoisted(() => {
   class AppendOnlyStreamTarget {
@@ -10,12 +28,6 @@ const mediabunny = vi.hoisted(() => {
     constructor(stream: WritableStream<Uint8Array>) {
       this.writer = stream.getWriter();
     }
-  }
-
-  class TrackSource {
-    readonly errorPromise = new Promise<never>(() => undefined);
-    readonly pause = vi.fn();
-    readonly resume = vi.fn();
   }
 
   class VideoSample {
@@ -95,8 +107,6 @@ const mediabunny = vi.hoisted(() => {
       }
     ) {}
   }
-
-  class MediaStreamAudioTrackSource extends TrackSource {}
 
   class Output {
     static instances: Output[] = [];
@@ -206,6 +216,7 @@ function createTestVideoFrame(timestamp: number): VideoFrame {
 export function resetLiveSessionFixture() {
   vi.clearAllMocks();
   mediabunny.Output.instances.length = 0;
+  mediabunny.MediaStreamAudioTrackSource.instances.length = 0;
   mediabunny.VideoSample.instances.length = 0;
   mediabunny.Output.encoderFrameRateOverride = null;
   mediabunny.Output.encoderBitrateMode = null;

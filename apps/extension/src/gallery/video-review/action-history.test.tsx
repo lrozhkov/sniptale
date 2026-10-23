@@ -233,9 +233,15 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     );
   const change = (key: string, value: string) =>
     act(() => {
-      const node = host.querySelector<HTMLInputElement | HTMLSelectElement>(
-        `[aria-label="gallery.videoReview.${key}"]`
-      )!;
+      const node = host.querySelector<HTMLElement>(`[aria-label="gallery.videoReview.${key}"]`)!;
+      if (!(node instanceof HTMLInputElement) && !(node instanceof HTMLSelectElement)) {
+        const option = [...node.querySelectorAll<HTMLButtonElement>('button')].find(
+          (button) => button.textContent === `gallery.videoReview.click_${value}`
+        );
+        expect(option).toBeDefined();
+        option!.click();
+        return;
+      }
       const proto =
         node instanceof HTMLSelectElement
           ? HTMLSelectElement.prototype
@@ -540,16 +546,10 @@ it('configures recorded keys without pointer locations, separately from selected
     );
     expect(host.textContent).toContain('gallery.videoReview.historyClicks');
     expect(host.textContent).toContain('gallery.videoReview.historyKeys');
-    const select = host.querySelector<HTMLSelectElement>(
-      '[aria-label="gallery.videoReview.keyDisplay"]'
-    )!;
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(
-        select,
-        'on'
-      );
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    const display = host.querySelector('[aria-label="gallery.videoReview.keyDisplay"]')!;
+    act(() =>
+      display.querySelector<HTMLButtonElement>('[title="gallery.videoReview.keyCaption"]')!.click()
+    );
     expect(onKeyChange).toHaveBeenCalledExactlyOnceWith(['key'], { enabled: true });
     expect(onChange).not.toHaveBeenCalled();
   } finally {

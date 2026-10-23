@@ -1,9 +1,11 @@
+import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { useEffect, useState } from 'react';
 import { BackgroundImagePicker } from '../../../../../composition/background-resources/picker';
-import { createSceneGradientBackground } from '../../../../../features/video/project/scene/background-gradient';
+import { resolveSceneBackgroundKind } from '../../../../../features/video/project/scene/background-settings';
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
 import { SelectInput } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { PANEL_META_CLASS_NAME } from '../shared/panel';
 import { SceneBackgroundColorEditor } from './colors';
 import type { SceneBackground, SceneBackgroundFieldProps } from './shared';
@@ -13,11 +15,47 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
   useEffect(() => {
     if (props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE) setImageRequested(false);
   }, [props.sceneBackground.kind]);
+  const blur = props.sceneBackground.blur ?? 0;
+  const zoomBehavior = props.sceneBackground.zoomBehavior ?? 'window';
+  const zoomOptions = [
+    { value: 'window' as const, label: translate('gallery.videoReview.backgroundZoomWindow') },
+    { value: 'content' as const, label: translate('gallery.videoReview.backgroundZoomContent') },
+  ];
   return (
-    <div className="sniptale-parameter-stack grid gap-3">
-      <SelectInput
+    <div className="sniptale-parameter-stack grid gap-3" data-ui="video-editor.scene-background">
+      <OptionButtonsField
+        layout="stacked"
+        label={translate('gallery.videoReview.backgroundZoom')}
+        value={zoomBehavior}
+        options={
+          zoomBehavior === 'fixed' || zoomBehavior === 'follow-video'
+            ? [
+                {
+                  value: zoomBehavior,
+                  label: translate(
+                    zoomBehavior === 'fixed'
+                      ? 'gallery.videoReview.backgroundZoomLegacyFixed'
+                      : 'gallery.videoReview.backgroundZoomLegacyFollow'
+                  ),
+                },
+                ...zoomOptions,
+              ]
+            : zoomOptions
+        }
+        onChange={(zoomBehavior) => {
+          props.onSetSceneBackground({ zoomBehavior });
+          props.onResetSceneBackgroundPreview();
+        }}
+      />
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.sceneBackgroundTypeLabel')}
-        value={imageRequested ? VideoSceneBackgroundKind.IMAGE : props.sceneBackground.kind}
+        value={
+          imageRequested
+            ? VideoSceneBackgroundKind.IMAGE
+            : props.sceneBackground.enabled === false
+              ? 'none'
+              : props.sceneBackground.kind
+        }
         onChange={(value) => {
           setImageRequested(
             value === VideoSceneBackgroundKind.IMAGE && props.imageAssets.length === 0
@@ -26,11 +64,31 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
         }}
         options={getSceneBackgroundKindOptions(props.imageAssets)}
       />
-      {imageRequested || props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE ? (
-        <ImageBackgroundEditor {...props} />
-      ) : (
-        <SceneBackgroundEditor {...props} />
-      )}
+      {(imageRequested || props.sceneBackground.enabled !== false) &&
+        (imageRequested || props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE ? (
+          <ImageBackgroundEditor {...props} />
+        ) : (
+          <SceneBackgroundEditor {...props} />
+        ))}
+      {props.sceneBackground.enabled !== false &&
+        !imageRequested &&
+        props.sceneBackground.kind !== VideoSceneBackgroundKind.SOLID && (
+          <NumericRow
+            label={translate('editor.scene.backgroundBlurAmount')}
+            value={blur}
+            min={0}
+            max={25}
+            step={1}
+            precision={2}
+            unit="px"
+            normalizeValue={(value) => (value === Number(blur.toFixed(2)) ? blur : value)}
+            onPreviewValue={() => undefined}
+            onCommitValue={(value) => {
+              props.onSetSceneBackground({ blur: value });
+              props.onResetSceneBackgroundPreview();
+            }}
+          />
+        )}
     </div>
   );
 }
@@ -61,6 +119,24 @@ function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
           options={getSceneBackgroundAssetOptions(props.imageAssets)}
         />
       )}
+      {props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE && (
+        <OptionButtonsField
+          label={translate('videoEditor.sidebar.sceneBackgroundImageFit')}
+          value={props.sceneBackground.imageFit ?? 'cover'}
+          options={[
+            { value: 'cover', label: translate('videoEditor.sidebar.sceneBackgroundImageCover') },
+            {
+              value: 'contain',
+              label: translate('videoEditor.sidebar.sceneBackgroundImageContain'),
+            },
+          ]}
+          onChange={(imageFit) => {
+            if (props.sceneBackground.kind !== VideoSceneBackgroundKind.IMAGE) return;
+            props.onSetSceneBackground({ ...props.sceneBackground, imageFit });
+            props.onResetSceneBackgroundPreview();
+          }}
+        />
+      )}
       {props.onImportImage && (
         <BackgroundImagePicker
           onSelect={({ file, originMediaId }) =>
@@ -81,54 +157,38 @@ function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
 }
 
 function handleSceneBackgroundKindChange(
-  nextKind: SceneBackground['kind'],
+  nextKind: SceneBackground['kind'] | 'none',
   props: SceneBackgroundFieldProps
 ) {
-  switch (nextKind) {
-    case VideoSceneBackgroundKind.SOLID:
-      props.onSetSceneBackground(resolveSolidSceneBackground(props.sceneBackground));
-      props.onResetSceneBackgroundPreview();
-      return;
-    case VideoSceneBackgroundKind.GRADIENT:
-      props.onSetSceneBackground(resolveGradientSceneBackground(props.sceneBackground));
-      props.onResetSceneBackgroundPreview();
-      return;
-    case VideoSceneBackgroundKind.IMAGE: {
-      const firstAsset = props.imageAssets[0];
-      if (!firstAsset) {
-        return;
-      }
-
-      props.onSetSceneBackground({
-        kind: VideoSceneBackgroundKind.IMAGE,
-        assetId: firstAsset.id,
-      });
-      props.onResetSceneBackgroundPreview();
-    }
+  if (nextKind === 'none') {
+    props.onSetSceneBackground({ ...props.sceneBackground, enabled: false });
+    props.onResetSceneBackgroundPreview();
+    return;
   }
-}
-
-function resolveSolidSceneBackground(sceneBackground: SceneBackground) {
-  return {
-    kind: VideoSceneBackgroundKind.SOLID,
-    color:
-      sceneBackground.kind === VideoSceneBackgroundKind.SOLID ? sceneBackground.color : '#111111',
-  } as const;
-}
-
-function resolveGradientSceneBackground(sceneBackground: SceneBackground) {
-  return sceneBackground.kind === VideoSceneBackgroundKind.GRADIENT
-    ? sceneBackground
-    : createSceneGradientBackground();
+  const next = resolveSceneBackgroundKind(
+    props.sceneBackground,
+    nextKind,
+    props.imageAssets[0]?.id
+  );
+  if (!next) return;
+  props.onSetSceneBackground(next);
+  props.onResetSceneBackgroundPreview();
 }
 
 function commitSceneBackgroundImage(
   assetId: string,
-  props: Pick<SceneBackgroundFieldProps, 'onResetSceneBackgroundPreview' | 'onSetSceneBackground'>
+  props: Pick<
+    SceneBackgroundFieldProps,
+    'onResetSceneBackgroundPreview' | 'onSetSceneBackground' | 'sceneBackground'
+  >
 ) {
   props.onSetSceneBackground({
     kind: VideoSceneBackgroundKind.IMAGE,
     assetId,
+    ...(props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE &&
+    props.sceneBackground.imageFit !== undefined
+      ? { imageFit: props.sceneBackground.imageFit }
+      : {}),
   });
   props.onResetSceneBackgroundPreview();
 }
@@ -137,6 +197,7 @@ export function getSceneBackgroundKindOptions(
   _imageAssets: SceneBackgroundFieldProps['imageAssets'] = []
 ) {
   return [
+    { value: 'none' as const, label: translate('gallery.videoReview.backgroundNone') },
     {
       value: VideoSceneBackgroundKind.SOLID,
       label: translate('videoEditor.sidebar.sceneBackgroundSolid'),

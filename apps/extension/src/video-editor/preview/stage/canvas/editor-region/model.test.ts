@@ -54,7 +54,9 @@ it('commits one four-control gesture and cancels Escape/unmount without writing'
   const cleanup = begin();
   move();
   move();
-  window.dispatchEvent(new Event('pointerup'));
+  const release = new MouseEvent('pointerup', { clientX: 20, clientY: 10 });
+  Object.defineProperty(release, 'pointerId', { value: 1 });
+  window.dispatchEvent(release);
   cleanup();
   expect(commit).toHaveBeenCalledTimes(1);
   expect(Object.keys(commit.mock.calls[0]![0])).toHaveLength(4);
@@ -70,4 +72,43 @@ it('commits one four-control gesture and cancels Escape/unmount without writing'
   unmount();
   expect(commit).not.toHaveBeenCalled();
   expect(document.querySelector('[data-video-editor-pointer-cursor]')).toBeNull();
+});
+
+it.each([
+  { name: 'invalid final inverse', move: true, x: 25, y: -1, id: 1, expected: null },
+  { name: 'different final coordinates', move: true, x: 40, y: 30, id: 1, expected: [40, 30] },
+  { name: 'release without a separate move', move: false, x: 25, y: 15, id: 1, expected: [25, 15] },
+  { name: 'return to origin', move: true, x: 0, y: 0, id: 1, expected: null },
+  { name: 'another pointer release', move: true, x: 25, y: 15, id: 2, expected: null },
+])('uses the final inverse for $name', ({ move, x, y, id, expected }) => {
+  const model = resolveEditorRegionModel(projectFixture(), 'fx', 1)!;
+  const preview = vi.fn(),
+    commit = vi.fn();
+  const cleanup = beginEditorRegionGesture({
+    model,
+    mode: 'move',
+    origin: { x: 0, y: 0 },
+    pointerId: 1,
+    mapPoint: (event) => (event.clientY < 0 ? null : { x: event.clientX, y: event.clientY }),
+    preview,
+    commit,
+  });
+  const send = (type: string, clientX: number, clientY: number, pointerId: number) => {
+    const event = new MouseEvent(type, { clientX, clientY });
+    Object.defineProperty(event, 'pointerId', { value: pointerId });
+    window.dispatchEvent(event);
+  };
+  try {
+    if (move) send('pointermove', 20, 10, 1);
+    send('pointerup', x, y, id);
+    if (expected) {
+      expect(commit).toHaveBeenCalledExactlyOnceWith(
+        resizeEditorRegion(model, 'move', expected[0]!, expected[1]!)
+      );
+    } else expect(commit).not.toHaveBeenCalled();
+    expect(preview).toHaveBeenLastCalledWith(null);
+    expect(document.querySelector('[data-video-editor-pointer-cursor]')).toBeNull();
+  } finally {
+    cleanup();
+  }
 });

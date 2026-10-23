@@ -17,10 +17,18 @@ export function applyTourHintSurface(hint, authored) {
 }
 
 /** Size the card and reserve its navigation chrome before measuring text pages. */
-export function sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight }) {
+export function sizeTourHint({
+  hint,
+  hintText,
+  surface,
+  appearance,
+  stageWidth,
+  stageHeight,
+  availableHeight = Infinity,
+}) {
   const caption = appearance.presentation !== 'callout';
   const inset = caption ? 0 : 16;
-  const maximumHeight = Math.max(1, Math.min(240, stageHeight - inset));
+  const maximumHeight = Math.max(1, Math.min(240, stageHeight - inset, availableHeight));
   const width = caption ? stageWidth : Math.min(stageWidth - inset, surface.width);
   hint.style.width = `${Math.max(1, width)}px`;
   hint.style.maxWidth = `${Math.max(1, stageWidth - inset)}px`;

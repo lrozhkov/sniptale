@@ -1,3 +1,4 @@
+import { isCameraMotionRegion } from './normalization';
 import type { VideoProject, VideoProjectMotionRegion } from '../types';
 import { resolveMotionConnectionSource } from './index';
 
@@ -5,7 +6,7 @@ type MotionRange = Pick<VideoProjectMotionRegion, 'startTime' | 'duration'>;
 const MIN_DURATION = 0.1;
 
 function occupiedRanges(project: VideoProject, movingId?: string): MotionRange[] {
-  return (project.motionRegions ?? []).flatMap((region) => {
+  return (project.motionRegions ?? []).filter(isCameraMotionRegion).flatMap((region) => {
     if (region.duration <= 0) return [];
     const ranges: MotionRange[] = region.id === movingId ? [] : [region];
     const source = resolveMotionConnectionSource(project, region);
@@ -40,7 +41,7 @@ export function constrainMotionTiming(
   const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
   let start = clip ? clip.startTime : 0;
   let end = clip ? clip.startTime + clip.duration : project.duration;
-  for (const range of occupiedRanges(project, region.id)) {
+  for (const range of isCameraMotionRegion(region) ? occupiedRanges(project, region.id) : []) {
     if (range.startTime + range.duration <= region.startTime) {
       start = Math.max(start, range.startTime + range.duration);
     } else if (range.startTime >= region.startTime + region.duration) {

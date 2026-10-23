@@ -4,6 +4,7 @@ import type { TourPlayerLabels } from './document';
 /** Trusted renderer inputs prepared by the document builder or owning editor session. */
 interface TourPlayerInput {
   tour: TourDocument;
+  headers?: Record<string, string> | undefined;
   assets: readonly { id: string; src: string }[];
   labels: TourPlayerLabels;
 }
@@ -15,11 +16,14 @@ export function createTourPlayer(
   options?: {
     /** Start playback at this slide without an intervening manual navigation pause. */
     initialSlideId?: string;
+    initialActionId?: string;
     /** Bounded editor preview: interactive with audio, but URL actions never navigate. */
     preview?: boolean;
     authoring?:
       | {
           cameraFrame?: boolean;
+          imageFrame?: boolean;
+          onFrameImage?(placement: { center: { x: number; y: number }; zoom: number }): void;
           onFrameCamera?(camera: { center: { x: number; y: number }; zoom: number }): void;
           canEdit?(): boolean;
           /** Disposable editor selection; navigation never executes authored actions. */

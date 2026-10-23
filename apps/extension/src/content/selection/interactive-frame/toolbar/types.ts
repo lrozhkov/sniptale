@@ -24,6 +24,7 @@ export interface InteractiveFrameToolbarProps {
   stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
   setState: Dispatch<SetStateAction<FrameState>>;
   handleEffectButtonClick: (mode: EffectMode) => void;
+  handleEffectModeSelect?: (mode: EffectMode) => void;
   handleStartEditing: () => void;
   handleDelete: () => void;
   onUpdate: (frame: FrameData) => void;

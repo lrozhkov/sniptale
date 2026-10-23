@@ -71,6 +71,7 @@ export function CheckboxField(props: {
 }
 
 const FIELD_LABEL_CLASS_NAME = [
+  'sniptale-interface-label',
   'flex-1 overflow-hidden text-ellipsis whitespace-nowrap',
   'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
   'text-[color:var(--sniptale-color-text-secondary)]',
@@ -112,7 +113,7 @@ export function ColorField({
     return (
       <InspectorParameterRow
         label={props.label}
-        valueMinimum={140}
+        valueMinimum={props.triggerVariant === 'swatch' ? 100 : 140}
         stacked={layout === 'stacked'}
         dataUi="shared.ui.compact-inspector.color-field"
         className={className}

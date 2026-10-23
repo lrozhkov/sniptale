@@ -74,16 +74,16 @@ export const settingsAiProvidersProviderMessages = defineMessageSource({
     en: 'Name *',
   },
   providerNamePlaceholder: {
-    ru: 'Например: OpenAI, Local LLM',
-    en: 'Example: OpenAI, Local LLM',
+    ru: 'Название подключения',
+    en: 'Connection name',
   },
   providerApiUrlLabel: {
     ru: 'API URL *',
     en: 'API URL *',
   },
   providerApiUrlPlaceholder: {
-    ru: 'Например: https://api.openai.com/v1',
-    en: 'Example: https://api.openai.com/v1',
+    ru: 'https://api.example.com/v1',
+    en: 'https://api.example.com/v1',
   },
   providerApiUrlHint: {
     ru: 'Используйте HTTPS. HTTP допустим только для localhost и 127.0.0.1.',

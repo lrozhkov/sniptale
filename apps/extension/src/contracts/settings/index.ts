@@ -49,14 +49,89 @@ export interface ContextMenuSettings {
 }
 
 export type ContentToolbarDisplayMode = 'horizontal' | 'vertical';
-export type ContentToolbarDockEdge = 'top' | 'bottom' | 'left' | 'right';
+export const CONTENT_TOOLBAR_DOCK_EDGES = [
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+  'left-top',
+  'left-bottom',
+  'right-top',
+  'right-bottom',
+] as const;
+export type ContentToolbarDockEdge = (typeof CONTENT_TOOLBAR_DOCK_EDGES)[number];
 
 export interface ContentToolbarPosition {
   x: number;
   y: number;
 }
 
+export const RECORDING_TOOLBAR_CONTROLS = [
+  'select',
+  'pencil',
+  'marker',
+  'text',
+  'shape',
+  'arrow',
+  'blur',
+  'eraser',
+  'clear',
+  'cursor',
+  'microphone',
+  'camera',
+] as const;
+export type RecordingToolbarControl = (typeof RECORDING_TOOLBAR_CONTROLS)[number];
+
+export const PAGE_TOOLBAR_CONTROLS = [
+  'auto-blur',
+  'capture-visible',
+  'capture-selection',
+  'capture-full',
+  'after-capture',
+  'capture-delay',
+  'capture-size',
+  'drawing-pencil',
+  'drawing-marker',
+  'drawing-text',
+  'drawing-shape',
+  'drawing-arrow',
+  'drawing-blur',
+  'annotation-callout',
+  'annotation-step-badge',
+  'editing-direct-text',
+  'editing-ai',
+  'review-panel',
+  'review-measurements',
+  'review-layout-guides',
+  'review-export',
+] as const;
+export type PageToolbarControl = (typeof PAGE_TOOLBAR_CONTROLS)[number];
+
+export const PAGE_TOOLBAR_OVERRIDE_MODES = [
+  'drawing',
+  'highlighter',
+  'quick-edit',
+  'design-review',
+] as const;
+export type PageToolbarMode = 'cursor' | (typeof PAGE_TOOLBAR_OVERRIDE_MODES)[number];
+export type PageToolbarControlOverrides = Partial<
+  Record<Exclude<PageToolbarMode, 'cursor'>, Partial<Record<PageToolbarControl, boolean | null>>>
+>;
+
 export interface ContentToolbarPreferences {
+  /** Shared non-recording toolbar choices. Missing controls remain visible. */
+  pageControls?: Partial<Record<PageToolbarControl, boolean>>;
+  /** Mode choices override shared defaults. Null restores inheritance for one control. */
+  pageControlOverrides?: PageToolbarControlOverrides;
+  cropMode?: 'drawing' | 'resize';
+  /** Missing controls remain visible during recording. This does not enable their tools. */
+  recordingControls?: Partial<Record<RecordingToolbarControl, boolean>>;
+  /** Missing values enable fading during recording. */
+  fadeDuringRecording?: boolean;
   /** Legacy absence uses docking at the top edge. */
   freePlacement?: boolean;
   dockEdge?: ContentToolbarDockEdge;
@@ -215,6 +290,7 @@ export interface HotkeyConfig {
 }
 
 export interface QuickActionOverlay {
+  transactionId?: string;
   afterCapture: CaptureActionType;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;

@@ -2,6 +2,9 @@ import type { VideoEditorFileInputRefs } from '../../../chrome/file-inputs';
 import type { WorkspaceSidebarProps } from './props';
 
 type WorkspaceSidebarPanelContentPropKeys =
+  | 'recognition'
+  | 'textRewrite'
+  | 'textVoice'
   | 'activeProjectId'
   | 'gridSettings'
   | 'inspectorMode'
@@ -61,7 +64,10 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onUpdateMediaClipFitScalePercent'
   | 'onUpdateMediaClipShadowIntensity'
   | 'onUpdateMediaClipShadowMode'
+  | 'onUpdateMediaClipShadowColor'
+  | 'onEditMediaClip'
   | 'onUpdateMediaClipWindowHeader'
+  | 'onPreviewMotion'
   | 'onUpdateMotionRegion'
   | 'onUpdateShapeStyle'
   | 'onUpdateSubtitleTrackStyle'
@@ -82,6 +88,8 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'recordingId'
   | 'recordings'
   | 'currentTime'
+  | 'watermark'
+  | 'sceneEdges'
   | 'typingProject'
   | 'recordingTelemetry'
   | 'onApplyTypingCompression'

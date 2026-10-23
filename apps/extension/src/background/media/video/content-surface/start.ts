@@ -1,7 +1,11 @@
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  CaptureMode,
+  type VideoRecordingSettings,
+} from '@sniptale/runtime-contracts/video/types/types';
 import {
   loadVideoSettings,
   loadVideoUiState,
+  patchVideoSettings,
 } from '../../../../composition/persistence/capture-settings';
 import { loadSettings } from '../../../../composition/persistence/settings';
 import { ensureMediaHubStorageHeadroom } from '../../../../features/media-hub/storage-capacity';
@@ -9,23 +13,38 @@ import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { startRecording } from '../manager';
 import { resolveVideoRecordingViewportPreset } from './preset';
 import { createVideoRecordingSurfaceSnapshot } from './snapshot';
+import { resolveRecordingMediaAccess } from './media-access';
 import {
   ensureVideoRecordingSurfaceLeaseHydrated,
   requestVideoRecordingSurface,
   updateVideoRecordingSurface,
+  type VideoRecordingSurfaceLease,
 } from './surface-lease';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { browserAction } from '@sniptale/platform/browser/action';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import type { StartSavedTabVideoRecordingMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import {
   ensureCurrentRecordingDocument,
   VideoRecordingStartFailure,
 } from '../manager/start-failure';
+import type { RecordingStartResult } from '../manager/start-delivery';
 
 const PREVIOUS_RECORDING_ERROR = 'Resolve the previous recording before starting another.';
 const logger = createLogger({ namespace: 'VideoRecordingContentSurfaceStart' });
+const pendingSavedStarts = new Map<number, { cancelled: boolean }>();
+
+/** Reports a pending saved-tab start before the runtime reaches PREPARING. */
+export function isSavedTabVideoRecordingStartPending(tabId: number): boolean {
+  return pendingSavedStarts.has(tabId);
+}
+
+export function cancelSavedTabVideoRecordingStart(tabId: number): void {
+  const attempt = pendingSavedStarts.get(tabId);
+  if (attempt) attempt.cancelled = true;
+}
 
 async function openPreviousRecordingResolution(tabId: number): Promise<void> {
   try {
@@ -39,8 +58,9 @@ async function openPreviousRecordingResolution(tabId: number): Promise<void> {
 }
 
 export async function activateVideoRecordingSurface(tabId: number) {
-  const settings = await loadVideoSettings();
+  const stored = await loadVideoSettings();
   const existingLease = await ensureVideoRecordingSurfaceLeaseHydrated();
+  const settings = existingLease?.recordingId ? stored : await resolveRecordingMediaAccess(stored);
   const lease =
     existingLease?.tabId === tabId
       ? existingLease
@@ -58,7 +78,7 @@ export async function activateVideoRecordingSurface(tabId: number) {
 }
 
 export async function openVideoRecordingSurfaceFromPopup(tabId: number): Promise<void> {
-  const settings = await loadVideoSettings();
+  const settings = await resolveRecordingMediaAccess(await loadVideoSettings());
   const lease = await requestVideoRecordingSurface({
     entry: 'popup',
     tabId,
@@ -77,30 +97,50 @@ export async function openVideoRecordingSurfaceFromPopup(tabId: number): Promise
 export async function startSavedTabVideoRecording(
   tabId: number,
   ownerSenderUrl: string | undefined,
-  ownerDocumentId: string | undefined
+  ownerDocumentId: string | undefined,
+  confirmation: Pick<
+    StartSavedTabVideoRecordingMessage,
+    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+  > = {}
+) {
+  if (pendingSavedStarts.has(tabId)) {
+    return { success: false, failureCode: 'duplicate-preparing' as const };
+  }
+  const attempt = { cancelled: false };
+  pendingSavedStarts.set(tabId, attempt);
+  try {
+    return await runSavedTabVideoRecordingStart(
+      tabId,
+      ownerSenderUrl,
+      ownerDocumentId,
+      confirmation,
+      attempt
+    );
+  } finally {
+    if (pendingSavedStarts.get(tabId) === attempt) pendingSavedStarts.delete(tabId);
+  }
+}
+
+async function runSavedTabVideoRecordingStart(
+  tabId: number,
+  ownerSenderUrl: string | undefined,
+  ownerDocumentId: string | undefined,
+  confirmation: Pick<
+    StartSavedTabVideoRecordingMessage,
+    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+  >,
+  attempt: { cancelled: boolean }
 ) {
   if (!ownerSenderUrl || !ownerDocumentId) {
     throw new VideoRecordingStartFailure('stale-context');
   }
   await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
-  const existingLease = await ensureVideoRecordingSurfaceLeaseHydrated();
-  const lease =
-    existingLease?.tabId === tabId
-      ? existingLease
-      : await requestVideoRecordingSurface({ entry: 'manual', tabId });
-  await ensureActivePageAccessRuntime(tabId, 'Page access is required for tab recording.');
+  const settings = await loadConfirmedRecordingSettings(confirmation);
+  if (!settings) return { success: true, confirmationRequired: true as const };
   await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
-  await ensureMediaHubStorageHeadroom();
-  const [settings, appSettings, uiState] = await Promise.all([
-    loadVideoSettings(),
-    loadSettings(),
-    loadVideoUiState(),
-  ]);
-  const viewportPresetId = await resolveVideoRecordingViewportPreset(appSettings);
-  if (uiState.viewportPresetId && !viewportPresetId) {
-    throw new Error('Saved viewport preset is unavailable');
-  }
-  await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
+  if (attempt.cancelled) return { success: false, failureCode: 'cancelled' as const };
+  const { lease, viewportPresetId } = await prepareSavedRecordingSource(tabId, ownerDocumentId);
+  if (attempt.cancelled) return { success: false, failureCode: 'cancelled' as const };
   const result = await startRecording(
     tabId,
     settings,
@@ -109,6 +149,47 @@ export async function startSavedTabVideoRecording(
     ownerSenderUrl,
     ownerDocumentId
   );
+  return projectSavedRecordingStart(tabId, settings, lease, result);
+}
+
+async function loadConfirmedRecordingSettings(
+  confirmation: Pick<
+    StartSavedTabVideoRecordingMessage,
+    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+  >
+): Promise<VideoRecordingSettings | null> {
+  const settings = await resolveRecordingMediaAccess(await loadVideoSettings());
+  if (settings.microphoneEnabled || settings.warnWithoutMicrophone === false) return settings;
+  if (confirmation.confirmedWithoutMicrophone !== true) return null;
+  return confirmation.rememberWithoutMicrophone === true
+    ? resolveRecordingMediaAccess(await patchVideoSettings({ warnWithoutMicrophone: false }))
+    : settings;
+}
+
+async function prepareSavedRecordingSource(tabId: number, ownerDocumentId: string) {
+  const existingLease = await ensureVideoRecordingSurfaceLeaseHydrated();
+  const lease =
+    existingLease?.tabId === tabId
+      ? existingLease
+      : await requestVideoRecordingSurface({ entry: 'manual', tabId });
+  await ensureActivePageAccessRuntime(tabId, 'Page access is required for tab recording.');
+  await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
+  await ensureMediaHubStorageHeadroom();
+  const [appSettings, uiState] = await Promise.all([loadSettings(), loadVideoUiState()]);
+  const viewportPresetId = await resolveVideoRecordingViewportPreset(appSettings);
+  if (uiState.viewportPresetId && !viewportPresetId) {
+    throw new Error('Saved viewport preset is unavailable');
+  }
+  await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
+  return { lease, viewportPresetId };
+}
+
+async function projectSavedRecordingStart(
+  tabId: number,
+  settings: VideoRecordingSettings,
+  lease: VideoRecordingSurfaceLease,
+  result: RecordingStartResult
+) {
   if (result.result !== 'accepted') {
     if (result.result === 'failed' && result.error === PREVIOUS_RECORDING_ERROR) {
       await openPreviousRecordingResolution(tabId);
@@ -118,11 +199,7 @@ export async function startSavedTabVideoRecording(
         ? result.error === PREVIOUS_RECORDING_ERROR
           ? 'already-active'
           : (result.failureCode ?? 'internal-error')
-        : result.result === 'duplicate-preparing'
-          ? 'duplicate-preparing'
-          : result.result === 'already-active'
-            ? 'already-active'
-            : 'cancelled';
+        : result.result;
     return {
       failureCode,
       success: false,

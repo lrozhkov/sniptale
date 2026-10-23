@@ -24,7 +24,7 @@ export function useCalloutMeasureEffect(args: {
 }) {
   const { containerRef, setDimensions, settingsKey } = args;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = containerRef.current;
     if (!element) return;
     const measure = () => {
@@ -58,7 +58,7 @@ export function useCalloutSyncContentEffect(args: {
 }) {
   const { contentEditableRef, htmlContent, isEditing, pendingHtmlContentRef } = args;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = contentEditableRef.current;
     if (!el || isEditing) {
       return;

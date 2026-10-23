@@ -1,3 +1,5 @@
+import { EffectSourceTimingRestore } from '../effect-instance/groups';
+import { getAudioFadeLimitSeconds } from '../../../../../features/video/audio/fades';
 import { DetailItem, DetailList } from '../shared/panel';
 import { InspectorDetails } from '../shared/details';
 import { ClipSourceRangeControls } from './source-range';
@@ -66,12 +68,21 @@ export function ClipTimingControls(props: ClipTimingControlsProps) {
           />
         </DetailList>
       ) : null}
+      {props.clip.type === 'EFFECT' && props.clip.sourceRange ? (
+        <EffectSourceTimingRestore
+          project={props.project}
+          host={props.clip}
+          separated
+          disabled={props.locked}
+        />
+      ) : null}
     </>
   );
 }
 
 export function ClipFadeFields(props: {
   audio?: boolean;
+  duration: number;
   clipId: string;
   fadeInMs: number;
   fadeOutMs: number;
@@ -88,7 +99,9 @@ export function ClipFadeFields(props: {
         )}
         value={props.fadeInMs / 1000}
         min={0}
-        max={5}
+        max={props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration)}
+        scrubMax={Math.min(5, props.duration)}
+        scrubValue={props.fadeInMs / 1000}
         step={0.05}
         disabled={props.locked}
         formatValue={(value) => `${value.toFixed(2)} s`}
@@ -104,7 +117,9 @@ export function ClipFadeFields(props: {
         )}
         value={props.fadeOutMs / 1000}
         min={0}
-        max={5}
+        max={props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration)}
+        scrubMax={Math.min(5, props.duration)}
+        scrubValue={props.fadeOutMs / 1000}
         step={0.05}
         disabled={props.locked}
         formatValue={(value) => `${value.toFixed(2)} s`}
@@ -129,6 +144,7 @@ function ClipPlaybackRateField(props: {
     <SliderField
       label={translate('videoEditor.sidebar.playbackRateLabel')}
       value={playbackRate}
+      precision={4}
       min={VIDEO_EDITOR_PLAYBACK_RATE_MIN}
       max={VIDEO_EDITOR_PLAYBACK_RATE_MAX}
       step={0.01}

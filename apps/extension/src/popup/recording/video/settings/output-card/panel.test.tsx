@@ -73,6 +73,10 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
   });
 
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+  expect(container?.textContent).not.toContain('popup.video.outputAspectNotice');
+  for (const button of container?.querySelectorAll('[role="group"] button') ?? []) {
+    expect(button.classList.contains('h-8')).toBe(true);
+  }
   const mp4Button = buttons.find((button) => button.textContent === 'MP4');
   const fourKButton = buttons.find((button) => button.textContent === '2160p (4K)');
   const manageButton = buttons.find(
@@ -128,7 +132,7 @@ it('disables a known over-budget frame-rate choice instead of silently accepting
     (button) => button.textContent === '60 fps'
   );
   expect(sixtyFps?.disabled).toBe(true);
-  expect(sixtyFps?.getAttribute('title')).toBe('popup.video.outputResourceUnsupported');
+  expect(sixtyFps?.getAttribute('data-popup-hint')).toBe('popup.video.outputResourceUnsupported');
 });
 
 it('disables 4K at 60 fps instead of silently changing the selected cadence', () => {
@@ -150,4 +154,21 @@ it('disables 4K at 60 fps instead of silently changing the selected cadence', ()
   expect(fourK?.disabled).toBe(true);
   act(() => fourK?.click());
   expect(onChange).not.toHaveBeenCalled();
+});
+
+it('exposes one neutral accepted choice in each output parameter group', () => {
+  act(() =>
+    root?.render(<OutputSettingsPanel onChange={vi.fn()} settings={DEFAULT_VIDEO_SETTINGS} />)
+  );
+
+  const groups = Array.from(container?.querySelectorAll('[role="group"]') ?? []);
+  expect(groups).toHaveLength(5);
+  for (const group of groups) {
+    expect(group.getAttribute('aria-label')).toBeTruthy();
+    const acceptedChoices = group.querySelectorAll<HTMLButtonElement>('[aria-pressed="true"]');
+    expect(acceptedChoices).toHaveLength(1);
+    expect(acceptedChoices[0]?.className).toContain('sniptale-color-surface-hover');
+    expect(acceptedChoices[0]?.className).not.toContain('accent');
+    expect(group.querySelectorAll('[aria-pressed="false"]').length).toBeGreaterThan(0);
+  }
 });

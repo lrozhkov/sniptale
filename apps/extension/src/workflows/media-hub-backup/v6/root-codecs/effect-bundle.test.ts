@@ -1,4 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { importRawEffectDocument } from '../../../../features/video/project/effect-bundle/import/zip';
+import { createEffectCatalogEntry } from '../../../../composition/persistence/effect-bundles/catalog-builder';
+import { prepareEffectBundleBackupRestore } from '../../../../composition/persistence/effect-bundles/backup-restore';
+import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
+import { buildEffectBundleRootInventory } from '../inventory/effect-bundles';
+import { encodeBackupMetadata } from '../metadata-transport';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock(
+  '../../../../composition/persistence/effect-bundles/preferences',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/effect-bundles/preferences')
+    >()),
+    readEffectCatalogPreferences: async () => [],
+  })
+);
 import { encodeEffectBundleMetadata, parseEffectBundleMetadata } from './effect-bundle';
 
 const entry = {
@@ -53,4 +69,57 @@ describe('effect bundle v6 root codec', () => {
       })
     ).toThrow('asset metadata');
   });
+});
+
+it('retains a valid catalog document without binary assets through backup and restore', async () => {
+  const imported = await importRawEffectDocument(
+    new Uint8Array(
+      readFileSync(
+        'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-transition.sniptale-effect.json'
+      )
+    )
+  );
+  if (!imported.ok) throw new Error('Invalid asset-free transition fixture');
+  const catalog = await createEffectCatalogEntry(
+    { kind: 'raw-json', document: imported.artifact },
+    1
+  );
+  expect(catalog.assets).toEqual([]);
+  const [root] = await buildEffectBundleRootInventory(
+    { getAll: async () => [catalog] },
+    createArchivePathAllocator()
+  );
+  expect(root!.descriptor.objectCount).toBe(0);
+  await expect(encodeBackupMetadata(root!, 1)).resolves.toBeDefined();
+  const encoded = encodeEffectBundleMetadata({ entry: catalog, objectIds: [] });
+  const decoded = parseEffectBundleMetadata(encoded);
+  expect(decoded).toEqual(encoded);
+  const { assets, ...restoredEntry } = decoded.entry;
+  expect(assets).toEqual([]);
+  const rows = new Map<string, unknown>();
+  const store = {
+    get: async (id: string) => rows.get(id),
+    put: async (value: typeof catalog) => {
+      rows.set(value.packId, value);
+    },
+  };
+  const publish = await prepareEffectBundleBackupRestore({ assets: [], entry: restoredEntry });
+  await expect(publish({ store, strategy: 'replace' })).resolves.toMatchObject({
+    imported: true,
+    packId: catalog.packId,
+  });
+  expect(rows.get(catalog.packId)).toEqual(catalog);
+  await expect(
+    prepareEffectBundleBackupRestore({
+      assets: [],
+      entry: {
+        ...restoredEntry,
+        documents: restoredEntry.documents.map((document) => ({ ...document, source: '{}' })),
+      },
+    })
+  ).rejects.toMatchObject({ code: 'catalogIntegrityFailure' });
+  expect(rows.get(catalog.packId)).toEqual(catalog);
+  expect(() => parseEffectBundleMetadata({ entry: { ...encoded.entry, documents: [] } })).toThrow(
+    'catalog metadata'
+  );
 });

@@ -181,3 +181,18 @@ describe('video editor project history', () => {
     expect(useVideoEditorStore.getState().projectHistory.past).toEqual([]);
   });
 });
+
+it('admits an exclusive typing lease only while history is idle', () => {
+  const store = useVideoEditorStore;
+  store.getState().setProject(createEmptyVideoProject('Typing'));
+  const foreign = store.getState().beginProjectHistoryTransaction();
+  expect(foreign).not.toBeNull();
+  expect(store.getState().beginProjectHistoryTransaction({ onlyIfIdle: true })).toBeNull();
+  expect(store.getState().isProjectHistoryTransactionCurrent(foreign!)).toBe(true);
+  expect(store.getState().beginProjectHistoryTransaction()).toBe(foreign);
+  store.getState().endProjectHistoryTransaction(foreign!);
+  const typing = store.getState().beginProjectHistoryTransaction({ onlyIfIdle: true });
+  expect(typing).not.toBeNull();
+  expect(typing).not.toBe(foreign);
+  store.getState().endProjectHistoryTransaction(typing!);
+});

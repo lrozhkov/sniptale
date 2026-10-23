@@ -15,6 +15,7 @@ import {
 } from './storage';
 import { usageReferenceKey, USAGE_INDEX_MARKER } from '../media-library/usage-index-keys';
 import {
+  sameReviewWorkspaceValue,
   compactVideoWorkspaceHistory,
   retainedWorkspaceReplacementStart,
 } from './history-retention';
@@ -185,6 +186,16 @@ async function readSnapshot(
   return { snapshot: { workspace, draft }, document, storage };
 }
 
+/** Checks the selected source inside the consuming project's publication transaction. */
+export async function assertVideoWorkspaceUnchanged(
+  tx: Transaction,
+  expected: VideoWorkspace
+): Promise<void> {
+  const current = await readSnapshot(tx, expected.aggregateId);
+  if (!current || !sameReviewWorkspaceValue(current.snapshot.workspace, expected))
+    throw new VideoWorkspaceError('conflict');
+}
+
 /** Read-only recovery: missing is distinct from invalid and never repairs durable content. */
 export async function readVideoWorkspace(
   aggregateId: string
@@ -318,6 +329,7 @@ export async function openVideoWorkspace(
     }
     if (media.lifecycle?.trashedAt !== undefined) throw new VideoWorkspaceError('missing-media');
     const now = Date.now();
+    const advanced = createQuickEditAdvancedState();
     const legacy = parseVideoWorkspace({
       aggregateId,
       formatVersion: 1,
@@ -327,7 +339,8 @@ export async function openVideoWorkspace(
       history: [],
       cursor: 0,
       advanced: {
-        ...createQuickEditAdvancedState(),
+        ...advanced,
+        ui: { ...advanced.ui, modeSelectionPending: true },
         background: { enabled: false, zoomBehavior: 'window' },
         presentation: createNewWorkspacePresentationSettings(),
       },

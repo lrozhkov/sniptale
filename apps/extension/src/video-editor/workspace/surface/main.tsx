@@ -8,6 +8,7 @@ import {
 } from '../../runtime/controller/composition/contexts';
 import {
   useVideoEditorPlaybackPort,
+  useVideoEditorExportPort,
   getCurrentVideoEditorProjectSnapshot,
 } from '../../runtime/controller/store';
 import { isAudioRecordingRangeAvailable } from '../../project/operations/timeline-gaps';
@@ -55,7 +56,9 @@ export function VideoEditorWorkspaceMain({
     toggleMaterials,
     inspector,
   } = useWorkspacePanels();
-  const [inspectorGroupFocus] = useState<InspectorGroupFocusIntent | null>(null);
+  const [inspectorGroupFocus, setInspectorGroupFocus] = useState<InspectorGroupFocusIntent | null>(
+    null
+  );
   const effectBundles = useWorkspaceEffectBundles();
   const effectOperations = useEffectLibraryOperations();
   const panelSizes = useWorkspacePanelSizes(materialsOpen || effectsLibraryDockOpen);
@@ -85,6 +88,12 @@ export function VideoEditorWorkspaceMain({
                 <VideoProjectStorageStatus />
                 <VideoEditorWorkspaceCanvas
                   inspectorPanel={inspector}
+                  onRevealBookends={() =>
+                    setInspectorGroupFocus({ groupId: 'scene-edges', token: crypto.randomUUID() })
+                  }
+                  onRevealWatermark={() =>
+                    setInspectorGroupFocus({ groupId: 'watermark', token: crypto.randomUUID() })
+                  }
                   onMaterialsOpenChange={toggleMaterials}
                   inspectorFullHeight={inspectorFullHeight}
                   materialsPanel={{
@@ -122,6 +131,16 @@ export function VideoEditorWorkspaceMain({
 
 function useWorkspacePanels() {
   const header = useVideoEditorHeaderController();
+  const exportOpen = useVideoEditorExportPort((port) => port.exportState.dialogOpen);
+  const closeExport = useVideoEditorExportPort((port) => port.closeExportDialog);
+  const collapsed = header?.leftSidebarCollapsed;
+  const previous = useRef({ exportOpen: false, collapsed });
+  const toggleInspector = header?.onToggleSidebar;
+  useEffect(() => {
+    if (exportOpen && !previous.current.exportOpen && collapsed) toggleInspector?.();
+    else if (exportOpen && collapsed && previous.current.collapsed === false) closeExport();
+    previous.current = { exportOpen, collapsed };
+  }, [exportOpen, collapsed, toggleInspector, closeExport]);
   const [activeLibrary, setActiveLibrary] = useWorkspacePreference('activeLibrary');
   const effectsLibraryDockOpen = activeLibrary !== null && activeLibrary !== 'materials';
   const effectKind =

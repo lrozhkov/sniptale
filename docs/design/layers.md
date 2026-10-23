@@ -41,7 +41,7 @@ Device-selection curtains belong to the extension popup. They are not a generic 
 
 Textual colors select all contents on initial pointer/Tab focus for paste replacement. Subsequent clicks can place the caret. Preserve ordinary editing, IME, paste, validation, acceptance, and cancellation. Declare this variant explicitly without extending it to ordinary text fields.
 
-Use native browser `title` for optional hints throughout the application. Do not create custom tooltip layers. Keep required information in visible content and preserve complete accessible names.
+Follow [full-text access](localization.md#full-text-access) for hints. Use native browser hints, not custom UI layers. Omit hints that repeat fully visible text. The popup uses conditional `title` attributes without changing control dimensions or text wrapping. Keep required information visible and preserve complete accessible names.
 
 Keep text and swatch alignment stable during hover and editing. Hovering the parameter name does not highlight its color field. Preserve color-plane geometry and transactional picker behavior.
 

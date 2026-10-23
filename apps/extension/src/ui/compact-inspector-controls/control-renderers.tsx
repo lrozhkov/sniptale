@@ -107,7 +107,7 @@ function InspectorSegments<T extends string>(
               disabled={option.disabled}
               onClick={() => props.onChange(option.value)}
             >
-              {option.icon ?? option.label}
+              {option.icon ?? <span className="sniptale-interface-label">{option.label}</span>}
             </button>
           ))}
         </div>
@@ -135,7 +135,9 @@ function SegmentedOption<T extends string>(props: {
       title={props.option.label}
       onClick={() => props.onChange(props.option.value)}
     >
-      {props.option.icon ?? <span className="min-w-0 break-normal">{props.option.label}</span>}
+      {props.option.icon ?? (
+        <span className="sniptale-interface-label min-w-0 break-normal">{props.option.label}</span>
+      )}
     </ProductActionButton>
   );
 }

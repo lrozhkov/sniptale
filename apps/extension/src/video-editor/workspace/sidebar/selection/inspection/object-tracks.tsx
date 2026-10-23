@@ -32,6 +32,7 @@ export function ObjectTrackSummaryCard(props: {
   onDeleteObjectTrack?: WorkspaceSidebarSelectionPanelProps['onDeleteObjectTrack'];
   onSelectObjectTrack?: WorkspaceSidebarSelectionPanelProps['onSelectObjectTrack'];
   selected?: boolean;
+  showDelete?: boolean;
 }) {
   const summary = getObjectTrackSummary(props.track);
 
@@ -52,14 +53,16 @@ export function ObjectTrackSummaryCard(props: {
         </div>
       )}
       <SceneObjectTrackDetails detectorVersion={props.track.detectorVersion} summary={summary} />
-      <InspectorActionButton
-        tone="danger"
-        separated
-        disabled={!props.onDeleteObjectTrack}
-        onClick={() => props.onDeleteObjectTrack?.(props.track.id)}
-      >
-        {translate('videoEditor.sidebar.objectTrackDeleteLabel')}
-      </InspectorActionButton>
+      {props.showDelete !== false ? (
+        <InspectorActionButton
+          tone="danger"
+          separated
+          disabled={!props.onDeleteObjectTrack}
+          onClick={() => props.onDeleteObjectTrack?.(props.track.id)}
+        >
+          {translate('videoEditor.sidebar.objectTrackDeleteLabel')}
+        </InspectorActionButton>
+      ) : null}
     </div>
   );
 }

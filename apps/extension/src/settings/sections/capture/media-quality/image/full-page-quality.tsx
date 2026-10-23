@@ -69,7 +69,12 @@ function PolicyNumber({
   unit: '' | '%';
 }) {
   return (
-    <SettingsControlRow label={translate(labelKey)}>
+    <SettingsControlRow
+      label={translate(labelKey)}
+      className="!max-w-[480px]"
+      keepInline
+      valueMinimum={100}
+    >
       <NumericRow
         appearance="plain"
         className="w-full"
@@ -104,6 +109,8 @@ export function FullPageQualitySettings({ state }: { state: State }) {
       </div>
       <SettingsControlRow
         label={translate('imageSettings.section.fullPageProfileLabel')}
+        className="settings-profile-choice !max-w-[560px]"
+        keepInline
         valueMinimum={460}
       >
         <ProfileSelector state={state} />

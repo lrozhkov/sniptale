@@ -129,9 +129,9 @@ it('renders a read-only codec field when MP4 has only one available codec', () =
     );
   });
 
-  const codecStatus = container?.querySelector(
-    '[data-ui="shared.ui.compact-inspector.status-row"]'
-  );
+  const codecStatus = [
+    ...container!.querySelectorAll('[data-ui="shared.ui.compact-inspector.status-row"]'),
+  ].find((row) => row.textContent?.includes('videoEditor.exportDialog.codecLabel'));
 
   expect(codecStatus).not.toBeNull();
   expect(codecStatus?.textContent).toContain('videoEditor.exportDialog.codecHevcLabel');
@@ -167,20 +167,18 @@ it('hides MP4 from format options when capability probing marks it unavailable',
     );
   });
 
-  const formatTrigger = container?.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.exportDialog.formatLabel"]'
+  const statuses = [
+    ...container!.querySelectorAll('[data-ui="shared.ui.compact-inspector.status-row"]'),
+  ];
+  const format = statuses.find((row) =>
+    row.textContent?.includes('videoEditor.exportDialog.formatLabel')
   );
-
-  act(() => {
-    formatTrigger?.click();
-  });
-
-  const options = Array.from(
-    document.body.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
-  ).map((button) => button.textContent);
-
-  expect(options).toContain('videoEditor.exportDialog.formatWebmLabel');
-  expect(options).not.toContain('videoEditor.exportDialog.formatMp4Label');
+  expect(format?.textContent).toContain('videoEditor.exportDialog.formatWebmLabel');
+  expect(format?.textContent).not.toContain('videoEditor.exportDialog.formatMp4Label');
+  expect(
+    container!.querySelector('[aria-label="videoEditor.exportDialog.formatLabel"]')
+  ).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
 });
 
 it('fits an arbitrary source into the selected standard resolution without distortion', async () => {
@@ -325,14 +323,10 @@ it('offers a selected timeline range independently of clip selection', async () 
       />
     )
   );
-  act(() =>
-    container!
-      .querySelector<HTMLButtonElement>('[aria-label="videoEditor.exportDialog.scopeLabel"]')!
-      .click()
+  const option = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.scopeLabel"] ' +
+      'button[title="videoEditor.exportDialog.scopeSelectedRangeLabel"]'
   );
-  const option = Array.from(
-    document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')
-  ).find((button) => button.textContent === 'videoEditor.exportDialog.scopeSelectedRangeLabel');
   expect(option).toBeDefined();
   await act(async () => option!.click());
   expect(onChange).toHaveBeenCalledWith({ scope: 'selected-range' });
@@ -366,11 +360,10 @@ it('selects adaptive60 atomically and restores the editable constant rate', asyn
   const choose = async (index: number) => {
     await act(async () =>
       container!
-        .querySelector<HTMLButtonElement>('[aria-label="videoEditor.exportDialog.frameRateMode"]')!
-        .click()
-    );
-    await act(async () =>
-      document.querySelectorAll<HTMLButtonElement>('[role="option"]')[index]!.click()
+        .querySelectorAll<HTMLButtonElement>(
+          '[aria-label="videoEditor.exportDialog.frameRateMode"] button'
+        )
+        [index]!.click()
     );
   };
   await choose(1);
@@ -381,4 +374,93 @@ it('selects adaptive60 atomically and restores the editable constant rate', asyn
   expect(
     container!.querySelector('[aria-label="videoEditor.exportDialog.fpsLabel"]')
   ).not.toBeNull();
+});
+
+it('exposes short export choices as selected segments and forwards codec and quality values', () => {
+  const onChange = vi.fn();
+  act(() =>
+    root!.render(
+      <ExportDialogSelectFields
+        capabilities={null}
+        onChange={onChange}
+        selectedClipAvailable={false}
+        sourceDimensions={{ width: 1920, height: 1080 }}
+        settings={{
+          format: VideoExportFormat.WEBM,
+          webmVideoCodec: 'VP9',
+          resolution: VideoResolutionPreset.SOURCE,
+          fps: 30,
+          width: 1920,
+          height: 1080,
+          quality: VideoExportQualityPreset.MEDIUM,
+          downloadAfterExport: false,
+        }}
+      />
+    )
+  );
+  expect(container!.querySelector('[aria-label="videoEditor.exportDialog.scopeLabel"]')).toBeNull();
+  expect(container!.textContent).toContain('videoEditor.exportDialog.scopeProjectLabel');
+  const codec = container!.querySelector('[aria-label="videoEditor.exportDialog.codecLabel"]')!;
+  const quality = container!.querySelector('[aria-label="videoEditor.exportDialog.qualityLabel"]')!;
+  expect(codec.querySelector('[aria-pressed="true"]')?.textContent).toBe('VP9');
+  expect(quality.querySelector('[aria-pressed="true"]')?.textContent).toContain('qualityMedium');
+  act(() => codec.querySelector<HTMLButtonElement>('[title="VP8"]')!.click());
+  act(() =>
+    quality
+      .querySelector<HTMLButtonElement>('[title="videoEditor.exportDialog.qualityUltra"]')!
+      .click()
+  );
+  expect(onChange).toHaveBeenCalledWith({ webmVideoCodec: 'VP8' });
+  expect(onChange).toHaveBeenCalledWith({ quality: VideoExportQualityPreset.ULTRA });
+  expect(
+    container!
+      .querySelector('[aria-label="videoEditor.exportDialog.resolutionLabel"]')
+      ?.getAttribute('aria-haspopup')
+  ).toBe('listbox');
+});
+
+it('keeps an unavailable current format visible until an available replacement is chosen', async () => {
+  const onChange = vi.fn();
+  act(() =>
+    root!.render(
+      <ExportDialogSelectFields
+        capabilities={createVideoExportCapabilities({
+          formats: [
+            { format: VideoExportFormat.MP4, available: false },
+            { format: VideoExportFormat.WEBM, available: true },
+          ],
+          mp4Codecs: [],
+        })}
+        onChange={onChange}
+        selectedClipAvailable={false}
+        sourceDimensions={{ width: 1920, height: 1080 }}
+        settings={{
+          format: VideoExportFormat.MP4,
+          mp4VideoCodec: VideoMp4Codec.AVC,
+          resolution: VideoResolutionPreset.SOURCE,
+          fps: 30,
+          width: 1920,
+          height: 1080,
+          quality: VideoExportQualityPreset.MEDIUM,
+          downloadAfterExport: false,
+        }}
+      />
+    )
+  );
+  const trigger = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.formatLabel"]'
+  )!;
+  expect(trigger.textContent).toContain('videoEditor.exportDialog.formatMp4Label');
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => trigger.click());
+  const options = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
+  const available = options.filter((option) => !option.disabled);
+  expect(available).toHaveLength(1);
+  expect(available[0]?.textContent).toBe('videoEditor.exportDialog.formatWebmLabel');
+  expect(
+    options.find((option) => option.textContent === 'videoEditor.exportDialog.formatMp4Label')
+      ?.disabled
+  ).toBe(true);
+  await act(async () => available[0]!.click());
+  expect(onChange).toHaveBeenCalledWith({ format: VideoExportFormat.WEBM, webmVideoCodec: 'VP9' });
 });

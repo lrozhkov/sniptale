@@ -4,10 +4,15 @@ import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-
 import { queryAllContentUiElements } from '../../../platform/dom-host';
 import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactions/scale';
 import type { FloatingRect } from './floating-placement';
+import {
+  FrameAnnotationPopoverMeasurementContext,
+  resolveFrameAnnotationPopoverDirection,
+} from '../../../../composition/frame-annotation-controls/popover/position';
 
 const VIEWPORT_MARGIN = 8;
 const FRAME_TOOLBAR_POPOVER_GAP = 4;
 const TOOLBAR_MENU_GAP = 10;
+const measuredPopoverSizes = new WeakMap<HTMLElement, { width: number; height: number }>();
 
 function toRect(rect: DOMRect): FloatingRect {
   return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
@@ -283,6 +288,45 @@ function calculateMainToolbarPopoverRect(params: {
   );
 }
 
+/** Predict the main-toolbar side with the existing placement policy and latest measured size. */
+export function resolveMainToolbarFramePopoverDirection(
+  anchorEl: HTMLElement | null,
+  fallbackSize: { width: number; height: number }
+) {
+  const mainToolbar = getMainToolbar(anchorEl);
+  if (!anchorEl || !mainToolbar) return undefined;
+  const uiScale = readContentUiScaleCompensation(anchorEl);
+  const layoutSize = measuredPopoverSizes.get(anchorEl) ?? fallbackSize;
+  const rect = calculateMainToolbarPopoverRect({
+    anchorRect: toRect(anchorEl.getBoundingClientRect()),
+    displayMode: mainToolbar.displayMode,
+    size: { width: layoutSize.width * uiScale, height: layoutSize.height * uiScale },
+    toolbarRect: mainToolbar.rect,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    uiScale,
+  });
+  return resolveFrameAnnotationPopoverDirection(anchorEl.getBoundingClientRect(), {
+    left: rect.x,
+    top: rect.y,
+    width: rect.width,
+  });
+}
+
+function readPopoverLayoutSize(
+  popover: HTMLDivElement,
+  mainToolbar: ReturnType<typeof getMainToolbar>
+) {
+  const body = mainToolbar
+    ? popover.querySelector<HTMLElement>(':scope > .sniptale-content-popover-body')
+    : undefined;
+  return {
+    width: popover.offsetWidth,
+    height: body
+      ? Math.max(popover.offsetHeight, popover.offsetHeight - body.clientHeight + body.scrollHeight)
+      : popover.offsetHeight,
+  };
+}
+
 interface FramePopoverPlacementSession {
   anchorEl: HTMLElement;
   anchorRect: FloatingRect;
@@ -354,7 +398,24 @@ export function useFramePopoverPosition(params: {
   popoverRef: React.RefObject<HTMLDivElement | null>;
   quickControlPlacement?: 'anchor-aligned' | 'callout-aware' | 'frame-aware';
 }) {
+  const onMeasured = React.useContext(FrameAnnotationPopoverMeasurementContext);
   const [, refresh] = React.useReducer((value) => value + 1, 0);
+  React.useLayoutEffect(() => {
+    const popover = params.popoverRef.current;
+    if (
+      !onMeasured ||
+      !params.isOpen ||
+      !params.anchorEl ||
+      !popover?.offsetWidth ||
+      !popover.offsetHeight
+    )
+      return;
+    const size = readPopoverLayoutSize(popover, getMainToolbar(params.anchorEl));
+    const previous = measuredPopoverSizes.get(params.anchorEl);
+    if (previous?.width === size.width && previous.height === size.height) return;
+    measuredPopoverSizes.set(params.anchorEl, size);
+    onMeasured?.();
+  });
   const uiScale = readContentUiScaleCompensation(params.anchorEl);
   const placementSessionRef = React.useRef<FramePopoverPlacementSession | null>(null);
   const placementSession = placementSessionRef.current;
@@ -423,16 +484,9 @@ export function useFramePopoverPosition(params: {
   if (!activePlacementSession) return getHiddenStyle();
   const popover = params.popoverRef.current;
   const mainToolbar = getMainToolbar(params.anchorEl);
-  const body = mainToolbar
-    ? popover?.querySelector<HTMLElement>(':scope > .sniptale-content-popover-body')
-    : undefined;
-  const naturalHeight =
-    popover && body
-      ? Math.max(popover.offsetHeight, popover.offsetHeight - body.clientHeight + body.scrollHeight)
-      : (popover?.offsetHeight ?? 0);
   const layoutSize =
     popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
-      ? { width: popover.offsetWidth, height: naturalHeight }
+      ? readPopoverLayoutSize(popover, mainToolbar)
       : params.fallbackSize;
   const size = { width: layoutSize.width * uiScale, height: layoutSize.height * uiScale };
   const viewport = { width: window.innerWidth, height: window.innerHeight };

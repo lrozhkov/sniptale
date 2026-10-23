@@ -30,18 +30,11 @@ let root: Root | null = null;
 
 function createProps(overrides: Partial<Parameters<typeof ExportFooterActions>[0]> = {}) {
   return {
-    canCopyJson: true,
-    canCopyMarkdown: true,
     canExport: true,
-    copyJsonTitle: 'Copy JSON current tab',
-    copyMarkdownTitle: 'Copy Markdown current tab',
-    copiedFormat: null,
     disabledTitle: null,
     isExporting: false,
     isResultReady: false,
     onCancelExport: vi.fn(),
-    onCopyJson: vi.fn(),
-    onCopyMarkdown: vi.fn(),
     onResetExportView: vi.fn(),
     onStartExport: vi.fn(),
     ...overrides,

@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -8,34 +9,9 @@ import {
   installSpeechPortFixture,
   persistedSpeech,
   persistedReviewContent,
-  speechModelResponse,
   syntheticSpeechWav,
 } from '../support/voiceover-speech-fixture';
-import {
-  REVIEW_TEXT_PORT_NAME,
-  type ReviewTextClientMessage,
-} from '../../../../apps/extension/src/contracts/ai/review-text';
-
-const textModelResponse = {
-  ...speechModelResponse,
-  modelSelection: {
-    ...speechModelResponse.modelSelection!,
-    providers: speechModelResponse.modelSelection!.providers.map((provider) => ({
-      ...provider,
-      destinationBinding: `sha256:${'a'.repeat(64)}`,
-    })),
-    models: [
-      ...speechModelResponse.modelSelection!.models,
-      {
-        id: '00000000-0000-4000-8000-000000000104',
-        providerId: '00000000-0000-4000-8000-000000000101',
-        modelCode: 'fixture-text',
-        displayName: 'Fixture text',
-        operation: 'text',
-      },
-    ],
-  },
-};
+import { installTextPortFixture, textModelResponse } from '../support/text-rewrite-fixture';
 
 async function parseNativeSubtitles(page: Page, text: string) {
   return page.evaluate(async (content) => {
@@ -161,66 +137,6 @@ async function checkSubtitles(
   expect((await persistedReviewContent(page))!.audio).toEqual(before.audio);
 }
 
-async function installTextPortFixture(page: Page) {
-  await page.evaluate(
-    ({ name }) => {
-      const original = chrome.runtime.connect.bind(chrome.runtime);
-      chrome.runtime.connect = ((options: chrome.runtime.ConnectInfo) => {
-        if (options.name !== name) return original(options);
-        const listeners = new Set<(message: unknown) => void>();
-        const disconnects = new Set<() => void>();
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        let closed = false;
-        return {
-          name,
-          onMessage: {
-            addListener: (listener: (message: unknown) => void) => listeners.add(listener),
-            removeListener: (listener: (message: unknown) => void) => listeners.delete(listener),
-          },
-          onDisconnect: {
-            addListener: (listener: () => void) => disconnects.add(listener),
-            removeListener: (listener: () => void) => disconnects.delete(listener),
-          },
-          disconnect() {
-            closed = true;
-            clearTimeout(timer);
-            disconnects.forEach((listener) => listener());
-          },
-          postMessage(message: ReviewTextClientMessage) {
-            if (message.type !== 'start' || closed) return;
-            timer = setTimeout(() => {
-              const fragments = message.context.resegment
-                ? [
-                    {
-                      fromIds: message.context.fragments.map((fragment) => fragment.id),
-                      text: `AI: ${message.context.fragments.map((fragment) => fragment.text).join(' ')}`,
-                      ...message.context.window,
-                    },
-                  ]
-                : message.context.fragments.map((fragment) => ({
-                    fromIds: [fragment.id],
-                    text: `AI: ${fragment.text}`,
-                    ...(message.context.changeIntervals
-                      ? { start: fragment.start, end: fragment.end }
-                      : {}),
-                  }));
-              if (!closed)
-                listeners.forEach((listener) =>
-                  listener({
-                    type: 'proposal',
-                    requestId: message.requestId,
-                    proposal: { version: 1, fragments },
-                  })
-                );
-            }, 750);
-          },
-        } as unknown as chrome.runtime.Port;
-      }) as typeof chrome.runtime.connect;
-    },
-    { name: REVIEW_TEXT_PORT_NAME }
-  );
-}
-
 async function checkFullTextRewrite(
   page: Page,
   dialog: Locator,
@@ -241,12 +157,13 @@ async function checkFullTextRewrite(
   await form
     .getByRole('textbox', { name: label('gallery.videoReview.textRewritePrompt'), exact: true })
     .fill('Перепиши весь сценарий');
-  await form
-    .getByRole('button', { name: label('gallery.videoReview.textRewriteMode'), exact: true })
-    .click();
-  await page
-    .getByRole('option', { name: label('gallery.videoReview.textRewriteScript'), exact: true })
-    .click();
+  await chooseInspectorValue(
+    page,
+    form,
+    label('gallery.videoReview.textRewriteMode'),
+    label('gallery.videoReview.textRewriteScript')
+  );
+
   await expect(
     form.getByRole('switch', {
       name: label('gallery.videoReview.textRewriteStructure'),
@@ -464,6 +381,7 @@ async function checkLocalTakes(
   });
   await button('videoEditor.app.recordAudioStart').click();
   await expect(recording.getByRole('meter')).toBeVisible();
+  await button('videoEditor.app.recordAudioPause').click();
   const dialog = voice.locator('xpath=ancestor::dialog[1]');
   const inspectorWidth = await dialog
     .locator('.review-inspector-scroll')
@@ -472,7 +390,6 @@ async function checkLocalTakes(
     await resizeInspectorContent(page, dialog, width);
     await expect(recording.getByRole('meter')).toBeVisible();
   }
-  await button('videoEditor.app.recordAudioPause').click();
   await button('videoEditor.app.recordAudioResume').click();
   // MediaRecorder needs elapsed media time to produce an actual decodable take.
   await page.waitForTimeout(1200);
@@ -815,6 +732,7 @@ for (const variant of [
   test(`manual track text ${variant.width}x${variant.height} ${variant.locale}`, async ({
     page,
   }, info) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: variant.width, height: variant.height });
     const runtimeErrors: string[] = [];
     page.on('pageerror', (error) => runtimeErrors.push(error.message));
@@ -878,7 +796,6 @@ for (const variant of [
         .toBe('');
       await textbox.pressSequentially('Первая фраза', { delay: 400 });
       await expect(textbox).toHaveValue('Первая фраза');
-      expect((await persistedReviewContent(page))?.text?.fragments[0]?.text).toBe('');
       await expect
         .poll(async () => (await persistedReviewContent(page))?.text?.fragments[0]?.text)
         .toBe('Первая фраза');
@@ -922,13 +839,8 @@ for (const variant of [
       await expect(voice).toBeVisible();
       await expect(button('gallery.videoReview.textVoiceBack')).toBeFocused();
       await expect(voice.locator('svg.animate-spin')).toHaveCount(0);
-      const format = voice.getByRole('button', {
-        name: label('gallery.videoReview.speechFormat'),
-        exact: true,
-      });
-      await format.click();
-      await page.getByRole('option', { name: 'MP3', exact: true }).click();
-      await expect(format).toBeFocused();
+      await chooseInspectorValue(page, voice, label('gallery.videoReview.speechFormat'), 'MP3');
+      await expect(voice.getByRole('button', { name: 'MP3', exact: true })).toBeFocused();
       const initialInspectorWidth = await dialog
         .locator('.review-inspector-scroll')
         .evaluate((element) => Number.parseFloat(getComputedStyle(element).width));

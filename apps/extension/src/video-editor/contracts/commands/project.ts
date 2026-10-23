@@ -1,4 +1,6 @@
-import type { WindowHeader } from '../../../features/browser-frame/header';
+import type { applyProjectSourceVoiceoverEdit } from '../../../features/video/project/source-voiceover';
+import type { VideoProjectBookendPresets } from '../../../features/video/project/scene/bookend-presets-types';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { VideoEditorAnnotationActions } from './annotation';
 import type { VideoEditorObjectTrackActions } from './object-tracks';
 import type { VideoEditorTemporalActions } from './temporal';
@@ -9,6 +11,7 @@ import type {
   VideoBlockKind,
   VideoMediaFitMode,
   VideoMediaShadowMode,
+  VideoProject,
   VideoProjectAsset,
   VideoProjectClip,
   VideoProjectShapeType,
@@ -17,11 +20,15 @@ import type {
   VideoProjectTrackRole,
 } from '../../../features/video/project/types/index';
 import type {
+  VideoEditorMediaClipEdit,
   VideoEditorAudioEnvelopePatch,
   VideoEditorFadePatch,
   VideoEditorTransitionPatch,
 } from './patches';
 import type {
+  VideoEditorBookendPlacementResult,
+  VideoEditorBookendPresetUpdateResult,
+  VideoEditorCompositionJoinUpdateResult,
   VideoEditorMaterialPlacementResult,
   VideoEditorMaterialSourceRange,
   VideoEditorMaterialTarget,
@@ -33,6 +40,13 @@ export interface VideoEditorProjectActions
     VideoEditorObjectTrackActions,
     VideoEditorTemporalActions,
     VideoEditorEffectInstanceActions {
+  editSourceVoiceover: (
+    expectedProject: VideoProject,
+    documentId: string,
+    patch: Exclude<Parameters<typeof applyProjectSourceVoiceoverEdit>[2], null>
+  ) => boolean;
+  deleteSourceVoiceover: (documentId: string) => void;
+  duplicateSourceVoiceover: (documentId: string) => string | null;
   renameProject: (name: string) => void;
   renameTrack: (trackId: string, name: string) => void;
   addTrackLogicalLane: (trackId: string) => void;
@@ -56,6 +70,22 @@ export interface VideoEditorProjectActions
     range?: VideoEditorMaterialSourceRange,
     telemetry?: RecordingTelemetryEntry
   ) => VideoEditorMaterialPlacementResult;
+  /** Accepts a recipe independently of any existing timeline instances. */
+  updateBookendPresets: (
+    value: VideoProjectBookendPresets | undefined,
+    expectedProject: VideoProject
+  ) => VideoEditorBookendPresetUpdateResult;
+  /** Accepts exact clip-edge descriptors without changing the referenced timeline clips. */
+  updateCompositionJoins: (
+    value: VideoProject['compositionJoins'],
+    expectedProject: VideoProject
+  ) => VideoEditorCompositionJoinUpdateResult;
+  /** Inserts an editable edge material against the exact accepted inspector snapshot. */
+  placeBookendMaterial: (
+    assetId: string,
+    side: 'intro' | 'outro',
+    expectedProject: VideoProject
+  ) => VideoEditorBookendPlacementResult;
   /** Inserts at the playhead and opens an equal gap across the montage. */
   insertMaterial: (
     assetId: string,
@@ -115,6 +145,9 @@ export interface VideoEditorProjectActions
   updateMediaClipFitScalePercent: (clipId: string, fitScalePercent: number) => void;
   updateMediaClipShadowIntensity: (clipId: string, shadowIntensity: number) => void;
   updateMediaClipShadowMode: (clipId: string, shadowMode: VideoMediaShadowMode) => void;
+  /** Edits source crop through the existing project history owner. */
+  editMediaClip: (clipId: string, edit: VideoEditorMediaClipEdit) => void;
+  updateMediaClipShadowColor: (clipId: string, shadowColor: string) => void;
   updateMediaClipWindowHeader: (clipId: string, windowHeader: WindowHeader | undefined) => void;
   applyMediaClipVisualsToTrack: (clipId: string) => void;
   closeTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;

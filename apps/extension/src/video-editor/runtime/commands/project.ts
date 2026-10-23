@@ -22,6 +22,8 @@ export async function loadProjectWorkspace(
   const transition = beginProjectTransition();
   try {
     const currentProject = port.getCurrentProject();
+    if (currentProject && port.beforeLeave && !(await port.beforeLeave())) return;
+    if (!transition.isCurrent()) return;
     if (currentProject && currentProject.id !== projectId) {
       await waitForVideoEditorSave(currentProject.id);
       if (!transition.isCurrent()) return;
@@ -49,6 +51,8 @@ export async function createProjectWorkspace(
   const transition = beginProjectTransition();
   try {
     const currentProject = port.getCurrentProject();
+    if (currentProject && port.beforeLeave && !(await port.beforeLeave())) return;
+    if (!transition.isCurrent()) return;
     if (currentProject) {
       await waitForVideoEditorSave(currentProject.id);
       if (!transition.isCurrent()) return;
@@ -97,6 +101,8 @@ export async function deleteProjectWorkspace(
     return;
   }
 
+  if (port.getCurrentProject()?.id === projectId && port.beforeLeave && !(await port.beforeLeave()))
+    return;
   const remainingProjects = await deletePersistedProject(projectId);
   if (port.getCurrentProject()?.id !== projectId) {
     await port.libraries.refreshProjects();

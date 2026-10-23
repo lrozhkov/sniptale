@@ -1,4 +1,9 @@
-import { getDrawingSelectionBounds, type DrawingObject } from '../../../../features/drawing/public';
+import {
+  getDrawingObjectBounds,
+  getDrawingObjectRotation,
+  getDrawingSelectionBounds,
+  type DrawingObject,
+} from '../../../../features/drawing/public';
 import { captureDrawingObjects, captureDrawingFrame } from '../../../drawing/frame';
 import type { VirtualDomOriginalElementResolver } from '../../dom-tree-parser/traversal';
 
@@ -81,6 +86,9 @@ export function prepareDrawingOverlayNodes(args: {
   const cloneCanvas = args.clone.querySelector('canvas.sniptale-drawing-canvas');
   if (!(canvas instanceof HTMLCanvasElement) || !cloneCanvas) return [];
   const objects = captureDrawingObjects(canvas);
+  for (const layer of args.clone.querySelectorAll('[data-ui="content.drawing.ink-layer"]')) {
+    layer.remove();
+  }
   if (!objects) {
     const frame = captureDrawingFrame(canvas);
     if (frame) {
@@ -106,7 +114,24 @@ export function prepareDrawingOverlayNodes(args: {
           (element) => element.getAttribute('data-sniptale-drawing-object-id') === entry.object.id
         );
     if (!node) continue;
+    if (entry.object.kind === 'blur') {
+      const bounds = getDrawingObjectBounds(entry.object);
+      const left = bounds.x - entry.projection.x;
+      const top = bounds.y - entry.projection.y;
+      Object.assign(node.style, {
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${bounds.width}px`,
+        height: `${bounds.height}px`,
+        transform: `rotate(${getDrawingObjectRotation(entry.object)}deg)`,
+        transformOrigin: 'center',
+        clipPath: entry.clip
+          ? `inset(${Math.max(0, entry.clip.top - top)}px ${Math.max(0, left + bounds.width - entry.clip.right)}px ${Math.max(0, top + bounds.height - entry.clip.bottom)}px ${Math.max(0, entry.clip.left - left)}px)`
+          : '',
+      });
+    }
     if (entry.canvas) {
+      node.setAttribute('data-sniptale-drawing-object-id', entry.object.id);
       args.originals.set(node, entry.canvas);
       cloneCanvas.before(node);
     }

@@ -1,3 +1,6 @@
+import { createVideoProjectTrack } from './factories/creation';
+import { reviewSpeechTextSignature } from '../review/speech-transcript';
+import { createSceneGradientBackground } from './scene/background-gradient';
 import { expect, it } from 'vitest';
 import { createVideoProjectCursorTrack } from './defaults';
 import { createEmptyVideoProject, createVideoProjectAsset } from './factories/creation';
@@ -280,4 +283,527 @@ it.each<VideoProjectAssetSource>([
   ]);
   expect(project).toEqual(original);
   expect(isExportReadyVideoProject(result)).toBe(true);
+});
+
+it('removes text bound to explicitly deleted sources while retaining independent and unrelated text', () => {
+  const source = { kind: 'library-asset' as const, mediaId: 'removed-source' };
+  const { project, removed, kept } = fixture(source);
+  project.version = 5;
+  project.textDocuments = [
+    {
+      id: 'removed',
+      binding: { kind: 'source', assetId: removed.id, sourceInstanceId: 'removed' },
+      document: { version: 1, fragments: [] },
+    },
+    {
+      id: 'kept',
+      binding: { kind: 'source', assetId: kept.id, sourceInstanceId: 'kept' },
+      document: { version: 1, fragments: [] },
+    },
+    { id: 'project', binding: { kind: 'project' }, document: { version: 1, fragments: [] } },
+  ];
+  const before = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.textDocuments?.map(({ id }) => id)).toEqual(['kept', 'project']);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(project).toEqual(before);
+});
+
+it.each(
+  ([undefined, 18] as const).flatMap((blur) =>
+    (['dormant', 'active', 'other-image'] as const).map((mode) => ({ mode, blur }))
+  )
+)('removes only deleted background refs and keeps %s variants', ({ mode, blur }) => {
+  const source = { kind: 'project-asset' as const, projectAssetId: 'source' };
+  const { project, removed, kept } = fixture(source);
+  project.version = blur === undefined ? 14 : 16;
+  project.clips = [];
+  const image = {
+    ...removed,
+    type: 'IMAGE' as const,
+    metadata: { ...removed.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+  };
+  const otherImage = {
+    ...image,
+    id: 'other-image',
+    source: { kind: 'project-asset' as const, projectAssetId: 'other-source' },
+  };
+  project.assets = [image, kept, otherImage];
+  const gradient = {
+    ...createSceneGradientBackground('#123456ff'),
+    animation: { mode: 'breathe' as const, speed: 42, intensity: 61 },
+  };
+  const solid = { kind: 'solid' as const, color: '#abcdef' };
+  const remembered = {
+    solid,
+    gradient,
+    image: {
+      kind: 'image' as const,
+      assetId: mode === 'other-image' ? otherImage.id : image.id,
+      imageFit: 'contain' as const,
+    },
+  };
+  project.sceneBackground =
+    mode === 'dormant'
+      ? { ...gradient, remembered }
+      : { kind: 'image', assetId: image.id, imageFit: 'cover', remembered };
+  if (blur !== undefined) project.sceneBackground.blur = blur;
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const before = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.version).toBe(blur === undefined ? 14 : 16);
+  expect(result.sceneBackground?.blur).toBe(blur);
+  expect(result.sceneBackground).toMatchObject({ remembered: { solid, gradient } });
+  expect(result.sceneBackground?.remembered?.image).toEqual(
+    mode === 'other-image' ? remembered.image : undefined
+  );
+  if (mode === 'dormant') expect(result.sceneBackground).toMatchObject(gradient);
+  else expect(result.sceneBackground).toMatchObject(solid);
+  expect(result.assets).toEqual([kept, otherImage]);
+  expect(result.tracks).toEqual(project.tracks);
+  expect(project).toEqual(before);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
+});
+
+it.each(['none', 'text', 'image'] as const)(
+  'clears only the deleted %s watermark logo and retains authored presentation',
+  async (mode) => {
+    const { createQuickEditWatermark } = await import('./scene/watermark');
+    const project = createEmptyVideoProject('Watermark source removal');
+    const source = { kind: 'project-asset' as const, projectAssetId: 'physical-logo' };
+    const logo = createVideoProjectAsset('Logo', 'IMAGE', source, {
+      width: 400,
+      height: 200,
+      duration: null,
+      mimeType: 'image/png',
+      size: 10,
+      hasAudio: false,
+      audioPeaks: null,
+    });
+    project.version = 20;
+    project.assets = [logo];
+    project.watermark = {
+      ...createQuickEditWatermark('Retained text'),
+      mode,
+      layout: 'tiled',
+      image: {
+        assetId: `project-asset:${logo.id}`,
+        width: 400,
+        height: 200,
+        size: 0.3,
+        opacity: 0.5,
+      },
+    };
+    const before = structuredClone(project);
+    expect(
+      removeVideoProjectLibrarySources(project, [
+        { kind: 'project-asset', projectAssetId: logo.id },
+      ])
+    ).toBe(project);
+    const next = removeVideoProjectLibrarySources(project, [source]);
+    expect(next.watermark).not.toHaveProperty('image');
+    expect(next.watermark).toEqual({
+      ...project.watermark,
+      image: undefined,
+      mode: mode === 'image' ? 'none' : mode,
+    });
+    expect(next.assets).toEqual([]);
+    expect(next.version).toBe(20);
+    expect(isExportReadyVideoProject(next)).toBe(true);
+    expect(project).toEqual(before);
+  }
+);
+
+it('removes only comment documents bound to explicitly deleted source assets', () => {
+  const source = { kind: 'library-asset' as const, mediaId: 'removed-source' };
+  const { project, removed, kept } = fixture(source);
+  project.version = 23;
+  project.commentDocuments = [
+    {
+      id: 'removed',
+      binding: { kind: 'source', assetId: removed.id, sourceInstanceId: 'removed' },
+      annotations: [],
+      canvasComments: [],
+    },
+    {
+      id: 'kept',
+      binding: { kind: 'source', assetId: kept.id, sourceInstanceId: 'kept' },
+      annotations: [],
+      canvasComments: [],
+    },
+    { id: 'independent', binding: { kind: 'project' }, annotations: [], canvasComments: [] },
+  ];
+  const before = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.commentDocuments?.map(({ id }) => id)).toEqual(['kept', 'independent']);
+  expect(project).toEqual(before);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
+});
+
+it('removes only source audio documents owned by the retired source, including dormant documents', () => {
+  const source = { kind: 'project-asset' as const, projectAssetId: 'source' };
+  const { project, removed, kept, removedClip, keptClip } = fixture(source);
+  project.version = 28;
+  project.sourceAudioDocuments = [removedClip, keptClip].map((clip, index) => ({
+    id: String(index),
+    binding: {
+      kind: 'source',
+      assetId: clip.assetId,
+      sourceInstanceId: ('sourceInstanceId' in clip ? clip.sourceInstanceId : undefined) ?? clip.id,
+    },
+    ranges: [{ id: 'range', start: 0, end: 1, volume: 2 }],
+    mutes: [],
+  }));
+  project.clips = [];
+  const before = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.assets).toEqual([kept]);
+  expect(result.sourceAudioDocuments).toEqual([project.sourceAudioDocuments[1]]);
+  expect(
+    result.sourceAudioDocuments?.some((document) => document.binding.assetId === removed.id)
+  ).toBe(false);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(project).toEqual(before);
+});
+
+it.each(['source', 'take', 'replacement'] as const)(
+  'removes the exact source voice %s dependency and preserves the remaining accepted data',
+  (role) => {
+    const removedSource = { kind: 'project-asset' as const, projectAssetId: 'removed' };
+    const { project, removed, kept, removedClip, keptClip } = fixture(removedSource);
+    const track = createVideoProjectTrack('Voice', 1, 'AUDIO');
+    project.tracks.push(track);
+    const audio = {
+      ...kept,
+      id: 'native-take',
+      type: 'AUDIO' as const,
+      source:
+        role === 'take'
+          ? removedSource
+          : { kind: 'project-asset' as const, projectAssetId: 'take-bytes' },
+      metadata: { ...kept.metadata, mimeType: 'audio/wav', hasAudio: true },
+    };
+    const replacement = {
+      ...audio,
+      id: 'project-asset:replacement',
+      source:
+        role === 'replacement'
+          ? removedSource
+          : { kind: 'project-asset' as const, projectAssetId: 'replacement-bytes' },
+    };
+    project.assets.push(audio, replacement);
+    const profile = { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' as const };
+    project.version = 31;
+    project.sourceVoiceoverDocuments = [
+      {
+        id: 'voice',
+        trackId: track.id,
+        enabled: false,
+        binding: {
+          kind: 'source',
+          assetId: role === 'source' ? removed.id : kept.id,
+          sourceInstanceId: role === 'source' ? removedClip.id : keptClip.id,
+        },
+        reference: [
+          { kind: 'keep', rate: 1, sourceStart: 0, sourceEnd: 5, resultStart: 0, resultEnd: 5 },
+        ],
+        take: {
+          id: 'take',
+          assetId: audio.id,
+          timelineStart: 0,
+          sourceOffset: 0,
+          duration: 4,
+          volume: 1,
+          muted: true,
+          dormant: true,
+          fadeIn: 0,
+          fadeOut: 0,
+          transcript: {
+            version: 1,
+            phrases: [],
+            replacements: [
+              {
+                id: 'replacement',
+                assetId: replacement.id,
+                start: 0,
+                end: 1,
+                duration: 1,
+                phraseId: 'phrase',
+                revision: 1,
+                text: 'Accepted',
+                textSignature: reviewSpeechTextSignature('Accepted', profile),
+                profile,
+              },
+            ],
+          },
+        },
+      },
+    ];
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const before = structuredClone(project);
+    const result = removeVideoProjectLibrarySources(project, [removedSource]);
+    expect(result.version).toBe(31);
+    expect(isExportReadyVideoProject(result)).toBe(true);
+    if (role === 'replacement') {
+      const expected = structuredClone(before.sourceVoiceoverDocuments!);
+      expected[0]!.take.transcript!.replacements = [];
+      expect(result.sourceVoiceoverDocuments).toEqual(expected);
+    } else expect(result.sourceVoiceoverDocuments).toEqual([]);
+    expect(project).toEqual(before);
+    expect(
+      removeVideoProjectLibrarySources(project, [{ kind: 'recording', recordingId: 'absent' }])
+    ).toBe(project);
+  }
+);
+
+it.each(['source', 'replacement'] as const)(
+  'retires passive speech %s without deleting unrelated metadata or envelopes',
+  (role) => {
+    const source = { kind: 'project-asset' as const, projectAssetId: 'retired-speech-resource' };
+    const { project, removed, kept } = fixture(source);
+    project.version = 31;
+    project.clips = [];
+    const first = {
+      ...structuredClone(kept),
+      id: 'project-asset:first-history',
+      type: 'AUDIO' as const,
+      metadata: { ...kept.metadata, duration: 1, mimeType: 'audio/wav', hasAudio: true },
+      source:
+        role === 'replacement'
+          ? source
+          : { kind: 'project-asset' as const, projectAssetId: 'first-history' },
+    };
+    const second = {
+      ...structuredClone(first),
+      id: 'project-asset:second-history',
+      source: { kind: 'project-asset' as const, projectAssetId: 'second-history' },
+    };
+    project.assets.push(first, second);
+    const profile = { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' as const };
+    project.sourceAudioDocuments = [
+      {
+        id: 'speech',
+        binding: {
+          kind: 'source',
+          assetId: role === 'source' ? removed.id : kept.id,
+          sourceInstanceId: 'missing-placement',
+        },
+        ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+        mutes: [{ id: 'mute', start: 1, end: 2, volume: 0.5 }],
+        speech: {
+          enabled: false,
+          transcript: {
+            version: 1,
+            phrases: [
+              {
+                id: 'phrase',
+                start: 0,
+                end: 1,
+                originalText: 'Original',
+                text: 'Draft',
+                revision: 1,
+                alignment: 'segment',
+              },
+            ],
+            replacements: [first, second].map((asset, index) => ({
+              id: `history-${index}`,
+              start: index,
+              end: index + 1,
+              duration: 1,
+              assetId: asset.id,
+              enabled: false,
+              originalVolume: 0.25,
+              phraseId: 'removed-phrase',
+              revision: 1,
+              text: 'Accepted',
+              profile,
+              textSignature: reviewSpeechTextSignature('Accepted', profile),
+            })),
+          },
+        },
+      },
+    ];
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const before = structuredClone(project);
+    const result = removeVideoProjectLibrarySources(project, [source]);
+    if (role === 'source') expect(result.sourceAudioDocuments).toEqual([]);
+    else {
+      const original = before.sourceAudioDocuments![0]!;
+      expect(result.sourceAudioDocuments).toEqual([
+        {
+          ...original,
+          speech: {
+            ...original.speech!,
+            transcript: {
+              ...original.speech!.transcript,
+              replacements: [original.speech!.transcript.replacements[1]!],
+            },
+          },
+        },
+      ]);
+      expect(result.assets.some((asset) => asset.id === second.id)).toBe(true);
+    }
+    expect(isExportReadyVideoProject(result)).toBe(true);
+    expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
+    expect(project).toEqual(before);
+  }
+);
+
+it.each(
+  [true, false].flatMap((hasSolid) =>
+    ([undefined, 'content'] as const).map((zoomBehavior) => ({ hasSolid, zoomBehavior }))
+  )
+)(
+  'keeps purged paint inactive with solid=$hasSolid mode=$zoomBehavior',
+  ({ hasSolid, zoomBehavior }) => {
+    const source = { kind: 'project-asset' as const, projectAssetId: 'source' };
+    const { project, removed, kept } = fixture(source);
+    project.version = zoomBehavior ? 37 : 36;
+    project.clips = [];
+    project.backgroundColor = '#00000000';
+    const image = {
+      ...removed,
+      type: 'IMAGE' as const,
+      metadata: { ...removed.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+    };
+    const solid = { kind: 'solid' as const, color: '#abcdef' };
+    project.assets = [image, kept];
+    project.sceneBackground = {
+      kind: 'image',
+      assetId: image.id,
+      enabled: false,
+      blur: 2,
+      rememberedBlur: 9,
+      ...(zoomBehavior ? { zoomBehavior } : {}),
+      ...(hasSolid ? { remembered: { solid } } : {}),
+    };
+    const before = structuredClone(project);
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const result = removeVideoProjectLibrarySources(project, [source]);
+    expect(result.sceneBackground).toMatchObject({
+      kind: 'solid',
+      color: hasSolid ? solid.color : '#00000000',
+      enabled: false,
+      blur: 2,
+      rememberedBlur: 9,
+    });
+    expect(result.sceneBackground?.zoomBehavior).toBe(zoomBehavior);
+    expect(result.backgroundColor).toBe('#00000000');
+    expect(result.assets).toEqual([kept]);
+    expect(isExportReadyVideoProject(result)).toBe(true);
+    expect(project).toEqual(before);
+    expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
+  }
+);
+
+it('purges confirmed source-attached effect hosts but retains viewport hosts and shared snapshots', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { sha256EffectV1Bytes, validateEffectV1Document } =
+    await import('@sniptale/runtime-contracts/effect-v1');
+  const { createEffectHostClip } = await import('./factories/overlay-clip');
+  const source = { kind: 'project-asset' as const, projectAssetId: 'attached-source' };
+  const { project, removed, removedClip, keptClip } = fixture(source);
+  if (removedClip.type !== 'VIDEO') throw new Error('Expected video');
+  removedClip.sourceInstanceId = 'attached-placement';
+  const text = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'utf8'
+  );
+  const document = validateEffectV1Document(JSON.parse(text)).document!;
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(text));
+  const attached = createEffectHostClip({
+    duration: 3,
+    effectInstanceId: 'attached',
+    name: 'Attached',
+    startTime: 0,
+    trackId: removedClip.trackId,
+    projectWidth: 100,
+    projectHeight: 100,
+  });
+  attached.attachment = {
+    kind: 'source',
+    assetId: removed.id,
+    sourceInstanceId: 'attached-placement',
+  };
+  const viewport = {
+    ...attached,
+    id: 'viewport',
+    effectInstanceId: 'viewport',
+    attachment: { kind: 'viewport' as const },
+  };
+  project.version = 38;
+  project.clips.push(attached, viewport);
+  project.effectSnapshots = [
+    {
+      id: `effect:${sha256}`,
+      sha256,
+      documentId: document.id,
+      source: text,
+      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      assets: [],
+      retainedByteLength: new TextEncoder().encode(text).byteLength,
+    },
+  ];
+  project.effectInstances = ['attached', 'viewport'].map((id) => ({
+    id,
+    snapshotId: `effect:${sha256}`,
+    kind: 'standalone',
+    controls: {},
+    enabled: true,
+    startTime: 0,
+    duration: 3,
+    playbackRate: 1,
+    target: { kind: 'scene' },
+  }));
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const original = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.clips).toEqual([keptClip, viewport]);
+  expect(result.effectInstances?.map(({ id }) => id)).toEqual(['viewport']);
+  expect(result.effectSnapshots).toEqual(project.effectSnapshots);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(project).toEqual(original);
+  const sourceRange = {
+    assetId: removed.id,
+    sourceInstanceId: 'attached-placement',
+    start: 0,
+    end: 3,
+  };
+  const dormantViewport = {
+    ...viewport,
+    id: 'dormant-viewport',
+    effectInstanceId: 'dormant-viewport',
+    sourceRange: { ...sourceRange, dormant: true as const },
+  };
+  const retained = {
+    ...project,
+    clips: [
+      ...project.clips.map((clip) =>
+        clip.id === viewport.id ? { ...viewport, sourceRange } : clip
+      ),
+      dormantViewport,
+    ],
+    effectInstances: [
+      ...project.effectInstances,
+      { ...project.effectInstances[1]!, id: 'dormant-viewport' },
+    ],
+  };
+  expect(isExportReadyVideoProject(retained)).toBe(true);
+  const retainedBefore = structuredClone(retained);
+  const purged = removeVideoProjectLibrarySources(retained, [source]);
+  expect(purged.clips).toEqual([keptClip, viewport]);
+  expect(purged.effectInstances!.map((instance) => instance.id)).toEqual(['viewport']);
+  expect(purged.effectSnapshots).toEqual(retained.effectSnapshots);
+  expect(retained).toEqual(retainedBefore);
+  const onlyAttached = {
+    ...project,
+    clips: [removedClip, keptClip, attached],
+    effectInstances: [project.effectInstances[0]!],
+  };
+  const unique = removeVideoProjectLibrarySources(onlyAttached, [source]);
+  expect(unique.effectInstances).toEqual([]);
+  expect(unique.effectSnapshots).toEqual([]);
 });

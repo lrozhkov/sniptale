@@ -1,10 +1,22 @@
+import type { MotionFocusEdit } from '../../../features/video/project/motion/focus-appearance';
+import type { MotionSpatialEdit } from '../../../features/video/project/motion/spatial';
+import type { MotionTransitionPhaseEdit } from '../../../features/video/project/motion/transitions';
+import type { MotionBlurPhaseEdit } from '../../../features/video/project/motion/blur';
+import type { MediaSourceCrop } from '../../../features/video/project/media-crop';
 import type { VideoClipTransitionKind } from '../../../features/video/project/types/index';
 import type {
+  VideoProjectSceneBackground,
   VideoProject,
   VideoProjectMotionRegion,
   VideoProjectTransition,
 } from '../../../features/video/project/types/index';
 import type { VideoProjectEffectInstance } from '../../../features/video/project/effect-instance/types';
+
+/** Replace the paint or edit its common blur under the current project authority. */
+export type VideoEditorSceneBackgroundEdit =
+  | VideoProjectSceneBackground
+  | { blur: number }
+  | { zoomBehavior: NonNullable<VideoProjectSceneBackground['zoomBehavior']> };
 
 export type VideoEditorAudioEnvelopePatch = {
   volumeEnvelopeEnd?: number;
@@ -57,6 +69,11 @@ export type VideoEditorMotionRegionPatch = Partial<
   >
 > & {
   sourceClipId?: string | null;
+  cameraTarget?: 'scene' | 'window';
+  focusEdit?: MotionFocusEdit;
+  motionBlurPhase?: MotionBlurPhaseEdit;
+  spatialEdit?: MotionSpatialEdit;
+  motionTransitionPhase?: MotionTransitionPhaseEdit;
   cameraFollow?: VideoProjectMotionRegion['cameraFollow'] | null;
 };
 
@@ -72,3 +89,10 @@ export type VideoProjectEffectInstancePatch = {
   enabled?: boolean;
   startTime?: number;
 };
+
+/** Original-source media edits; placement and source timing remain independent. */
+export type VideoEditorMediaClipEdit =
+  | { kind: 'padding'; padding: number }
+  | { kind: 'source-crop'; crop: MediaSourceCrop | null }
+  | { kind: 'window-corner-radius'; radius: number | null }
+  | { kind: 'window-layout-restore' };

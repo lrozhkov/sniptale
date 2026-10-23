@@ -4,7 +4,6 @@ import {
   type VideoRecordingSettings,
   type WebcamQualitySettings,
   WebcamPresentationMode,
-  WebcamPresentationShape,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { resolveWebcamQualitySettings } from '@sniptale/runtime-contracts/video/types/webcam-quality';
@@ -15,7 +14,13 @@ import {
   useWebcamResolutionOptions,
 } from './webcam-quality-controls';
 import { WebcamPreview, useWebcamPreview } from './webcam-preview';
-import { ProductRange } from '@sniptale/ui/product-form-controls';
+import { RecordingCameraControls } from '../../../../../ui/recording-camera-controls';
+import { useState } from 'react';
+import type { WebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  applyWebcamPresentationPatch,
+  type WebcamPresentationPatch,
+} from '../../../../../features/video/recording/webcam-presentation';
 
 type WebcamSettingsPanelProps = {
   captureMode: CaptureMode;
@@ -38,21 +43,25 @@ export function WebcamSettingsPanel({
   const updateQuality = (patch: Partial<WebcamQualitySettings>) => {
     onSettingsChange({ webcamQuality: { ...quality, ...patch } });
   };
-  const presentation = settings.webcamPresentation ?? DEFAULT_VIDEO_SETTINGS.webcamPresentation;
+  const acceptedPresentation =
+    settings.webcamPresentation ?? DEFAULT_VIDEO_SETTINGS.webcamPresentation;
+  const [preview, setPreview] = useState<WebcamPresentationSettings | null>(null);
+  const presentation = preview ?? acceptedPresentation;
   const embeddedPresentationAvailable =
     captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP;
 
-  const updatePresentation = (
-    patch: Partial<NonNullable<VideoRecordingSettings['webcamPresentation']>>
-  ) => {
+  const updatePresentation = (patch: WebcamPresentationPatch) => {
     if (!presentation) {
       return;
     }
-    onSettingsChange({ webcamPresentation: { ...presentation, ...patch } });
+    setPreview(null);
+    onSettingsChange({
+      webcamPresentation: applyWebcamPresentationPatch(acceptedPresentation!, patch),
+    });
   };
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       {embeddedPresentationAvailable && presentation ? (
         <WebcamPlacementControl presentation={presentation} onChange={updatePresentation} />
       ) : null}
@@ -61,12 +70,13 @@ export function WebcamSettingsPanel({
         state={previewState}
       />
       {embeddedPresentationAvailable && presentation?.mode === WebcamPresentationMode.EMBEDDED ? (
-        <WebcamEmbeddedPresentationControls
+        <RecordingCameraControls
           presentation={presentation}
           onChange={updatePresentation}
+          onPreview={(patch) => setPreview(applyWebcamPresentationPatch(presentation, patch))}
         />
       ) : null}
-      <div className="text-[11px] font-medium text-[var(--sniptale-color-text-secondary)]">
+      <div className="text-[11px] font-normal text-[var(--sniptale-color-text-secondary)]">
         {formatActualSettings(previewState.settings)}
       </div>
       <WebcamQualityOptionGroup
@@ -110,90 +120,5 @@ function WebcamPlacementControl({
         ]}
       />
     </div>
-  );
-}
-
-function WebcamEmbeddedPresentationControls({
-  presentation,
-  onChange,
-}: {
-  presentation: NonNullable<VideoRecordingSettings['webcamPresentation']>;
-  onChange: (patch: Partial<NonNullable<VideoRecordingSettings['webcamPresentation']>>) => void;
-}) {
-  return (
-    <div className="grid gap-3 border-b border-[var(--sniptale-color-border-soft)] pb-3">
-      <WebcamQualityOptionGroup
-        activeValue={presentation.shape}
-        labelKey="popup.video.webcamPresentationShapeLabel"
-        onChange={(shape) => onChange({ shape })}
-        options={[
-          {
-            label: translate('popup.video.webcamPresentationCircle'),
-            value: WebcamPresentationShape.CIRCLE,
-          },
-          {
-            label: translate('popup.video.webcamPresentationRectangle'),
-            value: WebcamPresentationShape.RECTANGLE,
-          },
-        ]}
-      />
-      <WebcamPresentationRange
-        label={translate('popup.video.webcamPresentationSize')}
-        min={12}
-        max={55}
-        value={Math.round(presentation.sizeFraction * 100)}
-        onChange={(value) => onChange({ sizeFraction: value / 100 })}
-      />
-      <WebcamPresentationRange
-        label={translate('popup.video.webcamPresentationCropHorizontal')}
-        min={-100}
-        max={100}
-        value={Math.round(presentation.cropOffset.x * 100)}
-        onChange={(value) =>
-          onChange({ cropOffset: { ...presentation.cropOffset, x: value / 100 } })
-        }
-      />
-      <WebcamPresentationRange
-        label={translate('popup.video.webcamPresentationCropVertical')}
-        min={-100}
-        max={100}
-        value={Math.round(presentation.cropOffset.y * 100)}
-        onChange={(value) =>
-          onChange({ cropOffset: { ...presentation.cropOffset, y: value / 100 } })
-        }
-      />
-    </div>
-  );
-}
-
-function WebcamPresentationRange(props: {
-  label: string;
-  max: number;
-  min: number;
-  onChange: (value: number) => void;
-  value: number;
-}) {
-  return (
-    <label className="grid gap-1.5">
-      <span
-        className={[
-          'flex items-center justify-between gap-2 text-[10px] font-medium',
-          'text-[var(--sniptale-color-text-muted-strong)]',
-        ].join(' ')}
-      >
-        <span>{props.label}</span>
-        <span className="tabular-nums text-[var(--sniptale-color-text-primary)]">
-          {props.value}%
-        </span>
-      </span>
-      <ProductRange
-        min={String(props.min)}
-        max={String(props.max)}
-        step="1"
-        value={props.value}
-        aria-label={props.label}
-        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
-      />
-    </label>
   );
 }

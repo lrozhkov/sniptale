@@ -5,7 +5,7 @@ import {
   syncContentSizeTooltipValues,
 } from '@sniptale/ui/content-size-tooltip/dom';
 import { bindRegionSelectorRootEvents } from './events';
-import { MIN_REGION_SELECTOR_SIZE } from './helpers';
+import { MIN_REGION_SELECTOR_SIZE, resizeRegionDimension } from './helpers';
 import { buildRegionSelectorMarkup, updateOverlayMask } from './markup';
 import { buildRecordingOverlayNode } from './recording-overlay.helpers';
 import { createRegionSelectorTooltip } from './tooltip';
@@ -42,7 +42,11 @@ function syncRegionSelectorTooltip(
 
   setContentSizeTooltipPosition(
     tooltip.root,
-    calculateContentSizeTooltipPosition({ anchorRect: currentRegion })
+    calculateContentSizeTooltipPosition({
+      anchorRect: currentRegion,
+      tooltipWidth: tooltip.root.getBoundingClientRect().width || tooltip.root.offsetWidth || 550,
+      tooltipHeight: tooltip.root.getBoundingClientRect().height || tooltip.root.offsetHeight || 50,
+    })
   );
   syncContentSizeTooltipValues({
     tooltip,
@@ -65,14 +69,23 @@ export function updateRegionSelectorUi(state: RegionSelectorState): void {
   const region = state.regionSelectorContainer.querySelector<HTMLElement>('#sniptale-region');
   if (region) {
     updateRegionSurface(region, state.currentRegion);
+    region.style.opacity = state.isResizing || state.isDragging ? '0' : '1';
+    region.style.cursor = 'move';
   }
 
   const overlay = state.regionSelectorContainer.querySelector<HTMLElement>('#sniptale-overlay');
   if (overlay) {
     updateOverlayMask(overlay, state.currentRegion);
+    overlay.style.cursor = state.isDragging
+      ? 'move'
+      : state.isResizing
+        ? `${state.resizeCorner}-resize`
+        : 'crosshair';
   }
 
   if (state.regionSelectorTooltip) {
+    state.regionSelectorTooltip.root.style.visibility =
+      state.isResizing || state.isDragging ? 'hidden' : 'visible';
     syncRegionSelectorTooltip(state.regionSelectorTooltip, state.currentRegion);
   }
 }
@@ -91,6 +104,7 @@ function renderRegionSelector(args: {
   );
 
   args.state.regionSelectorTooltip = createRegionSelectorTooltip({
+    aspectRatioState: args.state.aspectRatioState,
     getCurrentRegion: () => args.state.currentRegion,
     mountInto: args.root,
     onCancel: args.handleRegionCancelled,
@@ -107,16 +121,22 @@ function renderRegionSelector(args: {
     region,
     handleRegionCancelled: args.handleRegionCancelled,
     onDragStart: (event) => {
+      if (args.state.isDragging || args.state.isResizing) return;
+      args.state.regionSelectorTooltip?.dismissMenu();
       args.state.isDragging = true;
       args.state.dragStart = { x: event.clientX, y: event.clientY };
       args.state.initialRegion = { ...args.state.currentRegion };
+      updateRegionSelectorUi(args.state);
       event.preventDefault();
     },
     onResizeStart: (event, corner) => {
+      if (args.state.isDragging || args.state.isResizing) return;
+      args.state.regionSelectorTooltip?.dismissMenu();
       args.state.isResizing = true;
       args.state.resizeCorner = corner;
       args.state.dragStart = { x: event.clientX, y: event.clientY };
       args.state.initialRegion = { ...args.state.currentRegion };
+      updateRegionSelectorUi(args.state);
       event.preventDefault();
     },
   });
@@ -162,6 +182,11 @@ export function createRegionSelectorSurfaceActions(args: {
       if (args.state.regionSelectorContainer) {
         return;
       }
+      args.state.currentRegion = resizeRegionDimension(
+        args.state.currentRegion,
+        'width',
+        args.state.currentRegion.width
+      );
 
       args.state.regionSelectorContainer = document.createElement('div');
       args.state.regionSelectorContainer.id = 'sniptale-region-selector-root';

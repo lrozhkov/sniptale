@@ -114,15 +114,39 @@ Background preset metadata is local-only under `sniptale_background_presets`. It
 
 Local-data erasure removes it even if preferences remain preserved. Custom images are explicitly retained in Library through the existing asset publication owner. Removing a catalog entry does not remove its Library material. Missing or trashed materials cannot be selected. Editor insertion keeps its existing frozen bytes and source provenance without publishing a second Library card.
 
-### Explicit Gallery speech editing
+### Explicit speech editing
 
 Gallery speech editing is distinct from session-only browser voice input. Explicitly accepted transcripts and phrase edits become project content through review history. Accepted generated audio uses the existing private project-asset publication and reference-retention rules. Project backup includes those accepted references and text. It excludes jobs, secrets and temporary previews.
 
-`background/ai/audio/request.ts` alone assembles audio provider bearer headers. It sends only the authorized extracted interval or saved phrase to the selected provider. It rejects redirects. It omits ambient credentials and referrers. It bounds response bytes and elapsed time.
+`background/ai/audio/request.ts` alone assembles audio provider bearer headers. It sends only the authorized extracted interval or saved text to the selected provider. It rejects redirects. It omits ambient credentials and referrers. It bounds response bytes and elapsed time.
 
 Provider error bodies never enter UI, logs or diagnostics. There is no hidden retry after an ambiguous paid POST.
 
+Full video editor transcription uses the same audio job, ticket, staging and transport owners. It requires a separate project clip scope. The top-level editor document must match the scope owner. The saved project revision, snapshot timestamp, clip membership and native source interval must agree. A missing, changed or trashed project refuses admission. Source bytes resolve only through canonical project, Library, recording or scenario readers.
+
+Recheck project authority before POST and temporary input publication. Staging checks project scope under its ticket lock and after upload. A stale project cannot read staged input. Exact scoped cleanup remains available after source deletion. This clip scope authorizes transcription only. It requires an explicitly approved provider. It does not authorize speech or the combined montage mix.
+
+Full video editor speech uses a separate project text scope. The scope names the saved project, text document and fragment. It includes the project revision, timestamp and a SHA256 hash of the selected speech basis.
+
+The hash covers project creation identity, document identity, binding, text, text revisions, intervals, clock and every projected placement. The basis retains each native source slice and its project placement. Caption appearance and descriptive provenance do not change this basis. The exact approved text and revisions must match before POST.
+
+The caller explicitly approves the provider. Background repeats provider and canonical text checks before POST. Background repeats canonical text checks after the response.
+
+The project text scope does not authorize source byte reads. Project text can produce speech without source audio or a current clip placement. Dormant, partially excluded and repeated text keeps its exact captured placement state. Generation does not choose an accepted audio destination.
+
+After asynchronous project integrity checks and basis hashing, admission reads fresh canonical metadata. Restores that keep earlier revisions still invalidate the hash when text, binding or placement changes. Temporary audio checks this scope before and after writes and reads. Exact ticket cleanup remains available after text or project deletion.
+
+Scenario speech sends the exact saved hotspot or annotation text and explicitly selected voice parameters to the disclosed provider. Provider approval exists only for the mounted form and clears when its selected provider changes. The request binds the saved project revision, action identity and exact text hash. Source admission reads committed state without recovery writes. Neither action labels nor unrelated project content enter the speech payload.
+
+Generated Scenario audio remains disposable until explicit Apply. Successful previews survive individual batch failures and cancellation within the mounted form. Apply uses ordinary Scenario audio publication with frozen source text and expected narration checks. A competing edit rejects the old take without replacing current narration. Each accepted import advances the current aggregate revision for the next explicit import. Closing the form releases its preview URLs and temporary staging. Accepted narration uses existing project assets, history and backup rules.
+
 Gallery text editing uses the one-shot `review-text` LLM session purpose and typed `sniptale-gallery-review-text` Port. The exact top-level Gallery document, capability purpose, context hash and committed workspace scope must agree. The selector exposes only an opaque SHA256 provider-destination binding. Background compares provider identity, destination and model code before permission or secret activation and again before POST. Provider payload contains the disclosed prompt, texts, language and numeric result-video intervals plus fixed output-contract instructions.
+
+Full video editor text editing uses the same purpose, Port and job owner. Its scope identifies one committed project text document. The top-level editor document must match that scope. Gallery accepts only workspace scope. The full editor accepts only project scope.
+
+The saved project revision, timestamp, document, selected text and projected placements must agree with the disclosed context. A missing, changed or trashed project refuses admission. Background repeats this check after the final model admission and before POST. After asynchronous Effect integrity checks, it reads the committed project metadata again. That metadata must match the checked snapshot, including restored content that retains earlier revision values. The scope check reads no audio or video bytes. It does not change storage.
+
+Each authored fragment keeps one input identity across its placements. Optional numeric `ranges` retain every projected placement, including gaps, overlaps and repetitions. Fragment `start` and `end` enclose those placements. They do not imply continuous placement. The context retains no clip, lane, asset or project identity. Whole-document scope means the selected text document. Partially excluded or excluded fragments refuse disclosure. The caller must not silently remove them from whole-document scope.
 
 It excludes workspace/asset identities, sound, frames and video. The complete context has a 16KiB bound and a conservative2500-token application output budget. Refuse excessive scope instead of silent chunking. JSON proposal text is additionally bounded to48KiB and checked against the selected IDs and explicit timing/structure permissions. Jobs are memory-only, do not retry paid calls, own cancellation before authorization awaits and drain through the existing privacy-erasure exclusion holder alongside audio jobs.
 
@@ -130,7 +154,9 @@ History uses the existing metadata-only JSON request record. Raw prompts, text, 
 
 `composition/persistence/assets/audio-staging.ts` retains disposable input and previews under `sniptale-assets/audio-jobs`. Objects have random operation identities, a 32 MiB maximum (transcription inputs are additionally limited to 24 MiB), and a ten-minute access expiry. Successful jobs discard input. The page discards previews on release. Subsequent writes inspect at most 256 metadata entries for expired crash remnants.
 
-Expired bytes may remain physically until that cleanup or checked local-data erasure. This does not imply scheduled cleanup. Exclude staging from backup, sync and diagnostics. Scopes distinguish original source from a specific voiceover clip. Staged handles cannot cross those targets.
+Expired bytes may remain physically until that cleanup or checked local-data erasure. This does not imply scheduled cleanup. Exclude staging from backup, sync and diagnostics. Scopes distinguish original source, a specific voiceover clip, saved video text and saved Scenario action text. Staged handles cannot cross those targets.
+
+Scenario staging checks the canonical saved source before write admission and again inside the existing mutation barrier. It checks the same source before and after asynchronous staged reads. Discard checks issued scope and handle metadata without requiring a surviving project or unchanged text. A failed or cancelled request cannot recreate a project after deletion or publish narration.
 
 Original admission resolves the current Library source and compares immutable identity, MIME and size to the durable workspace. Provider admission additionally checks physical bytes and native coverage (complete original source for transcription, retained spans for synthesis and voice clips). It repeats this validation before egress and after response. Every write rechecks the current durable workspace and original source binding inside the existing persistence transition. A delayed page extraction cannot recreate bytes after erasure.
 

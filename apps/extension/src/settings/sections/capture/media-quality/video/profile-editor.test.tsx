@@ -134,6 +134,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('shows the codec selector without opening a disclosure', () => {
+  renderEditor();
+  const codec = container?.querySelector('[aria-label="settings.videoQuality.codecLabel"]');
+  expect(codec).not.toBeNull();
+  expect(codec?.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="settings.video-quality.codecs"]')).toBeNull();
+});
+
 it('creates a named profile and submits the selected output combination', () => {
   const props = renderEditor();
   expect(container?.textContent).toContain('settings.videoQuality.createTitle');
@@ -186,7 +194,7 @@ it('keeps the codec status slot mounted through format checks and their result',
   codecSupport.mockReturnValue('checking');
   renderEditor();
   expect(container?.querySelector('[role="status"]')).toBe(status);
-  expect(status?.textContent).toBe('settings.videoQuality.codecChecking');
+  expect(status?.textContent).toBe('');
   codecSupport.mockReturnValue('unavailable');
   renderEditor();
   expect(container?.querySelector('[role="status"]')).toBe(status);

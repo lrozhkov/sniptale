@@ -52,3 +52,38 @@ it('offers audio timing and easing without visual templates or style controls', 
     container.remove();
   }
 });
+
+it('disables every fallback easing choice when either transition track is locked', () => {
+  const project = createEmptyVideoProject('Locked transition');
+  project.tracks[0]!.locked = true;
+  project.clips = [
+    createAudioClip({ id: 'a', trackId: project.tracks[0]!.id, startTime: 0, duration: 4 }),
+    createAudioClip({ id: 'b', trackId: project.tracks[0]!.id, startTime: 3, duration: 4 }),
+  ];
+  const prepared = syncProjectTransitions(project);
+  const update = vi.fn();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    act(() =>
+      root.render(
+        <InspectTransitionPanel
+          project={prepared}
+          selectedTransition={prepared.transitions![0]!}
+          recentColors={[]}
+          onRememberRecentColor={vi.fn()}
+          onUpdateTransitionDuration={vi.fn()}
+          onUpdateTransitionEasing={update}
+          onUpdateTransitionTemplate={vi.fn()}
+        />
+      )
+    );
+    const choices = [...container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')];
+    expect(choices.length).toBeGreaterThan(1);
+    expect(choices.every((choice) => choice.disabled)).toBe(true);
+    act(() => choices[0]!.click());
+    expect(update).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+  }
+});

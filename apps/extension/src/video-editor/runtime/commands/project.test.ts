@@ -260,3 +260,21 @@ it('does not report creation failure after the project has been committed and op
   await expect(createProjectWorkspace(port, 'New')).resolves.toBeUndefined();
   expect(port.applyLoadedProject).toHaveBeenCalledWith(next, null);
 });
+
+it.each(['open', 'create', 'delete'] as const)(
+  'preserves the current project when recording admission refuses %s',
+  async (action) => {
+    vi.clearAllMocks();
+    const beforeLeave = vi.fn(async () => false);
+    const port = { ...createProjectHandlerParams(), beforeLeave };
+    if (action === 'open') await loadProjectWorkspace('other-project', port);
+    else if (action === 'create') await createProjectWorkspace(port, 'New');
+    else await deleteProjectWorkspace('current-project', port, async () => true);
+    expect(beforeLeave).toHaveBeenCalledOnce();
+    expect(mockWaitForVideoEditorSave).not.toHaveBeenCalled();
+    expect(mockOpenPersistedProject).not.toHaveBeenCalled();
+    expect(mockCreateBlankProject).not.toHaveBeenCalled();
+    expect(mockDeletePersistedProject).not.toHaveBeenCalled();
+    expect(port.applyLoadedProject).not.toHaveBeenCalled();
+  }
+);

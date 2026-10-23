@@ -14,6 +14,7 @@ export function applyRecordingReviewInteractions(
     content.cameraFollowDefaults === undefined &&
     content.actionAudio === undefined &&
     content.clickAnimations === undefined &&
+    content.keyAnimations === undefined &&
     content.actionsEnabled === undefined
   )
     return project;
@@ -33,12 +34,14 @@ export function applyRecordingReviewInteractions(
     (group) => group.recordingId === recordingId && group.sourceInstanceId === sourceInstanceId
   );
   const styles = content.clickAnimations ?? current?.gestureStyles;
+  const keys = content.keyAnimations ?? current?.keyStyles;
   const group = {
     recordingId,
     sourceInstanceId,
     signals: structuredClone(current?.signals ?? []),
     settings: structuredClone(content.actionAudio ?? current?.settings ?? []),
     ...(styles ? { gestureStyles: structuredClone(styles) } : {}),
+    ...(keys ? { keyStyles: structuredClone(keys) } : {}),
   };
   const cursorFocusPath = content.cursorFocusPath
     ? {
@@ -51,6 +54,7 @@ export function applyRecordingReviewInteractions(
             throw new Error('Review interaction source is inconsistent.');
           return {
             ...structuredClone(segment),
+            id: handoffSegmentId(segment.id, keyIds),
             binding: { kind: 'recording-source' as const, recordingId, sourceInstanceId },
             keys: segment.keys.map((key) => ({
               ...structuredClone(key),
@@ -84,6 +88,13 @@ function handoffCapturedKeyIdentities(
   sourceInstanceId: string
 ) {
   const identities = new Map<string, string>();
+  for (const group of project.cursorTrack?.sourceObservations ?? []) {
+    if (group.recordingId !== recordingId || group.sourceInstanceId !== sourceInstanceId) continue;
+    for (const sample of group.samples) {
+      identities.set(sample.id, `${sourceInstanceId}:${sample.id}`);
+      identities.set(`end:segment:${sample.id}`, `end:segment:${sourceInstanceId}:${sample.id}`);
+    }
+  }
   for (const event of project.actionEvents) {
     const anchor = event.anchor;
     if (
@@ -109,6 +120,14 @@ function handoffCapturedKeyIdentities(
 function handoffKeyId(id: string, identities: ReadonlyMap<string, string>): string {
   const prefix = 'focus-override:';
   if (!id.startsWith(prefix)) return identities.get(id) ?? id;
+  const captured = id.slice(prefix.length);
+  return identities.has(captured) ? `${prefix}${identities.get(captured)}` : id;
+}
+
+/** Derived segment identities follow their first captured key; manual segment IDs stay independent. */
+function handoffSegmentId(id: string, identities: ReadonlyMap<string, string>): string {
+  const prefix = 'segment:';
+  if (!id.startsWith(prefix)) return id;
   const captured = id.slice(prefix.length);
   return identities.has(captured) ? `${prefix}${identities.get(captured)}` : id;
 }

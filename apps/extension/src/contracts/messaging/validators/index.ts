@@ -32,6 +32,7 @@ export {
   isVideoProject,
   isVideoProjectExportSettings,
   isVideoRecordingRuntimeState,
+  isVideoMicrophoneActivity,
   isVideoRecordingSettings,
   isViewportInfo,
   isViewportRegion,

@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { AiEgressAuthority } from '../../../features/ai/egress-authority';
@@ -184,4 +184,58 @@ it('reports token issuance failures after sender preauthorization', async () => 
       error: 'Unable to issue LLM session token',
     });
   });
+});
+
+afterEach(() => vi.unstubAllGlobals());
+it('issues review-text editor tokens through the existing route authorization and sender policy', async () => {
+  const tokens = await vi.importActual<typeof import('./session-tokens')>('./session-tokens');
+  const preauthorization = await vi.importActual<typeof import('./authorization/preauthorization')>(
+    './authorization/preauthorization'
+  );
+  const { authorizeLlmSessionRequestRoute } = await import('./authorization/egress');
+  vi.stubGlobal('chrome', {
+    runtime: { id: 'extension', getURL: (path: string) => `chrome-extension://extension/${path}` },
+  });
+  resolveLlmSessionSenderKeyMock.mockImplementation(tokens.resolveLlmSessionSenderKey);
+  issueLlmSessionTokenMock.mockImplementation(tokens.issueLlmSessionToken);
+  hasPreauthorizedLlmSessionRequestMessageMock.mockImplementation(
+    preauthorization.hasPreauthorizedLlmSessionRequestMessage
+  );
+  tokens.resetLlmSessionTokensForTests();
+  const message = {
+    type: MessageType.REQUEST_LLM_SESSION,
+    purpose: 'review-text',
+    egressAuthority: {
+      contractVersion: 1,
+      purpose: 'review-text',
+      payloadHash: VALID_CONTENT_HASH,
+    },
+  };
+  const sender = {
+    id: 'extension',
+    frameId: 0,
+    documentId: 'editor-document',
+    url: 'chrome-extension://extension/apps/extension/src/video-editor/index.html',
+  };
+  expect(authorizeLlmSessionRequestRoute({ message, sender })).toMatchObject({ authorized: true });
+  const response = new Promise<unknown>((resolve) => {
+    expect(routeLlmSessionMessage(message, sender, resolve)).toBe(true);
+  });
+  await expect(response).resolves.toMatchObject({ success: true, token: expect.any(String) });
+  expect(issueLlmSessionTokenMock).toHaveBeenCalledOnce();
+  for (const patch of [
+    { id: 'other' },
+    { frameId: 1 },
+    { url: sender.url.replace('video-editor', 'settings') },
+  ]) {
+    expect(
+      authorizeLlmSessionRequestRoute({ message: { ...message }, sender: { ...sender, ...patch } })
+    ).toMatchObject({ authorized: false });
+  }
+  const { documentId: omittedDocumentId, ...missingDocument } = sender;
+  expect(omittedDocumentId).toBe('editor-document');
+  expect(
+    authorizeLlmSessionRequestRoute({ message: { ...message }, sender: missingDocument })
+  ).toMatchObject({ authorized: false });
+  tokens.resetLlmSessionTokensForTests();
 });

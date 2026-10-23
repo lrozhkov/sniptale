@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
 // @vitest-environment jsdom
 
 import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
@@ -7,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
+  createVideoProjectTrack,
   createVideoProjectAsset,
 } from '../../../features/video/project/factories/creation';
 import { VideoProjectAssetType } from '../../../features/video/project/types';
@@ -466,4 +468,264 @@ it('clears a rename draft without committing and Escape retains the source name'
     container.querySelector('[data-material-id] button[aria-pressed]')?.getAttribute('aria-label')
   ).toBe(asset.name);
   expect(onRename).not.toHaveBeenCalled();
+});
+
+it('shows dormant text sources as in use without offering an unavailable clip jump', () => {
+  const { asset, project, onImport, onSelect, onRemoveUnused } = renderMaterials();
+  project.version = 5;
+  project.textDocuments = [
+    {
+      id: 'retained',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'hidden' },
+      document: { version: 1, fragments: [] },
+    },
+  ];
+  act(() =>
+    root.render(
+      <VideoEditorMaterials
+        onRename={vi.fn()}
+        onShowUse={vi.fn()}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        project={project}
+        selectedAssetId={null}
+        onSelect={onSelect}
+        onImport={onImport}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(container.querySelector('[data-ui="video-editor.materials.show-use"]')).toBeNull();
+  const cleanup = container.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.materials.remove-unused"]'
+  )!;
+  expect(cleanup.disabled).toBe(true);
+  act(() => cleanup.click());
+  expect(onRemoveUnused).not.toHaveBeenCalled();
+});
+
+it('reveals a dormant watermark as a watermark and protects its material from removal', async () => {
+  const { asset, project, onImport, onSelect, onRename, onRemoveUnused } = renderMaterials();
+  asset.type = VideoProjectAssetType.IMAGE;
+  asset.name = 'Logo.png';
+  project.version = 20;
+  project.watermark = {
+    ...createQuickEditWatermark('Retained'),
+    image: {
+      assetId: `project-asset:${asset.id}`,
+      width: asset.metadata.width,
+      height: asset.metadata.height,
+      size: 0.2,
+      opacity: 1,
+    },
+  };
+  const onShowUse = vi.fn();
+  document.body.append(container);
+  await act(async () =>
+    root.render(
+      <VideoEditorMaterials
+        project={project}
+        onImport={onImport}
+        onSelect={onSelect}
+        onRename={onRename}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={onShowUse}
+        selectedAssetId={null}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .disabled
+  ).toBe(true);
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.show-use"] button')!
+      .click()
+  );
+  const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+  const watermark = options.find(
+    (option) => option.textContent === translate('gallery.videoReview.watermark')
+  );
+  expect(watermark).toBeDefined();
+  expect(
+    options.some(
+      (option) => option.textContent === translate('videoEditor.sidebar.materialsSceneUse')
+    )
+  ).toBe(false);
+  await act(async () => watermark!.click());
+  expect(onShowUse).toHaveBeenCalledExactlyOnceWith({ assetId: asset.id, kind: 'watermark' });
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onRemoveUnused).not.toHaveBeenCalled();
+});
+
+it('reveals a dormant source audio use and prevents removal of its retained material', async () => {
+  const { asset, project, onImport, onSelect, onRename, onRemoveUnused } = renderMaterials();
+  project.version = 28;
+  project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+      ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+      mutes: [],
+    },
+  ];
+  const onShowUse = vi.fn();
+  document.body.append(container);
+  await act(async () =>
+    root.render(
+      <VideoEditorMaterials
+        project={project}
+        onImport={onImport}
+        onSelect={onSelect}
+        onRename={onRename}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={onShowUse}
+        selectedAssetId={null}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .disabled
+  ).toBe(true);
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.show-use"] button')!
+      .click()
+  );
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (option) => option.textContent === translate('videoEditor.sidebar.sourceAudio')
+  );
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+  expect(onShowUse).toHaveBeenCalledExactlyOnceWith({
+    assetId: asset.id,
+    kind: 'source-audio',
+    documentId: 'envelope',
+  });
+  expect(onRemoveUnused).not.toHaveBeenCalled();
+});
+
+it('reveals the exact disabled dormant voice document from its retained source material', async () => {
+  const { asset, project, onImport, onSelect, onRename, onRemoveUnused } = renderMaterials();
+  const track = createVideoProjectTrack('Voice', 1, 'AUDIO');
+  const voiceAsset = createVideoProjectAsset(
+    'Voice',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'voice' },
+    { ...asset.metadata, width: 0, height: 0, mimeType: 'audio/wav', hasAudio: true }
+  );
+  project.tracks.push(track);
+  project.assets.push(voiceAsset);
+  project.version = 31;
+  project.sourceVoiceoverDocuments = [
+    {
+      id: 'whole-voice',
+      enabled: false,
+      trackId: track.id,
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant-source' },
+      reference: [
+        { kind: 'keep', rate: 1, sourceStart: 0, sourceEnd: 4, resultStart: 0, resultEnd: 4 },
+      ],
+      take: {
+        id: 'take',
+        assetId: voiceAsset.id,
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 1,
+        volume: 1,
+        muted: false,
+        fadeIn: 0,
+        fadeOut: 0,
+        dormant: true,
+      },
+    },
+  ];
+  const onShowUse = vi.fn();
+  document.body.append(container);
+  await act(async () =>
+    root.render(
+      <VideoEditorMaterials
+        project={project}
+        onImport={onImport}
+        onSelect={onSelect}
+        onRename={onRename}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={onShowUse}
+        selectedAssetId={null}
+      />
+    )
+  );
+  const row = container.querySelector(`[data-material-id="${asset.id}"]`)!;
+  await act(async () =>
+    row
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.show-use"] button')!
+      .click()
+  );
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (option) => option.textContent === translate('gallery.videoReview.audioVoiceover')
+  );
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+  expect(onShowUse).toHaveBeenCalledExactlyOnceWith({
+    assetId: asset.id,
+    kind: 'source-voiceover',
+    documentId: 'whole-voice',
+  });
+  expect(onRemoveUnused).not.toHaveBeenCalled();
+});
+
+it('protects a retained cut source from unused cleanup and exposes its settings destination', async () => {
+  const f = renderMaterials(),
+    onShowUse = vi.fn();
+  f.project.version = 40;
+  f.project.compositionJoins = [
+    {
+      id: 'retained-cut',
+      sampling: 'cut',
+      sourceRange: { assetId: f.asset.id, sourceInstanceId: 'original', start: 0, end: 1 },
+    },
+  ];
+  document.body.append(container);
+  await act(async () =>
+    root.render(
+      <VideoEditorMaterials
+        project={f.project}
+        onImport={f.onImport}
+        onSelect={f.onSelect}
+        onRename={f.onRename}
+        onRemoveUnused={f.onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={onShowUse}
+        selectedAssetId={null}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .disabled
+  ).toBe(true);
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.show-use"] button')!
+      .click()
+  );
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
+    option.textContent?.startsWith(translate('videoEditor.sidebar.compositionJoins'))
+  );
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+  expect(onShowUse).toHaveBeenCalledExactlyOnceWith({
+    assetId: f.asset.id,
+    kind: 'composition-join',
+    joinId: 'retained-cut',
+  });
+  expect(f.onRemoveUnused).not.toHaveBeenCalled();
 });

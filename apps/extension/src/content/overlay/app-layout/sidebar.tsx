@@ -1,6 +1,4 @@
-import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
-import { FileStack } from 'lucide-react';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { translate } from '../../../platform/i18n';
 import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
@@ -10,6 +8,7 @@ import { useScenarioRecorderSidebarPosition } from '../scenario-recorder/sidebar
 import { exitScreenshotModeFromUserAction, finishScenarioRecorder } from './scenario';
 import { useDeferredSidebarHighlight } from './sidebar-highlight';
 import { shouldRenderContentScenarioRecorderSidebar } from './sidebar-visibility';
+import { queryContentUiElement } from '../../platform/dom-host';
 import type {
   ContentAppLayoutScenarioProps,
   ContentAppModeController,
@@ -87,56 +86,24 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
   const capture = useSidebarCapture({ ...args, captureSuspended });
   const finish = useSidebarFinish({ ...args, captureSuspended }, capture.busy);
   const isHidden = !shouldRenderContentScenarioRecorderSidebar(args) || captureSuspended;
-  const focusTarget = useRef<'panel' | 'restore' | null>(null);
-  const restoreButton = useRef<HTMLButtonElement>(null);
-  const restorePress = useCommandPress({
-    onClick: (event) => {
-      if (event.detail === 0) focusTarget.current = 'panel';
-      args.scenario.actions.setSidebarVisible(true);
-    },
-  });
+  const focusRestorePending = useRef(false);
   const sidebarPosition = useScenarioRecorderSidebarPosition(
     !isHidden && args.scenario.state.sidebarVisible
   );
 
   useEffect(() => {
-    if (isHidden || !focusTarget.current) return;
-    const target = args.scenario.state.sidebarVisible
-      ? sidebarPosition.sidebarRef.current?.querySelector<HTMLButtonElement>(
-          '[data-ui="content.scenario.sidebar.project-button"]'
-        )
-      : restoreButton.current;
+    if (isHidden || args.scenario.state.sidebarVisible || !focusRestorePending.current) return;
+    const target = queryContentUiElement<HTMLButtonElement>(
+      '[data-ui="content.scenario.sidebar.restore"]'
+    );
     if (target) {
       target.focus();
-      focusTarget.current = null;
+      focusRestorePending.current = false;
     }
-  }, [args.scenario.state.sidebarVisible, isHidden, sidebarPosition.sidebarRef]);
+  }, [args.scenario.state.sidebarVisible, isHidden]);
 
-  if (isHidden) {
+  if (isHidden || !args.scenario.state.sidebarVisible) {
     return null;
-  }
-
-  if (!args.scenario.state.sidebarVisible) {
-    return (
-      <button
-        {...restorePress.props}
-        type="button"
-        ref={restoreButton}
-        data-command-press=""
-        data-pressing={restorePress.pressed ? 'true' : undefined}
-        className="sniptale-show-toolbar-button sniptale-compact-workspace !size-8 !rounded-[4px]
-          !animate-none !border-[var(--sniptale-color-border-soft)] !bg-[var(--sniptale-color-surface-panel)]
-          !text-[var(--sniptale-color-text-primary)] !shadow-none [&_svg]:!size-4"
-        style={{ right: 'calc(76px * var(--sniptale-content-ui-scale))' }}
-        data-ui="content.scenario.sidebar.restore"
-        aria-label={translate('scenario.content.restorePanel')}
-        title={translate('scenario.content.restorePanel')}
-      >
-        <span className="sniptale-command-content">
-          <FileStack aria-hidden="true" size={16} />
-        </span>
-      </button>
-    );
   }
 
   return (
@@ -144,7 +111,7 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
       onCaptureVisible={capture.captureVisible}
       captureBusy={capture.busy || finish.busy}
       onCollapse={(event) => {
-        if (event.detail === 0) focusTarget.current = 'restore';
+        if (event.detail === 0) focusRestorePending.current = true;
         args.scenario.actions.setSidebarVisible(false);
       }}
       highlightToken={args.scenario.state.recentStepHighlightToken}

@@ -19,6 +19,7 @@ export interface ProductToolbarMenuItemProps {
   dataUi?: string;
   ariaDescribedBy?: string;
   ariaDisabled?: boolean;
+  ariaPressed?: boolean;
   disabled?: boolean;
   selected?: boolean;
   onFocus?: FocusEventHandler<HTMLButtonElement>;
@@ -89,6 +90,7 @@ export function ProductToolbarMenuItem({
   dataUi,
   ariaDescribedBy,
   ariaDisabled = false,
+  ariaPressed,
   disabled = false,
   selected = false,
   onFocus,
@@ -113,6 +115,7 @@ export function ProductToolbarMenuItem({
       data-ui={dataUi}
       aria-describedby={ariaDescribedBy}
       aria-disabled={ariaDisabled || undefined}
+      aria-pressed={ariaPressed}
       disabled={disabled}
       className={resolvedClassName}
       onFocus={onFocus}

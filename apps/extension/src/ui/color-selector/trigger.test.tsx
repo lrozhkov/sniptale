@@ -5,6 +5,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ColorSelectorTrigger } from './trigger';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -44,6 +45,30 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+});
+
+it('uses the shared release activation before replacing a scoped value button with its editor', () => {
+  act(() =>
+    root?.render(
+      <CommandPressScope value>
+        <ColorSelectorTrigger
+          formatMode="hex"
+          label="Grid color"
+          value="#123456"
+          onOpenPicker={() => undefined}
+          onCommit={() => undefined}
+        />
+      </CommandPressScope>
+    )
+  );
+  const value = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.color-selector.value-trigger"]'
+  );
+  expect(value?.hasAttribute('data-command-press')).toBe(true);
+  act(() => value?.click());
+  const input = container?.querySelector('input');
+  expect(input?.value).toBe('#123456');
+  expect(document.activeElement).toBe(input);
 });
 
 afterEach(() => {
@@ -89,6 +114,33 @@ it('commits a normalized value once and restores keyboard focus', async () => {
   await enterValue('#abc', 'Enter');
   expect(onCommit).toHaveBeenCalledExactlyOnceWith('#aabbcc');
   expect(document.activeElement).toBe(getButton('Grid color'));
+});
+
+it('finishes the inline draft before opening the picker when toolbar presses retain focus', async () => {
+  const order: string[] = [];
+  function OwnedColor() {
+    const [color, setColor] = React.useState('#123456');
+    return (
+      <ColorSelectorTrigger
+        formatMode="hex"
+        label="Grid color"
+        value={color}
+        onCommit={(value) => {
+          order.push(value);
+          setColor(value);
+        }}
+        onOpenPicker={() => order.push(`picker:${color}`)}
+      />
+    );
+  }
+  act(() => root?.render(<OwnedColor />));
+  await enterValue('#abcdef', 'Tab');
+  const swatch = getButton('shared.ui.colorSelectorChooseColor')!;
+  await act(async () => {
+    swatch.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    swatch.click();
+  });
+  expect(order).toEqual(['#abcdef', 'picker:#abcdef']);
 });
 
 it('retains invalid input without changing the color and Escape cancels it', async () => {

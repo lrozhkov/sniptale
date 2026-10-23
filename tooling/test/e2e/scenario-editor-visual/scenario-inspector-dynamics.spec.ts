@@ -47,7 +47,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
           return Math.round(track.right - thumb.right);
         })
       )
-      .toBe(3);
+      .toBe(4);
     const numeric = panel.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').first();
     await numeric.hover();
     const slider = numeric.locator('input[type="range"]');
@@ -103,7 +103,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
         .click();
       const choice = panel
-        .locator('.guide-inspector-choice [role="group"] button[aria-pressed="false"]')
+        .locator(
+          '[data-ui="shared.ui.compact-inspector.segmented-row"] button[aria-pressed="false"]'
+        )
         .first();
       const idle = await choice.evaluate((node) => getComputedStyle(node).color);
       await choice.hover();
@@ -115,7 +117,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .click();
       await panel
         .getByRole('navigation')
-        .getByRole('button', { name: ru ? 'Объекты слайда' : 'Slide objects', exact: true })
+        .getByRole('button', { name: ru ? 'Действия' : 'Actions', exact: true })
         .click();
       await panel
         .getByRole('button', { name: ru ? 'Точка действия' : 'Hotspot', exact: true })
@@ -131,7 +133,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       for (const name of [
         ru ? 'Слайд' : 'Slide',
         ru ? 'Камера' : 'Camera',
-        ru ? 'Объекты слайда' : 'Slide objects',
+        ru ? 'Действия' : 'Actions',
         ru ? 'Воспроизведение' : 'Playback',
       ]) {
         const tab = panel.getByRole('navigation').getByRole('button', { name, exact: true });
@@ -150,7 +152,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       expect(Math.max(...bounds) - Math.min(...bounds)).toBeLessThanOrEqual(1);
       await panel
         .getByRole('navigation')
-        .getByRole('button', { name: ru ? 'Объекты слайда' : 'Slide objects', exact: true })
+        .getByRole('button', { name: ru ? 'Действия' : 'Actions', exact: true })
         .click();
       const add = heading.locator('button');
       await expect(add).toHaveCSS('width', '32px');
@@ -185,12 +187,19 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await expect(actions).toHaveCSS('opacity', '1');
       expect(await actions.evaluate((node) => node.contains(document.activeElement))).toBe(true);
       await info.attach(`objects-${locale}-${theme}`, {
-        body: await panel.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`objects-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
       const library = page.locator('#guide-library-panel');
       const tabs = library.locator('.guide-left-navigation');
       const oldLeft = await tabs.evaluate((node) => getComputedStyle(node, '::after').left);
+      const resourceIcon = tabs
+        .getByRole('button', { name: ru ? 'Ресурсы' : 'Resources', exact: true })
+        .locator('svg');
+      const idleIconColor = await resourceIcon.evaluate((node) => getComputedStyle(node).color);
       await tabs.getByRole('button', { name: ru ? 'Ресурсы' : 'Resources', exact: true }).click();
       await expect
         .poll(() => tabs.evaluate((node) => getComputedStyle(node, '::after').left))
@@ -198,15 +207,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       expect(
         await tabs.evaluate((node) => getComputedStyle(node, '::after').transitionDuration)
       ).toBe('0.28s');
-      const active = tabs.locator('[aria-pressed="true"]');
       await expect
-        .poll(() =>
-          active.evaluate(
-            (node) =>
-              getComputedStyle(node.querySelector('svg')!).color === getComputedStyle(node).color
-          )
-        )
-        .toBe(true);
+        .poll(() => resourceIcon.evaluate((node) => getComputedStyle(node).color))
+        .not.toBe(idleIconColor);
       await expect(library.locator('.guide-resource-footer')).toHaveCount(0);
       const images = library.locator('.guide-image-resources');
       const previewButton = images
@@ -255,6 +258,11 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       });
       await expect(library.locator('.tour-audio-resource')).toHaveCount(1);
       await expect(library.locator('.tour-audio-acquisition [aria-expanded]')).toHaveCount(1);
+      await panel
+        .getByRole('navigation')
+        .getByRole('button', { name: ru ? 'Действия' : 'Actions', exact: true })
+        .click();
+      await panel.locator('[data-inspector-object]').first().click();
       await library.locator('.tour-audio-resource').hover();
       await library
         .getByRole('button', {
@@ -268,7 +276,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await library.locator('.tour-audio-resource .tour-audio-name').click();
       await expect(library.locator('[data-tour-narration-preview]')).toBeVisible();
       await info.attach(`resources-full-${locale}-${theme}`, {
-        body: await library.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`resources-full-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
       const resize = page.locator('.guide-panel-divider-left');
@@ -286,7 +297,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         )
       ).toEqual([]);
       await info.attach(`resources-${locale}-${theme}`, {
-        body: await library.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`resources-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
       await page.getByRole('button', { name: ru ? 'Руководство' : 'Guide', exact: true }).click();
@@ -306,7 +320,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await page.keyboard.press('Escape');
       await expect(guidePreview).toBeFocused();
       await info.attach(`guide-resources-${locale}-${theme}`, {
-        body: await library.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`guide-resources-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
     });
@@ -329,4 +346,117 @@ function silentAudio(): Buffer {
   wav.write('data', 36);
   wav.writeUInt32LE(dataSize, 40);
   return wav;
+}
+
+for (const [locale, size] of [
+  ['ru', { width: 1280, height: 560 }],
+  ['en', { width: 1920, height: 900 }],
+] as const) {
+  test(`tour inspector keeps navigation and field accessories stable ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const ru = locale === 'ru';
+    await openVisualHarness(page, hostOrigin, ru ? 'light' : 'dark', locale, size, 'compare', {
+      tourFixture: '1',
+    });
+    await page
+      .getByRole('button', { name: ru ? 'Интерактивный тур' : 'Interactive tour', exact: true })
+      .click();
+    const panel = page.locator('#guide-inspector-panel');
+    const category = (name: string) =>
+      panel.getByRole('navigation').getByRole('button', { name, exact: true });
+    await category(ru ? 'Действия' : 'Actions').click();
+    await panel
+      .getByRole('button', { name: ru ? 'Точка действия' : 'Hotspot', exact: true })
+      .click();
+    const back = panel.getByRole('button', {
+      name: ru ? 'К настройкам слайда' : 'Back to slide settings',
+      exact: true,
+    });
+    await expect(
+      panel.locator(':scope > .guide-panel-heading').getByRole('button', {
+        name: ru ? 'К настройкам слайда' : 'Back to slide settings',
+        exact: true,
+      })
+    ).toBeVisible();
+    await category(ru ? 'Текст' : 'Text').click();
+    const field = panel.getByRole('textbox', { name: ru ? 'Текст' : 'Text', exact: true });
+    await field.fill('A useful explanation');
+    await field.blur();
+    await field.hover();
+    const wrapper = field.locator('..');
+    const clear = wrapper.locator('.sniptale-field-clear');
+    const microphone = wrapper.locator('[data-ui="scenario.voice-input"]');
+    await expect(clear).toBeVisible();
+    await expect(microphone).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath('text-field-hover.png'),
+      animations: 'disabled',
+      fullPage: false,
+    });
+    const hoverBackground = await field.evaluate((node) => getComputedStyle(node).backgroundColor);
+    await clear.hover();
+    await expect(clear).toHaveCSS('opacity', '1');
+    await expect(microphone).toHaveCSS('opacity', '1');
+    await expect(field).toHaveCSS('background-color', hoverBackground);
+    const clearBox = await clear.boundingBox();
+    const microphoneBox = await microphone.boundingBox();
+    expect(Math.abs(clearBox!.y - microphoneBox!.y)).toBeLessThanOrEqual(1);
+    await clear.click();
+    await expect(field).toHaveValue('');
+    await expect(field).toBeFocused();
+    await category(ru ? 'Оформление' : 'Appearance').click();
+    await panel
+      .getByRole('button', { name: ru ? 'Вид акцента' : 'Focus style', exact: true })
+      .click();
+    await page.getByRole('option', { name: ru ? 'Подсветка' : 'Highlight', exact: true }).click();
+    const x = panel.getByRole('textbox', { name: 'X', exact: true });
+    await expect(x).toHaveCount(1);
+    const region = page.locator('.tour-stage-host .tour-mask[data-tour-object-id]');
+    const before = await region.getAttribute('style');
+    await x.fill('20');
+    await x.press('Enter');
+    await expect(region).not.toHaveAttribute('style', before!);
+    const after = await region.getAttribute('style');
+    await page.getByRole('button', { name: ru ? 'Отменить' : 'Undo', exact: true }).click();
+    await expect(region).toHaveAttribute('style', before!);
+    await page.getByRole('button', { name: ru ? 'Повторить' : 'Redo', exact: true }).click();
+    await expect(region).toHaveAttribute('style', after!);
+    const rail = panel.getByRole('navigation');
+    const topBefore = (await rail.boundingBox())!.y;
+    await panel.locator('.guide-panel-scroll').evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+    });
+    if (size.height === 560)
+      expect(
+        await panel.locator('.guide-panel-scroll').evaluate((node) => node.scrollTop)
+      ).toBeGreaterThan(0);
+    expect(Math.abs((await rail.boundingBox())!.y - topBefore)).toBeLessThanOrEqual(1);
+    await expect(back).toBeInViewport();
+    await page.screenshot({
+      path: info.outputPath('fixed-inspector-navigation.png'),
+      fullPage: false,
+    });
+    await back.click();
+    await expect(panel.locator('[data-inspector-object]:focus')).toHaveCount(1);
+    await page
+      .locator('.guide-page-header')
+      .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
+      .click();
+    await category(ru ? 'Воспроизведение' : 'Playback').click();
+    const minimumLabel = ru ? 'Минимум' : 'Minimum';
+    const minimum = panel.getByRole('textbox', { name: minimumLabel, exact: true });
+    await minimum.fill('120.3');
+    await minimum.press('Enter');
+    await expect(minimum).toHaveValue('120.3');
+    await minimum.press('Tab');
+    await panel.locator('.sniptale-parameter-name').filter({ hasText: minimumLabel }).hover();
+    const range = panel.getByRole('slider', { name: `${minimumLabel} range`, exact: true });
+    await expect(range).toHaveAttribute('max', '10');
+    await range.focus();
+    await expect(minimum).toHaveValue('120.3');
+    await range.press('Tab');
+    await expect(minimum).toHaveValue('120.3');
+  });
 }

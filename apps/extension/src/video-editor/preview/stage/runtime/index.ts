@@ -1,4 +1,7 @@
-import { resolveCameraVisualClip } from '../../../../features/video/project/camera/animation';
+import {
+  hasCameraMediaAt,
+  resolveCameraVisualClip,
+} from '../../../../features/video/project/camera/animation';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -72,6 +75,10 @@ function syncPreviewVideoElement(params: {
   const nextTime = getVideoClipSourceTime(clip, currentTime);
   const playbackRate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
 
+  if (clip.cameraTiming && (nextTime < 0 || nextTime >= video.duration)) {
+    video.pause();
+    return;
+  }
   mutePreviewVideo(video);
   video.playbackRate = playbackRate;
   if (
@@ -109,7 +116,11 @@ export function useActivePreviewClips(project: VideoProject, currentTime: number
 
       const clips = getTrackClips(project, track.id);
       for (const clip of clips) {
-        if (isVisualClip(clip) && isClipActiveAtTime(clip, currentTime)) {
+        if (
+          isVisualClip(clip) &&
+          isClipActiveAtTime(clip, currentTime) &&
+          hasCameraMediaAt(project, clip, currentTime)
+        ) {
           result.push(resolveCameraVisualClip(project, clip, currentTime));
         }
       }
@@ -173,7 +184,11 @@ export function usePreviewStageVideoBankClips(
       }
 
       for (const clip of getTrackClips(project, track.id)) {
-        if (!isVideoClip(clip) || bankedClipIds.has(clip.id)) {
+        if (
+          !isVideoClip(clip) ||
+          bankedClipIds.has(clip.id) ||
+          !hasCameraMediaAt(project, clip, currentTime)
+        ) {
           continue;
         }
 

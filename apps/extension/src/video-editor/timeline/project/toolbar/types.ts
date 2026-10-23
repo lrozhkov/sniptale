@@ -11,6 +11,7 @@ export interface ProjectTimelineToolbarProps {
   hasHistory?: boolean;
   playback: ComponentProps<typeof ProjectTimelinePlaybackSummary>;
   canAddMotionRegion: boolean;
+  canDuplicateSelection: boolean;
   canDeleteSelectedClip: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;

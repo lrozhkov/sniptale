@@ -123,3 +123,21 @@ it('cancels a pending read and rejects late decode after disposal', async () => 
   release();
   await expect(decoded).rejects.toThrow();
 });
+
+it('calls browser fetch without injecting a method receiver', async () => {
+  const f = fixture();
+  f.fetchResource.mockImplementationOnce(async function (this: unknown) {
+    if (this !== undefined) throw new TypeError('Illegal invocation');
+    return new Response(f.bytes);
+  });
+  try {
+    await expect(f.source.read('key-01-v1')).resolves.toMatchObject({
+      sampleRate: 44100,
+      length: 5689,
+      numberOfChannels: 1,
+    });
+    expect(f.decode).toHaveBeenCalledOnce();
+  } finally {
+    f.source.dispose();
+  }
+});

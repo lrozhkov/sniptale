@@ -1,3 +1,4 @@
+import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../types/export';
 import { isSubtitleClip } from '../timeline/presentation';
 import {
   VideoProjectClipType,
@@ -7,10 +8,15 @@ import {
   type VideoProjectExportSettings,
 } from '../types';
 
+/** Disposable geometry context is never a saved project or a source of painted/audio clips. */
+export interface VideoProjectRenderScope extends VideoProject {
+  readonly [VIDEO_PROJECT_ATTACHMENT_GEOMETRY]?: VideoProject;
+}
+
 export function resolveProjectRenderScope(
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   settings: VideoProjectExportSettings
-): VideoProject {
+): VideoProjectRenderScope {
   const selectedClipIds =
     settings.scope === VideoExportScope.SELECTED_CLIP ? (settings.selectedClipIds ?? []) : [];
   if (settings.scope !== VideoExportScope.SELECTED_CLIP) {
@@ -25,9 +31,26 @@ export function resolveProjectRenderScope(
   }
   const scope = resolveSelectedClipClosure(project, settings, selectedClipIds);
   if (isCompleteRenderScope(project, scope)) return project;
+  const { [VIDEO_PROJECT_ATTACHMENT_GEOMETRY]: attachmentGeometryProject, ...renderProject } =
+    project;
+  const geometryProject = attachmentGeometryProject ?? project;
+  const selected = new Set(scope.clips.map((clip) => clip.id));
+  const needsSourceGeometry = scope.clips.some((host) => {
+    if (host.type !== 'EFFECT' || host.attachment?.kind !== 'source') return false;
+    const binding = host.attachment;
+    return geometryProject.clips.some(
+      (source) =>
+        source.type === 'VIDEO' &&
+        source.assetId === binding.assetId &&
+        (source.sourceInstanceId ?? source.id) === binding.sourceInstanceId &&
+        !selected.has(source.id)
+    );
+  });
   return {
-    ...project,
+    ...renderProject,
+    ...(needsSourceGeometry ? { [VIDEO_PROJECT_ATTACHMENT_GEOMETRY]: geometryProject } : {}),
     clips: scope.clips,
+    ...(project.compositionJoins ? { compositionJoins: [] } : {}),
     ...(project.transitions ? { transitions: scope.transitions } : {}),
     ...(project.effectInstances ? { effectInstances: scope.effectInstances } : {}),
     ...(project.effectSnapshots ? { effectSnapshots: scope.effectSnapshots } : {}),

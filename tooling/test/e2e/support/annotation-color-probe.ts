@@ -5,15 +5,13 @@ import {
 } from '@sniptale/runtime-contracts/effect-v1';
 import { createReviewAnnotationRenderer } from '../../../../apps/extension/src/workflows/video-review/annotation-renderer';
 import { createPreviewRenderResources } from '../../../../apps/extension/src/workflows/video-review/preview-render-resources';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/workflows/video-review/spatial-renderer';
+import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import { drawReviewSceneOverlays } from '../../../../apps/extension/src/workflows/video-review/render-scene-overlays';
 import { computeQuickEditSceneLayout } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
-import {
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-  quickEditSpatialTargetCamera,
-} from '../../../../apps/extension/src/features/video/review/advanced/spatial';
+import { quickEditSpatialTargetCamera } from '../../../../apps/extension/src/features/video/review/advanced/spatial';
+import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../../../apps/extension/src/features/video/project/motion/spatial';
 import type {
   ReviewAnnotationEffectSnapshot,
   ReviewAnnotationEffect,

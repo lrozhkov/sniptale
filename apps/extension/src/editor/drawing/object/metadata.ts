@@ -1,4 +1,14 @@
-import { ActiveSelection, type FabricObject, type Textbox } from 'fabric';
+import {
+  ActiveSelection,
+  Path,
+  Point,
+  util,
+  type FabricObject,
+  type ObjectEvents,
+  type PathProps,
+  type SerializedPathProps,
+  type Textbox,
+} from 'fabric';
 import {
   getDrawingObjectBounds,
   type DrawingBounds,
@@ -61,6 +71,13 @@ export function translateEditorDrawingObject(
       end: translatePoint(drawing.end, translation.x, translation.y),
       id,
       start: translatePoint(drawing.start, translation.x, translation.y),
+      ...(drawing.bendPoints
+        ? {
+            bendPoints: drawing.bendPoints.map((point) =>
+              translatePoint(point, translation.x, translation.y)
+            ),
+          }
+        : {}),
     };
   }
   return {
@@ -102,6 +119,36 @@ function scalePointToBounds(
   };
 }
 
+function normalizeSynchronizedArrowGeometry<
+  Props extends Partial<PathProps>,
+  SerializedProps extends SerializedPathProps,
+  Events extends ObjectEvents,
+>(target: Path<Props, SerializedProps, Events>): void {
+  const transform = target.calcTransformMatrix();
+  const scale = Math.sqrt(Math.abs(transform[0] * transform[3] - transform[1] * transform[2]));
+  const geometry = new Path(util.transformPath(target.path, transform, target.pathOffset), {
+    originX: 'left',
+    originY: 'top',
+    strokeWidth: target.strokeWidth * scale,
+  });
+  const placement = target.group
+    ? util.multiplyTransformMatrices(
+        util.invertTransform(target.group.calcTransformMatrix()),
+        geometry.calcOwnMatrix()
+      )
+    : geometry.calcOwnMatrix();
+  target.set({
+    height: geometry.height,
+    originX: geometry.originX,
+    originY: geometry.originY,
+    path: geometry.path,
+    pathOffset: geometry.pathOffset,
+    strokeWidth: geometry.strokeWidth,
+    width: geometry.width,
+  });
+  util.applyTransformToObject(target, placement);
+}
+
 export function synchronizeEditorDrawingObjectFromFabric(
   target: FabricObject
 ): DrawingObject | null {
@@ -125,13 +172,17 @@ export function synchronizeEditorDrawingObjectFromFabric(
       width: drawing.width * scale,
     };
   } else if (drawing.kind === 'arrow') {
-    const scale = Math.sqrt(
-      (bounds.width / Math.max(1, previous.width)) * (bounds.height / Math.max(1, previous.height))
-    );
+    const transform = target.calcTransformMatrix();
+    const scale = Math.sqrt(Math.abs(transform[0] * transform[3] - transform[1] * transform[2]));
+    const transformEndpoint = (point: DrawingPoint): DrawingPoint =>
+      target instanceof Path
+        ? util.transformPoint(new Point(point.x, point.y).subtract(target.pathOffset), transform)
+        : scalePointToBounds(point, previous, bounds);
     next = {
       ...drawing,
-      end: scalePointToBounds(drawing.end, previous, bounds),
-      start: scalePointToBounds(drawing.start, previous, bounds),
+      end: transformEndpoint(drawing.end),
+      start: transformEndpoint(drawing.start),
+      ...(drawing.bendPoints ? { bendPoints: drawing.bendPoints.map(transformEndpoint) } : {}),
       width: drawing.width * scale,
     };
   } else if (
@@ -150,6 +201,7 @@ export function synchronizeEditorDrawingObjectFromFabric(
   } else {
     next = { ...drawing, bounds, ...rotation };
   }
+  if (next.kind === 'arrow' && target instanceof Path) normalizeSynchronizedArrowGeometry(target);
   writeEditorDrawingObject(target, next);
   return next;
 }

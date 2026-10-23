@@ -2,15 +2,7 @@ import { appendToContentOverlayRoot, getContentUiElementById } from '../../platf
 import { isPageElementPickerActive, isSelectionDelegatedMode } from './routing';
 import { NAVIGATION_LOCK_OVERLAY_ID } from './constants';
 import { resolveShieldedPageElement } from '../page-element-target';
-
-const NAVIGATION_LOCK_OVERLAY_Z_INDEX = '2147483644';
-const NAVIGATION_LOCK_CURSOR = [
-  `url("data:image/svg+xml,`,
-  `%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E`,
-  `%3Cpath fill='%23ef4444' d='M5.5 3.21V20.8c0 .45.54.67.85.35`,
-  `l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.48 0 .72-.58.38-.92L6.35 2.85a.5.5 0 0 0-.85.36Z'/%3E`,
-  `%3C/svg%3E") 4 4, auto`,
-].join('');
+import { FRAME_ANNOTATION_Z_INDEX } from '../../../features/highlighter/frame-annotation/interaction/z-index';
 
 function blockOverlayPointerEvent(event: Event): void {
   event.preventDefault();
@@ -148,11 +140,11 @@ function createNavigationLockOverlay(): HTMLDivElement {
     position: fixed;
     inset: 0;
     background: transparent;
-    z-index: ${NAVIGATION_LOCK_OVERLAY_Z_INDEX};
+    z-index: ${FRAME_ANNOTATION_Z_INDEX.blockingOverlay};
     display: none;
     pointer-events: auto;
     touch-action: none;
-    cursor: ${NAVIGATION_LOCK_CURSOR};
+    cursor: default;
   `;
 
   attachOverlayEventListeners(overlay);
@@ -193,7 +185,7 @@ export function syncNavigationLockOverlay(enabled: boolean): void {
   }
 
   overlay.style.cursor =
-    isSelectionDelegatedMode() || isPageElementPickerActive() ? 'inherit' : NAVIGATION_LOCK_CURSOR;
+    isSelectionDelegatedMode() || isPageElementPickerActive() ? 'inherit' : 'default';
   overlay.style.display = enabled ? 'block' : 'none';
 }
 

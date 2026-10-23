@@ -4,9 +4,13 @@ import { translate } from '../../../../../platform/i18n/popup';
 import type {
   WebcamActualSettings,
   WebcamPresentationMode,
-  WebcamPresentationShape,
+  WebcamPresentationSettings,
   WebcamQualitySettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  webcamFrameStyle,
+  webcamVideoStyle,
+} from '../../../../../features/video/recording/webcam-presentation';
 import {
   WebcamPresentationMode as PresentationMode,
   WebcamPresentationShape as PresentationShape,
@@ -135,7 +139,8 @@ export function useWebcamPreview({
 type WebcamPreviewPresentation = {
   cropOffset: { x: number; y: number };
   mode: WebcamPresentationMode;
-  shape: WebcamPresentationShape;
+  shape: WebcamPresentationSettings['shape'];
+  appearance?: NonNullable<WebcamPresentationSettings['appearance']>;
 };
 
 export function WebcamPreview({
@@ -147,18 +152,19 @@ export function WebcamPreview({
 }) {
   const embedded = presentation?.mode === PresentationMode.EMBEDDED;
   const previewClassName = embedded
-    ? presentation.shape === PresentationShape.CIRCLE
-      ? 'h-[132px] w-[132px] overflow-hidden rounded-full'
+    ? presentation.shape === PresentationShape.CIRCLE ||
+      presentation.shape === PresentationShape.SQUARE
+      ? 'h-[132px] w-[132px] overflow-hidden'
       : 'aspect-video w-full overflow-hidden rounded-[10px]'
     : 'h-full w-full overflow-hidden rounded-[10px]';
-  const videoStyle = presentation
-    ? {
-        objectPosition: `${50 + presentation.cropOffset.x * 50}% ${50 + presentation.cropOffset.y * 50}%`,
-      }
-    : undefined;
+  const videoStyle = presentation && embedded ? webcamVideoStyle(presentation) : undefined;
   return (
     <div className={`${PREVIEW_BOX_CLASS_NAME} flex items-center justify-center`}>
-      <div className={previewClassName} data-ui="popup.video.webcam-preview-mask">
+      <div
+        className={previewClassName}
+        data-ui="popup.video.webcam-preview-mask"
+        style={embedded ? webcamFrameStyle(presentation) : undefined}
+      >
         {state.status === 'ready' ? (
           <MediaStreamVideo
             className="h-full w-full object-cover"

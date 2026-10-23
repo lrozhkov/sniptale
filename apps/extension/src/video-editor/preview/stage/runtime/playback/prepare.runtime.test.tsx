@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
+import type { VideoEditorPreviewPrepareRequest } from '../../../../contracts/preview-runtime';
 import type { PlaybackPreviewRuntime } from '../../../../interaction/playback/types';
 import { createVideoPreviewExactFrameCache } from '../../../../preview/cache/exact-frame-cache';
 
@@ -37,12 +38,15 @@ function Harness({
   mode,
   playbackRange = null,
   projectOverride = project,
+  prepareSourceVoiceover,
 }: {
   mode: 'cache' | 'live';
+  prepareSourceVoiceover?: (request: VideoEditorPreviewPrepareRequest) => Promise<void>;
   playbackRange?: { end: number; start: number } | null;
   projectOverride?: typeof project;
 }) {
   usePreviewStagePlaybackPreviewRuntime({
+    ...(prepareSourceVoiceover ? { prepareSourceVoiceover } : {}),
     assetUrls: {},
     audioBankClips: [],
     audioRefs: { current: {} },
@@ -266,3 +270,122 @@ it('reuses a completed cache for subsequent seeks until configuration changes', 
   });
   expect(mocks.prepareCache).toHaveBeenCalledTimes(2);
 });
+
+it('waits for voice preparation before declaring the Native playback request ready', async () => {
+  let resolve!: () => void;
+  const prepareSourceVoiceover = vi.fn(
+    () =>
+      new Promise<void>((done) => {
+        resolve = done;
+      })
+  );
+  await act(async () =>
+    root.render(<Harness mode="live" prepareSourceVoiceover={prepareSourceVoiceover} />)
+  );
+  const request: VideoEditorPreviewPrepareRequest = {
+    generation: 1,
+    isPlaying: true,
+    playbackRange: null,
+    reason: 'play',
+    signal: new AbortController().signal,
+    time: 0,
+  };
+  let complete = false;
+  const pending = runtime!.prepare(request).then((outcome) => {
+    complete = true;
+    return outcome;
+  });
+  await act(async () => Promise.resolve());
+  expect(prepareSourceVoiceover).toHaveBeenCalledWith(
+    expect.objectContaining({ time: 0, isPlaying: true, signal: expect.any(AbortSignal) })
+  );
+  expect(complete).toBe(false);
+  await act(async () => {
+    resolve();
+    await pending;
+  });
+  expect(await pending).toBe('live-ready');
+  prepareSourceVoiceover.mockClear();
+  await act(async () => {
+    await runtime!.prepare({ ...request, generation: 2, isPlaying: false, reason: 'seek' });
+  });
+  expect(prepareSourceVoiceover).not.toHaveBeenCalled();
+});
+
+it('cancels pending voice preparation through the existing runtime cancellation owner', async () => {
+  let signal!: AbortSignal;
+  const prepareSourceVoiceover = vi.fn((request: VideoEditorPreviewPrepareRequest) => {
+    signal = request.signal;
+    return new Promise<void>((_resolve, reject) =>
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    );
+  });
+  await act(async () =>
+    root.render(<Harness mode="live" prepareSourceVoiceover={prepareSourceVoiceover} />)
+  );
+  const pending = runtime!.prepare({
+    generation: 1,
+    isPlaying: true,
+    playbackRange: null,
+    reason: 'play',
+    signal: new AbortController().signal,
+    time: 0,
+  });
+  await act(async () => Promise.resolve());
+  runtime!.cancel(1);
+  expect(signal.aborted).toBe(true);
+  expect(await pending).toBe('cancelled');
+});
+
+it('rejects current voice preparation failure instead of starting silent playback', async () => {
+  const prepareSourceVoiceover = vi.fn(async () => {
+    throw new Error('Voice unavailable');
+  });
+  await act(async () =>
+    root.render(<Harness mode="live" prepareSourceVoiceover={prepareSourceVoiceover} />)
+  );
+  await expect(
+    runtime!.prepare({
+      generation: 1,
+      isPlaying: true,
+      playbackRange: null,
+      reason: 'play',
+      signal: new AbortController().signal,
+      time: 0,
+    })
+  ).rejects.toThrow('Voice unavailable');
+});
+
+it.each(['resolve', 'reject'] as const)(
+  'retries the current voice preparation when an older callback finishes by %s',
+  async (finish) => {
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    const old = vi.fn(
+      () =>
+        new Promise<void>((yes, no) => {
+          resolve = yes;
+          reject = no;
+        })
+    );
+    const current = vi.fn(async () => undefined);
+    await act(async () => root.render(<Harness mode="live" prepareSourceVoiceover={old} />));
+    const pending = runtime!.prepare({
+      generation: 1,
+      isPlaying: true,
+      playbackRange: null,
+      reason: 'play',
+      signal: new AbortController().signal,
+      time: 0,
+    });
+    await act(async () => Promise.resolve());
+    await act(async () => root.render(<Harness mode="live" prepareSourceVoiceover={current} />));
+    await act(async () => {
+      if (finish === 'resolve') resolve();
+      else reject(new Error('Old voice failed'));
+      await pending;
+    });
+    expect(current).toHaveBeenCalledOnce();
+    expect(await pending).toBe('live-ready');
+  }
+);

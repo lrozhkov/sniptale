@@ -3,6 +3,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import type {
   VideoEditorPreviewMode,
+  VideoEditorPreviewPrepareRequest,
   VideoEditorPreviewPrepareOutcome,
   VideoEditorPreviewStatus,
 } from '../../../../contracts/preview-runtime';
@@ -15,6 +16,7 @@ import type { PreviewStagePlaybackPrepareState } from './prime';
 
 export interface UsePreviewStagePlaybackPreviewRuntimeParams extends PreviewStagePlaybackPrepareState {
   assetUrls: Record<string, string>;
+  prepareSourceVoiceover?: (request: VideoEditorPreviewPrepareRequest) => Promise<void>;
   renderGenerationRef: MutableRefObject<number>;
   previewExactFrameCache: VideoPreviewExactFrameCache;
   previewMode: VideoEditorPreviewMode;

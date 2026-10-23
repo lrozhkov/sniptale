@@ -1,5 +1,16 @@
 import React from 'react';
-import { Eye, EyeOff, ListOrdered, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import {
+  ChevronDown,
+  Eye,
+  EyeOff,
+  ListOrdered,
+  Minus,
+  Scaling,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { AddFrameCommentIcon, FrameCommentIcon } from './icons';
 import {
   ProductGlassToolbar,
@@ -9,6 +20,15 @@ import {
 import type { EffectMode } from '@sniptale/ui/highlighter-style/types';
 import { getFrameAnnotationCommandSchema, type FrameAnnotationCommandId } from './commands';
 import { FrameAnnotationEffectIcon } from './effect-icon';
+import { translate } from '../../../platform/i18n';
+
+function effectControlMarker(
+  content: boolean | undefined,
+  marker: string | undefined
+): { dataUi?: string; 'data-ui'?: string } {
+  if (!marker) return {};
+  return content ? { dataUi: marker } : { 'data-ui': marker };
+}
 
 function commandLabels() {
   return new Map(getFrameAnnotationCommandSchema().map((item) => [item.id, item.label]));
@@ -20,72 +40,147 @@ export function FrameAnnotationToolbarEffectButton(props: {
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
   onClick: (event: React.MouseEvent) => void;
   onMouseDown: (event: React.MouseEvent) => void;
+  onSelect: (mode: EffectMode, event: React.MouseEvent) => void;
+  active?: boolean;
+  contentContext?: boolean;
+  disabled?: boolean;
+  dataUi?: string;
+  menuOpen?: boolean;
+  menuSide?: string | undefined;
 }) {
+  const Button = props.contentContext ? ContentToolbarButton : ProductGlassToolbarButton;
+  const labels = commandLabels();
   return (
-    <ProductGlassToolbarButton
-      active
-      data-sniptale-activation-bridge="defer"
-      ref={props.anchorRef}
-      onClick={props.onClick}
-      onMouseDown={props.onMouseDown}
-      menuIndicator
-      title={props.label ?? commandLabels().get(`effect-${props.effectMode}`)}
+    <div
+      className="sniptale-annotation-effect-switch"
+      role="group"
+      aria-label={props.label ?? labels.get(`effect-${props.effectMode}`)}
     >
-      <FrameAnnotationEffectIcon mode={props.effectMode} size={18} />
-    </ProductGlassToolbarButton>
+      <div className="sniptale-annotation-effect-options">
+        {(['border', 'blur', 'focus'] as const).map((mode) => (
+          <Button
+            key={mode}
+            active={props.active !== false && props.effectMode === mode}
+            aria-pressed={props.active !== false && props.effectMode === mode}
+            aria-label={labels.get(`effect-${mode}`)}
+            title={labels.get(`effect-${mode}`)}
+            disabled={props.disabled}
+            data-frame-effect={mode}
+            {...effectControlMarker(
+              props.contentContext,
+              props.effectMode === mode ? props.dataUi : undefined
+            )}
+            data-sniptale-activation-bridge="defer"
+            onClick={(event) => props.onSelect(mode, event)}
+            onMouseDown={props.onMouseDown}
+          >
+            <FrameAnnotationEffectIcon mode={mode} size={16} />
+          </Button>
+        ))}
+      </div>
+      <Button
+        ref={props.anchorRef}
+        className="sniptale-annotation-properties-arrow sniptale-full-page-chevron"
+        aria-expanded={props.menuOpen}
+        aria-haspopup="dialog"
+        aria-label={translate('content.interactiveFrame.frameSettings')}
+        title={translate('content.interactiveFrame.frameSettings')}
+        disabled={props.disabled}
+        {...effectControlMarker(
+          props.contentContext,
+          props.dataUi ? `${props.dataUi}.menu` : undefined
+        )}
+        data-menu-side={props.menuSide}
+        data-sniptale-activation-bridge="defer"
+        onClick={props.onClick}
+        onMouseDown={props.onMouseDown}
+      >
+        <ChevronDown size={12} />
+      </Button>
+    </div>
   );
 }
 
 type FrameAnnotationToolbarMenuButtonProps = {
   active: boolean;
-  title?: string;
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
   children: React.ReactNode;
   commandId: FrameAnnotationCommandId;
   onClick: (event: React.MouseEvent) => void;
   onMouseDown: (event: React.MouseEvent) => void;
+  onToggle: (event: React.MouseEvent) => void;
 };
 
 function FrameAnnotationToolbarMenuButton(props: FrameAnnotationToolbarMenuButtonProps) {
   return (
-    <ProductGlassToolbarButton
-      active={props.active}
-      data-sniptale-activation-bridge="defer"
-      ref={props.anchorRef}
-      onClick={props.onClick}
-      onMouseDown={props.onMouseDown}
-      menuIndicator
-      title={props.title ?? commandLabels().get(props.commandId)}
-    >
-      {props.children}
-    </ProductGlassToolbarButton>
+    <div className="sniptale-annotation-menu-control">
+      <ProductGlassToolbarButton
+        active={props.active}
+        data-sniptale-activation-bridge="defer"
+        onClick={props.onToggle}
+        onMouseDown={props.onMouseDown}
+        aria-pressed={props.active}
+        title={translate(
+          props.commandId === 'callout'
+            ? 'content.callout.settingsTitle'
+            : 'content.stepBadge.settingsTitle'
+        )}
+        aria-label={translate(
+          props.commandId === 'callout'
+            ? 'content.callout.settingsTitle'
+            : 'content.stepBadge.settingsTitle'
+        )}
+      >
+        {props.children}
+      </ProductGlassToolbarButton>
+      <ProductGlassToolbarButton
+        className="sniptale-annotation-properties-arrow sniptale-full-page-chevron"
+        ref={props.anchorRef}
+        title={translate(
+          props.commandId === 'callout'
+            ? 'content.interactiveFrame.calloutSettings'
+            : 'content.interactiveFrame.stepBadgeSettings'
+        )}
+        aria-label={translate(
+          props.commandId === 'callout'
+            ? 'content.interactiveFrame.calloutSettings'
+            : 'content.interactiveFrame.stepBadgeSettings'
+        )}
+        aria-haspopup="dialog"
+        onClick={props.onClick}
+        onMouseDown={props.onMouseDown}
+        data-sniptale-activation-bridge="defer"
+      >
+        <ChevronDown size={12} />
+      </ProductGlassToolbarButton>
+    </div>
   );
 }
 
 export function FrameAnnotationToolbarStepButton(props: {
   active: boolean;
-  title?: string;
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
   onClick: (event: React.MouseEvent) => void;
   onMouseDown: (event: React.MouseEvent) => void;
+  onToggle: (event: React.MouseEvent) => void;
 }) {
   return (
     <FrameAnnotationToolbarMenuButton {...props} commandId="step-badge">
-      <ListOrdered size={17} />
+      <ListOrdered size={16} />
     </FrameAnnotationToolbarMenuButton>
   );
 }
 
 export function FrameAnnotationToolbarCalloutButton(props: {
   active: boolean;
-  title?: string;
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
   onClick: (event: React.MouseEvent) => void;
   onMouseDown: (event: React.MouseEvent) => void;
+  onToggle: (event: React.MouseEvent) => void;
 }) {
   return (
     <FrameAnnotationToolbarMenuButton {...props} commandId="callout">
-      <FrameCommentIcon size={17} />
+      <FrameCommentIcon size={16} />
     </FrameAnnotationToolbarMenuButton>
   );
 }
@@ -105,7 +200,7 @@ export function FrameAnnotationToolbarAddCalloutButton(props: {
       onMouseDown={props.onMouseDown}
       title={props.title}
     >
-      <AddFrameCommentIcon size={17} />
+      <AddFrameCommentIcon size={16} />
     </ProductGlassToolbarButton>
   );
 }
@@ -134,7 +229,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         title={labels.get('decrease')}
         aria-label={labels.get('decrease')}
       >
-        <Minus size={18} />
+        <Minus size={16} />
       </ProductGlassToolbarButton>
       <ProductGlassToolbarButton
         onClick={props.onIncrease}
@@ -142,7 +237,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         title={labels.get('increase')}
         aria-label={labels.get('increase')}
       >
-        <Plus size={18} />
+        <Plus size={16} />
       </ProductGlassToolbarButton>
       {props.showEdit !== false ? (
         <ProductGlassToolbarButton
@@ -150,7 +245,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
           onMouseDown={props.onMouseDown}
           title={labels.get('edit')}
         >
-          <Pencil size={18} />
+          <Scaling size={16} />
         </ProductGlassToolbarButton>
       ) : null}
       {props.onCaptureVisibilityChange ? (
@@ -164,7 +259,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
             onMouseDown={props.onMouseDown}
             title={props.captureVisibilityTitle}
           >
-            {props.captureHidden ? <EyeOff size={18} /> : <Eye size={18} />}
+            {props.captureHidden ? <EyeOff size={16} /> : <Eye size={16} />}
           </ProductGlassToolbarButton>
         </>
       ) : null}
@@ -175,7 +270,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         onMouseDown={props.onMouseDown}
         title={labels.get('delete')}
       >
-        <Trash2 size={18} />
+        <Trash2 size={16} />
       </ProductGlassToolbarButton>
       <ProductGlassToolbarButton
         className={'sniptale-dismiss-button'}
@@ -184,7 +279,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         title={labels.get('close')}
         aria-label={labels.get('close')}
       >
-        <X size={18} />
+        <X size={16} />
       </ProductGlassToolbarButton>
     </>
   );
@@ -225,6 +320,9 @@ export function FrameAnnotationFloatingToolbar(props: {
         <FrameAnnotationToolbarEffectButton
           anchorRef={effectAnchorRef}
           effectMode={props.effectMode}
+          onSelect={(mode, event) => {
+            if (mode !== props.effectMode) command(`effect-${mode}`)(event);
+          }}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -241,6 +339,7 @@ export function FrameAnnotationFloatingToolbar(props: {
         <FrameAnnotationToolbarStepButton
           anchorRef={stepAnchorRef}
           active={props.stepBadgeEnabled === true}
+          onToggle={command('step-badge')}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -254,6 +353,7 @@ export function FrameAnnotationFloatingToolbar(props: {
         <FrameAnnotationToolbarCalloutButton
           anchorRef={calloutAnchorRef}
           active={props.calloutEnabled === true}
+          onToggle={command('callout')}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -286,7 +386,7 @@ export function FrameAnnotationFloatingToolbar(props: {
                 onClick={command(`effect-${mode}`)}
                 title={commandLabels().get(`effect-${mode}`)}
               >
-                <FrameAnnotationEffectIcon mode={mode} size={18} />
+                <FrameAnnotationEffectIcon mode={mode} size={16} />
               </ProductGlassToolbarButton>
             ))}
           </ProductGlassToolbar>

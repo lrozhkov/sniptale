@@ -1,6 +1,6 @@
 import { ColorField, SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
-import { ReviewPreviewNumberRow } from './number-row';
+import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { useEffect, useRef, useState } from 'react';
 import { BackgroundImagePicker } from '../../composition/background-resources/picker';
 import { translate } from '../../platform/i18n';

@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.1` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `33` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `34` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -38,6 +38,7 @@ The catalog owns control membership, order, scope, engine decision, normalized r
 This inventory is projected from the live source tree. It is navigation data, not an allowlist or path gate.
 
 - `apps/extension/src/composition/archive-transfer`
+- `apps/extension/src/composition/audio-library`
 - `apps/extension/src/composition/audio-recording`
 - `apps/extension/src/composition/background-resources`
 - `apps/extension/src/composition/editor-resource-admission.test.tsx`
@@ -130,7 +131,9 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/platform/navigation`
 - `apps/extension/src/platform/runtime-messaging`
 - `apps/extension/src/platform/security-e2e-control`
+- `apps/extension/src/ui/action-audio`
 - `apps/extension/src/ui/annotation-template-query`
+- `apps/extension/src/ui/audio`
 - `apps/extension/src/ui/background-thumbnails`
 - `apps/extension/src/ui/callout-background-settings`
 - `apps/extension/src/ui/camera-follow-segment-controls.test.tsx`
@@ -151,22 +154,39 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/effect-catalog-preview.test.tsx`
 - `apps/extension/src/ui/effect-catalog-preview.tsx`
 - `apps/extension/src/ui/effect-catalog.css`
+- `apps/extension/src/ui/focus-appearance`
 - `apps/extension/src/ui/glass-select`
 - `apps/extension/src/ui/gradient-preset-grid`
 - `apps/extension/src/ui/highlighter-preset-editor`
 - `apps/extension/src/ui/keyboard`
+- `apps/extension/src/ui/keyboard-feedback`
 - `apps/extension/src/ui/media-library-header.test.tsx`
 - `apps/extension/src/ui/media-library-header.tsx`
 - `apps/extension/src/ui/media-library-list.tsx`
+- `apps/extension/src/ui/native-hints`
 - `apps/extension/src/ui/page-bootstrap`
 - `apps/extension/src/ui/paint-selector`
+- `apps/extension/src/ui/pointer-feedback`
 - `apps/extension/src/ui/popup-shell`
+- `apps/extension/src/ui/presentation-fade-fields.test.tsx`
+- `apps/extension/src/ui/presentation-fade-fields.tsx`
+- `apps/extension/src/ui/presentation-join-fields.test.tsx`
+- `apps/extension/src/ui/presentation-join-fields.tsx`
+- `apps/extension/src/ui/presentation-media-fields.test.tsx`
+- `apps/extension/src/ui/presentation-media-fields.tsx`
+- `apps/extension/src/ui/recording-camera-controls.test.tsx`
+- `apps/extension/src/ui/recording-camera-controls.tsx`
+- `apps/extension/src/ui/recording-icon.test.tsx`
+- `apps/extension/src/ui/recording-icon.tsx`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/theme`
 - `apps/extension/src/ui/video-export`
+- `apps/extension/src/ui/video-text`
+- `apps/extension/src/ui/watermark`
 - `apps/extension/src/workflows/aggregate-editor-presence`
 - `apps/extension/src/workflows/ai-session`
 - `apps/extension/src/workflows/ai-settings`
+- `apps/extension/src/workflows/audio-jobs`
 - `apps/extension/src/workflows/background-images`
 - `apps/extension/src/workflows/browser-frame`
 - `apps/extension/src/workflows/editor`
@@ -177,6 +197,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/page-preparation`
 - `apps/extension/src/workflows/project-covers`
 - `apps/extension/src/workflows/scenario-capture-edit`
+- `apps/extension/src/workflows/scenario-narration`
 - `apps/extension/src/workflows/settings-transfer`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`
@@ -218,6 +239,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `content` → `apps/extension/src/content`
 - `camera-recorder` → `apps/extension/src/camera-recorder`
 - `popup` → `apps/extension/src/popup`
+- `media-permission` → `apps/extension/src/media-permission`
 - `settings` → `apps/extension/src/settings`
 - `gallery` → `apps/extension/src/gallery`
 - `design-system` → `apps/extension/src/design-system`

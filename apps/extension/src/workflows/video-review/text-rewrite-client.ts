@@ -1,4 +1,4 @@
-import { cancelReviewRemoteJob, keepReviewRemoteJobAlive } from './remote-job-port';
+import { cancelReviewRemoteJob, keepReviewRemoteJobAlive } from '../audio-jobs/remote-job-port';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import {
   REVIEW_TEXT_PORT_NAME,
