@@ -42,7 +42,6 @@ export function planReviewProjectCursor(args: {
       anchor.sourceClipId !== args.video.id ||
       anchor.sourceTime !== sample.time ||
       sample.time < 0 ||
-      sample.time > duration ||
       sample.timeBasis !== undefined ||
       sample.interpolationRange !== undefined ||
       (sample.interpolation !== undefined && sample.interpolation !== 'LINEAR') ||

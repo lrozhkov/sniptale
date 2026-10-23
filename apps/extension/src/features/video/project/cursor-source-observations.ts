@@ -25,8 +25,7 @@ export function hasValidVideoProjectCursorSourceObservations(project: VideoProje
       recordingIdForProjectAsset(asset) === group.recordingId &&
       typeof duration === 'number' &&
       Number.isFinite(duration) &&
-      duration > 0 &&
-      group.samples.every((sample) => sample.time <= duration)
+      duration > 0
     );
   });
   if (!valid) return false;

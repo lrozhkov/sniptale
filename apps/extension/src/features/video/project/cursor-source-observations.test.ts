@@ -361,3 +361,50 @@ it.each([
     expect(original).toEqual(before);
   }
 );
+
+it('uses the next raw fact beyond media for an in-clip boundary without projecting the tail', () => {
+  const project = fixture([
+    {
+      id: 'before-end',
+      time: 7,
+      x: 0,
+      y: 0,
+      visible: true,
+      observation: 'observed',
+      recordingPoint: { x: 0, y: 0 },
+    },
+    {
+      id: 'after-end',
+      time: 8.0028,
+      x: 640,
+      y: 360,
+      visible: true,
+      observation: 'observed',
+      recordingPoint: { x: 1, y: 1 },
+    },
+    {
+      id: 'tail',
+      time: 8.0088,
+      x: 320,
+      y: 180,
+      visible: true,
+      observation: 'observed',
+      recordingPoint: { x: 0.5, y: 0.5 },
+    },
+  ]);
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.sourceStart = 7;
+  clip.sourceDuration = 1;
+  clip.duration = 0.5;
+  const before = structuredClone(project);
+  const track = materializeVideoProjectCursorSourceObservations(project)!;
+  const captured = track.samples.filter((sample) => sample.sourceAnchor);
+  expect(captured.map((sample) => sample.sourceAnchor?.sourceTime)).toEqual([7, 8]);
+  expect(captured.map((sample) => sample.time)).toEqual([2, 2.5]);
+  expect(captured[1]!.recordingPoint?.x).toBeCloseTo(1 / 1.0028, 10);
+  expect(captured[1]!.x).toBeCloseTo(640 / 1.0028, 10);
+  expect(track.sourceObservations).toEqual(before.cursorTrack!.sourceObservations);
+  expect(project).toEqual(before);
+  expect(isExportReadyVideoProject({ ...project, cursorTrack: track })).toBe(true);
+});

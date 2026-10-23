@@ -643,4 +643,6 @@ Both editors use the same captured focus derivation. Full-source movement, click
 
 Gallery conversion retains every observation, including observations inside cuts. It maps authored focus identities to the destination source instance. Gallery paints no independent cursor. The destination retains captured appearance controls with a hidden skin until the user changes them.
 
+Recording observations can extend beyond the encoded media duration. Source groups retain these observations with their original times within the existing finite 0–86400 second limit. Projection limits timeline samples and source anchors to the owning clip. It can use a later observation to interpolate the final visible position. This corrects schema 33 admission without changing its stored fields or the original recording.
+
 The existing immutable project revision owns derived focus caches. Preview cache signatures include complete retained source observations. A source fact outside the visible clip can affect its inferred trajectory. This field adds no storage writer, resource store, or deletion authority. Existing guarded publication and source retention contracts remain authoritative.

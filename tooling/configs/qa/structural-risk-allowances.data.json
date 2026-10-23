@@ -1931,10 +1931,10 @@
       "file": "apps/extension/src/features/video/project/validation/root.test.ts",
       "symbol": "<file>",
       "owner": "project:validation:proof",
-      "reason": "tool-noise: This suite tests one Native root parser with the existing project fixtures. New cases check schema41 preset recipes and passive schema42 metadata. Fixture values and negative assertions do not own product state. The score remains2 and cohesion remains1. Splitting these version fences would duplicate the same parser fixture.",
+      "reason": "tool-noise: This suite tests one Native root parser with existing project fixtures. Added cases distinguish raw observation bounds from clip bounds. Fixture values and assertions add no product state, writer, or resource lifetime. The score remains 2 and cohesion remains 1. Splitting the admission cases would duplicate the same parser fixture. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "7c87e0705909c086b3d43b0fd89841acd025d667329a46b5435230855ea90792",
+      "reviewDate": "2026-10-23",
+      "astHash": "f9db9be3a3cccd91ca5b58614a8e5f5107cd0ff299b9f9354f7dd77471a664e6",
       "signatureHash": "85d80d305d90413787f4fd06541033136498dab3df551a6e51d559b3b9548a63"
     },
     {

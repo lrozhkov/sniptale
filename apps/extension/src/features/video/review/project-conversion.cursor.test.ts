@@ -23,7 +23,7 @@ import {
 import { planReviewProjectConversion } from './project-conversion';
 import { fixture } from './project-conversion.test-support';
 
-function cursorFixture() {
+function cursorFixture(includeTail = false) {
   const input = fixture();
   input.document.edits = [
     { id: 'cut', kind: 'cut', start: 1, end: 3, requestedStart: 1, requestedEnd: 3 },
@@ -50,6 +50,12 @@ function cursorFixture() {
         { id: 'outside', time: 5.5, x: 0.3, y: 0.4, visible: false },
         { id: 'return', time: 6, x: 0.7, y: 0.6, visible: true },
         { id: 'end', time: 7, x: 0.9, y: 0.8, visible: true },
+        ...(includeTail
+          ? [
+              { id: 'tail-1', time: 8.0028, x: 0.6, y: 0.5, visible: true },
+              { id: 'tail-2', time: 8.0088, x: 0.4, y: 0.3, visible: true },
+            ]
+          : []),
       ].map((sample) => ({
         ...sample,
         observation: sample.visible ? ('observed' as const) : ('outside' as const),
@@ -82,8 +88,10 @@ function cursorFixture() {
   };
 }
 
-function convertedCursorProject(): ReturnType<typeof cursorFixture> & { project: VideoProject } {
-  const value = cursorFixture();
+function convertedCursorProject(
+  includeTail = false
+): ReturnType<typeof cursorFixture> & { project: VideoProject } {
+  const value = cursorFixture(includeTail);
   value.input.seed = createVideoProjectFromRecording({
     ...value.input.source,
     recordingId: 'recording',
@@ -368,4 +376,50 @@ it.each([
   const before = structuredClone(input);
   expect(planReviewProjectConversion(input).status).toBe('blocked');
   expect(input).toEqual(before);
+});
+
+it('preserves post-media raw facts and edited focus through conversion and reopen', () => {
+  const { input, facts, authored, project } = convertedCursorProject(true);
+  expect(project.cursorTrack?.sourceObservations?.[0]?.samples).toEqual(facts.cursorTrack!.samples);
+  expect(
+    project.cursorTrack?.sourceObservations?.[0]?.samples.slice(-2).map((sample) => sample.time)
+  ).toEqual([8.0028, 8.0088]);
+  expect(
+    project.clips
+      .filter((clip) => clip.type === 'VIDEO')
+      .map((clip) => [clip.sourceStart, clip.sourceDuration, clip.playbackRate ?? 1])
+  ).toEqual([
+    [0, 1, 1],
+    [3, 1, 2],
+    [4, 4, 1],
+  ]);
+  expect(project.cursorFocusPath?.mode).toBe('follow');
+  expect(project.textDocuments?.length).toBeGreaterThan(0);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const reopened = parseHydratableVideoProject(structuredClone(project));
+  expect(reopened?.cursorTrack?.sourceObservations).toEqual(
+    project.cursorTrack?.sourceObservations
+  );
+  for (const sourceTime of [7.75, 7.999]) {
+    const clip = project.clips.find((item) => item.type === 'VIDEO' && item.sourceStart === 4);
+    if (clip?.type !== 'VIDEO') throw new Error('Expected final source slice');
+    const time = clip.startTime + sourceTime - clip.sourceStart;
+    const expected = evaluateReviewCursorFocus(
+      resolveReviewCursorFocusPath(facts, input.source, authored),
+      sourceTime
+    )!;
+    const actual = resolveProjectCursorFocus(project, time, undefined, clip.id)!;
+    expect(actual.x / project.width).toBeCloseTo(expected.x, 7);
+    expect(actual.y / project.height).toBeCloseTo(expected.y, 7);
+  }
+  for (const sample of project.cursorTrack!.samples) {
+    const anchor = sample.sourceAnchor;
+    if (!anchor) continue;
+    const clip = project.clips.find((item) => item.id === anchor.sourceClipId);
+    if (clip?.type !== 'VIDEO') throw new Error('Expected cursor owner');
+    expect(anchor.sourceTime).toBeGreaterThanOrEqual(clip.sourceStart);
+    expect(anchor.sourceTime).toBeLessThanOrEqual(clip.sourceStart + clip.sourceDuration);
+    expect(sample.time).toBeGreaterThanOrEqual(clip.startTime);
+    expect(sample.time).toBeLessThanOrEqual(clip.startTime + clip.duration);
+  }
 });

@@ -756,6 +756,37 @@ it('admits complete source cursor observations only at schema33 without changing
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(isHydratableVideoProject({ ...changed, version: 45 })).toBe(false);
   expect(isHydratableVideoProject(project)).toBe(true);
+  for (const time of [9, 86400]) {
+    const beyondMedia = {
+      ...changed,
+      cursorTrack: {
+        ...track,
+        sourceObservations: [{ ...group, samples: [{ ...group.samples[0], time }] }],
+      },
+    };
+    expect(isHydratableVideoProject(beyondMedia)).toBe(true);
+    expect(isExportReadyVideoProject(beyondMedia)).toBe(true);
+  }
+  expect(
+    isExportReadyVideoProject({
+      ...changed,
+      cursorTrack: {
+        ...track,
+        samples: [
+          {
+            ...group.samples[0],
+            time: 9,
+            sourceAnchor: {
+              kind: 'recording-source',
+              recordingId: 'recording',
+              sourceClipId: clip.id,
+              sourceTime: 9,
+            },
+          },
+        ],
+      },
+    })
+  ).toBe(false);
   for (const invalid of [
     null,
     { ...group, samples: null },
@@ -772,7 +803,9 @@ it('admits complete source cursor observations only at schema33 without changing
     { ...group, recordingId: 'other' },
     { ...group, sourceInstanceId: 'other' },
     { ...group, recordingId: ' recording' },
-    { ...group, samples: [{ ...group.samples[0], time: 9 }] },
+    { ...group, samples: [{ ...group.samples[0], time: -0.001 }] },
+    { ...group, samples: [{ ...group.samples[0], time: 86400.001 }] },
+    { ...group, samples: [{ ...group.samples[0], time: NaN }] },
     { ...group, samples: [{ ...group.samples[0], time: Infinity }] },
     { ...group, samples: [{ ...group.samples[0], recordingPoint: { x: 2, y: 0 } }] },
     {
