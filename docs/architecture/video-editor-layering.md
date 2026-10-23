@@ -49,3 +49,50 @@ The advanced canvas owner stores an optional normalized source rectangle. The sc
 The existing scene renderer clips source pixels before camera, perspective, blur, and magnification passes. Content objects use the source projection and crop boundary. Viewport objects and separate webcam frames retain their existing geometry. Camera planning clips disposable observations at crop entry and exit. It preserves separate visible visits and never changes stored events or paths.
 
 The crop editor keeps a local draft and commits once on Apply. Cancel and Escape discard that draft. The editor uses the existing frame decoder at the time selected when the editor opens. Crop changes use the existing workspace queue and history.
+
+## Gallery and Native ownership
+
+These editors share domain rules and rendering owners. They retain separate temporal adapters and mutation authorities.
+
+Paths in the following table are relative to `apps/extension/src/`.
+
+| Behavior | Shared owner | Gallery adapter | Native adapter |
+| --- | --- | --- | --- |
+| Text documents and accepted snapshots | `features/video/review/text-document.ts`, `text-validation.ts`, `speech-validation.ts` | `gallery/video-review/use-review-text.ts` and the review history writer | `features/video/project/text/` and `video-editor/runtime/session/text-voice.ts` |
+| Recognition, rewrite, and voice requests | `workflows/audio-jobs/`, `workflows/video-review/speech-audio.ts`, `recognition-text.ts`, `text-rewrite-client.ts` | `workflows/video-review/recognition.ts`, `text-rewrite.ts`, `text-voice.ts`, `speech-publication.ts` | `workflows/video/project-recognition.ts`, `project-text-rewrite.ts`, `project-text-voice.ts`, `project-voice-take.ts` |
+| Scene, motion, and spatial rendering | `features/video/composition/` and `features/video/project/scene/` | `features/video/review/advanced/` and review timeline projection | Project scene fields and the composition timeline |
+| EffectV1 documents, resources, and execution | `features/video/project/effect-bundle/`, `effect-instance/`, `features/video/composition/effect-runtime/` | `features/video/review/annotation-effects/` | Project EFFECT clips, effect instances, and transition targets |
+| Portable resource restoration | `workflows/media-hub-backup/v6/` and `composition/persistence/` | Review workspace roots | Video project roots and project resources |
+| Tags and saved views | `features/media-hub/`, `workflows/media-hub/`, `composition/persistence/media-library/` | Gallery library selection | Native material selection |
+
+Text edits change the current document. An accepted take retains its captured text, timing, and resource identity. Material names do not identify resources.
+
+The Gallery timeline maps source intervals through cuts and speed changes. Native project operations retain separate clips, tracks, logical lanes, source instances, and overlap policies. `features/video/project/source-voiceover-playback.ts` supplies the Native source-take playback plan. Preview and offline audio consume that same plan.
+
+Effect catalog entries supply verified documents and resources when the user applies an effect. The accepted project retains snapshots and resource references. Catalog replacement must not rewrite accepted project instances. Theme and style classify effects. Media tags remain library metadata. Grouping and linking remain montage relationships.
+
+### Transfer and publication
+
+`features/video/review/project-conversion.ts` plans conversion into existing Native project fields. Its presentation, annotation, motion, camera, cursor, audio, and document planners preserve their respective domain rules.
+
+`video-editor/project/operations/workspace.ts` captures the Gallery workspace and prepares its resources. The existing project persistence transaction checks that captured source before it publishes the destination. The conversion planner does not acquire write authority.
+
+Conversion creates a separate editable project. It does not flatten the Gallery result or make the catalog a runtime dependency. Missing resources, changed source data, and unsupported authored values produce explicit refusal before destination publication. Retry captures the source again.
+
+Deleting a Gallery project differs from purging its recording. Retained Native resources follow the existing persistence reference and deletion policies. Passive legacy fields do not enable retired overlays or speech behavior.
+
+### UI and future changes
+
+Both inspectors consume `@sniptale/ui/categorized-inspector`. Native shell surfaces also consume `@sniptale/ui/inspector-shell`. `ui/compact-inspector-controls/` supplies the shared parameter controls. Editor adapters select applicable sections and keep their own selection and draft state.
+
+Change a shared domain owner when both editors need the same rule. Keep temporal projection, placement, mutation, and save behavior in the applicable adapter. An editor-specific feature does not require a placeholder implementation in the other editor. Add a shared contract only when an actual second consumer needs it.
+
+The mounted editor retains mutation, history, and save authority during asynchronous proposals. Background admission and offscreen rendering retain their existing message and resource boundaries. A proposal or staged preview is not accepted project data.
+
+### Proof discovery
+
+`tooling/qa/proof/focused-coverage/maps/local.mjs` supplies the existing focused consumer map. Transitive affected-test discovery remains applicable where that map does not cover the changed behavior.
+
+The `native-workspace-review-transfer` entry includes workspace, transfer, and stale-save publication tests. The `source-voiceover-playback-consumers` entry includes playback planning, split behavior, and offline audio consumers. Update these existing entries when a supported consumer changes. Checkpoint must select and execute the required tests.
+
+Browser acceptance must exercise the actual editor operation. A prepared bitmap proves projection only. Owner tests prove controlled admission and concurrency. Real resource transfer and encoding require their own connected proof. Production MV3 dispatch requires a separate runtime witness when host harness tests bypass that boundary.
