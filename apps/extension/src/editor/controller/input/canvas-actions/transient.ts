@@ -7,6 +7,7 @@ interface CancelEditorTransientInteractionOptions {
   drawSession: DrawSession | null;
   cropGuide: Rect | null;
   activeTool: string;
+  preserveActiveTool?: boolean;
   clearCropSelection: () => void;
   switchToSelectTool: () => void;
   syncRuntimeState: () => void;
@@ -46,7 +47,7 @@ export function cancelEditorTransientInteraction(
   } else if (canvas.getActiveObjects().length > 0) {
     canvas.discardActiveObject();
     changed = true;
-  } else if (activeTool !== 'select') {
+  } else if (activeTool !== 'select' && !options.preserveActiveTool) {
     switchToSelectTool();
     changed = true;
   }

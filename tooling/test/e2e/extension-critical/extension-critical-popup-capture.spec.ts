@@ -268,6 +268,111 @@ async function attachDiagnostics(info: TestInfo, popup: Page, tabId: number, mes
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Editor annotation states survive focus loss at ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup, tabId } = await openCapturePage(
+      context,
+      extensionId,
+      hostOrigin,
+      viewport.size
+    );
+    await popup.evaluate(
+      async (theme) => chrome.storage.local.set({ 'sniptale-theme-preference': theme }),
+      viewport.size.width === 1920 ? 'dark' : 'light'
+    );
+    const editorOpened = context.waitForEvent('page');
+    expect(await triggerCapture(popup, tabId, 'home', 'visible', 0, 'edit')).toMatchObject({
+      success: true,
+    });
+    const editor = await editorOpened;
+    try {
+      await editor.setViewportSize(viewport.size);
+      await editor.waitForURL(/editor/);
+      const toolbar = editor.locator('[data-ui="editor.floating.tool-rail"]');
+      await expect(toolbar).toBeVisible();
+      await expect(editor.locator('[data-ui="editor.page.open-loading"]')).toHaveCount(0);
+      const editorCdp = await context.newCDPSession(editor);
+      await editorCdp.send('Emulation.setFocusEmulationEnabled', { enabled: false });
+      const effects = toolbar.locator('.sniptale-annotation-effect-switch');
+      const border = effects.locator('[data-frame-effect="border"]');
+      await border.click();
+      await expect(border).toHaveAttribute('aria-pressed', 'true');
+      await popup.bringToFront();
+      await popup.evaluate(async () => {
+        const current = await chrome.windows.getCurrent();
+        if (current.id !== undefined) await chrome.windows.update(current.id, { focused: true });
+      });
+      await expect.poll(() => editor.evaluate(() => document.hasFocus())).toBe(false);
+      await expect(border).toHaveAttribute('aria-pressed', 'true');
+      await editor.bringToFront();
+      await editor.evaluate(async () => {
+        const current = await chrome.windows.getCurrent();
+        if (current.id !== undefined) await chrome.windows.update(current.id, { focused: true });
+      });
+      for (const mode of ['blur', 'focus', 'border']) {
+        const option = effects.locator(`[data-frame-effect="${mode}"]`);
+        if ((await option.getAttribute('aria-pressed')) !== 'true') await option.click();
+        await expect(option).toHaveAttribute('aria-pressed', 'true');
+        await expect(effects.locator('.sniptale-annotation-effect-options')).not.toHaveCSS(
+          'background-color',
+          'rgba(0, 0, 0, 0)'
+        );
+      }
+      for (const kind of ['callout', 'step-badge']) {
+        const button = toolbar.locator(`[data-ui="content.toolbar.future-frame-${kind}"]`);
+        if ((await button.getAttribute('aria-pressed')) !== 'true') await button.click();
+        await expect(button).toHaveAttribute('aria-pressed', 'true');
+        await expect
+          .poll(() =>
+            button.evaluate((element) => {
+              const parent = element.parentElement!;
+              const pseudo = getComputedStyle(parent, '::after');
+              return pseudo.display === 'none' || pseudo.borderTopColor === 'rgba(0, 0, 0, 0)';
+            })
+          )
+          .toBe(true);
+      }
+      await editor.mouse.move(10, 100);
+      await editor.screenshot({
+        path: info.outputPath('editor-active-annotations.png'),
+        fullPage: false,
+      });
+      await toolbar.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+      await expect(border).toHaveAttribute('aria-pressed', 'false');
+      await expect(effects.locator('.sniptale-annotation-effect-options')).toHaveCSS(
+        'background-color',
+        'rgba(0, 0, 0, 0)'
+      );
+      await effects.locator('.sniptale-annotation-properties-arrow').hover();
+      await expect(effects).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await popup.bringToFront();
+      await editor.bringToFront();
+      await expect(toolbar.locator('[data-ui="editor.floating.tool-rail.pencil"]')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await editor.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      });
+      await editor.keyboard.press('Escape');
+      await expect(toolbar.locator('[data-ui="editor.floating.tool-rail.select"]')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await editor.screenshot({
+        path: info.outputPath('editor-inactive-annotations.png'),
+        fullPage: false,
+      });
+    } finally {
+      await editor.close();
+      await popup.close();
+      await page.close();
+    }
+  });
+
   for (const mode of ['visible', 'full'] as const) {
     test(`Popup ${mode} capture excludes late toast in editor at ${viewport.name}`, async ({
       context,

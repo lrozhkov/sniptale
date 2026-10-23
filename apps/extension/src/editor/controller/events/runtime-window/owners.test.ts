@@ -128,7 +128,7 @@ it('keeps keyup and blur cleanup owned by window adapters', () => {
 
   expect(bindings.setIsSpacePressed).toHaveBeenCalledWith(false);
   expect(mocks.handleEditorWindowBlur).toHaveBeenCalledWith({
-    cancelTransientInteraction: bindings.cancelTransientInteraction,
+    cancelTransientInteraction: expect.any(Function),
     endCurrentTransform: expect.any(Function),
     finalizeSelectionNudge: expect.any(Function),
   });
@@ -145,5 +145,6 @@ it('keeps keyup and blur cleanup owned by window adapters', () => {
   finalizeSelectionNudge();
   expect(bindings.getCanvas().endCurrentTransform).toHaveBeenCalledOnce();
   expect(bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
+  expect(bindings.cancelTransientInteraction).toHaveBeenCalledWith('window-blur');
   expect(bindings.finalizeSelectionNudge).toHaveBeenCalledOnce();
 });

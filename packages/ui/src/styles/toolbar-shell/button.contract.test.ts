@@ -9,6 +9,14 @@ const toolbarLegacyActionsStylesheet = readFileSync(
 );
 
 describe('toolbar-shell button contract', () => {
+  it('keeps inactive editor effects transparent and annotation toggles neutral', () => {
+    expect(toolbarShellButtonStylesheet).toContain(
+      ".sniptale-annotation-effect-switch:not(:has([aria-pressed='true']))"
+    );
+    expect(toolbarShellButtonStylesheet).toContain(
+      "[data-ui='editor.floating.tool-rail'] .sniptale-toolbar-split-control::after {"
+    );
+  });
   it('keeps annotation compound hover neutral and selected-frame arrows narrow', () => {
     expect(toolbarShellButtonStylesheet).toContain(
       '> button.sniptale-annotation-properties-arrow.sniptale-glass-toolbar-button {'

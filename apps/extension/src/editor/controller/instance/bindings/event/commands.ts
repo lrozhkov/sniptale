@@ -4,7 +4,8 @@ import type { EditorControllerInstance } from '../../types';
 
 export function createEditorControllerEventCommandBindings(controller: EditorControllerInstance) {
   return {
-    cancelTransientInteraction: () => controller.cancelTransientInteraction(),
+    cancelTransientInteraction: (reason?: 'window-blur') =>
+      controller.cancelTransientInteraction(reason),
     undo: () => fireAndReportEditorAction('keyboard-undo', () => controller.undo()),
     redo: () => fireAndReportEditorAction('keyboard-redo', () => controller.redo()),
     duplicateSelection: () =>

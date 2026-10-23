@@ -103,6 +103,45 @@ it('keeps transient cancellation mutations inside the transient owner', () => {
   expect(canvas.requestRenderAll).not.toHaveBeenCalled();
 });
 
+it('preserves the active tool on window blur but still resets it on explicit cancellation', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const switchToSelectTool = vi.fn();
+  const options = {
+    activeTool: 'frame-annotation',
+    canvas,
+    clearCropSelection: vi.fn(),
+    cropGuide: null,
+    drawSession: null,
+    switchToSelectTool,
+    syncRuntimeState: vi.fn(),
+  };
+  expect(cancelEditorTransientInteraction({ ...options, preserveActiveTool: true })).toEqual({
+    changed: false,
+    drawSession: null,
+  });
+  expect(switchToSelectTool).not.toHaveBeenCalled();
+  const draft = new Rect({ width: 20, height: 20 });
+  canvas.add(draft);
+  expect(
+    cancelEditorTransientInteraction({
+      ...options,
+      preserveActiveTool: true,
+      drawSession: {
+        tool: 'shape',
+        pointerId: 1,
+        start: new Point(0, 0),
+        objectId: 'draft',
+        object: draft,
+      },
+    })
+  ).toEqual({ changed: true, drawSession: null });
+  expect(canvas.getObjects()).not.toContain(draft);
+  expect(switchToSelectTool).not.toHaveBeenCalled();
+  expect(cancelEditorTransientInteraction(options).changed).toBe(true);
+  expect(switchToSelectTool).toHaveBeenCalledOnce();
+  canvas.dispose();
+});
+
 it('cancels selection before switching an active drawing tool to select', () => {
   const canvas = new Canvas(document.createElement('canvas'));
   const selected = new FabricObject();

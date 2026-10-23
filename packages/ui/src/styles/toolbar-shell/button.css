@@ -11,6 +11,19 @@
   border-radius: var(--sniptale-radius-md, 4px);
   background: var(--sniptale-color-surface-input);
 }
+[data-ui='editor.floating.tool-rail']
+  .sniptale-annotation-effect-switch:not(:has([aria-pressed='true'])),
+[data-ui='editor.floating.tool-rail']
+  .sniptale-annotation-effect-switch:not(:has([aria-pressed='true']))
+  > .sniptale-annotation-effect-options {
+  background: transparent !important;
+}
+[data-ui='editor.floating.tool-rail'] .sniptale-toolbar-split-control::after {
+  display: none;
+}
+[data-ui='editor.floating.tool-rail'] .sniptale-toolbar-split-control > button {
+  color: var(--sniptale-color-text-secondary);
+}
 .sniptale-annotation-effect-switch,
 .sniptale-annotation-menu-control {
   border-radius: var(--sniptale-radius-md, 4px);
