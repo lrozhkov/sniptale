@@ -34,7 +34,45 @@ const panel = (page: Page) =>
     .locator('.sniptale-content-popover--toolbar-menu:visible')
     .filter({ has: page.locator('.sniptale-settings-popover-header') });
 
+async function verifyCompoundHover(page: Page, toolbar: Locator, info: TestInfo, name: string) {
+  const effects = toolbar.locator('.sniptale-annotation-effect-switch');
+  await effects.locator('button[aria-haspopup="dialog"]').hover();
+  await expect
+    .poll(() => effects.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe('rgba(0, 0, 0, 0)');
+  await capture(page, info, `${name}-effect-hover.png`);
+  const activeEffect = effects.locator('[aria-pressed="true"]');
+  const accentColor = await activeEffect.evaluate((element) => getComputedStyle(element).color);
+  for (const group of await toolbar.locator('.sniptale-annotation-menu-control').all()) {
+    const primary = group.locator('button[aria-pressed]');
+    for (const toggle of [false, true, true]) {
+      if (toggle) await primary.click();
+      await primary.hover();
+      await expect
+        .poll(() =>
+          primary.evaluate((element) => {
+            const style = getComputedStyle(element);
+            return style.borderTopColor;
+          })
+        )
+        .toBe('rgba(0, 0, 0, 0)');
+      await expect(primary).not.toHaveCSS('color', accentColor);
+    }
+  }
+  const arrows = toolbar.locator('.sniptale-annotation-properties-arrow');
+  for (const arrow of await arrows.all()) {
+    const bounds = (await arrow.boundingBox())!;
+    if (
+      await arrow.evaluate((element) => element.classList.contains('sniptale-glass-toolbar-button'))
+    )
+      expect(Math.abs(bounds.width - 14)).toBeLessThanOrEqual(1);
+  }
+  await arrows.last().hover();
+  await capture(page, info, `${name}-menu-hover.png`);
+}
+
 async function verifyCreation(page: Page, toolbar: Locator, info: TestInfo) {
+  await verifyCompoundHover(page, toolbar, info, 'creation');
   const effects = toolbar.locator('.sniptale-annotation-effect-switch');
   await expect(effects.locator('[data-frame-effect]')).toHaveCount(3);
   for (const mode of ['blur', 'focus', 'border'] as const) {
@@ -91,6 +129,7 @@ async function verifyCreation(page: Page, toolbar: Locator, info: TestInfo) {
 async function verifySelected(page: Page, info: TestInfo) {
   const toolbar = page.locator('.sniptale-action-toolbar:visible');
   await expect(toolbar).toHaveCount(1);
+  await verifyCompoundHover(page, toolbar, info, 'selected');
   for (const mode of ['blur', 'focus', 'border'] as const) {
     const option = toolbar.locator(`[data-frame-effect="${mode}"]`);
     await option.click();

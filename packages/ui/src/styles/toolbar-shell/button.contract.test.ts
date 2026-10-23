@@ -9,6 +9,18 @@ const toolbarLegacyActionsStylesheet = readFileSync(
 );
 
 describe('toolbar-shell button contract', () => {
+  it('keeps annotation compound hover neutral and selected-frame arrows narrow', () => {
+    expect(toolbarShellButtonStylesheet).toContain(
+      '> button.sniptale-annotation-properties-arrow.sniptale-glass-toolbar-button {'
+    );
+    expect(toolbarShellButtonStylesheet).toContain('flex: 0 0 14px;');
+    expect(toolbarShellButtonStylesheet).toContain(
+      '.sniptale-annotation-menu-control > button[aria-pressed] {'
+    );
+    expect(toolbarShellButtonStylesheet).toContain(
+      "> .sniptale-annotation-properties-arrow:enabled:is(:hover, :focus-visible, [aria-expanded='true'])"
+    );
+  });
   it('shares annotation effect accents and compound menu geometry without changing recording selectors', () => {
     expect(toolbarShellButtonStylesheet).toContain(
       ".sniptale-annotation-effect-options > button[aria-pressed='true']"

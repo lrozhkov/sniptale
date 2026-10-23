@@ -11,6 +11,25 @@
   border-radius: var(--sniptale-radius-md, 4px);
   background: var(--sniptale-color-surface-input);
 }
+.sniptale-annotation-effect-switch,
+.sniptale-annotation-menu-control {
+  border-radius: var(--sniptale-radius-md, 4px);
+}
+:is(.sniptale-annotation-effect-switch, .sniptale-annotation-menu-control):has(
+  > .sniptale-annotation-properties-arrow:enabled:is(:hover, :focus-visible, [aria-expanded='true'])
+) {
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-annotation-effect-switch:has(
+    > .sniptale-annotation-properties-arrow:enabled:is(
+        :hover,
+        :focus-visible,
+        [aria-expanded='true']
+      )
+  )
+  > .sniptale-annotation-effect-options {
+  background: transparent;
+}
 .sniptale-annotation-effect-options > button {
   border: 1px solid transparent;
   border-radius: var(--sniptale-radius-sm, 4px);
@@ -30,17 +49,40 @@
   background: transparent;
   border-radius: var(--sniptale-radius-sm, 4px);
 }
-.sniptale-annotation-properties-arrow:hover,
-.sniptale-annotation-properties-arrow[aria-expanded='true'] {
-  background: var(--sniptale-color-surface-hover) !important;
+:is(.sniptale-annotation-effect-switch, .sniptale-annotation-menu-control)
+  > button.sniptale-annotation-properties-arrow:is(:hover, :active, [aria-expanded='true']) {
+  background: transparent !important;
+  border-color: transparent !important;
+  transform: none;
+}
+:is(.sniptale-annotation-effect-switch, .sniptale-annotation-menu-control)
+  > button.sniptale-annotation-properties-arrow.sniptale-glass-toolbar-button {
+  flex: 0 0 14px;
+  width: 14px;
+  min-width: 14px;
+  max-width: 14px;
 }
 .sniptale-annotation-menu-control > button:not(.sniptale-annotation-properties-arrow) {
   border-color: transparent;
   border-radius: var(--sniptale-radius-sm, 4px);
 }
-.sniptale-annotation-menu-control > .sniptale-glass-toolbar-button--active {
-  background: var(--sniptale-color-surface-hover);
-  color: var(--sniptale-color-text-primary);
+.sniptale-annotation-menu-control > button[aria-pressed] {
+  border-color: transparent !important;
+  color: var(--sniptale-color-text-secondary) !important;
+}
+.sniptale-annotation-menu-control > button[aria-pressed]:is(:hover, [aria-pressed='true']) {
+  background: var(--sniptale-color-surface-hover) !important;
+  color: var(--sniptale-color-text-primary) !important;
+}
+.sniptale-annotation-menu-control:has(
+    > .sniptale-annotation-properties-arrow:enabled:is(
+        :hover,
+        :focus-visible,
+        [aria-expanded='true']
+      )
+  )
+  > button[aria-pressed] {
+  background: transparent !important;
 }
 
 .sniptale-btn {
