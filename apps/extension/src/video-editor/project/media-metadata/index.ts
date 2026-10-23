@@ -45,6 +45,23 @@ export async function loadVideoMetadata(blob: Blob): Promise<LoadedVideoMetadata
   return { ...source, hasAudio, audioPeaks };
 }
 
+async function resolveWaveDuration(blob: Blob, fallbackDuration: number): Promise<number> {
+  const { Input, BlobSource, WAVE } = await import('mediabunny');
+  const input = new Input({ source: new BlobSource(blob), formats: [WAVE] });
+  try {
+    const track = await input.getPrimaryAudioTrack();
+    const duration = await track?.computeDuration();
+    // Element metadata rounds WAV frame durations; retained takes use sample precision.
+    return duration !== undefined && Number.isFinite(duration) && duration > 0
+      ? duration
+      : fallbackDuration;
+  } catch {
+    return fallbackDuration;
+  } finally {
+    input.dispose();
+  }
+}
+
 export function loadAudioMetadata(blob: Blob): Promise<LoadedAudioMetadata> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
@@ -59,7 +76,9 @@ export function loadAudioMetadata(blob: Blob): Promise<LoadedAudioMetadata> {
 
     resolveMediaDuration(audio, 1)
       .then(async (durationResult) => {
-        const { duration } = durationResult;
+        const duration = durationResult.isAuthoritative
+          ? await resolveWaveDuration(blob, durationResult.duration)
+          : durationResult.duration;
         const audioPeaks = durationResult.isAuthoritative
           ? await loadAudioPeaks(blob, duration)
           : null;
