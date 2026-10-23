@@ -126,6 +126,7 @@ export function FrameAnnotationCreationControls(props: {
         frameRef={frameRef}
         frameActive={frameActive}
         onToggleFrame={() => props.onFrameActiveChange?.(!frameActive)}
+        onEffectModeChange={(effectMode) => update({ effectMode })}
         settings={props.settings}
         toggle={toggle}
         resolveMenuDirection={contentContext ? props.resolveMenuDirection : undefined}

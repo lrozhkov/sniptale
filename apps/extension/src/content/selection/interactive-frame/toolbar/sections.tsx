@@ -19,6 +19,7 @@ export function InteractiveFrameToolbarEffectButtons(props: {
     mode: InteractiveFrameToolbarProps['effectMode']
   ) => (event: React.MouseEvent) => void;
   effectButtons: Array<{ mode: InteractiveFrameToolbarProps['effectMode']; label: string }>;
+  onEffectModeSelect?: ((mode: InteractiveFrameToolbarProps['effectMode']) => void) | undefined;
 }) {
   return (
     <FrameAnnotationToolbarEffectButton
@@ -27,6 +28,11 @@ export function InteractiveFrameToolbarEffectButtons(props: {
       label={props.effectButtons.find((item) => item.mode === props.effectMode)?.label}
       onClick={props.handleEffectClick(props.effectMode)}
       onMouseDown={props.handleButtonMouseDown}
+      onSelect={(mode, event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (mode !== props.effectMode) props.onEffectModeSelect?.(mode);
+      }}
     />
   );
 }
@@ -70,6 +76,8 @@ export function InteractiveFrameToolbarMiddleSection(props: {
   handleStepBadgeClick: (event: React.MouseEvent) => void;
   handleCalloutClick: (event: React.MouseEvent) => void;
   handleAddCalloutClick: (event: React.MouseEvent) => void;
+  handleToggleStepBadgeClick: (event: React.MouseEvent) => void;
+  handleToggleCalloutClick: (event: React.MouseEvent) => void;
 }) {
   const stepEnabled = props.frame.stepBadge?.enabled === true;
   const calloutEnabled = props.frame.callout?.enabled === true;
@@ -80,24 +88,16 @@ export function InteractiveFrameToolbarMiddleSection(props: {
         active={stepEnabled}
         anchorRef={props.stepBadgePopoverAnchorRef}
         onClick={props.handleStepBadgeClick}
+        onToggle={props.handleToggleStepBadgeClick}
         onMouseDown={props.handleButtonMouseDown}
-        title={translate(
-          stepEnabled
-            ? 'content.interactiveFrame.stepBadgeEnabled'
-            : 'content.interactiveFrame.stepBadgeEnable'
-        )}
       />
       <ProductGlassToolbarDivider />
       <FrameAnnotationToolbarCalloutButton
         active={calloutEnabled}
         anchorRef={props.calloutPopoverAnchorRef}
         onClick={props.handleCalloutClick}
+        onToggle={props.handleToggleCalloutClick}
         onMouseDown={props.handleButtonMouseDown}
-        title={translate(
-          calloutEnabled
-            ? 'content.interactiveFrame.calloutEdit'
-            : 'content.interactiveFrame.calloutAdd'
-        )}
       />
       {calloutEnabled ? (
         <FrameAnnotationToolbarAddCalloutButton

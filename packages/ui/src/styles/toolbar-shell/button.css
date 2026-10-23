@@ -1,3 +1,48 @@
+.sniptale-annotation-effect-switch,
+.sniptale-annotation-effect-options,
+.sniptale-annotation-menu-control {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.sniptale-annotation-effect-options {
+  padding: 2px;
+  border-radius: var(--sniptale-radius-md, 4px);
+  background: var(--sniptale-color-surface-input);
+}
+.sniptale-annotation-effect-options > button {
+  border: 1px solid transparent;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+.sniptale-annotation-effect-options > button[aria-pressed='true'] {
+  border-color: var(--sniptale-color-accent) !important;
+  color: var(--sniptale-color-accent) !important;
+  background: var(--sniptale-color-surface-panel) !important;
+  box-shadow: none !important;
+}
+.sniptale-annotation-effect-switch > button.sniptale-annotation-properties-arrow,
+.sniptale-annotation-menu-control > button.sniptale-annotation-properties-arrow {
+  width: 14px;
+  min-width: 14px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+.sniptale-annotation-properties-arrow:hover,
+.sniptale-annotation-properties-arrow[aria-expanded='true'] {
+  background: var(--sniptale-color-surface-hover) !important;
+}
+.sniptale-annotation-menu-control > button:not(.sniptale-annotation-properties-arrow) {
+  border-color: transparent;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+.sniptale-annotation-menu-control > .sniptale-glass-toolbar-button--active {
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
+}
+
 .sniptale-btn {
   position: relative;
   display: inline-flex;
@@ -388,28 +433,32 @@
 
 @layer utilities {
   .sniptale-content-toolbar-adopted
-    .sniptale-recording-media-control
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control)
     > .sniptale-btn[data-command-press] {
     border-radius: var(--sniptale-radius-sm, 4px) !important;
   }
 
-  .sniptale-content-toolbar-adopted .sniptale-recording-media-control::after {
+  .sniptale-content-toolbar-adopted
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control)::after {
     display: none;
   }
 
-  .sniptale-content-toolbar-adopted .sniptale-recording-media-control {
+  .sniptale-content-toolbar-adopted
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control) {
     border-radius: var(--sniptale-radius-sm, 4px) !important;
     background: transparent;
   }
 
   .sniptale-content-toolbar-adopted
-    .sniptale-recording-media-control:has(> .sniptale-split-action-start[data-active='true'])
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control):has(
+      > .sniptale-split-action-start[data-active='true']
+    )
     > .sniptale-btn[data-command-press] {
     transition-property: border-color, color, box-shadow, transform !important;
   }
 
   .sniptale-content-toolbar-adopted
-    .sniptale-recording-media-control:is(
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control):is(
       :has(> .sniptale-split-action-start:not([data-active='true']):enabled):hover,
       :has(> .sniptale-split-action-end:enabled:is(:hover, :focus-visible, [aria-expanded='true']))
     ) {
@@ -417,7 +466,7 @@
   }
 
   .sniptale-content-toolbar-adopted
-    .sniptale-recording-media-control:is(
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control):is(
       :has(> .sniptale-split-action-start:not([data-active='true']):enabled):hover,
       :has(> .sniptale-split-action-end:enabled:is(:hover, :focus-visible, [aria-expanded='true']))
     )

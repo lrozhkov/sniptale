@@ -9,6 +9,18 @@ const toolbarLegacyActionsStylesheet = readFileSync(
 );
 
 describe('toolbar-shell button contract', () => {
+  it('shares annotation effect accents and compound menu geometry without changing recording selectors', () => {
+    expect(toolbarShellButtonStylesheet).toContain(
+      ".sniptale-annotation-effect-options > button[aria-pressed='true']"
+    );
+    expect(toolbarShellButtonStylesheet).toContain(
+      'border-color: var(--sniptale-color-accent) !important;'
+    );
+    expect(toolbarShellButtonStylesheet).toContain(
+      ':is(.sniptale-recording-media-control, .sniptale-toolbar-split-control)'
+    );
+    expect(toolbarShellButtonStylesheet).toContain('.sniptale-annotation-properties-arrow');
+  });
   it('keeps toolbar button chrome on the button owner', () => {
     expect(toolbarShellButtonStylesheet).toContain('.sniptale-btn {');
     expect(toolbarShellButtonStylesheet).toContain(".sniptale-toggle[data-active='true']");

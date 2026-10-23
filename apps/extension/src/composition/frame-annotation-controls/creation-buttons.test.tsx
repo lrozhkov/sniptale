@@ -15,6 +15,33 @@ import type { FrameAnnotationCreationSettings } from './contracts';
 let host: HTMLDivElement;
 let root: Root;
 
+it('selects effects directly without opening properties and keeps the arrow independent', () => {
+  const onChange = vi.fn();
+  const onMenuChange = vi.fn();
+  act(() =>
+    root.render(
+      <FrameAnnotationCreationControls
+        activeMenu={null}
+        context="content"
+        settings={createSettings()}
+        onChange={onChange}
+        onMenuChange={onMenuChange}
+      />
+    )
+  );
+  const blur = host.querySelector<HTMLButtonElement>('[data-frame-effect="blur"]');
+  expect(blur).not.toBeNull();
+  act(() => blur!.click());
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ effectMode: 'blur' }));
+  expect(onMenuChange).not.toHaveBeenCalled();
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.future-frame-style.menu"]')!
+      .click()
+  );
+  expect(onMenuChange).toHaveBeenCalledWith('frame');
+});
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');

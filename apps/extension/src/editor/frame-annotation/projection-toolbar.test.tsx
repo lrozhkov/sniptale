@@ -61,7 +61,7 @@ import {
   createDefaultFrameCallout,
   createDefaultFrameStepBadge,
 } from '../../features/highlighter/frame-annotation/defaults';
-import { getFrameAnnotationCommandSchema } from '../../features/highlighter/frame-annotation/commands';
+import { translate } from '../../platform/i18n';
 import { applyFrameAnnotationCommand } from './commands';
 import { createFrameAnnotationProxy } from './proxy';
 import { FrameProjection } from './projection';
@@ -173,9 +173,7 @@ it('enables numbering and opens its shared settings menu in one interaction', ()
   }
 
   act(() => root.render(<Harness />));
-  const stepLabel = getFrameAnnotationCommandSchema().find(
-    (command) => command.id === 'step-badge'
-  )?.label;
+  const stepLabel = translate('content.interactiveFrame.stepBadgeSettings');
   const stepButton = Array.from(controlsRoot.querySelectorAll('button')).find(
     (button) => button.title === stepLabel
   );
@@ -320,9 +318,7 @@ it('adds comments through the fifth, deletes one, and routes primary settings to
   expect((document.activeElement as HTMLButtonElement).disabled).toBe(false);
 
   const primary = Array.from(controlsRoot.querySelectorAll('button')).find(
-    (button) =>
-      button.title ===
-      getFrameAnnotationCommandSchema().find((item) => item.id === 'callout')?.label
+    (button) => button.title === translate('content.interactiveFrame.calloutSettings')
   );
   act(() => primary?.click());
   expect(

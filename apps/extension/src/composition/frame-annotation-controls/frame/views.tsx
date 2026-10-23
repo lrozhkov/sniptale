@@ -51,12 +51,7 @@ import {
   ApplyToFutureFramesSetting,
   useApplyToFutureFrames,
 } from '../popover/apply-future';
-import {
-  FrameBlurControls,
-  FrameDecorationToggle,
-  FrameEffectModeSelector,
-  FrameFocusControls,
-} from './effect-controls';
+import { FrameBlurControls, FrameDecorationToggle, FrameFocusControls } from './effect-controls';
 
 function getFrameEffectTitle(effectMode: EffectMode) {
   if (effectMode === 'border') return translate('content.interactiveFrame.effectBorder');
@@ -164,16 +159,6 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
         />
       ) : (
         <>
-          <FrameEffectModeSelector
-            effectMode={props.effectMode}
-            onChange={(effectMode) => {
-              if (effectMode === props.effectMode) {
-                props.onClose();
-                return;
-              }
-              props.onEffectModeChange?.(effectMode);
-            }}
-          />
           {props.effectMode === 'blur' ? (
             <FrameEffectParameterGroup>
               <FrameBlurControls

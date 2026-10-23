@@ -495,7 +495,7 @@ describe('FrameSettingsPopover preset selection', () => {
   );
 
   it.each(['border', 'blur', 'focus'] as const)(
-    'closes when the already selected %s effect mode is clicked',
+    'keeps the %s effect choice in the toolbar instead of duplicating it in properties',
     (effectMode) => {
       const onClose = vi.fn();
       const onEffectModeChange = vi.fn();
@@ -514,10 +514,9 @@ describe('FrameSettingsPopover preset selection', () => {
       const activeMode = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
         (button) => button.title === label
       );
-      expect(activeMode).not.toBeNull();
-      act(() => activeMode?.click());
-
-      expect(onClose).toHaveBeenCalledOnce();
+      expect(activeMode).toBeUndefined();
+      expect(document.querySelector('.sniptale-frame-effect-mode-section')).toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
       expect(onEffectModeChange).not.toHaveBeenCalled();
     }
   );

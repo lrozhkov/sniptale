@@ -1,8 +1,9 @@
-import { ChevronDown, Droplet, Focus, ListOrdered, Square } from 'lucide-react';
+import { ChevronDown, ListOrdered } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react';
 import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
 import { FrameCommentIcon } from '../../features/highlighter/frame-annotation/icons';
+import { FrameAnnotationToolbarEffectButton } from '../../features/highlighter/frame-annotation/floating-toolbar';
 import type { EffectMode } from '../../features/highlighter/contracts';
 import { translate } from '../../platform/i18n';
 import type { FrameAnnotationCreationMenu, FrameAnnotationCreationSettings } from './contracts';
@@ -53,10 +54,11 @@ function CreationSplitButton(props: {
   const menuSide = useCreationMenuDirection(props.menu, props.menuRef, props.resolveMenuDirection);
   return (
     <div
-      className="sniptale-split-action sniptale-full-page-wrapper"
+      className="sniptale-split-action sniptale-full-page-wrapper sniptale-toolbar-split-control"
       data-active={props.active ? 'true' : 'false'}
     >
       <ContentToolbarButton
+        tone="property"
         active={props.active}
         aria-pressed={props.active}
         className="sniptale-split-action-start sniptale-full-page-primary"
@@ -71,6 +73,7 @@ function CreationSplitButton(props: {
         {props.children}
       </ContentToolbarButton>
       <ContentToolbarButton
+        tone="property"
         ref={props.menuRef}
         aria-expanded={props.menuOpen}
         aria-haspopup="menu"
@@ -98,6 +101,7 @@ export function FrameStyleCreationButton(props: {
   frameActive: boolean;
   frameRef: RefObject<HTMLButtonElement | null>;
   onToggleFrame: () => void;
+  onEffectModeChange?: (mode: EffectMode) => void;
   resolveMenuDirection?: FrameAnnotationMenuDirectionResolver | undefined;
   settings: FrameAnnotationCreationSettings;
   toggle: (menu: FrameAnnotationCreationMenu) => void;
@@ -105,6 +109,7 @@ export function FrameStyleCreationButton(props: {
   const dataUi = props.contentContext
     ? 'content.toolbar.future-frame-style'
     : 'frame-annotation.creation.frame';
+  const menuSide = useCreationMenuDirection('frame', props.frameRef, props.resolveMenuDirection);
   return (
     <div
       className="sniptale-toolbar-subgroup"
@@ -114,20 +119,30 @@ export function FrameStyleCreationButton(props: {
           : (props.dataUi ?? 'frame-annotation.creation-controls')
       }
     >
-      <CreationSplitButton
+      <FrameAnnotationToolbarEffectButton
+        contentContext
         active={props.frameActive}
         dataUi={dataUi}
         disabled={props.disabled ?? false}
         menuOpen={props.activeMenu === 'frame'}
-        menuRef={props.frameRef}
-        menu="frame"
-        resolveMenuDirection={props.resolveMenuDirection}
-        onMenuClick={() => props.toggle('frame')}
-        onToggle={props.onToggleFrame}
-        title={getEffectLabel(props.settings.effectMode)}
-      >
-        <FrameEffectIcon mode={props.settings.effectMode} />
-      </CreationSplitButton>
+        anchorRef={props.frameRef}
+        effectMode={props.settings.effectMode}
+        menuSide={menuSide}
+        onClick={(event) => {
+          event.stopPropagation();
+          props.toggle('frame');
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+        onSelect={(mode, event) => {
+          event.stopPropagation();
+          if (mode === props.settings.effectMode) props.onToggleFrame();
+          else {
+            props.onEffectModeChange?.(mode);
+            if (!props.frameActive) props.onToggleFrame();
+          }
+        }}
+        label={getEffectLabel(props.settings.effectMode)}
+      />
     </div>
   );
 }
@@ -209,12 +224,6 @@ export function AnnotationCreationButtons(props: {
         : null}
     </div>
   );
-}
-
-function FrameEffectIcon(props: { mode: EffectMode }) {
-  if (props.mode === 'border') return <Square size={18} />;
-  if (props.mode === 'blur') return <Droplet size={18} />;
-  return <Focus size={18} />;
 }
 
 function getEffectLabel(mode: EffectMode): string {

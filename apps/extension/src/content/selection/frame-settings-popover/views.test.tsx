@@ -148,14 +148,14 @@ describe('FrameSettingsPopoverContent', () => {
     }
   );
 
-  it('keeps the mode selector and templates available in compact toolbar menus', () => {
+  it('keeps current-effect properties and templates without a duplicate mode selector', () => {
     const expandedMarkup = renderContent('blur', true, false);
     const compactMarkup = renderContent('blur', true, true);
 
     for (const markup of [expandedMarkup, compactMarkup]) {
-      expect(markup).toContain(translate('content.interactiveFrame.effectBorder'));
       expect(markup).toContain(translate('content.interactiveFrame.effectBlur'));
-      expect(markup).toContain(translate('content.interactiveFrame.effectFocus'));
+      expect(markup).not.toContain('sniptale-frame-effect-mode-section');
+      expect(markup).toContain(translate('content.overlayControls.blurTypeLabel'));
       expect(markup).toContain('Default');
     }
   });
