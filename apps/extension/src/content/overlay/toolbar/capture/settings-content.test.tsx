@@ -184,6 +184,9 @@ describe('ToolbarSettingsDropdown', () => {
       const recording: ReturnType<typeof useRecordingToolbarControls> = {
         active: false,
         controls: {},
+        hasHidden: false,
+        revealed: false,
+        toggleRevealed: vi.fn(),
         editing: false,
         error: null,
         pending: false,

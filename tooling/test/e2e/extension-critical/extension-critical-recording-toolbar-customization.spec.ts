@@ -1571,6 +1571,7 @@ async function expectRecordingControlOrder(
   const lifecycle =
     phase === 'idle' ? ['start'] : [phase === 'paused' ? 'resume' : 'pause', 'stop'];
   const expected = [
+    ...(phase !== 'idle' && compact ? [`${recordingPrefix}reveal-controls`] : []),
     ...(phase === 'idle'
       ? [
           'content.toolbar.mode-selector-button',

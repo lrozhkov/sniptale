@@ -1,5 +1,9 @@
 import {
   Check,
+  ChevronsDown,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronsUp,
   LoaderCircle,
   Mic,
   MicOff,
@@ -323,6 +327,76 @@ function MediaControls(props: {
   );
 }
 
+function RecordingControlsDisclosure(props: {
+  displayMode: ContentToolbarDisplayMode;
+  toolbarMenuState: ToolbarMenuState;
+}) {
+  const visibility = useContext(RecordingToolbarControlsContext);
+  if (!visibility?.active || !visibility.hasHidden) return null;
+  const icons = {
+    horizontal: visibility.revealed ? ChevronsLeft : ChevronsRight,
+    vertical: visibility.revealed ? ChevronsUp : ChevronsDown,
+  };
+  const RevealIcon = icons[props.displayMode];
+  return (
+    <ContentToolbarButton
+      type="button"
+      tone="utility"
+      size="narrow"
+      dataUi="content.toolbar.video-recording.reveal-controls"
+      aria-expanded={visibility.revealed}
+      title={translate(
+        visibility.revealed
+          ? 'content.toolbar.recordingHideHiddenControls'
+          : 'content.toolbar.recordingShowHiddenControls'
+      )}
+      onClick={() => {
+        props.toolbarMenuState.closeMenus();
+        visibility.toggleRevealed();
+      }}
+    >
+      <RevealIcon size={14} aria-hidden="true" />
+    </ContentToolbarButton>
+  );
+}
+
+function RecordingCursorControl(props: {
+  compact: boolean;
+  disabled: boolean;
+  displayMode: ContentToolbarDisplayMode;
+  recording: ToolbarVideoRecordingProps;
+  toolbarMenuState: ToolbarMenuState;
+}) {
+  return (
+    <RecordingControlVisibility
+      control="cursor"
+      icon={MousePointer2}
+      label={translate('content.toolbar.videoRecordingSpotlight')}
+    >
+      <RecordingSpotlightMenu
+        compact={props.compact}
+        disabled={props.disabled}
+        displayMode={props.displayMode}
+        toolbarMenuState={props.toolbarMenuState}
+        settings={{
+          cursorHaloEnabled: props.recording.state.spotlightEnabled,
+          cursorDimmingEnabled: props.recording.state.spotlightDimmingEnabled,
+          clickAnimationEnabled: props.recording.state.spotlightClickAnimationEnabled,
+          ...(props.recording.state.cursorEffects
+            ? { cursorEffects: props.recording.state.cursorEffects }
+            : {}),
+        }}
+        onChange={(settings) => {
+          if (props.recording.onSpotlightSettingsChange) {
+            return props.recording.onSpotlightSettingsChange(settings);
+          }
+          return props.recording.onSpotlightEnabledChange(settings.cursorHaloEnabled);
+        }}
+      />
+    </RecordingControlVisibility>
+  );
+}
+
 export function ToolbarVideoRecordingControls(props: {
   compactMenus?: boolean;
   displayMode: ContentToolbarDisplayMode;
@@ -351,6 +425,10 @@ export function ToolbarVideoRecordingControls(props: {
   };
   return (
     <>
+      <RecordingControlsDisclosure
+        displayMode={props.displayMode}
+        toolbarMenuState={props.toolbarMenuState}
+      />
       {!visibility?.active ? (
         <>
           <ContentToolbarGroup dataUi="content.toolbar.video-recording.settings-group">
@@ -411,32 +489,13 @@ export function ToolbarVideoRecordingControls(props: {
       ) : null}
       <RecordingDrawingControls
         actionTail={
-          <RecordingControlVisibility
-            control="cursor"
-            icon={MousePointer2}
-            label={translate('content.toolbar.videoRecordingSpotlight')}
-          >
-            <RecordingSpotlightMenu
-              compact={props.compactMenus ?? false}
-              disabled={busy || !navigation}
-              displayMode={props.displayMode}
-              toolbarMenuState={props.toolbarMenuState}
-              settings={{
-                cursorHaloEnabled: props.recording.state.spotlightEnabled,
-                cursorDimmingEnabled: props.recording.state.spotlightDimmingEnabled,
-                clickAnimationEnabled: props.recording.state.spotlightClickAnimationEnabled,
-                ...(props.recording.state.cursorEffects
-                  ? { cursorEffects: props.recording.state.cursorEffects }
-                  : {}),
-              }}
-              onChange={(settings) => {
-                if (props.recording.onSpotlightSettingsChange) {
-                  return props.recording.onSpotlightSettingsChange(settings);
-                }
-                return props.recording.onSpotlightEnabledChange(settings.cursorHaloEnabled);
-              }}
-            />
-          </RecordingControlVisibility>
+          <RecordingCursorControl
+            compact={props.compactMenus ?? false}
+            disabled={busy || !navigation}
+            displayMode={props.displayMode}
+            recording={props.recording}
+            toolbarMenuState={props.toolbarMenuState}
+          />
         }
         compactMenus={props.compactMenus ?? false}
         displayMode={props.displayMode}

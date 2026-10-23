@@ -138,7 +138,7 @@ export interface ContentToolbarButtonProps extends ButtonHTMLAttributes<HTMLButt
   active?: boolean;
   menuIndicator?: boolean;
   tone?: 'default' | 'danger' | 'close' | 'utility' | 'outline' | 'property';
-  size?: 'default' | 'compact';
+  size?: 'default' | 'compact' | 'narrow';
   dataUi?: string;
 }
 
@@ -196,6 +196,7 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
           (tone === 'utility' || tone === 'close') && 'sniptale-btn-utility',
           tone === 'outline' && 'sniptale-btn-outline',
           size === 'compact' && 'sniptale-btn-compact',
+          size === 'narrow' && 'sniptale-btn-narrow',
           className
         )}
       >

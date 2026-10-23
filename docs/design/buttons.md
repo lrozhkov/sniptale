@@ -24,6 +24,8 @@ Do not mix borders among equivalent neighboring commands without a surface reaso
 
 Use 16px icons, 6px icon/text gaps, 10px compact horizontal padding, and the shared label weight. Preserve established 14px or 16px geometry on specialized surfaces. Labeled controls coordinate text weights 400/450/500 with Lucide strokes 1.75/1.875/2. Do not apply stroke overrides to filled logos.
 
+Use the shared `narrow` toolbar button size for optional-control disclosure. It keeps standard toolbar button height and half standard width in both orientations.
+
 ## Toolbar and disclosure
 
 Inactive icon-only tools brighten their icon and show a faint neutral hover boundary, mixed at 28% secondary foreground. Specialized injected icon tools retain no fill, an orange icon, and a 1px accent boundary mixed at 35%, rising to 55% on hover. Labeled panel tools use weight 400 at rest, 450 on hover, and 500 when selected. Selection adds a soft neutral fill. Hover adds no border. Keyboard focus remains visible. An icon row that selects a presentation remains a property choice. Its accepted value uses neutral selection, even when it resembles a toolbar. Do not add checks merely to indicate toolbar selection. Use radio for exclusive tools and aria-pressed for independent modes. Programmatic state needs a visible non-hue alternative.

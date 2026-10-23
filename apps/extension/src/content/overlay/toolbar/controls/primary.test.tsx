@@ -235,6 +235,9 @@ describe('ToolbarPrimaryControls', () => {
     const visibility: ReturnType<typeof useRecordingToolbarControls> = {
       active: false,
       controls: {},
+      hasHidden: false,
+      revealed: false,
+      toggleRevealed: vi.fn(),
       editing: true,
       error: null,
       pending: false,

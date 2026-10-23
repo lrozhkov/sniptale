@@ -3,6 +3,7 @@ import type {
   ContentToolbarPreferences,
   RecordingToolbarControl,
 } from '../../../../contracts/settings';
+import { RECORDING_TOOLBAR_CONTROLS } from '../../../../contracts/settings';
 import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
 import { translate } from '../../../../platform/i18n';
 
@@ -19,6 +20,7 @@ export function useRecordingToolbarControls(enabled: boolean, active: boolean) {
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingRef = useRef(false);
   const mountedRef = useRef(false);
@@ -49,6 +51,11 @@ export function useRecordingToolbarControls(enabled: boolean, active: boolean) {
   useEffect(() => {
     if (active) setEditing(false);
   }, [active]);
+  useEffect(() => {
+    setRevealed(false);
+  }, [enabled, active]);
+  const hasHidden = RECORDING_TOOLBAR_CONTROLS.some((control) => controls[control] === false);
+  const showingHidden = enabled && active && hasHidden && revealed;
 
   const setPreferences = async (patch: RecordingPreferencesPatch) => {
     if (!enabled || active || !ready || pendingRef.current) return;
@@ -74,7 +81,12 @@ export function useRecordingToolbarControls(enabled: boolean, active: boolean) {
 
   return {
     active,
-    controls,
+    controls: showingHidden ? {} : controls,
+    hasHidden,
+    revealed: showingHidden,
+    toggleRevealed: () => {
+      if (enabled && active && hasHidden) setRevealed((value) => !value);
+    },
     fadeDuringRecording,
     editing: editing && !active,
     error,

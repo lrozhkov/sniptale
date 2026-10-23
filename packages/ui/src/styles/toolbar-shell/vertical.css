@@ -40,6 +40,10 @@
   margin: 2px 0;
 }
 
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn.sniptale-btn-narrow {
+  width: calc(var(--sniptale-toolbar-button-size) / 2);
+}
+
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn,
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-mode-wrapper,
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-settings-wrapper,

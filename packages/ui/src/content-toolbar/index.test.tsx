@@ -11,6 +11,22 @@ import {
 } from '@sniptale/ui/content-toolbar';
 
 describe('ContentToolbar', () => {
+  it('renders narrow disclosure controls without reducing their height contract', () => {
+    const markup = renderToStaticMarkup(
+      <ContentToolbarButton
+        size="narrow"
+        tone="utility"
+        title="Show hidden buttons"
+        aria-expanded={false}
+      >
+        <svg />
+      </ContentToolbarButton>
+    );
+    expect(markup).toContain('sniptale-btn-narrow');
+    expect(markup).not.toContain('sniptale-btn-compact');
+    expect(markup).toContain('aria-label="Show hidden buttons"');
+    expect(markup).toContain('aria-expanded="false"');
+  });
   it.each([0, 3, 5, 10, 30])('keeps delay %s presentation inside its size container', (value) => {
     const markup = renderToStaticMarkup(
       <ContentToolbarDelayIndicator value={value} dataUi="test.delay">

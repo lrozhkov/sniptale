@@ -58,6 +58,61 @@ it('does not read or write recording preferences in other toolbar modes', async 
   expect(persistence.patch).not.toHaveBeenCalled();
 });
 
+it('temporarily reveals saved hidden controls without writing and resets after the active session', async () => {
+  const settings = createDefaultSettings();
+  settings.contentToolbar = {
+    ...settings.contentToolbar!,
+    recordingControls: { pencil: false, microphone: false, camera: false },
+  };
+  persistence.load.mockResolvedValue(settings);
+  await act(async () => root.render(<Harness active />));
+  expect(controls.hasHidden).toBe(true);
+  expect(controls.revealed).toBe(false);
+  act(() => controls.toggleRevealed());
+  expect(controls.revealed).toBe(true);
+  expect(controls.controls.pencil).not.toBe(false);
+  expect(controls.controls.microphone).not.toBe(false);
+  expect(controls.controls.camera).not.toBe(false);
+  await act(async () => root.render(<Harness active />));
+  expect(controls.revealed).toBe(true);
+  act(() => controls.toggleRevealed());
+  expect(controls.controls.pencil).toBe(false);
+  act(() => controls.toggleRevealed());
+  await act(async () => root.render(<Harness active={false} />));
+  expect(controls.revealed).toBe(false);
+  await act(async () => root.render(<Harness active />));
+  expect(controls.controls.pencil).toBe(false);
+  expect(persistence.patch).not.toHaveBeenCalled();
+  expect(settings.contentToolbar.recordingControls).toEqual({
+    pencil: false,
+    microphone: false,
+    camera: false,
+  });
+});
+
+it('does not reveal without hidden controls or outside recording and resets on mode exit', async () => {
+  await act(async () => root.render(<Harness active />));
+  expect(controls.hasHidden).toBe(false);
+  act(() => controls.toggleRevealed());
+  expect(controls.revealed).toBe(false);
+  const settings = createDefaultSettings();
+  settings.contentToolbar = { ...settings.contentToolbar!, recordingControls: { pencil: false } };
+  persistence.load.mockResolvedValue(settings);
+  await act(async () => controls.reload());
+  act(() => controls.toggleRevealed());
+  expect(controls.revealed).toBe(true);
+  await act(async () => root.render(<Harness enabled={false} active />));
+  expect(controls.revealed).toBe(false);
+  act(() => controls.toggleRevealed());
+  expect(controls.revealed).toBe(false);
+  await act(async () => root.render(<Harness enabled active />));
+  expect(controls.revealed).toBe(false);
+  await act(async () => root.render(<Harness active={false} />));
+  act(() => controls.toggleRevealed());
+  expect(controls.revealed).toBe(false);
+  expect(persistence.patch).not.toHaveBeenCalled();
+});
+
 it('defaults fading to enabled without writing and loads an explicit disabled value', async () => {
   await act(async () => root.render(<Harness />));
   expect(controls.fadeDuringRecording).toBe(true);

@@ -208,6 +208,16 @@
   opacity: 0.4;
   cursor: default;
 }
+.sniptale-btn.sniptale-btn-narrow {
+  width: calc(var(--sniptale-toolbar-button-size) / 2);
+  min-width: calc(var(--sniptale-toolbar-button-size) / 2);
+  padding: 0;
+  flex-shrink: 0;
+}
+.sniptale-btn.sniptale-btn-narrow svg {
+  width: 14px;
+  height: 14px;
+}
 .sniptale-btn.sniptale-btn-compact {
   width: var(--sniptale-size-icon-compact);
   height: var(--sniptale-size-icon-compact);
@@ -270,6 +280,7 @@
     .sniptale-full-page-chevron,
     .sniptale-btn-outline,
     .sniptale-btn-compact,
+    .sniptale-btn-narrow,
     .sniptale-drawing-options-popover *
   ) {
   width: var(--sniptale-toolbar-button-size);

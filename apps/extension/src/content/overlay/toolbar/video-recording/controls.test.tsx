@@ -124,6 +124,9 @@ function visibilityState(
   return {
     active: false,
     controls: {},
+    hasHidden: false,
+    revealed: false,
+    toggleRevealed: vi.fn(),
     editing: false,
     error: null,
     pending: false,
@@ -177,6 +180,42 @@ it('retains the focused lifecycle button when orientation changes', () => {
   renderPhase('recording', 'vertical', null, visibility);
   expect(queryButton('content.toolbar.video-recording.pause')).toBe(pause);
   expect(document.activeElement).toBe(pause);
+});
+
+it.each(['horizontal', 'vertical'] as const)(
+  'reveals optional controls through a leading narrow action in %s orientation',
+  (orientation) => {
+    const visibility = visibilityState({ active: true, hasHidden: true, revealed: true });
+    const actions = renderPhase('recording', orientation, null, visibility);
+    const reveal = queryButton('content.toolbar.video-recording.reveal-controls')!;
+    expect(host.querySelector('button')).toBe(reveal);
+    expect(reveal.classList.contains('sniptale-btn-narrow')).toBe(true);
+    expect(reveal.getAttribute('aria-expanded')).toBe('true');
+    expect(reveal.title).toBe('content.toolbar.recordingHideHiddenControls');
+    expect(
+      reveal.querySelector(
+        orientation === 'vertical' ? '.lucide-chevrons-up' : '.lucide-chevrons-left'
+      )
+    ).not.toBeNull();
+    expect(queryButton('content.toolbar.drawing.pencil')).not.toBeNull();
+    expect(queryButton('content.toolbar.video-recording.microphone.toggle')).not.toBeNull();
+    expect(queryButton('content.toolbar.video-recording.camera.toggle')).not.toBeNull();
+    expect(queryButton('content.toolbar.video-recording.auto-hide')).toBeNull();
+    expect(queryButton('content.toolbar.settings-button')).toBeNull();
+    expect(queryButton('content.toolbar.video-recording.customize')).toBeNull();
+    act(() => reveal.click());
+    expect(visibility.toggleRevealed).toHaveBeenCalledOnce();
+    expect(visibility.setVisible).not.toHaveBeenCalled();
+    expect(actions.onStart).not.toHaveBeenCalled();
+    expect(actions.onCameraEnabledChange).not.toHaveBeenCalled();
+  }
+);
+
+it('omits the disclosure without hidden controls and outside recording', () => {
+  renderPhase('recording', 'horizontal', null, visibilityState({ active: true }));
+  expect(queryButton('content.toolbar.video-recording.reveal-controls')).toBeNull();
+  renderPhase('idle', 'horizontal', null, visibilityState({ hasHidden: true }));
+  expect(queryButton('content.toolbar.video-recording.reveal-controls')).toBeNull();
 });
 
 it('customizes icons without activating their tools or media controls', () => {

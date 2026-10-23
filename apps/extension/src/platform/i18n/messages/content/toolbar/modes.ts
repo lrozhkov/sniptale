@@ -47,6 +47,14 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Завершить настройку кнопок',
     en: 'Finish customizing controls',
   },
+  recordingShowHiddenControls: {
+    ru: 'Показать скрытые кнопки',
+    en: 'Show hidden buttons',
+  },
+  recordingHideHiddenControls: {
+    ru: 'Свернуть дополнительные кнопки',
+    en: 'Collapse additional buttons',
+  },
   recordingControlVisible: {
     ru: 'Показывать «{tool}» во время записи',
     en: 'Show {tool} during recording',

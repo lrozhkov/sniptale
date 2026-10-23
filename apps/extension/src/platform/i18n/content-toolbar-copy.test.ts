@@ -5,6 +5,14 @@ import { translate, type AppLocale, type TranslationKey } from '.';
 type ExpectedCopy = Record<AppLocale, string>;
 
 const FRIENDLY_MAIN_TOOLBAR_COPY = {
+  'content.toolbar.recordingShowHiddenControls': {
+    ru: 'Показать скрытые кнопки',
+    en: 'Show hidden buttons',
+  },
+  'content.toolbar.recordingHideHiddenControls': {
+    ru: 'Свернуть дополнительные кнопки',
+    en: 'Collapse additional buttons',
+  },
   'content.toolbar.captureAskPresetLabel': {
     ru: 'Выбрать папку',
     en: 'Choose a folder',
