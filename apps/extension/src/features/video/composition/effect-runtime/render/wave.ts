@@ -3,7 +3,10 @@ import { drawSceneBackground, getProjectSceneBackground } from '../../../project
 import { resolveSceneBackgroundAudioEnvelope } from '../../../project/scene/background-audio';
 import type { VideoProject } from '../../../project/types';
 import type { ReviewSpatialRenderer } from '../../canvas/spatial-renderer';
-import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../runtime/resource-limits';
+import {
+  EFFECT_RUNTIME_RESOURCE_LIMITS,
+  closeEffectRuntimeBitmap,
+} from '../runtime/resource-limits';
 // policyStateIds: [] - empty render maps are immutable sentinels, not authority state.
 import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effect-runtime/types';
 import type { VideoCompositionMediaSource } from '../../draw/media-source';
@@ -14,6 +17,7 @@ import { disposeEffectRuntimeComposition } from './rendered';
 import { createEffectRuntimeCompositionResourceLedger } from '../runtime/resource-limits';
 import type {
   EffectRuntimeFramePlan,
+  EffectRuntimeRenderedFrame,
   EffectRuntimeRenderedComposition,
   EffectRuntimeRenderedFrameMap,
 } from '../runtime/types';
@@ -51,7 +55,7 @@ export async function renderEffectRuntimeComposition(args: {
     throw error;
   }
 
-  function renderFrame(
+  async function renderFrame(
     frame: VideoCompositionFrame,
     time: number,
     sampled = false
@@ -70,7 +74,7 @@ export async function renderEffectRuntimeComposition(args: {
       selected.map((plan) => scaleEffectRuntimeFramePlan(plan, args.rasterScale)),
       frame
     );
-    return renderEffectRuntimeFramePlans({
+    const frames = await renderEffectRuntimeFramePlans({
       executor: args.executor,
       inputMaterializer: createEffectRuntimeInputMaterializer({
         camera: frame.camera,
@@ -100,7 +104,43 @@ export async function renderEffectRuntimeComposition(args: {
       resourceScope,
       ...(args.signal ? { signal: args.signal } : {}),
     });
+    return releaseConsumedEffectOutputs(frames);
   }
+}
+
+/** Dependencies stay alive until every reader finishes; only final draw rasters cross exposure times. */
+function releaseConsumedEffectOutputs(
+  frames: EffectRuntimeRenderedFrameMap
+): EffectRuntimeRenderedFrameMap {
+  const clipTargets = new Set<string>();
+  const groupedClips = new Set<string>();
+  const videoGroupClips = new Set<string>();
+  for (const frame of frames.values()) {
+    if (frame.target.kind === 'clip') clipTargets.add(frame.target.clipId);
+    if (frame.target.kind === 'track' || frame.target.kind === 'video-group') {
+      for (const id of frame.target.clipIds) {
+        groupedClips.add(id);
+        if (frame.target.kind === 'video-group') videoGroupClips.add(id);
+      }
+    }
+  }
+  let retained: Map<string, EffectRuntimeRenderedFrame> | undefined;
+  for (const [id, frame] of frames) {
+    const target = frame.target;
+    const covered =
+      target.kind === 'scene'
+        ? clipTargets.has(target.clipId) || groupedClips.has(target.clipId)
+        : target.kind === 'clip'
+          ? groupedClips.has(target.clipId)
+          : target.kind === 'track' &&
+            target.clipIds.every((clipId) => videoGroupClips.has(clipId));
+    if (covered) {
+      retained ??= new Map(frames);
+      retained.delete(id);
+      closeEffectRuntimeBitmap(frame.bitmap);
+    }
+  }
+  return retained ?? frames;
 }
 
 /** Locked standalone layers draw once from the overlay; sampled dependencies still need their own clock. */

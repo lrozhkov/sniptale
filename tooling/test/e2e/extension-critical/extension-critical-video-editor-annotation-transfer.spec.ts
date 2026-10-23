@@ -1,3 +1,4 @@
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { syntheticSpeechWav } from '../support/voiceover-speech-fixture';
 import { reviewSpeechTextSignature } from '../../../../apps/extension/src/features/video/review/speech-transcript';
 import { inspectVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
@@ -67,7 +68,7 @@ async function drawAnnotation(page: Page, start: number, end: number) {
   await page.mouse.up();
 }
 
-async function resourceAnnotationSource(title: string, clocked = false) {
+async function resourceAnnotationSource(title: string, clocked = false, spatialDetails = false) {
   const base = parseEffectV1Source(
     await readFile(
       'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
@@ -76,7 +77,9 @@ async function resourceAnnotationSource(title: string, clocked = false) {
   );
   if (!base.document) throw new Error('Missing EffectV1 fixture');
   const svgText =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e020b0"/></svg>';
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e020b0"/>' +
+    (spatialDetails ? '<rect x="4" y="4" width="4" height="4" fill="#22d3ee"/>' : '') +
+    '</svg>';
   const source = JSON.stringify({
     ...base.document,
     id: 'transfer-svg',
@@ -449,6 +452,434 @@ async function checkTransferredResultVoiceEditing(
   });
 }
 
+async function configureGallerySpatialDetails(page: Page, dialog: Locator, label: InspectorLabel) {
+  await dialog
+    .locator('[data-ui="gallery.videoReview.spatialTools"]')
+    .getByRole('button', { name: label('gallery.videoReview.spatialToolFocus'), exact: true })
+    .click();
+  for (const [key, value] of [
+    ['gallery.videoReview.depthStrength', '55'],
+    ['gallery.videoReview.depthSoftness', '35'],
+  ] as const) {
+    const input = dialog.getByRole('textbox', { name: label(key), exact: true });
+    await input.fill(value);
+    await input.press('Enter');
+  }
+  for (const phase of ['enter', 'exit'] as const) {
+    const blur = dialog.locator(
+      `[data-ui="gallery.videoReview.motionBlurSettings"][data-phase="${phase}"]`
+    );
+    if (!(await blur.isVisible()))
+      await dialog
+        .getByRole('heading', {
+          name: label('videoEditor.sidebar.inspectorGroupAnimation'),
+          exact: true,
+        })
+        .click();
+    await blur
+      .getByRole('switch', { name: label('gallery.videoReview.motionBlur'), exact: true })
+      .click();
+    const strength = blur.getByRole('textbox', {
+      name: label('gallery.videoReview.motionBlurStrength'),
+      exact: true,
+    });
+    await strength.fill('65');
+    await strength.press('Enter');
+    await checkInspectorPaintedFont(page, strength, `gallery-resource-motion-blur-${phase}`);
+  }
+}
+
+async function checkTransferredSpatialDetails(
+  page: Page,
+  native: NativeProject,
+  label: InspectorLabel,
+  outputPath: (name: string) => string
+) {
+  await writeFile(outputPath('native-resource-spatial-intake.json'), JSON.stringify(native));
+  const region = native.motionRegions?.find(
+    (entry) => entry.depthOfField?.enabled && entry.duration > 0.1
+  );
+  if (!region) throw new Error('Missing transferred spatial focus');
+  expect(region.depthOfField).toMatchObject({
+    enabled: true,
+    mode: 'depth',
+    strength: 0.55,
+    softness: 0.35,
+  });
+  expect(region.motionBlur?.enter).toEqual({ enabled: true, strength: 0.65 });
+  const accepted = async () =>
+    (await readNativeVideoProject(page))!.motionRegions!.find((entry) => entry.id === region.id)!;
+  await page.locator(`[data-timeline-effect-segment="${region.id}"] button[title]`).click();
+  await page
+    .locator('[data-ui="video-editor.inspector.categories"] > nav')
+    .getByRole('button', { name: label('gallery.videoReview.depthOfField'), exact: true })
+    .click();
+  const depth = page.locator('[data-ui="video-editor.motion.depth"]');
+  await chooseInspectorValue(
+    page,
+    depth,
+    label('gallery.videoReview.depthMode'),
+    label('gallery.videoReview.depthModeArea')
+  );
+  const strength = depth.getByRole('textbox', {
+    name: label('gallery.videoReview.depthStrength'),
+    exact: true,
+  });
+  await expect(strength).toHaveValue('55');
+  await strength.fill('60');
+  await strength.press('Enter');
+  await expect
+    .poll(async () => (await accepted()).depthOfField)
+    .toMatchObject({ enabled: true, mode: 'area', strength: 0.6 });
+  await checkInspectorPaintedFont(page, strength, 'native-resource-depth');
+  await page.screenshot({ path: outputPath('native-resource-depth.png'), fullPage: false });
+  const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+  await playhead.press('Home');
+  for (let frame = 0; frame < 18; frame++) await playhead.press('ArrowRight');
+  const pixels = () =>
+    page.locator('[data-preview-stage-canvas]').evaluate(async (canvas: HTMLCanvasElement) => {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+      const bytes = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+      const hash = await crypto.subtle.digest('SHA-256', bytes);
+      return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join(
+        ''
+      );
+    });
+  let previous: string | undefined;
+  let stableFrames = 0;
+  await expect
+    .poll(async () => {
+      const current = await pixels();
+      stableFrames = current === previous ? stableFrames + 1 : 0;
+      previous = current;
+      return stableFrames;
+    })
+    .toBeGreaterThanOrEqual(2);
+  const saveCanvas = async (name: string) => {
+    const url = await page
+      .locator('[data-preview-stage-canvas]')
+      .evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+    await writeFile(outputPath(name), Buffer.from(url.split(',')[1]!, 'base64'));
+  };
+  const focused = await pixels();
+  await saveCanvas('resource-depth-enabled.png');
+  const enabled = depth.getByRole('switch', {
+    name: label('gallery.videoReview.spatialEnabled'),
+    exact: true,
+  });
+  await enabled.click();
+  await expect.poll(async () => (await accepted()).depthOfField?.enabled).toBe(false);
+  await expect.poll(pixels).not.toBe(focused);
+  await saveCanvas('resource-depth-disabled.png');
+  await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+  await expect.poll(async () => (await accepted()).depthOfField?.enabled).toBe(true);
+  await saveCanvas('resource-depth-restored.png');
+  await expect.poll(pixels).toBe(focused);
+  await page
+    .locator('[data-ui="video-editor.inspector.categories"] > nav')
+    .getByRole('button', {
+      name: label('videoEditor.sidebar.inspectorGroupAnimation'),
+      exact: true,
+    })
+    .click();
+  const exit = page.locator('[data-ui="video-editor.motion.blur"][data-phase="exit"]');
+  const exitStrength = exit.getByRole('textbox', {
+    name: label('gallery.videoReview.motionBlurStrength'),
+    exact: true,
+  });
+  await expect(exitStrength).toHaveValue('65');
+  await exitStrength.fill('75');
+  await exitStrength.press('Enter');
+  await expect
+    .poll(async () => (await accepted()).motionBlur?.exit)
+    .toEqual({ enabled: true, strength: 0.75 });
+  await checkInspectorPaintedFont(page, exitStrength, 'native-resource-motion-exit');
+  await page.screenshot({ path: outputPath('native-resource-motion-exit.png'), fullPage: false });
+  const blurRegion = native.motionRegions?.find(
+    (entry) => entry.motionBlur?.enter?.enabled && entry.duration > 0
+  );
+  if (!blurRegion) throw new Error('Missing visible retained blur phase');
+  const zoom = page.getByRole('slider', { name: label('videoEditor.timeline.zoom'), exact: true });
+  const originalZoom = Number(await zoom.inputValue());
+  await zoom.press('End');
+  await page.locator('[data-ui="video-editor.timeline.canvas-scroll"]').evaluate((node) => {
+    node.scrollLeft = 0;
+  });
+  await page.locator(`[data-timeline-effect-segment="${blurRegion.id}"] button[title]`).click();
+  await page
+    .locator('[data-ui="video-editor.inspector.categories"] > nav')
+    .getByRole('button', {
+      name: label('videoEditor.sidebar.inspectorGroupAnimation'),
+      exact: true,
+    })
+    .click();
+  const blur = page.locator('[data-ui="video-editor.motion.blur"][data-phase="enter"]');
+  const blurStrength = blur.getByRole('textbox', {
+    name: label('gallery.videoReview.motionBlurStrength'),
+    exact: true,
+  });
+  await expect(blurStrength).toHaveValue('65');
+  await blurStrength.fill('75');
+  await blurStrength.press('Enter');
+  await expect
+    .poll(
+      async () =>
+        (await readNativeVideoProject(page))!.motionRegions!.find(
+          (entry) => entry.id === blurRegion.id
+        )?.motionBlur?.enter
+    )
+    .toEqual({ enabled: true, strength: 0.75 });
+  await checkInspectorPaintedFont(page, blurStrength, 'native-resource-motion-blur');
+  await page.screenshot({ path: outputPath('native-resource-motion-blur.png'), fullPage: false });
+  await zoom.press('Home');
+  for (let pageStep = 0; pageStep < Math.floor(originalZoom / 10); pageStep++)
+    await zoom.press('PageUp');
+  const steps = Math.round((originalZoom - Number(await zoom.inputValue())) * 10);
+  for (let step = 0; step < Math.abs(steps); step++)
+    await zoom.press(steps < 0 ? 'ArrowLeft' : 'ArrowRight');
+  expect(Number(await zoom.inputValue())).toBeCloseTo(originalZoom, 1);
+  return { depthRegionId: region.id, blurRegionId: blurRegion.id };
+}
+
+async function checkTransferredRotatedArea(args: {
+  page: Page;
+  origin: string;
+  theme: string;
+  project: NativeProject;
+  regionId: string;
+  format: 'WEBM' | 'MP4';
+  label: InspectorLabel;
+  outputPath: (name: string) => string;
+}) {
+  const { page, project, label, outputPath } = args;
+  await page.goto(
+    `${args.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${encodeURIComponent(project.id)}&theme=${args.theme}`
+  );
+  await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+  const initial = project.motionRegions!.find((region) => region.id === args.regionId)!;
+  const video = project.clips.find((clip) => clip.id === initial.sourceBinding?.clipId);
+  if (video?.type !== 'VIDEO') throw new Error('Missing transferred camera owner');
+  const accepted = async () => (await readNativeVideoProject(page, project.id))!;
+  const region = async () =>
+    (await accepted()).motionRegions!.find((entry) => entry.id === args.regionId)!;
+  await page.locator('[data-ui="video-editor.timeline.toolbar.fit-project"]').click();
+  await page.locator(`[data-project-timeline-clip="${video.id}"]`).click();
+  const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+  await playhead.press('Home');
+  for (let frame = 0; frame < 18; frame++) await playhead.press('ArrowRight');
+  await page
+    .getByRole('button', {
+      name: label('videoEditor.sidebar.inspectorGroupTransform'),
+      exact: true,
+    })
+    .click();
+  const rotation = page.getByRole('textbox', {
+    name: label('videoEditor.sidebar.rotationLabel'),
+    exact: true,
+  });
+  await rotation.fill('30');
+  await rotation.press('Enter');
+  await expect
+    .poll(
+      async () => (await accepted()).clips.find((clip) => clip.id === video.id)?.transform.rotation
+    )
+    .toBe(30);
+  await page.locator(`[data-timeline-effect-segment="${args.regionId}"] button[title]`).click();
+  await page
+    .locator('[data-ui="video-editor.inspector.categories"] > nav')
+    .getByRole('button', { name: label('videoEditor.sidebar.inspectorGroupFraming'), exact: true })
+    .click();
+  const inspector = page.locator('[data-ui="video-editor.inspector.categories"]');
+  await chooseInspectorValue(
+    page,
+    inspector,
+    label('videoEditor.sidebar.motionFocusLabel'),
+    label('videoEditor.sidebar.motionFocusManualArea')
+  );
+  await expect.poll(async () => (await region()).focusArea).toBeTruthy();
+  const sourceArea = (await region()).focusArea!;
+  await chooseInspectorValue(
+    page,
+    inspector,
+    label('videoEditor.sidebar.motionCoverage'),
+    label('videoEditor.sidebar.spotlightCoverageScene')
+  );
+  await expect
+    .poll(async () => (await region()).sourceBinding?.coordinateSpace)
+    .not.toBe('source-window');
+  const rebased = await accepted();
+  await writeFile(
+    outputPath('native-resource-area-rebase.json'),
+    JSON.stringify({ sourceArea, video, rebased })
+  );
+  const transform = rebased.clips.find((clip) => clip.id === video.id)!.transform;
+  const source = rebased.assets.find((asset) => asset.id === video.assetId);
+  const sourceWidth = source?.metadata.width;
+  const sourceHeight = source?.metadata.height;
+  if (!sourceWidth || !sourceHeight || !video.sourceCrop || !video.windowHeader)
+    throw new Error('Missing cropped decorated source fixture');
+  const crop = video.sourceCrop;
+  const header = windowHeaderGeometry(video.windowHeader, {
+    width: sourceWidth,
+    height: sourceHeight,
+  });
+  const visibleBodyHeight =
+    (transform.width * (sourceHeight * crop.height)) / (sourceWidth * crop.width);
+  const snappedHeader = 2 * Math.ceil((header.height * transform.width) / sourceWidth / 2 - 1e-12);
+  expect(visibleBodyHeight + snappedHeader).toBeCloseTo(transform.height, 6);
+  const originalWidth = transform.width / crop.width;
+  const originalBodyHeight = visibleBodyHeight / crop.height;
+  const originalHeader = (header.height * originalWidth) / sourceWidth;
+  const originalWindow = {
+    x: transform.x - crop.x * originalWidth,
+    y: transform.y + snappedHeader - crop.y * originalBodyHeight - originalHeader,
+    width: originalWidth,
+    height: originalBodyHeight + originalHeader,
+  };
+  const c = Math.cos(Math.PI / 6),
+    sine = Math.sin(Math.PI / 6);
+  const turn = (x: number, y: number) => {
+    const dx =
+      originalWindow.x +
+      (x / project.width) * originalWindow.width -
+      (transform.x + transform.width / 2);
+    const dy =
+      originalWindow.y +
+      (y / project.height) * originalWindow.height -
+      (transform.y + transform.height / 2);
+    return {
+      x: transform.x + transform.width / 2 + dx * c - dy * sine,
+      y: transform.y + transform.height / 2 + dx * sine + dy * c,
+    };
+  };
+  const axes = sourceArea.axes ?? { x: { x: 1, y: 0 }, y: { x: 0, y: 1 } };
+  const origin = turn(sourceArea.x, sourceArea.y);
+  const xEnd = turn(
+    sourceArea.x + sourceArea.width * axes.x.x,
+    sourceArea.y + sourceArea.width * axes.x.y
+  );
+  const yEnd = turn(
+    sourceArea.x + sourceArea.height * axes.y.x,
+    sourceArea.y + sourceArea.height * axes.y.y
+  );
+  const oldWidth = Math.hypot(xEnd.x - origin.x, xEnd.y - origin.y);
+  const oldHeight = Math.hypot(yEnd.x - origin.x, yEnd.y - origin.y);
+  const unitX = { x: (xEnd.x - origin.x) / oldWidth, y: (xEnd.y - origin.y) / oldWidth };
+  const unitY = { x: (yEnd.x - origin.x) / oldHeight, y: (yEnd.y - origin.y) / oldHeight };
+  const checkArea = (candidate: NativeProject, width: number) => {
+    const area = candidate.motionRegions!.find((entry) => entry.id === args.regionId)!.focusArea!;
+    expect(area.axes).toBeDefined();
+    expect(area.width).toBeCloseTo(width, 6);
+    expect(area.height).toBeCloseTo(oldHeight, 6);
+    for (const [u, v] of [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ]) {
+      expect(
+        area.x + u! * area.width * area.axes!.x.x + v! * area.height * area.axes!.y.x
+      ).toBeCloseTo(origin.x + u! * width * unitX.x + v! * oldHeight * unitY.x, 6);
+      expect(
+        area.y + u! * area.width * area.axes!.x.y + v! * area.height * area.axes!.y.y
+      ).toBeCloseTo(origin.y + u! * width * unitX.y + v! * oldHeight * unitY.y, 6);
+    }
+  };
+  checkArea(rebased, oldWidth);
+  const exact = inspector.locator('[data-ui="video-editor.inspector.disclosure"]').filter({
+    has: page.getByRole('heading', {
+      name: label('videoEditor.sidebar.inspectorExactPlacement'),
+      exact: true,
+    }),
+  });
+  if (!(await exact.evaluate((node: HTMLDetailsElement) => node.open)))
+    await exact.locator('summary').click();
+  const width = inspector.getByRole('textbox', {
+    name: label('videoEditor.sidebar.motionAreaWidthLabel'),
+    exact: true,
+  });
+  const editedWidth = Math.round(oldWidth * 0.9);
+  await width.fill(String(editedWidth));
+  await width.press('Tab');
+  await expect.poll(async () => (await region()).focusArea?.width).toBeCloseTo(editedWidth, 6);
+  await checkInspectorPaintedFont(page, width, 'native-resource-rotated-area');
+  const authored = await accepted();
+  checkArea(authored, editedWidth);
+  await page.screenshot({ path: outputPath('native-resource-rotated-area.png'), fullPage: false });
+  await page.reload();
+  await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+  const restored = await accepted();
+  expect(restored).toEqual(authored);
+  checkArea(restored, editedWidth);
+  expect(restored.assets).toEqual(project.assets);
+  expect(restored.effectSnapshots).toEqual(project.effectSnapshots);
+  expect(restored.effectInstances).toEqual(project.effectInstances);
+  expect(restored.transitions).toEqual(project.transitions);
+  expect(
+    restored.clips
+      .filter((clip) => clip.id !== video.id)
+      .map((clip) => ({ ...clip, timelineLaneId: clip.timelineLaneId ?? null }))
+  ).toEqual(
+    project.clips
+      .filter((clip) => clip.id !== video.id)
+      .map((clip) => ({ ...clip, timelineLaneId: clip.timelineLaneId ?? null }))
+  );
+  for (const asset of restored.effectSnapshots?.flatMap((snapshot) => snapshot.assets) ?? []) {
+    expect(
+      createHash('sha256')
+        .update(new Uint8Array(await asset.blob.arrayBuffer()))
+        .digest('hex')
+    ).toBe(asset.sha256);
+  }
+  const host = restored.clips.find(
+    (clip) =>
+      clip.type === 'EFFECT' && clip.attachment?.kind === 'source' && !clip.sourceRange?.dormant
+  )!;
+  const point = (time: number, x = 0.5, y = 0.5) => {
+    const camera = resolveVideoCompositionFrame(restored, time).camera;
+    const projection = resolveEffectSourceProjection(restored, host, camera, time);
+    if (!projection) throw new Error('Missing restored resource projection');
+    const projected = projectQuickEditPoint(projection, {
+      x: host.transform.x + host.transform.width * x,
+      y: host.transform.y + host.transform.height * y,
+    });
+    const result = projected && mapCompositionPointThroughCamera(projected, camera);
+    if (!result) throw new Error('Missing restored resource landmark');
+    return result;
+  };
+  const samples = [0.6, 2].map((time) => ({
+    time,
+    x: Math.round(point(time).x),
+    y: Math.round(point(time).y),
+    expected: [224, 32, 176],
+  }));
+  if (
+    restored.effectInstances?.some(
+      (instance) =>
+        instance.kind === 'targetEffect' &&
+        instance.target.kind === 'clip' &&
+        instance.target.clipId === host.id
+    )
+  ) {
+    const green = point(2, 0.7, 0.65);
+    samples.push({
+      time: 2,
+      x: Math.round(green.x),
+      y: Math.round(green.y),
+      expected: [32, 176, 96],
+    });
+  }
+  const output = await encodedNativeVideoSamples(page, args.origin, restored, args.format, samples);
+  for (const sample of output.samples)
+    expect(sample.error, JSON.stringify(sample)).toBeLessThanOrEqual(12);
+  await writeFile(
+    outputPath('native-resource-rotated-area-encoded.json'),
+    JSON.stringify({ sourceArea, editedWidth, restored, output })
+  );
+}
+
 const baseCase = {
   viewport: PRIMARY_BROWSER_VIEWPORTS[0]!,
   format: 'WEBM',
@@ -456,6 +887,7 @@ const baseCase = {
   theme: 'light',
   crop: false,
   spatial: false,
+  spatialDetails: false,
   selectedOnly: false,
   nativeFx: false,
   groupFx: false,
@@ -479,6 +911,7 @@ for (const {
   theme,
   crop,
   spatial,
+  spatialDetails,
   selectedOnly,
   nativeFx,
   groupFx,
@@ -618,7 +1051,7 @@ for (const {
     theme: 'dark',
   },
   { ...baseCase, crop: true },
-  { ...baseCase, crop: true, spatial: true },
+  { ...baseCase, crop: true, spatial: true, spatialDetails: true },
   { ...baseCase, crop: true, selectedOnly: true, nativeFx: true },
   {
     ...baseCase,
@@ -674,11 +1107,12 @@ for (const {
     theme: 'dark',
     crop: true,
     spatial: true,
+    spatialDetails: true,
     nativeFx: true,
     galleryCut: 'fade-black',
   },
 ] as const) {
-  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}${fractionalVideo ? ' fractional-video' : ''}${fractionalMain ? ' fractional-main' : ''}${heldExposure ? ' held-exposure' : ''}${lateExposureEnd ? ' late-end' : ''}${emptyMedia ? ' empty-media' : ''}${resultVoice ? ' result-voice' : ''}`, async ({
+  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}${fractionalVideo ? ' fractional-video' : ''}${fractionalMain ? ' fractional-main' : ''}${heldExposure ? ' held-exposure' : ''}${lateExposureEnd ? ' late-end' : ''}${emptyMedia ? ' empty-media' : ''}${resultVoice ? ' result-voice' : ''}${spatialDetails ? ' spatial-details' : ''}`, async ({
     page,
   }, info) => {
     test.setTimeout(240000);
@@ -704,7 +1138,7 @@ for (const {
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
-      const source = await resourceAnnotationSource(title, heldExposure);
+      const source = await resourceAnnotationSource(title, heldExposure, spatialDetails);
       const admitted = parseEffectV1Source(source);
       expect(admitted.diagnostics).toEqual([]);
       expect(admitted.ok).toBe(true);
@@ -806,6 +1240,7 @@ for (const {
         });
         await tilt.fill('25');
         await tilt.press('Enter');
+        if (spatialDetails) await configureGallerySpatialDetails(page, dialog, label);
       }
       for (const [start, end] of [
         [1, 5],
@@ -1774,6 +2209,9 @@ for (const {
         .toBe(3);
       const native = (await readNativeVideoProject(page))!;
       expect(native.id).not.toBe(aggregate);
+      const spatialDetailIds = spatialDetails
+        ? await checkTransferredSpatialDetails(page, native, label, (name) => info.outputPath(name))
+        : undefined;
       const resultTake = resultVoice
         ? native.clips.find((clip) => clip.type === 'AUDIO' && clip.textSnapshot)
         : undefined;
@@ -2174,14 +2612,15 @@ for (const {
             }, spotlight)
         )
         .toBeGreaterThan(50);
-      const dormantPixel = await readDormantPixel();
-      expect(
-        Math.max(
-          ...dormantPixel.map((channel, channelIndex) =>
-            Math.abs(channel - [224, 32, 176][channelIndex]!)
+      await expect
+        .poll(async () =>
+          Math.max(
+            ...(await readDormantPixel()).map((channel, channelIndex) =>
+              Math.abs(channel - [224, 32, 176][channelIndex]!)
+            )
           )
         )
-      ).toBeGreaterThan(32);
+        .toBeGreaterThan(32);
 
       const dragTimelineClip = async (id: string, delta: number) => {
         const node = page.locator(`[data-project-timeline-clip="${id}"]`);
@@ -2957,6 +3396,50 @@ for (const {
         expect(final.bookendPresets?.outro.edgeControl?.plain.duration).toBe(0.9);
         expect(final.bookendPresets?.outro.edgeControl?.media.duration).toBe(0.4);
       }
+      if (spatialDetails) {
+        await writeFile(
+          info.outputPath('native-resource-spatial-final.json'),
+          JSON.stringify(final)
+        );
+        await writeFile(
+          info.outputPath('native-resource-exposure-probe.json'),
+          JSON.stringify(
+            [0.025, 0.1, 0.2].map((time) => {
+              const passes = resolveVideoCompositionRenderPasses(final, time);
+              return {
+                time,
+                camera: passes.overlayFrame.camera,
+                passes: passes.visualPasses.map((pass) => ({
+                  time: pass.time,
+                  camera: pass.frame.camera,
+                })),
+              };
+            })
+          )
+        );
+        const detail = final.motionRegions!.find(
+          (region) => region.depthOfField?.strength === 0.6
+        )!;
+        expect(detail.depthOfField).toMatchObject({ mode: 'area', strength: 0.6, softness: 0.35 });
+        expect(detail.motionBlur?.enter).toEqual({ enabled: true, strength: 0.65 });
+        expect(detail.motionBlur?.exit).toEqual({ enabled: true, strength: 0.75 });
+        expect(resolveVideoCompositionRenderPasses(final, 1.1).visualPasses.length).toBeGreaterThan(
+          1
+        );
+        expect(
+          final.motionRegions!.find((region) => region.id === spatialDetailIds?.blurRegionId)
+            ?.motionBlur?.enter
+        ).toEqual({ enabled: true, strength: 0.75 });
+        expect(
+          resolveVideoCompositionFrame(final, 0.6).camera.spatial?.focus.some(
+            (focus) => focus.weight > 0 && focus.settings.strength === 0.6
+          )
+        ).toBe(true);
+        expect(
+          resolveVideoCompositionRenderPasses(final, 0.025).visualPasses.length
+        ).toBeGreaterThan(1);
+        expect(resolveVideoCompositionFrame(final, 0.1).camera.motionBlurAmount).toBe(0);
+      }
       if (spatial) {
         const spatialFrame = resolveVideoCompositionFrame(final, 0.6);
         expect(spatialFrame.camera.spatial).toBeTruthy();
@@ -3348,6 +3831,16 @@ for (const {
                         x: Math.round(greenPoint.x),
                         y: Math.round(greenPoint.y),
                         expected: [32, 176, 96],
+                      },
+                    ]
+                  : []),
+                ...(spatialDetails
+                  ? [
+                      {
+                        time: 1.1,
+                        x: Math.round(final.width / 2),
+                        y: Math.round(final.height / 2),
+                        expected: [224, 32, 176],
                       },
                     ]
                   : []),
@@ -3767,6 +4260,19 @@ for (const {
       expect(Math.abs(output.duration - expectedDuration)).toBeLessThanOrEqual(0.1);
       if (selectedOnly) expect(output.audioTrackCount).toBe(0);
       expect(await readNativeVideoProject(page, final.id)).toEqual(final);
+      if (spatialDetails && spatialDetailIds) {
+        await checkTransferredRotatedArea({
+          page,
+          origin: host.origin,
+          theme,
+          project: final,
+          regionId: spatialDetailIds.depthRegionId,
+          format,
+          label,
+          outputPath: (name) => info.outputPath(name),
+        });
+        expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(gallery);
+      }
       expect(errors).toEqual([]);
     } finally {
       host.server.closeAllConnections();

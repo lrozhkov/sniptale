@@ -16,7 +16,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effect-runtime/types';
 import type { VideoCompositionFrame, VideoCompositionVisualPass } from '../../types';
 import { renderEffectRuntimeComposition } from './wave';
-import type { EffectRuntimeFramePlan, EffectRuntimeRenderedFrameMap } from '../runtime/types';
+import type {
+  EffectRuntimeFramePlan,
+  EffectRuntimeRenderedFrameMap,
+  EffectRuntimeRenderedFrame,
+} from '../runtime/types';
 
 const { renderPlans } = vi.hoisted(() => ({ renderPlans: vi.fn() }));
 vi.mock('../runtime/driver', async (importOriginal) => ({
@@ -522,3 +526,98 @@ it('keeps an overlay-sampled layer when the neighboring camera changes owner', a
     )
   ).toEqual(['source']);
 });
+
+it.each(['clip', 'track', 'video-group', 'stacked'] as const)(
+  'releases consumed rasters after scoped %s FX without closing later-reader inputs',
+  async (kind) => {
+    const { project, frame } = createAnnotationComposition();
+    const target: EffectRuntimeFramePlan['target'] =
+      kind === 'clip'
+        ? {
+            kind: 'clip',
+            clipId: 'source',
+            chainIndex: 0,
+            placement: { x: 0, y: 0, width: 20, height: 10, rotation: 0, opacity: 1 },
+          }
+        : kind === 'track'
+          ? { kind: 'track', trackId: 'track', clipIds: ['source', 'viewport'] }
+          : { kind: 'video-group', clipIds: ['source', 'viewport'] };
+    if (kind === 'stacked')
+      frame.effectRuntimePlans!.push(
+        {
+          ...createPlan('upstream-clip'),
+          kind: 'targetEffect',
+          target: {
+            kind: 'clip',
+            clipId: 'source',
+            chainIndex: 0,
+            placement: { x: 0, y: 0, width: 20, height: 10, rotation: 0, opacity: 1 },
+          },
+        },
+        {
+          ...createPlan('transition'),
+          kind: 'transition',
+          target: {
+            kind: 'transition',
+            transitionId: 'join',
+            leadingClipId: 'source',
+            trailingClipId: 'viewport',
+          },
+        },
+        {
+          ...createPlan('upstream-track'),
+          kind: 'targetEffect',
+          target: { kind: 'track', trackId: 'track', clipIds: ['source', 'viewport'] },
+        }
+      );
+    frame.effectRuntimePlans!.push({ ...createPlan('reader'), kind: 'targetEffect', target });
+    const bitmaps: ImageBitmap[] = [];
+    let peak = 0;
+    renderPlans.mockImplementation(
+      async ({
+        plans,
+        resourceScope,
+      }: {
+        plans: readonly EffectRuntimeFramePlan[];
+        resourceScope: EffectRuntimeFrameResourceScope;
+      }) => {
+        const frames = new Map<string, EffectRuntimeRenderedFrame>();
+        for (const plan of plans) {
+          if (plan.effectInstanceId === 'reader') {
+            expect(frames.has('source')).toBe(true);
+            for (const input of frames.values()) expect(input.bitmap.close).not.toHaveBeenCalled();
+          }
+          const output = createFrames(plan.effectInstanceId).get(plan.effectInstanceId)!;
+          resourceScope.retainBitmap(output.bitmap);
+          bitmaps.push(output.bitmap);
+          peak = Math.max(peak, resourceScope.snapshot().liveRasterResources);
+          frames.set(plan.effectInstanceId, { ...output, kind: plan.kind, target: plan.target });
+        }
+        return frames;
+      }
+    );
+    const rendered = await renderEffectRuntimeComposition({
+      project,
+      executor,
+      imageBank: {},
+      clipMediaElements: new Map(),
+      overlayFrame: frame,
+      overlayTime: 1,
+      visualPasses:
+        kind === 'stacked'
+          ? []
+          : [0.98, 0.99, 1, 1.01, 1.02].map((time) => createPass(time, frame)),
+    });
+    for (const frames of rendered.framesByTime.values()) {
+      expect(frames.has('reader')).toBe(true);
+      expect(frames.has('source')).toBe(false);
+      expect(frames.has('viewport')).toBe(kind === 'clip' && frames === rendered.overlayFrames);
+      if (kind === 'stacked') {
+        expect([...frames.keys()]).toEqual(['transition', 'reader']);
+      }
+    }
+    expect(peak).toBeLessThanOrEqual(EFFECT_RUNTIME_RESOURCE_LIMITS.maxLiveCanvases);
+    disposeEffectRuntimeComposition(rendered);
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  }
+);

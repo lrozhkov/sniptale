@@ -2338,22 +2338,33 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This file proves one resource transfer and montage journey. Two private helpers separate result voice fixture admission from Native text interaction. Existing cases share the same browser setup, real export oracle and cleanup. Effects belong to the test harness. No product authority or new runtime owner applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This suite proves one resource transfer and montage journey. Private helpers use the same saved root and browser lifetime. Spatial resource checks extend two existing cases. No new product owner or state authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
       "reviewDate": "2026-10-23",
-      "astHash": "055b6b44a6dbb158b7518c55a5f282868592e76f4fed68be674244ef406e8f6e",
-      "signatureHash": "b6353a31ec4dbbf2db65457fce19b2abb007cdfaefc80e7aaefd8cb1774544ee"
+      "astHash": "4db46764ff4a2ce80b681a3eb163bef572bfc48d8f825bcba1715bece9040e39",
+      "signatureHash": "814214b05a8d9ccfd5edc438c1558aa80bc04cf60ccd07c337a508441014ead3"
     },
     {
       "rule": "structural-function-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This callback owns one browser journey from Gallery transfer through Native editing, reload and real export. Its existing variants share one host and cleanup boundary. Result voice preparation and text interaction now have separate private helpers. Remaining ordering proves the connected acceptance result. No generic phase framework or new product state applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This callback owns one Gallery transfer, Native edit, reload and export journey. Existing cases share browser setup and cleanup. Private spatial helpers preserve this ordering. No generic phase framework or new runtime state applies. Main inspected this exact body. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
       "reviewDate": "2026-10-23",
-      "astHash": "fb75d6770e10604ebf18c5580270d14f7c74413926b86b2a3e673e672670ce37",
+      "astHash": "b3d00cb27dd2987444373fa8069ec714bf5794ce3fce626face264a7f608d743",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
+      "symbol": "checkTransferredRotatedArea",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: This helper proves one saved resource camera edit. Rotation, coordinate conversion, reload and encode use the same imported root. The independent corner oracle checks the converted geometry. Resource hashes check the same root. A split would separate this acceptance sequence without an owner boundary. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "426143f07cd42135c5c66d313ed758da3cfd91bbafa08bc3fb8ba2d70eb2af13",
+      "signatureHash": "b32d4c6f581059596a52b337e9fda04ab971db209dbdfac0f52002bbf9d071d7"
     }
   ]
 }
