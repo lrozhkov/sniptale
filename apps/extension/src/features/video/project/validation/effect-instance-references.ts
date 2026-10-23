@@ -1,3 +1,4 @@
+import { isEffectHostTimingValid } from '../effect-instance/timing';
 import { isVideoEffectTrack } from '../effect-instance/owner';
 import type {
   VideoProjectEffectInstance,
@@ -81,10 +82,7 @@ function isValidStandaloneInstance(
 ): boolean {
   const host = context.hostByInstanceId.get(instance.id);
   return (
-    instance.kind === 'standalone' &&
-    host !== undefined &&
-    nearlyEqual(host.startTime, instance.startTime) &&
-    nearlyEqual(host.duration, instance.duration)
+    instance.kind === 'standalone' && host !== undefined && isEffectHostTimingValid(host, instance)
   );
 }
 
@@ -120,10 +118,6 @@ function isValidTransitionInstance(
   }
   context.transitionTargets.add(target.transitionId);
   return true;
-}
-
-function nearlyEqual(left: number, right: number): boolean {
-  return Math.abs(left - right) <= 1e-7;
 }
 
 /** Removed source placements are dormant; an attachment cannot select another material. */

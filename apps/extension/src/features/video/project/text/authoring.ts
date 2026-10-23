@@ -1,3 +1,5 @@
+import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
+import { getMediaClipSourceTime } from '../timeline/rate';
 import { hasCurrentOriginalAudioTargets } from '../timeline/original-audio';
 import { isVideoProjectClip } from '../validation/clips';
 import { applyVideoProjectMutationPatch } from '../mutation';
@@ -167,14 +169,19 @@ export function videoProjectTextPlayhead(
   projectTime: number
 ): number | null {
   if (entry.binding.kind === 'project') return projectTime;
-  const values = project.clips.flatMap((clip) =>
-    (clip.type === 'VIDEO' || clip.type === 'AUDIO') &&
-    isTextSourceClip(clip, entry.binding) &&
-    clip.startTime <= projectTime &&
-    projectTime < clip.startTime + clip.duration
-      ? [clip.sourceStart + (projectTime - clip.startTime) * (clip.playbackRate ?? 1)]
-      : []
-  );
+  const values = project.clips.flatMap((clip) => {
+    if (
+      (clip.type !== 'VIDEO' && clip.type !== 'AUDIO') ||
+      !isTextSourceClip(clip, entry.binding) ||
+      !(clip.startTime <= projectTime && projectTime < clip.startTime + clip.duration)
+    )
+      return [];
+    const sourceTime =
+      clip.type === 'VIDEO'
+        ? mapProjectTimeToSourcePoint([clip], projectTime)?.sourceTime
+        : getMediaClipSourceTime(clip, projectTime);
+    return sourceTime === undefined ? [] : [sourceTime];
+  });
   const first = values[0];
   if (first === undefined || values.some((value) => Math.abs(value - first) > 1e-7)) return null;
   return first;

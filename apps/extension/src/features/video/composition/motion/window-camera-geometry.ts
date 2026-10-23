@@ -96,6 +96,7 @@ export function createWindowCameraGeometry(input: {
     end: number
   ) => Pick<QuickEditCameraProjectionInterval, 'planeTransform' | 'planeTransition'> | null;
   planeBreaks?: readonly number[];
+  phaseHoldAt?: number;
   windowWeight: 'window' | 'content' | 'spatial';
   region: CameraSpatialSettings & {
     start: number;
@@ -133,7 +134,7 @@ export function createWindowCameraGeometry(input: {
         )
       : null;
   const exitStart = region.end - region.exit.duration;
-  const phaseAt = (time: number) => {
+  const phaseTrajectoryAt = (time: number) => {
     if (
       !input.connectedIn &&
       region.enter.duration > 0 &&
@@ -147,6 +148,14 @@ export function createWindowCameraGeometry(input: {
       if (exit) return exit;
     }
     return 1;
+  };
+  const phaseAt = (time: number) => {
+    const hold = input.phaseHoldAt;
+    if (hold !== undefined && time >= hold) {
+      const phase = phaseTrajectoryAt(hold);
+      return typeof phase === 'number' ? phase : evaluateCameraTrajectory(phase, hold).x;
+    }
+    return phaseTrajectoryAt(time);
   };
   const instantBoundaries = [
     ...(!input.connectedIn && region.enter.type === 'instant' && region.enter.duration > 0
@@ -218,6 +227,9 @@ export function createWindowCameraGeometry(input: {
     end: number,
     targetScale: number
   ): Omit<QuickEditCameraProjectionInterval, 'pan'> | null => {
+    // Proof cells must split where the camera clock stops.
+    if (input.phaseHoldAt !== undefined && start < input.phaseHoldAt && end > input.phaseHoldAt)
+      return null;
     const plane = input.intervalPlane?.(start, end);
     if (input.intervalPlane && !plane) return null;
     return {
@@ -237,6 +249,7 @@ export function createWindowCameraGeometry(input: {
   };
   const minimumScale = (start: number, end: number, targetScale: number) => {
     const values = [phaseValue(start), phaseValue(end)];
+    end = Math.min(end, input.phaseHoldAt ?? Infinity);
     for (const trajectory of [enter, exit]) {
       if (trajectory && start < trajectory.end && end > trajectory.start)
         values.push(
@@ -254,6 +267,7 @@ export function createWindowCameraGeometry(input: {
     window: { width: input.window.width, height: input.window.height },
     breaks: [
       region.start,
+      input.phaseHoldAt,
       enter?.end,
       exit?.start,
       ...(!input.connectedOut && region.exit.type === 'instant' ? [exitStart] : []),
@@ -263,6 +277,19 @@ export function createWindowCameraGeometry(input: {
     discontinuities(targetScale) {
       if (targetScale === 1 && !hasQuickEditPerspective(region.perspective)) return [];
       const times: number[] = [];
+      const hold = input.phaseHoldAt;
+      if (hold !== undefined) {
+        const phase = phaseTrajectoryAt(hold);
+        if (
+          typeof phase !== 'number' &&
+          [1, 2].some(
+            (order) =>
+              Math.abs(evaluateCameraTrajectoryDerivative(phase, hold, order === 1 ? 1 : 2).x) >
+              1e-9
+          )
+        )
+          times.push(hold);
+      }
       for (const phase of [enter, exit]) {
         if (!phase) continue;
         for (const time of [phase.start, phase.end])

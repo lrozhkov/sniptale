@@ -186,3 +186,18 @@ function createInstance(
     target,
   };
 }
+
+it('keeps the retained document interval when a windowed EFFECT placement changes', () => {
+  const project = createProjectWithEffects();
+  const scene = project.effectInstances!.find(({ id }) => id === 'scene')!;
+  const original = structuredClone(scene);
+  const host = project.clips.find(
+    (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === scene.id
+  )!;
+  host.duration += 0.3;
+  host.playbackWindow = { offset: 0, holdAt: scene.duration - 0.1 };
+  project.version = 43;
+  const next = syncProjectDuration(project);
+  expect(next.effectInstances!.find(({ id }) => id === scene.id)).toEqual(original);
+  expect(isHydratableVideoProject(next)).toBe(true);
+});

@@ -1,3 +1,9 @@
+import {
+  bindMotionRegionToClip,
+  reconcileMotionSourceBindings,
+} from '../../project/motion/source-binding';
+import { materializeVideoProjectCursorSourceObservations } from '../../project/cursor-source-observations';
+import { sliceClipPlaybackWindow } from '../../project/timeline/rate';
 import { mapCompositionPointThroughCamera, resolveVideoCompositionCamera } from './index';
 import { isValidVideoProject } from '../../project/validation/root';
 import { expect, it } from 'vitest';
@@ -482,5 +488,90 @@ it.each([
       expect(pixel.y).toBeLessThanOrEqual(project.height + 1e-6);
     }
     expect(project).toEqual(before);
+  }
+);
+
+it.each([0, 3.05, 0.05])(
+  'retains the complete source-follow context for a window at %s',
+  (placement) => {
+    const { project, region: raw } = fixture();
+    const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    clip.sourceInstanceId = 'retained-follow';
+    project.version = 33;
+    project.cursorTrack = {
+      captureMode: 'separate',
+      skin: normalizeVideoProjectCursorSkin(undefined),
+      samples: [],
+      sourceObservations: [
+        {
+          recordingId: 'zones',
+          sourceInstanceId: 'retained-follow',
+          samples: [0, 0.5, 1, 1.5, 2, 2.5, 3].map((time) => ({
+            id: `p:${time}`,
+            time,
+            x: 150 + (700 * time) / 3,
+            y: 300,
+            visible: true,
+            captureSegment: 0,
+            recordingPoint: { x: (150 + (700 * time) / 3) / 1000, y: 0.5 },
+          })),
+        },
+      ],
+    };
+    project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+    const bound = bindMotionRegionToClip({ ...raw, scale: 2 }, clip);
+    bound.sourceBinding = { ...bound.sourceBinding!, coordinateSpace: 'source-window' };
+    project.motionRegions = [bound];
+    const expected = resolveVideoCompositionCamera({
+      project,
+      currentTime: 2.5,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(resolveProjectCursorCameraPlan(project, bound).status).toBe('ready');
+    const windowed = {
+      ...clip,
+      duration: 3.2,
+      playbackWindow: { offset: 0, extent: 3.2, holdAt: 2.5 },
+    };
+    const held = { ...project, version: 43 as const, duration: 3.2, clips: [windowed] };
+    let candidate: typeof project = held;
+    let time = 3.1;
+    if (placement > 0) {
+      const trailing = {
+        ...windowed,
+        id: 'retained-tail',
+        startTime: placement,
+        duration: 0.15,
+        playbackWindow: sliceClipPlaybackWindow(windowed, 3.05),
+      };
+      candidate = reconcileMotionSourceBindings(
+        held,
+        { ...held, clips: [{ ...windowed, duration: 3.05 }, trailing] },
+        new Map([[clip.id, trailing.id]])
+      );
+      if (placement < 1)
+        candidate = {
+          ...candidate,
+          clips: [trailing],
+          motionRegions: candidate.motionRegions!.filter(
+            (item) => item.sourceBinding?.clipId === trailing.id
+          ),
+        };
+      time = placement + 0.05;
+    }
+    candidate.cursorTrack = materializeVideoProjectCursorSourceObservations(candidate);
+    expect(isValidVideoProject(candidate)).toBe(true);
+    const before = structuredClone(candidate);
+    const actual = resolveVideoCompositionCamera({
+      project: candidate,
+      currentTime: time,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(actual.scale).toBeCloseTo(expected.scale, 6);
+    expect(actual.viewportX).toBeCloseTo(expected.viewportX, 6);
+    expect(actual.viewportY).toBeCloseTo(expected.viewportY, 6);
+    expect(candidate).toEqual(before);
   }
 );

@@ -1,3 +1,4 @@
+import { getSourceTimedClipProjectOffset, normalizeClipPlaybackRate } from './timeline/rate';
 import { MAX_VIDEO_PROJECT_ITEMS } from './validation/primitives';
 import type { VideoProject, VideoProjectCursorSample, VideoProjectVideoClip } from './types';
 import { recordingIdForProjectAsset } from './source-interactions';
@@ -14,7 +15,10 @@ export function hasValidVideoProjectCursorSourceObservations(project: VideoProje
         clip.type === 'VIDEO' && clip.sourceInstanceId === group.sourceInstanceId
     );
     if (!owners.length || new Set(owners.map((clip) => clip.assetId)).size !== 1) return false;
-    maximumProjected += (group.samples.length + 2) * owners.length;
+    maximumProjected += owners.reduce(
+      (sum, clip) => sum + group.samples.length + 2 + (clip.playbackWindow ? 1 : 0),
+      0
+    );
     const asset = project.assets.find((item) => item.id === owners[0]!.assetId);
     const duration = asset?.metadata.duration;
     return (
@@ -125,17 +129,43 @@ export function materializeVideoProjectCursorSourceObservations(
           group.recordingId
       )
         continue;
-      const start = clip.sourceStart;
-      const end = clip.sourceStart + clip.sourceDuration;
-      const retained = group.samples
-        .filter((sample) => sample.time >= start && sample.time <= end)
-        .map((sample) => ({ sample, key: `sample:${sample.id}` }));
+      const window = clip.playbackWindow;
+      const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+      const sourceAt = (offset: number) =>
+        clip.sourceStart +
+        Math.min(clip.sourceDuration, Math.min(offset, window?.holdAt ?? Infinity) * rate);
+      const start = window ? sourceAt(window.offset) : clip.sourceStart;
+      const end = window
+        ? sourceAt(window.offset + clip.duration)
+        : clip.sourceStart + clip.sourceDuration;
+      const projectTime = (sourceTime: number) =>
+        clip.startTime +
+        Math.max(
+          0,
+          Math.min(
+            clip.duration,
+            getSourceTimedClipProjectOffset(clip, sourceTime - clip.sourceStart)
+          )
+        );
+      const retained: { sample: VideoProjectCursorSample; key: string; time?: number }[] =
+        group.samples
+          .filter((sample) => sample.time >= start && sample.time <= end)
+          .map((sample) => ({ sample, key: `sample:${sample.id}` }));
       for (const time of [start, end]) {
         if (retained.some(({ sample }) => sample.time === time)) continue;
         const boundary = sourceBoundarySample(group.samples, time);
         if (boundary) retained.push({ sample: boundary, key: `boundary:${time}` });
       }
-      for (const { sample, key } of retained) {
+      if (window && projectTime(end) < clip.startTime + clip.duration) {
+        const boundary = sourceBoundarySample(group.samples, end);
+        if (boundary)
+          retained.push({
+            sample: boundary,
+            key: `hold-end:${end}`,
+            time: clip.startTime + clip.duration,
+          });
+      }
+      for (const { sample, key, time } of retained) {
         const {
           interpolationRange: _range,
           sourceAnchor: _anchor,
@@ -156,7 +186,11 @@ export function materializeVideoProjectCursorSourceObservations(
             ? { skinOverride: previous.skinOverride }
             : {}),
           id,
-          time: clip.startTime + (sample.time - clip.sourceStart) / (clip.playbackRate ?? 1),
+          time:
+            time ??
+            (window
+              ? projectTime(sample.time)
+              : clip.startTime + (sample.time - clip.sourceStart) / rate),
           interpolation: previous?.interpolation ?? 'LINEAR',
           sourceAnchor: {
             kind: 'recording-source',

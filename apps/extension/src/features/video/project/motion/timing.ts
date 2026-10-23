@@ -1,3 +1,5 @@
+import { getVideoClipSourceTime, normalizeClipPlaybackRate } from '../timeline/rate';
+import type { VideoProject } from '../types/model';
 import { fitCameraTransitionDurations, isMotionTransitionPhaseEdit } from './transitions';
 import type {
   CameraTransitionPhase,
@@ -28,12 +30,59 @@ export function isMotionAnimation(
   );
 }
 
+function sourceAnimationClock(
+  region: VideoProjectMotionRegion,
+  project?: Pick<VideoProject, 'clips'>
+) {
+  const binding = region.sourceBinding;
+  const clip = project?.clips.find((item) => item.id === binding?.clipId);
+  if (!binding || clip?.type !== 'VIDEO' || !clip.playbackWindow) return null;
+  const window = clip.playbackWindow;
+  const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+  const start = Math.max(
+    binding.sourceStart,
+    clip.sourceStart + Math.min(window.offset, window.holdAt ?? Infinity) * rate
+  );
+  const end = Math.min(
+    binding.sourceEnd,
+    clip.sourceStart + Math.min(clip.sourceDuration, (window.offset + clip.duration) * rate)
+  );
+  return end > start ? { clip, start, end, rate } : null;
+}
+
 /** Maps an offset within the visible region to its retained animation clock. */
-export function getMotionAnimationTime(region: VideoProjectMotionRegion, offset: number): number {
+export function getMotionAnimationTime(
+  region: VideoProjectMotionRegion,
+  offset: number,
+  project?: Pick<VideoProject, 'clips'>
+): number {
   const animation = region.animation;
-  return animation && region.duration > 0
-    ? animation.start + (offset / region.duration) * (animation.end - animation.start)
-    : offset;
+  if (!animation || region.duration <= 0) return offset;
+  const source = sourceAnimationClock(region, project);
+  const progress = source
+    ? Math.max(
+        0,
+        Math.min(
+          1,
+          (getVideoClipSourceTime(source.clip, region.startTime + offset) +
+            (source.clip.cameraTiming?.offsetSeconds ?? 0) -
+            source.start) /
+            (source.end - source.start)
+        )
+      )
+    : offset / region.duration;
+  return animation.start + progress * (animation.end - animation.start);
+}
+
+/** Returns animation seconds per project second before a visual hold. */
+export function getMotionAnimationRate(
+  region: VideoProjectMotionRegion,
+  project?: Pick<VideoProject, 'clips'>
+): number {
+  if (!region.animation) return 1;
+  const source = sourceAnimationClock(region, project);
+  const duration = source ? (source.end - source.start) / source.rate : region.duration;
+  return (region.animation.end - region.animation.start) / duration;
 }
 
 /** Map the retained Native scalar name to the common camera curve for new window controls. */

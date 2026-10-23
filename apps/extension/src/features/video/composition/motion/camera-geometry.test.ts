@@ -902,3 +902,61 @@ it('matches source-window ease-out connection bounds to the rendered connection'
     expect(bounds.viewport!.high).toBeCloseTo(clearance, 7);
   }
 });
+
+it.each([false, true])(
+  'keeps camera admission on the rendered phase throughout a held tail (source-window=%s)',
+  (sourceWindow) => {
+    const { project, region, policy } = fixture();
+    const selected: VideoProjectMotionRegion = {
+      ...region,
+      focusPoint: { x: 50, y: 50 },
+      zoomInDuration: 0,
+      zoomOutDuration: 1,
+      phaseTransitions: { enter: 'none', exit: 'linear' },
+      animation: { start: 0, end: 3, duration: 3 },
+      duration: 3.2,
+      sourceBinding: {
+        clipId: project.clips[0]!.id,
+        ...(sourceWindow ? { coordinateSpace: 'source-window' as const } : {}),
+        sourceStart: 0,
+        sourceEnd: 3,
+        animation: { start: 0, end: 3, duration: 3 },
+      },
+    };
+    project.version = 43;
+    project.clips = project.clips.map((clip) => ({
+      ...clip,
+      duration: 3.2,
+      playbackWindow: { offset: 0, extent: 3.2, holdAt: 2.5 },
+    }));
+    project.motionRegions = [selected];
+    const geometry = createProjectWorkingZoneCameraGeometry({
+      project,
+      region: selected,
+      policy,
+      connectedIn: false,
+      connectedOut: false,
+      bindings: new Map([['source', {}]]),
+    });
+    for (const time of [2.25, 2.5, 2.8, 3.1]) {
+      const camera = resolveVideoCompositionCamera({
+        project,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+      const pixel = mapCompositionPointThroughCamera({ x: 58, y: 50 }, camera)!;
+      const clearance = Math.min(pixel.x, pixel.y, 100 - pixel.x, 100 - pixel.y);
+      const bounds = geometry.clearanceBounds({
+        start: time,
+        end: time,
+        segmentId: 'source',
+        targetScale: 2,
+        pan: { minX: 50, maxX: 50, minY: 50, maxY: 50 },
+        actual: { from: { x: 0.58, y: 0.5 }, to: { x: 0.58, y: 0.5 } },
+      })!;
+      expect(bounds.viewport!.low).toBeCloseTo(clearance, 7);
+      expect(bounds.viewport!.high).toBeCloseTo(clearance, 7);
+    }
+  }
+);

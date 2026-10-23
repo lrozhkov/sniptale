@@ -12,6 +12,7 @@ import {
 } from './window-camera-geometry';
 import { resolveMotionSourceWindow, motionWindowFocusToWindow } from './source-window';
 import { projectMotionSourcePhases } from '../../project/motion/source-binding';
+import { resolveMotionSourcePlayback } from '../../project/motion/source-playback';
 import { isCameraMotionRegion } from '../../project/motion/normalization';
 import { cameraSourceGeometryBreaks } from './camera-source-geometry';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
@@ -568,6 +569,17 @@ export function resolveProjectCursorCameraPlan(
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
 ) {
+  const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
+  const playback = clip && resolveMotionSourcePlayback(project, clip.startTime, clip.id);
+  if (playback) {
+    const sourceRegion = playback.geometryProject.motionRegions?.find(
+      (item) => item.id === (playback.regionIds.get(region.id) ?? region.id)
+    );
+    if (sourceRegion) {
+      project = playback.geometryProject;
+      region = sourceRegion;
+    }
+  }
   project = projectMotionSourcePhases(project);
   region = project.motionRegions?.find((item) => item.id === region.id) ?? region;
   return resolvePlanEntry(project, region, output).plan;
@@ -769,6 +781,18 @@ export function resolveProjectFollowingCamera(
   time: number,
   output?: CameraOutputViewport
 ) {
+  const playback =
+    region.sourceBinding && resolveMotionSourcePlayback(project, time, region.sourceBinding.clipId);
+  if (playback) {
+    const sourceRegion = playback.geometryProject.motionRegions?.find(
+      (item) => item.id === (playback.regionIds.get(region.id) ?? region.id)
+    );
+    if (sourceRegion) {
+      project = playback.geometryProject;
+      region = sourceRegion;
+      time = playback.time;
+    }
+  }
   project = projectMotionSourcePhases(project);
   region = project.motionRegions?.find((item) => item.id === region.id) ?? region;
   const { plan, geometry } = resolvePlanEntry(project, region, output);

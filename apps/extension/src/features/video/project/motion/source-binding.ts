@@ -1,4 +1,6 @@
+import { mapSourceRangeToProjectSpans } from '../timeline/source-time';
 import { normalizeClipPlaybackRate } from '../timeline/basics';
+import { getClipPlaybackOffset } from '../timeline/rate';
 import {
   VideoProjectClipType,
   VideoProjectTrackRole,
@@ -51,8 +53,18 @@ export function bindMotionRegionToClip(
         ? { coordinateSpace: region.sourceBinding.coordinateSpace }
         : {}),
       clipId: clip.id,
-      sourceStart: clip.sourceStart + (region.startTime - clip.startTime) * rate,
-      sourceEnd: clip.sourceStart + (region.startTime + region.duration - clip.startTime) * rate,
+      sourceStart:
+        clip.sourceStart +
+        (clip.playbackWindow
+          ? getClipPlaybackOffset(clip, region.startTime)
+          : region.startTime - clip.startTime) *
+          rate,
+      sourceEnd:
+        clip.sourceStart +
+        (clip.playbackWindow
+          ? getClipPlaybackOffset(clip, region.startTime + region.duration)
+          : region.startTime + region.duration - clip.startTime) *
+          rate,
       animation: region.sourceBinding?.phaseProjection
         ? { start: 0, end: region.duration * rate, duration: region.duration * rate }
         : (region.animation ?? { start: 0, end: region.duration, duration: region.duration }),
@@ -230,8 +242,22 @@ export function projectMotionSourceBinding(
   const clip = project.clips.find((item) => item.id === binding.clipId);
   if (!clip || clip.type !== VideoProjectClipType.VIDEO) return { ...region, duration: 0 };
   if (binding.dormant) return { ...region, startTime: clip.startTime, duration: 0 };
-  const start = Math.max(binding.sourceStart, clip.sourceStart);
-  const end = Math.min(binding.sourceEnd, clip.sourceStart + clip.sourceDuration);
+  const span = clip.playbackWindow
+    ? mapSourceRangeToProjectSpans([clip], binding.sourceStart, binding.sourceEnd)[0]
+    : undefined;
+  if (clip.playbackWindow && !span) return { ...region, startTime: clip.startTime, duration: 0 };
+  const start = span?.sourceStart ?? Math.max(binding.sourceStart, clip.sourceStart);
+  const end = Math.min(
+    binding.sourceEnd,
+    clip.sourceStart +
+      Math.min(
+        clip.sourceDuration,
+        clip.playbackWindow
+          ? (clip.playbackWindow.offset + clip.duration) *
+              normalizeClipPlaybackRate(clip.playbackRate ?? 1)
+          : clip.sourceDuration
+      )
+  );
   if (end <= start) return { ...region, startTime: clip.startTime, duration: 0 };
   const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
   const animationTime = (sourceTime: number): number => {
@@ -249,8 +275,8 @@ export function projectMotionSourceBinding(
   };
   return {
     ...region,
-    startTime: clip.startTime + (start - clip.sourceStart) / rate,
-    duration: (end - start) / rate,
+    startTime: span?.startTime ?? clip.startTime + (start - clip.sourceStart) / rate,
+    duration: span ? span.endTime - span.startTime : (end - start) / rate,
     animation: {
       start: animationTime(start),
       end: animationTime(end),
@@ -260,10 +286,19 @@ export function projectMotionSourceBinding(
 }
 
 const phaseViews = new WeakMap<VideoProject, VideoProject>();
+const phaseSources = new WeakMap<VideoProject, VideoProject>();
 
 /** Derives render-only Gallery phases; source controls remain unchanged in the document. */
 export function projectMotionSourcePhases(project: VideoProject): VideoProject {
-  if (!project.motionRegions?.some((region) => region.sourceBinding?.phaseProjection))
+  if (
+    !project.motionRegions?.some(
+      (region) =>
+        region.sourceBinding?.phaseProjection ||
+        project.clips.some(
+          (clip) => clip.id === region.sourceBinding?.clipId && clip.playbackWindow
+        )
+    )
+  )
     return project;
   const previous = phaseViews.get(project);
   if (previous) return previous;
@@ -272,13 +307,15 @@ export function projectMotionSourcePhases(project: VideoProject): VideoProject {
     ...project,
     motionRegions: regions.map((region) => {
       const binding = region.sourceBinding;
-      if (!binding?.phaseProjection) return region;
+      if (!binding) return region;
+      const clip = project.clips.find((item) => item.id === binding.clipId);
+      if (!binding.phaseProjection)
+        return clip?.playbackWindow ? projectMotionSourceBinding(project, region) : region;
       const projected = projectMotionSourceBinding(project, region);
       const { phaseProjection: _policy, ...renderBinding } = binding;
       // Borders consume the retained source clock, including their raw phase boundaries.
       if (region.border || projected.duration <= 0)
         return { ...projected, sourceBinding: renderBinding };
-      const clip = project.clips.find((item) => item.id === binding.clipId);
       if (!clip || clip.type !== VideoProjectClipType.VIDEO) return projected;
       const group = binding.animationGroupId;
       const clipIds = new Set(
@@ -308,13 +345,43 @@ export function projectMotionSourcePhases(project: VideoProject): VideoProject {
         last = index;
       while (first > 0 && touches(clips[first - 1]!, clips[first]!)) first--;
       while (last + 1 < clips.length && touches(clips[last]!, clips[last + 1]!)) last++;
-      const visible: SourceFocusSpan[] = clips.slice(first, last + 1).map((item) => ({
-        sourceStart: item.sourceStart,
-        sourceEnd: item.sourceStart + item.sourceDuration,
-        start: item.startTime,
-        end: item.startTime + item.duration,
-        rate: normalizeClipPlaybackRate(item.playbackRate ?? 1),
-      }));
+      const visible: SourceFocusSpan[] = clips.slice(first, last + 1).map((item) => {
+        const rate = normalizeClipPlaybackRate(item.playbackRate ?? 1);
+        const start = item.startTime - (item.playbackWindow?.offset ?? 0);
+        return {
+          sourceStart: item.sourceStart,
+          sourceEnd: item.sourceStart + item.sourceDuration,
+          start,
+          end: item.playbackWindow
+            ? start + item.sourceDuration / rate
+            : item.startTime + item.duration,
+          rate,
+        };
+      });
+      const phaseVisible = clip.playbackWindow
+        ? [...new Map(visible.map((part) => [JSON.stringify(part), part])).values()]
+        : visible;
+      const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+      const window = clip.playbackWindow;
+      const origin = clip.startTime - (window?.offset ?? 0);
+      const contentStart = window
+        ? origin +
+          (Math.max(
+            binding.sourceStart,
+            clip.sourceStart + Math.min(window.offset, window.holdAt ?? Infinity) * rate
+          ) -
+            clip.sourceStart) /
+            rate
+        : projected.startTime;
+      const contentEnd = window
+        ? origin +
+          (Math.min(
+            binding.sourceEnd,
+            clip.sourceStart + Math.min(clip.sourceDuration, (window.offset + clip.duration) * rate)
+          ) -
+            clip.sourceStart) /
+            rate
+        : projected.startTime + projected.duration;
       const spans = projectSourceFocusPhases(
         {
           sourceStart: binding.sourceStart,
@@ -322,23 +389,18 @@ export function projectMotionSourcePhases(project: VideoProject): VideoProject {
           enter: motionTransitionSettings(region, 'enter'),
           exit: motionTransitionSettings(region, 'exit'),
         },
-        visible
+        phaseVisible
       );
       const span = spans.find(
-        (item) =>
-          projected.startTime >= item.start - 0.000001 &&
-          projected.startTime + projected.duration <= item.end + 0.000001
+        (item) => contentStart >= item.start - 0.000001 && contentEnd <= item.end + 0.000001
       );
       if (!span) return { ...projected, sourceBinding: renderBinding, duration: 0 };
       return {
         ...projected,
         sourceBinding: renderBinding,
         animation: {
-          start: Math.max(0, projected.startTime - span.start),
-          end: Math.min(
-            span.end - span.start,
-            projected.startTime + projected.duration - span.start
-          ),
+          start: Math.max(0, contentStart - span.start),
+          end: Math.min(span.end - span.start, contentEnd - span.start),
           duration: span.end - span.start,
         },
         zoomInDuration: span.enter.duration,
@@ -348,6 +410,13 @@ export function projectMotionSourcePhases(project: VideoProject): VideoProject {
     }),
   };
   // Projects are immutable snapshots; the disposable view shares their lifetime.
+  phaseSources.set(view, project);
   phaseViews.set(project, view);
+  phaseViews.set(view, view);
   return view;
+}
+
+/** Returns the source snapshot for a disposable phase view without exposing its cache. */
+export function getMotionPhaseSource(project: VideoProject): VideoProject {
+  return phaseSources.get(project) ?? project;
 }

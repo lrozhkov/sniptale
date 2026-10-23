@@ -11,6 +11,7 @@ import { runReviewSpeechJob } from '../audio-jobs/client';
 import { extractReviewSpeechWav, planReviewSpeechChunks } from '../video-review/speech-audio';
 import {
   prepareProjectRecognition,
+  projectRecognitionRange,
   runProjectRecognition,
   applyProjectRecognition,
   type ProjectRecognitionAccess,
@@ -470,4 +471,35 @@ it('keeps explicit audio-chat camera metadata authored while extracting actual m
     end: 10,
     origin: { start: 4, end: 10 },
   });
+});
+
+it('recognizes only a split window and rejects a result after its content offset changes', async () => {
+  const f = fixture();
+  f.change((project) => ({
+    ...project,
+    version: 43,
+    clips: project.clips.map((clip) => ({
+      ...clip,
+      duration: 1,
+      playbackWindow: { offset: 3.5, holdAt: 4 },
+    })),
+  }));
+  expect(projectRecognitionRange(f.project, f.options.clipId)).toEqual({ start: 9, end: 10 });
+  await expect(prepareProjectRecognition(f.access, f.options, signal())).rejects.toThrow(
+    'selection'
+  );
+  const job = await prepareProjectRecognition(
+    f.access,
+    { ...f.options, start: 9, end: 10 },
+    signal()
+  );
+  expect(readVideoProjectAudioSource).toHaveBeenCalledWith(
+    expect.objectContaining({ nativeStart: 9, nativeEnd: 10 })
+  );
+  f.change((project) => ({
+    ...project,
+    clips: project.clips.map((clip) => ({ ...clip, playbackWindow: { offset: 3.6, holdAt: 4 } })),
+  }));
+  await expect(runProjectRecognition(f.access, job, signal())).rejects.toThrow('stale');
+  expect(f.update).not.toHaveBeenCalled();
 });

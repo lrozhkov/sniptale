@@ -1,3 +1,4 @@
+import { shouldLockVisualLayerToViewport } from '../../motion/layer-camera';
 import { drawSceneBackground, getProjectSceneBackground } from '../../../project/scene/background';
 import { resolveSceneBackgroundAudioEnvelope } from '../../../project/scene/background-audio';
 import type { VideoProject } from '../../../project/types';
@@ -39,7 +40,7 @@ export async function renderEffectRuntimeComposition(args: {
     renderedByTime.set(args.overlayTime, overlayFrames);
     for (const pass of args.visualPasses) {
       if (renderedByTime.has(pass.time)) continue;
-      renderedByTime.set(pass.time, await renderFrame(pass.frame, pass.time));
+      renderedByTime.set(pass.time, await renderFrame(pass.frame, pass.time, true));
     }
     return { framesByTime: renderedByTime, overlayFrames };
   } catch (error) {
@@ -52,19 +53,21 @@ export async function renderEffectRuntimeComposition(args: {
 
   function renderFrame(
     frame: VideoCompositionFrame,
-    time: number
+    time: number,
+    sampled = false
   ): Promise<EffectRuntimeRenderedFrameMap> {
     args.signal?.throwIfAborted();
-    if ((frame.effectRuntimePlans ?? []).length === 0) {
+    const selected = sampled
+      ? selectExposurePlans(frame, args.overlayFrame)
+      : (frame.effectRuntimePlans ?? []);
+    if (selected.length === 0) {
       return Promise.resolve(EMPTY_EFFECT_RUNTIME_FRAMES);
     }
     if (frame.sceneSpotlights?.some((state) => state.afterClipId) && !args.project)
       throw new Error('EFFECT_RUNTIME_SOURCE_SCENE_CONTEXT_MISSING');
     const resourceScope = resourceLedger.createFrameScope();
     const plans = orderBackdropTrackPlans(
-      (frame.effectRuntimePlans ?? []).map((plan) =>
-        scaleEffectRuntimeFramePlan(plan, args.rasterScale)
-      ),
+      selected.map((plan) => scaleEffectRuntimeFramePlan(plan, args.rasterScale)),
       frame
     );
     return renderEffectRuntimeFramePlans({
@@ -98,6 +101,43 @@ export async function renderEffectRuntimeComposition(args: {
       ...(args.signal ? { signal: args.signal } : {}),
     });
   }
+}
+
+/** Locked standalone layers draw once from the overlay; sampled dependencies still need their own clock. */
+function selectExposurePlans(
+  frame: VideoCompositionFrame,
+  overlay: VideoCompositionFrame
+): readonly EffectRuntimeFramePlan[] {
+  const plans = frame.effectRuntimePlans ?? [];
+  if (frame.sceneSpotlights?.some((state) => state.afterClipId)) return plans;
+  const locked = new Set(
+    overlay.visualLayers
+      .filter((layer) => shouldLockVisualLayerToViewport(layer, overlay.camera))
+      .map((layer) => layer.clipId)
+  );
+  const inputs = new Set(
+    plans.flatMap((plan) => {
+      const target = plan.target;
+      switch (target.kind) {
+        case 'scene':
+          return [];
+        case 'clip':
+          return [target.clipId];
+        case 'transition':
+          return [target.leadingClipId, target.trailingClipId];
+        case 'track':
+        case 'video-group':
+          return target.clipIds;
+      }
+    })
+  );
+  return plans.filter(
+    (plan) =>
+      plan.kind !== 'standalone' ||
+      plan.target.kind !== 'scene' ||
+      !locked.has(plan.target.clipId) ||
+      inputs.has(plan.target.clipId)
+  );
 }
 
 /** Backdrop readers depend on lower track results; each FX chain retains its authored order. */

@@ -13,7 +13,7 @@ import {
 } from './spatial-geometry';
 import { cameraTransitionDerivative } from '../../project/motion/transitions';
 import type { CameraTransitionType } from '../../project/motion/transitions';
-import { motionTransitionSettings } from '../../project/motion/timing';
+import { motionTransitionSettings, getMotionAnimationRate } from '../../project/motion/timing';
 import { roundedWindowClearance } from '../../project/window-geometry';
 import { boundCameraSourceGeometry, cameraSourceGeometryBreaks } from './camera-source-geometry';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
@@ -133,15 +133,14 @@ function hasActiveCameraPhase(phase: number | CameraTrajectory, time: number) {
 }
 
 function nominalPhase(
+  project: VideoProject,
   region: VideoProjectMotionRegion,
   connectedIn: boolean,
   connectedOut: boolean
 ) {
   const animationDuration = region.animation?.duration ?? region.duration;
-  const animationStart = getMotionAnimationTime(region, 0);
-  const rate = region.animation
-    ? (region.animation.end - region.animation.start) / region.duration
-    : 1;
+  const animationStart = getMotionAnimationTime(region, 0, project);
+  const rate = getMotionAnimationRate(region, project);
   const output = (local: number) => region.startTime + (local - animationStart) / rate;
   const enterSettings = motionTransitionSettings(region, 'enter');
   const exitSettings = motionTransitionSettings(region, 'exit');
@@ -168,20 +167,32 @@ function nominalPhase(
         )
       : [];
   const pieces = [...enter, ...exit];
+  const bound = project.clips.find((clip) => clip.id === region.sourceBinding?.clipId);
+  const holdAt =
+    bound?.playbackWindow?.holdAt !== undefined
+      ? bound.startTime + bound.playbackWindow.holdAt - bound.playbackWindow.offset
+      : undefined;
   const at = (time: number) => {
-    const local = getMotionAnimationTime(region, time - region.startTime);
+    const local = getMotionAnimationTime(region, time - region.startTime, project);
+    const phaseTime = holdAt !== undefined && time >= holdAt ? output(local) : time;
+    const selectedPhase = (pieces: CameraTrajectory[], fallback: number) => {
+      const selected = pieces.find((piece) => phaseTime <= piece.end);
+      if (!selected) return fallback;
+      return phaseTime === time ? selected : evaluateCameraTrajectory(selected, phaseTime).x;
+    };
     if (!connectedIn && enterDuration > 0 && local < enterDuration) {
       if (enterSettings.instant) return local <= 0 ? 0 : 1;
-      return enter.find((piece) => time <= piece.end) ?? 1;
+      return selectedPhase(enter, 1);
     }
     if (!connectedOut && exitSettings.duration > 0 && local > exitStart) {
       if (exitSettings.instant) return 0;
-      return exit.find((piece) => time <= piece.end) ?? 0;
+      return selectedPhase(exit, 0);
     }
     return 1;
   };
   const breaks = [
     ...new Set([
+      ...(holdAt !== undefined ? [holdAt] : []),
       output(0),
       output(enterDuration),
       output(exitStart),
@@ -200,6 +211,23 @@ function nominalPhase(
   if (!connectedIn && (!enterDuration || enterSettings.instant)) discontinuities.push(output(0));
   if (!connectedOut && (!exitSettings.duration || exitSettings.instant))
     discontinuities.push(output(exitSettings.duration ? exitStart : animationDuration));
+  if (holdAt !== undefined) {
+    const phaseTime = output(getMotionAnimationTime(region, holdAt - region.startTime, project));
+    if (
+      pieces.some(
+        (piece) =>
+          phaseTime >= piece.start &&
+          phaseTime <= piece.end &&
+          [1, 2].some(
+            (order) =>
+              Math.abs(
+                evaluateCameraTrajectoryDerivative(piece, phaseTime, order === 1 ? 1 : 2).x
+              ) > 1e-9
+          )
+      )
+    )
+      discontinuities.push(holdAt);
+  }
   for (const time of [region.startTime, region.startTime + region.duration]) {
     const phase = at(time);
     const active = hasActiveCameraPhase(phase, time);
@@ -527,13 +555,18 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     });
     const region = input.region;
     const clock = region.animation;
-    const clockScale = clock ? region.duration / (clock.end - clock.start) : 1;
-    const start = region.startTime - (clock?.start ?? 0) * clockScale;
+    const clockScale = 1 / getMotionAnimationRate(region, project);
+    const start = region.startTime - getMotionAnimationTime(region, 0, project) * clockScale;
+    const phaseHoldAt =
+      bound?.playbackWindow?.holdAt !== undefined
+        ? bound.startTime + bound.playbackWindow.holdAt - bound.playbackWindow.offset
+        : undefined;
     const enter = motionTransitionSettings(region, 'enter');
     const exit = motionTransitionSettings(region, 'exit');
     const clip = project.clips.find((item) => item.id === sourceWindow.clipId);
     return createWindowCameraGeometry({
       output,
+      ...(phaseHoldAt !== undefined ? { phaseHoldAt } : {}),
       window: mapRect(sourceWindow.window),
       ...createProjectWindowPlaneProjection(project, region, size),
       video: mapRect(sourceWindow.video),
@@ -557,7 +590,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       policy: input.policy,
     });
   }
-  const phase = nominalPhase(input.region, input.connectedIn, input.connectedOut);
+  const phase = nominalPhase(project, input.region, input.connectedIn, input.connectedOut);
   const perspective = hasCameraPerspective(input.region.perspective)
     ? input.region.perspective
     : null;

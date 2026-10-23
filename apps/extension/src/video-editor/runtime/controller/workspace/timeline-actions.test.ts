@@ -347,6 +347,83 @@ it('preserves captured facts while cursor moves remain explicit', () => {
   );
 });
 
+it('moves a retained source cursor key through the windowed timeline clock', () => {
+  const clip = createVideoClip({
+    startTime: 2,
+    duration: 2,
+    sourceStart: 2,
+    sourceDuration: 6,
+    sourceInstanceId: 'instance-video',
+    playbackWindow: { offset: 2, extent: 2 },
+  });
+  const project = createProject([clip]);
+  project.baseRecordingId = 'rec-asset-video';
+  project.source = { kind: 'recording', recordingId: 'rec-asset-video' };
+  project.cursorTrack = {
+    captureMode: 'separate',
+    samples: [],
+    skin: {
+      animationPreset: 'NONE',
+      color: '#fff',
+      hidden: false,
+      preset: 'ARROW',
+      scale: 1,
+      shadow: false,
+    },
+  };
+  const binding = {
+    kind: 'recording-source' as const,
+    recordingId: 'rec-asset-video',
+    sourceInstanceId: 'instance-video',
+  };
+  project.cursorFocusPath = {
+    version: 1,
+    smoothing: 0,
+    sensitivity: 1,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'source-segment',
+        binding,
+        start: 2,
+        end: 8,
+        keys: [
+          {
+            id: 'retained-key',
+            time: 4.25,
+            x: 0.4,
+            y: 0.5,
+            anchor: 'manual',
+            interpolation: 'smooth',
+          },
+        ],
+      },
+    ],
+  };
+  const capturedTrack = structuredClone(project.cursorTrack);
+  expect(projectCursorFocusTimelineKeys(project)).toContainEqual(
+    expect.objectContaining({ id: 'retained-key', sourceTime: 4.25, time: 2.25 })
+  );
+  const store = createStore(project);
+  createWorkspaceTimelineEditingActions(
+    store,
+    createWorkspace(),
+    createSelectedClipActions()
+  ).onMoveCursorSegment('retained-key', null, 2.5, null);
+
+  expect(store.project?.cursorFocusPath?.segments[0]?.binding).toEqual(binding);
+  expect(store.project?.cursorTrack).toEqual(capturedTrack);
+  expect(store.project?.cursorFocusPath?.segments[0]?.keys[0]).toMatchObject({
+    id: 'retained-key',
+    time: 4.5,
+    authored: true,
+  });
+  expect(projectCursorFocusTimelineKeys(store.project!)).toContainEqual(
+    expect.objectContaining({ id: 'retained-key', sourceTime: 4.5, time: 2.5 })
+  );
+});
+
 it('clears the playback interval only for seeks outside its inclusive boundaries', () => {
   const workspace = { ...createWorkspace(), playbackRange: { start: 2, end: 5 } };
   const seekTo = vi.fn();

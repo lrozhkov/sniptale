@@ -1,3 +1,5 @@
+import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
+import { getSourceTimedClipProjectOffset } from '../timeline/rate';
 import { deriveRecordedCursorFocusPath } from './recorded';
 import {
   simplifyCursorFocusPath,
@@ -146,10 +148,12 @@ export function resolveProjectSourceCursorObservation(
     segments = deriveSourceObservationFocusSegments(project, undefined, true);
     sourceObservationPaths.set(project, segments);
   }
-  const sourceTime =
-    time === clip.startTime + clip.duration
+  const sourceTime = clip.playbackWindow
+    ? mapProjectTimeToSourcePoint([clip], time, clip.id)?.sourceTime
+    : time === clip.startTime + clip.duration
       ? clip.sourceStart + clip.sourceDuration
       : clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1);
+  if (sourceTime === undefined) return null;
   for (const [index, segment] of segments.entries()) {
     if (
       segment.binding.kind !== 'recording-source' ||
@@ -201,7 +205,9 @@ export function resolveProjectCursorFocus(
       );
       if (!clip || clip.type !== 'VIDEO') continue;
       runId = clip.id;
-      sourceTime = clip.sourceStart + (currentTime - clip.startTime) * (clip.playbackRate ?? 1);
+      const point = mapProjectTimeToSourcePoint([clip], currentTime, clip.id);
+      if (!point) continue;
+      sourceTime = point.sourceTime;
     }
     const point = evaluateCursorFocusSegment(segment, sourceTime, path.smoothing);
     if (point)
@@ -279,10 +285,10 @@ export function addProjectCursorFocusKey(
     (item) =>
       item.type === 'VIDEO' && time >= item.startTime && time < item.startTime + item.duration
   );
-  const sourceTime =
-    clip?.type === 'VIDEO'
-      ? clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1)
-      : time;
+  const sourcePoint =
+    clip?.type === 'VIDEO' ? mapProjectTimeToSourcePoint([clip], time, clip.id) : null;
+  if (clip?.type === 'VIDEO' && !sourcePoint) return path;
+  const sourceTime = sourcePoint?.sourceTime ?? time;
   const binding: CursorFocusBinding =
     clip?.type === 'VIDEO' && project.baseRecordingId
       ? {
@@ -552,14 +558,27 @@ export function projectCursorFocusKeyOccurrences(
   return project.clips.flatMap((clip) => {
     if (clip.type !== 'VIDEO' || (clip.sourceInstanceId ?? clip.id) !== binding.sourceInstanceId)
       return [];
+    const first = clip.playbackWindow
+      ? mapProjectTimeToSourcePoint([clip], clip.startTime, clip.id)?.sourceTime
+      : clip.sourceStart;
+    const last = clip.playbackWindow
+      ? mapProjectTimeToSourcePoint([clip], clip.startTime + clip.duration, clip.id)?.sourceTime
+      : clip.sourceStart + clip.sourceDuration;
+    if (first === undefined || last === undefined) return [];
     return segment.keys
-      .filter(
-        (key) => key.time >= clip.sourceStart && key.time <= clip.sourceStart + clip.sourceDuration
-      )
+      .filter((key) => key.time >= first && key.time <= last)
       .map((key) => ({
         key,
         clip,
-        time: clip.startTime + (key.time - clip.sourceStart) / (clip.playbackRate ?? 1),
+        time:
+          clip.startTime +
+          Math.max(
+            0,
+            Math.min(
+              clip.duration,
+              getSourceTimedClipProjectOffset(clip, key.time - clip.sourceStart)
+            )
+          ),
       }));
   });
 }

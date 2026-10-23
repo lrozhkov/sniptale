@@ -1,3 +1,5 @@
+import { resolveMotionSourcePlayback } from './source-playback';
+import { resolveProjectCursorFocus } from '../cursor-focus-path/projection';
 import { createQuickEditBorder } from '../scene/focus-appearance';
 import { expect, it } from 'vitest';
 import { resolveVideoCompositionCamera } from '../../composition/motion';
@@ -418,7 +420,7 @@ it('preserves Gallery phase policy on resize, persistence and raw phase editing'
   expect(isHydratableVideoProject({ ...saved, version: 38 })).toBe(true);
   expect(isHydratableVideoProject({ ...saved, version: 39 })).toBe(true);
   expect(isHydratableVideoProject({ ...saved, version: 40 })).toBe(true);
-  expect(isHydratableVideoProject({ ...saved, version: 43 })).toBe(false);
+  expect(isHydratableVideoProject({ ...saved, version: 44 })).toBe(false);
   expect(parseMotionSourceBinding({ ...bound.sourceBinding, phaseProjection: 'other' })).toBeNull();
   expect(parseMotionSourceBinding({ ...bound.sourceBinding, phaseProjection: null })).toBeNull();
   expect(parseMotionSourceBinding(bound.sourceBinding)).toEqual(bound.sourceBinding);
@@ -578,4 +580,108 @@ it('retains a passive missing target through rebinding and rejects malformed tar
   expect(isHydratableVideoProject({ ...project, version: 33, motionRegions: [rebound] })).toBe(
     false
   );
+});
+
+it('bounds a held source camera to each physical split window and retains its authored recipe', () => {
+  const { project, clip, region } = fixture();
+  const windowed = {
+    ...clip,
+    startTime: 10,
+    duration: 0.2,
+    playbackWindow: { offset: 6, holdAt: 5 },
+  };
+  const candidate = { ...project, version: 43 as const, clips: [windowed] };
+  const projected = projectMotionSourceBinding(candidate, region);
+  expect(projected.startTime).toBe(10);
+  expect(projected.duration).toBeCloseTo(0.2, 12);
+  expect(projected.animation).toEqual({ start: 3, end: 4, duration: 4 });
+  expect(projected.sourceBinding).toBe(region.sourceBinding);
+  expect(isExportReadyVideoProject({ ...candidate, motionRegions: [projected] })).toBe(true);
+  expect(region.startTime).toBe(4);
+  expect(region.duration).toBe(4);
+});
+
+it.each([false, true])(
+  'holds the source camera phase without stretching it across a physical tail (Gallery policy=%s)',
+  (gallery) => {
+    const { project, clip, region: original } = fixture();
+    const region = {
+      ...original,
+      scale: 2,
+      easing: 'LINEAR' as const,
+      zoomInDuration: 0,
+      zoomOutDuration: 2,
+      sourceBinding: {
+        ...original.sourceBinding,
+        ...(gallery ? { phaseProjection: 'retained-result' as const } : {}),
+      },
+    };
+    project.motionRegions = [region];
+    const expected = resolveVideoCompositionCamera({
+      project,
+      currentTime: 7,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(expected.scale).toBeCloseTo(1.5, 12);
+    const candidate = {
+      ...project,
+      version: 43 as const,
+      clips: [{ ...clip, startTime: 10, duration: 0.2, playbackWindow: { offset: 6, holdAt: 5 } }],
+    };
+    const actual = resolveVideoCompositionCamera({
+      project: candidate,
+      currentTime: 10.1,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(actual.regionId).toBe(region.id);
+    expect(actual.scale).toBeCloseTo(expected.scale, 12);
+  }
+);
+
+it('keeps explicit project focus on its physical clock inside disposable source geometry', () => {
+  const { project, clip, region } = fixture();
+  const candidate = {
+    ...project,
+    version: 43 as const,
+    duration: 20,
+    clips: [
+      {
+        ...clip,
+        startTime: 10,
+        duration: 0.2,
+        playbackWindow: { offset: 6, extent: 6.2, holdAt: 5 },
+      },
+    ],
+    motionRegions: [region],
+  };
+  candidate.cursorFocusPath = {
+    version: 1,
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'project-focus',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 20,
+        keys: [
+          { id: 'first', time: 0, x: 0.1, y: 0.2, anchor: 'manual', interpolation: 'linear' },
+          { id: 'last', time: 20, x: 0.9, y: 0.8, anchor: 'manual', interpolation: 'linear' },
+        ],
+      },
+    ],
+  };
+  const before = structuredClone(candidate);
+  for (const time of [10.01, 10.15]) {
+    const expected = resolveProjectCursorFocus(candidate, time)!;
+    const playback = resolveMotionSourcePlayback(candidate, time, clip.id)!;
+    const actual = resolveProjectCursorFocus(playback.geometryProject, playback.time)!;
+    expect(actual.x).toBeCloseTo(expected.x, 9);
+    expect(actual.y).toBeCloseTo(expected.y, 9);
+  }
+  expect(candidate).toEqual(before);
 });

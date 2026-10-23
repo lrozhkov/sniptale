@@ -132,13 +132,14 @@ function projectRanges(
   if (clip.type !== 'AUDIO' && clip.type !== 'VIDEO') return [];
   const document = getProjectSourceAudioDocument(project, clip);
   if (!document) return [];
-  const sourceDuration = Math.min(
-    clip.sourceDuration,
-    clip.duration * normalizeClipPlaybackRate(clip.playbackRate ?? 1)
-  );
+  const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+  const offset = clip.playbackWindow?.offset ?? 0;
+  const sourceStart = clip.sourceStart + offset * rate;
+  const sourceEnd =
+    clip.sourceStart + Math.min(clip.sourceDuration, (offset + clip.duration) * rate);
   return document[branch].flatMap((range) => {
-    const start = Math.max(clip.sourceStart, range.start);
-    const end = Math.min(clip.sourceStart + sourceDuration, range.end);
+    const start = Math.max(sourceStart, range.start);
+    const end = Math.min(sourceEnd, range.end);
     return end > start
       ? [
           {

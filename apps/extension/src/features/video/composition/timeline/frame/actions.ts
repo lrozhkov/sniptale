@@ -1,3 +1,4 @@
+import { getVideoClipPresentationTime } from '../../../project/timeline/rate';
 import { REVIEW_KEY_VIEWPORT_WIDTH } from '../../../project/action-feedback/key-animation';
 import {
   getVideoProjectClickStyle,
@@ -25,6 +26,7 @@ function clampProgress(value: number): number {
 }
 
 function resolveActionState(
+  project: VideoProject,
   presentation: ResolvedVideoProjectActionPresentation,
   currentTime: number
 ): VideoCompositionActionState | null {
@@ -37,6 +39,11 @@ function resolveActionState(
     (item) => currentTime >= item.start && currentTime < item.end
   );
   if (!interval) return null;
+  const clip = project.clips.find((item) => item.id === interval.clipId);
+  const phaseTime =
+    clip?.type === 'VIDEO' && clip.playbackWindow
+      ? getVideoClipPresentationTime(clip, currentTime)
+      : currentTime;
   return {
     occurrence: presentation.occurrence,
     clipId: interval.clipId,
@@ -48,7 +55,7 @@ function resolveActionState(
     preset: presentation.preset,
     renderKind: presentation.renderKind,
     point: presentation.point,
-    progress: clampProgress((currentTime - animationStart) / duration),
+    progress: clampProgress((phaseTime - animationStart) / duration),
     start,
   };
 }
@@ -69,7 +76,7 @@ export function resolveVideoCompositionActions(
       }
       continue;
     }
-    const state = resolveActionState(presentation, currentTime);
+    const state = resolveActionState(project, presentation, currentTime);
     const anchor = state?.event.anchor;
     const authoredFeedback =
       anchor?.kind === 'recording-source' &&
@@ -92,7 +99,7 @@ export function resolveVideoCompositionActions(
     }
   }
   for (const presentation of keys.values()) {
-    const state = resolveActionState(presentation, currentTime);
+    const state = resolveActionState(project, presentation, currentTime);
     if (state)
       states.push({ ...state, clipId: null, keyStyleViewportWidth: REVIEW_KEY_VIEWPORT_WIDTH });
   }

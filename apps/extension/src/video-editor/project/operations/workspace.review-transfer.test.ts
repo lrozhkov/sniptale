@@ -1219,20 +1219,18 @@ it.each(['revision', 'recreated'] as const)(
   }
 );
 
-it('reports unsupported bookend timing before publication and accepts a corrected retry', async () => {
+it('transfers fractional bookend timing without modifying Gallery or requiring a corrected retry', async () => {
   const { snapshot } = await bookendTransferFixture();
   const settings = snapshot.workspace.advanced.presentation!;
   settings.intro.image!.duration = 0.15;
   const source = structuredClone(snapshot);
-  await expect(loadInitialProjectFromLocation()).rejects.toMatchObject({
-    name: 'ReviewProjectTransferError',
-    reason: 'timing',
-  });
-  expect(saveVideoProject).not.toHaveBeenCalled();
-  expect(deleteProjectAsset).not.toHaveBeenCalled();
-  expect(snapshot).toEqual(source);
-  settings.intro.image!.duration = 1;
   const result = await loadInitialProjectFromLocation();
   expect(result.project).not.toBeNull();
+  expect(result.project!.duration).toBeCloseTo(5.15, 12);
+  expect(result.project!.bookendPresets!.intro.image!.duration).toBe(0.15);
+  const intro = result.project!.clips.find((clip) => clip.id.endsWith(':bookend:intro:media'))!;
+  expect(intro.duration).toBeCloseTo(5 / 30, 12);
   expect(saveVideoProject).toHaveBeenCalledOnce();
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+  expect(snapshot).toEqual(source);
 });

@@ -1,3 +1,7 @@
+import {
+  evaluateProjectGestureFeedback,
+  buildProjectActionAudioPlan,
+} from '../../review/project-action-audio';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../factories/creation';
 import { getVideoProjectUtilityLanes } from '../utility-lanes';
@@ -222,4 +226,59 @@ it('retains feedback mapping after source media becomes a project asset', () => 
   expect(getVideoProjectFeedbackRuns(project, { ...identity, recordingId: 'different' })).toEqual(
     []
   );
+});
+
+it('retains a Gallery gesture phase across split windows without repeating its sound', () => {
+  const { project } = fixture();
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  project.actionFeedback = project.actionFeedback!.slice(0, 1);
+  project.clips = [{ ...clip, duration: 1.2, sourceDuration: 1.2 }];
+  project.duration = 1.2;
+  const expected = evaluateProjectGestureFeedback(project, 1.1).map((item) => item.frame);
+  expect(expected).toHaveLength(1);
+  const audio = buildProjectActionAudioPlan(project);
+  const candidate = {
+    ...project,
+    version: 43 as const,
+    duration: 1.4,
+    clips: [
+      {
+        ...clip,
+        id: 'left',
+        duration: 0.8,
+        sourceDuration: 1.2,
+        playbackWindow: { offset: 0, extent: 1.4, holdAt: 1.1 },
+      },
+      {
+        ...clip,
+        id: 'right',
+        startTime: 0.8,
+        duration: 0.6,
+        sourceDuration: 1.2,
+        playbackWindow: { offset: 0.8, extent: 1.4, holdAt: 1.1 },
+      },
+    ],
+  };
+  const before = structuredClone(candidate);
+  expect(evaluateProjectGestureFeedback(candidate, 1.3).map((item) => item.frame)).toEqual(
+    expected
+  );
+  const withoutIdentity = (plan: ReturnType<typeof buildProjectActionAudioPlan>) =>
+    plan.descriptors.map(({ id: _id, ...descriptor }) => descriptor);
+  expect(withoutIdentity(buildProjectActionAudioPlan(candidate))).toEqual(withoutIdentity(audio));
+  const heldOnly = {
+    ...candidate,
+    clips: [
+      {
+        ...candidate.clips[1]!,
+        startTime: 1.2,
+        duration: 0.2,
+        playbackWindow: { offset: 1.2, extent: 1.4, holdAt: 1.1 },
+      },
+    ],
+  };
+  expect(evaluateProjectGestureFeedback(heldOnly, 1.3).map((item) => item.frame)).toEqual(expected);
+  expect(buildProjectActionAudioPlan(heldOnly).descriptors).toEqual([]);
+  expect(candidate).toEqual(before);
 });

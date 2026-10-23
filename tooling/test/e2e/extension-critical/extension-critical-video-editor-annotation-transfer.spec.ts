@@ -1,3 +1,13 @@
+import { inspectVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
+import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
+import { resolveVideoCompositionRenderPasses } from '../../../../apps/extension/src/features/video/composition/timeline/render';
+import { resolveEffectRuntimeFramePlans } from '../../../../apps/extension/src/features/video/composition/effect-runtime/frame/plan';
+import { presentationMainHoldTime } from '../../../../apps/extension/src/features/video/review/presentation-sequence';
+import { buildReviewTimeMap } from '../../../../apps/extension/src/features/video/review/timeline';
+import {
+  planReviewPresentationSequence,
+  presentationAudioGain,
+} from '../../../../apps/extension/src/features/video/review/presentation-sequence';
 import {
   replayReviewHistory,
   reviewDocumentBaseline,
@@ -30,7 +40,10 @@ import {
   getRuntimeMessagesByType,
 } from '../extension-critical.helpers';
 import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
-import { readNativeReviewWorkspace } from '../support/native-review-workspace';
+import {
+  readNativeReviewWorkspace,
+  replaceNativeReviewWorkspace,
+} from '../support/native-review-workspace';
 import { readNativeVideoProject } from '../support/native-video-project';
 import {
   encodedNativeVideoSamples,
@@ -52,6 +65,94 @@ async function drawAnnotation(page: Page, start: number, end: number) {
   await page.mouse.up();
 }
 
+async function resourceAnnotationSource(title: string, clocked = false) {
+  const base = parseEffectV1Source(
+    await readFile(
+      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+      'utf8'
+    )
+  );
+  if (!base.document) throw new Error('Missing EffectV1 fixture');
+  const svgText =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e020b0"/></svg>';
+  const source = JSON.stringify({
+    ...base.document,
+    id: 'transfer-svg',
+    label: { en: title, ru: title },
+    objectLayout: { width: 160, height: 90, resize: 'scale' },
+    controls: [
+      {
+        id: 'reveal',
+        kind: 'number',
+        min: 0.2,
+        max: 1,
+        step: 0.1,
+        defaultValue: 1,
+        label: { en: 'Reveal', ru: 'Появление' },
+        group: 'appearance',
+      },
+    ],
+    assets: [
+      {
+        id: 'mark',
+        kind: 'svg',
+        mimeType: 'image/svg+xml',
+        width: 32,
+        height: 32,
+        svgText,
+        byteLength: Buffer.byteLength(svgText),
+        sha256: createHash('sha256').update(svgText).digest('hex'),
+      },
+    ],
+    layers: [
+      {
+        id: 'mark',
+        name: 'Mark',
+        type: 'svgAsset',
+        visible: true,
+        assetId: 'mark',
+        width: 32,
+        height: 32,
+        x: 0,
+        y: 0,
+      },
+    ],
+    clips: [{ layerId: 'mark', sceneId: 'main', start: 0, duration: 3 }],
+    timeline: { phases: [], tracks: [] },
+    program: {
+      kind: 'graph',
+      version: 1,
+      commands: [
+        {
+          op: 'svgParts',
+          layerId: 'mark',
+          assetId: 'mark',
+          x: clocked
+            ? {
+                op: 'mul',
+                args: [{ op: 'read', path: 'progress' }, { op: 'read', path: 'width' }, 0.4],
+              }
+            : 0,
+          y: 0,
+          width: { op: 'read', path: 'width' },
+          height: { op: 'read', path: 'height' },
+          part: {
+            kind: 'preset',
+            mode: 'assemble',
+            order: 'center',
+            reveal: { op: 'read', path: 'controls.reveal' },
+            spread: 0,
+            scaleFrom: 1,
+            stagger: 0,
+            rotate: 0,
+          },
+        },
+      ],
+    },
+  });
+  return source;
+}
+
 const baseCase = {
   viewport: PRIMARY_BROWSER_VIEWPORTS[0]!,
   format: 'WEBM',
@@ -67,6 +168,11 @@ const baseCase = {
   galleryCut: 'none',
   bookends: false,
   activeIntro: false,
+  fractionalVideo: false,
+  fractionalMain: false,
+  heldExposure: false,
+  lateExposureEnd: false,
+  emptyMedia: false,
 } as const;
 
 for (const {
@@ -84,8 +190,87 @@ for (const {
   galleryCut,
   bookends,
   activeIntro,
+  fractionalVideo,
+  fractionalMain,
+  heldExposure,
+  lateExposureEnd,
+  emptyMedia,
 } of [
   { ...baseCase, nativeFx: true },
+  { ...baseCase, bookends: true, heldExposure: true, emptyMedia: true },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    bookends: true,
+    heldExposure: true,
+    emptyMedia: true,
+  },
+  { ...baseCase, bookends: true, heldExposure: true },
+  { ...baseCase, bookends: true, heldExposure: true, lateExposureEnd: true },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    bookends: true,
+    heldExposure: true,
+    lateExposureEnd: true,
+  },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    bookends: true,
+    heldExposure: true,
+  },
+  {
+    ...baseCase,
+    crop: true,
+    nativeFx: true,
+    galleryCut: 'dissolve',
+    bookends: true,
+    fractionalVideo: true,
+    fractionalMain: true,
+  },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    crop: true,
+    nativeFx: true,
+    galleryCut: 'fade-black',
+    bookends: true,
+    fractionalVideo: true,
+    fractionalMain: true,
+  },
+  {
+    ...baseCase,
+    crop: true,
+    nativeFx: true,
+    galleryCut: 'dissolve',
+    bookends: true,
+    fractionalVideo: true,
+  },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    crop: true,
+    nativeFx: true,
+    galleryCut: 'fade-black',
+    bookends: true,
+    fractionalVideo: true,
+  },
   {
     ...baseCase,
     crop: true,
@@ -186,7 +371,7 @@ for (const {
     galleryCut: 'fade-black',
   },
 ] as const) {
-  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}`, async ({
+  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}${fractionalVideo ? ' fractional-video' : ''}${fractionalMain ? ' fractional-main' : ''}${heldExposure ? ' held-exposure' : ''}${lateExposureEnd ? ' late-end' : ''}${emptyMedia ? ' empty-media' : ''}`, async ({
     page,
   }, info) => {
     test.setTimeout(240000);
@@ -197,7 +382,8 @@ for (const {
     const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
     const aggregate = 'recording:beta-v1-recording';
     const title = 'Retained SVG annotation';
-    const outroFixture = activeIntro ? 'review-cut-vfr-audio.webm' : 'review-cut-vfr.webm';
+    const outroFixture =
+      activeIntro || fractionalVideo ? 'review-cut-vfr-audio.webm' : 'review-cut-vfr.webm';
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     try {
@@ -211,85 +397,7 @@ for (const {
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
-      const base = parseEffectV1Source(
-        await readFile(
-          'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
-          'utf8'
-        )
-      );
-      if (!base.document) throw new Error('Missing EffectV1 fixture');
-      const svgText =
-        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#e020b0"/></svg>';
-      const source = JSON.stringify({
-        ...base.document,
-        id: 'transfer-svg',
-        label: { en: title, ru: title },
-        objectLayout: { width: 160, height: 90, resize: 'scale' },
-        controls: [
-          {
-            id: 'reveal',
-            kind: 'number',
-            min: 0.2,
-            max: 1,
-            step: 0.1,
-            defaultValue: 1,
-            label: { en: 'Reveal', ru: 'Появление' },
-            group: 'appearance',
-          },
-        ],
-        assets: [
-          {
-            id: 'mark',
-            kind: 'svg',
-            mimeType: 'image/svg+xml',
-            width: 32,
-            height: 32,
-            svgText,
-            byteLength: Buffer.byteLength(svgText),
-            sha256: createHash('sha256').update(svgText).digest('hex'),
-          },
-        ],
-        layers: [
-          {
-            id: 'mark',
-            name: 'Mark',
-            type: 'svgAsset',
-            visible: true,
-            assetId: 'mark',
-            width: 32,
-            height: 32,
-            x: 0,
-            y: 0,
-          },
-        ],
-        clips: [{ layerId: 'mark', sceneId: 'main', start: 0, duration: 3 }],
-        timeline: { phases: [], tracks: [] },
-        program: {
-          kind: 'graph',
-          version: 1,
-          commands: [
-            {
-              op: 'svgParts',
-              layerId: 'mark',
-              assetId: 'mark',
-              x: 0,
-              y: 0,
-              width: { op: 'read', path: 'width' },
-              height: { op: 'read', path: 'height' },
-              part: {
-                kind: 'preset',
-                mode: 'assemble',
-                order: 'center',
-                reveal: { op: 'read', path: 'controls.reveal' },
-                spread: 0,
-                scaleFrom: 1,
-                stagger: 0,
-                rotate: 0,
-              },
-            },
-          ],
-        },
-      });
+      const source = await resourceAnnotationSource(title, heldExposure);
       const admitted = parseEffectV1Source(source);
       expect(admitted.diagnostics).toEqual([]);
       expect(admitted.ok).toBe(true);
@@ -439,7 +547,10 @@ for (const {
         const fields = dialog.locator('[data-ui="gallery.videoReview.editRangeFields"]');
         for (const [field, value] of [
           ['gallery.videoReview.rangeStart', '0.03'],
-          ['gallery.videoReview.rangeEnd', (sourceDuration - 11.2 + 0.03).toFixed(6)],
+          [
+            'gallery.videoReview.rangeEnd',
+            (sourceDuration - (fractionalMain ? 11.21 : 11.2) + 0.03).toFixed(6),
+          ],
         ] as const) {
           const input = fields.getByRole('textbox', { name: label(field), exact: true });
           await input.fill(value);
@@ -501,13 +612,46 @@ for (const {
                 : 'gallery.videoReview.cutFadeColor'
             )
           );
-        } else {
+        } else if (!fractionalVideo) {
           await intro
             .getByRole('button', {
               name: label('gallery.videoReview.presentationNoEffect'),
               exact: true,
             })
             .click();
+        }
+        if (fractionalVideo) {
+          const movie = page.waitForEvent('filechooser');
+          await intro
+            .getByRole('button', {
+              name: label('gallery.videoReview.presentationComputer'),
+              exact: true,
+            })
+            .click();
+          await (await movie).setFiles(`tooling/test/e2e/fixtures/${outroFixture}`);
+          await expect(presentation).toHaveAttribute('aria-busy', 'false');
+          const trim = intro.getByRole('textbox', {
+            name: label('gallery.videoReview.presentationTrimEnd'),
+            exact: true,
+          });
+          if (!(await trim.isVisible()))
+            await intro
+              .locator('summary')
+              .filter({ hasText: label('gallery.videoReview.presentationTrim') })
+              .click();
+          await trim.fill('0.15');
+          await trim.press('Enter');
+          await expect
+            .poll(async () => {
+              const workspace = (await readNativeReviewWorkspace(page, aggregate))!;
+              return replayReviewHistory(
+                workspace.history,
+                workspace.cursor,
+                workspace.source,
+                reviewDocumentBaseline(workspace)
+              ).advancedContent.presentation?.intro.video?.trim.end;
+            })
+            .toBe(0.15);
         }
         const outro = presentation.locator(
           `section[aria-label="${label('gallery.videoReview.presentationOutro')}"]`
@@ -574,7 +718,7 @@ for (const {
           })
           .toBe(1);
         if (activeIntro) {
-          const beforeRefusal = await readNativeReviewWorkspace(page, aggregate);
+          const beforeCadenceTransfer = await readNativeReviewWorkspace(page, aggregate);
           await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
           await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
           await expect
@@ -583,39 +727,50 @@ for (const {
                 (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).length
             )
             .toBe(1);
-          const refusedTab = (
+          const cadenceTab = (
             await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])
           )[0]!;
-          const refusedQuery = new URL(refusedTab.url!).searchParams;
-          refusedQuery.set('theme', theme);
-          const refusedPage = await page.context().newPage();
+          const cadenceQuery = new URL(cadenceTab.url!).searchParams;
+          cadenceQuery.set('theme', theme);
+          const cadencePage = await page.context().newPage();
           try {
-            await refusedPage.setViewportSize({ ...viewport.size });
-            await refusedPage.emulateMedia({ colorScheme: theme });
-            await applyHarnessBootstrap(refusedPage, {
+            await cadencePage.setViewportSize({ ...viewport.size });
+            await cadencePage.emulateMedia({ colorScheme: theme });
+            await applyHarnessBootstrap(cadencePage, {
               preserveMediaLibrary: true,
               storage: {
                 'sniptale-locale-preference': locale,
                 'sniptale-theme-preference': theme,
               },
             });
-            await refusedPage.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${refusedQuery}`);
-            const feedback = refusedPage.getByText(
-              label('videoEditor.app.transferTimingUnsupported'),
-              { exact: true }
-            );
-            await expect(feedback).toBeVisible();
+            await cadencePage.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${cadenceQuery}`);
             await expect(
-              refusedPage.getByText(label('common.errors.storageDetail'), { exact: false })
+              cadencePage.locator('[data-ui="video-editor.timeline.surface"]')
+            ).toBeVisible();
+            await expect
+              .poll(
+                async () =>
+                  (await readNativeVideoProject(cadencePage))?.clips.filter(
+                    (clip) => clip.type === 'EFFECT'
+                  ).length
+              )
+              .toBe(3);
+            const transferred = (await readNativeVideoProject(cadencePage))!;
+            expect(transferred.id).not.toBe(aggregate);
+            expect(transferred.bookendPresets?.intro.image?.duration).toBe(0.15);
+            expect(
+              transferred.clips.find(({ id }) => id === `${transferred.id}:bookend:intro:media`)
+            ).toMatchObject({ type: 'IMAGE', startTime: 0, duration: expect.closeTo(5 / 30, 8) });
+            await expect(
+              cadencePage.getByText(label('common.errors.storageDetail'), { exact: false })
             ).toHaveCount(0);
-            expect(await readNativeVideoProject(refusedPage)).toBeUndefined();
-            expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(beforeRefusal);
-            await refusedPage.screenshot({
-              path: info.outputPath('native-transfer-refused.png'),
+            expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(beforeCadenceTransfer);
+            await cadencePage.screenshot({
+              path: info.outputPath('native-transfer-main-cadence.png'),
               fullPage: false,
             });
           } finally {
-            await refusedPage.close();
+            await cadencePage.close();
           }
           await button('gallery.videoReview.scene').click();
           const duration = intro
@@ -630,6 +785,379 @@ for (const {
         await page.screenshot({ path: info.outputPath('gallery-bookends.png'), fullPage: false });
         await button('gallery.videoReview.pointerTool').click();
         await dialog.locator('[data-ui="gallery.videoReview.editBlock"]').first().click();
+      }
+      if (heldExposure) {
+        await expect(dialog.locator('[data-ui="autosave-control"] button').first()).toHaveAttribute(
+          'aria-label',
+          `${label('editor.documentActions.autosaveTitle')}: ${label('common.states.saved')}`
+        );
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+        const stored = (await readNativeReviewWorkspace(page, aggregate))!;
+        const document = replayReviewHistory(
+          stored.history,
+          stored.cursor,
+          stored.source,
+          reviewDocumentBaseline(stored)
+        );
+        const mainDuration = emptyMedia ? 1.1955 : 1.198;
+        const sourceEnd = stored.source.duration;
+        const cutEnd = sourceEnd - 1.198 + 0.03;
+        document.edits = [
+          {
+            id: 'held-main-cut',
+            kind: 'cut',
+            start: 0.03,
+            end: cutEnd,
+            requestedStart: 0.03,
+            requestedEnd: cutEnd,
+          },
+        ];
+        if (emptyMedia)
+          document.edits.push({
+            id: 'last-subframe-speed',
+            kind: 'speed',
+            start: sourceEnd - 0.005,
+            end: sourceEnd,
+            requestedStart: sourceEnd - 0.005,
+            requestedEnd: sourceEnd,
+            rate: 2,
+            audio: 'speed',
+          });
+        document.advancedContent.audio.voiceoverSegments = buildReviewTimeMap(
+          sourceEnd,
+          document.edits
+        );
+        for (const [
+          i,
+          annotation,
+        ] of document.advancedContent.annotationEffects!.instances.entries()) {
+          if (i > 1) continue;
+          annotation.start = 0;
+          annotation.end = sourceEnd - (lateExposureEnd ? 0.005 : 0);
+          annotation.transform = {
+            x: i === 0 ? 0.1 : 0.65,
+            y: i === 0 ? 0.1 : 0.65,
+            width: 0.2,
+            height: 0.2,
+            rotation: 0,
+          };
+        }
+        document.advancedContent.zoom = {
+          enabled: true,
+          regions: [
+            {
+              ...createQuickEditZoomRegion({
+                id: 'held-camera',
+                at: mainDuration - 0.8,
+                duration: 0.8,
+                sourceAnchor: { start: sourceEnd - 0.8, end: sourceEnd },
+              }),
+              transform: { scale: 3, centerX: 0.7, centerY: 0.3 },
+              followCursor: false,
+              enter: { type: 'none', duration: 0 },
+              exit: { type: 'linear', duration: 0.8 },
+              motionBlur: { exit: { enabled: true, strength: 1 } },
+            },
+          ],
+        };
+        const presentation = document.advancedContent.presentation!;
+        presentation.intro.mode = 'none';
+        presentation.outro.mode = 'none';
+        presentation.introControl!.mode = 'none';
+        presentation.outroControl!.mode = 'none';
+        delete presentation.introTransition;
+        delete presentation.outroTransition;
+        const transfer = async () => {
+          const inspected = inspectVideoWorkspace({
+            ...stored,
+            formatVersion: stored.project ? 4 : 2,
+            baseline: document,
+            history: [],
+            cursor: 0,
+            revision: stored.revision + 1,
+            updatedAt: Date.now(),
+            advanced: {
+              ...document.advancedContent,
+              ui: {
+                ...stored.advanced.ui,
+                mode: 'advanced',
+                tracks: { ...stored.advanced.ui.tracks, zoom: true },
+              },
+            },
+          });
+          const fixture = inspected.workspace;
+          if (!fixture)
+            throw new Error(
+              `Invalid held exposure Gallery workspace: ${JSON.stringify(inspected.failure)}`
+            );
+          await replaceNativeReviewWorkspace(page, aggregate, fixture);
+          await page.goto(
+            `${host.origin}${GALLERY_HARNESS_PATH}?recordingId=beta-v1-recording&mode=edit&theme=${theme}`
+          );
+          await expect(dialog).toBeVisible();
+          await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+          const beforeTabs = (
+            await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])
+          ).length;
+          await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
+          await expect
+            .poll(
+              async () =>
+                (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).length
+            )
+            .toBe(beforeTabs + 1);
+          const created = (
+            await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])
+          ).at(-1)!;
+          const query = new URL(created.url!).searchParams;
+          await page.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${query}`);
+          await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+          await expect
+            .poll(
+              async () => (await readNativeVideoProject(page))?.effectSnapshots?.[0]?.assets.length
+            )
+            .toBe(1);
+          const project = (await readNativeVideoProject(page))!;
+          await page.reload();
+          await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+          await expect.poll(async () => (await readNativeVideoProject(page))?.id).toBe(project.id);
+          return (await readNativeVideoProject(page))!;
+        };
+        const reference = await transfer();
+        presentation.intro.mode = 'image';
+        presentation.intro.image!.duration = emptyMedia ? 0.15 : 0.14;
+        presentation.introControl!.mode = 'media';
+        presentation.introControl!.media.enabled = false;
+        const sequence = planReviewPresentationSequence({
+          settings: presentation,
+          mainDuration,
+          fragmentOffset: 0,
+          includeBookends: true,
+          rate: { numerator: 30, denominator: 1 },
+        });
+        if (!sequence.ok) throw new Error('Missing held exposure sequence');
+        const main = sequence.plan.segments.find(({ name }) => name === 'main')!;
+        const hold = presentationMainHoldTime(sequence.plan);
+        const last = (sequence.plan.candidateCount - 1) / 30;
+        if (emptyMedia) expect(last - main.startTick / 30).toBeLessThan(mainDuration);
+        else expect(last - main.startTick / 30).toBeGreaterThanOrEqual(mainDuration);
+        const points = [12, 28, 44, 60, 76, 92, 108, 124, 140].flatMap((x) =>
+          [8, 20, 32, 44, 56, 68, 80].map((y) => ({ x, y, expected: [0, 0, 0] }))
+        );
+        const settings = {
+          burnInSubtitles: false,
+          downloadAfterExport: false,
+          format,
+          fps: 30,
+          width: reference.width,
+          height: reference.height,
+          quality: 'MEDIUM' as const,
+          resolution: 'SOURCE' as const,
+          scope: 'project' as const,
+          subtitleSidecarFormats: [],
+          ...(format === 'WEBM'
+            ? { webmVideoCodec: 'VP9' as const }
+            : { mp4VideoCodec: 'VP9' as const }),
+        };
+        const referenceTime = emptyMedia ? last - main.startTick / 30 : hold;
+        const expected = resolveVideoCompositionRenderPasses(reference, referenceTime);
+        expect(expected.visualPasses).toHaveLength(5);
+        expect(expected.overlayFrame.camera.scale).toBeGreaterThan(1.05);
+        const original = await encodedNativeVideoSamples(
+          page,
+          host.origin,
+          reference,
+          format,
+          points.map((point) => ({ ...point, time: hold + 0.001 })),
+          undefined,
+          undefined,
+          settings
+        );
+        const project = await transfer();
+        const nativeUrl = page.url();
+        expect(project.id).not.toBe(reference.id);
+        const resource = project.effectSnapshots![0]!.assets[0]!;
+        expect(resource.blob.type).toBe('image/svg+xml');
+        expect(resource.blob.size).toBeGreaterThan(0);
+        expect(project.effectSnapshots![0]!.sha256).toBe(reference.effectSnapshots![0]!.sha256);
+        const current = resolveVideoCompositionRenderPasses(project, last);
+        if (emptyMedia)
+          await writeFile(
+            info.outputPath('empty-media-clock-diagnostic.json'),
+            JSON.stringify({
+              reference,
+              project,
+              hold,
+              last,
+              referenceTime,
+              expectedCamera: expected.overlayFrame.camera,
+              actualCamera: current.overlayFrame.camera,
+            })
+          );
+        expect(current.visualPasses).toHaveLength(5);
+        for (const key of ['scale', 'viewportX', 'viewportY'] as const)
+          expect(current.overlayFrame.camera[key]).toBeCloseTo(
+            expected.overlayFrame.camera[key],
+            6
+          );
+        const originalPlans = resolveEffectRuntimeFramePlans(reference, referenceTime);
+        const heldPlans = resolveEffectRuntimeFramePlans(project, last);
+        expect(originalPlans).toHaveLength(2);
+        expect(heldPlans).toHaveLength(2);
+        for (const [i, plan] of heldPlans.entries())
+          expect(plan.time).toBeCloseTo(originalPlans[i]!.time, 7);
+        const heldPlayhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+        await heldPlayhead.press('Home');
+        for (let tick = 0; tick < sequence.plan.candidateCount - 1; tick++)
+          await heldPlayhead.press('ArrowRight');
+        for (const point of [
+          { x: 28, y: 20 },
+          { x: 124, y: 68 },
+        ])
+          await expect
+            .poll(() =>
+              page
+                .locator('[data-ui="video.preview.stage.root"] canvas[data-preview-stage-canvas]')
+                .evaluate(
+                  (canvas: HTMLCanvasElement, input) => {
+                    const pixel = canvas
+                      .getContext('2d')!
+                      .getImageData(
+                        Math.round((canvas.width * input.point.x) / input.width),
+                        Math.round((canvas.height * input.point.y) / input.height),
+                        1,
+                        1
+                      ).data;
+                    return Math.max(
+                      ...[224, 32, 176].map((color, channel) => Math.abs(pixel[channel]! - color))
+                    );
+                  },
+                  { point, width: project.width, height: project.height }
+                )
+            )
+            .toBeLessThanOrEqual(12);
+        await page.screenshot({
+          path: info.outputPath('native-held-exposure-reopened.png'),
+          fullPage: false,
+        });
+        const actual = await encodedNativeVideoSamples(
+          page,
+          host.origin,
+          project,
+          format,
+          points.map((point) => ({ ...point, time: last + 0.0001 })),
+          undefined,
+          undefined,
+          settings
+        );
+        await writeFile(
+          info.outputPath('held-resource-exposure-pixels.json'),
+          JSON.stringify(
+            {
+              hold,
+              referenceTime,
+              last,
+              mainDuration,
+              original,
+              actual,
+              camera: { original: expected.overlayFrame.camera, held: current.overlayFrame.camera },
+              passes: {
+                original: expected.visualPasses.map(({ time, alpha }) => ({ time, alpha })),
+                held: current.visualPasses.map(({ time, alpha }) => ({ time, alpha })),
+              },
+            },
+            null,
+            2
+          )
+        );
+        for (const region of [
+          (x: number, y: number) => x < 80 && y < 45,
+          (x: number, y: number) => x > 80 && y > 45,
+        ])
+          expect(
+            original.samples.some(
+              ({ x, y, pixel }) =>
+                region(x, y) &&
+                Math.abs(pixel[0]! - 224) < 12 &&
+                Math.abs(pixel[1]! - 32) < 12 &&
+                Math.abs(pixel[2]! - 176) < 12
+            )
+          ).toBe(true);
+        // WebM stores millisecond packets; MP4 keeps microseconds. Both comparisons use a one-microsecond tolerance.
+        const packetScale = format === 'WEBM' ? 1000 : 1_000_000;
+        const originalPacketTime = Math.round(hold * packetScale) / packetScale;
+        const heldPacketTime = Math.round(last * packetScale) / packetScale;
+        for (const [i, sample] of actual.samples.entries()) {
+          expect(Math.abs(original.samples[i]!.mediaTime - originalPacketTime)).toBeLessThanOrEqual(
+            0.000001
+          );
+          expect(Math.abs(sample.mediaTime - heldPacketTime)).toBeLessThanOrEqual(0.000001);
+          for (let channel = 0; channel < 3; channel++)
+            expect(
+              Math.abs(sample.pixel[channel]! - original.samples[i]!.pixel[channel]!)
+            ).toBeLessThanOrEqual(12);
+        }
+        if (emptyMedia) {
+          await page.goto(nativeUrl);
+          await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+          const retained = project.clips.find(
+            (clip) => clip.type === 'VIDEO' && clip.duration === 0
+          )!;
+          expect(retained).toBeDefined();
+          expect(retained.playbackWindow!.extent).toBeCloseTo(0.0025, 12);
+          expect(
+            project.clips.filter((clip) => clip.type === 'AUDIO' && clip.duration === 0)
+          ).toHaveLength(1);
+          const node = page.locator(`[data-project-timeline-clip="${retained.id}"]`);
+          await node.scrollIntoViewIfNeeded();
+          await expect(node).toBeVisible();
+          await node.click();
+          await page
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.inspectorGroupTiming'),
+              exact: true,
+            })
+            .click();
+          const bounds = page.locator('[data-ui="video-editor.inspector.source-range"]');
+          if (!(await bounds.isVisible()))
+            await page
+              .getByRole('heading', {
+                name: label('videoEditor.sidebar.inspectorSourceBounds'),
+                exact: true,
+              })
+              .click();
+          const out = bounds.getByRole('textbox', {
+            name: label('videoEditor.sidebar.sourceOut'),
+            exact: true,
+          });
+          await expect(out).toHaveValue(String(Number((sourceEnd - 0.005).toFixed(3))));
+          await out.fill(String(sourceEnd));
+          await out.press('Enter');
+          await expect
+            .poll(
+              async () =>
+                (await readNativeVideoProject(page))!.clips.find((clip) => clip.id === retained.id)!
+                  .duration
+            )
+            .toBeCloseTo(0.0025, 9);
+          await page.screenshot({
+            path: info.outputPath('native-empty-media-restored.png'),
+            fullPage: false,
+          });
+          await page.reload();
+          await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+          const restored = (await readNativeVideoProject(page))!;
+          expect(restored.clips.find((clip) => clip.id === retained.id)).toMatchObject({
+            sourceStart: sourceEnd - 0.005,
+            playbackRate: 2,
+          });
+          expect(restored.clips.find((clip) => clip.id === retained.id)!.duration).toBeCloseTo(
+            0.0025,
+            9
+          );
+        }
+        expect(errors).toEqual([]);
+        return;
       }
       if (galleryCut !== 'none') {
         const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
@@ -929,9 +1457,18 @@ for (const {
         .toBe(3);
       const native = (await readNativeVideoProject(page))!;
       expect(native.id).not.toBe(aggregate);
+      if (fractionalMain)
+        expect(
+          native.clips.some(
+            (clip) =>
+              clip.type === 'VIDEO' &&
+              !clip.id.includes(':bookend:') &&
+              clip.playbackWindow !== undefined
+          )
+        ).toBe(true);
       if (activeIntro) expect(native.id).not.toBe(dormantNativeProjectId);
       if (bookends) {
-        expect(native.version).toBe(41);
+        expect(native.version).toBe(fractionalVideo ? 43 : 41);
         expect(
           native.assets.find(({ id }) => id === native.bookendPresets?.intro.image?.assetId)?.name
         ).toBe('retained-opening.png');
@@ -939,7 +1476,9 @@ for (const {
           native.assets.find(({ id }) => id === native.bookendPresets?.outro.video?.assetId)?.name
         ).toBe(outroFixture);
         expect(native.bookendPresets?.intro.image).toBeDefined();
-        expect(native.bookendPresets?.intro.edgeControl?.mode).toBe(activeIntro ? 'media' : 'none');
+        expect(native.bookendPresets?.intro.edgeControl?.mode).toBe(
+          activeIntro || fractionalVideo ? 'media' : 'none'
+        );
         if (activeIntro)
           expect(native.clips).toContainEqual(
             expect.objectContaining({
@@ -949,6 +1488,18 @@ for (const {
               duration: 0.1,
             })
           );
+        if (fractionalVideo) {
+          expect(native.bookendPresets?.intro.video?.trim).toEqual({ start: 0, end: 0.15 });
+          expect(
+            native.clips.find(({ id }) => id === `${native.id}:bookend:intro:media`)
+          ).toMatchObject({
+            type: 'VIDEO',
+            duration: expect.closeTo(5 / 30, 8),
+            sourceStart: 0,
+            sourceDuration: 0.15,
+            playbackWindow: { offset: 0, holdAt: 0.15 },
+          });
+        }
         expect(native.bookendPresets?.outro.video?.trim).toEqual({ start: 0, end: 1 });
         if (activeIntro) {
           expect(native.bookendPresets?.outro.video?.audio).toEqual({ muted: false, gain: 0.7 });
@@ -960,7 +1511,9 @@ for (const {
           expect.objectContaining({
             id: `${native.id}:bookend:outro:media`,
             type: 'VIDEO',
-            duration: 1,
+            duration: fractionalVideo
+              ? expect.closeTo(1 - (5 / 30 - 0.15) + (fractionalMain ? 0.01 : 0), 8)
+              : 1,
             sourceStart: 0,
             sourceDuration: 1,
             playbackRate: 1,
@@ -2574,6 +3127,73 @@ for (const {
             2
           )
         );
+      if (fractionalVideo) {
+        const offsets = [0.025, 0.075, 0.125];
+        const windowDuration = 0.005;
+        const sourceAudio = await page.evaluate(
+          async ({ encoded, offsets, windowDuration }) => {
+            const decoder = new AudioContext({ sampleRate: 48000 });
+            try {
+              const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+              const audio = await decoder.decodeAudioData(bytes.buffer);
+              const pcm = audio.getChannelData(0);
+              return offsets.map((time) => {
+                const first = Math.round(time * audio.sampleRate),
+                  last = Math.round((time + windowDuration) * audio.sampleRate);
+                let squares = 0;
+                for (let i = first; i < last; i++) squares += pcm[i]! ** 2;
+                return Math.sqrt(squares / (last - first));
+              });
+            } finally {
+              await decoder.close();
+            }
+          },
+          {
+            encoded: (await readFile(`tooling/test/e2e/fixtures/${outroFixture}`)).toString(
+              'base64'
+            ),
+            offsets,
+            windowDuration,
+          }
+        );
+        const document = replayReviewHistory(
+          gallery.history,
+          gallery.cursor,
+          gallery.source,
+          reviewDocumentBaseline(gallery)
+        );
+        const mainDuration = buildReviewTimeMap(gallery.source.duration, document.edits).at(
+          -1
+        )!.resultEnd;
+        const sequence = planReviewPresentationSequence({
+          settings: document.advancedContent.presentation!,
+          mainDuration,
+          fragmentOffset: 0,
+          includeBookends: true,
+          rate: { numerator: final.fps, denominator: 1 },
+        });
+        if (!sequence.ok) throw new Error('Missing Gallery audio sequence');
+        const decoded = await readEncodedAudioWindows(page, [...offsets, 0.16], windowDuration);
+        const ratios = offsets.map((_, i) => decoded[i]! / sourceAudio[i]!);
+        const expected = offsets.map(
+          (time) =>
+            presentationAudioGain(sequence.plan, Math.round((time + windowDuration / 2) * 48000)) *
+            document.advancedContent.presentation!.intro.video!.audio.gain
+        );
+        await writeFile(
+          info.outputPath('fractional-bookend-encoded-audio.json'),
+          JSON.stringify(
+            { offsets, windowDuration, sourceAudio, decoded, ratios, expected },
+            null,
+            2
+          )
+        );
+        for (let i = 0; i < offsets.length; i++) {
+          expect(sourceAudio[i]!).toBeGreaterThan(0.001);
+          expect(Math.abs(ratios[i]! - expected[i]!)).toBeLessThan(0.08);
+        }
+        expect(decoded.at(-1)! / Math.max(...sourceAudio)).toBeLessThan(0.12);
+      }
       if (activeIntro) {
         const offsets = [0.25, 0.65, 0.85, 0.95];
         const sourceAudio = await page.evaluate(

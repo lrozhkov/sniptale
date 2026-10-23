@@ -52,7 +52,7 @@ export function resolveVideoCompositionSpotlights(project: VideoProject, time: n
       : {
           id: region.id,
           spotlight: region.spotlight!,
-          ...sampleSpotlightPhase(region, time, edges.connectedIn, edges.connectedOut),
+          ...sampleSpotlightPhase(region, time, edges.connectedIn, edges.connectedOut, project),
         };
     const state = {
       ...sampled,
@@ -143,9 +143,10 @@ function sampleSpotlightPhase(
   region: VideoProjectMotionRegion,
   time: number,
   connectedIn: boolean,
-  connectedOut: boolean
+  connectedOut: boolean,
+  project: VideoProject
 ): Pick<VideoCompositionSpotlightState, 'phase' | 'progress'> {
-  const local = getMotionAnimationTime(region, time - region.startTime);
+  const local = getMotionAnimationTime(region, time - region.startTime, project);
   const duration =
     region.animation?.duration ?? region.sourceBinding?.animation.duration ?? region.duration;
   const enter = motionTransitionSettings(region, 'enter');

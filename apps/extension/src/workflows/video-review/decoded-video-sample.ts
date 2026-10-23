@@ -1,6 +1,7 @@
+import { getClipPlaybackOffset } from '../../features/video/project/timeline/rate';
 import { resolveVideoCompositionRenderPasses } from '../../features/video/composition/timeline/render';
 import { hasCameraMediaAt } from '../../features/video/project/camera/animation';
-import { getMediaClipSourceTime, isClipActiveAtTime } from '../../features/video/project/timeline';
+import { getVideoClipSourceTime, isClipActiveAtTime } from '../../features/video/project/timeline';
 import type { VideoProject, VideoProjectVideoClip } from '../../features/video/project/types';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import { readRetainedTransitionSample } from './cut-transition-frames';
@@ -139,8 +140,11 @@ export function createCompositionCutSampleSource(params: {
           const sample = await readRetainedTransitionSample(
             sink,
             range,
-            getMediaClipSourceTime(clip, time),
-            fallback,
+            getVideoClipSourceTime(clip, time),
+            clip.playbackWindow?.holdAt !== undefined &&
+              getClipPlaybackOffset(clip, time) >= clip.playbackWindow.holdAt
+              ? 'last'
+              : fallback,
             check
           );
           if (!sample) throw new Error('Cut source has no retained video frame.');

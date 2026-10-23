@@ -729,3 +729,27 @@ it.each(['none', 'dissolve', 'fade-black'] as const)(
     }
   }
 );
+
+it('materializes a windowed video with the bounded decoder outside composition joins', async () => {
+  mockDelayedSeekVideo();
+  const project = createEmptyVideoProject('Held preview');
+  const clip = createVideoClip(project.tracks[0]!.id);
+  clip.duration = 1.2;
+  clip.playbackWindow = { offset: 0, holdAt: 1 };
+  project.clips = [clip];
+  const source = { sourceWidth: 16, sourceHeight: 16, draw: vi.fn() };
+  const decoded = new Map([[clip.id, source]]);
+  cut.sample.mockResolvedValue({ media: decoded, release: cut.release });
+  const materializer = createVideoPreviewFrameMaterializer({
+    project,
+    assetUrls: { 'asset-1': 'blob:held' },
+    ownerDocument: document,
+    rasterSize: { width: 16, height: 9 },
+  });
+  await materializer.renderFrame(1.1, new AbortController().signal);
+  expect(cut.sample).toHaveBeenCalledWith(1.1, expect.any(AbortSignal), 'last');
+  expect(renderPreviewScene.mock.lastCall?.[0].decodedVideoFrames).toBe(decoded);
+  expect(cut.release).toHaveBeenCalledOnce();
+  materializer.dispose();
+  expect(cut.dispose).toHaveBeenCalledOnce();
+});

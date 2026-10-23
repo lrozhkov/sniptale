@@ -142,6 +142,12 @@ function updateClipAudioEnvelope(
   clipId: string,
   patch: { volumeEnvelopeEnd?: number; volumeEnvelopeStart?: number }
 ) {
+  if (
+    (patch.volumeEnvelopeStart === undefined && patch.volumeEnvelopeEnd === undefined) ||
+    (patch.volumeEnvelopeStart !== undefined && !Number.isFinite(patch.volumeEnvelopeStart)) ||
+    (patch.volumeEnvelopeEnd !== undefined && !Number.isFinite(patch.volumeEnvelopeEnd))
+  )
+    return;
   set((state) =>
     applyProjectUpdate(state, (project) =>
       updateClipWithProjectGuard(project, clipId, (item) => {
@@ -170,8 +176,11 @@ function syncLegacyClipAudioFields(
   const audioGainStart = patch.audioGainStart ?? gainRange.start;
   const audioGainEnd = patch.audioGainEnd ?? gainRange.end;
 
+  const playbackWindow = clip.playbackWindow ? { ...clip.playbackWindow } : undefined;
+  if (playbackWindow) delete playbackWindow.gainPhase;
   return {
     ...clip,
+    ...(playbackWindow ? { playbackWindow } : {}),
     audioGainStart,
     audioGainEnd,
     volume: 1,

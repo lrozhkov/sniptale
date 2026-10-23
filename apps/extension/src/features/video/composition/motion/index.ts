@@ -1,7 +1,10 @@
+import { resolveVideoCompositionActions } from '../timeline/frame/actions';
+import { resolveCursorSample } from '../timeline/frame/cursor';
 import { applySourceWindowCameraMode } from './source-window';
 import { resolveManualMotionFocusPoint, resolveMotionTargetScale } from './focus-target';
 import { resolveSourceWindowCamera, resolveMotionSourceWindow } from './source-window';
 import { projectMotionSourcePhases } from '../../project/motion/source-binding';
+import { resolveMotionSourcePlayback } from '../../project/motion/source-playback';
 import { evaluateMotionSpatial, motionCameraProjection } from './spatial';
 import { invertQuickEditProjection, projectQuickEditPoint } from './spatial-geometry';
 import { cameraTransitionProgress } from '../../project/motion/transitions';
@@ -36,12 +39,13 @@ import type { VideoCompositionActionState, VideoCompositionCameraState } from '.
 export { applyTemporalEasing };
 
 function resolveMotionProgress(
+  project: VideoProject,
   region: VideoProjectMotionRegion,
   currentTime: number,
   connectedIn: boolean,
   connectedOut: boolean
 ): number {
-  const localTime = getMotionAnimationTime(region, currentTime - region.startTime);
+  const localTime = getMotionAnimationTime(region, currentTime - region.startTime, project);
   const animationDuration = region.animation?.duration ?? region.duration;
   const enter = motionTransitionSettings(region, 'enter');
   const exit = motionTransitionSettings(region, 'exit');
@@ -85,6 +89,15 @@ export function resolveVideoCompositionCamera(params: {
   project: VideoProject;
   cameraViewport?: CameraOutputViewport;
 }): VideoCompositionCameraState {
+  const playback = resolveMotionSourcePlayback(params.project, params.currentTime);
+  if (playback)
+    return resolveVideoCompositionCamera({
+      ...params,
+      project: playback.geometryProject,
+      currentTime: playback.time,
+      actions: resolveVideoCompositionActions(playback.geometryProject, playback.time),
+      cursorSample: resolveCursorSample(playback.geometryProject, playback.time),
+    });
   params = { ...params, project: projectMotionSourcePhases(params.project) };
   if (!isVideoProjectUtilityLaneVisible(params.project, 'camera')) {
     return createDefaultCameraState(params.project);
@@ -99,8 +112,14 @@ export function resolveVideoCompositionCamera(params: {
   }
 
   const edges = resolveProjectCameraEdges(params.project, activeRegion);
-  const motionBlurAmount = regionMotionBlurAmount(activeRegion, params.currentTime, edges);
+  const motionBlurAmount = regionMotionBlurAmount(
+    activeRegion,
+    params.currentTime,
+    edges,
+    params.project
+  );
   const progress = resolveMotionProgress(
+    params.project,
     activeRegion,
     params.currentTime,
     edges.connectedIn,

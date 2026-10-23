@@ -373,3 +373,35 @@ it('does not require hidden cut media that the composition will not paint', asyn
   lease.release();
   source.dispose();
 });
+
+it('holds the last bounded video frame after a split even when the caller requests a first endpoint', async () => {
+  const clip = createVideoClip({
+    id: 'held',
+    sourceStart: 2.9,
+    sourceDuration: 0.1,
+    startTime: 0,
+    duration: 0.1,
+    playbackWindow: { offset: 0.2, holdAt: 0.1 },
+  });
+  const first = cutFrame(2.91),
+    last = cutFrame(2.95),
+    excluded = cutFrame(3);
+  const closeFirst = vi.spyOn(first, 'close'),
+    closeLast = vi.spyOn(last, 'close');
+  cutDecode.getSample.mockResolvedValue(excluded);
+  cutDecode.samples.mockImplementation(async function* () {
+    yield first;
+    yield last;
+  });
+  const source = createCompositionCutSampleSource({
+    project: createProject([clip]),
+    sourceUrl: () => 'blob:held',
+  });
+  const lease = await source.sample(0.05, new AbortController().signal, 'first');
+  expect(cutDecode.getSample).toHaveBeenCalledWith(3);
+  expect(closeFirst).toHaveBeenCalledOnce();
+  expect(closeLast).not.toHaveBeenCalled();
+  lease.release();
+  source.dispose();
+  expect(closeLast).toHaveBeenCalledOnce();
+});

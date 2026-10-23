@@ -1,4 +1,4 @@
-import type { VideoProjectMotionRegion } from '../../project/types';
+import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
 import { motionTransitionSettings, getMotionAnimationTime } from '../../project/motion/timing';
 import { motionBlurPhaseSetting } from '../../project/motion/blur';
 
@@ -18,9 +18,10 @@ export function motionBlurSamples(time: number, strength: number, start: number,
 export function motionRegionBlurPhase(
   region: VideoProjectMotionRegion,
   time: number,
-  edges: { connectedIn: boolean; connectedOut: boolean }
+  edges: { connectedIn: boolean; connectedOut: boolean },
+  project?: VideoProject
 ): 'enter' | 'exit' | 'hold' {
-  const local = getMotionAnimationTime(region, time - region.startTime);
+  const local = getMotionAnimationTime(region, time - region.startTime, project);
   const duration = region.animation?.duration ?? region.duration;
   const enter = Math.min(motionTransitionSettings(region, 'enter').duration, duration);
   if (!edges.connectedIn && enter > 0 && local < enter) return 'enter';
@@ -34,10 +35,11 @@ export function motionRegionBlurPhase(
 export function regionMotionBlurAmount(
   region: VideoProjectMotionRegion,
   time: number,
-  edges: { connectedIn: boolean; connectedOut: boolean }
+  edges: { connectedIn: boolean; connectedOut: boolean },
+  project?: VideoProject
 ) {
   if (region.motionBlur === undefined) return region.motionBlurAmount ?? 0;
-  const phase = motionRegionBlurPhase(region, time, edges);
+  const phase = motionRegionBlurPhase(region, time, edges, project);
   if (phase === 'hold' || motionTransitionSettings(region, phase).instant) return 0;
   const setting = motionBlurPhaseSetting(region.motionBlur, phase);
   return setting.enabled ? setting.strength : 0;

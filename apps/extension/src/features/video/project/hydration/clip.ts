@@ -22,7 +22,7 @@ function normalizeClipPlayback(clip: VideoProject['clips'][number]) {
   return {
     playbackRate,
     sourceDuration,
-    duration: sourceDuration / playbackRate,
+    duration: clip.playbackWindow ? clip.duration : sourceDuration / playbackRate,
   };
 }
 

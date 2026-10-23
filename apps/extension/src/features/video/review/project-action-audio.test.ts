@@ -1,3 +1,5 @@
+import { materializeVideoProjectCursorSourceObservations } from '../project/cursor-source-observations';
+import { normalizeVideoProjectCursorSkin } from '../project/cursor';
 import { getVideoProjectActionPresentation } from '../project/action-presentation';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../project/factories/creation';
@@ -551,4 +553,52 @@ it('shares inherited gesture appearance without changing project defaults or cap
     stroke: 5,
     opacity: 0.8,
   });
+});
+
+it('retains the full captured gesture path when only a held source frame remains visible', () => {
+  const project = fixture();
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  if (!clip.sourceInstanceId) throw new Error('Missing captured source instance');
+  project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'rec',
+        sourceInstanceId: clip.sourceInstanceId,
+        samples: [1, 3, 5].map((time, index) => ({
+          id: `captured:${time}`,
+          time,
+          x: (0.1 + index * 0.2) * 1280,
+          y: 144,
+          visible: true,
+          captureSegment: 0,
+          recordingPoint: { x: 0.1 + index * 0.2, y: 0.2 },
+        })),
+      },
+    ],
+  };
+  project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+  project.actionFeedback![0]!.gestureStyles = patchReviewClicks([], ['drag'], {
+    effect: 'press',
+    gestureAppearance: 'path',
+  });
+  const expected = evaluateProjectGestureFeedback(project, 4).map((item) => item.frame);
+  expect(expected).toHaveLength(1);
+  expect(expected[0]!.path!.length).toBeGreaterThan(1);
+  const candidate = {
+    ...project,
+    version: 43 as const,
+    duration: 11,
+    clips: [
+      { ...clip, startTime: 10, duration: 1, playbackWindow: { offset: 6, extent: 7, holdAt: 4 } },
+    ],
+  };
+  candidate.cursorTrack = materializeVideoProjectCursorSourceObservations(candidate);
+  const before = structuredClone(candidate);
+  expect(evaluateProjectGestureFeedback(candidate, 10.5).map((item) => item.frame)).toEqual(
+    expected
+  );
+  expect(candidate).toEqual(before);
 });

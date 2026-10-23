@@ -57,6 +57,8 @@ function canUseDecodedFrameProvider(
   const asset = getAssetById(project, clip.assetId);
   return Boolean(
     asset &&
+    // Playback windows require the shared bounded scene decoder, including held-only descendants.
+    !clip.playbackWindow &&
     settings.format === VideoExportFormat.MP4 &&
     (isMimeTypeCompatibleWithFormat(asset.metadata.mimeType, VideoExportFormat.WEBM) ||
       isMimeTypeCompatibleWithFormat(asset.metadata.mimeType, VideoExportFormat.MP4)) &&

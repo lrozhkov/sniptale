@@ -53,6 +53,7 @@ export function getClipEndTime(clip: VideoProjectClip): number {
 export function calculateProjectDuration(project: VideoProject): number {
   let duration = project.clips.reduce(
     (maxEnd, clip) =>
+      (clip.duration === 0 && clip.playbackWindow !== undefined) ||
       (clip.type === VideoProjectClipType.EFFECT && clip.sourceRange?.dormant) ||
       (clip.type === VideoProjectClipType.AUDIO &&
         clip.durationMode === VideoProjectDurationMode.PROJECT)

@@ -121,3 +121,9 @@ it('refuses decoded acceleration only where a whole-composition join is active',
     'accelerated-composite'
   );
 });
+
+it('routes retained playback windows through the shared bounded scene decoder', () => {
+  const project = createProject();
+  project.clips[0]!.playbackWindow = { offset: 0, holdAt: 3.9 };
+  expect(createAcceleratedCompositeSpan(project, settings, 0, 4)).toBeNull();
+});

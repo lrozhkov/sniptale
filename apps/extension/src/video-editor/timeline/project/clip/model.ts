@@ -1,4 +1,4 @@
-import { projectTimelineInterval } from '../interaction-state/projection';
+import { projectTimelineInterval, projectTimelinePoint } from '../interaction-state/projection';
 import type React from 'react';
 import { getClipWaveformPeaks, isAudioClip } from '../../../../features/video/project/timeline';
 import { getClipGainRange } from '../../../../features/video/project/timeline/basics';
@@ -41,8 +41,21 @@ export function buildProjectTimelineClipViewModel({
   | 'trackClipRowHeight'
   | 'trackLocked'
 >): ProjectTimelineClipViewModel {
+  const retainedPoint =
+    projection && clip.duration === 0 && clip.playbackWindow
+      ? projectTimelinePoint(projection, clip.startTime)
+      : null;
   const interval = projection
-    ? projectTimelineInterval(projection, clip.startTime, clip.startTime + clip.duration)
+    ? retainedPoint !== null
+      ? {
+          left: retainedPoint,
+          width: 1,
+          offsetSeconds: 0,
+          durationSeconds: 0,
+          includesStart: true,
+          includesEnd: true,
+        }
+      : projectTimelineInterval(projection, clip.startTime, clip.startTime + clip.duration)
     : {
         left: clip.startTime * pixelsPerSecond,
         width: Math.max(1, clip.duration * pixelsPerSecond),

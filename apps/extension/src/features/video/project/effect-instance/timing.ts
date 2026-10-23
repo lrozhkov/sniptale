@@ -1,3 +1,4 @@
+import type { VideoProjectClip } from '../types';
 import type { VideoProjectEffectInstance } from './types';
 
 const EFFECT_INSTANCE_TIMING_EPSILON = 1e-7;
@@ -40,7 +41,8 @@ export function resolveEffectInstanceTime(
     'duration' | 'playbackRate' | 'startTime' | 'sourceStart'
   >,
   documentDuration: number,
-  projectTime: number
+  projectTime: number,
+  placement?: Pick<VideoProjectClip, 'duration' | 'playbackWindow'>
 ): EffectInstanceTime | null {
   if (
     !Number.isFinite(projectTime) ||
@@ -49,7 +51,7 @@ export function resolveEffectInstanceTime(
     instance.duration <= 0 ||
     instance.playbackRate <= 0 ||
     projectTime < instance.startTime ||
-    projectTime >= instance.startTime + instance.duration
+    projectTime >= instance.startTime + (placement?.duration ?? instance.duration)
   ) {
     return null;
   }
@@ -57,8 +59,30 @@ export function resolveEffectInstanceTime(
     documentDuration,
     Math.max(
       0,
-      (instance.sourceStart ?? 0) + (projectTime - instance.startTime) * instance.playbackRate
+      (instance.sourceStart ?? 0) +
+        Math.min(
+          (placement?.playbackWindow?.offset ?? 0) + projectTime - instance.startTime,
+          placement?.playbackWindow?.holdAt ?? Infinity
+        ) *
+          instance.playbackRate
     )
   );
   return { effectTime, progress: effectTime / documentDuration };
+}
+
+/** A retained document interval remains independent from its physical EFFECT placement. */
+export function isEffectHostTimingValid(
+  host: Pick<VideoProjectClip, 'startTime' | 'duration' | 'playbackWindow'>,
+  instance: Pick<VideoProjectEffectInstance, 'startTime' | 'duration'>
+): boolean {
+  if (!isEffectInstanceTimingEqual(host.startTime, instance.startTime)) return false;
+  const window = host.playbackWindow;
+  if (!window) return isEffectInstanceTimingEqual(host.duration, instance.duration);
+  const end = Math.min(window.offset + host.duration, window.holdAt ?? Infinity);
+  return (
+    Number.isFinite(end) &&
+    end >= 0 &&
+    end <= instance.duration + EFFECT_INSTANCE_TIMING_EPSILON &&
+    (window.holdAt === undefined || window.holdAt < instance.duration)
+  );
 }

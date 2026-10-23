@@ -1,3 +1,9 @@
+import { createEffectHostClip } from '../../../project/factories/overlay-clip';
+import { disposeEffectRuntimeComposition } from './rendered';
+import {
+  EFFECT_RUNTIME_RESOURCE_LIMITS,
+  type EffectRuntimeFrameResourceScope,
+} from '../runtime/resource-limits';
 import { createEffectRuntimeInputMaterializer } from '../frame/inputs';
 import { drawSceneBackground } from '../../../project/scene/background';
 import { createVideoProjectFromRecording } from '../../../project/factories/creation';
@@ -343,4 +349,176 @@ it('samples the shared background with each unique frame time and its own camera
     expect.objectContaining({ currentTime: 0.5 })
   );
   expect(vi.mocked(drawSceneBackground).mock.calls[1]![0]).not.toHaveProperty('camera');
+});
+
+function createAnnotationComposition() {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 20,
+    height: 10,
+    duration: 2,
+    size: 1,
+    mimeType: 'video/webm',
+  });
+  const source = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const hosts = ['source', 'viewport'].map((attachment) => {
+    const host = createEffectHostClip({
+      trackId: source.trackId,
+      startTime: 0,
+      duration: 2,
+      effectInstanceId: attachment,
+      name: attachment,
+      projectWidth: 20,
+      projectHeight: 10,
+    });
+    host.id = attachment;
+    host.attachment =
+      attachment === 'viewport'
+        ? { kind: 'viewport' }
+        : {
+            kind: 'source',
+            assetId: source.assetId,
+            sourceInstanceId: source.sourceInstanceId ?? source.id,
+          };
+    host.sourceRange = {
+      assetId: source.assetId,
+      sourceInstanceId: source.sourceInstanceId ?? source.id,
+      start: 0,
+      end: 2,
+    };
+    return host;
+  });
+  project.clips.push(...hosts);
+  const frame = resolveVideoCompositionFrame(project, 1);
+  frame.effectRuntimePlans = hosts.map((host) => ({
+    ...createPlan(host.id),
+    target: { kind: 'scene', clipId: host.id },
+  }));
+  return { project, frame };
+}
+
+it('keeps both annotation planes and five camera exposures within the real retained raster limit', async () => {
+  const { project, frame } = createAnnotationComposition();
+  const bitmaps: ImageBitmap[] = [];
+  let peak = 0;
+  renderPlans.mockImplementation(
+    async ({
+      plans,
+      resourceScope,
+    }: {
+      plans: readonly EffectRuntimeFramePlan[];
+      resourceScope: EffectRuntimeFrameResourceScope;
+    }) => {
+      const frames = new Map();
+      for (const plan of plans) {
+        const output = createFrames(plan.effectInstanceId).get(plan.effectInstanceId)!;
+        resourceScope.retainBitmap(output.bitmap);
+        bitmaps.push(output.bitmap);
+        peak = Math.max(peak, resourceScope.snapshot().liveRasterResources);
+        frames.set(plan.effectInstanceId, { ...output, target: plan.target });
+      }
+      return frames;
+    }
+  );
+  const rendered = await renderEffectRuntimeComposition({
+    project,
+    executor,
+    imageBank: {},
+    clipMediaElements: new Map(),
+    overlayFrame: frame,
+    overlayTime: 1,
+    visualPasses: [0.98, 0.99, 1, 1.01, 1.02].map((time) => createPass(time, frame)),
+  });
+  expect(rendered.overlayFrames.size).toBe(2);
+  expect(rendered.framesByTime.size).toBe(5);
+  expect(peak).toBeLessThanOrEqual(EFFECT_RUNTIME_RESOURCE_LIMITS.maxLiveCanvases);
+  for (const time of [0.98, 0.99, 1.01, 1.02]) {
+    expect([...rendered.framesByTime.get(time)!.keys()]).toEqual(['source']);
+  }
+  disposeEffectRuntimeComposition(rendered);
+  for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+});
+
+it.each(['clip', 'transition', 'track', 'video-group', 'backdrop'] as const)(
+  'retains a viewport annotation read by a sampled %s input',
+  async (kind) => {
+    const { project, frame } = createAnnotationComposition();
+    const plan = {
+      ...createPlan('reader'),
+      kind: kind === 'transition' ? ('transition' as const) : ('targetEffect' as const),
+    };
+    switch (kind) {
+      case 'clip':
+        plan.target = {
+          kind: 'clip',
+          clipId: 'viewport',
+          chainIndex: 0,
+          placement: { x: 0, y: 0, width: 20, height: 10, opacity: 1, rotation: 0 },
+        };
+        break;
+      case 'transition':
+        plan.target = {
+          kind: 'transition',
+          transitionId: 'transition',
+          leadingClipId: 'source',
+          trailingClipId: 'viewport',
+        };
+        break;
+      case 'track':
+        plan.target = { kind: 'track', trackId: 'track', clipIds: ['source', 'viewport'] };
+        break;
+      case 'video-group':
+        plan.target = { kind: 'video-group', clipIds: ['source', 'viewport'] };
+        break;
+      case 'backdrop':
+        frame.sceneSpotlights = [
+          {
+            id: 'backdrop',
+            clipId: 'source',
+            afterClipId: 'source',
+            spotlight: { ...createQuickEditSpotlight(), effect: 'blur' },
+            phase: 'hold',
+            progress: 1,
+          },
+        ];
+        break;
+    }
+    if (kind !== 'backdrop') frame.effectRuntimePlans!.push(plan);
+    renderPlans.mockResolvedValue(new Map());
+    await renderEffectRuntimeComposition({
+      project,
+      executor,
+      imageBank: {},
+      clipMediaElements: new Map(),
+      overlayFrame: frame,
+      overlayTime: 1,
+      visualPasses: [createPass(0.99, frame)],
+    });
+    expect(
+      renderPlans.mock.lastCall?.[0].plans.map(
+        (item: EffectRuntimeFramePlan) => item.effectInstanceId
+      )
+    ).toEqual(kind === 'backdrop' ? ['source', 'viewport'] : ['source', 'viewport', 'reader']);
+  }
+);
+
+it('keeps an overlay-sampled layer when the neighboring camera changes owner', async () => {
+  const { project, frame } = createAnnotationComposition();
+  const neighboring = { ...frame, camera: { ...frame.camera, sourceClipId: 'another-video' } };
+  renderPlans.mockResolvedValue(new Map());
+  await renderEffectRuntimeComposition({
+    project,
+    executor,
+    imageBank: {},
+    clipMediaElements: new Map(),
+    overlayFrame: frame,
+    overlayTime: 1,
+    visualPasses: [createPass(0.99, neighboring)],
+  });
+  expect(
+    renderPlans.mock.lastCall?.[0].plans.map(
+      (plan: EffectRuntimeFramePlan) => plan.effectInstanceId
+    )
+  ).toEqual(['source']);
 });

@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject, createVideoProjectAsset } from '../factories/creation';
 import { createVideoClipFromAsset } from '../factories/clip';
-import { editReviewTextFragment } from '../../review/text-document';
+import { editReviewTextFragment, splitReviewTextFragment } from '../../review/text-document';
 import {
   applyVideoProjectTextEdit,
   addVideoProjectVoiceTake,
@@ -129,6 +129,78 @@ it('does not guess native time in gaps or conflicting placements and respects so
       target: source,
     })
   ).toEqual({ ok: false, reason: 'stale' });
+});
+
+it('splits source text at the retained window playhead and preserves audio progression', () => {
+  const { project, entry } = fixture();
+  const asset = createVideoProjectAsset(
+    'Windowed source',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'windowed' },
+    {
+      duration: 10,
+      width: 640,
+      height: 360,
+      hasAudio: true,
+      mimeType: 'video/mp4',
+      size: 1,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 640, 360, 2);
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  const source = {
+    ...entry,
+    binding: { kind: 'source' as const, assetId: asset.id, sourceInstanceId: clip.id },
+    document: {
+      ...entry.document,
+      fragments: entry.document.fragments.map((fragment) => ({
+        ...fragment,
+        text: 'Left right',
+        start: 4,
+        end: 6,
+        timeDomain: 'source' as const,
+      })),
+    },
+  };
+  project.textDocuments = [source];
+  project.clips = [
+    {
+      ...clip,
+      sourceStart: 2,
+      sourceDuration: 8,
+      duration: 2,
+      playbackWindow: { offset: 2, extent: 4 },
+    },
+  ];
+  const playhead = videoProjectTextPlayhead(project, source, 2.75);
+  expect(playhead).toBe(4.75);
+  if (playhead === null) throw new Error('Missing source playhead');
+  const split = splitReviewTextFragment(source.document, 'phrase', {
+    id: 'right',
+    position: 5,
+    time: playhead,
+  });
+  if (!split.ok) throw new Error('Text split refused');
+  const edited = applyVideoProjectTextEdit(project, source, { document: split.document });
+  expect(edited.ok && edited.entry.document.fragments).toMatchObject([
+    { text: 'Left', start: 4, end: 4.75 },
+    { text: 'right', start: 4.75, end: 6 },
+  ]);
+  expect(source.document.fragments).toHaveLength(1);
+  const windowed = project.clips[0]!;
+  if (windowed.type !== 'VIDEO') throw new Error('Expected windowed video');
+  project.clips = [{ ...windowed, playbackWindow: { offset: 2, extent: 4, holdAt: 2.5 } }];
+  expect(videoProjectTextPlayhead(project, source, 2.75)).toBe(4.5);
+  project.clips = [
+    { ...windowed, type: 'AUDIO', playbackWindow: { offset: 2, extent: 4, holdAt: 2.5 } },
+  ];
+  expect(videoProjectTextPlayhead(project, source, 2.75)).toBe(4.75);
+  project.clips = [{ ...windowed, sourceDuration: 2.5 }];
+  expect(videoProjectTextPlayhead(project, source, 2.75)).toBe(4.5);
+  expect(videoProjectTextPlayhead(project, source, 4)).toBeNull();
+  project.clips.push({ ...windowed, id: 'conflicting', sourceInstanceId: clip.id, sourceStart: 3 });
+  expect(videoProjectTextPlayhead(project, source, 2.75)).toBeNull();
 });
 
 function voiceAsset() {

@@ -323,3 +323,44 @@ it('edits linked source clips to exact 1/16 and reopens the resulting schema27 m
   expect(store.getState().project!.version).toBe(27);
   expect(store.getState().project!.duration).toBe(1);
 });
+
+it('replaces only the fade phase when a transferred clip fade is edited', () => {
+  const store = createTimingStore();
+  const project = createProjectWithVideoClip();
+  const window = {
+    offset: 0.5,
+    holdAt: 3,
+    fadePhase: { offset: 0.5, duration: 4 },
+    gainPhase: { offset: 0.5, duration: 4 },
+  };
+  project.version = 43;
+  project.clips[0]!.playbackWindow = window;
+  store.getState().setProject(project);
+  store.getState().updateClipFades('clip-1', { fadeOutMs: 300 });
+  expect(store.getState().project?.clips[0]?.playbackWindow).toEqual({
+    offset: 0.5,
+    holdAt: 3,
+    gainPhase: window.gainPhase,
+  });
+  expect(store.getState().project?.clips[0]?.fadeOutMs).toBe(300);
+  expect(project.clips[0]?.playbackWindow).toEqual(window);
+});
+
+it('bounds speed by the physical held placement before the next video', () => {
+  const store = createTimingStore();
+  const project = createProjectWithVideoClip();
+  const first = project.clips[0]!;
+  if (first.type !== 'VIDEO') throw new Error('Missing source clip');
+  first.sourceDuration = 0.15;
+  first.duration = 5 / 30;
+  first.playbackWindow = { offset: 0, holdAt: 0.15 };
+  project.clips[1]!.startTime = 2;
+  project.version = 43;
+  store.getState().setProject(project);
+  store.getState().updateClipPlaybackRate(first.id, 0.0625);
+  const changed = store.getState().project!.clips[0]!;
+  expect(changed.startTime + changed.duration).toBeCloseTo(2, 12);
+  if (changed.type !== 'VIDEO') throw new Error('Missing source clip');
+  expect(changed.playbackRate).toBeCloseTo(1 / 6, 12);
+  expect(changed.sourceDuration).toBe(0.15);
+});

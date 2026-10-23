@@ -374,7 +374,7 @@ it('moves only the current cut side without rounding its camera clock to output 
     project.compositionJoins
   );
   expect(isHydratableVideoProject({ ...project, version: 39 })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 43 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 44 })).toBe(false);
   for (const time of [undefined, NaN, -1, 1.2])
     expect(() => resolveVideoProjectCompositionJoinEndpoints(plan, 30, time)).toThrow(
       'Invalid moving composition join time'

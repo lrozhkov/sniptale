@@ -1,4 +1,9 @@
 import {
+  getVideoClipPresentationTime,
+  getMediaClipSourceTime,
+  areVideoClipSourceClocksContinuous,
+} from '../timeline/rate';
+import {
   patchReviewKeys,
   REVIEW_KEY_DEFAULT,
   type ReviewKeyStyle,
@@ -108,31 +113,97 @@ function clipRuns(clips: readonly VideoProjectVideoClip[]): VideoProjectVideoCli
     if (
       previous &&
       Math.abs(previous.startTime + previous.duration - clip.startTime) < 1e-6 &&
-      Math.abs(previous.sourceStart + previous.sourceDuration - clip.sourceStart) < 1e-6
+      areVideoClipSourceClocksContinuous(previous, clip)
     )
       run!.push(clip);
     else runs.push([clip]);
   }
   return runs;
 }
-function segments(clips: readonly VideoProjectVideoClip[]): ReviewTimeSegment[] {
-  return clips.map((clip) => ({
-    sourceStart: clip.sourceStart,
-    sourceEnd: clip.sourceStart + clip.sourceDuration,
-    resultStart: clip.startTime,
-    resultEnd: clip.startTime + clip.duration,
-    kind: (clip.playbackRate ?? 1) === 1 ? 'keep' : 'speed',
-    rate: clip.playbackRate ?? 1,
-  }));
+function segments(clips: readonly VideoProjectVideoClip[], visual = false): ReviewTimeSegment[] {
+  const result: ReviewTimeSegment[] = [];
+  for (const clip of clips) {
+    const window = clip.playbackWindow;
+    const rate = clip.playbackRate ?? 1;
+    const sourceStart =
+      window && !visual
+        ? Math.min(
+            clip.sourceStart + clip.sourceDuration,
+            getMediaClipSourceTime(clip, clip.startTime) + (clip.cameraTiming?.offsetSeconds ?? 0)
+          )
+        : clip.sourceStart;
+    const sourceEnd =
+      window && !visual
+        ? Math.min(clip.sourceStart + clip.sourceDuration, sourceStart + clip.duration * rate)
+        : clip.sourceStart + clip.sourceDuration;
+    if (sourceEnd <= sourceStart) continue;
+    const resultStart = clip.startTime - (visual ? (window?.offset ?? 0) : 0);
+    const segment: ReviewTimeSegment = {
+      sourceStart,
+      sourceEnd,
+      resultStart,
+      resultEnd: window
+        ? resultStart + (sourceEnd - sourceStart) / rate
+        : clip.startTime + clip.duration,
+      kind: rate === 1 ? 'keep' : 'speed',
+      rate,
+    };
+    if (
+      visual &&
+      result.some(
+        (item) =>
+          item.sourceStart === segment.sourceStart &&
+          item.sourceEnd === segment.sourceEnd &&
+          Math.abs(item.resultStart - segment.resultStart) < 1e-6 &&
+          item.rate === segment.rate
+      )
+    )
+      continue;
+    result.push(segment);
+  }
+  return result;
+}
+
+/** Gates an authored result-time cue through a physical clip and its retained visual hold. */
+export function projectVideoProjectFeedbackInterval(
+  clip: VideoProjectVideoClip,
+  start: number,
+  end: number
+) {
+  const physicalEnd = clip.startTime + clip.duration;
+  if (!clip.playbackWindow) {
+    const interval = {
+      clipId: clip.id,
+      start: Math.max(clip.startTime, start),
+      end: Math.min(physicalEnd, end),
+    };
+    return interval.end > interval.start ? interval : null;
+  }
+  const last = getVideoClipPresentationTime(clip, physicalEnd);
+  if (getVideoClipPresentationTime(clip, clip.startTime) >= end || last < start) return null;
+  const interval = {
+    clipId: clip.id,
+    start: Math.max(clip.startTime, start),
+    end:
+      last < physicalEnd && last >= start && last < end ? physicalEnd : Math.min(physicalEnd, end),
+  };
+  return interval.end > interval.start ? interval : null;
 }
 /** Maps retained source fragments without restricting continuity to one track. */
 export function getVideoProjectFeedbackRuns(
   project: VideoProject,
   identity: Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>
-): readonly { clips: readonly VideoProjectVideoClip[]; segments: readonly ReviewTimeSegment[] }[] {
+): readonly {
+  clips: readonly VideoProjectVideoClip[];
+  segments: readonly ReviewTimeSegment[];
+  visualSegments: readonly ReviewTimeSegment[];
+}[] {
   return clipRuns(sourceClips(project, identity)).map((clips) => ({
     clips,
     segments: segments(clips),
+    visualSegments: clips.some((clip) => clip.playbackWindow)
+      ? segments(clips, true)
+      : segments(clips),
   }));
 }
 

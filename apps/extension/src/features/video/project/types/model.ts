@@ -170,6 +170,17 @@ interface VideoProjectBaseClip {
   linkMode: VideoClipLinkMode;
   startTime: number;
   duration: number;
+  /** Physical placement can differ from the retained content and envelope clocks. */
+  playbackWindow?: {
+    /** Elapsed content seconds at placement start, at the current playback rate. */
+    offset: number;
+    /** Original physical extent retained when an edge is trimmed or split. */
+    extent?: number;
+    /** Last valid visual content time. Audio continues on its independent source clock. */
+    holdAt?: number;
+    fadePhase?: { offset: number; duration: number };
+    gainPhase?: { offset: number; duration: number };
+  };
   muted: boolean;
   volume: number;
   audioGainStart?: number;
@@ -360,7 +371,8 @@ export interface VideoProject {
     | 39
     | 40
     | 41
-    | 42;
+    | 42
+    | 43;
   sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

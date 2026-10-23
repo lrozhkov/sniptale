@@ -1,3 +1,5 @@
+import { isExportReadyVideoProject } from '../validation/root';
+import { resolveVideoCompositionActions } from '../../composition/timeline/frame/actions';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../factories/creation';
 import {
@@ -142,3 +144,40 @@ it('refuses removed batch targets and locked edits and makes reset retry a no-op
   expect(patchVideoProjectKeyFeedback(reset, targets, null)).toBe(reset);
   expect(patchVideoProjectKeyFeedback(reset, [], { enabled: true })).toBe(reset);
 });
+
+it.each([1, 2])(
+  'retains the source key caption phase inside a held-only slice at rate %s',
+  (rate) => {
+    const project = fixture();
+    const clip = project.clips[0]!;
+    if (clip.type !== 'VIDEO') throw new Error('Expected video');
+    project.actionFeedback![0]!.keyStyles = patchReviewKeys([], ['key'], { enabled: true });
+    project.clips = [{ ...clip, duration: 1.2 / rate, sourceDuration: 1.2, playbackRate: rate }];
+    project.duration = 1.2 / rate;
+    const expected = resolveVideoCompositionActions(project, 1.1 / rate);
+    expect(expected).toHaveLength(1);
+    const candidate = {
+      ...project,
+      version: 43 as const,
+      duration: 2,
+      clips: [
+        {
+          ...clip,
+          startTime: 1.2,
+          duration: 0.2 / rate,
+          sourceDuration: 1.2,
+          playbackRate: rate,
+          playbackWindow: { offset: 1.2 / rate, extent: 1.4 / rate, holdAt: 1.1 / rate },
+        },
+      ],
+    };
+    const before = structuredClone(candidate);
+    expect(isExportReadyVideoProject(candidate)).toBe(true);
+    const held = resolveVideoCompositionActions(candidate, 1.2 + 0.1 / rate);
+    expect(held).toHaveLength(1);
+    expect(held[0]!.progress).toBeCloseTo(expected[0]!.progress, 12);
+    expect(held[0]!.keyStyle).toEqual(expected[0]!.keyStyle);
+    expect(held[0]!.clipId).toBeNull();
+    expect(candidate).toEqual(before);
+  }
+);

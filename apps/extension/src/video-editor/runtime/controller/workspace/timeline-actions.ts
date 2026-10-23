@@ -7,6 +7,7 @@ import { resolveMotionConnectionSource } from '../../../../features/video/projec
 import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
 import { getClipEndTime } from '../../../../features/video/project/timeline';
+import { mapProjectTimeToSourcePoint } from '../../../../features/video/project/timeline/source-time';
 import { getProjectTransitionById } from '../../../../features/video/project/transition/project';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import { VideoProjectInteractionTimeBasis } from '../../../../features/video/project/types';
@@ -95,9 +96,8 @@ function createCursorSegmentMover(store: TimelineActionStore) {
               : undefined;
           if (binding.kind === 'recording-source' && clip?.type !== 'VIDEO') return;
           const sourceTime =
-            clip?.type === 'VIDEO'
-              ? clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1)
-              : time;
+            clip?.type === 'VIDEO' ? mapProjectTimeToSourcePoint([clip], time)?.sourceTime : time;
+          if (sourceTime === undefined) return;
           cursorFocusPath = updateCursorFocusKey(cursorFocusPath, id, { time: sourceTime });
         };
         move(sampleId, startTime);

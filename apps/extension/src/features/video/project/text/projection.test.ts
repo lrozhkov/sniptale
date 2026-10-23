@@ -131,3 +131,14 @@ it('keeps project-bound text independent of source timing and retains out-of-ran
   });
   expect(fragment.end).toBe(9);
 });
+
+it('keeps a source caption in a held-only descendant after a split', () => {
+  const { project, clip, entry, fragment } = fixture();
+  clip.duration = 0.5;
+  clip.playbackWindow = { offset: 8.6, holdAt: 8.5 };
+  expect(projectVideoProjectTextFragment(project, entry, fragment).ranges).toEqual([
+    { start: 2, end: 2.5 },
+  ]);
+  expect(fragment.start).toBe(1);
+  expect(fragment.end).toBe(9);
+});

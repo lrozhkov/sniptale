@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from '../project/cursor-source-observations';
 import type { CompositionJoinSettings } from '../project/scene/composition-join';
 import { calculateProjectDuration } from '../project/timeline/basics';
 import { resolveVideoProjectCompositionJoinPlans } from '../project/scene/joins';
@@ -16,6 +17,7 @@ import {
 } from './advanced/presentation';
 import {
   planReviewPresentationSequence,
+  presentationMainHoldTime,
   type PresentationSequencePlan,
 } from './presentation-sequence';
 
@@ -223,16 +225,27 @@ function insertBookend(
   );
   if (!styled) return null;
   const fillTrack = { ...styled.track, id: `${prefix}:fill-track` };
-  const composition = side === 'intro' ? prefixVideoProjectComposition(project, duration) : project;
+  const window =
+    preset.mode === 'video' && Math.abs(placement.duration - duration) > 0.000001
+      ? {
+          offset: 0,
+          extent: placement.duration,
+          holdAt: duration,
+          fadePhase: { offset: 0, duration },
+          gainPhase: { offset: 0, duration },
+        }
+      : undefined;
+  const composition =
+    side === 'intro' ? prefixVideoProjectComposition(project, placement.duration) : project;
   if (!composition) return null;
   const authoredTransition =
     side === 'intro'
       ? project.bookendPresets?.introTransition
       : project.bookendPresets?.outroTransition;
-  const adjustedImage =
-    preset.mode === 'image' && Math.abs(duration - preset.image.duration) > 0.000001;
+  const adjustedSlot =
+    window || (preset.mode === 'image' && Math.abs(duration - preset.image.duration) > 0.000001);
   const transition =
-    adjustedImage && authoredTransition && placement.transition
+    adjustedSlot && authoredTransition && placement.transition
       ? {
           ...authoredTransition,
           before: placement.transition.before,
@@ -241,15 +254,20 @@ function insertBookend(
       : authoredTransition;
   return {
     ...composition,
-    duration: side === 'intro' ? project.duration + duration : start + duration,
+    version: window ? 43 : composition.version,
+    duration: side === 'intro' ? project.duration + placement.duration : start + placement.duration,
     tracks: [...composition.tracks, ...tracks, fillTrack],
     clips: [
       ...composition.clips,
-      ...styled.clips.map((clip) =>
-        clip.trackId === styled.track.id
-          ? { ...clip, id: `${prefix}:fill`, trackId: fillTrack.id }
-          : clip
-      ),
+      ...styled.clips.map((clip) => ({
+        ...clip,
+        ...(window
+          ? { duration: placement.duration, playbackWindow: structuredClone(window) }
+          : {}),
+        ...(clip.trackId === styled.track.id
+          ? { id: `${prefix}:fill`, trackId: fillTrack.id }
+          : {}),
+      })),
     ],
     compositionJoins: [
       ...(composition.compositionJoins ?? []),
@@ -302,7 +320,7 @@ function preservesJoinTiming(
   }
 }
 
-/** Static slots can absorb lattice rounding; media and main clocks must retain their span. */
+/** Physical slots use the same output lattice as the Gallery sequence. */
 function sequencePlacements(sequence: PresentationSequencePlan) {
   const fps = sequence.rate.numerator / sequence.rate.denominator;
   const placements = new Map<
@@ -317,11 +335,7 @@ function sequencePlacements(sequence: PresentationSequencePlan) {
         ? sequence.totalDurationUs / 1_000_000
         : segment.endTick / fps;
     const duration = end - start;
-    if (
-      duration <= 0 ||
-      (segment.content.kind !== 'image' && Math.abs(duration - segment.contentDuration) > 0.000001)
-    )
-      return null;
+    if (duration <= 0) return null;
     const seam = segment.name === 'intro' ? segment.endUs : segment.startUs;
     const join =
       segment.name === 'main' ? undefined : sequence.joins?.find(({ seamUs }) => seamUs === seam);
@@ -341,6 +355,77 @@ function sequencePlacements(sequence: PresentationSequencePlan) {
     });
   }
   return placements;
+}
+
+function fitMainPlacement(
+  project: VideoProject,
+  duration: number,
+  hold: number
+): VideoProject | null {
+  if (Math.abs(duration - project.duration) <= 0.000001) return project;
+  const expanding = duration > project.duration;
+  const boundary = expanding ? hold : duration;
+  const clips: VideoProjectClip[] = [];
+  for (const clip of project.clips) {
+    const end = clip.startTime + clip.duration;
+    if (
+      (clip.type === 'EFFECT' && clip.sourceRange?.dormant) ||
+      end <= boundary ||
+      (clip.type === 'AUDIO' && end <= duration && end < project.duration - 0.000001)
+    ) {
+      clips.push(clip);
+      continue;
+    }
+    const outsidePlacement =
+      clip.type === 'AUDIO'
+        ? clip.startTime >= duration
+        : expanding
+          ? clip.startTime > boundary
+          : clip.startTime >= boundary;
+    if (outsidePlacement) {
+      if (clip.type === 'VIDEO' || clip.type === 'AUDIO') {
+        clips.push({
+          ...clip,
+          duration: 0,
+          playbackWindow: {
+            offset: 0,
+            extent: clip.duration,
+            fadePhase: { offset: 0, duration: clip.duration },
+            gainPhase: { offset: 0, duration: clip.duration },
+          },
+        });
+        continue;
+      }
+      if (clip.type !== 'EFFECT' || !clip.sourceRange) return null;
+      clips.push({ ...clip, sourceRange: { ...clip.sourceRange, dormant: true } });
+      continue;
+    }
+    if (
+      end < project.duration - 0.000001 &&
+      clip.type !== 'VIDEO' &&
+      clip.type !== 'AUDIO' &&
+      clip.type !== 'EFFECT'
+    )
+      return null;
+    if (clip.playbackWindow) return null;
+    const placementDuration = duration - clip.startTime;
+    clips.push({
+      ...clip,
+      duration: placementDuration,
+      playbackWindow: {
+        offset: 0,
+        extent: Math.max(clip.duration, placementDuration),
+        ...(expanding && clip.type !== 'AUDIO'
+          ? { holdAt: Math.max(0, hold - clip.startTime) }
+          : {}),
+        fadePhase: { offset: 0, duration: clip.duration },
+        gainPhase: { offset: 0, duration: clip.duration },
+      },
+    });
+  }
+  const fitted: VideoProject = { ...project, version: 43, duration, clips };
+  fitted.cursorTrack = materializeVideoProjectCursorSourceObservations(fitted);
+  return fitted;
 }
 
 /** Materializes supported bookends with existing clips, prefixes and scene-edge fields. */
@@ -371,6 +456,16 @@ export function planReviewProjectPresentation(args: {
   if (active && !placements) return { status: 'blocked', field: 'presentation-timing' };
   if (active && calculateProjectDuration(args.project) > args.project.duration + 0.000001)
     return { status: 'blocked', field: 'presentation-overlays' };
+  const mainPlacement = placements?.get('main');
+  const mainProject =
+    active && mainPlacement
+      ? fitMainPlacement(
+          args.project,
+          mainPlacement.duration,
+          presentationMainHoldTime(sequence.plan)
+        )
+      : args.project;
+  if (!mainProject) return { status: 'blocked', field: 'presentation-timing' };
   const independent = settings.introControl !== undefined || settings.outroControl !== undefined;
   const fade = (side: 'intro' | 'outro') => {
     const value = side === 'intro' ? resolved.fadeIn : resolved.fadeOut;
@@ -393,8 +488,8 @@ export function planReviewProjectPresentation(args: {
     resources.size > 0 || independent || settings.introTransition || settings.outroTransition;
   const requiredVersion: VideoProject['version'] = independent ? 41 : hasPresets ? 26 : 24;
   let project: VideoProject = {
-    ...args.project,
-    version: args.project.version > requiredVersion ? args.project.version : requiredVersion,
+    ...mainProject,
+    version: mainProject.version > requiredVersion ? mainProject.version : requiredVersion,
     assets: [
       ...args.project.assets,
       ...[...resources.values()].filter(

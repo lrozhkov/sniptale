@@ -466,3 +466,19 @@ it('projects an ordinary effect onto its exact source and keeps missing placemen
     })
   ).toBe(true);
 });
+
+it('retains a standalone content clock through a held placement and reopen', () => {
+  const project = createProject();
+  const host = project.clips.find(({ id }) => id === 'standalone-host')!;
+  Object.assign(host, { duration: 3.3, playbackWindow: { offset: 0, holdAt: 2.9 } });
+  project.version = 43;
+  const before = resolveEffectRuntimeFramePlans(project, 3.2);
+  expect(before).toEqual([
+    expect.objectContaining({ effectInstanceId: 'standalone-1', time: 2.9 }),
+  ]);
+  expect(resolveEffectRuntimeFramePlans(project, 3.3)).toEqual([]);
+  const reopened = JSON.parse(JSON.stringify(project));
+  expect(resolveEffectRuntimeFramePlans(reopened, 3.2)).toEqual([
+    expect.objectContaining({ time: 2.9 }),
+  ]);
+});

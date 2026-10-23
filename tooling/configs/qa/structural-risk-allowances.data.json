@@ -490,10 +490,10 @@
       "file": "apps/extension/src/features/video/composition/motion/camera-geometry.ts",
       "symbol": "createProjectWorkingZoneCameraGeometry",
       "owner": "composition:motion",
-      "reason": "tool-noise: This pure factory returns one geometry receiver. Its closures share immutable project, source mapping, phase and output transform. The candidate adds a bounded window-weight policy call in the existing source-window branch. Point, interval and derivative bounds still enforce the same admission contract. No writer, resource or recovery authority enters the factory. Main inspected this exact body. Independent architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "eba681d57b15ba767aef360ab5a35f9a7f8fe8b9d38f77a7151414fb715c7938",
+      "reason": "tool-noise: This factory creates one immutable camera geometry receiver. Its closures share the same project, region, output and policy. Retained animation rate and hold boundaries belong to this projection. No writer, transport or independent recovery applies. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "a0f2b7662054ddc6fad32328e0b45bcd18581f2100f09cddfc48c17d3fb374ad",
       "signatureHash": "bf0f4f53e34843f435e3221d9ec8a76f30cbe24c2ee8d7c390def907f6c82e95"
     },
     {
@@ -1678,10 +1678,10 @@
       "file": "apps/extension/src/features/video/composition/motion/index.ts",
       "symbol": "resolveVideoCompositionCamera",
       "owner": "composition:motion",
-      "reason": "tool-noise: This pure resolver selects one active camera frame. The candidate applies the authored window/content split at the existing source-window and connection returns. Endpoint evaluation remains in the existing owners. It adds no state, effects or recovery lifetime. A mechanical split would distribute this decision. Main inspected this exact body. Independent architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "cbee2abb67a7b3a68acae02336964a93974a788e8db80ee2249be0313f45e7c1",
+      "reason": "tool-noise: This resolver produces one camera frame. It first maps retained playback into a readonly source context, then uses the existing camera operation. Derived observations confer no persistence, resource or recovery authority. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "9043079563a7eb54bf24d6fbc396ea61b98bebd8a6c73532c3ab1061bba31a31",
       "signatureHash": "40a97668312cca68cbb4b5f4e9aaf1a061ed96f550635aedbd54936e4887d342"
     },
     {
@@ -1975,10 +1975,10 @@
       "file": "apps/extension/src/features/video/composition/motion/camera-geometry.ts",
       "symbol": "<file>",
       "owner": "composition:motion",
-      "reason": "tool-noise: This pure Native adapter maps observations and clip planes into one camera geometry contract. File cohesion is 1.00, with no effects or state authorities. The candidate selects the existing shared window-weight policy. A mechanical split would separate the same projection inputs from their bounds. Main inspected this exact body. Independent architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "d0b1788fc839a4ede210ec1db12ce25d99b88c92e06fe875f90b6f78d882f325",
+      "reason": "tool-noise: This pure Native adapter maps source phase and clip planes into one camera geometry contract. File cohesion is 1.00, with no effects or state authorities. Retained phase and hold boundaries use the existing geometry receiver. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "8cd0fa293c494170ec59f8168c0dfec9d24a0b5e23df505081a4d6518034a91e",
       "signatureHash": "7fa14f86d047fe67b6f395d6dcebc5e5dfbe5dbb8f1b6a22d2d4b4b0b4350d95"
     },
     {
@@ -2030,11 +2030,11 @@
       "file": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
       "symbol": "createWindowCameraGeometry",
       "owner": "composition:motion",
-      "reason": "tool-noise: This factory returns one immutable geometry receiver for phase, pan, containment and derivative proof. Its instant boundary loop includes the exact renderer frame in each closed proof cell. All closures share the same window, region, output and policy. It adds no state authority, writer, transport, resource lifetime or recovery. A failing endpoint test establishes the need for the boundary union. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "adc1cffdf9aade5268c6e2954001d6d32189b8979c427f040ca1a09677b1a169",
-      "signatureHash": "81f670eb5036eb3d4c69bb09a16c519b9f6dff89fabe2571469e7f1b1ca0b488"
+      "reason": "tool-noise: This factory returns one immutable window geometry receiver. Phase, pan, containment and derivative closures share one window, region, output and policy. A held phase requires its boundary in the same proof cells. No independent writer, effect or recovery applies. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "c4c6ea65ccccc2d090431c2d52df121c48d526bee403a54044a7ff483a600509",
+      "signatureHash": "f33198130165d0ccacb82f7558345429ed1abaa3027b272694af666606a7d1a8"
     },
     {
       "rule": "structural-function-risk",
@@ -2096,10 +2096,10 @@
       "file": "apps/extension/src/features/video/composition/motion/camera-geometry.test.ts",
       "symbol": "<file>",
       "owner": "composition:motion:proof",
-      "reason": "tool-noise: This suite compares one Native geometry receiver with the actual renderer. The added five-type entrance and exit matrix checks exact jump endpoints and closed proof cells. The link test checks the same ease-out phase through rendered connections. Test fixtures are local values, not production state authorities. File cohesion is1.00, with one owner and no effects. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "32a98d45f6f9084cb4a45039723f295179d684aa91c302d861967f38ebe892d8",
+      "reason": "tool-noise: This file compares one camera geometry contract with its renderer oracle. Reported state counts isolated test fixtures. The added held-tail case checks the same source-window and scene geometry. No runtime state or resource owner applies. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "29df306b4d10c9e593c3ae9864d3598da82dbd4b2d6a8b483b860453ae8b20f6",
       "signatureHash": "2f71cc2f8aa9734e57cce70ec7d8a74784a5c2cb8222e05d67e84617f32392cd"
     },
     {
@@ -2183,12 +2183,12 @@
       "rule": "structural-function-risk",
       "file": "apps/extension/src/features/video/composition/timeline/frame/index.ts",
       "symbol": "resolveVideoCompositionFrame",
-      "owner": "extension:features:video",
-      "reason": "tool-noise: This function resolves one accepted project frame. It assembles existing camera, source, mask and effect plans. Selected export geometry remains disposable runtime context. No writer or independent state authority moves here. Splitting the assembly would repeat that same frame context.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result, or recovery. Remove when analysis models this cohesive operation. Independent architecture review must assess this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "7ff2728f4d7bfc861d67db7171ddab6fd113b0c72f53bd40447b6dde3d42378b",
-      "signatureHash": "24a906b51ccb0ddf7a3dea574fa33b043c9c97fa66749b86db568d60de91ace4"
+      "owner": "composition:timeline",
+      "reason": "tool-noise: This resolver assembles one composition frame from existing pure layer, camera, cursor and effect owners. The camera override preserves one exposure sample. It does not add state, transport, resource ownership or recovery. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "fea025bee4b09ff1c6995bdd81b537f4cb6491c93ae87412e1a1cc3fab69f196",
+      "signatureHash": "1ac65c6fea3e739fd56958e974b84e8aaca8c0d7d9c30276189b0df92111ada2"
     },
     {
       "rule": "structural-function-risk",
@@ -2271,11 +2271,11 @@
       "rule": "structural-function-risk",
       "file": "apps/extension/src/offscreen/project-export/composition-joins.ts",
       "symbol": "createProjectExportCompositionJoinRenderer",
-      "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: This factory owns one staging, cancellation and cleanup lifetime. Its157 lines include nested sample and returned lifecycle methods, which analysis also measures separately. The outer body has14 statements and cyclomatic2. One subordinate cut renderer shares parent cancellation. Controlled failure and disposal tests prove no late publication. Splitting the closures would distribute this lifetime.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "024ef1665f7de05179f231b18a15f69cc052682b532bf66cd102e7fb44633dbb",
+      "owner": "offscreen:project-export",
+      "reason": "tool-noise: This existing sampler factory owns one export operation and its decoder lifetime. The bounded-window branch reuses its cut sampler, cancellation signal and canvas release. Three adapter owners feed the same render result. No additional writer, runtime or recovery authority applies. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "982a9a0b3a983f840b9e7dc9b4cb41a59d145bf227a658ef7568d5a5aa0890a5",
       "signatureHash": "3e3aac676fafdc23b6a94224f2aea7ccf3955812b51827e6a6018f6f0e1b0775"
     },
     {
@@ -2288,6 +2288,28 @@
       "reviewDate": "2026-10-22",
       "astHash": "c19667a07e89fd8e9191ede0711cf80dc059fcb41145b6e94d394185276a042d",
       "signatureHash": "d124a5c7e4a4a1fcffed5cc4aa1ec6dcadaff12efa7f44644016471279b89945"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/motion/project-follow.ts",
+      "symbol": "<file>",
+      "owner": "composition:motion",
+      "reason": "tool-noise: This file owns the existing readonly follow plan and its geometry cache. The candidate maps source clocks before the same plan lookup. Its three state signals remain disposable plan caches, without durable writers or independent recovery. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "c7ef3f4e5888d003578aaf74f9ad700cb75caaf235c69efe478be8c4576dc4d2",
+      "signatureHash": "32bd3e67233c3986f0027472e6b6ee5a77ee6bfcc2628cfbdcc910fc2635c301"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/project/motion/source-playback.ts",
+      "symbol": "resolveMotionSourcePlayback",
+      "owner": "project:motion",
+      "reason": "tool-noise: This resolver selects one readonly source geometry context and its playback time. It preserves independent Native camera connections and translates disposable project-time observations. One WeakMap caches a derived view per immutable snapshot. A WeakSet prevents recursive projection. No media acquisition, publication, durable writer or independent recovery applies. Main inspected this exact implementation. Independent architecture review must assess this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "cbaf720cb295f98389dfaddd49ebf7c37fb9622a59c6f56c43a691a16c1a5d43",
+      "signatureHash": "04ffd514aaa3222bfa3c01f47d5ba0dddbef6e1ce101c3d0378144c7c1e23b14"
     }
   ]
 }

@@ -4,7 +4,7 @@ import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
 import { buildProjectTransitionSegments } from '../../../project/transition/project';
 import {
   isEffectInstanceSourceRangeValid,
-  isEffectInstanceTimingEqual,
+  isEffectHostTimingValid,
 } from '../../../project/effect-instance/timing';
 import type {
   VideoProjectEffectInstance,
@@ -62,6 +62,21 @@ function resolveInstanceAudioPlans(
   if (targetAvailability.status !== 'available') return [];
   const document = parseSnapshot(snapshot);
   assertAudioSnapshotIntegrity(instance, snapshot, document);
+  const host =
+    instance.kind === 'standalone'
+      ? project.clips.find(
+          (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
+        )
+      : undefined;
+  const offset = host?.playbackWindow?.offset ?? 0;
+  const audioInstance = host?.playbackWindow
+    ? {
+        ...instance,
+        sourceStart: (instance.sourceStart ?? 0) + offset * instance.playbackRate,
+        duration: Math.min(host.duration, Math.max(0, instance.duration - offset)),
+      }
+    : instance;
+  if (audioInstance.duration <= 0) return [];
   const declaredAssets = new Map(document.assets.map((asset) => [asset.id, asset]));
   return document.layers.flatMap((layer) => {
     if (layer.type !== 'audio' || layer.visible === false) return [];
@@ -86,7 +101,7 @@ function resolveInstanceAudioPlans(
         clip,
         documentDuration: document.duration,
         index,
-        instance,
+        instance: audioInstance,
         layer,
         sceneEnabled: isSceneEnabled(document.scenes, clip.sceneId),
         ...(targetAvailability.timelineInterval
@@ -147,12 +162,7 @@ function resolveTargetAvailability(
     const host = project.clips.find(
       (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
     );
-    if (
-      !host ||
-      !isEffectInstanceTimingEqual(host.startTime, instance.startTime) ||
-      !isEffectInstanceTimingEqual(host.duration, instance.duration)
-    )
-      return { status: 'invalid' };
+    if (!host || !isEffectHostTimingValid(host, instance)) return { status: 'invalid' };
     if (host.type === 'EFFECT' && host.sourceRange?.dormant) return { status: 'hidden' };
     const track = project.tracks.find(({ id }) => id === host.trackId);
     return track?.visible === true

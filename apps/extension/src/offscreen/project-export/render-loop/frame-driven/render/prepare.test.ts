@@ -90,6 +90,7 @@ it('prepares the frame by syncing and drawing project content', async () => {
   syncVideoClipFrameMock.mockResolvedValue(undefined);
   renderOffscreenProjectEffectFramesMock.mockResolvedValue(undefined);
   const throwIfPipelineFailed = vi.fn();
+  const project = { ...createEmptyVideoProject('Frame'), duration: 10 };
 
   await prepareFrameDrivenCompositeFrame({
     canvas: {} as HTMLCanvasElement,
@@ -100,7 +101,7 @@ it('prepares the frame by syncing and drawing project content', async () => {
     job: { cancelled: false, clipMediaElements: ['clip'] } as never,
     keyframeInterval: 3,
     loadedImages: { image: 'loaded' } as never,
-    project: { duration: 10 } as never,
+    project,
     settings: { fps: 30 } as never,
     throwIfPipelineFailed,
     videoEncoder: { encode: vi.fn() } as never,
@@ -109,13 +110,13 @@ it('prepares the frame by syncing and drawing project content', async () => {
   expect(throwIfPipelineFailed).toHaveBeenCalledTimes(1);
   expect(syncVideoClipFrameMock).toHaveBeenCalledWith(
     expect.objectContaining({ cancelled: false, clipMediaElements: ['clip'] }),
-    { duration: 10 },
+    project,
     2.5,
     undefined
   );
   expect(drawProjectFrameMock).toHaveBeenCalledWith(
     { stroke: expect.any(Function) },
-    { duration: 10 },
+    project,
     { fps: 30 },
     2.5,
     { image: 'loaded' },

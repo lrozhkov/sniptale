@@ -28,7 +28,7 @@ export function resolveVideoCompositionBorders(project: VideoProject, time: numb
       border: region.border!,
       ...(binding?.coordinateSpace ? { coordinateSpace: binding.coordinateSpace } : {}),
       clock: {
-        time: getMotionAnimationTime(region, time - region.startTime),
+        time: getMotionAnimationTime(region, time - region.startTime, project),
         duration: region.animation?.duration ?? binding?.animation.duration ?? region.duration,
         enter: motionTransitionSettings(region, 'enter'),
         exit: motionTransitionSettings(region, 'exit'),

@@ -150,3 +150,17 @@ it('borrows complete accepted source URLs when both endpoint media are outside t
     'asset-video': 'blob:inactive-main',
   });
 });
+
+it('uses the exact sampler for an active windowed video outside a join and releases it on exit', async () => {
+  const f = fixture();
+  f.input.project.clips.find(({ id }) => id === 'underlay')!.playbackWindow = {
+    offset: 0,
+    holdAt: 2.9,
+  };
+  await f.owner.render({ ...f.input, currentTime: 2.95 });
+  expect(f.renderFrame).toHaveBeenCalledWith(2.95, expect.any(AbortSignal), undefined);
+  expect(f.raw).not.toHaveBeenCalled();
+  await f.owner.render({ ...f.input, currentTime: 3.1 });
+  expect(f.raw).toHaveBeenCalledOnce();
+  expect(f.dispose).toHaveBeenCalledOnce();
+});

@@ -30,7 +30,7 @@ export function resolveVideoProjectAudioTarget(
   )
     return null;
   const offset = clip.type === 'VIDEO' ? (clip.cameraTiming?.offsetSeconds ?? 0) : 0;
-  const start = Math.max(clip.sourceStart, offset);
+  const start = Math.max(getMediaClipSourceTime(clip, clip.startTime) + offset, offset);
   const end = Math.min(
     clip.sourceStart + clip.sourceDuration,
     getMediaClipSourceTime(clip, clip.startTime + clip.duration) + offset,

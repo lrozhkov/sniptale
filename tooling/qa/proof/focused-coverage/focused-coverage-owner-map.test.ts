@@ -459,3 +459,12 @@ it('includes linked clip proof in the exclusive duration owner scope', async () 
     )
   ).toContain('apps/extension/src/features/video/project/timeline/basics.waveforms.test.ts');
 });
+
+it('keeps concurrent project publication proof in root contract validation selection', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/features/video/project/validation/root.ts'
+    )
+  ).toContain('apps/extension/src/composition/persistence/projects/index.stale-save.test.ts');
+});

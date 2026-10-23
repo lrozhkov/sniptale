@@ -3,6 +3,7 @@ import {
   getVideoProjectClickStyle,
   getVideoProjectKeyStyle,
   getVideoProjectFeedbackRuns,
+  projectVideoProjectFeedbackInterval,
 } from './action-feedback/projection';
 import { REVIEW_CLICK_DEFAULT } from './action-feedback/validation';
 import type { ReviewClickStyle } from './action-feedback/types';
@@ -128,13 +129,23 @@ function resolveEvent(
         return clip ? [{ clipId, start: clip.startTime, end: clip.startTime + clip.duration }] : [];
       })
     : [{ clipId: null, start: 0, end: project.duration }];
-  const renderIntervals = intervals
-    .map((interval) => ({
+  const renderIntervals = intervals.flatMap((interval) => {
+    const clip = project.clips.find((item) => item.id === interval.clipId);
+    if (clip?.type === 'VIDEO' && clip.playbackWindow) {
+      const projected = projectVideoProjectFeedbackInterval(
+        clip,
+        animationStart,
+        animationStart + duration
+      );
+      return projected ? [projected] : [];
+    }
+    const projected = {
       clipId: interval.clipId,
       start: Math.max(0, animationStart, interval.start),
       end: Math.min(project.duration, animationStart + duration, interval.end),
-    }))
-    .filter((interval) => interval.end > interval.start);
+    };
+    return projected.end > projected.start ? [projected] : [];
+  });
   const start = renderIntervals[0]?.start ?? Math.max(0, animationStart);
   const end = renderIntervals.at(-1)?.end ?? start;
   const reason = resolveReason(event, defaults, preset, renderIntervals.length > 0);
@@ -191,7 +202,13 @@ function resolveSourceClick(
   const clips = run?.clips ?? [];
   const window =
     anchor.kind === 'recording-source' && run
-      ? reviewCueWindow(run.segments, anchor.sourceTime, style.offset, style.before, style.after)
+      ? reviewCueWindow(
+          run.visualSegments,
+          anchor.sourceTime,
+          style.offset,
+          style.before,
+          style.after
+        )
       : null;
   const feedbackOccurrence = run
     ? {
@@ -201,13 +218,10 @@ function resolveSourceClick(
     : occurrence;
   const animationStart = (window?.anchor ?? occurrence.time + style.offset) - style.before;
   const renderIntervals = window
-    ? clips
-        .map((clip) => ({
-          clipId: clip.id,
-          start: Math.max(clip.startTime, window.start),
-          end: Math.min(clip.startTime + clip.duration, window.end),
-        }))
-        .filter((interval) => interval.end > interval.start)
+    ? clips.flatMap((clip) => {
+        const interval = projectVideoProjectFeedbackInterval(clip, window.start, window.end);
+        return interval ? [interval] : [];
+      })
     : [];
   const reason = resolveSourceClickReason(event, defaults, style, renderIntervals.length > 0);
   const start = renderIntervals[0]?.start ?? Math.max(0, animationStart);
@@ -311,7 +325,7 @@ function resolveSourceKey(
   const window =
     anchor.kind === 'recording-source' && run
       ? reviewCueWindow(
-          run.segments,
+          run.visualSegments,
           anchor.sourceTime,
           settings.offset,
           settings.before,
@@ -319,13 +333,10 @@ function resolveSourceKey(
         )
       : null;
   const renderIntervals = window
-    ? (run?.clips ?? [])
-        .map((clip) => ({
-          clipId: clip.id,
-          start: Math.max(clip.startTime, window.start),
-          end: Math.min(clip.startTime + clip.duration, window.end),
-        }))
-        .filter((interval) => interval.end > interval.start)
+    ? (run?.clips ?? []).flatMap((clip) => {
+        const interval = projectVideoProjectFeedbackInterval(clip, window.start, window.end);
+        return interval ? [interval] : [];
+      })
     : [];
   let reason: VideoProjectActionPresentationReason | null = null;
   if (!defaults.enabled) reason = 'track-disabled';
@@ -333,8 +344,10 @@ function resolveSourceKey(
   else if (!settings.enabled) reason = 'keystrokes-disabled';
   else if (!event.label) reason = 'unsupported';
   else if (!renderIntervals.length) reason = 'outside-source';
-  const start = window?.start ?? Math.max(0, occurrence.time + settings.offset - settings.before);
-  const end = window?.end ?? start;
+  const animationStart =
+    window?.start ?? Math.max(0, occurrence.time + settings.offset - settings.before);
+  const start = renderIntervals[0]?.start ?? animationStart;
+  const end = renderIntervals.at(-1)?.end ?? start;
   return {
     event,
     occurrence: run
@@ -347,7 +360,7 @@ function resolveSourceKey(
     keyStyle: settings.style,
     easing: 'LINEAR',
     preset: 'NONE',
-    duration: window ? end - start : settings.before + settings.after,
+    duration: window ? window.end - window.start : settings.before + settings.after,
     offset: settings.offset,
     point: null,
     pointSpace: 'scene',
@@ -359,6 +372,6 @@ function resolveSourceKey(
     overridden: settings !== REVIEW_KEY_DEFAULT || event.presentation?.enabled !== undefined,
     start,
     end,
-    animationStart: start,
+    animationStart,
   };
 }

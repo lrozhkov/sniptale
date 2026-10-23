@@ -431,3 +431,28 @@ it('uses export fps when a single project frame becomes multiple encoded frames'
     )
   ).toBe(true);
 });
+
+it('keeps hybrid span boundaries on the shared output lattice after a fractional bookend', () => {
+  const project = createProject();
+  const main = project.clips[0]!;
+  if (main.type !== 'VIDEO') throw new Error('Missing source video');
+  project.clips = [
+    {
+      ...main,
+      id: 'intro',
+      duration: 5 / 30,
+      sourceDuration: 0.15,
+      playbackWindow: { offset: 0, holdAt: 0.15 },
+    },
+    { ...main, startTime: 5 / 30, duration: 1, sourceDuration: 1 },
+  ];
+  project.duration = 1 + 5 / 30;
+  const spans = planMp4VideoRenderSpans(project, createSettings({ fps: 40 }));
+  expect(spans[0]).toMatchObject({ kind: 'composite', start: 0, end: 7 / 40 });
+  expect(spans[1]).toMatchObject({
+    kind: 'clean-source',
+    start: 7 / 40,
+    sourceStart: expect.closeTo(7 / 40 - 5 / 30, 12),
+  });
+  expect(spans.at(-1)?.end).toBe(project.duration);
+});

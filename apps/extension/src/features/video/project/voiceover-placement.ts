@@ -18,20 +18,21 @@ export function projectSourceVoiceoverPlacement(
 ): QuickEditAudioClip[] {
   if (take.dormant || !take.sourceAnchor?.length || !reference.length) return [];
   const rate = normalizeClipPlaybackRate(placement.playbackRate ?? 1);
-  const end = placement.sourceStart + Math.min(placement.sourceDuration, placement.duration * rate);
-  if (end <= placement.sourceStart) return [];
-  const normalized = retimeReviewVoiceover(
-    take,
-    occurrenceClock(reference, placement.sourceStart, end, rate)
-  );
+  const offset = placement.playbackWindow?.offset ?? 0;
+  const start = placement.sourceStart + offset * rate;
+  const end =
+    placement.sourceStart +
+    Math.min(placement.sourceDuration, (offset + placement.duration) * rate);
+  if (end <= start) return [];
+  const normalized = retimeReviewVoiceover(take, occurrenceClock(reference, start, end, rate));
   return projectReviewVoiceoverAnchors(take, normalized.sourceAnchor ?? [], [
     {
       kind: rate === 1 ? 'keep' : 'speed',
       rate,
-      sourceStart: placement.sourceStart,
+      sourceStart: start,
       sourceEnd: end,
       resultStart: placement.startTime,
-      resultEnd: placement.startTime + (end - placement.sourceStart) / rate,
+      resultEnd: placement.startTime + (end - start) / rate,
     },
   ]).map((view, index) => ({
     ...view,

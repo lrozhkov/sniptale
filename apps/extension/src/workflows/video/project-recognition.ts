@@ -66,7 +66,7 @@ export function projectRecognitionRange(project: VideoProject, clipId: string) {
   const asset = project.assets.find((entry) => entry.id === clip.assetId);
   if (!asset?.metadata.hasAudio) return null;
   const offset = clip.type === 'VIDEO' ? (clip.cameraTiming?.offsetSeconds ?? 0) : 0;
-  const start = Math.max(clip.sourceStart, offset);
+  const start = Math.max(getMediaClipSourceTime(clip, clip.startTime) + offset, offset);
   const end = Math.min(
     clip.sourceStart + clip.sourceDuration,
     getMediaClipSourceTime(clip, clip.startTime + clip.duration) + offset,
@@ -93,6 +93,7 @@ function basis(project: VideoProject, clipId: string) {
     clip.startTime,
     clip.duration,
     clip.sourceStart,
+    clip.playbackWindow?.offset ?? 0,
     clip.sourceDuration,
     clip.playbackRate ?? 1,
     clip.type === 'VIDEO' ? clip.cameraTiming : undefined,

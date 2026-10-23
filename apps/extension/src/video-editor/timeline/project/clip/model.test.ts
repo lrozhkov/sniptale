@@ -366,3 +366,32 @@ it('uses the compact clip height for thumbnails when its track hides captions', 
   expect(hidden.previewTileWidth).toBeGreaterThan(0);
   expect(hidden.style.height).toBe(visible.style.height);
 });
+
+it('keeps an empty retained media window selectable without an offscreen scroll surface', () => {
+  const project = createEmptyVideoProject('Retained slice');
+  const clip = {
+    ...createVideoClip(project.tracks[0]!.id),
+    startTime: 1,
+    duration: 0,
+    playbackWindow: { offset: 0, extent: 0.0025 },
+  };
+  for (const startTime of [0, 20]) {
+    const model = buildProjectTimelineClipViewModel({
+      clip,
+      project,
+      projection: createTimelineProjection({
+        extentSeconds: 30,
+        pixelsPerSecond: 100,
+        viewportWidth: 500,
+        startTime,
+      }),
+      pixelsPerSecond: 100,
+      isHovered: false,
+      isSelected: false,
+      trackLocked: false,
+    });
+    expect(model.visible).toBe(startTime === 0);
+    if (startTime === 0) expect(model.width).toBeGreaterThanOrEqual(1);
+  }
+  expect(clip.duration).toBe(0);
+});

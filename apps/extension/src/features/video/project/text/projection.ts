@@ -33,7 +33,8 @@ export function projectVideoProjectTextSourceSpans(
         ...clip,
         sourceDuration: Math.min(
           clip.sourceDuration,
-          clip.duration * normalizeClipPlaybackRate(clip.playbackRate ?? 1)
+          ((clip.playbackWindow?.offset ?? 0) + clip.duration) *
+            normalizeClipPlaybackRate(clip.playbackRate ?? 1)
         ),
       },
     ];

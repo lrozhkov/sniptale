@@ -63,6 +63,7 @@ function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoP
 }
 
 function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
+  if (clips.some((clip) => clip.playbackWindow !== undefined)) return 43;
   if (
     clips.some(
       (clip) =>

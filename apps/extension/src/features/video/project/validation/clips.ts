@@ -82,6 +82,38 @@ function isEffectSourceRange(value: unknown): boolean {
   );
 }
 
+function isPlaybackPhase(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) => ['offset', 'duration'].includes(key)) &&
+    isBoundedNumber(
+      value['offset'],
+      -MAX_VIDEO_PROJECT_DURATION_SECONDS,
+      MAX_VIDEO_PROJECT_DURATION_SECONDS
+    ) &&
+    isBoundedNumber(value['duration'], Number.MIN_VALUE, MAX_VIDEO_PROJECT_DURATION_SECONDS)
+  );
+}
+
+function isPlaybackWindow(value: unknown, duration: number): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) =>
+      ['offset', 'extent', 'holdAt', 'fadePhase', 'gainPhase'].includes(key)
+    ) &&
+    isBoundedNumber(value['offset'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+    (value['extent'] === undefined ||
+      (isBoundedNumber(value['extent'], Number.MIN_VALUE, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+        typeof value['extent'] === 'number' &&
+        typeof value['offset'] === 'number' &&
+        value['offset'] + duration <= value['extent'] + 0.000_001)) &&
+    (value['holdAt'] === undefined ||
+      isBoundedNumber(value['holdAt'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS)) &&
+    (value['fadePhase'] === undefined || isPlaybackPhase(value['fadePhase'])) &&
+    (value['gainPhase'] === undefined || isPlaybackPhase(value['gainPhase']))
+  );
+}
+
 function hasBaseClipFields(value: Record<string, unknown>): boolean {
   return (
     (value['sourceRange'] === undefined ||
@@ -98,6 +130,15 @@ function hasBaseClipFields(value: Record<string, unknown>): boolean {
     isEnumValue(value['linkMode'], VideoClipLinkMode) &&
     isBoundedNumber(value['startTime'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
     isBoundedNumber(value['duration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+    (value['playbackWindow'] === undefined ||
+      (typeof value['duration'] === 'number' &&
+        (value['duration'] > 0 ||
+          ((value['type'] === VideoProjectClipType.VIDEO ||
+            value['type'] === VideoProjectClipType.AUDIO) &&
+            isRecord(value['playbackWindow']) &&
+            typeof value['playbackWindow']['extent'] === 'number' &&
+            value['playbackWindow']['extent'] > 0)) &&
+        isPlaybackWindow(value['playbackWindow'], value['duration']))) &&
     (value['effectsBypassed'] === undefined || isBoolean(value['effectsBypassed'])) &&
     isBoolean(value['muted']) &&
     isVolume(value['volume']) &&

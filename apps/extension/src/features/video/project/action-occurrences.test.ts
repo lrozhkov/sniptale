@@ -1,3 +1,4 @@
+import { resolveVideoCompositionActions } from '../composition/timeline/frame/actions';
 import { expect, it } from 'vitest';
 import { resolveVideoProjectActionOccurrences } from './action-occurrences';
 import { resolveVideoProjectActionPresentations } from './action-presentation';
@@ -147,4 +148,41 @@ it('does not infer a retained gesture continuation when its observed endpoint is
   expect(resolveVideoProjectActionOccurrences(project)).toMatchObject([
     { eventId: 'held', clipId: 'tail', time: -1 },
   ]);
+});
+
+it('keeps one source occurrence and its visual phase across a window split and held tail', () => {
+  const source = fragment('source', 0, 0, 1.5);
+  source.sourceDuration = 0.15;
+  source.playbackRate = 0.1;
+  const reference = createProject([source]);
+  reference.actionEvents = [fact('held-click', 0.12)];
+  const expected = resolveVideoCompositionActions(reference, 1.3);
+  expect(expected).toHaveLength(1);
+  const project = createProject([
+    {
+      ...source,
+      id: 'left',
+      duration: 1.1,
+      playbackWindow: { offset: 0, extent: 5 / 3, holdAt: 1.3 },
+    },
+    {
+      ...source,
+      id: 'right',
+      startTime: 1.1,
+      duration: 5 / 3 - 1.1,
+      playbackWindow: { offset: 1.1, extent: 5 / 3, holdAt: 1.3 },
+    },
+  ]);
+  project.version = 43;
+  project.actionEvents = reference.actionEvents;
+  const before = structuredClone(project);
+  expect(resolveVideoProjectActionOccurrences(project)).toMatchObject([
+    { clipId: 'right', time: expect.closeTo(1.2, 12) },
+  ]);
+  expect(resolveVideoProjectActionOccurrences(project)).toHaveLength(1);
+  const held = resolveVideoCompositionActions(project, 1.57);
+  expect(held).toHaveLength(1);
+  expect(held[0]!.progress).toBeCloseTo(expected[0]!.progress, 12);
+  expect(held[0]!.clipId).toBe('right');
+  expect(project).toEqual(before);
 });

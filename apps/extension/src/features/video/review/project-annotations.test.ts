@@ -1,3 +1,7 @@
+import { createVideoProjectAsset } from '../project/factories/creation';
+import { createBookendImagePresentation } from '../project/scene/bookend-media';
+import { createNeutralPresentationSettings } from './advanced/presentation';
+import { planReviewPresentationSequence, presentationMainHoldTime } from './presentation-sequence';
 import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../project/types/export';
 import { resolveVideoCompositionFrame } from '../composition/timeline/frame';
 import { resolveProjectRenderScope } from '../project/export/render-scope';
@@ -369,3 +373,180 @@ it('retains dormant source annotations through bookend transfer and reopen', asy
   expect(isExportReadyVideoProject(reopened)).toBe(true);
   expect(input).toEqual(before);
 });
+
+it.each([3.87, 3.86])(
+  'retains both full-length EffectV1 clocks after main fitting and reopen with cut end %s',
+  async (cutEnd) => {
+    const input = await annotationsFixture();
+    input.document.edits[0]!.end = cutEnd;
+    input.document.edits[0]!.requestedEnd = cutEnd;
+    for (const annotation of input.document.advancedContent.annotationEffects!.instances)
+      annotation.end = input.source.duration;
+    const baseline = planReviewProjectConversion(input);
+    if (baseline.status !== 'prepared') throw new Error(JSON.stringify(baseline));
+    const settings = createNeutralPresentationSettings();
+    settings.outro = {
+      mode: 'image',
+      image: {
+        ...createBookendImagePresentation(),
+        assetId: 'project-asset:tail-card',
+        width: 32,
+        height: 16,
+        duration: 0.14,
+      },
+    };
+    input.document.advancedContent.presentation = settings;
+    const asset = createVideoProjectAsset(
+      'Tail card',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'tail-card' },
+      {
+        width: 32,
+        height: 16,
+        duration: null,
+        hasAudio: false,
+        audioPeaks: null,
+        size: 100,
+        mimeType: 'image/png',
+      }
+    );
+    const result = planReviewProjectConversion({
+      ...input,
+      bookendAssets: [{ reviewAssetId: 'project-asset:tail-card', asset }],
+    });
+    expect(result.status).toBe('prepared');
+    if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+    const sequence = planReviewPresentationSequence({
+      settings,
+      mainDuration: baseline.project.duration,
+      fragmentOffset: 0,
+      includeBookends: true,
+      rate: { numerator: 30, denominator: 1 },
+    });
+    if (!sequence.ok) throw new Error('Missing sequence');
+    const main = sequence.plan.segments.find(({ name }) => name === 'main')!;
+    const hold = presentationMainHoldTime(sequence.plan);
+    const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const mainEnd = main.endTick / 30;
+    const expanding = mainEnd > baseline.project.duration;
+    for (const time of [hold, mainEnd - 0.001, mainEnd - 0.000001]) {
+      const expected = resolveEffectRuntimeFramePlans(
+        baseline.project,
+        expanding ? Math.min(time, hold) : time
+      );
+      expect(expected).toHaveLength(2);
+      const plans = resolveEffectRuntimeFramePlans(project, time);
+      expect(plans).toHaveLength(2);
+      for (const [i, plan] of plans.entries()) {
+        expect(plan.time).toBeCloseTo(expected[i]!.time, 7);
+        expect(plan.progress).toBeCloseTo(expected[i]!.progress, 7);
+      }
+    }
+    expect(project.effectSnapshots).toEqual(baseline.project.effectSnapshots);
+    expect(project.effectInstances).toEqual(baseline.project.effectInstances);
+    for (const original of baseline.project.clips.filter((clip) => clip.type === 'EFFECT')) {
+      const clip = project.clips.find(({ id }) => id === original.id)!;
+      expect(clip.type === 'EFFECT' && clip.sourceRange).toEqual(original.sourceRange);
+    }
+  }
+);
+
+it.each([
+  ['appears', 3.87],
+  ['disappears', 3.87],
+  ['appears', 3.86],
+  ['disappears', 3.86],
+] as const)(
+  'retains source-bound annotations that %s near the main end with cut end %s',
+  async (edge, cutEnd) => {
+    const input = await annotationsFixture();
+    input.document.edits[0]!.end = cutEnd;
+    input.document.edits[0]!.requestedEnd = cutEnd;
+    for (const annotation of input.document.advancedContent.annotationEffects!.instances) {
+      annotation.start = edge === 'appears' ? 7.995 : 7.8;
+      annotation.end = edge === 'appears' ? 8 : 7.995;
+    }
+    const baseline = planReviewProjectConversion(input);
+    if (baseline.status !== 'prepared') throw new Error(JSON.stringify(baseline));
+    const settings = createNeutralPresentationSettings();
+    settings.outro = {
+      mode: 'image',
+      image: {
+        ...createBookendImagePresentation(),
+        assetId: 'project-asset:late-card',
+        width: 32,
+        height: 16,
+        duration: 0.14,
+      },
+    };
+    input.document.advancedContent.presentation = settings;
+    const asset = createVideoProjectAsset(
+      'Late card',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'late-card' },
+      {
+        width: 32,
+        height: 16,
+        duration: null,
+        hasAudio: false,
+        audioPeaks: null,
+        size: 100,
+        mimeType: 'image/png',
+      }
+    );
+    const before = structuredClone(input);
+    const result = planReviewProjectConversion({
+      ...input,
+      bookendAssets: [{ reviewAssetId: 'project-asset:late-card', asset }],
+    });
+    expect(result.status).toBe('prepared');
+    if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+    const sequence = planReviewPresentationSequence({
+      settings,
+      mainDuration: baseline.project.duration,
+      fragmentOffset: 0,
+      includeBookends: true,
+      rate: { numerator: 30, denominator: 1 },
+    });
+    if (!sequence.ok) throw new Error('Missing late annotation sequence');
+    const main = sequence.plan.segments.find(({ name }) => name === 'main')!;
+    const end = main.endTick / 30;
+    const hold = presentationMainHoldTime(sequence.plan);
+    const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    expect(calculateProjectDuration(project)).toBeCloseTo(project.duration, 12);
+    expect(project.effectSnapshots).toEqual(baseline.project.effectSnapshots);
+    expect(project.effectInstances).toEqual(baseline.project.effectInstances);
+    const time = end - 0.000001;
+    if (edge === 'appears') {
+      for (const original of hydrateVideoProject(baseline.project).clips.filter(
+        (clip) => clip.type === 'EFFECT'
+      )) {
+        expect(project.clips.find(({ id }) => id === original.id)).toEqual({
+          ...original,
+          sourceRange: { ...original.sourceRange, dormant: true },
+        });
+      }
+      expect(resolveEffectRuntimeFramePlans(project, time)).toEqual([]);
+      expect(resolveEffectRuntimeFramePlans(project, end + 0.001)).toEqual([]);
+    } else {
+      const expected = resolveEffectRuntimeFramePlans(
+        baseline.project,
+        end > baseline.project.duration ? hold : time
+      );
+      const actual = resolveEffectRuntimeFramePlans(project, time);
+      expect(expected).toHaveLength(2);
+      expect(actual).toHaveLength(2);
+      for (const [i, plan] of actual.entries()) expect(plan.time).toBeCloseTo(expected[i]!.time, 7);
+      expect(resolveEffectRuntimeFramePlans(project, end + 0.001)).toEqual([]);
+      for (const original of hydrateVideoProject(baseline.project).clips.filter(
+        (clip) => clip.type === 'EFFECT'
+      )) {
+        const clip = project.clips.find(({ id }) => id === original.id)!;
+        expect(clip.type === 'EFFECT' && clip.sourceRange).toEqual(original.sourceRange);
+      }
+    }
+    expect(input).toEqual(before);
+  }
+);

@@ -1,4 +1,8 @@
-import type { ReviewProjectBookendResource } from './project-presentation';
+import {
+  planReviewProjectPresentation,
+  type ReviewProjectBookendResource,
+} from './project-presentation';
+import { createShapeClip } from '../project/timeline/project-meta.test.helpers';
 import { expect, it } from 'vitest';
 import { createVideoProjectAsset } from '../project/factories/creation';
 import { hydrateVideoProject } from '../project/hydration';
@@ -6,16 +10,16 @@ import { isExportReadyVideoProject } from '../project/validation/root';
 import { resolveVideoProjectCompositionJoinPlans } from '../project/scene/joins';
 import { getProjectAssetUseCounts } from '../project/media-usage';
 import { getClipAudioGain } from '../project/timeline/presentation.gain';
-import { getMediaClipSourceTime } from '../project/timeline/rate';
+import { getMediaClipSourceTime, getVideoClipSourceTime } from '../project/timeline/rate';
 import { calculateProjectDuration, isClipActiveAtTime } from '../project/timeline/basics';
-import { planReviewPresentationSequence } from './presentation-sequence';
+import { planReviewPresentationSequence, presentationMainHoldTime } from './presentation-sequence';
 import {
   createBookendImagePresentation,
   createBookendVideoPresentation,
 } from '../project/scene/bookend-media';
 import { createNeutralPresentationSettings } from './advanced/presentation';
 import { planReviewProjectConversion } from './project-conversion';
-import { fixture } from './project-conversion.test-support';
+import { fixture, externalAudioFixture } from './project-conversion.test-support';
 
 function bookendFixture() {
   const input = fixture();
@@ -201,16 +205,42 @@ it.each(['missing', 'duplicate', 'changed-source', 'extra'] as const)(
   }
 );
 
-it('refuses a nonaligned video boundary instead of retiming its source or losing the authored interval', () => {
+it('transfers a nonaligned video boundary without retiming or losing its authored source interval', () => {
   const input = bookendFixture();
   const settings = input.document.advancedContent.presentation!;
   settings.intro = { ...settings.intro, mode: 'video', video: settings.intro.video! };
-  settings.intro.video.trim.end = 1.15;
+  settings.intro.video = { ...settings.intro.video, trim: { start: 1, end: 1.15 } };
   const before = structuredClone(input);
-  expect(planReviewProjectConversion(input)).toEqual({
-    status: 'blocked',
-    issues: [{ kind: 'unmapped-content', field: 'presentation-timing' }],
+  const result = planReviewProjectConversion(input);
+  expect(result.status).toBe('prepared');
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(project.version).toBe(43);
+  const intro = project.clips.find(({ id }) => id === `${project.id}:bookend:intro:media`)!;
+  expect(intro.duration).toBeCloseTo(5 / 30, 12);
+  expect(intro).toMatchObject({
+    sourceStart: 1,
+    sourceDuration: expect.closeTo(0.15, 12),
+    playbackRate: 1,
+    playbackWindow: {
+      offset: 0,
+      extent: expect.closeTo(5 / 30, 12),
+      holdAt: expect.closeTo(0.15, 12),
+      fadePhase: { offset: 0, duration: expect.closeTo(0.15, 12) },
+      gainPhase: { offset: 0, duration: expect.closeTo(0.15, 12) },
+    },
   });
+  for (const suffix of ['audio', 'fill']) {
+    expect(
+      project.clips.find(({ id }) => id === `${project.id}:bookend:intro:${suffix}`)?.duration
+    ).toBeCloseTo(5 / 30, 12);
+  }
+  const audio = project.clips.find(({ id }) => id === `${project.id}:bookend:intro:audio`)!;
+  expect(getClipAudioGain(audio, 0.14)).toBeCloseTo(0.7, 12);
+  expect(getClipAudioGain(audio, 0.16)).toBe(0);
+  expect(project.bookendPresets?.intro.video?.trim).toEqual({ start: 1, end: 1.15 });
+  expect(calculateProjectDuration(project)).toBeCloseTo(8.15, 12);
   expect(input).toEqual(before);
 });
 
@@ -299,20 +329,73 @@ it.each([24, 30, 60])(
   }
 );
 
-it('still refuses image cards when their main slot needs a different content duration', () => {
-  const input = bookendFixture();
-  input.document.edits[0]!.end = 3.87;
-  input.document.edits[0]!.requestedEnd = 3.87;
-  const settings = input.document.advancedContent.presentation!;
-  settings.intro.image!.duration = 0.15;
-  settings.outro = { ...settings.outro, mode: 'image', image: { ...settings.intro.image! } };
-  const before = structuredClone(input);
-  expect(planReviewProjectConversion(input)).toEqual({
-    status: 'blocked',
-    issues: [{ kind: 'unmapped-content', field: 'presentation-timing' }],
-  });
-  expect(input).toEqual(before);
-});
+it.each([0.14, 0.15])(
+  'fits the main slot after a %ss card without changing source clocks',
+  (duration) => {
+    const input = bookendFixture();
+    input.document.edits[0]!.end = 3.87;
+    input.document.edits[0]!.requestedEnd = 3.87;
+    const settings = input.document.advancedContent.presentation!;
+    settings.intro.image!.duration = duration;
+    settings.outro = { ...settings.outro, mode: 'image', image: { ...settings.intro.image! } };
+    const before = structuredClone(input);
+    const baselineInput = structuredClone(input);
+    delete baselineInput.document.advancedContent.presentation;
+    baselineInput.bookendAssets = [];
+    const baseline = planReviewProjectConversion(baselineInput);
+    const result = planReviewProjectConversion(input);
+    expect(result.status).toBe('prepared');
+    if (baseline.status !== 'prepared' || result.status !== 'prepared')
+      throw new Error(JSON.stringify(result));
+    const sequence = planReviewPresentationSequence({
+      settings,
+      mainDuration: baseline.project.duration,
+      fragmentOffset: 0,
+      includeBookends: true,
+      rate: { numerator: 30, denominator: 1 },
+    });
+    if (!sequence.ok) throw new Error('Missing sequence');
+    const main = sequence.plan.segments.find(({ name }) => name === 'main')!;
+    const offset = main.startTick / 30;
+    const end = main.endTick / 30;
+    const hold = presentationMainHoldTime(sequence.plan);
+    const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    expect(project.duration).toBeCloseTo(baseline.project.duration + 2 * duration, 12);
+    expect(calculateProjectDuration(project)).toBeCloseTo(project.duration, 12);
+    for (const original of hydrateVideoProject(baseline.project).clips) {
+      const clip = project.clips.find(({ id }) => id === original.id)!;
+      expect(clip.startTime).toBeCloseTo(original.startTime + offset, 12);
+      if (original.startTime + original.duration < baseline.project.duration - 0.000001) {
+        expect(clip).toEqual({ ...original, startTime: original.startTime + offset });
+        continue;
+      }
+      expect(clip.startTime + clip.duration).toBeCloseTo(end, 12);
+      expect(clip).toMatchObject({
+        sourceStart:
+          original.type === 'VIDEO' || original.type === 'AUDIO' ? original.sourceStart : undefined,
+        sourceDuration:
+          original.type === 'VIDEO' || original.type === 'AUDIO'
+            ? original.sourceDuration
+            : undefined,
+      });
+      for (let tick = main.startTick; tick < main.endTick; tick++) {
+        const time = tick / 30;
+        const local = Math.min(time - offset, hold);
+        if (clip.type === 'VIDEO' && original.type === 'VIDEO')
+          expect(
+            Math.abs(getVideoClipSourceTime(clip, time) - getVideoClipSourceTime(original, local))
+          ).toBeLessThanOrEqual(0.000001);
+        if (clip.type === 'AUDIO' && original.type === 'AUDIO')
+          expect(getMediaClipSourceTime(clip, time)).toBeCloseTo(
+            getMediaClipSourceTime(original, time - offset),
+            6
+          );
+      }
+    }
+    expect(input).toEqual(before);
+  }
+);
 
 it.each(['codec-mime', 'audio-tail'] as const)(
   'preserves the video trim with canonical Native %s metadata',
@@ -381,3 +464,150 @@ it('transfers the final-canvas Gallery watermark with bookends without creating 
     result.project.watermark
   );
 });
+
+it.each(['appears', 'disappears'] as const)(
+  'preserves the source and refuses a late layer that %s inside the retained tail',
+  (edge) => {
+    const input = bookendFixture();
+    input.document.edits[0]!.end = 3.87;
+    input.document.edits[0]!.requestedEnd = 3.87;
+    const settings = input.document.advancedContent.presentation!;
+    settings.intro.image!.duration = 0.14;
+    settings.outro = { ...settings.outro, mode: 'image', image: { ...settings.intro.image! } };
+    const baselineInput = structuredClone(input);
+    delete baselineInput.document.advancedContent.presentation;
+    baselineInput.bookendAssets = [];
+    const baseline = planReviewProjectConversion(baselineInput);
+    if (baseline.status !== 'prepared') throw new Error(JSON.stringify(baseline));
+    const project = baseline.project;
+    project.clips.push(
+      createShapeClip({
+        id: 'late-layer',
+        trackId: project.tracks[0]!.id,
+        startTime: edge === 'appears' ? 7.12 : 7,
+        duration: edge === 'appears' ? 0.01 : 0.12,
+      })
+    );
+    const before = structuredClone(project);
+    expect(
+      planReviewProjectPresentation({
+        project,
+        settings,
+        applied: true,
+        resources: input.bookendAssets,
+      })
+    ).toEqual({ status: 'blocked', field: 'presentation-timing' });
+    expect(project).toEqual(before);
+  }
+);
+
+it('keeps an external audio end inside the retained visual tail instead of extending its envelope', () => {
+  const bookends = bookendFixture();
+  const input = { ...externalAudioFixture(), bookendAssets: bookends.bookendAssets };
+  input.document.edits[0]!.end = 3.87;
+  input.document.edits[0]!.requestedEnd = 3.87;
+  const music = input.document.advancedContent.audio.music[0]!;
+  music.timelineStart = 7;
+  music.duration = 0.12;
+  const baseline = planReviewProjectConversion({ ...input, bookendAssets: [] });
+  if (baseline.status !== 'prepared') throw new Error(JSON.stringify(baseline));
+  const settings = bookends.document.advancedContent.presentation!;
+  settings.intro.mode = 'none';
+  settings.introControl!.mode = 'media';
+  settings.introControl!.media.enabled = false;
+  settings.outro = {
+    ...settings.outro,
+    mode: 'image',
+    image: { ...settings.outro.image!, duration: 0.14 },
+  };
+  input.document.advancedContent.presentation = settings;
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion(input);
+  expect(result.status).toBe('prepared');
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  const original = hydrateVideoProject(baseline.project).clips.find(
+    (clip) =>
+      clip.type === 'AUDIO' &&
+      clip.assetId === input.externalAudio.assets[0]!.asset.id &&
+      clip.startTime === 7
+  )!;
+  const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+  const clip = project.clips.find(({ id }) => id === original.id)!;
+  expect(clip).toEqual(original);
+  expect(clip.duration).toBeCloseTo(0.12, 12);
+  expect(getClipAudioGain(clip, 7.11)).toBeCloseTo(getClipAudioGain(original, 7.11), 12);
+  expect(isClipActiveAtTime(clip, 7.121)).toBe(false);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(input).toEqual(before);
+});
+
+it.each([0.14, 0.15])(
+  'retains an unsampled last source slice in an empty window with intro %s',
+  (introDuration) => {
+    const input = bookendFixture();
+    input.document.edits[0]!.end = 3.87;
+    input.document.edits[0]!.requestedEnd = 3.87;
+    input.document.edits.push({
+      id: 'last-speed',
+      kind: 'speed',
+      start: 7.995,
+      end: 8,
+      requestedStart: 7.995,
+      requestedEnd: 8,
+      rate: 2,
+      audio: 'speed',
+    });
+    const settings = input.document.advancedContent.presentation!;
+    settings.intro.image!.duration = introDuration;
+    settings.introControl!.mode = 'media';
+    settings.introControl!.media.enabled = false;
+    settings.outro.mode = 'none';
+    settings.outroControl!.mode = 'none';
+    delete settings.introTransition;
+    delete settings.outroTransition;
+    const baselineInput = structuredClone(input);
+    delete baselineInput.document.advancedContent.presentation;
+    baselineInput.bookendAssets = [];
+    const baseline = planReviewProjectConversion(baselineInput);
+    if (baseline.status !== 'prepared') throw new Error(JSON.stringify(baseline));
+    const before = structuredClone(input);
+    const result = planReviewProjectConversion(input);
+    expect(result.status).toBe('prepared');
+    if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+    const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+    expect(project.duration).toBeCloseTo(baseline.project.duration + introDuration, 6);
+    expect(calculateProjectDuration(project)).toBeCloseTo(project.duration, 12);
+    const retained = project.clips.filter(
+      (clip) => (clip.type === 'VIDEO' || clip.type === 'AUDIO') && clip.sourceStart === 7.995
+    );
+    expect(retained).toHaveLength(2);
+    for (const clip of retained) {
+      const original = hydrateVideoProject(baseline.project).clips.find(
+        ({ id }) => id === clip.id
+      )!;
+      if (clip.type === 'AUDIO' && introDuration === 0.14) {
+        expect(clip.duration).toBeGreaterThan(0);
+        expect(getClipAudioGain(clip, clip.startTime + 0.001)).toBeCloseTo(
+          getClipAudioGain(original, original.startTime + 0.001),
+          12
+        );
+        expect(getMediaClipSourceTime(clip, clip.startTime + 0.001)).toBeCloseTo(7.997, 12);
+        expect(getClipAudioGain(clip, clip.startTime + original.duration + 0.001)).toBe(0);
+        continue;
+      }
+      expect(clip).toMatchObject({
+        ...original,
+        duration: 0,
+        startTime:
+          original.startTime +
+          project.clips.find((clip) => clip.id === baseline.project.clips[0]!.id)!.startTime,
+        playbackWindow: { offset: 0 },
+      });
+      expect(clip.playbackWindow!.extent).toBeCloseTo(original.duration, 12);
+      for (const time of [clip.startTime - 0.000001, clip.startTime, clip.startTime + 0.001])
+        expect(isClipActiveAtTime(clip, time)).toBe(false);
+    }
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    expect(input).toEqual(before);
+  }
+);

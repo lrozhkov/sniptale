@@ -7,7 +7,7 @@ import { resolveVideoCompositionBorders } from './borders';
 import type { CameraOutputViewport } from '../../../project/export/output-dimensions';
 import { resolveVideoCompositionCamera } from '../../motion/index';
 import { resolveEffectRuntimeFramePlans } from '../../effect-runtime/frame/plan';
-import type { VideoCompositionFrame } from '../../types';
+import type { VideoCompositionFrame, VideoCompositionCameraState } from '../../types';
 import { resolveVideoCompositionActions } from './actions';
 import { resolveCursorSample, resolveVideoCompositionCursor } from './cursor';
 import {
@@ -31,6 +31,7 @@ export function resolveVideoCompositionFrame(
     includeSubtitles?: boolean;
     timelineIndex?: VideoCompositionTimelineIndex;
     cameraViewport?: CameraOutputViewport;
+    cameraOverride?: VideoCompositionCameraState;
   } = {}
 ): VideoCompositionFrame {
   const attachmentGeometryProject = project[VIDEO_PROJECT_ATTACHMENT_GEOMETRY];
@@ -52,19 +53,21 @@ export function resolveVideoCompositionFrame(
     windowSpotlights: spotlights.windows,
   };
 
-  const camera = resolveVideoCompositionCamera({
-    actions:
-      geometryProject === project
-        ? actions
-        : resolveVideoCompositionActions(geometryProject, currentTime),
-    cursorSample:
-      geometryProject === project
-        ? cursorSample
-        : resolveCursorSample(geometryProject, currentTime),
-    currentTime,
-    project: geometryProject,
-    ...(options.cameraViewport ? { cameraViewport: options.cameraViewport } : {}),
-  });
+  const camera =
+    options.cameraOverride ??
+    resolveVideoCompositionCamera({
+      actions:
+        geometryProject === project
+          ? actions
+          : resolveVideoCompositionActions(geometryProject, currentTime),
+      cursorSample:
+        geometryProject === project
+          ? cursorSample
+          : resolveCursorSample(geometryProject, currentTime),
+      currentTime,
+      project: geometryProject,
+      ...(options.cameraViewport ? { cameraViewport: options.cameraViewport } : {}),
+    });
   const cursor = resolveVideoCompositionCursor(project, currentTime, actions);
   const sourceContentTransform = camera.sourceContentTransform;
   const contentLayers = (layers: VideoCompositionFrame['visualLayers']) =>

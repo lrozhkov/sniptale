@@ -323,3 +323,17 @@ it.each([
     expect(owners.dispose).toHaveBeenCalledTimes(4);
   }
 );
+
+it('uses bounded decoded frames for a windowed video outside a join', async () => {
+  const args = input();
+  args.project.clips.find(({ id }) => id === 'main')!.playbackWindow = { offset: 0, holdAt: 0.9 };
+  args.currentTime = 1.9;
+  const decoded = new Map();
+  owners.cutSample.mockResolvedValue({ media: decoded, release: owners.cutRelease });
+  await renderProjectCompositionFrame(args);
+  expect(owners.cutSample).toHaveBeenCalledWith(1.9, expect.any(AbortSignal), 'last');
+  expect(owners.scene.mock.lastCall?.[0].clipMediaElements).toBe(decoded);
+  expect(owners.cutRelease).toHaveBeenCalledOnce();
+  args.job.compositionJoinRenderer?.dispose();
+  expect(owners.cutDispose).toHaveBeenCalledOnce();
+});

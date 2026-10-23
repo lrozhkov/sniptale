@@ -1,3 +1,4 @@
+import { getVideoClipPresentationTime } from '../project/timeline/rate';
 import { REVIEW_CLICK_DEFAULT } from '../project/action-feedback/validation';
 import { getVideoProjectActionPresentation } from '../project/action-presentation';
 import type { VideoProject, RecordingActionEvent } from '../project/types';
@@ -43,14 +44,20 @@ export function projectActionFeedbackMarkers(
   });
   const cursorIdentities = new Set<string>();
   const rawTrack = geometry ? project.cursorTrack : null;
+  const captured = rawTrack?.sourceObservations?.find(
+    (item) =>
+      item.recordingId === group.recordingId && item.sourceInstanceId === group.sourceInstanceId
+  );
   const cursorTrack = rawTrack
     ? {
         ...rawTrack,
-        samples: rawTrack.samples.flatMap((sample) => {
+        samples: (captured?.samples ?? rawTrack.samples).flatMap((sample) => {
           const anchor = sample.sourceAnchor;
-          if (!anchor || anchor.recordingId !== group.recordingId) return [];
+          const sourceTime = captured ? sample.time : anchor?.sourceTime;
+          if (sourceTime === undefined || (!captured && anchor?.recordingId !== group.recordingId))
+            return [];
           const identity = JSON.stringify([
-            anchor.sourceTime,
+            sourceTime,
             sample.captureSegment,
             sample.visible,
             sample.observation,
@@ -62,7 +69,7 @@ export function projectActionFeedbackMarkers(
           return [
             {
               ...sample,
-              time: anchor.sourceTime,
+              time: sourceTime,
               x: sample.recordingPoint?.x ?? sample.x,
               y: sample.recordingPoint?.y ?? sample.y,
             },
@@ -169,7 +176,7 @@ export function evaluateProjectGestureFeedback(project: VideoProject, time: numb
     );
     if (!clip) return [];
     return cues.flatMap((cue) =>
-      evaluateReviewClicks([cue], time).map((frame) => ({
+      evaluateReviewClicks([cue], getVideoClipPresentationTime(clip, time)).map((frame) => ({
         frame,
         clipId: clip.id,
         eventId: cue.id!,
@@ -207,9 +214,9 @@ function prepareProjectGestureFeedback(project: VideoProject) {
         },
       ];
     });
-    return getVideoProjectFeedbackRuns(project, group).map(({ clips, segments }) => ({
+    return getVideoProjectFeedbackRuns(project, group).map(({ clips, visualSegments }) => ({
       clips,
-      cues: scheduleReviewClicks(facts, styles, segments),
+      cues: scheduleReviewClicks(facts, styles, visualSegments),
     }));
   });
 }

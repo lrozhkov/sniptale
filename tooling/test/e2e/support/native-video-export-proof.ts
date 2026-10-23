@@ -150,14 +150,28 @@ export async function encodedNativeVideoSamples(
         const samples = [];
         for (const time of [...new Set(points.map((point) => point.time))]) {
           let mediaTime = time;
-          await new Promise<void>((resolve) => {
+          await new Promise<void>((resolve, reject) => {
+            // A paused seek presents the output frame containing the requested time.
+            const frameTime = Math.floor(time * fps) / fps;
+            let lastPresented: number | undefined;
+            let callback = 0;
+            const timeout = window.setTimeout(() => {
+              video.cancelVideoFrameCallback(callback);
+              reject(
+                new Error(
+                  `Native export frame unavailable: requested=${time}, frame=${frameTime}, presented=${lastPresented}, current=${video.currentTime}, seeking=${video.seeking}, ready=${video.readyState}`
+                )
+              );
+            }, 15000);
             const presented: VideoFrameRequestCallback = (_now, metadata) => {
-              if (Math.abs(metadata.mediaTime - time) < 0.5 / fps + 0.000001) {
+              lastPresented = metadata.mediaTime;
+              if (Math.abs(metadata.mediaTime - frameTime) < 0.5 / fps + 0.000001) {
+                window.clearTimeout(timeout);
                 mediaTime = metadata.mediaTime;
                 resolve();
-              } else video.requestVideoFrameCallback(presented);
+              } else callback = video.requestVideoFrameCallback(presented);
             };
-            video.requestVideoFrameCallback(presented);
+            callback = video.requestVideoFrameCallback(presented);
             video.currentTime = time;
           });
           context.drawImage(video, 0, 0);
@@ -223,13 +237,17 @@ export async function encodedNativeVideoSamples(
   return { ...result, audioTrackCount };
 }
 
-/** Measures 20ms RMS windows in the latest completed actual Native export. */
-export async function readEncodedAudioWindows(page: Page, times: readonly number[]) {
+/** Measures RMS windows in the latest completed actual Native export; the default window is20ms. */
+export async function readEncodedAudioWindows(
+  page: Page,
+  times: readonly number[],
+  duration = 0.02
+) {
   const messages = await getRuntimeMessagesByType(page, VideoMessageType.PROJECT_EXPORT_COMPLETED);
   const exportId = messages.at(-1)?.exportId;
   if (typeof exportId !== 'string') throw new Error('Missing encoded export');
   return page.evaluate(
-    async ({ id, times }) => {
+    async ({ id, times, duration }) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('sniptale-db');
         request.onsuccess = () => resolve(request.result);
@@ -258,7 +276,7 @@ export async function readEncodedAudioWindows(page: Page, times: readonly number
         const pcm = audio.getChannelData(0);
         return times.map((time) => {
           const first = Math.round(time * audio.sampleRate),
-            last = Math.round((time + 0.02) * audio.sampleRate);
+            last = Math.round((time + duration) * audio.sampleRate);
           if (first < 0 || last > pcm.length)
             throw new Error('Encoded audio window is outside the export.');
           let squares = 0;
@@ -269,6 +287,6 @@ export async function readEncodedAudioWindows(page: Page, times: readonly number
         await decoder.close();
       }
     },
-    { id: exportId, times }
+    { id: exportId, times, duration }
   );
 }

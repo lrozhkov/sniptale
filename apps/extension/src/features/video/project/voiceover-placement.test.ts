@@ -237,3 +237,25 @@ it('retains authored source gaps and distinct identities for repeated source ran
   expect(new Set([...views, ...repeated].map((view) => view.id)).size).toBe(4);
   expect(take.sourceAnchor).toHaveLength(2);
 });
+
+it('projects a source take through a split window without voicing its held tail', () => {
+  const map = buildReviewTimeMap(8, []);
+  const take = anchorReviewVoiceoverAtSource(fixture().take, map);
+  const clip = {
+    ...fixture().clip,
+    sourceStart: 0,
+    sourceDuration: 4,
+    startTime: 10,
+    duration: 1,
+    playbackWindow: { offset: 2, holdAt: 3.5 },
+  };
+  expect(projectSourceVoiceoverPlacement(take, map, clip)).toEqual([
+    expect.objectContaining({ timelineStart: 10, duration: 1, sourceOffset: 1.5 }),
+  ]);
+  expect(
+    projectSourceVoiceoverPlacement(take, map, {
+      ...clip,
+      playbackWindow: { offset: 4.2, holdAt: 3.5 },
+    })
+  ).toEqual([]);
+});

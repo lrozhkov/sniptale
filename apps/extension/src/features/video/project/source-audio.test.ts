@@ -298,3 +298,20 @@ it.each(['missing', 'wrong-type', 'native-end'] as const)(
     expect(isExportReadyVideoProject(project)).toBe(false);
   }
 );
+
+it('clips source audio ranges to a split placement without holding the audio clock', () => {
+  const { project, clip, document } = fixture();
+  project.sourceAudioDocuments = [document];
+  const placement = {
+    ...clip,
+    sourceStart: 4,
+    sourceDuration: 4,
+    startTime: 10,
+    duration: 1,
+    playbackWindow: { offset: 3.5, holdAt: 3 },
+  };
+  expect(getProjectSourceAudioRanges(project, placement)).toEqual([
+    { start: 10, end: 10.5, volume: 2 },
+  ]);
+  expect(getProjectSourceAudioAttenuationRanges(project, placement)).toEqual([]);
+});

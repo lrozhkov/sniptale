@@ -1,10 +1,11 @@
 import { expect, it } from 'vitest';
+import { resolveCursorSample } from '../composition/timeline/frame/cursor';
 import { createVideoProjectFromRecording } from './factories/creation';
 import { normalizeVideoProjectCursorSkin } from './cursor';
 import { applyVideoProjectMutationPatch } from './mutation';
 import { isExportReadyVideoProject } from './validation/root';
 import { materializeVideoProjectCursorSourceObservations } from './cursor-source-observations';
-import type { VideoProjectCursorSample } from './types';
+import type { VideoProject, VideoProjectCursorSample } from './types';
 
 function fixture(samples?: VideoProjectCursorSample[]) {
   const project = createVideoProjectFromRecording({
@@ -294,3 +295,69 @@ it('refuses groups bound to different assets or overflowing unrelated manual aut
     })
   ).toBe(false);
 });
+
+it.each([
+  {
+    offset: 0.5,
+    duration: 1.2,
+    positions: [
+      [2, 4],
+      [2.25, 4.5],
+      [3.2, 4.5],
+    ],
+  },
+  {
+    offset: 1,
+    duration: 0.2,
+    positions: [
+      [2, 4.5],
+      [2.2, 4.5],
+    ],
+  },
+])(
+  'keeps captured cursor samples inside a physical playback slice with offset $offset',
+  ({ offset, duration, positions }) => {
+    const original = fixture();
+    const before = structuredClone(original);
+    const candidate: VideoProject = {
+      ...original,
+      version: 43,
+      clips: original.clips.map((clip) => ({
+        ...clip,
+        duration,
+        playbackWindow: { offset, holdAt: 0.75 },
+      })),
+      cursorTrack: {
+        ...original.cursorTrack!,
+        captureMode: 'separate' as const,
+        skin: { ...original.cursorTrack!.skin, hidden: false },
+      },
+    };
+    const track = materializeVideoProjectCursorSourceObservations(candidate)!;
+    const projected = track.samples.filter((sample) => sample.sourceAnchor);
+    expect(projected.map((sample) => [sample.time, sample.sourceAnchor!.sourceTime])).toEqual(
+      positions
+    );
+    const ready = { ...candidate, cursorTrack: track };
+    expect(isExportReadyVideoProject(ready)).toBe(true);
+    for (const time of [1.99, 2 + duration + 0.01]) {
+      const invalid = {
+        ...ready,
+        cursorTrack: { ...track, samples: [{ ...projected[0]!, time }] },
+      };
+      expect(isExportReadyVideoProject(invalid)).toBe(false);
+    }
+    const wrongSource = {
+      ...projected.at(-1)!,
+      sourceAnchor: { ...projected.at(-1)!.sourceAnchor!, sourceTime: 4.6 },
+    };
+    expect(
+      isExportReadyVideoProject({ ...ready, cursorTrack: { ...track, samples: [wrongSource] } })
+    ).toBe(false);
+    const held = resolveCursorSample(ready, 2 + duration - 0.01)!;
+    expect(held.recordingPoint?.x).toBeCloseTo(4.5 / 8, 12);
+    expect(materializeVideoProjectCursorSourceObservations(ready)).toEqual(track);
+    expect(track.sourceObservations).toBe(original.cursorTrack!.sourceObservations);
+    expect(original).toEqual(before);
+  }
+);

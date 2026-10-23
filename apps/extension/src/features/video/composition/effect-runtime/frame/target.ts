@@ -2,7 +2,7 @@ import { isClipActiveAtTime } from '../../../project/timeline/basics';
 import { resolveEffectSourceClip } from '../../../project/effect-instance/placement';
 import { resolveEffectOwner, isVideoEffectTrack } from '../../../project/effect-instance/owner';
 import type { VideoProjectEffectInstance } from '../../../project/effect-instance/types';
-import { isEffectInstanceTimingEqual } from '../../../project/effect-instance/timing';
+import { isEffectHostTimingValid } from '../../../project/effect-instance/timing';
 import type {
   VideoProject,
   VideoProjectEffectClip,
@@ -36,12 +36,7 @@ export function resolveEffectRuntimeFrameTarget(
       (clip): clip is VideoProjectEffectClip =>
         clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
     );
-    if (
-      !host ||
-      !isEffectInstanceTimingEqual(host.startTime, instance.startTime) ||
-      !isEffectInstanceTimingEqual(host.duration, instance.duration)
-    )
-      return undefined;
+    if (!host || !isEffectHostTimingValid(host, instance)) return undefined;
     if (!isClipActiveAtTime(host, projectTime)) return null;
     if (host.attachment?.kind === 'source' && !resolveEffectSourceClip(project, host, projectTime))
       return null;

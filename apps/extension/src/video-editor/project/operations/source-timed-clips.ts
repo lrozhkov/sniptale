@@ -1,3 +1,4 @@
+import { scaleClipPlaybackWindow } from '../../../features/video/project/timeline/rate';
 import { motionWindowFocusToComposition } from '../../../features/video/composition/motion/source-window';
 import { materializeVideoProjectCursorSourceObservations } from '../../../features/video/project/cursor-source-observations';
 import { resolveVideoCompositionActionSourceMapping } from '../../../features/video/composition/timeline/frame/actions';
@@ -57,13 +58,26 @@ export function updateSourceTimedClipTiming<TClip extends SourceTimedClip>(
   const playbackRate = normalizeClipPlaybackRate(patch.playbackRate ?? clip.playbackRate ?? 1);
   const sourceDuration = patch.sourceDuration ?? clip.sourceDuration;
 
+  const window =
+    patch.sourceStart === undefined && patch.sourceDuration === undefined
+      ? clip.playbackWindow
+      : undefined;
+  const factor = normalizeClipPlaybackRate(clip.playbackRate ?? 1) / playbackRate;
   return {
     ...clip,
     ...patch,
+    ...(clip.playbackWindow
+      ? { playbackWindow: window ? scaleClipPlaybackWindow(window, factor) : undefined }
+      : {}),
+    ...(window?.fadePhase
+      ? { fadeInMs: clip.fadeInMs * factor, fadeOutMs: clip.fadeOutMs * factor }
+      : {}),
     playbackRate,
     sourceDuration,
     sourceStart: Math.max(0, patch.sourceStart ?? clip.sourceStart),
-    duration: getSourceTimedClipProjectDuration({ playbackRate, sourceDuration }),
+    duration: window
+      ? clip.duration * factor
+      : getSourceTimedClipProjectDuration({ playbackRate, sourceDuration }),
   };
 }
 

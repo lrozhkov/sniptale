@@ -1,3 +1,4 @@
+import { sliceClipPlaybackWindow } from '../../../../features/video/project/timeline/rate';
 import { activateRetainedEffectHost } from '../../../../features/video/project/effect-instance/placement';
 import { getEffectClipLabel } from '../../../../features/video/project/effect-instance/presentation';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
@@ -94,6 +95,9 @@ export function splitStandaloneEffectHostWithResult(
   const secondHost: VideoProjectEffectClip = {
     ...activeHost,
     duration: secondDuration,
+    ...(sourceHost.playbackWindow
+      ? { playbackWindow: sliceClipPlaybackWindow(sourceHost, localOffset) }
+      : {}),
     effectInstanceId: instanceId,
     id: crypto.randomUUID(),
     startTime: splitTime,
@@ -102,20 +106,33 @@ export function splitStandaloneEffectHostWithResult(
   const firstInstance = {
     ...structuredClone(sourceInstance),
     controls: { ...sourceInstance.controls },
-    duration: localOffset,
+    duration: sourceHost.playbackWindow ? sourceInstance.duration : localOffset,
     sourceStart,
   };
   const secondInstance = {
     ...structuredClone(sourceInstance),
     controls: { ...sourceInstance.controls },
-    duration: secondDuration,
+    duration: sourceHost.playbackWindow ? sourceInstance.duration : secondDuration,
     id: instanceId,
-    sourceStart: sourceStart + localOffset * sourceInstance.playbackRate,
+    sourceStart: sourceHost.playbackWindow
+      ? sourceStart
+      : sourceStart + localOffset * sourceInstance.playbackRate,
     startTime: splitTime,
   };
   const nextProject = applyVideoProjectMutationPatch(project, {
     clips: project.clips.flatMap((clip) =>
-      clip.id === sourceHost.id ? [{ ...activeHost, duration: localOffset }, secondHost] : [clip]
+      clip.id === sourceHost.id
+        ? [
+            {
+              ...activeHost,
+              duration: localOffset,
+              ...(sourceHost.playbackWindow
+                ? { playbackWindow: sliceClipPlaybackWindow(sourceHost, 0) }
+                : {}),
+            },
+            secondHost,
+          ]
+        : [clip]
     ),
     effectInstances: (project.effectInstances ?? []).flatMap((instance) =>
       instance.id === sourceInstance.id ? [firstInstance, secondInstance] : [instance]

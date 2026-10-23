@@ -1,3 +1,4 @@
+import { isClipActiveAtTime } from '../../../../features/video/project/timeline/basics';
 import {
   resolveVideoProjectCompositionJoinPlans,
   resolveActiveVideoProjectCompositionJoinPlan,
@@ -11,7 +12,7 @@ import { resolvePreviewCompositionFrameSize, publishPreviewCompositionFrame } fr
 import type { renderPreviewScene } from './render-preview';
 
 type Input = Parameters<typeof renderPreviewScene>[0];
-/** Reuses the existing renderer with independent media only while a final join is visible. */
+/** Reuses the existing renderer for composition joins and bounded content clocks. */
 export function createVideoPreviewCompositionJoinRenderer(
   renderCurrent: typeof renderPreviewScene
 ) {
@@ -57,7 +58,15 @@ export function createVideoPreviewCompositionJoinRenderer(
         projection.plans,
         input.currentTime
       );
-      if (!selected) {
+      if (
+        !selected &&
+        !input.project.clips.some(
+          (clip) =>
+            clip.type === 'VIDEO' &&
+            clip.playbackWindow &&
+            isClipActiveAtTime(clip, input.currentTime)
+        )
+      ) {
         releaseSampler();
         return renderCurrent(input);
       }

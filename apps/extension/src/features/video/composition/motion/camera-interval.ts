@@ -55,8 +55,8 @@ function phaseKey(project: VideoProject, span: CameraSpan, time: number) {
   if (owner.motionBlur === undefined) {
     if (span.kind === 'link') return 'legacy';
     const edges = resolveProjectCameraEdges(project, owner);
-    const local = getMotionAnimationTime(owner, time - owner.startTime);
-    const phase = motionRegionBlurPhase(owner, time, edges);
+    const local = getMotionAnimationTime(owner, time - owner.startTime, project);
+    const phase = motionRegionBlurPhase(owner, time, edges, project);
     if (phase === 'enter' && local <= 0 && motionTransitionSettings(owner, 'enter').instant)
       return 'instant-start';
     const exit = motionTransitionSettings(owner, 'exit');
@@ -65,7 +65,7 @@ function phaseKey(project: VideoProject, span: CameraSpan, time: number) {
   }
   return span.kind === 'link'
     ? 'link'
-    : motionRegionBlurPhase(owner, time, resolveProjectCameraEdges(project, owner));
+    : motionRegionBlurPhase(owner, time, resolveProjectCameraEdges(project, owner), project);
 }
 
 function cameraControlKey(region: VideoProjectMotionRegion) {
@@ -121,8 +121,10 @@ function continuousSplit(
     group === right.sourceBinding?.animationGroupId &&
     Math.abs(left.startTime + left.duration - time) <= 1e-9 &&
     Math.abs(right.startTime - time) <= 1e-9 &&
-    Math.abs(getMotionAnimationTime(left, left.duration) - getMotionAnimationTime(right, 0)) <=
-      1e-9 &&
+    Math.abs(
+      getMotionAnimationTime(left, left.duration, project) -
+        getMotionAnimationTime(right, 0, project)
+    ) <= 1e-9 &&
     (left.animation?.duration ?? left.duration) === (right.animation?.duration ?? right.duration) &&
     cameraControlKey(left) === cameraControlKey(right) &&
     sameSourceGeometry(project, left, right, time)

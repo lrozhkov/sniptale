@@ -530,3 +530,104 @@ it.each([
     expect(context.lastSource!.stop).toHaveBeenCalledWith(expected.start + expected.duration);
   }
 });
+
+it('schedules bounded held-clip audio from the collector with the retained gain and fade phase', async () => {
+  const { collectRenderableAudioClips } = await import('../clip-audio/collect');
+  const { scheduleOfflineAudioClipMix } = await import('./schedule');
+  const project = createEmptyVideoProject('Held mix');
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 3,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(project.tracks[0]!.id, asset, 2);
+  Object.assign(clip, {
+    sourceStart: 1,
+    sourceDuration: 0.15,
+    duration: 5 / 30 - 0.04,
+    audioGainStart: 0.2,
+    audioGainEnd: 0.8,
+    fadeOutMs: 100,
+    playbackWindow: {
+      offset: 0.04,
+      holdAt: 0.14,
+      fadePhase: { offset: 0.04, duration: 0.15 },
+      gainPhase: { offset: 0.04, duration: 0.15 },
+    },
+  });
+  project.assets = [asset];
+  project.clips = [clip];
+  const prepared = collectRenderableAudioClips(project)[0]!;
+  const context = new FakeOfflineAudioContext() as unknown as FakeOfflineAudioContext &
+    OfflineAudioContext;
+  await scheduleOfflineAudioClipMix(context, prepared, createAudioBuffer(1, 48000, 144000));
+  expect(context.lastSource?.start).toHaveBeenCalledWith(2, 1.04, expect.closeTo(0.11, 12));
+  expect(context.lastSource?.stop).toHaveBeenCalledWith(expect.closeTo(2.11, 12));
+  expect(context.gains[0]?.gain.setValueAtTime).toHaveBeenCalledWith(expect.closeTo(0.36, 12), 2);
+  expect(context.gains[0]?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+    expect.closeTo(0.8, 12),
+    expect.closeTo(2.11, 12)
+  );
+  expect(context.gains[1]?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+    0,
+    expect.closeTo(2.11, 12)
+  );
+});
+
+it('keeps a restored leading gain plateau through collection, range clipping and scheduling', async () => {
+  const { collectRenderableAudioClips } = await import('../clip-audio/collect');
+  const { scheduleOfflineAudioClipMix } = await import('./schedule');
+  const project = createEmptyVideoProject('Restored gain');
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 3,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(project.tracks[0]!.id, asset);
+  Object.assign(clip, {
+    duration: 2.5,
+    sourceDuration: 2.5,
+    audioGainStart: 0.2,
+    audioGainEnd: 0.8,
+    playbackWindow: { offset: 0, gainPhase: { offset: -0.5, duration: 2 } },
+  });
+  project.assets = [asset];
+  project.clips = [clip];
+  project.duration = 2.5;
+  for (const partial of [false, true]) {
+    const prepared = collectRenderableAudioClips(
+      project,
+      partial ? { rangeStartSeconds: 0.25, rangeEndSeconds: 2 } : undefined
+    )[0]!;
+    const context = new FakeOfflineAudioContext() as unknown as FakeOfflineAudioContext &
+      OfflineAudioContext;
+    await scheduleOfflineAudioClipMix(context, prepared, createAudioBuffer(1, 48000, 144000));
+    expect(context.gains[0]?.gain.setValueAtTime).toHaveBeenCalledWith(0.2, 0);
+    expect(context.gains[0]?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0.2,
+      partial ? 0.25 : 0.5
+    );
+    expect(context.gains[0]?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(partial ? 0.65 : 0.8, 12),
+      partial ? 1.75 : 2.5
+    );
+  }
+});

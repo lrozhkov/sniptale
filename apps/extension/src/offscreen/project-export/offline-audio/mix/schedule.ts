@@ -11,6 +11,7 @@ import type { OfflineAudioRenderableClip } from '../clip-audio/index';
 function resolveEnvelopeGainAtTime(
   clip: Pick<
     OfflineAudioRenderableClip,
+    | 'audioGainPhase'
     | 'audioGainEnd'
     | 'audioGainStart'
     | 'duration'
@@ -21,8 +22,14 @@ function resolveEnvelopeGainAtTime(
   >,
   time: number
 ) {
+  const duration = clip.audioGainPhase?.duration ?? clip.duration;
   const progress =
-    clip.duration <= 0 ? 0 : Math.min(1, Math.max(0, (time - clip.startTime) / clip.duration));
+    duration <= 0
+      ? 0
+      : Math.min(
+          1,
+          Math.max(0, ((clip.audioGainPhase?.offset ?? 0) + time - clip.startTime) / duration)
+        );
   const startGain =
     Math.max(0, clip.volume) * (clip.volumeEnvelopeStart ?? clip.audioGainStart ?? 1);
   const endGain = Math.max(0, clip.volume) * (clip.volumeEnvelopeEnd ?? clip.audioGainEnd ?? 1);
@@ -118,8 +125,19 @@ export async function scheduleOfflineAudioClipMix(
   const envelopeGainStart = clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, clipStart);
   const envelopeGainEnd = clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, clipEnd);
   gain.gain.setValueAtTime(envelopeGainStart, clipStart);
-  if (envelopeGainStart > 0 || envelopeGainEnd > 0)
-    gain.gain.linearRampToValueAtTime(envelopeGainEnd, clipEnd);
+  if (envelopeGainStart > 0 || envelopeGainEnd > 0) {
+    const phase = clip.audioGainPhase;
+    const points = phase
+      ? [clip.startTime - phase.offset, clip.startTime - phase.offset + phase.duration].filter(
+          (time) => time > clipStart && time < clipEnd
+        )
+      : [];
+    for (const time of [...points, clipEnd])
+      gain.gain.linearRampToValueAtTime(
+        clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, time),
+        time
+      );
+  }
 
   const offset =
     rate === 1

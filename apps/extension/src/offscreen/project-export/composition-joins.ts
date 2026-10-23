@@ -35,7 +35,7 @@ export interface ProjectExportCompositionJoinRenderer {
   dispose(): void;
   draw(
     context: CanvasRenderingContext2D,
-    plan: VideoProjectCompositionJoinPlan,
+    plan: VideoProjectCompositionJoinPlan | undefined,
     time: number,
     signal: AbortSignal
   ): Promise<void>;
@@ -46,11 +46,16 @@ export async function renderProjectCompositionFrame(args: Input): Promise<void> 
   if (args.job.cancelled || args.signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
   const plans = resolveVideoProjectCompositionJoinPlans(args.project);
   const plan = resolveActiveVideoProjectCompositionJoinPlan(plans, args.currentTime);
-  if (!plan) {
+  const windowed = args.project.clips.some(
+    (clip) =>
+      clip.type === 'VIDEO' && clip.playbackWindow && isClipActiveAtTime(clip, args.currentTime)
+  );
+  if (!plan && !windowed) {
     args.job.compositionJoinRenderer?.clear();
     await renderProjectCompositionScene(args);
   } else if (
-    plan.boundary.transition?.type === 'fade-black' &&
+    !windowed &&
+    plan?.boundary.transition?.type === 'fade-black' &&
     plan.boundary.sampling !== 'cut' &&
     !resolveActiveVideoProjectCompositionJoinPlan(
       plans.filter(({ boundary }) => boundary.sampling === 'cut'),
@@ -121,7 +126,12 @@ function createProjectExportCompositionJoinRenderer(
     const nested = cutPlan
       ? undefined
       : resolveActiveVideoProjectCompositionJoinPlan(cutPlans, time);
-    if (!cutPlan && !nested)
+    const bounded =
+      cutPlan ||
+      args.project.clips.some(
+        (clip) => clip.type === 'VIDEO' && clip.playbackWindow && isClipActiveAtTime(clip, time)
+      );
+    if (!bounded && !nested)
       for (const clip of args.project.clips) {
         signal.throwIfAborted();
         if (clip.type !== 'VIDEO' || !isClipActiveAtTime(clip, time)) continue;
@@ -143,10 +153,10 @@ function createProjectExportCompositionJoinRenderer(
         await waitForMediaElementReady(video, { signal });
         signal.throwIfAborted();
       }
-    if (!cutPlan && !nested)
+    if (!bounded && !nested)
       await syncVideoClipFrame({ clipMediaElements: videos }, args.project, time, signal);
     signal.throwIfAborted();
-    if (cutPlan)
+    if (bounded)
       cutSampler ??= createCompositionCutSampleSource({
         project: args.project,
         sourceUrl: (clip) => {
@@ -154,8 +164,8 @@ function createProjectExportCompositionJoinRenderer(
           return source?.currentSrc || source?.src;
         },
       });
-    const frames = cutPlan
-      ? await cutSampler!.sample(time, signal, time < cutPlan.seam ? 'last' : 'first')
+    const frames = bounded
+      ? await cutSampler!.sample(time, signal, !cutPlan || time < cutPlan.seam ? 'last' : 'first')
       : undefined;
     let sample: ReturnType<typeof resources.canvas> | undefined;
     try {
@@ -214,26 +224,33 @@ function createProjectExportCompositionJoinRenderer(
       if (disposed) throw new Error('Composition export sampler is disposed.');
       const samplingSignal = AbortSignal.any([signal, controller.signal]);
       samplingSignal.throwIfAborted();
-      cutPlan = plan.boundary.sampling === 'cut' ? plan : undefined;
+      cutPlan = plan?.boundary.sampling === 'cut' ? plan : undefined;
       if (cutPlan) {
         nestedCuts?.dispose();
         nestedCuts = undefined;
       }
-      if (!cutPlan) {
+      if (
+        !cutPlan &&
+        !args.project.clips.some(
+          (clip) => clip.type === 'VIDEO' && clip.playbackWindow && isClipActiveAtTime(clip, time)
+        )
+      ) {
         cutSampler?.dispose();
         cutSampler = undefined;
       }
-      if (plan.boundary.transition?.type === 'fade-black') {
+      if (!plan || plan.boundary.transition?.type === 'fade-black') {
         const sample = await renderSample(time, samplingSignal);
         try {
           context.clearRect(0, 0, size.width, size.height);
           context.drawImage(sample.canvas, 0, 0);
-          const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
-          drawCompositionColorOverlay(
-            context,
-            blend.black,
-            plan.boundary.transition.color ?? '#000000'
-          );
+          if (plan) {
+            const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
+            drawCompositionColorOverlay(
+              context,
+              blend.black,
+              plan.boundary.transition?.color ?? '#000000'
+            );
+          }
         } finally {
           sample.release();
         }

@@ -47,6 +47,7 @@ export interface VideoPreviewFrameMaterializer {
 
 interface VideoPreviewMaterializerState {
   disposed: boolean;
+  playbackSampler: ReturnType<typeof createCompositionCutSampleSource> | null;
   spatialRenderer: ReviewSpatialRenderer | null;
   stagingCanvas: HTMLCanvasElement | null;
   captionRenderer: ReturnType<typeof createVideoProjectCaptionRenderer>;
@@ -403,6 +404,7 @@ function createMaterializerMediaState(
 ): VideoPreviewMaterializerState {
   const state: VideoPreviewMaterializerState = {
     disposed: false,
+    playbackSampler: null,
     spatialRenderer: null,
     stagingCanvas: null,
     captionRenderer: createVideoProjectCaptionRenderer(),
@@ -459,6 +461,8 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
     video?.remove();
   });
   state.effectRuntime?.dispose();
+  state.playbackSampler?.dispose();
+  state.playbackSampler = null;
   state.captionRenderer.clear();
   state.watermarkRenderer.clear();
   state.effectRuntime = null;
@@ -480,54 +484,79 @@ async function renderMaterializedFrame(
     throwIfAborted(signal);
     if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
   };
-  assertActive();
-  await Promise.all(Object.values(state.imageBank).map((image) => waitForImage(image, signal)));
-  assertActive();
-  if (!decodedVideoFrames)
-    await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
-  assertActive();
-  const drawn = await renderPreviewScene({
-    sampleFps: params.sampleFps ?? params.project.fps,
-    ...(sceneEdges === 'omit' ? { sceneEdges } : {}),
-    captionRenderer: state.captionRenderer,
-    watermarkRenderer: state.watermarkRenderer,
-    stagingCanvas: () => {
-      assertActive();
-      state.stagingCanvas ??= params.ownerDocument.createElement('canvas');
-      return state.stagingCanvas;
-    },
-    spatialRenderer: () => {
-      assertActive();
-      if (state.spatialRenderer) return state.spatialRenderer;
-      const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
-        if (state.spatialRenderer !== renderer) return;
-        state.spatialRenderer = null;
-        renderer.dispose();
+  let sampled:
+    | Awaited<ReturnType<ReturnType<typeof createCompositionCutSampleSource>['sample']>>
+    | undefined;
+  try {
+    assertActive();
+    if (
+      !decodedVideoFrames &&
+      params.project.clips.some(
+        (clip) => clip.type === 'VIDEO' && clip.playbackWindow && isClipActiveAtTime(clip, time)
+      )
+    ) {
+      state.playbackSampler ??= createCompositionCutSampleSource({
+        project: params.project,
+        sourceUrl: (clip) => params.assetUrls[clip.assetId],
       });
-      state.spatialRenderer = renderer;
-      return renderer;
-    },
-    ...(cameraOverride ? { cameraOverride } : {}),
-    canvas,
-    currentTime: time,
-    effectRuntimeExecutor: () => {
-      assertActive();
-      state.effectRuntime ??= createVideoEditorEffectRuntime({
-        ownerDocument: params.ownerDocument,
-      });
-      return state.effectRuntime.executor;
-    },
-    imageBank: state.imageBank,
-    previewRasterSize: params.rasterSize,
-    project: params.project,
-    signal,
-    stage,
-    videoRefs: { current: state.videoRefs },
-    ...(decodedVideoFrames ? { decodedVideoFrames } : {}),
-  });
-  assertActive();
-  if (drawn === false) throw new Error('Preview frame is unavailable.');
-  return canvas;
+      sampled = await state.playbackSampler.sample(time, signal, 'last');
+      decodedVideoFrames = sampled.media;
+    }
+    assertActive();
+    await Promise.all(Object.values(state.imageBank).map((image) => waitForImage(image, signal)));
+    assertActive();
+    if (!decodedVideoFrames)
+      await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
+    assertActive();
+    const drawn = await renderPreviewScene({
+      sampleFps: params.sampleFps ?? params.project.fps,
+      ...(sceneEdges === 'omit' ? { sceneEdges } : {}),
+      captionRenderer: state.captionRenderer,
+      watermarkRenderer: state.watermarkRenderer,
+      stagingCanvas: () => {
+        assertActive();
+        state.stagingCanvas ??= params.ownerDocument.createElement('canvas');
+        return state.stagingCanvas;
+      },
+      spatialRenderer: () => {
+        assertActive();
+        if (state.spatialRenderer) return state.spatialRenderer;
+        const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+          if (state.spatialRenderer !== renderer) return;
+          state.spatialRenderer = null;
+          renderer.dispose();
+        });
+        state.spatialRenderer = renderer;
+        return renderer;
+      },
+      ...(cameraOverride ? { cameraOverride } : {}),
+      canvas,
+      currentTime: time,
+      effectRuntimeExecutor: () => {
+        assertActive();
+        state.effectRuntime ??= createVideoEditorEffectRuntime({
+          ownerDocument: params.ownerDocument,
+        });
+        return state.effectRuntime.executor;
+      },
+      imageBank: state.imageBank,
+      previewRasterSize: params.rasterSize,
+      project: params.project,
+      signal,
+      stage,
+      videoRefs: { current: state.videoRefs },
+      ...(decodedVideoFrames ? { decodedVideoFrames } : {}),
+    });
+    assertActive();
+    if (drawn === false) throw new Error('Preview frame is unavailable.');
+    return canvas;
+  } catch (error) {
+    state.playbackSampler?.dispose();
+    state.playbackSampler = null;
+    throw error;
+  } finally {
+    sampled?.release();
+  }
 }
 
 async function prepareMaterializedVideos(

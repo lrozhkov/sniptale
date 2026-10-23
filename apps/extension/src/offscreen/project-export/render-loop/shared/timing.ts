@@ -1,8 +1,8 @@
 const MP4_KEYFRAME_INTERVAL_SECONDS = 2;
 
-/** Normalizes render-loop duration to the minimum supported length. */
+/** Preserves positive work intervals; empty intervals retain the existing minimum. */
 export function getRenderLoopDuration(duration: number): number {
-  return Math.max(0.1, duration);
+  return duration > 0 ? duration : Math.max(0.1, duration);
 }
 
 /** Normalizes render-loop fps to the minimum supported rate. */
@@ -12,7 +12,9 @@ export function getRenderLoopFps(fps: number): number {
 
 /** Calculates the total number of frames the render loop should emit. */
 export function getRenderLoopTotalFrames(duration: number, fps: number): number {
-  return Math.max(1, Math.ceil(duration * fps));
+  // Rounded encoder timestamps must remain strictly before the rounded interval end.
+  const endUs = Math.round(duration * 1_000_000);
+  return Math.max(1, Math.ceil(((endUs - 0.5) * fps) / 1_000_000));
 }
 
 /** Converts the normalized fps into a frame duration in microseconds. */

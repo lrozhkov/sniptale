@@ -200,3 +200,20 @@ it('keeps a retained dormant Native host silent without disabling its authored i
   expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
   expect(project.effectInstances![0]!.enabled).toBe(true);
 });
+
+it('advances EffectV1 audio by the placement offset without holding its tail', () => {
+  const project = createAudioProject();
+  const host = project.clips[0]!;
+  host.duration = 1.8;
+  host.playbackWindow = { offset: 0.5, holdAt: 1.4 };
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([
+    expect.objectContaining({
+      startTime: 2,
+      duration: 0.25,
+      sourceStart: 0.75,
+      sourceDuration: 0.5,
+    }),
+  ]);
+  host.playbackWindow = { offset: 1.6, holdAt: 1.4 };
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([]);
+});

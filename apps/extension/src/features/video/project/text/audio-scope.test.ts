@@ -118,3 +118,13 @@ it('authorizes camera selections in covered authored seconds for signed offsets'
     expect(createVideoProjectAudioScope(project, 1, clip.id, 2, 3)).toBeNull();
   }
 });
+
+it('authorizes only audible source seconds in a split playback window', () => {
+  const { project, clip } = fixture();
+  Object.assign(clip, { duration: 1, playbackWindow: { offset: 3.5, holdAt: 4 } });
+  project.version = 43;
+  expect(createVideoProjectAudioScope(project, 3, clip.id, 9, 10)).not.toBeNull();
+  expect(createVideoProjectAudioScope(project, 3, clip.id, 2, 9)).toBeNull();
+  Object.assign(clip, { playbackWindow: { offset: 4.2, holdAt: 4 } });
+  expect(createVideoProjectAudioScope(project, 3, clip.id, 9, 10)).toBeNull();
+});

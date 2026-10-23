@@ -1,3 +1,4 @@
+import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
 import { hasValidVideoProjectCursorSourceObservations } from '../cursor-source-observations';
 import {
   parseVideoProjectSourceVoiceoverDocuments,
@@ -98,6 +99,7 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['playbackWindow'] !== undefined) return 43;
   if (value['attachment'] !== undefined || value['sourceRange'] !== undefined) return 38;
   if (value['rememberedWindowLayout'] !== undefined) return 36;
   if (value['rememberedWindowHeader'] !== undefined || value['rememberedSourceCrop'] !== undefined)
@@ -132,7 +134,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 42) &&
+    isBoundedNumber(version, 2, 43) &&
     Number.isInteger(version) &&
     (version >= 42 || value['watermarkSource'] === undefined) &&
     (version >= 41 ||
@@ -416,13 +418,16 @@ function hasValidInteractionAnchorReference(
       (asset.source.kind === 'project-asset' &&
         asset.source.originRecordingId === anchor.recordingId))
   );
+  const projected = clip.playbackWindow ? mapProjectTimeToSourcePoint([clip], time, clip.id) : null;
   return (
     matchesRecording &&
     anchor.sourceTime >= clip.sourceStart &&
     anchor.sourceTime <= clip.sourceStart + clip.sourceDuration &&
-    Math.abs(
-      clip.startTime + (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) - time
-    ) <= 0.000_001
+    (clip.playbackWindow
+      ? projected !== null && Math.abs(projected.sourceTime - anchor.sourceTime) <= 0.000_001
+      : Math.abs(
+          clip.startTime + (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) - time
+        ) <= 0.000_001)
   );
 }
 

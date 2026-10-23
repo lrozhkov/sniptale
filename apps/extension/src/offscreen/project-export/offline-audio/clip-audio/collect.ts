@@ -1,3 +1,4 @@
+import { normalizeClipPlaybackRate } from '../../../../features/video/project/timeline/rate';
 import { planProjectSourceVoiceoverPlayback } from '../../../../features/video/project/source-voiceover-playback';
 import { composeSourceAudioRanges } from '../../../../features/video/audio/source-attenuation';
 import { getProjectSourceAudioRanges } from '../../../../features/video/project/source-audio';
@@ -29,8 +30,26 @@ export function collectRenderableAudioClips(
       shouldRenderClipAudio(project, clip)
   );
   const segments = buildProjectTransitionSegments(project);
-  const preparedMediaClips = mediaClips.map((clip) => {
-    const gain = getClipGainRange(clip);
+  const preparedMediaClips = mediaClips.flatMap((clip): OfflineAudioRenderableClip[] => {
+    const { playbackWindow: window, ...media } = clip;
+    const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+    const sourceOffset = (window?.offset ?? 0) * rate;
+    const duration = window
+      ? Math.min(clip.duration, Math.max(0, clip.sourceDuration - sourceOffset) / rate)
+      : clip.duration;
+    if (duration <= 0) return [];
+    const range = getClipGainRange(clip);
+    const phase = window?.gainPhase;
+    const gainAt = (elapsed: number) =>
+      range.start +
+      (range.end - range.start) *
+        Math.min(
+          1,
+          Math.max(0, ((phase?.offset ?? 0) + elapsed) / (phase?.duration ?? clip.duration))
+        );
+    const retainedGainPhase =
+      phase && (phase.offset < 0 || phase.offset + duration > phase.duration) ? phase : undefined;
+    const gain = window && !retainedGainPhase ? { start: gainAt(0), end: gainAt(duration) } : range;
     const audioTransitions = segments
       .filter((segment) => segment.leadingClipId === clip.id || segment.trailingClipId === clip.id)
       .map((segment) => ({
@@ -43,8 +62,15 @@ export function collectRenderableAudioClips(
       getProjectSourceAudioRanges(project, clip),
       getProjectOriginalAudioRanges(project, clip)
     );
-    return {
-      ...clip,
+    const prepared: OfflineAudioRenderableClip = {
+      ...media,
+      ...(window
+        ? {
+            duration,
+            sourceStart: clip.sourceStart + sourceOffset,
+            sourceDuration: duration * rate,
+          }
+        : {}),
       volume: getProjectTrackAudioVolume(project, clip.trackId),
       audioGainStart: gain.start,
       audioGainEnd: gain.end,
@@ -52,8 +78,13 @@ export function collectRenderableAudioClips(
       volumeEnvelopeEnd: gain.end,
       ...(audioTransitions.length ? { audioTransitions } : {}),
       originalAudioRanges,
-      audioFadePhase: { offset: 0, duration: clip.duration },
+      audioFadePhase: window?.fadePhase
+        ? { ...window.fadePhase }
+        : { offset: 0, duration: clip.duration },
     };
+    delete prepared.audioGainPhase;
+    if (retainedGainPhase) prepared.audioGainPhase = { ...retainedGainPhase };
+    return [prepared];
   });
   const clips: OfflineAudioRenderableClip[] = [
     ...preparedMediaClips,
@@ -149,22 +180,31 @@ export function clipAudioClipToExportRange(
       offset: (clip.audioFadePhase?.offset ?? 0) + overlapStart - clip.startTime,
       duration: clip.audioFadePhase?.duration ?? clip.duration,
     },
-    ...buildOptionalGainPatch(
-      'audioGainStart',
-      interpolateGain(clip.audioGainStart, clip.audioGainEnd, startProgress)
-    ),
-    ...buildOptionalGainPatch(
-      'audioGainEnd',
-      interpolateGain(clip.audioGainStart, clip.audioGainEnd, endProgress)
-    ),
-    ...buildOptionalGainPatch(
-      'volumeEnvelopeStart',
-      interpolateGain(clip.volumeEnvelopeStart, clip.volumeEnvelopeEnd, startProgress)
-    ),
-    ...buildOptionalGainPatch(
-      'volumeEnvelopeEnd',
-      interpolateGain(clip.volumeEnvelopeStart, clip.volumeEnvelopeEnd, endProgress)
-    ),
+    ...(clip.audioGainPhase
+      ? {
+          audioGainPhase: {
+            offset: clip.audioGainPhase.offset + overlapStart - clip.startTime,
+            duration: clip.audioGainPhase.duration,
+          },
+        }
+      : {
+          ...buildOptionalGainPatch(
+            'audioGainStart',
+            interpolateGain(clip.audioGainStart, clip.audioGainEnd, startProgress)
+          ),
+          ...buildOptionalGainPatch(
+            'audioGainEnd',
+            interpolateGain(clip.audioGainStart, clip.audioGainEnd, endProgress)
+          ),
+          ...buildOptionalGainPatch(
+            'volumeEnvelopeStart',
+            interpolateGain(clip.volumeEnvelopeStart, clip.volumeEnvelopeEnd, startProgress)
+          ),
+          ...buildOptionalGainPatch(
+            'volumeEnvelopeEnd',
+            interpolateGain(clip.volumeEnvelopeStart, clip.volumeEnvelopeEnd, endProgress)
+          ),
+        }),
   };
 }
 

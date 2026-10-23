@@ -37,6 +37,8 @@ export type OfflineAudioRenderableClip = (
 ) & {
   /** Authored result-time phase. The collector replaces imported properties. */
   audioFadePhase?: { offset: number; duration: number };
+  /** Derived from a validated clip window when endpoint interpolation would lose a plateau. */
+  audioGainPhase?: { offset: number; duration: number };
   originalAudioRanges?: AudioGainRange[];
   /** Export-local automation; never persisted in the project. */
   audioTransitions?: {

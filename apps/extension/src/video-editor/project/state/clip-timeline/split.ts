@@ -1,3 +1,4 @@
+import { sliceClipPlaybackWindow } from '../../../../features/video/project/timeline/rate';
 import { materializeVideoProjectCursorSourceObservations } from '../../../../features/video/project/cursor-source-observations';
 import {
   isSourceVoiceoverSourceClip,
@@ -89,6 +90,7 @@ export function splitProjectClipsAtTimeWithResult(
       !item.sourceInstanceId &&
       (project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
         project.commentDocuments?.some((entry) => isCommentSourceClip(item, entry.binding)) ||
+        project.motionRegions?.some((region) => region.sourceBinding?.clipId === item.id) ||
         isProjectOriginalAudioTarget(project, item) ||
         isSourceVoiceoverSourceClip(project, item))
         ? { ...item, sourceInstanceId: item.id }
@@ -366,6 +368,15 @@ function splitProjectClip(
   localOffset: number,
   secondGroupId: string | null
 ): VideoProjectClip[] {
+  if (clip.playbackWindow) {
+    return [
+      { ...clip, duration: localOffset, playbackWindow: sliceClipPlaybackWindow(clip, 0) },
+      {
+        ...createSplitSecondClipBase(clip, localOffset, secondGroupId),
+        playbackWindow: sliceClipPlaybackWindow(clip, localOffset),
+      },
+    ];
+  }
   if (isSourceTimedClip(clip)) {
     const secondClipBase = createSplitSecondClipBase(clip, localOffset, secondGroupId);
     const sourceOffset = getSourceTimedClipSourceOffset(clip, localOffset);

@@ -1302,7 +1302,8 @@ export const LOCAL_OWNER_MAPPINGS = [
   {
     owner: 'shared-video-project-validation',
     productionFile: 'apps/extension/src/features/video/project/validation/root.ts',
-    reason: 'Video project boundary validation is covered by parser and transitive boundary tests.',
+    reason:
+      'Video project boundary validation covers parser, export and concurrent durable publication.',
     testFiles: [
       'apps/extension/src/features/video/project/camera/animation.test.ts',
       'apps/extension/src/features/video/project/motion/source-binding.test.ts',
@@ -1318,6 +1319,7 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/offscreen/project-export/service/root.test.ts',
       'apps/extension/src/contracts/messaging/video/validators.project-export.test.ts',
       'apps/extension/src/composition/persistence/projects/index.read-guards.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.stale-save.test.ts',
       'apps/extension/src/features/video/project/validation/project-domain-boundary.test.ts',
       'apps/extension/src/features/video/project/validation/project.test.ts',
     ],
