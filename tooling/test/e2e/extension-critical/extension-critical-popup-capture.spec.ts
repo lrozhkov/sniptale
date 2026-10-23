@@ -268,6 +268,116 @@ async function attachDiagnostics(info: TestInfo, popup: Page, tabId: number, mes
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const mode of ['visible', 'full'] as const) {
+    test(`Popup ${mode} capture excludes late toast in editor at ${viewport.name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup, tabId } = await openCapturePage(
+        context,
+        extensionId,
+        hostOrigin,
+        viewport.size
+      );
+      try {
+        await enableToolbar(popup, page, tabId);
+        await popup.evaluate(async (id) => {
+          await chrome.tabs.sendMessage(id, {
+            type: 'SHOW_TOAST',
+            payload: { message: 'Toast capture proof', type: 'info' },
+          });
+        }, tabId);
+        const toast = page.locator('[data-ui="shared.toast.host"]').last();
+        await expect(toast).toBeVisible();
+        await toast.evaluate((element) => {
+          const root = element.getRootNode();
+          if (!(root instanceof ShadowRoot)) throw new Error('Content toast root unavailable');
+          const lateToast = element.cloneNode(true);
+          if (!(lateToast instanceof HTMLElement)) throw new Error('Toast clone unavailable');
+          const marker = document.createElement('span');
+          marker.style.cssText =
+            'position:absolute;left:0;top:0;width:32px;height:32px;background:rgb(255,0,255);z-index:2147483647';
+          lateToast.append(marker);
+          const observer = new MutationObserver(() => {
+            if (!root.host.classList.contains('sniptale-capture-ui-hidden')) return;
+            root.append(lateToast);
+            root.host.setAttribute(
+              'data-toast-capture-display',
+              getComputedStyle(lateToast).display
+            );
+            lateToast.setAttribute('data-capture-toast-proof', 'true');
+            observer.disconnect();
+          });
+          observer.observe(root.host, { attributes: true, attributeFilter: ['class'] });
+        });
+        const editorOpened = context.waitForEvent('page');
+        expect(await triggerCapture(popup, tabId, 'home', mode, 0, 'edit')).toMatchObject({
+          success: true,
+          result: 'accepted',
+        });
+        const editor = await editorOpened;
+        try {
+          await editor.setViewportSize(viewport.size);
+          await editor.waitForURL(/editor/);
+          await expect(editor.locator('[data-ui="editor.page.root"]')).toBeVisible();
+          const lateToast = page.locator('[data-capture-toast-proof="true"]');
+          await expect(lateToast).toHaveCount(1);
+          await expect
+            .poll(() =>
+              lateToast.evaluate((element) => {
+                const root = element.getRootNode();
+                return root instanceof ShadowRoot
+                  ? root.host.getAttribute('data-toast-capture-display')
+                  : null;
+              })
+            )
+            .toBe('none');
+          const canvas = editor.locator('canvas').first();
+          await expect
+            .poll(() =>
+              canvas.evaluate((element: HTMLCanvasElement) => {
+                if (!element.width || !element.height) return { hasPage: false, toast: 0 };
+                const pixels = element
+                  .getContext('2d')
+                  ?.getImageData(0, 0, element.width, element.height).data;
+                if (!pixels) return { hasPage: false, toast: 0 };
+                let pagePixels = 0;
+                let toastPixels = 0;
+                for (let offset = 0; offset < pixels.length; offset += 4) {
+                  if (pixels[offset]! > 250 && pixels[offset + 1]! < 5 && pixels[offset + 2]! > 250)
+                    toastPixels += 1;
+                  if (
+                    pixels[offset]! > 220 &&
+                    pixels[offset + 1]! > 70 &&
+                    pixels[offset + 1]! < 150 &&
+                    pixels[offset + 2]! < 70
+                  )
+                    pagePixels += 1;
+                }
+                return { hasPage: pagePixels > 1000, toast: toastPixels };
+              })
+            )
+            .toEqual({ toast: 0, hasPage: true });
+          await expect(editor.locator('[data-ui="editor.page.open-loading"]')).toHaveCount(0);
+          await editor.evaluate(() => document.fonts.ready);
+          await editor.screenshot({
+            path: info.outputPath('editor-without-toast.png'),
+            fullPage: false,
+          });
+          await page.bringToFront();
+          await expect(lateToast).toBeVisible();
+          await lateToast.evaluate((element) => element.remove());
+        } finally {
+          await editor.close();
+        }
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
+
   test(`Crop output actions retain preparation without conflicting feedback at ${viewport.name}`, async ({
     context,
     extensionId,

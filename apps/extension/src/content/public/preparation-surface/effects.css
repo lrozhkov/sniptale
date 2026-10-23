@@ -157,6 +157,7 @@
 }
 
 :host(.sniptale-capture-ui-hidden) .sniptale-app,
+:host(.sniptale-capture-ui-hidden) [data-ui='shared.toast.host'],
 :host(.sniptale-capture-ui-hidden) .sniptale-toolbar,
 :host(.sniptale-capture-ui-hidden) .sniptale-action-toolbar,
 :host(.sniptale-capture-ui-hidden) .sniptale-toolbar-portal-wrapper,
