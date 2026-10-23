@@ -10,7 +10,7 @@ import type { VideoProjectTrack } from '../project/types/layout';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import { buildQuickEditAudioPlan, buildQuickEditClipEnvelope } from './advanced/audio-plan';
 import { projectReviewVoiceover } from './voiceover-edits';
-import { planReviewProjectAudio } from './project-audio';
+import { planReviewProjectAudio, prepareReviewProjectVoiceSnapshots } from './project-audio';
 
 function fixture() {
   const asset: VideoProjectAsset = {
@@ -64,6 +64,40 @@ function fixture() {
     },
   };
 }
+
+it('admits result-only takes while retaining passive transcript data', () => {
+  const input = fixture();
+  const transcript = {
+    version: 1 as const,
+    phrases: [
+      {
+        id: 'historical',
+        start: 2,
+        end: 6,
+        originalText: 'Recorded',
+        text: 'Edited',
+        revision: 1,
+        alignment: 'manual' as const,
+      },
+    ],
+    replacements: [],
+  };
+  input.audio.voiceover[0]!.transcript = transcript;
+  const before = structuredClone(input);
+  const result = planReviewProjectAudio(input);
+  expect(result.status).toBe('prepared');
+  if (result.status === 'prepared') {
+    expect(result.clips[0]).toMatchObject({
+      transcript,
+      linkMode: 'DETACHED',
+      sourceStart: 2,
+      sourceDuration: 4,
+    });
+    expect(result.clips[0]!.transcript).not.toBe(transcript);
+    expect(result.sourceVoiceoverDocuments).toEqual([]);
+  }
+  expect(input).toEqual(before);
+});
 
 it.each([0.25, 1, 4])(
   'preserves actual Gallery own-tempo fade phase and independent masters at %s',
@@ -231,25 +265,13 @@ it.each(['locked', 'hidden', 'wrong-kind', 'same-id', 'non-neutral-master'] as c
   }
 );
 
-it.each(['dormant', 'sourceAnchor', 'transcript', 'textSnapshot'] as const)(
-  'keeps unmapped %s authored metadata blocked instead of publishing audible slices',
+it.each(['dormant', 'sourceAnchor'] as const)(
+  'keeps unmapped %s metadata blocked without a source binding',
   (field) => {
     const input = fixture();
     const clip = input.audio.voiceover[0]!;
     if (field === 'dormant') clip.dormant = true;
-    if (field === 'textSnapshot')
-      clip.textSnapshot = {
-        kind: 'microphone',
-        textId: 'text',
-        revision: 0,
-        timingRevision: 0,
-        text: 'Historical',
-        start: 1,
-        end: 2,
-        timeDomain: 'result',
-      };
-    if (field === 'transcript') clip.transcript = { version: 1, phrases: [], replacements: [] };
-    if (field === 'sourceAnchor') {
+    else {
       clip.sourceAnchor = [{ start: 1, end: 5, offset: 0, duration: 4 }];
       input.audio.voiceoverSegments = [
         { kind: 'keep', sourceStart: 0, sourceEnd: 20, resultStart: 0, resultEnd: 20, rate: 1 },
@@ -257,20 +279,67 @@ it.each(['dormant', 'sourceAnchor', 'transcript', 'textSnapshot'] as const)(
     }
     expect(planReviewProjectAudio(input)).toEqual({
       status: 'blocked',
-      issues:
-        field === 'dormant' || field === 'sourceAnchor'
-          ? [
-              {
-                kind: 'audio-resources',
-                lane: 'voiceover',
-                clipId: 'take',
-                field: 'source-binding',
-              },
-            ]
-          : [{ kind: 'audio-content', lane: 'voiceover', clipId: 'take', field }],
+      issues: [
+        { kind: 'audio-resources', lane: 'voiceover', clipId: 'take', field: 'source-binding' },
+      ],
     });
   }
 );
+
+it('preserves a historical result snapshot without requiring current text', async () => {
+  const input = fixture();
+  const snapshot = {
+    kind: 'microphone' as const,
+    textId: 'removed-text',
+    revision: 2,
+    timingRevision: 3,
+    text: 'Historical words',
+    start: 1,
+    end: 2,
+    timeDomain: 'result' as const,
+  };
+  input.audio.voiceover[0]!.textSnapshot = snapshot;
+  const voiceSnapshots = await prepareReviewProjectVoiceSnapshots(input.operationId, input.audio);
+  const args = {
+    ...input,
+    textDocumentIds: { source: 'source-text', result: 'result-text' },
+    resources: { ...input.resources, voiceSnapshots },
+  };
+  const result = planReviewProjectAudio(args);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(result.clips[0]!.textSnapshot).toEqual({
+    version: 1,
+    documentId: 'result-text',
+    binding: { kind: 'project' },
+    basisHash: voiceSnapshots[0]!.basisHash,
+    text: snapshot,
+  });
+  expect(result.sourceVoiceoverDocuments).toEqual([]);
+  expect(await prepareReviewProjectVoiceSnapshots(input.operationId, input.audio)).toEqual(
+    voiceSnapshots
+  );
+  input.audio.voiceover[0]!.textSnapshot!.text = 'Different snapshot';
+  expect(await prepareReviewProjectVoiceSnapshots(input.operationId, input.audio)).not.toEqual(
+    voiceSnapshots
+  );
+  expect(result.clips[0]!.textSnapshot!.text.text).toBe('Historical words');
+  for (const supplied of [
+    undefined,
+    [],
+    [{ ...voiceSnapshots[0]!, basisHash: 'invalid' }],
+    [voiceSnapshots[0]!, voiceSnapshots[0]!],
+  ]) {
+    expect(
+      planReviewProjectAudio({
+        ...args,
+        resources: {
+          ...input.resources,
+          ...(supplied === undefined ? {} : { voiceSnapshots: supplied }),
+        },
+      }).status
+    ).toBe('blocked');
+  }
+});
 
 it('retains an authored tail and refuses missing resources', () => {
   const input = fixture();

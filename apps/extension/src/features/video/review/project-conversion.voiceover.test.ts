@@ -1,3 +1,7 @@
+import { prepareReviewProjectVoiceSnapshots } from './project-audio';
+import { editReviewTextFragment } from './text-document';
+import { applyVideoProjectTextEdit } from '../project/text/authoring';
+import { getProjectAssetUseCounts } from '../project/media-usage';
 import { anchorReviewVoiceoverAtSource, projectReviewVoiceover } from './voiceover-edits';
 import { buildQuickEditAudioPlan } from './advanced/audio-plan';
 import {
@@ -409,4 +413,95 @@ it('retains original recognition with a VIDEO source fallback and no external by
   );
   expect(result.project.assets).toEqual(input.seed.assets);
   expect(result.project.sourceVoiceoverDocuments).toBeUndefined();
+});
+
+it('transfers detached result speech metadata without reviving replacements or depending on live text', async () => {
+  const input = externalAudioFixture();
+  const audio = input.document.advancedContent.audio;
+  const take = audio.voiceover[0]!;
+  const profile = { modelId: 'legacy-model', voiceId: 'voice', responseFormat: 'wav' as const };
+  const replacement = structuredClone(input.externalAudio.assets[0]!);
+  replacement.reviewAssetId = 'project-asset:retained-only';
+  replacement.asset.id = 'project-asset:native-retained-only';
+  replacement.asset.source = { kind: 'project-asset', projectAssetId: 'retained-only' };
+  input.externalAudio.assets.push(replacement);
+  take.transcript = {
+    version: 1,
+    phrases: [
+      {
+        id: 'legacy-phrase',
+        start: 0.5,
+        end: 1.5,
+        originalText: 'Recorded',
+        text: 'Retained legacy',
+        revision: 2,
+        alignment: 'manual',
+      },
+    ],
+    replacements: [
+      {
+        id: 'legacy-replacement',
+        start: 0.5,
+        end: 1.5,
+        duration: 0.25,
+        assetId: replacement.reviewAssetId,
+        phraseId: 'legacy-phrase',
+        revision: 2,
+        text: 'Retained legacy',
+        textSignature: reviewSpeechTextSignature('Retained legacy', profile),
+        profile,
+      },
+    ],
+  };
+  take.textSnapshot = {
+    kind: 'microphone',
+    textId: 'deleted-phrase',
+    revision: 1,
+    timingRevision: 2,
+    text: 'Accepted historical words',
+    start: 1,
+    end: 3,
+    timeDomain: 'result',
+  };
+  const text = input.document.advancedContent.text!;
+  text.fragments[0] = { ...text.fragments[0]!, timeDomain: 'result', text: 'Current words' };
+  const voiceSnapshots = await prepareReviewProjectVoiceSnapshots(input.seed.id, audio);
+  const args = { ...input, externalAudio: { ...input.externalAudio, voiceSnapshots } };
+  const before = structuredClone(args);
+  const result = planReviewProjectConversion(args);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(result.project.version).toBe(44);
+  expect(isExportReadyVideoProject(result.project)).toBe(true);
+  expect(result.project.sourceVoiceoverDocuments).toBeUndefined();
+  const converted = result.project.clips.find((clip) => clip.trackId === 'voice-track');
+  if (converted?.type !== 'AUDIO') throw new Error('Missing result take');
+  expect(converted).toMatchObject({
+    startTime: 1,
+    sourceStart: 0.5,
+    sourceDuration: 1,
+    duration: 4,
+    playbackRate: 0.25,
+    linkMode: 'DETACHED',
+    transcript: { replacements: [{ assetId: 'project-asset:native-retained-only' }] },
+    textSnapshot: { binding: { kind: 'project' }, text: take.textSnapshot },
+  });
+  expect(
+    result.project.clips.some(
+      (clip) => 'assetId' in clip && clip.assetId === 'project-asset:native-retained-only'
+    )
+  ).toBe(false);
+  expect(getProjectAssetUseCounts(result.project).get('project-asset:native-retained-only')).toBe(
+    1
+  );
+  const current = result.project.textDocuments!.find((entry) => entry.binding.kind === 'project')!;
+  const change = editReviewTextFragment(current.document, 'text', { text: 'Changed later' });
+  if (!change.ok) throw new Error('Text edit refused');
+  const edited = applyVideoProjectTextEdit(result.project, current, { document: change.document });
+  if (!edited.ok) throw new Error('Document edit refused');
+  expect(edited.project.clips.find((clip) => clip.id === converted.id)).toEqual(converted);
+  const removed = { ...edited.project, textDocuments: [] };
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(removed)));
+  expect(reopened?.clips.find((clip) => clip.id === converted.id)).toEqual(converted);
+  expect(isExportReadyVideoProject(removed)).toBe(true);
+  expect(args).toEqual(before);
 });

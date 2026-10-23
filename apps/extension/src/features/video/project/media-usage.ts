@@ -21,6 +21,10 @@ export type ProjectAssetUse = { assetId: string } & (
 export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
   const uses: ProjectAssetUse[] = [];
   for (const clip of project.clips) {
+    if (clip.type === VideoProjectClipType.AUDIO) {
+      for (const replacement of clip.transcript?.replacements ?? [])
+        uses.push({ assetId: replacement.assetId, kind: 'clip', clipId: clip.id });
+    }
     if ('assetId' in clip) uses.push({ assetId: clip.assetId, kind: 'clip', clipId: clip.id });
     if (clip.type === VideoProjectClipType.SHAPE && clip.embeddedAsset) {
       uses.push({ assetId: clip.embeddedAsset.assetId, kind: 'clip', clipId: clip.id });

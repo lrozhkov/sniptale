@@ -99,6 +99,7 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['transcript'] !== undefined) return 44;
   if (value['playbackWindow'] !== undefined) return 43;
   if (value['attachment'] !== undefined || value['sourceRange'] !== undefined) return 38;
   if (value['rememberedWindowLayout'] !== undefined) return 36;
@@ -134,7 +135,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 43) &&
+    isBoundedNumber(version, 2, 44) &&
     Number.isInteger(version) &&
     (version >= 42 || value['watermarkSource'] === undefined) &&
     (version >= 41 ||
@@ -434,6 +435,18 @@ function hasValidInteractionAnchorReference(
 function hasValidReferences(project: VideoProject): boolean {
   return (
     hasValidVideoProjectBaseReferences(project) &&
+    project.clips.every(
+      (clip) =>
+        clip.type !== VideoProjectClipType.AUDIO ||
+        (clip.transcript?.replacements ?? []).every((replacement) => {
+          const asset = project.assets.find((entry) => entry.id === replacement.assetId);
+          return (
+            asset?.type === VideoProjectClipType.AUDIO &&
+            (asset.metadata.duration === null ||
+              replacement.duration <= asset.metadata.duration + 1e-7)
+          );
+        })
+    ) &&
     hasValidEffectProjectReferences(project) &&
     hasValidVideoProjectSourceAudioReferences(project) &&
     hasValidVideoProjectSourceVoiceoverReferences(project) &&

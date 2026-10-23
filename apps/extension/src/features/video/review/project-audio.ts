@@ -1,3 +1,5 @@
+import { createSha256Digest, isSha256Digest } from '@sniptale/platform/security/digest';
+import { parseVideoProjectVoiceTextSnapshot } from '../project/text/voice-take';
 import { parseReviewOriginalSpeech, type ReviewOriginalSpeech } from './original-speech';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseVideoProjectTextBinding } from '../project/text/validation';
@@ -30,6 +32,32 @@ interface ReviewProjectAudioApplication {
 export interface ReviewProjectAudioResources {
   assets: readonly { reviewAssetId: string; asset: VideoProjectAsset }[];
   tracks: Record<Lane, VideoProjectTrack>;
+  /** Hashes describe historical transfer provenance, never generation authority. */
+  voiceSnapshots?: readonly { lane: Lane; clipId: string; basisHash: string }[];
+}
+
+/** Prepares historical snapshot hashes without consulting or authorizing current editable text. */
+export async function prepareReviewProjectVoiceSnapshots(
+  operationId: string,
+  audio: Pick<QuickEditAudioState, 'voiceover' | 'music'>
+): Promise<NonNullable<ReviewProjectAudioResources['voiceSnapshots']>> {
+  const snapshots: NonNullable<ReviewProjectAudioResources['voiceSnapshots']>[number][] = [];
+  for (const lane of ['voiceover', 'music'] as const) {
+    for (const clip of audio[lane]) {
+      if (!clip.textSnapshot || clip.sourceAnchor?.length || clip.dormant === true) continue;
+      const basisHash = await createSha256Digest(
+        JSON.stringify({
+          kind: 'gallery-transfer',
+          operationId,
+          lane,
+          clipId: clip.id,
+          text: clip.textSnapshot,
+        })
+      );
+      snapshots.push({ lane, clipId: clip.id, basisHash });
+    }
+  }
+  return snapshots;
 }
 
 /** Refusals retain the complete source snapshot for the later publication workflow. */
@@ -49,6 +77,7 @@ export function planReviewProjectAudio(args: {
     binding: VideoProjectSourceVoiceoverDocument['binding'];
     reference: readonly ReviewTimeSegment[];
   };
+  textDocumentIds?: { source: string; result: string };
   mainDuration: number;
   originalAudioTarget?: NonNullable<VideoProjectAudioClip['originalAudioMute']>['targets'][number];
   resources?: ReviewProjectAudioResources;
@@ -104,6 +133,27 @@ export function planReviewProjectAudio(args: {
     };
   const resources = args.resources;
   if (!resources) return blocked({ kind: 'audio-resources' });
+  const voiceSnapshots: NonNullable<ReviewProjectAudioResources['voiceSnapshots']> =
+    resources.voiceSnapshots ?? [];
+  if (resources.voiceSnapshots !== undefined && !Array.isArray(resources.voiceSnapshots))
+    return blocked({ kind: 'audio-resources', field: 'text-snapshot' });
+  const snapshotKeys = new Set<string>();
+  for (const snapshot of voiceSnapshots) {
+    if (
+      !isRecord(snapshot) ||
+      Object.keys(snapshot).some((key) => !['lane', 'clipId', 'basisHash'].includes(key)) ||
+      (snapshot['lane'] !== 'voiceover' && snapshot['lane'] !== 'music') ||
+      typeof snapshot['clipId'] !== 'string' ||
+      typeof snapshot['basisHash'] !== 'string' ||
+      !isSha256Digest(snapshot['basisHash']) ||
+      !audio[snapshot['lane']].some(
+        (clip) => clip.id === snapshot['clipId'] && clip.textSnapshot
+      ) ||
+      snapshotKeys.has(JSON.stringify([snapshot['lane'], snapshot['clipId']]))
+    )
+      return blocked({ kind: 'audio-resources', field: 'text-snapshot' });
+    snapshotKeys.add(JSON.stringify([snapshot['lane'], snapshot['clipId']]));
+  }
   const assetsByReviewId = new Map<string, VideoProjectAsset>();
   const assetIds = new Set<string>();
   for (const binding of resources.assets) {
@@ -160,9 +210,8 @@ export function planReviewProjectAudio(args: {
       const whole = lane === 'voiceover' && (!!clip.sourceAnchor?.length || clip.dormant === true);
       const field = whole
         ? undefined
-        : ((['sourceAnchor', 'transcript', 'textSnapshot'] as const).find(
-            (key) => clip[key] !== undefined
-          ) ?? (clip.dormant ? 'dormant' : undefined));
+        : ((['sourceAnchor'] as const).find((key) => clip[key] !== undefined) ??
+          (clip.dormant ? 'dormant' : undefined));
       if (field) return blocked({ kind: 'audio-content', lane, clipId: clip.id, field });
       const asset = assetsByReviewId.get(clip.assetId);
       if (!asset)
@@ -188,6 +237,34 @@ export function planReviewProjectAudio(args: {
         usedAssets.set(asset.id, asset);
         continue;
       }
+      const transcript =
+        clip.transcript === undefined ? undefined : structuredClone(clip.transcript);
+      const replacementIssue = rebindReplacementAssets({
+        replacements: transcript?.replacements ?? [],
+        assetsByReviewId,
+        usedAssets,
+        endField: 'replacement-end',
+        context: { lane, clipId: clip.id },
+      });
+      if (replacementIssue) return blocked(replacementIssue);
+      const text = clip.textSnapshot;
+      const digest = voiceSnapshots.find(
+        (entry) => entry.lane === lane && entry.clipId === clip.id
+      );
+      const binding =
+        text?.timeDomain === 'source' ? args.source?.binding : { kind: 'project' as const };
+      const textSnapshot =
+        text && binding && args.textDocumentIds && digest
+          ? parseVideoProjectVoiceTextSnapshot({
+              version: 1,
+              documentId: args.textDocumentIds[text.timeDomain],
+              binding,
+              basisHash: digest.basisHash,
+              text,
+            })
+          : undefined;
+      if (text && !textSnapshot)
+        return blocked({ kind: 'audio-resources', lane, clipId: clip.id, field: 'text-snapshot' });
       const converted = convertResultClip({
         input: args,
         clip,
@@ -198,7 +275,14 @@ export function planReviewProjectAudio(args: {
         suppress: mutedByTakes.has(clip.id),
       });
       if (!converted) return blocked({ kind: 'audio-input', lane, clipId: clip.id });
-      clips.push(converted);
+      const retained = {
+        ...converted,
+        ...(transcript === undefined ? {} : { transcript }),
+        ...(textSnapshot ? { textSnapshot } : {}),
+      };
+      if (!isVideoProjectClip(retained))
+        return blocked({ kind: 'audio-input', lane, clipId: clip.id });
+      clips.push(retained);
       usedAssets.set(asset.id, asset);
     }
   }

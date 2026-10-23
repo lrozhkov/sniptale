@@ -1,3 +1,10 @@
+import {
+  reviewSpeechTextSignature,
+  type ReviewSpeechTranscript,
+} from '../../review/speech-transcript';
+import { applyVideoProjectClipsPatch } from '../mutation';
+import { getProjectAssetUses } from '../media-usage';
+import { removeVideoProjectLibrarySources } from '../library-source-removal';
 import { expect, it } from 'vitest';
 import {
   parseVideoProjectVoiceTextSnapshot,
@@ -138,4 +145,155 @@ it('preserves the complete accepted snapshot while splitting and retiming ordina
       true
     );
   }
+});
+
+function passiveTranscript(): ReviewSpeechTranscript {
+  const profile = {
+    modelId: 'retired-model',
+    voiceId: 'retired-voice',
+    responseFormat: 'pcm' as const,
+  };
+  return {
+    version: 1,
+    transcriptionModelId: 'retired-recognizer',
+    profile,
+    phrases: [
+      {
+        id: 'phrase',
+        start: 0,
+        end: 3,
+        text: 'Edited',
+        originalText: 'Recognized',
+        revision: 2,
+        alignment: 'word',
+        words: [{ text: 'Edited', start: 0, end: 1 }],
+      },
+    ],
+    replacements: [
+      {
+        id: 'replacement',
+        phraseId: 'phrase',
+        start: 0,
+        end: 3,
+        duration: 2,
+        assetId: 'project-asset:passive-replacement',
+        revision: 1,
+        text: 'Historical',
+        textSignature: reviewSpeechTextSignature('Historical', profile),
+        profile,
+      },
+    ],
+  };
+}
+
+it('requires schema 44 and preserves detached passive transcript through split and reopen', () => {
+  const { project, clip, asset } = fixture();
+  const transcript = passiveTranscript();
+  transcript.replacements.push({
+    ...transcript.replacements[0]!,
+    id: 'kept-replacement',
+    start: 3,
+    end: 6,
+    assetId: 'project-asset:kept-replacement',
+  });
+  const retained = { ...clip, transcript };
+  const replacement = {
+    ...asset,
+    id: transcript.replacements[0]!.assetId,
+    source: { kind: 'project-asset' as const, projectAssetId: 'passive-bytes' },
+  };
+  project.assets.push(replacement, { ...asset, id: 'project-asset:kept-replacement' });
+  for (const version of [2, 30, 31, 42, 43] as const)
+    expect(parseHydratableVideoProject({ ...project, version, clips: [retained] })).toBeNull();
+  const admitted = applyVideoProjectClipsPatch(project, [retained]);
+  expect(admitted.version).toBe(44);
+  expect(isExportReadyVideoProject(admitted)).toBe(true);
+  const reopened = hydrateVideoProject(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(admitted)))!
+  );
+  const audio = reopened.clips[0]!;
+  expect(audio).toMatchObject({ transcript, textSnapshot: clip.textSnapshot });
+  if (audio.type !== 'AUDIO') throw new Error('Expected audio');
+  audio.transcript!.phrases[0]!.words![0]!.text = 'Changed later';
+  expect(transcript.phrases[0]!.words![0]!.text).toBe('Edited');
+  const pieces = splitClipAfterOverwrite(retained, [{ start: 4, end: 5 }], new Map());
+  expect(pieces).toHaveLength(2);
+  for (const piece of pieces) expect(piece).toMatchObject({ transcript });
+  expect(getProjectAssetUses(admitted)).toContainEqual({
+    kind: 'clip',
+    clipId: clip.id,
+    assetId: replacement.id,
+  });
+  const removed = removeVideoProjectLibrarySources(admitted, [replacement.source]);
+  expect(removed.clips[0]).toMatchObject({
+    transcript: { ...transcript, replacements: [transcript.replacements[1]!] },
+    textSnapshot: clip.textSnapshot,
+  });
+  expect(isExportReadyVideoProject(removed)).toBe(true);
+  expect(retained.transcript.replacements).toHaveLength(2);
+  expect(getProjectAssetUses(removed)).toContainEqual({
+    kind: 'clip',
+    clipId: clip.id,
+    assetId: 'project-asset:kept-replacement',
+  });
+});
+
+it.each(['missing', 'video', 'too-short'] as const)(
+  'retains hydratable transcript but refuses %s replacement resources',
+  (failure) => {
+    const { project, clip, asset } = fixture();
+    const transcript = passiveTranscript();
+    project.version = 44;
+    project.clips = [{ ...clip, transcript }];
+    if (failure !== 'missing')
+      project.assets.push({
+        ...asset,
+        id: transcript.replacements[0]!.assetId,
+        type: failure === 'video' ? 'VIDEO' : 'AUDIO',
+        metadata: { ...asset.metadata, duration: failure === 'too-short' ? 1 : 12 },
+      });
+    expect(parseHydratableVideoProject(project)).not.toBeNull();
+    expect(isExportReadyVideoProject(project)).toBe(false);
+  }
+);
+
+it.each(['transcript', 'phrase', 'word', 'replacement', 'profile', 'replacement-profile'] as const)(
+  'refuses unknown passive %s fields instead of discarding them',
+  (level) => {
+    const { clip } = fixture();
+    const transcript = passiveTranscript();
+    const target =
+      level === 'transcript'
+        ? transcript
+        : level === 'phrase'
+          ? transcript.phrases[0]!
+          : level === 'word'
+            ? transcript.phrases[0]!.words![0]!
+            : level === 'replacement'
+              ? transcript.replacements[0]!
+              : level === 'profile'
+                ? transcript.profile!
+                : transcript.replacements[0]!.profile;
+    Object.assign(target, { unsupported: true });
+    expect(isVideoProjectClip({ ...clip, transcript })).toBe(false);
+  }
+);
+
+it.each([
+  null,
+  { version: 1, phrases: [], replacements: null },
+  { ...passiveTranscript(), phrases: [{ ...passiveTranscript().phrases[0]!, end: -1 }] },
+  {
+    ...passiveTranscript(),
+    replacements: [{ ...passiveTranscript().replacements[0]!, textSignature: 'invalid' }],
+  },
+])('refuses malformed passive transcript %j', (transcript) => {
+  const { clip, asset } = fixture();
+  expect(isVideoProjectClip({ ...clip, transcript })).toBe(false);
+  expect(
+    isVideoProjectClip({
+      ...createVideoClipFromAsset('track', { ...asset, type: 'VIDEO' }, 640, 360),
+      transcript: passiveTranscript(),
+    })
+  ).toBe(false);
 });

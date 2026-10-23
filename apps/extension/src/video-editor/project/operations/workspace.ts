@@ -14,7 +14,10 @@ import { planReviewProjectConversion } from '../../../features/video/review/proj
 import type { ReviewProjectCameraResource } from '../../../features/video/review/project-camera';
 import { assertImportableProjectAssetFile } from './import-validation';
 import { PROJECT_ASSET_VIDEO_MIME_TYPES } from '../../../features/media-hub/project-assets';
-import type { ReviewProjectAudioResources } from '../../../features/video/review/project-audio';
+import {
+  prepareReviewProjectVoiceSnapshots,
+  type ReviewProjectAudioResources,
+} from '../../../features/video/review/project-audio';
 import type { ReviewDocument } from '../../../features/video/review/types';
 import { loadAudioMetadata, loadImageMetadata, loadVideoMetadata } from '../media-metadata';
 import {
@@ -382,6 +385,7 @@ async function prepareReviewResources(
       ? {
           audio: {
             assets: audioAssets,
+            voiceSnapshots: await prepareReviewProjectVoiceSnapshots(project.id, audio),
             tracks: {
               voiceover: createVideoProjectTrack(
                 translate('gallery.videoReview.audioVoiceover'),

@@ -1,3 +1,4 @@
+import type { ReviewSpeechTranscript } from '../../review/speech-transcript';
 import type { CameraHiddenRange } from '../camera/visibility';
 import type { CameraAppearance, CameraCrop } from '../camera/appearance';
 import type { VideoProjectVoiceTextSnapshot } from '../text/types';
@@ -257,6 +258,8 @@ export interface VideoProjectAudioClip extends VideoProjectBaseClip {
   };
   /** Accepted speech keeps its original text even after that text or source is removed. */
   textSnapshot?: VideoProjectVoiceTextSnapshot;
+  /** Passive legacy recognition metadata never schedules replacement playback. */
+  transcript?: ReviewSpeechTranscript;
   /** Stable text/speech placement identity; split retains it and duplicate replaces it. */
   sourceInstanceId?: string;
   type: typeof VideoProjectClipType.AUDIO;
@@ -372,7 +375,8 @@ export interface VideoProject {
     | 40
     | 41
     | 42
-    | 43;
+    | 43
+    | 44;
   sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

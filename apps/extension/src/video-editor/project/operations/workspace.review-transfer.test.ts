@@ -435,6 +435,17 @@ it('claims existing accepted audio resources without copying bytes and retries a
       muted: false,
       fadeIn: 0,
       fadeOut: 0,
+      transcript: { version: 1, phrases: [], replacements: [] },
+      textSnapshot: {
+        kind: 'microphone',
+        textId: 'deleted-script',
+        revision: 2,
+        timingRevision: 3,
+        text: 'Accepted historical script',
+        start: 0,
+        end: 1,
+        timeDomain: 'result',
+      },
     },
   ];
   getProjectAsset.mockResolvedValue({ status: 'not-found' });
@@ -470,6 +481,20 @@ it('claims existing accepted audio resources without copying bytes and retries a
       (clip) => clip.type === 'AUDIO' && clip.assetId === 'project-asset:voice-bytes'
     )
   ).toBe(true);
+  const take = result.project!.clips.find(
+    (clip) => clip.type === 'AUDIO' && clip.assetId === 'project-asset:voice-bytes'
+  );
+  expect(result.project!.version).toBe(44);
+  expect(take).toMatchObject({
+    linkMode: 'DETACHED',
+    transcript: { version: 1, phrases: [], replacements: [] },
+    textSnapshot: {
+      binding: { kind: 'project' },
+      basisHash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+      text: snapshot.workspace.advanced.audio.voiceover[0]!.textSnapshot,
+    },
+  });
+  expect(snapshot.workspace.advanced.audio.voiceover[0]!.sourceAnchor).toBeUndefined();
   expect(saveVideoProject).toHaveBeenCalledTimes(1);
   expect(deleteProjectAsset).not.toHaveBeenCalled();
 });

@@ -1,3 +1,5 @@
+import { syntheticSpeechWav } from '../support/voiceover-speech-fixture';
+import { reviewSpeechTextSignature } from '../../../../apps/extension/src/features/video/review/speech-transcript';
 import { inspectVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 import { resolveVideoCompositionRenderPasses } from '../../../../apps/extension/src/features/video/composition/timeline/render';
@@ -24,7 +26,7 @@ import {
 import { isBoundedVideoProjectExportSettings } from '../../../../apps/extension/src/features/video/project/export/settings-validation';
 import { resolveVideoCompositionFrame } from '../../../../apps/extension/src/features/video/composition/timeline/frame';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
@@ -153,6 +155,300 @@ async function resourceAnnotationSource(title: string, clocked = false) {
   return source;
 }
 
+type InspectorLabel = (key: Parameters<typeof translate>[0]) => string;
+type NativeProject = NonNullable<Awaited<ReturnType<typeof readNativeVideoProject>>>;
+
+const frozenVoiceText = {
+  kind: 'microphone',
+  textId: 'deleted-historical-phrase',
+  revision: 2,
+  timingRevision: 3,
+  text: 'Frozen historical voice words. Привет, мир!',
+  start: 1,
+  end: 3,
+  timeDomain: 'result',
+} as const;
+
+async function prepareResultVoiceGalleryFixture(
+  page: Page,
+  dialog: Locator,
+  origin: string,
+  theme: string,
+  aggregate: string,
+  label: InspectorLabel,
+  outputPath: (name: string) => string
+) {
+  await expect(dialog.locator('[data-ui="autosave-control"] button').first()).toHaveAttribute(
+    'aria-label',
+    `${label('editor.documentActions.autosaveTitle')}: ${label('common.states.saved')}`
+  );
+  await page.goto(`${origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+  const stored = (await readNativeReviewWorkspace(page, aggregate))!;
+  const document = replayReviewHistory(
+    stored.history,
+    stored.cursor,
+    stored.source,
+    reviewDocumentBaseline(stored)
+  );
+  const takeBytes = syntheticSpeechWav(5, 220);
+  // The source interval of the passive replacement is silent in the accepted take.
+  takeBytes.fill(0, 44 + 16000 * 2, 44 + 1.5 * 16000 * 2);
+  await page.evaluate(
+    async (resources) => {
+      const objects = await (
+        await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
+      ).getDirectoryHandle('objects');
+      for (const resource of resources) {
+        const bytes = Uint8Array.from(atob(resource.body), (value) => value.charCodeAt(0));
+        const writer = await (
+          await objects.getFileHandle(resource.id, { create: true })
+        ).createWritable();
+        await writer.write(bytes);
+        await writer.close();
+      }
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-db');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const tx = db.transaction(['project_assets', 'asset_refs', 'asset_owners'], 'readwrite');
+      const done = new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onabort = () => reject(tx.error);
+      });
+      for (const resource of resources) {
+        const size = atob(resource.body).length;
+        tx.objectStore('project_assets').put({
+          id: resource.id,
+          assetId: resource.id,
+          mimeType: 'audio/wav',
+          size,
+          createdAt: 1,
+        });
+        tx.objectStore('asset_refs').put({
+          assetId: resource.id,
+          mimeType: 'audio/wav',
+          size,
+          createdAt: 1,
+          sha256: null,
+          location: { kind: 'opfs', objectKey: `objects/${resource.id}` },
+        });
+        tx.objectStore('asset_owners').put({
+          assetId: resource.id,
+          ownerKind: 'project-asset',
+          ownerId: resource.id,
+          role: 'body',
+        });
+      }
+      await done;
+      db.close();
+    },
+    [
+      { id: 'result-voice-take', body: takeBytes.toString('base64') },
+      { id: 'result-voice-passive', body: syntheticSpeechWav(0.5, 880).toString('base64') },
+    ]
+  );
+  const profile = {
+    modelId: 'legacy-result-model',
+    voiceId: 'voice',
+    responseFormat: 'wav' as const,
+  };
+  document.advancedContent.audio.original = { muted: true, volume: 1 };
+  document.advancedContent.audio.voiceover = [
+    {
+      id: 'result-voice',
+      assetId: 'project-asset:result-voice-take',
+      timelineStart: 1,
+      sourceOffset: 0.5,
+      duration: 4,
+      tempo: 0.5,
+      volume: 0.8,
+      muted: false,
+      fadeIn: 0.1,
+      fadeOut: 0.2,
+      textSnapshot: frozenVoiceText,
+      transcript: {
+        version: 1,
+        phrases: [
+          {
+            id: 'legacy-result-phrase',
+            start: 1,
+            end: 1.5,
+            originalText: 'Recorded words',
+            text: 'Passive replacement words',
+            revision: 2,
+            alignment: 'manual',
+          },
+        ],
+        replacements: [
+          {
+            id: 'legacy-result-replacement',
+            phraseId: 'legacy-result-phrase',
+            start: 1,
+            end: 1.5,
+            duration: 0.5,
+            assetId: 'project-asset:result-voice-passive',
+            revision: 2,
+            text: 'Passive replacement words',
+            textSignature: reviewSpeechTextSignature('Passive replacement words', profile),
+            profile,
+          },
+        ],
+      },
+    },
+  ];
+  document.advancedContent.text = {
+    version: 1,
+    fragments: [
+      {
+        id: 'current-result-phrase',
+        start: 1,
+        end: 3,
+        timeDomain: 'result',
+        originalText: 'Current editable words',
+        text: 'Current editable words',
+        revision: 1,
+        timingRevision: 1,
+        alignment: 'manual',
+        showInVideo: false,
+      },
+    ],
+  };
+  const inspected = inspectVideoWorkspace({
+    ...stored,
+    formatVersion: stored.project ? 4 : 2,
+    baseline: document,
+    history: [],
+    cursor: 0,
+    revision: stored.revision + 1,
+    updatedAt: Date.now(),
+    advanced: { ...document.advancedContent, ui: stored.advanced.ui },
+  });
+  if (!inspected.workspace)
+    throw new Error(`Invalid result voice Gallery workspace: ${JSON.stringify(inspected.failure)}`);
+  await replaceNativeReviewWorkspace(page, aggregate, inspected.workspace);
+  await writeFile(outputPath('result-voice-gallery.json'), JSON.stringify(inspected.workspace));
+  await page.goto(
+    `${origin}${GALLERY_HARNESS_PATH}?recordingId=beta-v1-recording&mode=edit&theme=${theme}`
+  );
+  await expect(dialog).toBeVisible();
+}
+
+async function checkTransferredResultVoiceEditing(
+  page: Page,
+  native: NativeProject,
+  label: InspectorLabel,
+  outputPath: (name: string) => string
+) {
+  const resultTake = native.clips.find((clip) => clip.type === 'AUDIO' && clip.textSnapshot);
+  const canonicalResultTake = resultTake
+    ? hydrateVideoProject(native).clips.find((clip) => clip.id === resultTake.id)
+    : undefined;
+  if (resultTake?.type !== 'AUDIO') throw new Error('Missing transferred result take');
+  expect(native.version).toBe(44);
+  expect(resultTake).toMatchObject({
+    startTime: 1,
+    sourceStart: 0.5,
+    sourceDuration: 4,
+    duration: 8,
+    playbackRate: 0.5,
+    linkMode: 'DETACHED',
+    volume: 0.8,
+    muted: false,
+    fadeInMs: 200,
+    fadeOutMs: 400,
+    textSnapshot: { binding: { kind: 'project' }, text: frozenVoiceText },
+  });
+  expect(resultTake.textSnapshot?.basisHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+  expect('sourceRange' in resultTake).toBe(false);
+  expect(native.sourceVoiceoverDocuments).toBeUndefined();
+  const passive = native.assets.find(
+    (item) =>
+      item.source.kind === 'project-asset' && item.source.projectAssetId === 'result-voice-passive'
+  );
+  expect(passive?.type).toBe('AUDIO');
+  expect(resultTake.transcript?.replacements[0]?.assetId).toBe(passive?.id);
+  expect(native.clips.some((clip) => 'assetId' in clip && clip.assetId === passive?.id)).toBe(
+    false
+  );
+  await page.locator(`[data-project-timeline-clip="${resultTake.id}"]`).click();
+  const audio = page.getByRole('button', {
+    name: label('videoEditor.sidebar.inspectorGroupAudio'),
+    exact: true,
+  });
+  if ((await audio.getAttribute('aria-expanded')) === 'false') await audio.click();
+  const volume = page.getByRole('textbox', {
+    name: label('videoEditor.sidebar.volumeLabel'),
+    exact: true,
+  });
+  await expect(volume).toBeVisible();
+  await expect(volume).toHaveValue('80');
+  await checkInspectorPaintedFont(page, volume, 'result-voice-volume');
+  await page.screenshot({
+    path: outputPath('result-voice-audio-inspector.png'),
+    fullPage: false,
+  });
+  await page
+    .getByRole('button', {
+      name: label('videoEditor.sidebar.sceneProperties'),
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole('button', {
+      name: label('videoEditor.sidebar.textDocuments'),
+      exact: true,
+    })
+    .click();
+  const textPanel = page.locator('[data-ui="video-editor.text.panel"]');
+  const phrase = textPanel.locator('[data-text-id="current-result-phrase"]');
+  await expect(phrase).toContainText('Current editable words');
+  const editor = phrase.getByRole('textbox', {
+    name: label('gallery.videoReview.speechText'),
+    exact: true,
+  });
+  if (!(await editor.isVisible())) await phrase.locator('button[aria-expanded]').click();
+  await checkInspectorPaintedFont(page, editor, 'input');
+  await editor.fill('Edited current words after transfer');
+  await editor.press('Tab');
+  await expect
+    .poll(
+      async () =>
+        (await readNativeVideoProject(page))?.textDocuments
+          ?.flatMap((entry) => entry.document.fragments)
+          .find((fragment) => fragment.id === 'current-result-phrase')?.text
+    )
+    .toBe('Edited current words after transfer');
+  expect(
+    (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === resultTake.id)
+  ).toEqual(canonicalResultTake);
+  await page.screenshot({
+    path: outputPath('result-voice-current-text-edited.png'),
+    fullPage: false,
+  });
+  await phrase
+    .getByRole('button', {
+      name: label('gallery.videoReview.textFragmentDelete'),
+      exact: true,
+    })
+    .click();
+  await expect
+    .poll(
+      async () =>
+        (await readNativeVideoProject(page))?.textDocuments
+          ?.flatMap((entry) => entry.document.fragments)
+          .some((fragment) => fragment.id === 'current-result-phrase') ?? false
+    )
+    .toBe(false);
+  expect(
+    (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === resultTake.id)
+  ).toEqual(canonicalResultTake);
+  await page.screenshot({
+    path: outputPath('result-voice-current-text-deleted.png'),
+    fullPage: false,
+  });
+}
+
 const baseCase = {
   viewport: PRIMARY_BROWSER_VIEWPORTS[0]!,
   format: 'WEBM',
@@ -173,6 +469,7 @@ const baseCase = {
   heldExposure: false,
   lateExposureEnd: false,
   emptyMedia: false,
+  resultVoice: false,
 } as const;
 
 for (const {
@@ -195,7 +492,17 @@ for (const {
   heldExposure,
   lateExposureEnd,
   emptyMedia,
+  resultVoice,
 } of [
+  { ...baseCase, resultVoice: true },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    resultVoice: true,
+  },
   { ...baseCase, nativeFx: true },
   { ...baseCase, bookends: true, heldExposure: true, emptyMedia: true },
   {
@@ -371,7 +678,7 @@ for (const {
     galleryCut: 'fade-black',
   },
 ] as const) {
-  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}${fractionalVideo ? ' fractional-video' : ''}${fractionalMain ? ' fractional-main' : ''}${heldExposure ? ' held-exposure' : ''}${lateExposureEnd ? ' late-end' : ''}${emptyMedia ? ' empty-media' : ''}`, async ({
+  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}${fractionalVideo ? ' fractional-video' : ''}${fractionalMain ? ' fractional-main' : ''}${heldExposure ? ' held-exposure' : ''}${lateExposureEnd ? ' late-end' : ''}${emptyMedia ? ' empty-media' : ''}${resultVoice ? ' result-voice' : ''}`, async ({
     page,
   }, info) => {
     test.setTimeout(240000);
@@ -1429,6 +1736,16 @@ for (const {
         );
         await button('gallery.videoReview.scene').click();
       }
+      if (resultVoice)
+        await prepareResultVoiceGalleryFixture(
+          page,
+          dialog,
+          host.origin,
+          theme,
+          aggregate,
+          label,
+          (name) => info.outputPath(name)
+        );
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
       await expect
@@ -1457,6 +1774,17 @@ for (const {
         .toBe(3);
       const native = (await readNativeVideoProject(page))!;
       expect(native.id).not.toBe(aggregate);
+      const resultTake = resultVoice
+        ? native.clips.find((clip) => clip.type === 'AUDIO' && clip.textSnapshot)
+        : undefined;
+      const canonicalResultTake = resultTake
+        ? hydrateVideoProject(native).clips.find((clip) => clip.id === resultTake.id)
+        : undefined;
+      if (resultVoice)
+        await checkTransferredResultVoiceEditing(page, native, label, (name) =>
+          info.outputPath(name)
+        );
+
       if (fractionalMain)
         expect(
           native.clips.some(
@@ -2599,6 +2927,17 @@ for (const {
         expect((await readNativeVideoProject(page))?.sceneEdges).toEqual(placed.sceneEdges);
       }
       const final = (await readNativeVideoProject(page))!;
+      if (resultVoice) {
+        expect(final.clips.find((clip) => clip.id === resultTake?.id)).toEqual(canonicalResultTake);
+        expect(
+          final.clips.filter((clip) => clip.type === 'VIDEO' && clip.assetId !== asset.id)
+        ).toEqual(hydrateVideoProject(native).clips.filter((clip) => clip.type === 'VIDEO'));
+        await writeFile(
+          info.outputPath('result-voice-native-before-reopen.json'),
+          JSON.stringify(final)
+        );
+      }
+
       const otherVideo = final.clips.find(
         (clip) => clip.type === 'VIDEO' && clip.assetId === asset.id
       )!;
@@ -3113,6 +3452,26 @@ for (const {
         start.input,
         selectedOnly || activeIntro ? start.settings : undefined
       );
+      if (resultVoice) {
+        const audio = await readEncodedAudioWindows(page, [2.2, 4.2], 0.1);
+        await writeFile(
+          info.outputPath('result-voice-real-encode.json'),
+          JSON.stringify(
+            {
+              format,
+              audio,
+              output,
+              take: resultTake,
+            },
+            null,
+            2
+          )
+        );
+        expect(audio).toHaveLength(2);
+        // The 880 Hz replacement is audible if it is scheduled; codec silence stays below 0.001 RMS.
+        expect(audio[0]).toBeLessThan(0.001);
+        expect(audio[1]).toBeGreaterThan(0.02);
+      }
       if (bookends)
         await writeFile(
           info.outputPath('bookend-encoded-pixels.json'),

@@ -60,6 +60,19 @@ export function removeVideoProjectLibrarySources(
     .map((clip) => {
       const next = { ...clip };
       if (
+        next.type === 'AUDIO' &&
+        next.transcript?.replacements.some((replacement) =>
+          removedAssetIds.has(replacement.assetId)
+        )
+      ) {
+        next.transcript = {
+          ...next.transcript,
+          replacements: next.transcript.replacements.filter(
+            (replacement) => !removedAssetIds.has(replacement.assetId)
+          ),
+        };
+      }
+      if (
         next.type === 'EFFECT' &&
         next.sourceRange &&
         removedAssetIds.has(next.sourceRange.assetId)

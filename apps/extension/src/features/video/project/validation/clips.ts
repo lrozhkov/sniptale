@@ -1,3 +1,4 @@
+import { parseReviewSpeechTranscript } from '../../review/speech-validation';
 import { parseMediaSourceCrop } from '../media-crop';
 import { parseCameraHiddenRanges } from '../camera/visibility';
 import { parseColor } from '@sniptale/foundation/color';
@@ -34,6 +35,79 @@ import {
 } from './primitives';
 import { hasAnnotationFields } from './annotations';
 import { parseVideoProjectVoiceTextSnapshot } from '../text/voice-take';
+
+/** Refuses unsupported retained fields that the shared parser would normalize away. */
+function isRetainedAudioTranscript(value: unknown): boolean {
+  const parsed = parseReviewSpeechTranscript(value);
+  if (!parsed || !isRecord(value)) return false;
+  if (
+    Object.keys(value).some(
+      (key) =>
+        !['version', 'phrases', 'replacements', 'profile', 'transcriptionModelId'].includes(key)
+    )
+  )
+    return false;
+  if (!Array.isArray(value['phrases']) || !Array.isArray(value['replacements'])) return false;
+  const profiles = [value['profile']];
+  for (const phrase of value['phrases']) {
+    if (
+      !isRecord(phrase) ||
+      Object.keys(phrase).some(
+        (key) =>
+          ![
+            'id',
+            'start',
+            'end',
+            'text',
+            'originalText',
+            'revision',
+            'alignment',
+            'words',
+          ].includes(key)
+      )
+    )
+      return false;
+    if (
+      Array.isArray(phrase['words']) &&
+      phrase['words'].some(
+        (word: unknown) =>
+          !isRecord(word) ||
+          Object.keys(word).some((key) => !['text', 'start', 'end'].includes(key))
+      )
+    )
+      return false;
+  }
+  for (const replacement of value['replacements']) {
+    if (
+      !isRecord(replacement) ||
+      Object.keys(replacement).some(
+        (key) =>
+          ![
+            'id',
+            'start',
+            'end',
+            'assetId',
+            'duration',
+            'phraseId',
+            'revision',
+            'text',
+            'textSignature',
+            'profile',
+          ].includes(key)
+      )
+    )
+      return false;
+    profiles.push(replacement['profile']);
+  }
+  return profiles.every(
+    (profile) =>
+      profile === undefined ||
+      (isRecord(profile) &&
+        Object.keys(profile).every((key) =>
+          ['modelId', 'voiceId', 'responseFormat', 'speed', 'instructions'].includes(key)
+        ))
+  );
+}
 
 function isTransform(value: unknown): boolean {
   return (
@@ -371,6 +445,13 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
     value['durationMode'] !== undefined &&
     (value['type'] !== VideoProjectClipType.AUDIO ||
       !isVideoProjectDurationMode(value['durationMode']))
+  )
+    return false;
+
+  if (
+    value['transcript'] !== undefined &&
+    (value['type'] !== VideoProjectClipType.AUDIO ||
+      !isRetainedAudioTranscript(value['transcript']))
   )
     return false;
 
