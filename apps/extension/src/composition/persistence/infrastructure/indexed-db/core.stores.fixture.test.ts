@@ -134,12 +134,14 @@ it('pins the complete released beta fixture to the database and domain registrie
     expect(source).toBeDefined();
     expect(target).toBeDefined();
     if (!source || !target) continue;
-    const changedDomains = Object.keys(source.domainVersions)
+    const changedDomains = [
+      ...new Set([...Object.keys(source.domainVersions), ...Object.keys(target.domainVersions)]),
+    ]
       .filter((domainId) => source.domainVersions[domainId] !== target.domainVersions[domainId])
       .sort();
     expect(migration.domainVersions.map(({ domainId }) => domainId).sort()).toEqual(changedDomains);
     for (const change of migration.domainVersions) {
-      expect(change.from).toBe(source.domainVersions[change.domainId]);
+      expect(change.from).toBe(source.domainVersions[change.domainId] ?? 0);
       expect(change.to).toBe(target.domainVersions[change.domainId]);
     }
     expect(
@@ -269,4 +271,22 @@ it('retains every version 33 row and immutable byte across scenario framing admi
   expect(target.stores).toEqual(source.stores);
   expect(target.indexes).toEqual(source.indexes);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, scenarioProjects: 8 });
+});
+
+it('adds private voice history without rewriting released rows media or indexes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 34
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 35
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'voice_input_history')).toEqual(source.stores);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, voiceInputHistory: 1 });
+  expect(DATABASE_MIGRATIONS.at(-1)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [{ domainId: 'voiceInputHistory', from: 0, to: 1 }],
+  });
 });

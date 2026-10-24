@@ -256,18 +256,27 @@ function parseAiDomain(
     case 'ai.prompts':
       if (
         Object.keys(value).some(
-          (key) => key !== 'global' && key !== 'scenario' && key !== 'recognition'
+          (key) =>
+            key !== 'global' &&
+            key !== 'scenario' &&
+            key !== 'recognition' &&
+            key !== 'voiceCorrection'
         ) ||
         (value['global'] !== undefined && typeof value['global'] !== 'string') ||
         (value['scenario'] !== undefined && typeof value['scenario'] !== 'string') ||
         (value['recognition'] !== undefined &&
-          (typeof value['recognition'] !== 'string' || value['recognition'].length > 10000))
+          (typeof value['recognition'] !== 'string' || value['recognition'].length > 10000)) ||
+        (value['voiceCorrection'] !== undefined &&
+          (typeof value['voiceCorrection'] !== 'string' || value['voiceCorrection'].length > 10000))
       )
         failSettingsTransferDomain(domainId);
       return json({
         ...(value['global'] === undefined ? {} : { global: value['global'] }),
         ...(value['scenario'] === undefined ? {} : { scenario: value['scenario'] }),
         ...(value['recognition'] === undefined ? {} : { recognition: value['recognition'] }),
+        ...(value['voiceCorrection'] === undefined
+          ? {}
+          : { voiceCorrection: value['voiceCorrection'] }),
       });
     case 'ai.prompt-templates': {
       const templates = parseStoredPromptTemplates(value['items']);

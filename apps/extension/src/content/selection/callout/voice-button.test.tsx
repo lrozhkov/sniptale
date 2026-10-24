@@ -4,8 +4,14 @@ import { CalloutVoiceButton, resolveCalloutVoiceButtonLeftOffset } from './voice
 
 it('renders the microphone substrate only while the callout is being edited', () => {
   const voice = {
-    actions: { start: () => undefined, stop: () => undefined },
-    state: { active: false, audioLevel: 0, errorCode: null, phase: 'idle' as const },
+    actions: { start: () => undefined, stop: () => undefined, cancel: () => undefined },
+    state: {
+      active: false,
+      pending: false,
+      audioLevel: 0,
+      errorCode: null,
+      phase: 'idle' as const,
+    },
   };
 
   expect(

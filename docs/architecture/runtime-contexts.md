@@ -94,6 +94,14 @@ Accept offscreen commands only from the checked background channel. Check freshn
 
 Keep reusable voice input under `workflows/voice-input`, `background/voice-input`, and `offscreen/voice-input`. Register each consumer policy explicitly. Scope events to the active consumer Port. Translate the private offscreen session nonce to consumer identity in background. Serialize video recording, desktop capture, and speech recognition through one offscreen media-activity lease.
 
+Background freezes canonical voice preferences at admission. Offscreen records the acquired microphone track without a second hardware request. It releases the microphone and media lease before audio conversion, publication, or provider processing. Private capture events carry the scoped history identity, never audio bytes or filesystem paths. Public voice Ports cannot receive these events.
+
+Background owns pending recognition and correction after capture release. Expected offscreen completion does not invalidate this processing phase. Delayed offscreen responses cannot replace background processing state. Cleanup recovery rechecks capture authority before each offscreen effect and before resetting session state.
+
+Stop permits completion. Cancel, disconnect, and privacy erasure abort and drain owned jobs. Chrome without correction retains streaming delivery. Model recognition and optional correction deliver one final insertion. Chrome recognition errors retain usable captured audio without starting provider processing.
+
+Only the exact top-level Settings document can use the private history Port. Retry reads current configured models and repeats source and provider checks before each POST. Correction uses the dedicated local prompt. Provider failure never permits an implicit retry. Field owners retain insertion targets through Stop and clear them on invalidation or Cancel.
+
 ## Effect sandbox
 
 `apps/extension/src/effect-runtime-sandbox/index.html` is the manifest sandbox for EffectV1 frame evaluation. It has no extension API authority. [EffectV1 bundles](video-effect-bundles.md#runtime) owns its runtime contract.

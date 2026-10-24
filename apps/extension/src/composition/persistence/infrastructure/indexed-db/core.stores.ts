@@ -1,12 +1,13 @@
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 34;
+export const DB_VERSION = 35;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
 export const DATABASE_BACKUP_RECEIPT_KEY = 'sniptale.persistence.backup-receipt.v1';
 
+export const VOICE_INPUT_HISTORY_STORE = 'voice_input_history';
 export const STORE_NAME = 'recordings';
 export const RECORDING_RECOVERY_SESSIONS_STORE = 'recording_recovery_sessions';
 export const RECORDING_RECOVERY_BLOCKS_STORE = 'recording_recovery_blocks';
@@ -78,6 +79,7 @@ export const EXPECTED_STORES = [
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
+  VOICE_INPUT_HISTORY_STORE,
   SCHEMA_CONTRACTS_STORE,
 ] as const;
 
@@ -116,5 +118,6 @@ export const EXPECTED_INDEXES = {
   [ASSET_REFS_STORE]: ['createdAt'],
   [ASSET_OWNERS_STORE]: ['assetId'],
   [ASSET_OPERATIONS_STORE]: ['status', 'updatedAt'],
+  [VOICE_INPUT_HISTORY_STORE]: [],
   [SCHEMA_CONTRACTS_STORE]: [],
 } as const satisfies Record<(typeof EXPECTED_STORES)[number], readonly string[]>;

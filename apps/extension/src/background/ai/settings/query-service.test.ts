@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const storageMocks = vi.hoisted(() => ({
   initializeAiStorageAccess: vi.fn(),
   loadAudioTranscriptionSystemPrompt: vi.fn(),
+  loadVoiceInputCorrectionSystemPrompt: vi.fn(),
   loadAIModels: vi.fn(),
   loadAIProviders: vi.fn(),
   loadAISecretProtectionStatus: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock('../../../composition/persistence/ai-settings', async (importOriginal) =
   ...(await importOriginal<typeof import('../../../composition/persistence/ai-settings')>()),
   initializeAiStorageAccess: storageMocks.initializeAiStorageAccess,
   loadAudioTranscriptionSystemPrompt: storageMocks.loadAudioTranscriptionSystemPrompt,
+  loadVoiceInputCorrectionSystemPrompt: storageMocks.loadVoiceInputCorrectionSystemPrompt,
   loadAIModels: storageMocks.loadAIModels,
   loadAIProviders: storageMocks.loadAIProviders,
   loadAISecretProtectionStatus: storageMocks.loadAISecretProtectionStatus,
@@ -53,6 +55,9 @@ beforeEach(() => {
   storageMocks.loadChromeAiEnabled.mockResolvedValue(false);
   storageMocks.loadDefaultModelId.mockResolvedValue('model-1');
   storageMocks.loadAudioTranscriptionSystemPrompt.mockResolvedValue('Audio instructions');
+  storageMocks.loadVoiceInputCorrectionSystemPrompt.mockResolvedValue(
+    'Voice correction instructions'
+  );
   storageMocks.loadGlobalSystemPrompt.mockResolvedValue('Global prompt');
   storageMocks.loadScenarioEditorSystemPrompt.mockResolvedValue('Scenario prompt');
   storageMocks.loadAISecretProtectionStatus.mockResolvedValue({
@@ -107,6 +112,9 @@ it('keeps full provider metadata only in settings page runtime data', async () =
   });
   expect(response.settingsRuntimeData?.scenarioEditorSystemPrompt).toBe('Scenario prompt');
   expect(response.settingsRuntimeData?.audioTranscriptionSystemPrompt).toBe('Audio instructions');
+  expect(response.settingsRuntimeData?.voiceInputCorrectionSystemPrompt).toBe(
+    'Voice correction instructions'
+  );
   expect(response.settingsRuntimeData?.secretProtectionStatus).toEqual({
     isEnabled: false,
     isUnlocked: true,

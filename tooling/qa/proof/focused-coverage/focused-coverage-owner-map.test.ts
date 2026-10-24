@@ -15,6 +15,21 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it.each(['core.ts', 'settings.ts', 'graph-mutations.ts'])(
+  'retains AI settings aggregation and queued command proof for %s',
+  async (owner) => {
+    const module = await importOwnerMap();
+    const root = 'apps/extension/src/composition/persistence/ai-settings';
+    expect(module.resolveMappedCoverageOwnerTests(`${root}/${owner}`)).toEqual(
+      expect.arrayContaining([
+        `${root}/index.test.ts`,
+        `${root}/graph-mutations.test.ts`,
+        `${root}/graph-mutations.settings.test.ts`,
+      ])
+    );
+  }
+);
+
 it.each(['parser', 'store'])(
   'selects unlock persistence and protected-provider route proof for the %s owner',
   async (owner) => {

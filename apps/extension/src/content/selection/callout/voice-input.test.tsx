@@ -63,6 +63,7 @@ beforeEach(() => {
     refresh: vi.fn(() => 'refresh-1'),
     start: vi.fn(() => 'session-1'),
     stop: vi.fn(() => 'stop-1'),
+    cancel: vi.fn(() => 'cancel-1'),
     subscribe: vi.fn((listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -110,5 +111,44 @@ it('streams transcript at the captured caret and stops when editing ends', async
   expect(onContentChange).toHaveBeenLastCalledWith('Before spoken after');
 
   act(() => root?.render(<Harness isEditing={false} />));
-  expect(client.stop).toHaveBeenCalledWith('session-1');
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
+});
+
+it('retains the callout insertion after Stop and rejects speech after manual editing', async () => {
+  act(() => root?.render(<Harness isEditing />));
+  const editable = container?.querySelector<HTMLDivElement>('[data-ui="editable"]');
+  if (!editable) throw new Error('Expected editable fixture');
+  const range = document.createRange();
+  range.selectNodeContents(editable);
+  range.collapse(false);
+  window.getSelection()?.removeAllRanges();
+  window.getSelection()?.addRange(range);
+  await act(async () => latest?.actions.start());
+  act(() => latest?.actions.stop());
+  expect(latest?.state.pending).toBe(true);
+  await act(async () => latest?.actions.start());
+  emit({
+    type: VoiceInputPortMessageType.TRANSCRIPT,
+    sessionId: 'session-1',
+    confidence: null,
+    sequence: 1,
+    text: 'final',
+    isFinal: true,
+  });
+  expect(editable.textContent).toContain('final');
+  expect(client.start).toHaveBeenCalledOnce();
+  act(() => {
+    editable.textContent = 'Manual';
+    editable.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  emit({
+    type: VoiceInputPortMessageType.TRANSCRIPT,
+    sessionId: 'session-1',
+    confidence: null,
+    sequence: 2,
+    text: 'late',
+    isFinal: true,
+  });
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
+  expect(editable.textContent).toBe('Manual');
 });

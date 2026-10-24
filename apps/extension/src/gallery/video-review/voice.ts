@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { useVoiceInputSession } from '../../composition/voice-input/session';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 
@@ -34,9 +34,15 @@ export function useReviewVoice(args: {
       target.end = target.start;
     },
   });
+  const cancelSession = voice.actions.cancel;
+  useEffect(() => {
+    placement.current = null;
+    cancelSession();
+  }, [args.annotation.id, cancelSession]);
   return {
     state: voice.state,
     start() {
+      if (voice.state.active || voice.state.pending) return;
       const field = args.textarea.current;
       placement.current = {
         id: args.annotation.id,
@@ -46,11 +52,17 @@ export function useReviewVoice(args: {
       };
       void voice.actions.start();
     },
-    stop() {
+    stop: voice.actions.stop,
+    cancel() {
       placement.current = null;
-      voice.actions.stop();
+      cancelSession();
     },
     moveCaret() {
+      if (voice.state.pending) {
+        placement.current = null;
+        cancelSession();
+        return;
+      }
       const field = args.textarea.current;
       if (field && placement.current) {
         placement.current.start = field.selectionStart;

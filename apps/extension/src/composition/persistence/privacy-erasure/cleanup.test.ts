@@ -33,6 +33,10 @@ function createErasureDeps() {
       countRoots: vi.fn<() => Promise<number>>().mockResolvedValue(0),
       erase: vi.fn<() => Promise<number>>().mockResolvedValue(0),
     },
+    voiceInputHistory: {
+      erase: vi.fn().mockResolvedValue(undefined),
+      verifyEmpty: vi.fn().mockResolvedValue(true),
+    },
     eventHistory: {
       erase: vi.fn().mockResolvedValue(undefined),
       verifyEmpty: vi.fn().mockResolvedValue(true),
@@ -177,6 +181,7 @@ it('does not remove browser storage when a plan has no direct or prefix keys', a
       assetStorage: deps.assetStorage,
       videoPreviewCache: deps.videoPreviewCache,
       eventHistory: deps.eventHistory,
+      voiceInputHistory: deps.voiceInputHistory,
     }
   );
 
@@ -272,4 +277,29 @@ it('requires event history erasure and verifies the archive store twice', async 
   );
   expect(failed.success).toBe(false);
   expect(failed.failedRequiredParticipantIds).toContain('indexed-db:event-history');
+});
+
+it('requires voice audio erasure and verification even when preferences remain', async () => {
+  const result = await erasePersistentLocalExtensionData(
+    { includeAiProviderSecrets: false, preservePreferences: true },
+    deps
+  );
+  expect(deps.voiceInputHistory.erase).toHaveBeenCalledOnce();
+  expect(deps.voiceInputHistory.verifyEmpty).toHaveBeenCalledTimes(2);
+  expect(result.participants).toContainEqual(
+    expect.objectContaining({
+      id: 'opfs:voice-input-history',
+      severity: 'required',
+      status: 'verified-empty',
+    })
+  );
+  deps.voiceInputHistory.verifyEmpty.mockResolvedValue(false);
+  expect(
+    (
+      await erasePersistentLocalExtensionData(
+        { includeAiProviderSecrets: false, preservePreferences: true },
+        deps
+      )
+    ).failedRequiredParticipantIds
+  ).toContain('opfs:voice-input-history');
 });

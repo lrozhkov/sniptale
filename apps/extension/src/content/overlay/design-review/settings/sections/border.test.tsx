@@ -24,7 +24,7 @@ const actions: DesignReviewActions = {
   setSideFieldLinked: vi.fn(),
   updateValue: vi.fn(),
   updateValues: vi.fn(),
-  voice: { start: vi.fn(), stop: vi.fn() },
+  voice: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
 };
 
 const borderValues = {
@@ -60,6 +60,7 @@ const state: DesignReviewViewState = {
   values: borderValues,
   voice: {
     active: false,
+    pending: false,
     audioLevel: 0,
     caretPosition: null,
     errorCode: null,

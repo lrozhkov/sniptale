@@ -1,3 +1,4 @@
+import { createVoiceHistoryPrivacyErasure } from '../voice-input-history/privacy-erasure';
 import { createEventHistoryDatabase } from '../diagnostics/event-history-database';
 import { privacyErasureBrowserStorage } from '../infrastructure/browser-storage/privacy-erasure';
 import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
@@ -61,6 +62,7 @@ const defaultErasureDeps: LocalExtensionDataErasureDeps = {
     },
   },
   eventHistory: createEventHistoryDatabase(),
+  voiceInputHistory: createVoiceHistoryPrivacyErasure(),
   videoPreviewCache: {
     erase: eraseVideoPreviewCacheForPrivacyErasure,
     verifyEmpty: verifyVideoPreviewCacheEmptyAfterPrivacyErasure,

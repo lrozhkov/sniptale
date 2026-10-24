@@ -30,6 +30,8 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
   },
 }));
 
+vi.mock('./history', () => ({ VoiceInputHistoryPanel: () => null }));
+
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -73,9 +75,44 @@ function createController(overrides: ControllerOverrides = {}): VoiceInputSettin
       requestMicrophone: vi.fn().mockResolvedValue(undefined),
       start: vi.fn().mockResolvedValue(undefined),
       stop: vi.fn(),
+      cancel: vi.fn(),
       ...overrides.actions,
     },
+    models: {
+      transcription: {
+        models: [],
+        providers: [],
+        chromeAiEnabled: false,
+        defaultModelId: null,
+        globalSystemPrompt: '',
+      },
+      correction: {
+        models: [],
+        providers: [],
+        chromeAiEnabled: false,
+        defaultModelId: null,
+        globalSystemPrompt: '',
+      },
+      transcriptionSelectionId: null,
+      correctionSelectionId: null,
+      loading: false,
+      error: false,
+      prompt: '',
+      promptSaving: false,
+      promptDirty: false,
+      refresh: vi.fn().mockResolvedValue(undefined),
+      setPrompt: vi.fn(),
+      savePrompt: vi.fn().mockResolvedValue(undefined),
+      resetPrompt: vi.fn().mockResolvedValue(undefined),
+      selectTranscription: vi.fn().mockResolvedValue(undefined),
+      selectCorrection: vi.fn().mockResolvedValue(undefined),
+    },
     preferences: {
+      backend: 'browser',
+      transcription: null,
+      correction: { enabled: false, model: null },
+      setBackend: vi.fn().mockResolvedValue(undefined),
+      setCorrectionEnabled: vi.fn().mockResolvedValue(undefined),
       language: 'ru-RU',
       microphoneDeviceId: null,
       mode: 'local-first',

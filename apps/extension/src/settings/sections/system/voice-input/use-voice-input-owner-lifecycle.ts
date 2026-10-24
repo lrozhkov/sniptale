@@ -27,6 +27,7 @@ export function useVoiceInputOwnerLifecycle(args: {
   activeSessionIdRef: RefObject<string | null>;
   applyServerEvent(event: VoiceInputServerEvent): void;
   client: VoiceInputClient;
+  cancelSession(): void;
   invalidateCapability(): void;
   microphoneAccess: MicrophoneAccessState;
   refreshCapability(): Promise<void>;
@@ -37,6 +38,7 @@ export function useVoiceInputOwnerLifecycle(args: {
     activeSessionIdRef,
     applyServerEvent,
     client,
+    cancelSession,
     invalidateCapability,
     microphoneAccess,
     refreshCapability,
@@ -71,7 +73,7 @@ export function useVoiceInputOwnerLifecycle(args: {
       if (state !== 'granted') {
         startGenerationRef.current += 1;
         startPendingRef.current = false;
-        if (activeSessionIdRef.current) client.stop(activeSessionIdRef.current);
+        if (activeSessionIdRef.current) cancelSession();
       }
     }).then((nextUnsubscribe) => {
       if (!mountedRef.current || lifecycleGeneration !== lifecycleGenerationRef.current) {
@@ -87,6 +89,14 @@ export function useVoiceInputOwnerLifecycle(args: {
       startPendingRef.current = false;
       invalidateCapability();
       unsubscribePermission();
+      if (activeSessionIdRef.current) {
+        try {
+          client.cancel(activeSessionIdRef.current);
+        } catch {
+          /* Disconnect still revokes authority. */
+        }
+        activeSessionIdRef.current = null;
+      }
       unsubscribe();
       client.disconnect();
     };
@@ -94,6 +104,7 @@ export function useVoiceInputOwnerLifecycle(args: {
     activeSessionIdRef,
     applyServerEvent,
     client,
+    cancelSession,
     invalidateCapability,
     refresh,
     setMicrophoneAccess,

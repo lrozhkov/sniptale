@@ -62,7 +62,7 @@ export function useAIModalState({ isOpen, isLoading }: Pick<AIModalProps, 'isOpe
     textareaRef: core.resize.textareaRef,
   });
 
-  const actions = createAIModalActions(core, voice.actions.stop);
+  const actions = createAIModalActions(core, voice.actions.cancel);
 
   return buildAIModalState({
     editor: core.editor,

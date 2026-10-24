@@ -1,3 +1,4 @@
+import { VOICE_INPUT_TRANSCRIPT_MAX_CHARS } from './types';
 import { describe, expect, it } from 'vitest';
 import { MessageType } from '../messaging/message-types/index';
 import {
@@ -40,6 +41,13 @@ describe('voice input boundary parsers', () => {
     ).not.toBeNull();
     const offscreenStart = {
       capabilityToken: 'capability',
+      captureToken: {
+        entryId: 'entry',
+        incarnation: 'incarnation',
+        epoch: 'epoch',
+        sequence: 1,
+        createdAt: 0,
+      },
       preferences: { language: 'ru-RU', mode: 'local-first' },
       quality: 'dictation',
       requestId: 'request-1',
@@ -114,7 +122,12 @@ describe('voice input boundary parsers', () => {
     };
     expect(parseVoiceInputServerEvent(event)).toEqual(event);
     expect(parseVoiceInputServerEvent({ ...event, rawError: 'secret' })).toBeNull();
-    expect(parseVoiceInputServerEvent({ ...event, text: 'x'.repeat(16_001) })).toBeNull();
+    expect(
+      parseVoiceInputServerEvent({
+        ...event,
+        text: 'x'.repeat(VOICE_INPUT_TRANSCRIPT_MAX_CHARS + 1),
+      })
+    ).toBeNull();
     expect(parseVoiceInputServerEvent({ ...event, confidence: 2 })).toBeNull();
     expect(
       parseVoiceInputServerEvent({
@@ -141,4 +154,113 @@ describe('voice input boundary parsers', () => {
       })
     ).toBeNull();
   });
+});
+
+it('preserves legacy voice preferences and strictly admits explicit model choices', async () => {
+  const { parseVoiceInputPreferences, resolveVoiceInputPreferences } = await import('./parsers');
+  const legacy = {
+    language: 'ru-RU' as const,
+    microphoneDeviceId: null,
+    mode: 'local-first' as const,
+  };
+  expect(parseVoiceInputPreferences(legacy)).toEqual(legacy);
+  expect(resolveVoiceInputPreferences(legacy)).toMatchObject({
+    backend: 'browser',
+    transcription: null,
+    correction: { enabled: false, model: null },
+  });
+  const selection = {
+    modelId: 'asr',
+    approvedProviderId: 'provider',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+    approvedModelCode: 'whisper',
+  };
+  const prefs = {
+    ...legacy,
+    backend: 'model',
+    transcription: selection,
+    correction: { enabled: true, model: selection },
+  };
+  expect(parseVoiceInputPreferences(prefs)).toEqual(prefs);
+  expect(
+    parseVoiceInputPreferences({
+      ...prefs,
+      transcription: { ...selection, approvedDestination: 'https://provider.example' },
+    })
+  ).toBeNull();
+  expect(
+    parseVoiceInputPreferences({
+      ...prefs,
+      correction: { ...prefs.correction, prompt: 'must be local' },
+    })
+  ).toBeNull();
+  expect(parseVoiceInputPreferences({ ...prefs, backend: 'automatic' })).toBeNull();
+  expect(resolveVoiceInputPreferences({ ...legacy, backend: 'model' }).backend).toBe('model');
+});
+
+it('requires capture admission and keeps private release ready events off public ports', async () => {
+  const { parseVoiceInputCaptureEvent } = await import('./parsers');
+  const scope = {
+    entryId: 'entry',
+    incarnation: 'incarnation',
+    epoch: 'epoch',
+    revision: 1,
+    audioDigest: `sha256:${'a'.repeat(64)}`,
+  };
+  const released = { type: 'VOICE_INPUT_CAPTURE_RELEASED', sessionId: 'session' };
+  const ready = {
+    type: 'VOICE_INPUT_CAPTURE_READY',
+    sessionId: 'session',
+    scope,
+    rawTranscript: 'words',
+    durationSeconds: 1,
+  };
+  expect(parseVoiceInputCaptureEvent(released)).toEqual(released);
+  expect(parseVoiceInputCaptureEvent(ready)).toEqual(ready);
+  expect(
+    parseOffscreenVoiceInputRuntimeMessage({
+      type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
+      event: ready,
+    })
+  ).toEqual({ type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT, event: ready });
+  expect(parseVoiceInputServerEvent(ready)).toBeNull();
+  expect(parseVoiceInputServerEvent(released)).toBeNull();
+  expect(parseVoiceInputCaptureEvent({ ...ready, durationSeconds: Infinity })).toBeNull();
+  expect(
+    parseVoiceInputCaptureEvent({
+      ...ready,
+      rawTranscript: 'x'.repeat(VOICE_INPUT_TRANSCRIPT_MAX_CHARS + 1),
+    })
+  ).toBeNull();
+  expect(
+    parseVoiceInputCaptureEvent({ ...ready, scope: { ...scope, path: '/private' } })
+  ).toBeNull();
+  expect(parseVoiceInputCaptureEvent({ ...released, audio: 'bytes' })).toBeNull();
+  expect(
+    parseOffscreenVoiceInputRuntimeMessage({
+      capabilityToken: 'capability',
+      maxDurationMs: null,
+      preferences: { language: 'ru-RU', mode: 'local-first' },
+      quality: 'dictation',
+      requestId: 'request',
+      sessionId: 'session',
+      type: MessageType.OFFSCREEN_VOICE_INPUT_START,
+    })
+  ).toBeNull();
+  expect(
+    parseVoiceInputPortRequest({
+      type: VoiceInputPortMessageType.CANCEL,
+      requestId: 'request',
+      sessionId: 'session',
+    })
+  ).toMatchObject({ type: VoiceInputPortMessageType.CANCEL });
+  expect(
+    parseVoiceInputSnapshot({
+      ...snapshot,
+      delivery: 'final',
+      effectiveMode: 'model',
+      phase: 'processing-asr',
+      errorCode: 'stale',
+    })
+  ).not.toBeNull();
 });

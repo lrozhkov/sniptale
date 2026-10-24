@@ -90,7 +90,7 @@ function createActions(): DesignReviewActions['comment'] & {
     endComposition: vi.fn(),
     startComposition: vi.fn(),
     updateDraft: vi.fn(),
-    voice: { start: vi.fn(), stop: vi.fn() },
+    voice: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
   };
 }
 
@@ -107,6 +107,7 @@ function createState(
 
 const idleVoiceState: DesignReviewViewState['voice'] = {
   active: false,
+  pending: false,
   audioLevel: 0,
   caretPosition: null,
   errorCode: null,
@@ -390,6 +391,7 @@ it('shows an audio-reactive active ring and stops from the same microphone butto
     actions,
     {
       active: true,
+      pending: false,
       audioLevel: 0.5,
       caretPosition: 4,
       errorCode: null,
@@ -418,6 +420,7 @@ it('surfaces a localized voice failure without discarding the comment draft', ()
     createActions(),
     {
       active: false,
+      pending: false,
       audioLevel: 0,
       caretPosition: null,
       errorCode: 'permission-denied',
@@ -489,4 +492,40 @@ it('ships the comment field and marker copy in both supported locales', () => {
   );
   expect(translate('content.designReview.voiceInputStart', 'ru')).toContain('Удерживайте');
   expect(translate('content.designReview.voiceInputError', 'en')).toContain('voice input settings');
+});
+
+it('cancels processing before applying a manually edited comment', () => {
+  const actions = createActions();
+  renderField(createState(), actions, {
+    ...idleVoiceState,
+    pending: true,
+    phase: 'processing-text',
+  });
+  const textarea = host.querySelector('textarea');
+  if (!textarea) throw new Error('Expected comment textarea');
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(textarea, 'Manual');
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(actions.voice.cancel).toHaveBeenCalledOnce();
+  expect(actions.updateDraft).toHaveBeenCalledWith('Manual');
+});
+
+it('cancels pending processing from the same microphone control', () => {
+  const actions = createActions();
+  renderField(
+    createState(),
+    actions,
+    { ...idleVoiceState, pending: true, phase: 'processing-asr' },
+    <span>Action</span>
+  );
+  const button = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.design-review.comment-voice-input"]'
+  );
+  if (!button) throw new Error('Expected comment microphone');
+  expect(button.disabled).toBe(false);
+  act(() => button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })));
+  expect(actions.voice.cancel).toHaveBeenCalledOnce();
+  expect(actions.voice.start).not.toHaveBeenCalled();
 });

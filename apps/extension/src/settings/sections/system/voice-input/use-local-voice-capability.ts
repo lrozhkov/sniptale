@@ -21,10 +21,11 @@ const logger = createLogger({ namespace: 'SettingsSpeechRecognition' });
 export function useLocalVoiceCapability(args: {
   language: VoiceInputLanguage;
   mode: VoiceInputMode;
+  backend?: 'browser' | 'model';
   setError: Dispatch<SetStateAction<VoiceInputSettingsError>>;
   setSnapshot: Dispatch<SetStateAction<VoiceInputSnapshot>>;
 }) {
-  const { language, mode, setError, setSnapshot } = args;
+  const { language, mode, backend = 'browser', setError, setSnapshot } = args;
   const [checking, setChecking] = useState(false);
   const capabilityGenerationRef = useRef(0);
   const availabilityGenerationRef = useRef(0);
@@ -39,6 +40,7 @@ export function useLocalVoiceCapability(args: {
   } = microphone.actions;
 
   const refreshAvailability = useCallback(async (): Promise<VoiceInputLocalAvailability> => {
+    if (backend === 'model') return 'unsupported';
     const capabilityGeneration = capabilityGenerationRef.current;
     const generation = ++availabilityGenerationRef.current;
     const startedAt = performance.now();
@@ -96,7 +98,7 @@ export function useLocalVoiceCapability(args: {
         );
       }
     }
-  }, [language, mode, setSnapshot]);
+  }, [backend, language, mode, setSnapshot]);
 
   const refresh = useCallback(async () => {
     await Promise.all([refreshMicrophone(), refreshAvailability()]);

@@ -60,6 +60,7 @@ export function CalloutVoiceButton(props: {
         }}
         onStart={props.voice.actions.start}
         onStop={props.voice.actions.stop}
+        onCancel={props.voice.actions.cancel}
         state={props.voice.state}
       />
     </div>

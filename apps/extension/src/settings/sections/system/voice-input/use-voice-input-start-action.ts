@@ -39,7 +39,8 @@ export function useVoiceInputStartAction(args: {
     authority.startPendingRef.current = true;
     setError(null);
     try {
-      if (preferences.mode === 'local-first') await ensureLocalPackage(localAvailability);
+      if (preferences.backend !== 'model' && preferences.mode === 'local-first')
+        await ensureLocalPackage(localAvailability);
       if (
         !authority.mountedRef.current ||
         lifecycleGeneration !== authority.lifecycleGenerationRef.current ||

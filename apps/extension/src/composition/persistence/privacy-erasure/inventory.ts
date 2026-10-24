@@ -6,6 +6,7 @@ import {
 } from '../infrastructure/indexed-db/core.stores.ts';
 import {
   AI_CHROME_ENABLED_KEY,
+  AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
   AI_DEFAULT_MODEL_KEY,
   AI_LOCAL_SECRET_KEY_STORAGE_KEY,
   AI_MODELS_KEY,
@@ -106,6 +107,7 @@ const localSensitiveKeys = [
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
   'sniptale_ai_audio_transcription_prompt',
+  AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
   'sniptale_last_save_as_dir',
   'sniptale_prompt_templates',
   'sniptale_template_order',

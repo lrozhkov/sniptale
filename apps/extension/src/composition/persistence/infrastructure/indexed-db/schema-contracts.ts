@@ -3,6 +3,7 @@ import type { PersistenceDomainId, DatabaseMigrationDescriptor } from './schema-
 export { DATABASE_MIGRATIONS };
 export type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
+  VOICE_INPUT_HISTORY_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -59,6 +60,11 @@ interface StoredSchemaContract {
 }
 
 export const PERSISTENCE_DOMAIN_REGISTRY = [
+  {
+    domainId: 'voiceInputHistory',
+    schemaVersion: 1,
+    stores: [{ storeName: VOICE_INPUT_HISTORY_STORE, dataClass: 'durable-authority' }],
+  },
   {
     domainId: 'recordings',
     schemaVersion: 3,

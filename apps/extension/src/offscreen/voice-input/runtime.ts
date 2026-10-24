@@ -19,10 +19,14 @@ import {
   type OffscreenVoiceInputCommand,
   type OffscreenVoiceInputResponse,
   type VoiceInputServerEvent,
+  type VoiceInputCaptureEvent,
 } from '@sniptale/runtime-contracts/voice-input';
 import { createRuntimeMessagingTransport } from '../../platform/runtime-messaging';
 import { authorizeOffscreenRuntimeCommand } from '../runtime/authorization';
 import { executeOffscreenResponseCommand } from '../runtime/idempotency';
+import { createVoiceInputHistory } from '../../composition/persistence/voice-input-history';
+import { createVoiceAudioCapture } from './audio-capture';
+import { normalizeVoiceAudio } from './audio-input';
 import { createOffscreenVoiceInputService } from './service';
 import { createVoiceInputTelemetryPort } from './telemetry-port';
 
@@ -30,7 +34,9 @@ const logger = createLogger({ namespace: 'OffscreenSpeechRecognition' });
 const runtimeMessaging = createRuntimeMessagingTransport();
 const telemetryPort = createVoiceInputTelemetryPort();
 
-function emitVoiceInputEvent(event: VoiceInputServerEvent): Promise<unknown> {
+function emitVoiceInputEvent(
+  event: VoiceInputServerEvent | VoiceInputCaptureEvent
+): Promise<unknown> {
   if (event.type === VoiceInputPortMessageType.AUDIO_LEVEL) {
     return Promise.resolve({ delivered: telemetryPort.send(event) });
   }
@@ -56,7 +62,11 @@ function isVoiceInputCommandCandidate(message: unknown): message is Record<strin
   );
 }
 
+const history = createVoiceInputHistory();
 const service = createOffscreenVoiceInputService({
+  createCapture: createVoiceAudioCapture,
+  normalizeAudio: normalizeVoiceAudio,
+  publishAudio: (token, input, signal) => history.publishAudio(token, input, signal),
   acquireMicrophone: acquireMicrophoneInput,
   createRecognition: createSpeechRecognitionSession,
   emit: emitVoiceInputEvent,
@@ -65,12 +75,15 @@ const service = createOffscreenVoiceInputService({
   resolveApi: resolveSpeechRecognitionApi,
 });
 
-function routeCommand(command: OffscreenVoiceInputCommand): OffscreenVoiceInputResponse {
+function routeCommand(
+  command: OffscreenVoiceInputCommand
+): OffscreenVoiceInputResponse | Promise<OffscreenVoiceInputResponse> {
   if (command.type === MessageType.OFFSCREEN_VOICE_INPUT_STATUS) {
     return { success: true, snapshot: service.getSnapshot() };
   }
   if (command.type === MessageType.OFFSCREEN_VOICE_INPUT_START) {
     const snapshot = service.start({
+      captureToken: command.captureToken,
       maxDurationMs: command.maxDurationMs,
       preferences: command.preferences,
       requestId: command.requestId,
@@ -79,6 +92,8 @@ function routeCommand(command: OffscreenVoiceInputCommand): OffscreenVoiceInputR
     return { success: true, result: 'accepted', snapshot };
   }
   const result = service.stop(command.sessionId, command.force);
+  if (command.force)
+    return service.drain().then(() => ({ success: true, result, snapshot: service.getSnapshot() }));
   return { success: true, result, snapshot: service.getSnapshot() };
 }
 
@@ -124,8 +139,13 @@ export function registerOffscreenVoiceInputMessageListener(): void {
       });
       if (execution.duplicate) {
         logger.warn('Replayed duplicate voice input command response', { type: parsed.type });
-        return routeDuplicateCommand(execution.completion, responseHandler);
+        return routeDuplicateCommand(
+          execution.completion.then((response) => response),
+          responseHandler
+        );
       }
+      if (execution.response instanceof Promise)
+        return routeDuplicateCommand(execution.response, responseHandler);
       responseHandler?.(execution.response);
     } catch {
       logger.warn('Voice input command execution failed', { type: parsed.type });

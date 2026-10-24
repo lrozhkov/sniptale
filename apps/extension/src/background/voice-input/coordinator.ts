@@ -2,6 +2,9 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import {
   parseVoiceInputPortRequest,
   parseVoiceInputServerEvent,
+  parseVoiceInputCaptureEvent,
+  VOICE_INPUT_HISTORY_PORT_NAME,
+  type VoiceInputPreferences,
   VOICE_INPUT_PORT_NAME,
   VoiceInputPortMessageType,
   type OffscreenVoiceInputEventMessage,
@@ -28,6 +31,24 @@ import {
 } from './protocol';
 import { VoiceInputSessionAuthority } from './session-authority';
 import { VoiceInputStartOperation } from './start-operation';
+import { loadSettings } from '../../composition/persistence/settings';
+import {
+  createVoiceInputHistory,
+  type VoiceInputHistory,
+} from '../../composition/persistence/voice-input-history';
+import { createVoiceInputProcessor } from './processing';
+import { createVoiceInputCaptureCompletion } from './capture-completion';
+import { createVoiceInputHistoryPort } from './history-port';
+import {
+  createVoiceInputProcessingOperations,
+  type VoiceInputProcessingOperations,
+} from './processing-operation';
+
+interface CoordinatorDependencies {
+  history: VoiceInputHistory;
+  loadPreferences(): Promise<VoiceInputPreferences>;
+  processor: ReturnType<typeof createVoiceInputProcessor>;
+}
 
 const logger = createLogger({ namespace: 'BackgroundSpeechRecognition' });
 const STOP_CLEANUP_RETRY_MS = 1_000;
@@ -55,20 +76,45 @@ function withStopSettlementTimeout<TValue>(work: Promise<TValue>): Promise<TValu
 class VoiceInputCoordinator {
   private readonly sessions = new VoiceInputSessionAuthority();
   private readonly startOperation: VoiceInputStartOperation;
+  private readonly processing: VoiceInputProcessingOperations;
+  private readonly historyPort: ReturnType<typeof createVoiceInputHistoryPort>;
+  private readonly captureCompletion: ReturnType<typeof createVoiceInputCaptureCompletion>;
+  private readonly captureEvents = new Set<Promise<void>>();
 
   constructor(
     private readonly gateway: VoiceInputOffscreenGateway,
     private readonly createInternalSessionId: () => string,
-    private readonly schedule: (callback: () => void, delayMs: number) => void
+    private readonly schedule: (callback: () => void, delayMs: number) => void,
+    deps: CoordinatorDependencies
   ) {
     this.startOperation = new VoiceInputStartOperation(
       gateway,
       this.sessions,
-      createInternalSessionId
+      createInternalSessionId,
+      deps.history,
+      deps.loadPreferences
     );
+    this.processing = createVoiceInputProcessingOperations({
+      history: deps.history,
+      processor: deps.processor,
+    });
+    this.captureCompletion = createVoiceInputCaptureCompletion({
+      sessions: this.sessions,
+      history: deps.history,
+      processing: this.processing,
+    });
+    this.historyPort = createVoiceInputHistoryPort({
+      history: deps.history,
+      processing: this.processing,
+      loadPreferences: deps.loadPreferences,
+    });
   }
 
   registerPort(port: chrome.runtime.Port): void {
+    if (port.name === VOICE_INPUT_HISTORY_PORT_NAME) {
+      this.historyPort.registerPort(port);
+      return;
+    }
     if (port.name !== VOICE_INPUT_PORT_NAME) return;
     const sender = authorizeVoiceInputPortSender(port.sender);
     if (!sender) {
@@ -88,6 +134,13 @@ class VoiceInputCoordinator {
   }
 
   handleOffscreenEvent(message: OffscreenVoiceInputEventMessage): void {
+    const capture = parseVoiceInputCaptureEvent(message.event);
+    if (capture) {
+      const flight = this.captureCompletion.handle(capture);
+      this.captureEvents.add(flight);
+      void flight.finally(() => this.captureEvents.delete(flight)).catch(() => undefined);
+      return;
+    }
     const event = parseVoiceInputServerEvent(message.event);
     if (!event) return;
     const sessionId = 'sessionId' in event ? event.sessionId : event.snapshot.sessionId;
@@ -99,6 +152,7 @@ class VoiceInputCoordinator {
       });
       return;
     }
+    if (session.cancelled || session.processing) return;
     session.offscreenObserved = true;
     const translatedEvent = translateVoiceInputEvent(event, session);
     if ('snapshot' in translatedEvent) {
@@ -139,6 +193,9 @@ class VoiceInputCoordinator {
 
   async cleanupForPrivacyErasure(): Promise<boolean> {
     const sessionAtDispatch = this.sessions.active;
+    if (sessionAtDispatch) sessionAtDispatch.cancelled = true;
+    await this.processing.abortAndDrain();
+    await Promise.allSettled([...this.captureEvents]);
     const requestId = `privacy-erasure:${this.createInternalSessionId()}`;
     try {
       if (
@@ -192,6 +249,17 @@ class VoiceInputCoordinator {
     }
   }
 
+  private async cancelSession(session: ActiveVoiceInputSession, requestId: string): Promise<void> {
+    session.cancelled = true;
+    await this.processing.cancelOwner(session);
+    if (session.captureReleased && session.processing) {
+      if (this.sessions.owns(session)) this.completeStopCleanup(session, requestId);
+      return;
+    }
+    session.stopCleanupPending = true;
+    await this.recoverStopCleanup(session, requestId);
+  }
+
   private disconnectPort(
     registration: VoiceInputPortRegistration,
     onMessage: (message: unknown) => void,
@@ -201,7 +269,7 @@ class VoiceInputCoordinator {
     registration.port.onDisconnect.removeListener(onDisconnect);
     if (this.sessions.active?.port === registration.port) {
       const session = this.sessions.active;
-      void this.stopSession(session, `disconnect:${session.sessionId}`);
+      void this.cancelSession(session, `disconnect:${session.sessionId}`);
     }
     logger.debug('Voice input port disconnected', {
       consumerId: registration.consumerId,
@@ -226,7 +294,9 @@ class VoiceInputCoordinator {
       this.sessions.active?.port === registration.port &&
       this.sessions.active.sessionId === request.sessionId
     ) {
-      void this.stopSession(this.sessions.active, request.requestId);
+      if (request.type === VoiceInputPortMessageType.CANCEL)
+        void this.cancelSession(this.sessions.active, request.requestId);
+      else void this.stopSession(this.sessions.active, request.requestId);
     }
   }
 
@@ -235,6 +305,7 @@ class VoiceInputCoordinator {
     requestId: string
   ): Promise<void> {
     const sessionAtDispatch = this.sessions.active;
+    if (this.deliverSupersedingSnapshot(registration, requestId, sessionAtDispatch)) return;
     const offscreenObservedAtDispatch = sessionAtDispatch?.offscreenObserved === true;
     logger.debug('Reconciling voice input status', {
       consumerId: registration.consumerId,
@@ -266,6 +337,7 @@ class VoiceInputCoordinator {
           sessionId: snapshot.sessionId,
           type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
         });
+        if (this.deliverSupersedingSnapshot(registration, requestId, sessionAtDispatch)) return;
         if (
           stopped?.success !== true ||
           stopped.result !== 'accepted' ||
@@ -293,12 +365,29 @@ class VoiceInputCoordinator {
         sessionId: this.sessions.snapshot.sessionId,
       });
     } catch {
+      if (this.deliverSupersedingSnapshot(registration, requestId, sessionAtDispatch)) return;
       logger.warn('Voice input status reconciliation failed', { requestId });
       postVoiceInputPortEvent(
         registration,
         createVoiceInputFailureEvent({ errorCode: 'offscreen-unavailable', requestId })
       );
     }
+  }
+
+  private deliverSupersedingSnapshot(
+    registration: VoiceInputPortRegistration,
+    requestId: string,
+    session: ActiveVoiceInputSession | null
+  ): boolean {
+    const replaced = this.sessions.active !== session;
+    const transferred =
+      session && !session.cancelled && (session.captureReleased || session.processing);
+    if (!replaced && !transferred) return false;
+    postVoiceInputPortEvent(
+      registration,
+      createVoiceInputSnapshotEvent(this.sessions.snapshot, requestId)
+    );
+    return true;
   }
 
   private reconcileStatusSnapshot(args: {
@@ -317,6 +406,8 @@ class VoiceInputCoordinator {
       });
       return false;
     }
+    if (this.deliverSupersedingSnapshot(args.registration, args.requestId, args.sessionAtDispatch))
+      return true;
     if (!args.sessionAtDispatch) {
       this.sessions.replaceSnapshot(
         createIdleVoiceInputSnapshot({
@@ -392,6 +483,7 @@ class VoiceInputCoordinator {
     requestId: string,
     acquireMutationPermit = true
   ): Promise<boolean> {
+    if (session.captureReleased || session.processing || session.cancelled) return true;
     logger.debug('Stopping voice input session', {
       acquireMutationPermit,
       requestId,
@@ -407,8 +499,14 @@ class VoiceInputCoordinator {
             type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
           })
         );
+        if (
+          this.sessions.active !== session ||
+          session.captureReleased ||
+          session.processing ||
+          session.cancelled
+        )
+          return;
         if (response?.success !== true) throw new Error('offscreen-stop-rejected');
-        if (this.sessions.active !== session) return;
         if (response.snapshot) {
           if (
             response.snapshot.sessionId !== null &&
@@ -434,6 +532,7 @@ class VoiceInputCoordinator {
         if (response.result === 'stale') {
           throw new Error('offscreen-stop-stale');
         }
+        if (session.captureReleased || session.processing) return;
         session.stopCleanupPending = true;
         this.scheduleStopCleanupRetry(session, requestId);
       };
@@ -441,7 +540,13 @@ class VoiceInputCoordinator {
       else await sendStop();
       return true;
     } catch {
-      if (this.sessions.active !== session) return false;
+      if (
+        this.sessions.active !== session ||
+        session.captureReleased ||
+        session.processing ||
+        session.cancelled
+      )
+        return false;
       session.stopCleanupPending = true;
       await this.recoverStopCleanup(session, requestId);
       return false;
@@ -456,15 +561,22 @@ class VoiceInputCoordinator {
     return snapshot.sessionId === null || snapshot.sessionId === session.offscreenSessionId;
   }
 
+  private canMutateCaptureCleanup(session: ActiveVoiceInputSession): boolean {
+    return (
+      this.sessions.active === session &&
+      (session.cancelled === true || !(session.captureReleased || session.processing))
+    );
+  }
+
   private completeStopCleanup(session: ActiveVoiceInputSession, requestId: string): void {
-    if (this.sessions.active !== session) return;
+    if (!this.canMutateCaptureCleanup(session)) return;
     session.stopCleanupPending = false;
     const idleSnapshot = this.sessions.reset(session.preferences);
     postVoiceInputPortEvent(session, createVoiceInputSnapshotEvent(idleSnapshot, requestId));
   }
 
   private scheduleStopCleanupRetry(session: ActiveVoiceInputSession, requestId: string): void {
-    if (this.sessions.active !== session || !session.stopCleanupPending) return;
+    if (!session.stopCleanupPending || !this.canMutateCaptureCleanup(session)) return;
     this.schedule(() => {
       void this.recoverStopCleanup(session, requestId);
     }, STOP_CLEANUP_RETRY_MS);
@@ -474,10 +586,11 @@ class VoiceInputCoordinator {
     session: ActiveVoiceInputSession,
     requestId: string
   ): Promise<void> {
-    if (this.sessions.active !== session || !session.stopCleanupPending) return;
+    if (!session.stopCleanupPending || !this.canMutateCaptureCleanup(session)) return;
     try {
       const verified = await this.gateway.withMediaMutationPermit(async () => {
         await withStopSettlementTimeout(this.gateway.ensureReady());
+        if (!session.stopCleanupPending || !this.canMutateCaptureCleanup(session)) return false;
         const forced = await withStopSettlementTimeout(
           this.gateway.send({
             force: true,
@@ -486,6 +599,7 @@ class VoiceInputCoordinator {
             type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
           })
         );
+        if (!session.stopCleanupPending || !this.canMutateCaptureCleanup(session)) return false;
         if (forced?.success === true && this.isStopCleanupVerified(session, forced.snapshot)) {
           return true;
         }
@@ -495,7 +609,12 @@ class VoiceInputCoordinator {
             type: MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
           })
         );
-        return status?.success === true && this.isStopCleanupVerified(session, status.snapshot);
+        return (
+          session.stopCleanupPending &&
+          this.canMutateCaptureCleanup(session) &&
+          status?.success === true &&
+          this.isStopCleanupVerified(session, status.snapshot)
+        );
       });
       if (verified) {
         this.completeStopCleanup(session, requestId);
@@ -522,9 +641,23 @@ export function createVoiceInputCoordinator(
   createInternalSessionId = createInternalVoiceInputSessionId,
   schedule: (callback: () => void, delayMs: number) => void = (callback, delayMs) => {
     globalThis.setTimeout(callback, delayMs);
-  }
+  },
+  dependencies?: Partial<CoordinatorDependencies>
 ) {
-  const coordinator = new VoiceInputCoordinator(gateway, createInternalSessionId, schedule);
+  const history = dependencies?.history ?? createVoiceInputHistory();
+  const deps: CoordinatorDependencies = {
+    history,
+    loadPreferences:
+      dependencies?.loadPreferences ??
+      (async () =>
+        (await loadSettings()).voiceInput ?? {
+          language: 'ru-RU',
+          microphoneDeviceId: null,
+          mode: 'local-first',
+        }),
+    processor: dependencies?.processor ?? createVoiceInputProcessor({ history }),
+  };
+  const coordinator = new VoiceInputCoordinator(gateway, createInternalSessionId, schedule, deps);
   return {
     cleanupForPrivacyErasure: () => coordinator.cleanupForPrivacyErasure(),
     handleOffscreenEvent: (message: OffscreenVoiceInputEventMessage) =>

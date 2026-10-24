@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The file is one ordered registry of database migrations. The new metadata-only migration preserves existing stores and rows. It adds no writer, state receiver or recovery authority. Splitting the registry at 800 lines would divide its chronological admission contract. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-19",
-      "astHash": "a545f538210f02625c123ae3a19b956175a8574548f12a55939ccef7e04c5708",
+      "reason": "tool-noise: This file remains one ordered registry of contiguous released database migrations. Version 35 adds the empty private voice history table and its 0-to-1 domain contract. The registry retains one versionchange adapter authority; it adds no independent runtime state receiver or recovery lifetime. Current metrics show owners 0, effects 0, state 0 and cohesion 1.00. The additive migration and released fixtures prove earlier rows and media remain unchanged. Splitting the chronological registry only at 800 lines would add navigation without separating a change reason. Main compared the complete registry with its prior locked body and inspected the added descriptor. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive registry boundary.",
+      "reviewDate": "2026-10-24",
+      "astHash": "94e2686a9e8fce469bc72da26a8058701dbb702a72347f561218e8f22642901f",
       "signatureHash": "e475b1fb64e96c97e8e5f06c50cd59834a250f161221c716acf6b3c21840b0ee"
     },
     {

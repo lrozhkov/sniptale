@@ -1,5 +1,6 @@
 import {
   createPort,
+  createProcessingSessionFixture,
   createSnapshot,
   createVoiceInputCoordinator,
   flush,
@@ -282,4 +283,75 @@ describe('background voice input worker recovery', () => {
       expect.objectContaining({ errorCode: 'busy-speech', sessionId: 'session-2' })
     );
   });
+});
+
+describe('Status response after capture authority transfer', () => {
+  it.each(['ended', 'error', 'rejected', 'refused'] as const)(
+    'preserves processing and final insertion when delayed Status is %s',
+    async (outcome) => {
+      let reply!: (value: unknown) => void;
+      let reject!: (error: Error) => void;
+      mocks.sendRuntimeMessage.mockImplementation((message) => {
+        if (
+          message.type === MessageType.OFFSCREEN_VOICE_INPUT_STATUS &&
+          message.requestId === 'held-status'
+        )
+          return new Promise((resolve, no) => {
+            reply = resolve;
+            reject = no;
+          });
+        return Promise.resolve({
+          success: true,
+          result: 'accepted',
+          snapshot:
+            message.type === MessageType.OFFSCREEN_VOICE_INPUT_START
+              ? createSnapshot('offscreen-session-1', 'listening')
+              : createSnapshot(null, 'idle'),
+        });
+      });
+      const h = await createProcessingSessionFixture();
+      h.owner.onMessage.emit({ type: VoiceInputPortMessageType.STATUS, requestId: 'held-status' });
+      await flush();
+      await h.transfer();
+      if (outcome === 'rejected') reject(new Error('transport failed'));
+      else if (outcome === 'refused') reply({ success: false });
+      else
+        reply({
+          success: true,
+          snapshot: {
+            ...createSnapshot('offscreen-session-1', outcome),
+            errorCode: outcome === 'error' ? 'offscreen-unavailable' : null,
+          },
+        });
+      await flush();
+      h.owner.onMessage.emit({
+        type: VoiceInputPortMessageType.STATUS,
+        requestId: 'after-transfer',
+      });
+      await flush();
+      const observation = h.owner.postMessage.mock.calls.filter(
+        ([event]) => event.requestId === 'after-transfer'
+      );
+      h.complete();
+      await flush();
+      expect(observation).toEqual([
+        [
+          expect.objectContaining({
+            snapshot: expect.objectContaining({ phase: 'processing-asr', sessionId: 'client' }),
+          }),
+        ],
+      ]);
+      expect(h.owner.postMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'held-status',
+          type: VoiceInputPortMessageType.FAILURE,
+        })
+      );
+      expect(
+        h.owner.postMessage.mock.calls.filter(
+          ([event]) => event.type === VoiceInputPortMessageType.TRANSCRIPT
+        )
+      ).toEqual([[expect.objectContaining({ text: 'final', isFinal: true })]]);
+    }
+  );
 });

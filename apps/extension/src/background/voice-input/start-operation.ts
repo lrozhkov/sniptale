@@ -3,8 +3,10 @@ import {
   type OffscreenVoiceInputResponse,
   type VoiceInputPortRequest,
   type VoiceInputSnapshot,
+  type VoiceInputPreferences,
 } from '@sniptale/runtime-contracts/voice-input';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import type { VoiceInputHistory } from '../../composition/persistence/voice-input-history';
 import type { VoiceInputOffscreenGateway } from './offscreen-gateway';
 import {
   createIdleVoiceInputSnapshot,
@@ -34,7 +36,9 @@ export class VoiceInputStartOperation {
   constructor(
     private readonly gateway: VoiceInputOffscreenGateway,
     private readonly sessions: VoiceInputSessionAuthority,
-    private readonly createInternalSessionId: () => string
+    private readonly createInternalSessionId: () => string,
+    private readonly history: VoiceInputHistory,
+    private readonly loadPreferences: () => Promise<VoiceInputPreferences>
   ) {}
 
   async execute(
@@ -50,7 +54,7 @@ export class VoiceInputStartOperation {
         registration,
         createVoiceInputFailureEvent({
           errorCode: 'busy-speech',
-          preferences: request.preferences,
+          preferences: this.sessions.active.preferences,
           requestId: request.requestId,
           sessionId: request.sessionId,
         })
@@ -60,10 +64,21 @@ export class VoiceInputStartOperation {
 
     const session = this.begin(registration, request);
     try {
+      const preferences = await this.loadPreferences();
+      if (!this.ownsCaptureStart(session)) return;
+      session.preferences = preferences;
+      await this.gateway.withMediaMutationPermit(async () => {
+        if (!this.ownsCaptureStart(session)) return;
+        await this.history.initialize();
+        if (!this.ownsCaptureStart(session)) return;
+        const captureToken = await this.history.beginCapture();
+        if (this.ownsCaptureStart(session)) session.captureToken = captureToken;
+      });
+      if (!this.ownsCaptureStart(session)) return;
       const response = await dispatchVoiceInputStart({
         gateway: this.gateway,
-        isCurrent: () => this.sessions.owns(session) && !session.stopCleanupPending,
-        preferences: request.preferences,
+        isCurrent: () => this.ownsCaptureStart(session),
+        preferences: session.preferences,
         requestId: request.requestId,
         session,
       });
@@ -80,6 +95,16 @@ export class VoiceInputStartOperation {
     }
   }
 
+  private ownsCaptureStart(session: ActiveVoiceInputSession): boolean {
+    return (
+      this.sessions.owns(session) &&
+      !session.cancelled &&
+      !session.stopCleanupPending &&
+      !session.captureReleased &&
+      !session.processing
+    );
+  }
+
   private begin(
     registration: VoiceInputPortRegistration,
     request: VoiceInputStartRequest
@@ -88,13 +113,13 @@ export class VoiceInputStartOperation {
       ...registration,
       offscreenObserved: false,
       offscreenSessionId: this.createInternalSessionId(),
-      preferences: request.preferences,
+      preferences: { language: 'ru-RU', mode: 'local-first', microphoneDeviceId: null },
       startRollbackPending: false,
       stopCleanupPending: false,
       sessionId: request.sessionId,
     };
     const snapshot: VoiceInputSnapshot = {
-      ...createIdleVoiceInputSnapshot(request.preferences),
+      ...createIdleVoiceInputSnapshot(session.preferences),
       phase: 'starting',
       sessionId: request.sessionId,
     };
@@ -111,15 +136,18 @@ export class VoiceInputStartOperation {
     session: ActiveVoiceInputSession,
     requestId: string
   ): Promise<void> {
+    if (!session.startRollbackPending || !this.ownsCaptureStart(session)) return;
     let recovered = false;
     try {
       recovered = await this.gateway.withMediaMutationPermit(() =>
-        compensateAmbiguousVoiceInputStart(this.gateway, session, requestId)
+        compensateAmbiguousVoiceInputStart(this.gateway, session, requestId, () =>
+          this.ownsCaptureStart(session)
+        )
       );
     } catch {
       logger.warn('Voice input start rollback retry failed', { sessionId: session.sessionId });
     }
-    if (recovered && this.sessions.owns(session)) {
+    if (recovered && session.startRollbackPending && this.ownsCaptureStart(session)) {
       this.sessions.reset(session.preferences);
     }
   }
@@ -130,7 +158,7 @@ export class VoiceInputStartOperation {
     request: VoiceInputStartRequest,
     response: OffscreenVoiceInputResponse
   ): boolean {
-    if (session.stopCleanupPending) return true;
+    if (!this.ownsCaptureStart(session)) return true;
     if (response.snapshot && isTerminalVoiceInputSnapshot(response.snapshot)) {
       if (this.sessions.owns(session)) {
         const translatedSnapshot = translateVoiceInputSnapshot(response.snapshot, session);
@@ -167,7 +195,7 @@ export class VoiceInputStartOperation {
     request: VoiceInputStartRequest,
     error: unknown
   ): void {
-    if (!this.sessions.owns(session) || session.stopCleanupPending) return;
+    if (!this.ownsCaptureStart(session)) return;
     const errorCode =
       error instanceof Error && error.message === 'privacy-erasure-in-progress'
         ? 'privacy-erasure-in-progress'
@@ -186,7 +214,7 @@ export class VoiceInputStartOperation {
       registration,
       createVoiceInputFailureEvent({
         errorCode,
-        preferences: request.preferences,
+        preferences: session.preferences,
         requestId: request.requestId,
         sessionId: request.sessionId,
       })

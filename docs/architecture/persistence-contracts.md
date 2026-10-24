@@ -660,3 +660,19 @@ Recording-source actions and signals retain all admitted source facts. Their cou
 Transfer preparation keeps new private Library bindings in memory. The destination transaction rechecks source authority and publishes the binding, byte ownership, and project together. Refusal or transaction failure publishes none of them. Retry creates a new candidate. No compensating deletion can remove another accepted destination or shared source bytes.
 
 Audio acquisition reconciles an insufficient metadata duration through the existing bounded Gallery decoder. It uses the retained take and replacement endpoints. It never extends duration to an unsupported requested endpoint. Source bytes and authored edits remain unchanged.
+
+## Private voice input history
+
+Database version 35 adds the durable `voice_input_history` store and its version 1 domain contract. The additive migration preserves every earlier row and media object. Earlier applications refuse the newer database before ordinary writes.
+
+The store contains one bounded catalog. It owns an epoch, capture sequence, pending capture admissions, twenty retained entries, and physical deletion intents. Immutable audio lives under `sniptale-voice-input`, outside project assets and Library. Ordinary media and project backups exclude this history. Destructive migration requires separate policy and complete recovery coverage.
+
+The history owner serializes catalog and audio transitions through one native cross-context lock and the existing persistent mutation barrier. Opening captures the epoch before waiting for the lock. Publication consumes one admitted capture token and refuses a changed epoch. Mutations compare entry identity, incarnation, revision, and audio digest. Retry advances the revision without changing the original capture order.
+
+Publication writes immutable bytes before committing metadata and eviction intent. Failed publication preserves admitted entries. Recovery deletes orphan bytes and drains physical deletion intents.
+
+Capture admission completes recovery before it creates a new token. Cleanup failure refuses admission and preserves accepted entries. Incomplete deletion prevents further retained publication until cleanup succeeds. Recovery does not change a live processing status. Reads never initialize, repair, evict, or rewrite data.
+
+Raw transcript publication precedes optional correction. Correction failure retains that raw text. Deletion, eviction, erasure, and identity recreation invalidate old results. Complete local-data erasure deletes metadata and the private OPFS root even when preferences remain preserved. Its required participant verifies deletion without reopening the deleted database under the exclusive erasure barrier.
+
+Browser termination before a completed audio Blob has no crash recovery guarantee. Retained audio remains available after recognition failure. Voice history never becomes a project source or an AI provider authorization record.

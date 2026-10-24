@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AI_LOCAL_SECRET_KEY_STORAGE_KEY,
+  AI_MODELS_KEY,
+  AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
   AI_PROVIDER_STORAGE_MIGRATION_PHASE,
   AI_PROVIDERS_KEY,
   AI_PROVIDER_SECRETS_KEY,
@@ -350,3 +352,116 @@ it('includes local recognition instructions in the aggregate settings query', as
   });
   expect(syncSetMock).not.toHaveBeenCalled();
 });
+
+it('keeps bounded voice correction instructions local and reads without repair', async () => {
+  resetAiStorageCoreMocks();
+  installStorageState({ local: { [AI_STORAGE_VERSION_KEY]: AI_STORAGE_VERSION } });
+  const {
+    loadVoiceInputCorrectionSystemPrompt,
+    saveVoiceInputCorrectionSystemPrompt,
+    resetVoiceInputCorrectionSystemPrompt,
+  } = await import('./core');
+  const { DEFAULT_VOICE_INPUT_CORRECTION_SYSTEM_PROMPT } = await import('./constants');
+  await expect(loadVoiceInputCorrectionSystemPrompt()).resolves.toBe(
+    DEFAULT_VOICE_INPUT_CORRECTION_SYSTEM_PROMPT
+  );
+  expect(localSetMock).not.toHaveBeenCalled();
+  await saveVoiceInputCorrectionSystemPrompt('Исправь пунктуацию. '.repeat(400));
+  const saved = await loadVoiceInputCorrectionSystemPrompt();
+  expect(saved).toContain('Исправь пунктуацию.');
+  expect(syncSetMock).not.toHaveBeenCalled();
+  await expect(saveVoiceInputCorrectionSystemPrompt('x'.repeat(10001))).rejects.toThrow(
+    'Invalid voice correction instructions'
+  );
+  await expect(loadVoiceInputCorrectionSystemPrompt()).resolves.toBe(saved);
+  await resetVoiceInputCorrectionSystemPrompt();
+  await expect(loadVoiceInputCorrectionSystemPrompt()).resolves.toBe(
+    DEFAULT_VOICE_INPUT_CORRECTION_SYSTEM_PROMPT
+  );
+});
+
+async function installPromptErasureOrdering() {
+  const barrier = await import('../infrastructure/mutation-barrier');
+  const requested = Promise.withResolvers<void>();
+  const queues = new Map<string, Promise<void>>();
+  barrier.installPersistenceLockManagerForTests({
+    request(name, options, operation) {
+      if (options.mode === 'exclusive' && name.endsWith(':transition')) requested.resolve();
+      const next = (queues.get(name) ?? Promise.resolve()).then(() => operation());
+      queues.set(
+        name,
+        next.then(
+          () => undefined,
+          () => undefined
+        )
+      );
+      return next;
+    },
+  });
+  return { ...barrier, requested };
+}
+
+it.each([
+  { operation: 'save', preservePreferences: false },
+  { operation: 'save', preservePreferences: true },
+  { operation: 'reset', preservePreferences: false },
+  { operation: 'reset', preservePreferences: true },
+] as const)(
+  'orders queued correction $operation before verified erasure with preservePreferences=$preservePreferences',
+  async ({ operation, preservePreferences }) => {
+    resetAiStorageCoreMocks();
+    installStorageState({ local: { [AI_STORAGE_VERSION_KEY]: AI_STORAGE_VERSION } });
+    const { mutateStoredAISettings } = await import('./graph-mutations');
+    const { buildBrowserStorageErasurePlan } = await import('../privacy-erasure/inventory');
+    const barrier = await installPromptErasureOrdering();
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const read = localGetMock.getMockImplementation()!;
+    localGetMock.mockImplementation(async (keys?: string | string[]) => {
+      if (Array.isArray(keys) && keys.includes(AI_MODELS_KEY)) {
+        entered.resolve();
+        await release.promise;
+      }
+      return read(keys);
+    });
+    const events: string[] = [];
+    const write = localSetMock.getMockImplementation()!;
+    localSetMock.mockImplementation(async (payload: Record<string, unknown>) => {
+      if (AI_VOICE_INPUT_CORRECTION_PROMPT_KEY in payload) events.push('save');
+      return write(payload);
+    });
+    const remove = localRemoveMock.getMockImplementation()!;
+    localRemoveMock.mockImplementation(async (keys: string | string[]) => {
+      if (keys === AI_VOICE_INPUT_CORRECTION_PROMPT_KEY) events.push('reset');
+      return remove(keys);
+    });
+    try {
+      const saving = mutateStoredAISettings(
+        operation === 'save'
+          ? {
+              operation: 'save-voice-input-correction-prompt',
+              prompt: 'private correction instructions',
+            }
+          : { operation: 'reset-voice-input-correction-prompt' }
+      );
+      await entered.promise;
+      const erasing = barrier.runWithPersistentDataErasureBarrier(async () => {
+        const plan = buildBrowserStorageErasurePlan({
+          preservePreferences,
+          includeAiProviderSecrets: true,
+        });
+        await localRemoveMock(plan.local);
+        expect(localState).not.toHaveProperty(AI_VOICE_INPUT_CORRECTION_PROMPT_KEY);
+        events.push('erased');
+      });
+      await barrier.requested.promise;
+      release.resolve();
+      await saving;
+      await erasing;
+      expect(events).toEqual([operation, 'erased']);
+      expect(localState).not.toHaveProperty(AI_VOICE_INPUT_CORRECTION_PROMPT_KEY);
+    } finally {
+      barrier.installPersistenceLockManagerForTests(null);
+    }
+  }
+);

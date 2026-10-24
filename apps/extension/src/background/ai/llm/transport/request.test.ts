@@ -419,3 +419,42 @@ describe('transport/request', () => {
   it('omits an absent provider label from invalid-request errors', verifyProviderErrorWithoutLabel);
   it('maps secret-bearing network failures onto a fixed safe error', verifyNetworkFailureSurface);
 });
+
+it('refuses a prepared text request when final caller admission fails', async () => {
+  resetLlmTransportRequestMocks();
+  const { requestChatCompletion } = await import('./request');
+  await expect(
+    requestChatCompletion({
+      apiKey: 'fixture',
+      baseUrl: 'https://example.test/v1',
+      modelCode: 'text',
+      systemPrompt: 'Correct',
+      userPrompt: 'Dictated text',
+      beforeSend: async () => {
+        throw new Error('stale');
+      },
+    })
+  ).rejects.toThrow('stale');
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('refuses provider-declared partial text when the caller requires the full correction', async () => {
+  resetLlmTransportRequestMocks();
+  const { requestChatCompletion } = await import('./request');
+  fetchMock.mockResolvedValue(
+    Response.json({
+      choices: [{ finish_reason: 'length', message: { content: 'Partial correction' } }],
+    })
+  );
+  await expect(
+    requestChatCompletion({
+      apiKey: 'fixture',
+      baseUrl: 'https://example.test/v1',
+      modelCode: 'text',
+      systemPrompt: 'Correct',
+      userPrompt: 'Long dictation',
+      rejectTruncated: true,
+    })
+  ).rejects.toThrow();
+  expect(fetchMock).toHaveBeenCalledOnce();
+});

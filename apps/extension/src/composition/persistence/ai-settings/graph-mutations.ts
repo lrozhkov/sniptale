@@ -3,6 +3,7 @@ import {
   isValidAIModelOperationConfiguration,
 } from '../../../contracts/settings/model-operation';
 import type { AIModel } from '../../../contracts/settings';
+import { acquirePersistenceMutationTransition } from '../infrastructure/mutation-barrier';
 import type { AIProviderUpsertInput } from './core';
 import {
   changeAISecretPassphraseProtection,
@@ -17,6 +18,8 @@ import {
   lockAISecretProtection,
   resetAudioTranscriptionSystemPrompt,
   saveAudioTranscriptionSystemPrompt,
+  saveVoiceInputCorrectionSystemPrompt,
+  resetVoiceInputCorrectionSystemPrompt,
   resetGlobalSystemPrompt,
   resetAISecretPassphraseProtection,
   resetScenarioEditorSystemPrompt,
@@ -181,6 +184,10 @@ async function applyAISettingsMutation(command: AISettingsMutationCommand): Prom
       return moveModel(command.modelId, command.beforeModelId);
     case 'save-default-model':
       return saveDefaultModel(command.defaultModelId);
+    case 'save-voice-input-correction-prompt':
+      return saveVoiceInputCorrectionSystemPrompt(command.prompt);
+    case 'reset-voice-input-correction-prompt':
+      return resetVoiceInputCorrectionSystemPrompt();
     case 'save-audio-transcription-prompt':
       return saveAudioTranscriptionSystemPrompt(command.prompt);
     case 'reset-audio-transcription-prompt':
@@ -215,11 +222,23 @@ async function applyAISettingsMutation(command: AISettingsMutationCommand): Prom
 
 /** Serializes every durable AI settings mutation through the persistence owner. */
 export function mutateStoredAISettings(command: AISettingsMutationCommand): Promise<void> {
+  const transition =
+    command.operation === 'save-voice-input-correction-prompt' ||
+    command.operation === 'reset-voice-input-correction-prompt'
+      ? acquirePersistenceMutationTransition()
+      : null;
+  // Admission starts before queueing; observe failure even while an earlier command is pending.
+  void transition?.catch(() => undefined);
   return queueAISettingsMutation(async () => {
-    await initializeAiStorageAccess();
-    await assertAISettingsGraphInvariants();
-    await applyAISettingsMutation(command);
-    await assertAISettingsGraphInvariants();
+    const lease = await transition;
+    try {
+      await initializeAiStorageAccess();
+      await assertAISettingsGraphInvariants();
+      await applyAISettingsMutation(command);
+      await assertAISettingsGraphInvariants();
+    } finally {
+      await lease?.release();
+    }
   });
 }
 

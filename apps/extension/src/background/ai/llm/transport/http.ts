@@ -107,6 +107,9 @@ export async function postJsonWithTimeout(args: {
       body: JSON.stringify(args.body),
       // Provider POSTs carry prompt payloads and bearer headers; do not let fetch replay them.
       redirect: 'error',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+      cache: 'no-store',
       signal: controller.signal,
     });
     if (!response.ok) {

@@ -13,14 +13,21 @@ import {
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   VOICE_INPUT_LOCAL_QUALITY,
+  VOICE_INPUT_TRANSCRIPT_MAX_CHARS,
+  VOICE_HISTORY_MAX_DURATION_SECONDS,
   VoiceInputPortMessageType,
   type VoiceInputErrorCode,
   type VoiceInputFallbackReason,
   type VoiceInputLocalAvailability,
   type VoiceInputPreferences,
   type VoiceInputServerEvent,
+  type VoiceInputCaptureEvent,
+  type VoiceCaptureToken,
+  type VoiceHistoryScope,
   type VoiceInputSnapshot,
 } from '@sniptale/runtime-contracts/voice-input';
+import type { VoiceAudioCapture } from './audio-capture';
+import type { VoiceAudioInput } from './audio-input';
 import type { OffscreenMediaActivityLease } from '../media-activity/lease';
 import {
   createVoiceInputRecognitionInstance,
@@ -34,7 +41,17 @@ const STOP_GRACE_MS = 1_000;
 export type VoiceInputRecognitionDeps = {
   acquireMicrophone: typeof acquireMicrophoneInput;
   createRecognition: typeof createSpeechRecognitionSession;
-  emit(event: VoiceInputServerEvent): Promise<unknown>;
+  emit(event: VoiceInputServerEvent | VoiceInputCaptureEvent): Promise<unknown>;
+  createCapture(track: MediaStreamTrack, onLimit: () => void): VoiceAudioCapture;
+  normalizeAudio(input: VoiceAudioInput, signal: AbortSignal): Promise<VoiceAudioInput>;
+  publishAudio(
+    token: VoiceCaptureToken,
+    input: VoiceAudioInput & {
+      backend: 'browser' | 'model';
+      language: VoiceInputPreferences['language'];
+    },
+    signal: AbortSignal
+  ): Promise<VoiceHistoryScope>;
   loadAvailability: typeof loadSpeechRecognitionAvailability;
   observeMicrophoneLevel: typeof observeMicrophoneLevel;
   resolveApi: typeof resolveSpeechRecognitionApi;
@@ -47,6 +64,7 @@ type RecognitionRunCallbacks = {
 };
 
 type RecognitionRunArgs = {
+  captureToken: VoiceCaptureToken;
   callbacks: RecognitionRunCallbacks;
   deps: VoiceInputRecognitionDeps;
   initialSnapshot: VoiceInputSnapshot;
@@ -59,6 +77,7 @@ type RecognitionRunArgs = {
 
 export type VoiceInputRecognitionRun = {
   abort(): void;
+  drain(): Promise<void>;
   getSnapshot(): VoiceInputSnapshot;
   preferences: VoiceInputPreferences;
   sessionId: string;
@@ -106,6 +125,12 @@ class RecognitionRun implements VoiceInputRecognitionRun {
   readonly preferences: VoiceInputPreferences;
   readonly sessionId: string;
   private finished = false;
+  private captureFinishing = false;
+  private readonly controller = new AbortController();
+  private readonly flights = new Set<Promise<unknown>>();
+  private capture: VoiceAudioCapture | null = null;
+  private readonly finalText: string[] = [];
+  private finalCharacters = 0;
   private readonly instance: VoiceInputRecognitionInstance;
   private snapshot: VoiceInputSnapshot;
   private microphone: MicrophoneInputAcquisition | null = null;
@@ -130,6 +155,15 @@ class RecognitionRun implements VoiceInputRecognitionRun {
           this.emitSnapshot();
         },
         onTranscript: (result) => {
+          if (result.isFinal) {
+            this.finalCharacters += result.text.length + (this.finalText.length ? 1 : 0);
+            if (this.finalCharacters > VOICE_INPUT_TRANSCRIPT_MAX_CHARS) {
+              this.finish('error', 'too-large');
+              return;
+            }
+            this.finalText.push(result.text);
+          }
+          if (this.preferences.backend === 'model' || this.preferences.correction?.enabled) return;
           this.emit({
             confidence: result.confidence,
             isFinal: result.isFinal,
@@ -153,7 +187,11 @@ class RecognitionRun implements VoiceInputRecognitionRun {
 
   start(): void {
     this.emitSnapshot(this.args.requestId);
-    if (this.args.maxDurationMs !== null) {
+    const maxDurationMs = Math.min(
+      this.args.maxDurationMs ?? Infinity,
+      VOICE_HISTORY_MAX_DURATION_SECONDS * 1000
+    );
+    {
       this.watchdogId = globalThis.setTimeout(() => {
         if (!this.isCurrent()) return;
         logger.debug('Voice input reached the session time limit', {
@@ -161,13 +199,13 @@ class RecognitionRun implements VoiceInputRecognitionRun {
           timeoutMs: this.args.maxDurationMs,
         });
         this.stop();
-      }, this.args.maxDurationMs);
+      }, maxDurationMs);
     }
-    void this.resolveStartMode();
+    this.track(this.resolveStartMode());
   }
 
   stop(): 'accepted' {
-    if (this.snapshot.phase === 'stopping') return 'accepted';
+    if (this.snapshot.phase === 'stopping' || this.captureFinishing) return 'accepted';
     if (this.watchdogId !== null) globalThis.clearTimeout(this.watchdogId);
     this.watchdogId = null;
     this.updateSnapshot({ phase: 'stopping' });
@@ -187,10 +225,21 @@ class RecognitionRun implements VoiceInputRecognitionRun {
   abort(): void {
     if (this.finished) return;
     this.finished = true;
+    this.controller.abort();
+    this.capture?.abort();
     this.clearTimers();
     this.instance.dispose(true);
     this.releaseMicrophone();
     this.args.lease.release();
+  }
+
+  async drain(): Promise<void> {
+    while (this.flights.size) await Promise.allSettled([...this.flights]);
+  }
+
+  private track(work: Promise<unknown>): void {
+    this.flights.add(work);
+    void work.finally(() => this.flights.delete(work)).catch(() => undefined);
   }
 
   private isCurrent(): boolean {
@@ -214,7 +263,7 @@ class RecognitionRun implements VoiceInputRecognitionRun {
     }
   }
 
-  private emit(event: VoiceInputServerEvent): void {
+  private emit(event: VoiceInputServerEvent | VoiceInputCaptureEvent): void {
     void this.args.deps.emit(event).catch(() => {
       logger.warn('Failed to deliver voice input event', {
         eventType: event.type,
@@ -240,25 +289,90 @@ class RecognitionRun implements VoiceInputRecognitionRun {
   }
 
   private finish(phase: 'ended' | 'error', errorCode: VoiceInputErrorCode | null): void {
-    if (!this.isCurrent()) return;
+    if (!this.isCurrent() || this.captureFinishing) return;
+    this.captureFinishing = true;
     this.clearTimers();
     this.instance.dispose(phase === 'error');
+    if (!this.capture) {
+      this.releaseHardware();
+      this.end(errorCode);
+      return;
+    }
+    this.track(this.publishCapture(errorCode));
+  }
+
+  private releaseHardware(): void {
     this.releaseMicrophone();
     this.args.lease.release();
-    this.updateSnapshot({ busyOwner: null, errorCode, phase, sessionId: this.sessionId });
+    this.updateSnapshot({ busyOwner: null });
+    this.emit({ type: 'VOICE_INPUT_CAPTURE_RELEASED', sessionId: this.sessionId });
+  }
+
+  private async publishCapture(terminalError: VoiceInputErrorCode | null): Promise<void> {
+    try {
+      const original = await this.capture!.finish();
+      this.releaseHardware();
+      if (!this.isCurrent()) return;
+      if (!original.audio.size || original.durationSeconds <= 0) throw new Error('no-speech');
+      let input = original;
+      try {
+        input = await this.args.deps.normalizeAudio(original, this.controller.signal);
+      } catch {
+        this.controller.signal.throwIfAborted();
+        // Original WebM remains valid for playback and multipart-model retry.
+      }
+      if (!this.isCurrent()) return;
+      const scope = await this.args.deps.publishAudio(
+        this.args.captureToken,
+        {
+          ...input,
+          backend: this.preferences.backend ?? 'browser',
+          language: this.preferences.language,
+        },
+        this.controller.signal
+      );
+      if (!this.isCurrent()) return;
+      if (terminalError !== null) {
+        // Recognition failed, but completed audio remains available for an explicit model retry.
+        this.end(terminalError);
+        return;
+      }
+      const rawTranscript =
+        this.preferences.backend === 'model' ? null : this.finalText.join(' ').trim();
+      await this.args.deps.emit({
+        type: 'VOICE_INPUT_CAPTURE_READY',
+        sessionId: this.sessionId,
+        scope,
+        rawTranscript,
+        durationSeconds: input.durationSeconds,
+      });
+      if (!this.isCurrent()) return;
+      this.updateSnapshot({ phase: 'ended', errorCode: null });
+      this.finished = true;
+      this.args.callbacks.onFinished(this, this.snapshot);
+    } catch (error) {
+      if (!this.isCurrent()) return;
+      this.releaseHardware();
+      this.end(
+        terminalError ??
+          (error instanceof Error && error.message === 'too-large' ? 'too-large' : 'storage-failed')
+      );
+    }
+  }
+
+  private end(errorCode: VoiceInputErrorCode | null): void {
+    if (!this.isCurrent()) return;
+    this.updateSnapshot({ busyOwner: null, errorCode, phase: errorCode ? 'error' : 'ended' });
     this.finished = true;
     this.args.callbacks.onFinished(this, this.snapshot);
-    if (errorCode) {
+    if (errorCode)
       this.emit({
         errorCode,
         sessionId: this.sessionId,
         snapshot: this.snapshot,
         type: VoiceInputPortMessageType.FAILURE,
       });
-    } else {
-      this.emitSnapshot();
-    }
-    logger.debug('Voice input session finished', { errorCode, phase, sessionId: this.sessionId });
+    else this.emitSnapshot();
   }
 
   private useBrowserFallback(reason: VoiceInputFallbackReason): void {
@@ -288,6 +402,11 @@ class RecognitionRun implements VoiceInputRecognitionRun {
     if (!(await this.acquireSelectedMicrophone())) return;
     const track = this.microphone?.track;
     if (!track || !this.isCurrent()) return;
+    if (this.preferences.backend === 'model') {
+      this.updateSnapshot({ effectiveMode: 'model', phase: 'listening' });
+      this.emitSnapshot();
+      return;
+    }
     if (this.preferences.mode === 'browser-managed') {
       this.instance.start('browser-managed', null, track);
       return;
@@ -305,6 +424,7 @@ class RecognitionRun implements VoiceInputRecognitionRun {
         return false;
       }
       this.microphone = microphone;
+      this.capture = this.args.deps.createCapture(microphone.track, () => this.stop());
       this.startMicrophoneLevelMonitor(microphone.track);
       logger.debug('Selected microphone acquired', {
         microphoneSelected: this.preferences.microphoneDeviceId !== null,

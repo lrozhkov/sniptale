@@ -315,11 +315,15 @@ class RecognitionInstance implements VoiceInputRecognitionInstance {
   }
 
   private handleResult(instanceGeneration: number, result: SpeechRecognitionResult): void {
-    if (this.stopRequested || !this.isCurrent(instanceGeneration)) return;
+    if (!this.isCurrent(instanceGeneration) || (this.stopRequested && !result.isFinal)) return;
     this.hasTranscript = true;
     this.restartAttemptsWithoutTranscript = 0;
     this.sequence += 1;
-    const text = result.text.slice(0, VOICE_INPUT_TRANSCRIPT_MAX_CHARS);
+    if (result.text.length > VOICE_INPUT_TRANSCRIPT_MAX_CHARS) {
+      this.args.callbacks.onFinished('too-large');
+      return;
+    }
+    const text = result.text;
     this.args.callbacks.onTranscript({ ...result, sequence: this.sequence, text });
     logger.debug('Voice input transcript event', {
       charCount: text.length,

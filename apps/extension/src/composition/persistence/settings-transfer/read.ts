@@ -99,7 +99,6 @@ export async function readSettingsTransferSnapshot(
       entry.status === 'ready' ? [encodeEffectSettingsEntry(entry.entry)] : []
     )
   );
-  const providers = ai.providers.map(selectSettingsTransferProviderMetadata);
   const domains: Record<string, SettingsTransferDomainPayload> = {
     'interface.preferences': payload({
       theme: preferences[THEME_STORAGE_KEY] ?? 'system',
@@ -152,18 +151,7 @@ export async function readSettingsTransferSnapshot(
         await readEffectCatalogPreferences()
       ),
     }),
-    'ai.providers': payload({ items: providers }),
-    'ai.models': payload({
-      items: ai.models.map(selectSettingsTransferModelMetadata),
-      defaultModelId: ai.defaultModelId,
-    }),
-    'ai.chrome': payload({ enabled: ai.chromeAiEnabled }),
-    'ai.prompts': payload({
-      global: ai.globalSystemPrompt,
-      scenario: ai.scenarioEditorSystemPrompt,
-      recognition: ai.audioTranscriptionSystemPrompt ?? '',
-    }),
-    'ai.prompt-templates': payload({ items: promptTemplates, order: templateOrder }),
+    ...collectAITransferDomains(ai, promptTemplates, templateOrder),
     'system.voice': payload({
       language: settings.voiceInput?.language ?? 'ru-RU',
       mode: settings.voiceInput?.mode ?? 'local-first',
@@ -190,6 +178,29 @@ export async function readSettingsTransferSnapshot(
     dynamicItems: collectSettingsTransferDynamicItems(domains, locale),
     dependencies: collectSettingsTransferDependencies(domains),
     locale,
+  };
+}
+
+function collectAITransferDomains(
+  ai: Awaited<ReturnType<typeof loadAISettings>>,
+  promptTemplates: Awaited<ReturnType<typeof getPromptTemplates>>,
+  templateOrder: Awaited<ReturnType<typeof loadTemplateOrder>>
+): Record<string, SettingsTransferDomainPayload> {
+  const providers = ai.providers.map(selectSettingsTransferProviderMetadata);
+  return {
+    'ai.providers': payload({ items: providers }),
+    'ai.models': payload({
+      items: ai.models.map(selectSettingsTransferModelMetadata),
+      defaultModelId: ai.defaultModelId,
+    }),
+    'ai.chrome': payload({ enabled: ai.chromeAiEnabled }),
+    'ai.prompts': payload({
+      global: ai.globalSystemPrompt,
+      scenario: ai.scenarioEditorSystemPrompt,
+      recognition: ai.audioTranscriptionSystemPrompt ?? '',
+      voiceCorrection: ai.voiceInputCorrectionSystemPrompt ?? '',
+    }),
+    'ai.prompt-templates': payload({ items: promptTemplates, order: templateOrder }),
   };
 }
 

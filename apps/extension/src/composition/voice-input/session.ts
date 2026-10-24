@@ -7,10 +7,18 @@ import {
 import { loadSettings } from '../persistence/settings';
 import { createVoiceInputClient, type VoiceInputClient } from '../../workflows/voice-input';
 
-type VoiceInputPhase = 'error' | 'idle' | 'listening' | 'starting' | 'stopping';
+type VoiceInputPhase =
+  | 'error'
+  | 'idle'
+  | 'listening'
+  | 'starting'
+  | 'stopping'
+  | 'processing-asr'
+  | 'processing-text';
 
 export interface VoiceInputState {
   active: boolean;
+  pending: boolean;
   audioLevel: number;
   errorCode: VoiceInputErrorCode | 'runtime' | null;
   phase: VoiceInputPhase;
@@ -47,6 +55,8 @@ function resolveSnapshotPhase(event: VoiceInputServerEvent): VoiceInputPhase | n
   if (event.snapshot.phase === 'checking' || event.snapshot.phase === 'starting') return 'starting';
   if (event.snapshot.phase === 'listening') return 'listening';
   if (event.snapshot.phase === 'stopping') return 'stopping';
+  if (event.snapshot.phase === 'processing-asr' || event.snapshot.phase === 'processing-text')
+    return event.snapshot.phase;
   if (event.snapshot.phase === 'ended' || event.snapshot.phase === 'idle') return 'idle';
   return event.snapshot.phase === 'error' ? 'error' : null;
 }
@@ -90,7 +100,7 @@ function useClientLifecycle(args: {
       startPendingRef.current = false;
       if (sessionId) {
         try {
-          client.stop(sessionId);
+          client.cancel(sessionId);
         } catch {
           // Disconnect remains the authoritative cleanup fallback.
         }
@@ -119,14 +129,17 @@ export function useVoiceInputSession(args: {
   const acceptingTranscriptRef = useRef(false);
   const generationRef = useRef(0);
   const startPendingRef = useRef(false);
+  const stoppingRef = useRef(false);
+  const lastSequenceRef = useRef(-1);
+  const deliveryRef = useRef<'live' | 'final'>('live');
   const onTranscriptRef = useRef(args.onTranscript);
   onTranscriptRef.current = args.onTranscript;
   const readActiveSessionId = useCallback(() => activeSessionIdRef.current, []);
 
   const stop = useCallback(() => {
     generationRef.current += 1;
-    acceptingTranscriptRef.current = false;
     startPendingRef.current = false;
+    stoppingRef.current = true;
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) {
       dispatch({ type: 'phase', value: 'idle' });
@@ -141,15 +154,36 @@ export function useVoiceInputSession(args: {
     }
   }, [client]);
 
+  const cancel = useCallback(() => {
+    generationRef.current += 1;
+    acceptingTranscriptRef.current = false;
+    stoppingRef.current = false;
+    startPendingRef.current = false;
+    const sessionId = activeSessionIdRef.current;
+    activeSessionIdRef.current = null;
+    dispatch({ type: 'phase', value: 'idle' });
+    if (sessionId) {
+      try {
+        client.cancel(sessionId);
+      } catch {
+        dispatch({ type: 'error', value: 'runtime' });
+      }
+    }
+  }, [client]);
+
   const applyServerEvent = useCallback((event: VoiceInputServerEvent) => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId || !isEventForSession(event, sessionId)) return;
     if (event.type === VoiceInputPortMessageType.AUDIO_LEVEL) {
-      if (acceptingTranscriptRef.current) dispatch({ type: 'level', value: event.level });
+      if (acceptingTranscriptRef.current && !stoppingRef.current)
+        dispatch({ type: 'level', value: event.level });
       return;
     }
     if (event.type === VoiceInputPortMessageType.TRANSCRIPT) {
-      if (acceptingTranscriptRef.current) onTranscriptRef.current(event);
+      if (!acceptingTranscriptRef.current || event.sequence <= lastSequenceRef.current) return;
+      lastSequenceRef.current = event.sequence;
+      onTranscriptRef.current(event);
+      if (event.isFinal && deliveryRef.current === 'final') acceptingTranscriptRef.current = false;
       return;
     }
     if (event.type === VoiceInputPortMessageType.FAILURE) {
@@ -159,17 +193,16 @@ export function useVoiceInputSession(args: {
       dispatch({ type: 'error', value: event.errorCode });
       return;
     }
+    deliveryRef.current = event.snapshot.delivery ?? 'live';
     const nextPhase = resolveSnapshotPhase(event);
-    if (
-      !acceptingTranscriptRef.current &&
-      (nextPhase === 'starting' || nextPhase === 'listening')
-    ) {
+    if (stoppingRef.current && (nextPhase === 'starting' || nextPhase === 'listening')) {
       return;
     }
     if (nextPhase === 'idle') {
       activeSessionIdRef.current = null;
       acceptingTranscriptRef.current = false;
       startPendingRef.current = false;
+      stoppingRef.current = false;
     } else if (nextPhase === 'error') {
       activeSessionIdRef.current = null;
       acceptingTranscriptRef.current = false;
@@ -206,6 +239,9 @@ export function useVoiceInputSession(args: {
       );
       activeSessionIdRef.current = sessionId;
       acceptingTranscriptRef.current = true;
+      stoppingRef.current = false;
+      lastSequenceRef.current = -1;
+      deliveryRef.current = 'live';
       startPendingRef.current = false;
     } catch {
       if (generation !== generationRef.current) return;
@@ -215,10 +251,14 @@ export function useVoiceInputSession(args: {
   }, [client]);
 
   return {
-    actions: { start, stop },
+    actions: { start, stop, cancel },
     state: {
       ...state,
       active: state.phase === 'starting' || state.phase === 'listening',
+      pending:
+        state.phase === 'stopping' ||
+        state.phase === 'processing-asr' ||
+        state.phase === 'processing-text',
     } satisfies VoiceInputState,
   };
 }

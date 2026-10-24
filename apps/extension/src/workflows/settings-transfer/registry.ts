@@ -168,6 +168,7 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('ai.prompts', 'global'),
     field('ai.prompts', 'scenario'),
     field('ai.prompts', 'recognition'),
+    field('ai.prompts', 'voiceCorrection'),
   ]),
   ...domain('ai.prompt-templates', [
     field('ai.prompt-templates', 'items', { kind: 'collection', dynamicItems: true }),

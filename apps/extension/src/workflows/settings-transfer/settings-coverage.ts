@@ -19,7 +19,14 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   ],
   'ai-connections': ['ai.providers', 'ai.models', 'ai.chrome'],
   'ai-prompts': ['ai.prompts', 'ai.prompt-templates'],
-  'voice-input': ['system.voice', 'system.voice.microphone'],
+  'voice-input': [
+    'system.voice',
+    'system.voice.microphone',
+    'system.voice.provider-bindings',
+    'system.voice.history',
+    'ai.prompts',
+    'action/status',
+  ],
   'native-app': ['system.native', 'system.native.connection'],
   'access-data': ['action/status'],
   'events-logs': ['action/status'],
@@ -53,7 +60,17 @@ export const SETTINGS_TRANSFER_EXCLUDED_VIEW_COVERAGE = {
   },
 } as const;
 
-export const SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE = {} as const;
+export const SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE = {
+  'system.voice.provider-bindings': {
+    policy: 'docs/security/data-handling.md',
+    reason:
+      'Settings transfer preserves the local recognition backend, model approvals, and correction switch.',
+  },
+  'system.voice.history': {
+    policy: 'docs/security/data-handling.md',
+    reason: 'Private microphone audio and transcripts are excluded from settings transfer.',
+  },
+} as const;
 
 type SettingsTransferExcludedControlId = keyof typeof SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE;
 
@@ -285,7 +302,19 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     ['createSettingsTransferClient', 'settingsRuntimeMessagingTransport'],
     'action/status'
   ),
-  transferable('system/voice-input/use-voice-input.ts', ['updateSettings'], ['system.voice']),
+  transferable(
+    'system/voice-input/use-voice-input.ts',
+    ['updateSettings'],
+    ['system.voice'],
+    ['system.voice.provider-bindings']
+  ),
+  transferable(
+    'system/voice-input/use-voice-model-selection.ts',
+    ['saveVoiceInputCorrectionSystemPrompt', 'resetVoiceInputCorrectionSystemPrompt'],
+    ['ai.prompts']
+  ),
+  // The factory supplies a read-only audio adapter here; this call does not publish history.
+  excluded('system/voice-input/use-voice-history.ts', ['createVoiceInputHistory'], 'action/status'),
 ] as const satisfies readonly PersistenceMutationCoverage[];
 
 function transferable(

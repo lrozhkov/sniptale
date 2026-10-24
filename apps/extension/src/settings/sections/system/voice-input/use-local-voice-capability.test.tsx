@@ -58,12 +58,13 @@ let current: {
 } | null;
 let root: Root;
 
-function Harness() {
+function Harness({ backend = 'browser' }: { backend?: 'browser' | 'model' } = {}) {
   const [error, setError] = useState<VoiceInputSettingsError>(null);
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const capability = useLocalVoiceCapability({
     language: 'ru-RU',
     mode: 'local-first',
+    backend,
     setError,
     setSnapshot,
   });
@@ -163,4 +164,11 @@ describe('local voice capability', () => {
     await act(async () => first);
     expect(current?.snapshot.localAvailability).toBe('downloadable');
   });
+});
+
+it('does not probe browser speech recognition for the model backend', async () => {
+  act(() => root.render(<Harness backend="model" />));
+  await act(async () => current?.capability.actions.refresh());
+  expect(mocks.loadAvailability).not.toHaveBeenCalled();
+  expect(mocks.install).not.toHaveBeenCalled();
 });

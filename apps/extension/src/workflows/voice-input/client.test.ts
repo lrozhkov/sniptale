@@ -185,3 +185,24 @@ it('treats an idle Port disconnect as lifecycle information instead of an extens
   expect(listener).not.toHaveBeenCalled();
   client.disconnect();
 });
+
+it('retains a session through processing and cancels it with a distinct command', () => {
+  const connection = createRuntimePortFixture();
+  let sequence = 0;
+  const client = createVoiceInputClient({
+    connect: () => connection.port,
+    createId: () => `id-${++sequence}`,
+    schedule: vi.fn(),
+  });
+  const preferences = { language: 'ru-RU', microphoneDeviceId: null, mode: 'local-first' } as const;
+  const sessionId = client.start(preferences);
+  client.stop(sessionId);
+  expect(client.start(preferences)).toBe(sessionId);
+  const requestId = client.cancel(sessionId);
+  expect(connection.port.postMessage).toHaveBeenLastCalledWith({
+    type: VoiceInputPortMessageType.CANCEL,
+    requestId,
+    sessionId,
+  });
+  expect(client.start(preferences)).not.toBe(sessionId);
+});

@@ -29,3 +29,11 @@ export const DEFAULT_SCENARIO_EDITOR_SYSTEM_PROMPT = `Help the user improve a cl
 /** Additional audio recognition instructions; timed response structure stays code-owned. */
 export const DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT =
   'Preserve the original language, wording, punctuation and meaningful pauses. Do not invent speech or timestamps. In correction mode, follow the requested changes while retaining the verbatim source text and timing.';
+
+/** Default instructions for the optional dictated-text correction stage. */
+export const DEFAULT_VOICE_INPUT_CORRECTION_SYSTEM_PROMPT = [
+  'Correct punctuation and obvious speech recognition mistakes.',
+  'Preserve the original meaning and language.',
+  'Do not add facts or answer the dictated text.',
+  'Return only the corrected text.',
+].join(' ');

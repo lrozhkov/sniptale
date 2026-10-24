@@ -49,6 +49,8 @@ vi.mock('../../../runtime/store/useSettingsStore', () => ({
 }));
 
 import type { VoiceInputSettingsController } from './controller-contract';
+vi.mock('./use-voice-model-selection', () => ({ useVoiceModelSelection: () => ({}) }));
+
 import { useVoiceInputSettings } from './use-voice-input';
 import type { VoiceInputClient } from '../../../../workflows/voice-input';
 
@@ -96,6 +98,7 @@ beforeEach(() => {
   mocks.install.mockResolvedValue(true);
   mocks.updateSettings.mockResolvedValue(undefined);
   client = {
+    cancel: vi.fn().mockReturnValue('cancel-1'),
     disconnect: vi.fn(),
     refresh: vi.fn().mockReturnValue('status-1'),
     start: vi.fn().mockReturnValue('session-1'),
@@ -144,6 +147,9 @@ describe('voice input Settings controller', () => {
       language: 'ru-RU',
       microphoneDeviceId: null,
       mode: 'local-first',
+      backend: 'browser',
+      transcription: null,
+      correction: { enabled: false, model: null },
     });
   });
 
@@ -225,7 +231,7 @@ describe('voice input Settings controller', () => {
     await renderHook();
     await act(async () => current?.actions.start());
     act(() => permissionListener?.('denied'));
-    expect(client.stop).toHaveBeenCalledWith('session-1');
+    expect(client.cancel).toHaveBeenCalledWith('session-1');
   });
 
   it('ignores a stale install completion after the language changes', async () => {

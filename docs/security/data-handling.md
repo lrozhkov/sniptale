@@ -40,11 +40,19 @@ Web Snapshots may retain sanitized HTML and CSS, non-credential form state, and 
 
 Disclose that screenshots may still contain visible private pixels from images, canvas, video, or closed shadow roots.
 
-Raw voice transcripts and recognition results are session-only. Send them only to the authorized Port that owns the active request. A recognition event must not persist, commit, or export text except for the user-requested field behavior described below. Text becomes ordinary annotation content only after the user explicitly commits it. In the scenario editor, final dictated text inserted into a field becomes ordinary project content through the existing editing, undo history, and local autosave path.
+Voice input uses the globally selected Chrome or model backend. Model recognition sends completed microphone audio to the configured transcription provider. Optional correction sends recognized text and the dedicated local prompt to the configured text provider. Neither stage includes page content, project context, or recording identifiers.
 
-This requires no separate Apply or Save action. Recognition events, interim results, and audio remain session-only. Gallery video review also retains final text from its comment field as a local recovery draft, including final dictated text. It retains that draft until Save, explicit discard, or media deletion. This user-requested field recovery is separate from committed undo history: recognition events, interim results, and audio remain session-only.
+Private voice history retains at most twenty completed recordings, including failed recognition attempts. Audio resides under the separate `sniptale-voice-input` OPFS root. The canonical `voice_input_history` store retains bounded metadata and transcripts. Only Settings exposes this history. Library, ordinary media backups, project exports, sync, diagnostics, traces, and AI request history exclude it.
 
-Explicit media backup includes the review history and recovery draft. Annotation reports include committed comments only. Send neither form to sync, diagnostics, or logs.
+Settings transfer changes the voice language and Chrome mode. It preserves the local microphone, recognition backend, model approvals, and correction switch. Correction instructions use the AI prompt domain.
+
+An explicit retry uses the current configured models and does not renew the recording's retention order. Failed correction preserves the raw transcript. Failed recognition preserves admitted audio for retry. Stop ends capture and permits the pending result. Cancel, field invalidation, and disposal prevent late insertion. Privacy erasure aborts and drains capture and processing before deleting private voice data, including when preferences remain preserved.
+
+Voice correction prompt commands reserve erasure coordination before entering the AI settings queue. Erasure waits for these admitted commands before deleting their stored values.
+
+Interim recognition events remain disposable. Final annotation text becomes ordinary content after the user explicitly commits it. Final text inserted into Scenario fields uses the existing editing, Undo, and local autosave path. The user does not need a separate Apply or Save action. Gallery review retains final dictated comments as a local recovery draft until Save, discard, or media deletion.
+
+Explicit media backup includes accepted review history and its comment recovery draft. It excludes private voice history. Annotation reports include committed comments only. Neither comments nor recognition events enter sync, diagnostics, or logs.
 
 LLM request history may retain only timestamp, model ID, request kind, result count, status, and fixed error code. Normalize legacy prompt-bearing records before returning them. Before model egress, disclose the provider, model, prompt inclusion, page-data classes, and metadata-only history.
 
@@ -116,9 +124,9 @@ Local-data erasure removes it even if preferences remain preserved. Custom image
 
 ### Explicit speech editing
 
-Gallery speech editing is distinct from session-only browser voice input. Explicitly accepted transcripts and phrase edits become project content through review history. Accepted generated audio uses the existing private project-asset publication and reference-retention rules. Project backup includes those accepted references and text. It excludes jobs, secrets and temporary previews.
+Gallery speech editing retains project authority separately from private dictation history. Explicitly accepted transcripts and phrase edits become project content through review history. Accepted generated audio uses the existing private project-asset publication and reference-retention rules. Project backup includes those accepted references and text. It excludes jobs, secrets and temporary previews.
 
-`background/ai/audio/request.ts` alone assembles audio provider bearer headers. It sends only the authorized extracted interval or saved text to the selected provider. It rejects redirects. It omits ambient credentials and referrers. It bounds response bytes and elapsed time.
+`background/ai/audio/request.ts` alone assembles audio provider bearer headers. It sends authorized source intervals, saved speech text, or explicitly configured private dictation audio to the selected provider. It rejects redirects. It omits ambient credentials and referrers. It bounds response bytes and elapsed time.
 
 Provider error bodies never enter UI, logs or diagnostics. There is no hidden retry after an ambiguous paid POST.
 

@@ -116,7 +116,8 @@ async function sendChatRequest(
   apiKey: string,
   payload: object,
   handleStatus: (status: number, errorData: unknown) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  rejectTruncated = false
 ): Promise<string> {
   let response: Awaited<ReturnType<typeof postJsonWithTimeout>>;
   try {
@@ -147,7 +148,7 @@ async function sendChatRequest(
     handleStatus(response.status, response.data);
   }
 
-  const content = getChatCompletionContent(response.data);
+  const content = getChatCompletionContent(response.data, rejectTruncated);
   if (!content) {
     logger.error('Unexpected response structure from provider');
     throw new Error(translate('background.runtime.llmUnexpectedResponse'));
@@ -157,7 +158,7 @@ async function sendChatRequest(
   return content;
 }
 
-function getChatCompletionContent(result: unknown): string | null {
+function getChatCompletionContent(result: unknown, rejectTruncated: boolean): string | null {
   if (!isRecord(result)) {
     return null;
   }
@@ -167,6 +168,11 @@ function getChatCompletionContent(result: unknown): string | null {
     return null;
   }
 
+  if (
+    rejectTruncated &&
+    (choice['finish_reason'] === 'length' || choice['finish_reason'] === 'content_filter')
+  )
+    return null;
   const content = choice['message']['content'];
   if (typeof content === 'string') {
     return content;
@@ -218,16 +224,23 @@ export async function requestChatCompletion(options: {
   userPrompt: string;
   providerErrorLabel?: string;
   signal?: AbortSignal;
+  /** Rechecks the caller scope and provider after preparing the request payload. */
+  beforeSend?(): Promise<void>;
+  /** Refuses provider-declared partial text while retaining the caller source. */
+  rejectTruncated?: boolean;
 }): Promise<string> {
   const apiUrl = buildChatCompletionsUrl(options.baseUrl);
   const payload = buildChatPayload(options.modelCode, options.systemPrompt, options.userPrompt);
+  if (options.beforeSend) await options.beforeSend();
+  options.signal?.throwIfAborted();
 
   return sendChatRequest(
     apiUrl,
     options.apiKey,
     payload,
     createStatusHandler(options.providerErrorLabel),
-    options.signal
+    options.signal,
+    options.rejectTruncated
   );
 }
 

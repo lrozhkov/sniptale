@@ -1,4 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
+import {
+  resolveVoiceInputPreferences,
+  type VoiceInputPreferences,
+} from '@sniptale/runtime-contracts/voice-input';
+import { useVoiceModelSelection } from './use-voice-model-selection';
 import { createVoiceInputClient, type VoiceInputClient } from '../../../../workflows/voice-input';
 import { useSettingsStore } from '../../../runtime/store/useSettingsStore';
 import type { VoiceInputSettingsController, VoiceInputSettingsError } from './controller-contract';
@@ -13,11 +18,13 @@ export function useVoiceInputSettings(
   const { settings, updateSettings } = useSettingsStore();
   const preferences = useMemo(
     () =>
-      settings.voiceInput ?? {
-        language: 'ru-RU' as const,
-        microphoneDeviceId: null,
-        mode: 'local-first' as const,
-      },
+      resolveVoiceInputPreferences(
+        settings.voiceInput ?? {
+          language: 'ru-RU',
+          microphoneDeviceId: null,
+          mode: 'local-first',
+        }
+      ),
     [settings.voiceInput]
   );
   const client = useMemo(createClient, [createClient]);
@@ -34,11 +41,14 @@ export function useVoiceInputSettings(
     applyServerEvent,
     begin,
     stop: stopSession,
+    cancel: cancelSession,
   } = voiceSession.connection;
   const { audioLevel, audioPeaks, setSnapshot, snapshot } = voiceSession.snapshotState;
+  const cancelOwnedSession = useCallback(() => cancelSession(client), [cancelSession, client]);
   const capability = useLocalVoiceCapability({
     language: preferences.language,
     mode: preferences.mode,
+    backend: preferences.backend,
     setError,
     setSnapshot,
   });
@@ -57,6 +67,7 @@ export function useVoiceInputSettings(
     activeSessionIdRef,
     applyServerEvent,
     client,
+    cancelSession: cancelOwnedSession,
     invalidateCapability,
     microphoneAccess,
     refreshCapability,
@@ -81,7 +92,7 @@ export function useVoiceInputSettings(
   }, [authority, client, stopSession]);
 
   const updatePreference = useCallback(
-    async (patch: Partial<typeof preferences>) => {
+    async (patch: Partial<VoiceInputPreferences>) => {
       setSaving(true);
       setError(null);
       try {
@@ -95,32 +106,29 @@ export function useVoiceInputSettings(
     [updateSettings]
   );
 
+  const models = useVoiceModelSelection({ preferences, updatePreference });
+  const cancel = useCallback(() => {
+    authority.startGenerationRef.current += 1;
+    authority.startPendingRef.current = false;
+    cancelSession(client);
+  }, [authority, cancelSession, client]);
   return {
+    models,
     actions: {
       installPackage,
       refresh,
       requestMicrophone: () => requestMicrophone(preferences.microphoneDeviceId),
       start,
       stop,
+      cancel,
     },
-    preferences: {
-      ...preferences,
+    preferences: createVoicePreferenceActions({
+      preferences,
       saving,
-      setLanguage: (language) => {
-        authority.startGenerationRef.current += 1;
-        invalidateCapability();
-        return updatePreference({ language });
-      },
-      setMicrophoneDeviceId: (microphoneDeviceId) => {
-        authority.startGenerationRef.current += 1;
-        return updatePreference({ microphoneDeviceId });
-      },
-      setMode: (mode) => {
-        authority.startGenerationRef.current += 1;
-        invalidateCapability();
-        return updatePreference({ mode });
-      },
-    },
+      cancel,
+      invalidateCapability,
+      updatePreference,
+    }),
     status: {
       audioLevel,
       audioPeaks,
@@ -133,5 +141,47 @@ export function useVoiceInputSettings(
       snapshot,
     },
     transcript: voiceSession.transcript,
+  };
+}
+
+function createVoicePreferenceActions({
+  preferences,
+  saving,
+  cancel,
+  invalidateCapability,
+  updatePreference,
+}: {
+  preferences: ReturnType<typeof resolveVoiceInputPreferences>;
+  saving: boolean;
+  cancel(): void;
+  invalidateCapability(): void;
+  updatePreference(patch: Partial<VoiceInputPreferences>): Promise<void>;
+}): VoiceInputSettingsController['preferences'] {
+  return {
+    ...preferences,
+    saving,
+    setBackend: (backend) => {
+      cancel();
+      invalidateCapability();
+      return updatePreference({ backend });
+    },
+    setCorrectionEnabled: (enabled) => {
+      cancel();
+      return updatePreference({ correction: { ...preferences.correction, enabled } });
+    },
+    setLanguage: (language) => {
+      cancel();
+      invalidateCapability();
+      return updatePreference({ language });
+    },
+    setMicrophoneDeviceId: (microphoneDeviceId) => {
+      cancel();
+      return updatePreference({ microphoneDeviceId });
+    },
+    setMode: (mode) => {
+      cancel();
+      invalidateCapability();
+      return updatePreference({ mode });
+    },
   };
 }

@@ -9,6 +9,8 @@ import {
   SettingsControlRow,
   settingsSectionClassName,
 } from '../../../section-surface';
+import { VoiceModelPreferences } from './model-preferences';
+import { VoiceInputHistoryPanel } from './history';
 import type { VoiceInputSettingsController } from './controller-contract';
 
 const activeMicrophoneIndicatorClassName = 'text-[var(--sniptale-color-accent)]';
@@ -33,6 +35,8 @@ function statusKey(value: string): TranslationKey {
     starting: 'settings.voiceInput.phaseStarting',
     listening: 'settings.voiceInput.phaseListening',
     stopping: 'settings.voiceInput.phaseStopping',
+    'processing-asr': 'settings.voiceInput.phaseProcessingAsr',
+    'processing-text': 'settings.voiceInput.phaseProcessingText',
     ended: 'settings.voiceInput.phaseEnded',
     error: 'settings.voiceInput.phaseError',
   };
@@ -47,6 +51,8 @@ function phaseDescriptionKey(value: string): TranslationKey {
     starting: 'settings.voiceInput.phaseStartingDescription',
     listening: 'settings.voiceInput.phaseListeningDescription',
     stopping: 'settings.voiceInput.phaseStoppingDescription',
+    'processing-asr': 'settings.voiceInput.phaseProcessingAsrDescription',
+    'processing-text': 'settings.voiceInput.phaseProcessingTextDescription',
     ended: 'settings.voiceInput.phaseEndedDescription',
     error: 'settings.voiceInput.phaseErrorDescription',
   };
@@ -144,6 +150,10 @@ function resolveErrorNoticeMessage(args: {
   if (args.errorCode === 'network') {
     return translate('settings.voiceInput.errorNetwork');
   }
+  if (args.errorCode === 'model-unavailable') return translate('settings.voiceInput.errorModel');
+  if (args.errorCode === 'provider-failed') return translate('settings.voiceInput.errorProvider');
+  if (args.errorCode === 'storage-failed' || args.errorCode === 'too-large')
+    return translate('settings.voiceInput.historyError');
   if (args.errorCode === 'timeout') return translate('settings.voiceInput.errorTimeout');
   if (args.error === 'permission') return translate('settings.voiceInput.permissionError');
   if (args.error === 'install') return translate('settings.voiceInput.installError');
@@ -156,21 +166,22 @@ function isActive(controller: VoiceInputSettingsController): boolean {
     controller.status.snapshot.sessionId !== null &&
     (controller.status.snapshot.phase === 'checking' ||
       controller.status.snapshot.phase === 'starting' ||
-      controller.status.snapshot.phase === 'listening' ||
-      controller.status.snapshot.phase === 'stopping')
+      controller.status.snapshot.phase === 'listening')
   );
 }
 
 function VoiceInputStatusGrid({ controller }: { controller: VoiceInputSettingsController }) {
   const effectiveMode = controller.status.snapshot.effectiveMode;
   const effectiveDescription =
-    effectiveMode === 'local'
-      ? translate('settings.voiceInput.effectiveLocal')
-      : effectiveMode === 'legacy'
-        ? translate('settings.voiceInput.effectiveLegacy')
-        : effectiveMode === 'browser-managed'
-          ? translate('settings.voiceInput.effectiveBrowser')
-          : undefined;
+    effectiveMode === 'model'
+      ? translate('settings.voiceInput.effectiveModel')
+      : effectiveMode === 'local'
+        ? translate('settings.voiceInput.effectiveLocal')
+        : effectiveMode === 'legacy'
+          ? translate('settings.voiceInput.effectiveLegacy')
+          : effectiveMode === 'browser-managed'
+            ? translate('settings.voiceInput.effectiveBrowser')
+            : undefined;
   const microphoneError =
     controller.status.microphoneAccess === 'denied' ||
     controller.status.microphoneAccess === 'no-device' ||
@@ -297,30 +308,32 @@ function VoiceInputPreferencesPanel({
           ]}
         />
       </SettingsControlRow>
-      <SettingsControlRow label={translate('settings.voiceInput.modeLabel')}>
-        <ProductSelect
-          aria-label={translate('settings.voiceInput.modeLabel')}
-          disabled={
-            active ||
-            controller.preferences.saving ||
-            controller.status.checking ||
-            controller.status.installing
-          }
-          value={controller.preferences.mode}
-          onChange={(value) => {
-            void controller.preferences.setMode(
-              value === 'browser-managed' ? 'browser-managed' : 'local-first'
-            );
-          }}
-          options={[
-            { value: 'local-first', label: translate('settings.voiceInput.modeLocalFirst') },
-            {
-              value: 'browser-managed',
-              label: translate('settings.voiceInput.modeBrowserManaged'),
-            },
-          ]}
-        />
-      </SettingsControlRow>
+      {controller.preferences.backend === 'browser' ? (
+        <SettingsControlRow label={translate('settings.voiceInput.modeLabel')}>
+          <ProductSelect
+            aria-label={translate('settings.voiceInput.modeLabel')}
+            disabled={
+              active ||
+              controller.preferences.saving ||
+              controller.status.checking ||
+              controller.status.installing
+            }
+            value={controller.preferences.mode}
+            onChange={(value) => {
+              void controller.preferences.setMode(
+                value === 'browser-managed' ? 'browser-managed' : 'local-first'
+              );
+            }}
+            options={[
+              { value: 'local-first', label: translate('settings.voiceInput.modeLocalFirst') },
+              {
+                value: 'browser-managed',
+                label: translate('settings.voiceInput.modeBrowserManaged'),
+              },
+            ]}
+          />
+        </SettingsControlRow>
+      ) : null}
     </div>
   );
 }
@@ -329,12 +342,19 @@ function VoiceInputActions({
   active,
   controller,
   installAvailable,
+  pending,
 }: {
   active: boolean;
+  pending: boolean;
   controller: VoiceInputSettingsController;
   installAvailable: boolean;
 }) {
   const startDisabled =
+    pending ||
+    (controller.preferences.backend === 'model' &&
+      controller.models.transcriptionSelectionId === null) ||
+    (controller.preferences.correction.enabled &&
+      controller.models.correctionSelectionId === null) ||
     controller.status.microphoneAccess !== 'granted' ||
     controller.status.checking ||
     controller.status.installing ||
@@ -381,6 +401,7 @@ function VoiceInputActions({
       <ProductActionButton
         compact
         tone="primary"
+        data-ui="settings.voice.start"
         disabled={!active && startDisabled}
         type="button"
         onClick={(event) => {
@@ -402,16 +423,27 @@ function VoiceInputActions({
           compact
           tone="secondary"
           type="button"
+          data-ui="settings.voice.stop"
           onClick={controller.actions.stop}
         >
           <Square aria-hidden="true" className="h-4 w-4" />
           {translate('settings.voiceInput.stop')}
         </ProductActionButton>
       ) : null}
+      {pending ? (
+        <ProductActionButton
+          compact
+          tone="secondary"
+          data-ui="settings.voice.cancel"
+          onClick={controller.actions.cancel}
+        >
+          {translate('settings.voiceInput.cancel')}
+        </ProductActionButton>
+      ) : null}
       <ProductActionButton
         compact
         tone="secondary"
-        disabled={active || controller.status.checking}
+        disabled={active || pending || controller.status.checking}
         type="button"
         onClick={() => void controller.actions.refresh()}
       >
@@ -508,15 +540,18 @@ function VoiceInputLevelMeter({
 
 function VoiceInputTestPanel({
   active,
+  pending,
   controller,
 }: {
   active: boolean;
+  pending: boolean;
   controller: VoiceInputSettingsController;
 }) {
   const transcript = `${controller.transcript.finalText}${controller.transcript.interimText}`;
   const installAvailable =
     !active &&
     controller.status.microphoneAccess === 'granted' &&
+    controller.preferences.backend === 'browser' &&
     controller.preferences.mode === 'local-first' &&
     (controller.status.snapshot.localAvailability === 'downloadable' ||
       controller.status.snapshot.localAvailability === 'downloading');
@@ -541,7 +576,7 @@ function VoiceInputTestPanel({
         <ProductTextarea
           className="!min-h-20 w-full resize-y !text-[13px] !leading-5"
           placeholder={translate('settings.voiceInput.textareaPlaceholder')}
-          readOnly={active}
+          readOnly={active || pending}
           value={transcript}
           onChange={(event) => controller.transcript.setFinalText(event.target.value)}
         />
@@ -555,6 +590,7 @@ function VoiceInputTestPanel({
         active={active}
         controller={controller}
         installAvailable={installAvailable}
+        pending={pending}
       />
     </div>
   );
@@ -562,6 +598,8 @@ function VoiceInputTestPanel({
 
 export function VoiceInputSettingsContent(controller: VoiceInputSettingsController) {
   const active = isActive(controller);
+  const phase = controller.status.snapshot.phase;
+  const pending = phase === 'stopping' || phase === 'processing-asr' || phase === 'processing-text';
   return (
     <section className={settingsSectionClassName}>
       <ErrorNotice
@@ -570,8 +608,21 @@ export function VoiceInputSettingsContent(controller: VoiceInputSettingsControll
         errorCode={controller.status.snapshot.errorCode}
       />
 
-      <VoiceInputPreferencesPanel active={active} controller={controller} />
-      <VoiceInputTestPanel active={active} controller={controller} />
+      <VoiceModelPreferences
+        controller={controller}
+        disabled={active || pending || controller.preferences.saving}
+      />
+      <VoiceInputPreferencesPanel active={active || pending} controller={controller} />
+      <VoiceInputTestPanel active={active} pending={pending} controller={controller} />
+      <VoiceInputHistoryPanel
+        refreshToken={phase}
+        canRetry={controller.models.transcriptionSelectionId !== null}
+        retryModelLabel={
+          controller.models.transcription.models.find(
+            (model) => model.id === controller.models.transcriptionSelectionId
+          )?.displayName ?? null
+        }
+      />
 
       <details className={`${settingsCompactWorkbenchClassName} group/voice-status`}>
         <summary

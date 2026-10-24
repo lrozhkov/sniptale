@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { usePushToTalk } from '@sniptale/ui/voice-input/use-push-to-talk';
 import { isTrustedMouseEvent, isTrustedPointerEvent } from './trusted-events';
 import type { VoiceInputState } from './session';
+import { translate } from '../../platform/i18n';
 
 type VoiceInputButtonProps = {
   appearance?: 'contrast' | 'default';
@@ -12,11 +13,13 @@ type VoiceInputButtonProps = {
   labels: { error: string; start: string; stop: string };
   onStart(): void;
   onStop(): void;
+  onCancel?(): void;
   state: VoiceInputState;
   style?: CSSProperties;
 };
 
 function resolveVoiceButtonLabel(props: VoiceInputButtonProps): string {
+  if (props.state.pending) return translate('settings.voiceInput.cancel');
   if (props.state.errorCode !== null) return props.labels.error;
   return props.state.active ? props.labels.stop : props.labels.start;
 }
@@ -79,7 +82,7 @@ export function VoiceInputButton(props: VoiceInputButtonProps) {
     onStart: props.onStart,
     onStop: props.onStop,
   });
-  const stopping = props.state.phase === 'stopping';
+  const stopping = props.state.pending;
   const contrast = props.appearance === 'contrast';
   const label = resolveVoiceButtonLabel(props);
   const level = Math.max(0, Math.min(props.state.audioLevel, 1));
@@ -90,17 +93,25 @@ export function VoiceInputButton(props: VoiceInputButtonProps) {
       aria-pressed={props.state.active}
       className={getVoiceButtonClassName(props)}
       data-ui={props.dataUi}
-      disabled={props.disabled || stopping}
+      disabled={props.disabled || (stopping && !props.onCancel)}
       style={props.style}
       title={label}
       type="button"
       onClick={(event) => {
         if (event.detail !== 0) return;
+        if (props.state.pending) {
+          props.onCancel?.();
+          return;
+        }
         if (props.state.active) props.onStop();
         else if (isTrustedMouseEvent(event.nativeEvent)) props.onStart();
       }}
       onPointerCancel={pushToTalk.onPointerCancel}
       onPointerDown={(event) => {
+        if (props.state.pending) {
+          if (event.button === 0) props.onCancel?.();
+          return;
+        }
         if (props.state.active) {
           if (event.button === 0) props.onStop();
           return;

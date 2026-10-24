@@ -256,6 +256,7 @@ export interface AISettings {
   globalSystemPrompt: string;
   scenarioEditorSystemPrompt: string;
   audioTranscriptionSystemPrompt?: string;
+  voiceInputCorrectionSystemPrompt?: string;
 }
 
 export interface PromptTemplate {

@@ -38,6 +38,7 @@ function renderButton(active: boolean, onStart = vi.fn(), onStop = vi.fn()) {
         onStop={onStop}
         state={{
           active,
+          pending: false,
           audioLevel: active ? 0.5 : 0,
           errorCode: null,
           phase: active ? 'listening' : 'idle',
@@ -77,7 +78,7 @@ it('uses the contrast surface and inverse icon treatment above arbitrary page co
         labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
         onStart={vi.fn()}
         onStop={vi.fn()}
-        state={{ active: false, audioLevel: 0, errorCode: null, phase: 'idle' }}
+        state={{ active: false, pending: false, audioLevel: 0, errorCode: null, phase: 'idle' }}
       />
     );
   });
@@ -95,7 +96,13 @@ it('uses the contrast surface and inverse icon treatment above arbitrary page co
         labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
         onStart={vi.fn()}
         onStop={vi.fn()}
-        state={{ active: true, audioLevel: 0.5, errorCode: null, phase: 'listening' }}
+        state={{
+          active: true,
+          pending: false,
+          audioLevel: 0.5,
+          errorCode: null,
+          phase: 'listening',
+        }}
       />
     );
   });
@@ -119,7 +126,7 @@ it('keeps the pointer stable while an internal stop is settling', () => {
         labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
         onStart={vi.fn()}
         onStop={vi.fn()}
-        state={{ active: false, audioLevel: 0, errorCode: null, phase: 'stopping' }}
+        state={{ active: false, pending: true, audioLevel: 0, errorCode: null, phase: 'stopping' }}
       />
     );
   });
@@ -146,7 +153,13 @@ it('renders error and disabled states and stops an active pointer session', () =
         labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
         onStart={vi.fn()}
         onStop={vi.fn()}
-        state={{ active: false, audioLevel: 0, errorCode: 'runtime', phase: 'error' }}
+        state={{
+          active: false,
+          pending: false,
+          audioLevel: 0,
+          errorCode: 'runtime',
+          phase: 'error',
+        }}
       />
     );
   });
@@ -154,4 +167,34 @@ it('renders error and disabled states and stops an active pointer session', () =
   expect(error?.title).toBe('Error');
   expect(error?.className).toContain('color-danger');
   expect(error?.className).toContain('disabled:opacity-45');
+});
+
+it('uses Cancel during processing and never restarts dictation', () => {
+  const onCancel = vi.fn();
+  const onStart = vi.fn();
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  act(() =>
+    root?.render(
+      <ContentVoiceInputButton
+        dataUi="processing"
+        disabled={false}
+        labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
+        onStart={onStart}
+        onStop={vi.fn()}
+        onCancel={onCancel}
+        state={{
+          active: false,
+          pending: true,
+          audioLevel: 0,
+          errorCode: null,
+          phase: 'processing-asr',
+        }}
+      />
+    )
+  );
+  act(() => container?.querySelector('button')?.click());
+  expect(onCancel).toHaveBeenCalledOnce();
+  expect(onStart).not.toHaveBeenCalled();
 });

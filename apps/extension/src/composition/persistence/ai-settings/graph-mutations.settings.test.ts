@@ -8,6 +8,8 @@ const coreMocks = vi.hoisted(() => ({
   lockAISecretProtection: vi.fn(),
   resetAudioTranscriptionSystemPrompt: vi.fn(),
   saveAudioTranscriptionSystemPrompt: vi.fn(),
+  saveVoiceInputCorrectionSystemPrompt: vi.fn(),
+  resetVoiceInputCorrectionSystemPrompt: vi.fn(),
   resetGlobalSystemPrompt: vi.fn(),
   resetAISecretPassphraseProtection: vi.fn(),
   resetScenarioEditorSystemPrompt: vi.fn(),
@@ -114,4 +116,126 @@ it('keeps recognition prompt save/reset ordered with other AI settings mutations
   expect(coreMocks.saveAudioTranscriptionSystemPrompt.mock.invocationCallOrder[0]).toBeLessThan(
     coreMocks.resetAudioTranscriptionSystemPrompt.mock.invocationCallOrder[0]!
   );
+});
+
+it('orders correction prompt writes and permits an explicit retry after failure', async () => {
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  coreMocks.saveVoiceInputCorrectionSystemPrompt.mockImplementationOnce(async () => {
+    entered.resolve();
+    await release.promise;
+    throw new Error('storage unavailable');
+  });
+  const first = mutateStoredAISettings({
+    operation: 'save-voice-input-correction-prompt',
+    prompt: 'First',
+  });
+  const rejected = expect(first).rejects.toThrow('storage unavailable');
+  await entered.promise;
+  const retry = mutateStoredAISettings({
+    operation: 'save-voice-input-correction-prompt',
+    prompt: 'Retry',
+  });
+  const reset = mutateStoredAISettings({ operation: 'reset-voice-input-correction-prompt' });
+  expect(coreMocks.saveVoiceInputCorrectionSystemPrompt).toHaveBeenCalledTimes(1);
+  expect(coreMocks.resetVoiceInputCorrectionSystemPrompt).not.toHaveBeenCalled();
+  release.resolve();
+  await rejected;
+  await retry;
+  await reset;
+  expect(coreMocks.saveVoiceInputCorrectionSystemPrompt).toHaveBeenLastCalledWith('Retry');
+  expect(coreMocks.saveVoiceInputCorrectionSystemPrompt.mock.invocationCallOrder[1]).toBeLessThan(
+    coreMocks.resetVoiceInputCorrectionSystemPrompt.mock.invocationCallOrder[0]!
+  );
+});
+
+it('preserves correction prompt queue order relative to unrelated settings commands', async () => {
+  const commands: string[] = [];
+  coreMocks.saveVoiceInputCorrectionSystemPrompt.mockImplementationOnce(async () => {
+    commands.push('correction');
+  });
+  coreMocks.saveGlobalSystemPrompt.mockImplementationOnce(async () => {
+    commands.push('global');
+  });
+  const correction = mutateStoredAISettings({
+    operation: 'save-voice-input-correction-prompt',
+    prompt: 'Correction',
+  });
+  const global = mutateStoredAISettings({ operation: 'save-global-prompt', prompt: 'Global' });
+  await Promise.all([correction, global]);
+  expect(commands).toEqual(['correction', 'global']);
+});
+
+it.each(['validation', 'save', 'reset'] as const)(
+  'releases correction admission after %s failure so erasure and explicit retry can finish',
+  async (failure) => {
+    const { runWithPersistentDataErasureBarrier } =
+      await import('../infrastructure/mutation-barrier');
+    coreMocks.saveVoiceInputCorrectionSystemPrompt.mockResolvedValue(undefined);
+    coreMocks.resetVoiceInputCorrectionSystemPrompt.mockResolvedValue(undefined);
+    if (failure === 'validation') invariantMock.mockRejectedValueOnce(new Error('failed'));
+    if (failure === 'save')
+      coreMocks.saveVoiceInputCorrectionSystemPrompt.mockRejectedValueOnce(new Error('failed'));
+    if (failure === 'reset')
+      coreMocks.resetVoiceInputCorrectionSystemPrompt.mockRejectedValueOnce(new Error('failed'));
+    await expect(
+      mutateStoredAISettings(
+        failure === 'reset'
+          ? {
+              operation: 'reset-voice-input-correction-prompt',
+            }
+          : { operation: 'save-voice-input-correction-prompt', prompt: 'First' }
+      )
+    ).rejects.toThrow('failed');
+    await expect(runWithPersistentDataErasureBarrier(async () => 'verified')).resolves.toBe(
+      'verified'
+    );
+    await mutateStoredAISettings({
+      operation: 'save-voice-input-correction-prompt',
+      prompt: 'Retry',
+    });
+    await mutateStoredAISettings({ operation: 'reset-voice-input-correction-prompt' });
+    expect(coreMocks.saveVoiceInputCorrectionSystemPrompt).toHaveBeenLastCalledWith('Retry');
+    expect(coreMocks.resetVoiceInputCorrectionSystemPrompt).toHaveBeenCalled();
+  }
+);
+
+it('observes failed correction admission behind a busy queue and allows an explicit retry', async () => {
+  const { installPersistenceLockManagerForTests } =
+    await import('../infrastructure/mutation-barrier');
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  coreMocks.saveGlobalSystemPrompt.mockImplementationOnce(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  const previous = mutateStoredAISettings({ operation: 'save-global-prompt', prompt: 'Global' });
+  await entered.promise;
+  const validations = invariantMock.mock.calls.length;
+  installPersistenceLockManagerForTests({
+    request() {
+      return Promise.reject(new Error('admission unavailable'));
+    },
+  });
+  try {
+    const refused = mutateStoredAISettings({
+      operation: 'save-voice-input-correction-prompt',
+      prompt: 'Refused',
+    });
+    const rejected = expect(refused).rejects.toThrow('admission unavailable');
+    expect(coreMocks.saveVoiceInputCorrectionSystemPrompt).not.toHaveBeenCalled();
+    expect(invariantMock).toHaveBeenCalledTimes(validations);
+    release.resolve();
+    await previous;
+    await rejected;
+    expect(coreMocks.saveVoiceInputCorrectionSystemPrompt).not.toHaveBeenCalled();
+  } finally {
+    release.resolve();
+    installPersistenceLockManagerForTests(null);
+  }
+  await mutateStoredAISettings({
+    operation: 'save-voice-input-correction-prompt',
+    prompt: 'Retry',
+  });
+  expect(coreMocks.saveVoiceInputCorrectionSystemPrompt).toHaveBeenLastCalledWith('Retry');
 });

@@ -62,12 +62,21 @@ interface DesignReviewCommentActions {
 interface DesignReviewCommentVoiceActions {
   start: (caretPosition: number) => void;
   stop: () => void;
+  cancel: () => void;
 }
 
 interface DesignReviewCommentVoiceViewState {
   active: boolean;
+  pending: boolean;
   audioLevel: number;
   caretPosition: number | null;
   errorCode: VoiceInputErrorCode | 'runtime' | null;
-  phase: 'error' | 'idle' | 'listening' | 'starting' | 'stopping';
+  phase:
+    | 'error'
+    | 'idle'
+    | 'listening'
+    | 'starting'
+    | 'stopping'
+    | 'processing-asr'
+    | 'processing-text';
 }

@@ -63,6 +63,7 @@ beforeEach(() => {
   });
   listeners = new Set();
   client = {
+    cancel: vi.fn(() => 'cancel-1'),
     disconnect: vi.fn(),
     refresh: vi.fn(() => 'refresh-1'),
     start: vi.fn(() => 'session-1'),
@@ -157,7 +158,7 @@ afterEach(() => {
   latest = null;
 });
 
-it('routes only the owning session transcript and stops accepting after stop', async () => {
+it('keeps final transcript acceptance after Stop and rejects it after Cancel', async () => {
   await act(async () => latest?.actions.start());
   const transcript = {
     confidence: 0.8,
@@ -172,6 +173,42 @@ it('routes only the owning session transcript and stops accepting after stop', a
 
   act(() => latest?.actions.stop());
   emit({ ...transcript, sequence: 1, sessionId: 'session-1', text: 'late' });
-  expect(onTranscript).toHaveBeenCalledOnce();
+  expect(onTranscript).toHaveBeenCalledTimes(2);
   expect(client.stop).toHaveBeenCalledWith('session-1');
+  act(() => latest?.actions.cancel());
+  emit({ ...transcript, sequence: 2, sessionId: 'session-1', text: 'cancelled' });
+  expect(onTranscript).toHaveBeenCalledTimes(2);
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
+});
+
+it('accepts one processed final after Stop and blocks duplicate insertion and new starts while pending', async () => {
+  await act(async () => latest?.actions.start());
+  emit({
+    snapshot: { ...listeningSnapshot, delivery: 'final' },
+    type: VoiceInputPortMessageType.SNAPSHOT,
+  });
+  act(() => latest?.actions.stop());
+  emit({
+    snapshot: { ...listeningSnapshot, delivery: 'final', phase: 'processing-asr' },
+    type: VoiceInputPortMessageType.SNAPSHOT,
+  });
+  expect(latest?.state).toMatchObject({ active: false, pending: true });
+  await act(async () => latest?.actions.start());
+  expect(client.start).toHaveBeenCalledOnce();
+  const event = {
+    type: VoiceInputPortMessageType.TRANSCRIPT,
+    confidence: null,
+    isFinal: true,
+    sequence: 0,
+    sessionId: 'session-1',
+    text: 'processed',
+  } as const;
+  emit(event);
+  emit({ ...event, sequence: 1 });
+  expect(onTranscript).toHaveBeenCalledOnce();
+  emit({
+    snapshot: { ...listeningSnapshot, phase: 'ended' },
+    type: VoiceInputPortMessageType.SNAPSHOT,
+  });
+  expect(latest?.state.pending).toBe(false);
 });

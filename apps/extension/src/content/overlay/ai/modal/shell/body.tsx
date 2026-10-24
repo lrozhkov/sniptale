@@ -21,12 +21,12 @@ export function AIModalContent({
   state: ReturnType<typeof useAIModalState>;
 }) {
   const handleClose = () => {
-    state.voice.actions.stop();
+    state.voice.actions.cancel();
     onClose();
   };
   const handleSubmit = createAIModalSubmitHandler(
     (...args) => {
-      state.voice.actions.stop();
+      state.voice.actions.cancel();
       onSubmit(...args);
     },
     isLoading,
@@ -44,7 +44,7 @@ export function AIModalContent({
     <>
       <AIModalDialog
         onClose={handleClose}
-        onStopVoice={state.voice.actions.stop}
+        onStopVoice={state.voice.actions.cancel}
         promptField={renderAIModalPromptField({
           disabled: Boolean(isLoading),
           handleKeyDown,
@@ -52,7 +52,7 @@ export function AIModalContent({
         })}
         state={state}
         title={<AIModalHeaderTitle {...(treeData === undefined ? {} : { treeData })} />}
-        voiceActive={state.voice.state.active}
+        voiceActive={state.voice.state.active || state.voice.state.pending}
         {...(isLoading === undefined ? {} : { isLoading })}
         {...(onCancelLoading === undefined ? {} : { onCancelLoading })}
         {...(treeData === undefined ? {} : { treeData })}

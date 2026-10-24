@@ -9,6 +9,8 @@ import {
 } from './guards';
 import {
   AI_AUDIO_TRANSCRIPTION_PROMPT_KEY,
+  AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
+  DEFAULT_VOICE_INPUT_CORRECTION_SYSTEM_PROMPT,
   DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT,
   AI_CHROME_ENABLED_KEY,
   AI_DEFAULT_MODEL_KEY,
@@ -261,4 +263,31 @@ export async function resetAudioTranscriptionSystemPrompt(): Promise<void> {
   await initializeAiStorageAccess();
   await browserStorage.local.remove(AI_AUDIO_TRANSCRIPTION_PROMPT_KEY);
   logger.info('Audio transcription instructions reset');
+}
+
+/** Reads local correction instructions without credentials or storage repair. */
+export async function loadVoiceInputCorrectionSystemPrompt(): Promise<string> {
+  const result = await browserStorage.local.get([AI_VOICE_INPUT_CORRECTION_PROMPT_KEY]);
+  const value = result[AI_VOICE_INPUT_CORRECTION_PROMPT_KEY];
+  return typeof value === 'string' && value.length <= 10000
+    ? value
+    : DEFAULT_VOICE_INPUT_CORRECTION_SYSTEM_PROMPT;
+}
+
+/** Saves bounded correction instructions through the existing local settings writer. */
+export async function saveVoiceInputCorrectionSystemPrompt(prompt: string): Promise<void> {
+  if (prompt.length > 10000) throw new Error('Invalid voice correction instructions');
+  await initializeAiStorageAccess();
+  return saveLocalValue(
+    AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
+    prompt,
+    'Voice input correction instructions saved'
+  );
+}
+
+/** Restores the default correction instructions by removing the local override. */
+export async function resetVoiceInputCorrectionSystemPrompt(): Promise<void> {
+  await initializeAiStorageAccess();
+  await browserStorage.local.remove(AI_VOICE_INPUT_CORRECTION_PROMPT_KEY);
+  logger.info('Voice input correction instructions reset');
 }

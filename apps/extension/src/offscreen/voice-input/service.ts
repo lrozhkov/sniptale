@@ -6,6 +6,7 @@ import {
   type VoiceInputErrorCode,
   type VoiceInputBusyOwner,
   type VoiceInputPreferences,
+  type VoiceCaptureToken,
   type VoiceInputServerEvent,
   type VoiceInputSnapshot,
 } from '@sniptale/runtime-contracts/voice-input';
@@ -31,6 +32,7 @@ function createSnapshot(
   api = resolveSpeechRecognitionApi()
 ): VoiceInputSnapshot {
   return {
+    delivery: preferences.backend === 'model' || preferences.correction?.enabled ? 'final' : 'live',
     apiFlavor: api.flavor,
     busyOwner: inspectVoiceInputBusyOwner(),
     effectiveMode: null,
@@ -57,6 +59,7 @@ function emitEvent(deps: VoiceInputRecognitionDeps, event: VoiceInputServerEvent
 
 export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps) {
   let active: VoiceInputRecognitionRun | null = null;
+  const retiring = new Set<VoiceInputRecognitionRun>();
   let snapshot = createSnapshot(
     { language: 'ru-RU', microphoneDeviceId: null, mode: 'local-first' },
     deps.resolveApi()
@@ -86,6 +89,7 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
   }
 
   function start(args: {
+    captureToken: VoiceCaptureToken;
     maxDurationMs: number | null;
     preferences: VoiceInputPreferences;
     requestId: string;
@@ -113,6 +117,7 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
       sessionId: args.sessionId,
     };
     const run = createVoiceInputRecognitionRun({
+      captureToken: args.captureToken,
       callbacks: {
         isCurrent: (candidate) => active === candidate,
         onFinished: (candidate, nextSnapshot) => {
@@ -141,7 +146,10 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
     if (!active || active.sessionId !== sessionId) return 'stale';
     if (force) {
       const preferences = active.preferences;
-      active.abort();
+      const stopped = active;
+      stopped.abort();
+      retiring.add(stopped);
+      void stopped.drain().finally(() => retiring.delete(stopped));
       active = null;
       snapshot = createSnapshot(preferences, deps.resolveApi());
       return 'accepted';
@@ -155,6 +163,10 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
   }
 
   return {
+    async drain() {
+      const runs = [...retiring, ...(active ? [active] : [])];
+      await Promise.all(runs.map((run) => run.drain()));
+    },
     abortOnUnload,
     getSnapshot: () => snapshot,
     start,

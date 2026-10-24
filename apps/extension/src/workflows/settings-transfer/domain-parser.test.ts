@@ -113,3 +113,15 @@ it('admits bounded optional recognition instructions without changing legacy pro
     })
   ).toThrow();
 });
+
+it('retains bounded optional voice correction prompts and rejects oversized values', () => {
+  const payload = {
+    'ai.prompts': { schemaVersion: 1, data: { voiceCorrection: 'Keep my meaning' } },
+  };
+  expect(parseSettingsTransferDomains(payload)).toEqual(payload);
+  expect(() =>
+    parseSettingsTransferDomains({
+      'ai.prompts': { schemaVersion: 1, data: { voiceCorrection: 'x'.repeat(10001) } },
+    })
+  ).toThrow();
+});

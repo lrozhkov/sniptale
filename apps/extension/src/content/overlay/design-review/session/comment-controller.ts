@@ -12,7 +12,10 @@ export function useDesignReviewCommentController(args: {
   return {
     close: draft.closeComment,
     draftActions: {
-      commit: draft.commitComment,
+      commit: () => {
+        voice.actions.cancel();
+        return draft.commitComment();
+      },
       endComposition: draft.endCommentComposition,
       startComposition: draft.startCommentComposition,
       updateDraft: draft.updateCommentDraft,
@@ -21,6 +24,7 @@ export function useDesignReviewCommentController(args: {
       void voice.actions.start(draft.commentDraft, caretPosition);
     },
     stopVoice: voice.actions.stop,
+    cancelVoice: voice.actions.cancel,
     view: {
       comment: {
         commitFailed: draft.commentCommitFailed,

@@ -8,6 +8,7 @@ const io = vi.hoisted(() => ({
   phase: 'idle' as 'idle' | 'stopping',
   start: vi.fn(),
   stop: vi.fn(),
+  cancel: vi.fn(),
   change: vi.fn(),
   transcript: null as
     | null
@@ -17,8 +18,14 @@ vi.mock('../../composition/voice-input/session', () => ({
   useVoiceInputSession: (args: { onTranscript: typeof io.transcript }) => {
     io.transcript = args.onTranscript;
     return {
-      actions: { start: io.start, stop: io.stop },
-      state: { active: false, audioLevel: 0, phase: io.phase, errorCode: null },
+      actions: { start: io.start, stop: io.stop, cancel: io.cancel },
+      state: {
+        active: false,
+        pending: io.phase === 'stopping',
+        audioLevel: 0,
+        phase: io.phase,
+        errorCode: null,
+      },
     };
   },
 }));
@@ -132,7 +139,7 @@ it('stops on leaving the field and rejects late final text', async () => {
   await click('Start');
   await act(async () => field().blur());
   await transcript('late');
-  expect(io.stop).toHaveBeenCalled();
+  expect(io.cancel).toHaveBeenCalled();
   expect(io.change).not.toHaveBeenCalled();
 });
 it('stops when disabled and prevents new text or recording', async () => {
@@ -140,12 +147,12 @@ it('stops when disabled and prevents new text or recording', async () => {
   await click('Start');
   await mount({ disabled: true });
   await transcript('late');
-  expect(io.stop).toHaveBeenCalled();
+  expect(io.cancel).toHaveBeenCalled();
   expect(io.change).not.toHaveBeenCalled();
   await click('Start');
   expect(io.start).toHaveBeenCalledOnce();
 });
-it('honors explicit stop and collapses newlines in the project name', async () => {
+it('retains the insertion after explicit stop and collapses newlines in the project name', async () => {
   await mount({ singleLine: true });
   field().setSelectionRange(0, 11);
   await click('Start');
@@ -153,7 +160,8 @@ it('honors explicit stop and collapses newlines in the project name', async () =
   expect(field().value).toBe('New name');
   await click('Stop');
   await transcript('late', 2);
-  expect(field().value).toBe('New name');
+  expect(field().value).toBe('New name late');
+  expect(io.stop).toHaveBeenCalledOnce();
 });
 it('tracks an explicitly moved caret during dictation', async () => {
   await mount();
@@ -226,7 +234,7 @@ it('clears the draft, restores focus and ignores late dictation', async () => {
   expect(field().value).toBe('');
   expect(document.activeElement).toBe(field());
   expect(field().selectionStart).toBe(0);
-  expect(io.stop).toHaveBeenCalled();
+  expect(io.cancel).toHaveBeenCalled();
   await transcript('late result');
   expect(field().value).toBe('');
   expect(clear.disabled).toBe(true);
@@ -302,4 +310,17 @@ it('provides an ordinary field placeholder without adding text to authored prose
   expect(field().placeholder).toBe('Project name');
   await renderField({});
   expect(field().placeholder).toBe('');
+});
+
+it('does not replace a pending insertion with a new start', async () => {
+  await mount();
+  field().setSelectionRange(6, 11);
+  await click('Start');
+  await click('Stop');
+  io.phase = 'stopping';
+  await mount();
+  await click('Start');
+  await transcript('final');
+  expect(field().value).toBe('hello final');
+  expect(io.start).toHaveBeenCalledOnce();
 });

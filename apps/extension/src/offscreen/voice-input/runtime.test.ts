@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   serviceDeps: null as { emit(event: unknown): Promise<unknown> } | null,
   start: vi.fn(),
   stop: vi.fn(),
+  drain: vi.fn(),
   telemetryDisconnect: vi.fn(),
   telemetryOnDisconnectAdd: vi.fn(),
   telemetryOnDisconnectRemove: vi.fn(),
@@ -62,6 +63,7 @@ vi.mock('./service', () => ({
       getSnapshot: mocks.getSnapshot,
       start: mocks.start,
       stop: mocks.stop,
+      drain: mocks.drain,
     };
   },
 }));
@@ -77,6 +79,13 @@ let generationSequence = 0;
 function startMessage() {
   return {
     capabilityToken: 'capability',
+    captureToken: {
+      entryId: 'entry',
+      incarnation: 'incarnation',
+      epoch: 'epoch',
+      sequence: 1,
+      createdAt: 1,
+    },
     maxDurationMs: null,
     preferences: {
       language: 'ru-RU' as const,
@@ -106,6 +115,7 @@ beforeEach(() => {
   mocks.getSnapshot.mockReturnValue({ phase: 'idle' });
   mocks.start.mockReturnValue({ phase: 'starting', sessionId: 'session-1' });
   mocks.stop.mockReturnValue('accepted');
+  mocks.drain.mockResolvedValue(undefined);
   generationSequence += 1;
   const generation = `generation-${generationSequence}`;
   mocks.authorize.mockImplementation(({ message }) => ({
@@ -167,6 +177,7 @@ describe('offscreen voice input runtime boundary', () => {
 
     expect(mocks.start).toHaveBeenCalledOnce();
     expect(mocks.start).toHaveBeenCalledWith({
+      captureToken: startMessage().captureToken,
       maxDurationMs: null,
       preferences: { language: 'ru-RU', microphoneDeviceId: null, mode: 'local-first' },
       requestId: 'request-1',
@@ -233,6 +244,7 @@ describe('offscreen voice input runtime boundary', () => {
     };
     expect(mocks.listener?.(message, sender, respond)).toBe(false);
     mocks.stop.mockReturnValue('accepted');
+    mocks.drain.mockResolvedValue(undefined);
     expect(mocks.listener?.(message, sender, respond)).toBe(true);
 
     await vi.waitFor(() => expect(respond).toHaveBeenCalledTimes(2));

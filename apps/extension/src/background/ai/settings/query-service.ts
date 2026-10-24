@@ -1,5 +1,6 @@
 import {
   loadAudioTranscriptionSystemPrompt,
+  loadVoiceInputCorrectionSystemPrompt,
   loadAIModels,
   loadAIProviders,
   loadAISecretProtectionStatus,
@@ -86,16 +87,19 @@ async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataP
     scenarioEditorSystemPrompt,
     secretProtectionStatus,
     audioTranscriptionSystemPrompt,
+    voiceInputCorrectionSystemPrompt,
   ] = await Promise.all([
     loadStoredModelSelection(),
     loadScenarioEditorSystemPrompt(),
     loadAISecretProtectionStatus(),
     loadAudioTranscriptionSystemPrompt(),
+    loadVoiceInputCorrectionSystemPrompt(),
   ]);
 
   return {
     scenarioEditorSystemPrompt,
     audioTranscriptionSystemPrompt,
+    voiceInputCorrectionSystemPrompt,
     secretProtectionStatus,
     selectionBootstrap,
   };

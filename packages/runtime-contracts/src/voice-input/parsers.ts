@@ -1,5 +1,10 @@
+import { parseVoiceCaptureToken, parseVoiceInputHistoryScope } from './history';
+import { SHA256_DIGEST_PATTERN } from '../protocol/digest';
 import { MessageType } from '../messaging/message-types/index';
 import {
+  VOICE_HISTORY_MAX_DURATION_SECONDS,
+  isVoiceInputErrorCode,
+  isVoiceInputLanguage,
   VOICE_INPUT_LEVEL_PEAK_COUNT,
   VOICE_INPUT_DEVICE_ID_MAX_CHARS,
   VOICE_INPUT_LOCAL_QUALITY,
@@ -11,17 +16,17 @@ import {
 // policyStateIds: [] - these sets are immutable parser allowlists, not mutable authority state.
 import type {
   OffscreenVoiceInputRuntimeMessage,
+  VoiceInputCaptureEvent,
   VoiceInputApiFlavor,
   VoiceInputBusyOwner,
   VoiceInputEffectiveMode,
-  VoiceInputErrorCode,
   VoiceInputFallbackReason,
-  VoiceInputLanguage,
   VoiceInputLocalAvailability,
   VoiceInputMode,
   VoiceInputPhase,
   VoiceInputPortRequest,
   VoiceInputPreferences,
+  VoiceProviderSelection,
   VoiceInputServerEvent,
   VoiceInputSnapshot,
 } from './types';
@@ -51,10 +56,6 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
-export function isVoiceInputLanguage(value: unknown): value is VoiceInputLanguage {
-  return value === 'ru-RU' || value === 'en-US';
-}
-
 export function isVoiceInputMode(value: unknown): value is VoiceInputMode {
   return value === 'local-first' || value === 'browser-managed';
 }
@@ -62,13 +63,27 @@ export function isVoiceInputMode(value: unknown): value is VoiceInputMode {
 export function parseVoiceInputPreferences(value: unknown): VoiceInputPreferences | null {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, ['language', 'microphoneDeviceId', 'mode']) ||
+    !hasOnlyKeys(value, [
+      'language',
+      'microphoneDeviceId',
+      'mode',
+      'backend',
+      'transcription',
+      'correction',
+    ]) ||
     !isVoiceInputLanguage(value['language']) ||
     (value['microphoneDeviceId'] !== undefined &&
       value['microphoneDeviceId'] !== null &&
       (!isNonEmptyString(value['microphoneDeviceId']) ||
         value['microphoneDeviceId'].length > VOICE_INPUT_DEVICE_ID_MAX_CHARS)) ||
-    !isVoiceInputMode(value['mode'])
+    !isVoiceInputMode(value['mode']) ||
+    (value['backend'] !== undefined &&
+      value['backend'] !== 'browser' &&
+      value['backend'] !== 'model') ||
+    (value['transcription'] !== undefined &&
+      value['transcription'] !== null &&
+      !parseVoiceProviderSelection(value['transcription'])) ||
+    (value['correction'] !== undefined && !parseVoiceCorrection(value['correction']))
   ) {
     return null;
   }
@@ -77,6 +92,63 @@ export function parseVoiceInputPreferences(value: unknown): VoiceInputPreference
     microphoneDeviceId:
       typeof value['microphoneDeviceId'] === 'string' ? value['microphoneDeviceId'] : null,
     mode: value['mode'],
+    ...(value['backend'] === undefined ? {} : { backend: value['backend'] }),
+    ...(value['transcription'] === undefined
+      ? {}
+      : { transcription: parseVoiceProviderSelection(value['transcription']) }),
+    ...(value['correction'] === undefined
+      ? {}
+      : { correction: parseVoiceCorrection(value['correction'])! }),
+  };
+}
+
+/** Parses a user-approved model identity; this value does not itself authorize a request. */
+export function parseVoiceProviderSelection(value: unknown): VoiceProviderSelection | null {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, [
+      'modelId',
+      'approvedProviderId',
+      'approvedDestination',
+      'approvedModelCode',
+    ])
+  )
+    return null;
+  const { modelId, approvedProviderId, approvedDestination, approvedModelCode } = value;
+  if (
+    ![modelId, approvedProviderId, approvedModelCode].every(
+      (field) => typeof field === 'string' && field.length > 0 && field.length <= 512
+    ) ||
+    typeof modelId !== 'string' ||
+    typeof approvedProviderId !== 'string' ||
+    typeof approvedModelCode !== 'string' ||
+    typeof approvedDestination !== 'string' ||
+    !SHA256_DIGEST_PATTERN.test(approvedDestination)
+  )
+    return null;
+  return { modelId, approvedProviderId, approvedDestination, approvedModelCode };
+}
+
+function parseVoiceCorrection(
+  value: unknown
+): NonNullable<VoiceInputPreferences['correction']> | null {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ['enabled', 'model']) ||
+    typeof value['enabled'] !== 'boolean'
+  )
+    return null;
+  const model = value['model'] === null ? null : parseVoiceProviderSelection(value['model']);
+  return value['model'] !== null && !model ? null : { enabled: value['enabled'], model };
+}
+
+/** Resolves legacy absence without silently changing an explicitly selected model backend. */
+export function resolveVoiceInputPreferences(value: VoiceInputPreferences) {
+  return {
+    ...value,
+    backend: value.backend ?? 'browser',
+    transcription: value.transcription ?? null,
+    correction: value.correction ?? { enabled: false, model: null },
   };
 }
 
@@ -86,7 +158,12 @@ const busyOwners = new Set<VoiceInputBusyOwner>([
   'video-recording',
   'privacy-erasure',
 ]);
-const effectiveModes = new Set<VoiceInputEffectiveMode>(['local', 'browser-managed', 'legacy']);
+const effectiveModes = new Set<VoiceInputEffectiveMode>([
+  'local',
+  'browser-managed',
+  'legacy',
+  'model',
+]);
 const localAvailabilities = new Set<VoiceInputLocalAvailability>([
   'available',
   'downloadable',
@@ -102,6 +179,8 @@ const phases = new Set<VoiceInputPhase>([
   'starting',
   'listening',
   'stopping',
+  'processing-asr',
+  'processing-text',
   'ended',
   'error',
 ]);
@@ -114,26 +193,6 @@ const fallbackReasons = new Set<VoiceInputFallbackReason>([
   'local-check-failed',
   'local-start-failed',
 ]);
-const errorCodes = new Set<VoiceInputErrorCode>([
-  'unsupported',
-  'permission-denied',
-  'microphone-unavailable',
-  'microphone-busy',
-  'no-speech',
-  'language-not-supported',
-  'network',
-  'service-not-allowed',
-  'local-install-failed',
-  'offscreen-unavailable',
-  'busy-video',
-  'busy-speech',
-  'privacy-erasure-in-progress',
-  'timeout',
-  'aborted',
-  'stopped',
-  'unexpected',
-]);
-
 function isNullableSetValue<TValue extends string>(
   value: unknown,
   values: ReadonlySet<TValue>
@@ -152,6 +211,7 @@ export function parseVoiceInputSnapshot(value: unknown): VoiceInputSnapshot | nu
   if (
     !isRecord(value) ||
     !hasOnlyKeys(value, [
+      'delivery',
       'apiFlavor',
       'busyOwner',
       'effectiveMode',
@@ -165,10 +225,13 @@ export function parseVoiceInputSnapshot(value: unknown): VoiceInputSnapshot | nu
       'requestedMode',
       'sessionId',
     ]) ||
+    (value['delivery'] !== undefined &&
+      value['delivery'] !== 'live' &&
+      value['delivery'] !== 'final') ||
     !isSetValue(value['apiFlavor'], apiFlavors) ||
     !isNullableSetValue(value['busyOwner'], busyOwners) ||
     !isNullableSetValue(value['effectiveMode'], effectiveModes) ||
-    !isNullableSetValue(value['errorCode'], errorCodes) ||
+    (value['errorCode'] !== null && !isVoiceInputErrorCode(value['errorCode'])) ||
     !isNullableSetValue(value['fallbackReason'], fallbackReasons) ||
     !isVoiceInputLanguage(value['language']) ||
     !isSetValue(value['localAvailability'], localAvailabilities) ||
@@ -181,6 +244,7 @@ export function parseVoiceInputSnapshot(value: unknown): VoiceInputSnapshot | nu
     return null;
   }
   return {
+    ...(value['delivery'] === undefined ? {} : { delivery: value['delivery'] }),
     apiFlavor: value['apiFlavor'],
     busyOwner: value['busyOwner'],
     effectiveMode: value['effectiveMode'],
@@ -220,7 +284,8 @@ export function parseVoiceInputPortRequest(value: unknown): VoiceInputPortReques
       : null;
   }
   if (
-    value['type'] === VoiceInputPortMessageType.STOP &&
+    (value['type'] === VoiceInputPortMessageType.STOP ||
+      value['type'] === VoiceInputPortMessageType.CANCEL) &&
     hasOnlyKeys(value, ['requestId', 'sessionId', 'type']) &&
     isNonEmptyString(value['sessionId'])
   ) {
@@ -287,7 +352,7 @@ export function parseVoiceInputServerEvent(value: unknown): VoiceInputServerEven
   if (
     value['type'] === VoiceInputPortMessageType.FAILURE &&
     hasOnlyKeys(value, ['errorCode', 'requestId', 'sessionId', 'snapshot', 'type']) &&
-    isSetValue(value['errorCode'], errorCodes) &&
+    isVoiceInputErrorCode(value['errorCode']) &&
     (value['requestId'] === undefined || isNonEmptyString(value['requestId'])) &&
     (value['sessionId'] === undefined || isNonEmptyString(value['sessionId']))
   ) {
@@ -305,6 +370,39 @@ export function parseVoiceInputServerEvent(value: unknown): VoiceInputServerEven
   return null;
 }
 
+/** Only the trusted offscreen runtime receives this scoped handoff protocol. */
+export function parseVoiceInputCaptureEvent(value: unknown): VoiceInputCaptureEvent | null {
+  if (!isRecord(value) || !isNonEmptyString(value['sessionId'])) return null;
+  if (
+    value['type'] === 'VOICE_INPUT_CAPTURE_RELEASED' &&
+    hasOnlyKeys(value, ['type', 'sessionId'])
+  ) {
+    return { type: value['type'], sessionId: value['sessionId'] };
+  }
+  if (
+    value['type'] !== 'VOICE_INPUT_CAPTURE_READY' ||
+    !hasOnlyKeys(value, ['type', 'sessionId', 'scope', 'rawTranscript', 'durationSeconds']) ||
+    (value['rawTranscript'] !== null &&
+      (typeof value['rawTranscript'] !== 'string' ||
+        value['rawTranscript'].length > VOICE_INPUT_TRANSCRIPT_MAX_CHARS)) ||
+    typeof value['durationSeconds'] !== 'number' ||
+    !Number.isFinite(value['durationSeconds']) ||
+    value['durationSeconds'] <= 0 ||
+    value['durationSeconds'] > VOICE_HISTORY_MAX_DURATION_SECONDS
+  )
+    return null;
+  const scope = parseVoiceInputHistoryScope(value['scope']);
+  return scope
+    ? {
+        type: value['type'],
+        sessionId: value['sessionId'],
+        scope,
+        rawTranscript: value['rawTranscript'],
+        durationSeconds: value['durationSeconds'],
+      }
+    : null;
+}
+
 export function parseOffscreenVoiceInputRuntimeMessage(
   value: unknown
 ): OffscreenVoiceInputRuntimeMessage | null {
@@ -313,7 +411,8 @@ export function parseOffscreenVoiceInputRuntimeMessage(
     value['type'] === MessageType.OFFSCREEN_VOICE_INPUT_EVENT &&
     hasOnlyKeys(value, ['event', 'type'])
   ) {
-    const event = parseVoiceInputServerEvent(value['event']);
+    const event =
+      parseVoiceInputCaptureEvent(value['event']) ?? parseVoiceInputServerEvent(value['event']);
     return event ? { event, type: value['type'] } : null;
   }
   if (!isNonEmptyString(value['capabilityToken']) || !isNonEmptyString(value['requestId'])) {
@@ -338,6 +437,7 @@ export function parseOffscreenVoiceInputRuntimeMessage(
     hasOnlyKeys(value, [
       'capabilityToken',
       'maxDurationMs',
+      'captureToken',
       'preferences',
       'quality',
       'requestId',
@@ -347,8 +447,10 @@ export function parseOffscreenVoiceInputRuntimeMessage(
     parseVoiceInputPreferences(value['preferences']) !== null
   ) {
     const preferences = parseVoiceInputPreferences(value['preferences']);
-    if (!preferences) return null;
+    const captureToken = parseVoiceCaptureToken(value['captureToken']);
+    if (!preferences || !captureToken) return null;
     return {
+      captureToken,
       capabilityToken: value['capabilityToken'],
       maxDurationMs: value['maxDurationMs'],
       preferences,
