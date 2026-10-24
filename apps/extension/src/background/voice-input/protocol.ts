@@ -43,7 +43,7 @@ export function createIdleVoiceInputSnapshot(
   preferences = DEFAULT_PREFERENCES
 ): VoiceInputSnapshot {
   return {
-    delivery: preferences.backend === 'model' || preferences.correction?.enabled ? 'final' : 'live',
+    delivery: preferences.backend === 'model' ? 'final' : 'live',
     apiFlavor: 'unsupported',
     busyOwner: null,
     effectiveMode: null,

@@ -567,3 +567,36 @@ describe('voice input Stop final result', () => {
     );
   });
 });
+
+it('streams Chrome results despite a saved enabled model correction', async () => {
+  const harness = createHarness('available');
+  harness.service.start({
+    captureToken: {
+      entryId: 'entry',
+      incarnation: 'incarnation',
+      epoch: 'epoch',
+      sequence: 1,
+      createdAt: 1,
+    },
+    preferences: {
+      language: 'ru-RU',
+      microphoneDeviceId: null,
+      mode: 'local-first',
+      backend: 'browser',
+      correction: { enabled: true, model: null },
+    },
+    requestId: 'request-s1',
+    sessionId: 's1',
+    maxDurationMs: null,
+  });
+  await flushStart();
+  expect(harness.service.getSnapshot().delivery).toBe('live');
+  harness.recognitions[0]?.callbacks.onResult(transcript('Chrome live words', true));
+  expect(harness.events).toContainEqual(
+    expect.objectContaining({
+      type: VoiceInputPortMessageType.TRANSCRIPT,
+      text: 'Chrome live words',
+      isFinal: true,
+    })
+  );
+});

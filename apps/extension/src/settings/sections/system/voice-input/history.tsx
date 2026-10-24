@@ -25,12 +25,14 @@ const statusKeys: Record<VoiceHistoryEntry['status'], TranslationKey> = {
 export function VoiceInputHistoryPanel({
   dependencies,
   refreshToken,
+  showRetry = true,
   canRetry = false,
   retryModelLabel = null,
 }: {
   dependencies?: VoiceHistoryDependencies;
   refreshToken?: string | number;
   canRetry?: boolean;
+  showRetry?: boolean;
   retryModelLabel?: string | null;
 } = {}) {
   const history = useVoiceHistory(dependencies);
@@ -89,7 +91,7 @@ export function VoiceInputHistoryPanel({
           {translate('settings.voiceInput.historyEmpty')}
         </p>
       ) : null}
-      {retryModelLabel ? (
+      {showRetry && retryModelLabel ? (
         <dl className="text-xs leading-5">
           <div className="flex flex-wrap gap-x-2">
             <dt className="text-[var(--sniptale-color-text-secondary)]">
@@ -101,7 +103,7 @@ export function VoiceInputHistoryPanel({
           </div>
         </dl>
       ) : null}
-      {history.entries.length > 0 && !canRetry ? (
+      {showRetry && history.entries.length > 0 && !canRetry ? (
         <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('settings.voiceInput.historyRetryUnavailable')}
         </p>
@@ -113,6 +115,7 @@ export function VoiceInputHistoryPanel({
             entry={entry}
             history={history}
             locale={locale}
+            showRetry={showRetry}
             canRetry={canRetry}
             confirmId={confirmId}
             setConfirmId={setConfirmId}
@@ -129,11 +132,13 @@ function HistoryEntryActions({
   entry,
   history,
   canRetry,
+  showRetry,
   onDelete,
 }: {
   entry: VoiceHistoryEntry;
   history: HistoryState;
   canRetry: boolean;
+  showRetry: boolean;
   onDelete(): void;
 }) {
   const deleting = history.deletingIds.has(entry.entryId);
@@ -170,16 +175,18 @@ function HistoryEntryActions({
             : 'settings.voiceInput.historyCopy'
         )}
       </ProductActionButton>
-      <ProductActionButton
-        compact
-        tone="secondary"
-        data-ui="settings.voice.history-retry"
-        disabled={busy || !canRetry}
-        onClick={() => void history.retry(entry)}
-      >
-        <RefreshCw aria-hidden="true" className="h-4 w-4" />
-        {translate('settings.voiceInput.historyRetry')}
-      </ProductActionButton>
+      {showRetry ? (
+        <ProductActionButton
+          compact
+          tone="secondary"
+          data-ui="settings.voice.history-retry"
+          disabled={busy || !canRetry}
+          onClick={() => void history.retry(entry)}
+        >
+          <RefreshCw aria-hidden="true" className="h-4 w-4" />
+          {translate('settings.voiceInput.historyRetry')}
+        </ProductActionButton>
+      ) : null}
       <ProductActionButton
         compact
         tone="secondary"
@@ -235,6 +242,7 @@ function HistoryEntryRow({
   history,
   locale,
   canRetry,
+  showRetry,
   confirmId,
   setConfirmId,
 }: {
@@ -242,6 +250,7 @@ function HistoryEntryRow({
   history: HistoryState;
   locale: AppLocale;
   canRetry: boolean;
+  showRetry: boolean;
   confirmId: string | null;
   setConfirmId(value: string | null): void;
 }) {
@@ -292,6 +301,7 @@ function HistoryEntryRow({
         entry={entry}
         history={history}
         canRetry={canRetry}
+        showRetry={showRetry}
         onDelete={() => setConfirmId(entry.entryId)}
       />
       {playing && history.playback ? (

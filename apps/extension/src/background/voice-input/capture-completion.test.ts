@@ -127,6 +127,8 @@ describe('private capture admission and final delivery', () => {
   });
   it('completes browser history without duplicating already streamed text', async () => {
     const h = await harness('browser');
+    h.session.preferences.correction = { enabled: true, model: null };
+    expect(createIdleVoiceInputSnapshot(h.session.preferences).delivery).toBe('live');
     h.run.mockImplementation(async (args) =>
       h.history.complete(args.scope, {
         rawTranscript: args.browserTranscript ?? '',

@@ -32,7 +32,7 @@ function createSnapshot(
   api = resolveSpeechRecognitionApi()
 ): VoiceInputSnapshot {
   return {
-    delivery: preferences.backend === 'model' || preferences.correction?.enabled ? 'final' : 'live',
+    delivery: preferences.backend === 'model' ? 'final' : 'live',
     apiFlavor: api.flavor,
     busyOwner: inspectVoiceInputBusyOwner(),
     effectiveMode: null,

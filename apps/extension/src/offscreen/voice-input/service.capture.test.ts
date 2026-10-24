@@ -71,7 +71,7 @@ describe('voice capture publication lifecycle', () => {
       expect.any(AbortSignal)
     );
   });
-  it('buffers browser results when correction is enabled and includes the final result after Stop', async () => {
+  it('streams Chrome despite saved correction and retains the final result after Stop', async () => {
     const harness = createHarness();
     modelStart(harness, true);
     await flushStart();
@@ -81,9 +81,11 @@ describe('voice capture publication lifecycle', () => {
     harness.recognitions[0]?.callbacks.onResult(transcript('last', true));
     harness.recognitions[0]?.callbacks.onEnd();
     await flushStart();
-    expect(harness.events).not.toContainEqual(
-      expect.objectContaining({ type: VoiceInputPortMessageType.TRANSCRIPT })
-    );
+    expect(
+      harness.events
+        .filter((event) => event.type === VoiceInputPortMessageType.TRANSCRIPT)
+        .map((event) => event.text)
+    ).toEqual(['interim', 'first', 'last']);
     expect(harness.events).toContainEqual(
       expect.objectContaining({ type: 'VOICE_INPUT_CAPTURE_READY', rawTranscript: 'first last' })
     );

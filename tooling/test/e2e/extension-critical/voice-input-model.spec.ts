@@ -23,6 +23,67 @@ test.setTimeout(120_000);
 
 for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
   const locale = index === 0 ? 'en' : 'ru';
+  test(`voice settings follow the selected recognition backend ${viewport.name} ${locale}`, async ({}, info) => {
+    await withVoiceBrowser(viewport.size, locale, async ({ page, provider }) => {
+      const backend = ui(page, 'settings.voice.backend');
+      const choose = (
+        key: 'settings.voiceInput.backendBrowser' | 'settings.voiceInput.backendModel'
+      ) => backend.getByRole('button', { name: translate(key, locale), exact: true });
+      const draft = `${CORRECTION_PROMPT} Draft kept across recognition changes.`;
+      await ui(page, 'settings.voice.correction-prompt').fill(draft);
+      await expect(
+        page.getByLabel(translate('settings.voiceInput.modeLabel', locale), { exact: true })
+      ).toHaveCount(0);
+      await backend.scrollIntoViewIfNeeded();
+      await choose('settings.voiceInput.backendBrowser').click();
+      await expect(choose('settings.voiceInput.backendBrowser')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      for (const field of [
+        'transcription-model',
+        'correction',
+        'correction-model',
+        'correction-prompt',
+      ])
+        await expect(ui(page, `settings.voice.${field}`)).toHaveCount(0);
+      await expect(
+        page.getByLabel(translate('settings.voiceInput.modeLabel', locale), { exact: true })
+      ).toBeVisible();
+      await expect(
+        page.getByLabel(translate('settings.voiceInput.microphoneLabel', locale), { exact: true })
+      ).toBeVisible();
+      await page
+        .getByText(translate('settings.voiceInput.diagnosticsTitle', locale), { exact: true })
+        .click();
+      await expect(
+        page.getByText(translate('settings.voiceInput.apiStatus', locale), { exact: true })
+      ).toBeVisible();
+      await expect(
+        page.getByText(translate('settings.voiceInput.packageStatus', locale), { exact: true })
+      ).toBeVisible();
+      await backend.scrollIntoViewIfNeeded();
+      await voiceScreenshot(page, info, 'chrome-recognition-settings');
+      await choose('settings.voiceInput.backendModel').click();
+      await expect(ui(page, 'settings.voice.transcription-model')).toContainText(ASR_MODEL_NAME);
+      await expect(ui(page, 'settings.voice.correction')).toHaveAttribute('aria-checked', 'true');
+      await expect(ui(page, 'settings.voice.correction-prompt')).toHaveValue(draft);
+      await expect(
+        page.getByLabel(translate('settings.voiceInput.modeLabel', locale), { exact: true })
+      ).toHaveCount(0);
+      await expect(
+        page.getByText(translate('settings.voiceInput.apiStatus', locale), { exact: true })
+      ).toHaveCount(0);
+      await expect(
+        page.getByText(translate('settings.voiceInput.packageStatus', locale), { exact: true })
+      ).toHaveCount(0);
+      await backend.scrollIntoViewIfNeeded();
+      await voiceScreenshot(page, info, 'audio-model-recognition-settings');
+      expect(provider.uploads).toHaveLength(0);
+      expect(provider.corrections).toHaveLength(0);
+    });
+  });
+
   test(`native model dictation settings pipeline and private history ${viewport.name} ${locale}`, async ({}, info) => {
     await withVoiceBrowser(viewport.size, locale, async ({ page, extensionId, provider }) => {
       await captureVoicePreferences(page, info, viewport.name);

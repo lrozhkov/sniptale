@@ -143,7 +143,8 @@ export function createVoiceInputProcessor(deps: {
     raw: string,
     assertCurrent: () => Promise<void>
   ): Promise<{ transcript: string; correctionStatus: VoiceHistoryEntry['correctionStatus'] }> {
-    if (!args.preferences.correction?.enabled) return { transcript: raw, correctionStatus: 'off' };
+    if (args.preferences.backend !== 'model' || !args.preferences.correction?.enabled)
+      return { transcript: raw, correctionStatus: 'off' };
     args.onPhase?.('processing-text', scope);
     try {
       if (!args.preferences.correction.model) throw new Error('model-unavailable');

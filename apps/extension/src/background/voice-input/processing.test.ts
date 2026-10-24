@@ -381,3 +381,17 @@ it('recovers raw through the real processor and revisioned history after a corre
     vi.useRealTimers();
   }
 });
+
+it('does not apply a saved model correction to Chrome dictation', async () => {
+  const saved = { ...preferences, backend: 'browser' as const };
+  await expect(
+    run({ browserTranscript: 'Chrome words', preferences: saved })
+  ).resolves.toMatchObject({
+    transcript: 'Chrome words',
+    correctionStatus: 'off',
+  });
+  expect(transcribe).not.toHaveBeenCalled();
+  expect(correct).not.toHaveBeenCalled();
+  expect(loadCorrectionPrompt).not.toHaveBeenCalled();
+  expect(saved.correction?.enabled).toBe(true);
+});

@@ -73,12 +73,14 @@ it('uses the incumbent segmented backend control and correction switch', () => {
       '[data-ui="settings.voice.backend"] [data-ui="shared.ui.compact-inspector.segmented-row"]'
     )
   ).not.toBeNull();
-  expect(container.querySelector('[data-ui="settings.voice.transcription-model"]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="settings.voice.transcription-model"]')).toBeNull();
   const model = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.textContent === 'settings.voiceInput.backendModel'
   );
   act(() => model?.click());
   expect(controller.preferences.setBackend).toHaveBeenCalledWith('model');
+  controller.preferences.backend = 'model';
+  act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
   act(() => container.querySelector<HTMLButtonElement>('[role=switch]')?.click());
   expect(controller.preferences.setCorrectionEnabled).toHaveBeenCalledWith(true);
 });
@@ -101,6 +103,7 @@ it('shows configured model selectors and local correction prompt controls', () =
 
 it('routes model selection, prompt editing and reset through their existing controllers', () => {
   const controller = createController();
+  controller.preferences.backend = 'model';
   controller.preferences.correction.enabled = true;
   act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
   for (const kind of ['transcription', 'correction']) {
@@ -129,6 +132,7 @@ it('routes model selection, prompt editing and reset through their existing cont
 });
 it('offers catalogue reload after failure and disables editing during an owned operation', () => {
   const controller = createController();
+  controller.preferences.backend = 'model';
   controller.preferences.correction.enabled = true;
   controller.models.error = true;
   act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
@@ -150,4 +154,37 @@ it('offers catalogue reload after failure and disables editing during an owned o
     container.querySelector<HTMLButtonElement>('[data-ui="settings.voice.correction-model"] button')
       ?.disabled
   ).toBe(true);
+});
+
+it('shows transcription configuration only for the selected model backend', () => {
+  const controller = createController();
+  act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
+  expect(container.querySelector('[data-ui="settings.voice.transcription-model"]')).toBeNull();
+  controller.preferences.backend = 'model';
+  act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
+  expect(container.querySelector('[data-ui="settings.voice.transcription-model"]')).not.toBeNull();
+});
+
+it('hides saved model correction and catalogue failures in Chrome and restores the model draft', () => {
+  const controller = createController();
+  controller.preferences.correction.enabled = true;
+  controller.models.error = true;
+  const render = () =>
+    act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
+  render();
+  expect(container.querySelector('[role="switch"]')).toBeNull();
+  expect(container.querySelector('[data-ui="settings.voice.correction-model"]')).toBeNull();
+  expect(container.querySelector('textarea')).toBeNull();
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(container.querySelector('a')).toBeNull();
+  controller.preferences.backend = 'model';
+  render();
+  expect(container.querySelector('textarea')?.value).toBe('Keep my words');
+  controller.preferences.backend = 'browser';
+  render();
+  controller.preferences.backend = 'model';
+  render();
+  expect(container.querySelector('textarea')?.value).toBe('Keep my words');
+  expect(controller.preferences.setCorrectionEnabled).not.toHaveBeenCalled();
+  expect(controller.models.setPrompt).not.toHaveBeenCalled();
 });

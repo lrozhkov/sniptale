@@ -385,3 +385,23 @@ describe('voice input Settings content', () => {
     expect(container.textContent).toContain('settings.voiceInput.signalDetected');
   });
 });
+
+it('omits Chrome mode, API and local package diagnostics for the model backend', () => {
+  render(createController({ preferences: { backend: 'model' } }));
+  expect(container.querySelector('[aria-label="settings.voiceInput.modeLabel"]')).toBeNull();
+  expect(container.textContent).not.toContain('settings.voiceInput.apiStatus');
+  expect(container.textContent).not.toContain('settings.voiceInput.packageStatus');
+  expect(container.textContent).not.toContain('settings.voiceInput.localDisclosure');
+  expect(container.textContent).not.toContain('settings.voiceInput.browserDisclosure');
+  expect(container.textContent).toContain('settings.voiceInput.microphoneStatus');
+});
+
+it('lets Chrome start despite a dormant enabled correction without a configured model', () => {
+  const controller = createController({
+    preferences: { backend: 'browser', correction: { enabled: true, model: null } },
+    status: { microphoneAccess: 'granted' },
+  });
+  render(controller);
+  expect(button('settings.voiceInput.start')?.disabled).toBe(false);
+  expect(container.querySelector('[data-ui="settings.voice.correction"]')).toBeNull();
+});

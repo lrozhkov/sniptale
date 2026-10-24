@@ -38,81 +38,82 @@ export function VoiceModelPreferences({
           />
         </div>
       </SettingsControlRow>
-      <SettingsControlRow
-        label={translate('settings.voiceInput.transcriptionModel')}
-        description={translate(
-          preferences.backend === 'model'
-            ? 'settings.voiceInput.audioDisclosure'
-            : 'settings.voiceInput.historyModelDisclosure'
-        )}
-      >
-        <div data-ui="settings.voice.transcription-model">
-          <AIModelSelector
-            models={models.transcription.models}
-            providers={models.transcription.providers}
-            selectedModelId={models.transcriptionSelectionId}
-            disabled={disabled || models.loading}
-            onSelect={(id) => {
-              void models.selectTranscription(id);
-            }}
-          />
-        </div>
-      </SettingsControlRow>
-      <SettingsControlRow
-        label={translate('settings.voiceInput.correctionLabel')}
-        description={translate('settings.voiceInput.textDisclosure')}
-      >
-        <SettingsSwitch
-          data-ui="settings.voice.correction"
-          checked={preferences.correction.enabled}
-          aria-label={translate('settings.voiceInput.correctionLabel')}
-          disabled={disabled}
-          onClick={() => {
-            void preferences.setCorrectionEnabled(!preferences.correction.enabled);
-          }}
-        />
-      </SettingsControlRow>
-      {preferences.correction.enabled ? (
+      {preferences.backend === 'model' ? (
         <>
-          <SettingsControlRow label={translate('settings.voiceInput.correctionModel')}>
-            <div data-ui="settings.voice.correction-model">
+          <SettingsControlRow
+            label={translate('settings.voiceInput.transcriptionModel')}
+            description={translate('settings.voiceInput.audioDisclosure')}
+          >
+            <div data-ui="settings.voice.transcription-model">
               <AIModelSelector
-                models={models.correction.models}
-                providers={models.correction.providers}
-                selectedModelId={models.correctionSelectionId}
+                models={models.transcription.models}
+                providers={models.transcription.providers}
+                selectedModelId={models.transcriptionSelectionId}
                 disabled={disabled || models.loading}
                 onSelect={(id) => {
-                  void models.selectCorrection(id);
+                  void models.selectTranscription(id);
                 }}
               />
             </div>
           </SettingsControlRow>
-          <VoiceCorrectionPrompt models={models} disabled={disabled} />
+
+          <SettingsControlRow
+            label={translate('settings.voiceInput.correctionLabel')}
+            description={translate('settings.voiceInput.textDisclosure')}
+          >
+            <SettingsSwitch
+              data-ui="settings.voice.correction"
+              checked={preferences.correction.enabled}
+              aria-label={translate('settings.voiceInput.correctionLabel')}
+              disabled={disabled}
+              onClick={() => {
+                void preferences.setCorrectionEnabled(!preferences.correction.enabled);
+              }}
+            />
+          </SettingsControlRow>
+          {preferences.correction.enabled ? (
+            <>
+              <SettingsControlRow label={translate('settings.voiceInput.correctionModel')}>
+                <div data-ui="settings.voice.correction-model">
+                  <AIModelSelector
+                    models={models.correction.models}
+                    providers={models.correction.providers}
+                    selectedModelId={models.correctionSelectionId}
+                    disabled={disabled || models.loading}
+                    onSelect={(id) => {
+                      void models.selectCorrection(id);
+                    }}
+                  />
+                </div>
+              </SettingsControlRow>
+              <VoiceCorrectionPrompt models={models} disabled={disabled} />
+            </>
+          ) : null}
+          {models.error ? (
+            <div className="grid gap-2">
+              <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+                {translate('settings.voiceInput.modelsError')}
+              </p>
+              <ProductActionButton
+                compact
+                tone="secondary"
+                disabled={models.loading}
+                onClick={() => {
+                  void models.refresh();
+                }}
+              >
+                {translate('settings.voiceInput.reloadModels')}
+              </ProductActionButton>
+            </div>
+          ) : null}
+          <a
+            className="text-xs text-[var(--sniptale-color-text-secondary)] underline"
+            href="?section=access-data&view=permissions"
+          >
+            {translate('settings.voiceInput.managePermissions')}
+          </a>
         </>
       ) : null}
-      {models.error ? (
-        <div className="grid gap-2">
-          <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
-            {translate('settings.voiceInput.modelsError')}
-          </p>
-          <ProductActionButton
-            compact
-            tone="secondary"
-            disabled={models.loading}
-            onClick={() => {
-              void models.refresh();
-            }}
-          >
-            {translate('settings.voiceInput.reloadModels')}
-          </ProductActionButton>
-        </div>
-      ) : null}
-      <a
-        className="text-xs text-[var(--sniptale-color-text-secondary)] underline"
-        href="?section=access-data&view=permissions"
-      >
-        {translate('settings.voiceInput.managePermissions')}
-      </a>
     </div>
   );
 }

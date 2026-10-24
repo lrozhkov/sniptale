@@ -208,36 +208,40 @@ function VoiceInputStatusGrid({ controller }: { controller: VoiceInputSettingsCo
       className={`${settingsCompactWorkbenchClassName} grid divide-y divide-[var(--sniptale-color-border-subtle)]`}
       aria-live="polite"
     >
-      <StatusCard
-        label={translate('settings.voiceInput.apiStatus')}
-        value={translate(statusKey(controller.status.snapshot.apiFlavor))}
-        description={translate(
-          controller.status.snapshot.qualitySupported
-            ? 'settings.voiceInput.qualitySupported'
-            : 'settings.voiceInput.qualityLegacy'
-        )}
-        error={controller.status.snapshot.apiFlavor === 'unsupported'}
-      />
+      {controller.preferences.backend === 'browser' ? (
+        <StatusCard
+          label={translate('settings.voiceInput.apiStatus')}
+          value={translate(statusKey(controller.status.snapshot.apiFlavor))}
+          description={translate(
+            controller.status.snapshot.qualitySupported
+              ? 'settings.voiceInput.qualitySupported'
+              : 'settings.voiceInput.qualityLegacy'
+          )}
+          error={controller.status.snapshot.apiFlavor === 'unsupported'}
+        />
+      ) : null}
       <StatusCard
         label={translate('settings.voiceInput.microphoneStatus')}
         value={translate(statusKey(controller.status.microphoneAccess))}
         description={microphoneDescription}
         error={microphoneError}
       />
-      <StatusCard
-        label={translate('settings.voiceInput.packageStatus')}
-        value={translate(
-          controller.status.snapshot.localAvailability === 'unavailable'
-            ? 'settings.voiceInput.localPackageUnavailable'
-            : statusKey(controller.status.snapshot.localAvailability)
-        )}
-        description={
-          controller.status.snapshot.localAvailability === 'unavailable'
-            ? translate('settings.voiceInput.localPackageUnavailableDescription')
-            : ''
-        }
-        error={controller.status.snapshot.localAvailability === 'unsupported'}
-      />
+      {controller.preferences.backend === 'browser' ? (
+        <StatusCard
+          label={translate('settings.voiceInput.packageStatus')}
+          value={translate(
+            controller.status.snapshot.localAvailability === 'unavailable'
+              ? 'settings.voiceInput.localPackageUnavailable'
+              : statusKey(controller.status.snapshot.localAvailability)
+          )}
+          description={
+            controller.status.snapshot.localAvailability === 'unavailable'
+              ? translate('settings.voiceInput.localPackageUnavailableDescription')
+              : ''
+          }
+          error={controller.status.snapshot.localAvailability === 'unsupported'}
+        />
+      ) : null}
       <StatusCard
         label={translate('settings.voiceInput.runtimeStatus')}
         value={translate(statusKey(controller.status.snapshot.phase))}
@@ -353,7 +357,8 @@ function VoiceInputActions({
     pending ||
     (controller.preferences.backend === 'model' &&
       controller.models.transcriptionSelectionId === null) ||
-    (controller.preferences.correction.enabled &&
+    (controller.preferences.backend === 'model' &&
+      controller.preferences.correction.enabled &&
       controller.models.correctionSelectionId === null) ||
     controller.status.microphoneAccess !== 'granted' ||
     controller.status.checking ||
@@ -615,6 +620,7 @@ export function VoiceInputSettingsContent(controller: VoiceInputSettingsControll
       <VoiceInputPreferencesPanel active={active || pending} controller={controller} />
       <VoiceInputTestPanel active={active} pending={pending} controller={controller} />
       <VoiceInputHistoryPanel
+        showRetry={controller.preferences.backend === 'model'}
         refreshToken={phase}
         canRetry={controller.models.transcriptionSelectionId !== null}
         retryModelLabel={
@@ -642,10 +648,12 @@ export function VoiceInputSettingsContent(controller: VoiceInputSettingsControll
         </summary>
         <div className="pl-[30px] pr-2 pt-2">
           <VoiceInputStatusGrid controller={controller} />
-          <div className="space-y-1 pt-2 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
-            <p>{translate('settings.voiceInput.localDisclosure')}</p>
-            <p>{translate('settings.voiceInput.browserDisclosure')}</p>
-          </div>
+          {controller.preferences.backend === 'browser' ? (
+            <div className="space-y-1 pt-2 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
+              <p>{translate('settings.voiceInput.localDisclosure')}</p>
+              <p>{translate('settings.voiceInput.browserDisclosure')}</p>
+            </div>
+          ) : null}
         </div>
       </details>
     </section>

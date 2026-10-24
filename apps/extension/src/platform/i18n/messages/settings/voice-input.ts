@@ -2,10 +2,6 @@ import { defineMessageSource } from '../source';
 
 export const settingsVoiceInputMessages = defineMessageSource({
   historyRetryModel: { ru: 'Модель для сохранённого аудио', en: 'Saved audio recognition model' },
-  historyModelDisclosure: {
-    ru: 'Для повторного распознавания сохранённого аудио. Текущий ввод распознаёт Chrome.',
-    en: 'Used to transcribe saved audio again. Chrome recognizes live dictation.',
-  },
   reloadModels: { ru: 'Загрузить настройки заново', en: 'Reload model settings' },
   historyRetryUnavailable: {
     ru: 'Для повторного распознавания сохранённого аудио выберите модель распознавания.',
@@ -17,7 +13,7 @@ export const settingsVoiceInputMessages = defineMessageSource({
   },
   backendLabel: { ru: 'Распознавание', en: 'Recognition' },
   backendBrowser: { ru: 'Chrome', en: 'Chrome' },
-  backendModel: { ru: 'Модель', en: 'Model' },
+  backendModel: { ru: 'Аудиомодель', en: 'Audio model' },
   transcriptionModel: { ru: 'Модель распознавания', en: 'Speech recognition model' },
   correctionLabel: { ru: 'Коррекция текста', en: 'Correct dictated text' },
   correctionModel: { ru: 'Модель коррекции', en: 'Text correction model' },
@@ -236,12 +232,12 @@ export const settingsVoiceInputMessages = defineMessageSource({
     en: 'This Chrome does not support the quality parameter',
   },
   localDisclosure: {
-    ru: 'Локальное распознавание Chrome обрабатывает аудио на устройстве. Если включена коррекция, текст отправляется выбранной модели.',
-    en: 'Chrome local recognition processes audio on the device. When correction is enabled, text is sent to the selected model.',
+    ru: 'Локальное распознавание Chrome обрабатывает аудио на устройстве.',
+    en: 'Chrome local recognition processes audio on the device.',
   },
   browserDisclosure: {
-    ru: 'В режиме, управляемом Chrome, браузер выбирает локальное или серверное распознавание. При включённой коррекции текст дополнительно отправляется выбранной модели.',
-    en: 'In browser-managed mode, Chrome chooses local or server recognition. When correction is enabled, text is also sent to the selected model.',
+    ru: 'В режиме, управляемом Chrome, браузер выбирает локальное или серверное распознавание.',
+    en: 'In browser-managed mode, Chrome chooses local or server recognition.',
   },
   permissionError: {
     ru: 'Разрешите доступ к микрофону в настройках Chrome.',

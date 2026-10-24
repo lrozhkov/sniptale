@@ -82,7 +82,7 @@ export function createVoiceInputCaptureCompletion(deps: {
   }
 
   function completeProcessing(session: ActiveVoiceInputSession, text: string): void {
-    if (session.preferences.backend === 'model' || session.preferences.correction?.enabled) {
+    if (session.preferences.backend === 'model') {
       postVoiceInputPortEvent(session, {
         type: VoiceInputPortMessageType.TRANSCRIPT,
         sessionId: session.sessionId,

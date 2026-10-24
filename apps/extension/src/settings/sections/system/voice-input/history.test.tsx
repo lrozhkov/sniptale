@@ -55,11 +55,17 @@ function fixture() {
   return {
     client,
     deps,
-    async render(refreshToken = 0, canRetry?: boolean, retryModelLabel?: string | null) {
+    async render(
+      refreshToken = 0,
+      canRetry?: boolean,
+      retryModelLabel?: string | null,
+      showRetry = true
+    ) {
       await act(async () =>
         root.render(
           <CommandPressScope value>
             <VoiceInputHistoryPanel
+              showRetry={showRetry}
               dependencies={deps}
               refreshToken={refreshToken}
               {...(canRetry === undefined ? {} : { canRetry })}
@@ -189,4 +195,19 @@ describe('private voice history panel', () => {
     expect(container.textContent).toContain('accepted');
     expect(button('retry').disabled).toBe(false);
   });
+});
+
+it('keeps Chrome history readable without model retry controls and restores them on return', async () => {
+  const f = fixture();
+  await f.render(0, true, 'Speech model', false);
+  expect(button('retry')).toBeNull();
+  expect(button('play')).not.toBeNull();
+  expect(button('copy')).not.toBeNull();
+  expect(button('delete')).not.toBeNull();
+  expect(container.textContent).not.toContain('Speech model');
+  expect(container.textContent).not.toContain('settings.voiceInput.historyRetryUnavailable');
+  await f.render(0, true, 'Speech model', true);
+  expect(button('retry').disabled).toBe(false);
+  expect(container.textContent).toContain('Speech model');
+  expect(f.client.remove).not.toHaveBeenCalled();
 });

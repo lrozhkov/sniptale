@@ -163,7 +163,7 @@ class RecognitionRun implements VoiceInputRecognitionRun {
             }
             this.finalText.push(result.text);
           }
-          if (this.preferences.backend === 'model' || this.preferences.correction?.enabled) return;
+          if (this.preferences.backend === 'model') return;
           this.emit({
             confidence: result.confidence,
             isFinal: result.isFinal,

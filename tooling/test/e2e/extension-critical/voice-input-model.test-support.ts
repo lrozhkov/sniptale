@@ -259,7 +259,7 @@ export async function configureVoicePreferences(
 ) {
   await openVoiceSettings(page, extensionId);
   await ui(page, 'settings.voice.backend')
-    .getByRole('button', { name: locale === 'ru' ? 'Модель' : 'Model', exact: true })
+    .getByRole('button', { name: label(locale, 'settings.voiceInput.backendModel'), exact: true })
     .click();
   const asr = ui(page, 'settings.voice.transcription-model').locator(
     '.sniptale-ai-model-selector-trigger'
