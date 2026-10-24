@@ -3,7 +3,7 @@ import { translate } from '../../platform/i18n';
 
 const TYPES = ['linear', 'radial', 'conic'] as const;
 const buttonClass = [
-  'h-8 min-w-0 flex-1 cursor-pointer rounded-[3px] px-2 text-xs',
+  'h-8 min-w-0 flex-1 cursor-pointer rounded-[4px] px-2 text-xs',
   'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-hover)]',
   'aria-pressed:bg-[var(--sniptale-picker-selected)]',
   'aria-pressed:text-[var(--sniptale-color-text-primary)] focus-visible:outline-1',

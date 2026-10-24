@@ -36,7 +36,7 @@ const APPLY_ACTION_CLASS = [
 ].join(' ');
 
 const FORMAT_BUTTON_CLASS = [
-  'h-7 cursor-pointer rounded-[3px] text-xs focus-visible:outline-1',
+  'h-7 cursor-pointer rounded-[4px] text-xs focus-visible:outline-1',
   'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 

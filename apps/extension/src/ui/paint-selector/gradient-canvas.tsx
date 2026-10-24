@@ -282,7 +282,7 @@ function CanvasHandle({
         style={{
           width: kind === 'start' ? 8 : kind === 'center' ? 16 : 12,
           height: kind === 'start' ? 8 : kind === 'center' ? 16 : 12,
-          boxShadow: '0 0 0 1px #0009, inset 0 0 0 1px #0005',
+          boxShadow: '0 0 1px 1px #0006',
         }}
       />
     </button>

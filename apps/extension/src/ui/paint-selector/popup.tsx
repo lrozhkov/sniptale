@@ -291,6 +291,21 @@ export function PaintSelectorPopup(
       }}
       onKeyDownCapture={(event) => {
         event.currentTarget.dataset['keyboard'] = 'true';
+        if (
+          !event.repeat &&
+          (event.key === 'Enter' || event.key === ' ') &&
+          event.target instanceof Element &&
+          event.target.closest('.sniptale-picker-steppers button')
+        )
+          props.history.begin();
+      }}
+      onKeyUpCapture={(event) => {
+        if (
+          (event.key === 'Enter' || event.key === ' ') &&
+          event.target instanceof Element &&
+          event.target.closest('.sniptale-picker-steppers button')
+        )
+          props.history.end();
       }}
       onPointerUpCapture={props.history.end}
       onPointerCancelCapture={props.history.end}
@@ -298,7 +313,12 @@ export function PaintSelectorPopup(
         if (event.target instanceof HTMLInputElement) props.history.begin();
       }}
       onBlurCapture={(event) => {
-        if (event.target instanceof HTMLInputElement) props.history.end();
+        if (
+          event.target instanceof Element &&
+          (event.target instanceof HTMLInputElement ||
+            event.target.closest('.sniptale-picker-steppers button'))
+        )
+          props.history.end();
       }}
       onKeyDown={(event) => handlePaintHistoryKey(event, props.history)}
     >

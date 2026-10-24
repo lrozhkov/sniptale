@@ -103,9 +103,7 @@
   border: 2px solid white;
   border-radius: 50%;
   background: transparent;
-  box-shadow:
-    0 0 0 1px #0009,
-    inset 0 0 0 1px #0005;
+  box-shadow: 0 0 1px 1px #0006;
 }
 .sniptale-picker-range::-moz-range-thumb {
   box-sizing: border-box;
@@ -114,9 +112,7 @@
   border: 2px solid white;
   border-radius: 50%;
   background: transparent;
-  box-shadow:
-    0 0 0 1px #0009,
-    inset 0 0 0 1px #0005;
+  box-shadow: 0 0 1px 1px #0006;
 }
 .sniptale-picker-range:focus-visible {
   outline: 1px solid var(--sniptale-color-text-secondary);
@@ -150,9 +146,7 @@
   border: 2px solid white;
   border-radius: 50%;
   background: transparent;
-  box-shadow:
-    0 0 0 1px #0009,
-    inset 0 0 0 1px #0005;
+  box-shadow: 0 0 1px 1px #0006;
 }
 .sniptale-picker-root,
 .sniptale-picker-formats {
@@ -224,4 +218,58 @@
 
 .sniptale-paint-color .sniptale-picker-comparison {
   padding: 3px;
+}
+
+.sniptale-gradient-number .sniptale-picker-number {
+  padding-left: 6px;
+  font-size: 12px;
+}
+.sniptale-gradient-number .sniptale-picker-steppers svg {
+  width: 10px;
+  height: 10px;
+}
+.sniptale-picker-select {
+  border-color: var(--sniptale-color-border-soft) !important;
+  background: var(--sniptale-color-surface-input) !important;
+  font-weight: 400 !important;
+}
+.sniptale-picker-select:hover {
+  background: var(--sniptale-color-surface-hover) !important;
+}
+.sniptale-picker-select:focus-visible {
+  outline: 1px solid var(--sniptale-color-text-secondary) !important;
+  outline-offset: 2px;
+}
+.sniptale-picker-select > svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.75;
+  color: var(--sniptale-color-text-primary);
+}
+.sniptale-picker-select-menu {
+  display: grid;
+  gap: 2px;
+  padding: 5px !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: var(--sniptale-color-surface-panel) !important;
+  box-shadow: 0 6px 24px #0004 !important;
+  font-family: var(--sniptale-font-interface);
+  font-size: 13px;
+  line-height: 18px;
+}
+.sniptale-picker-select-menu [role='option'] {
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font: inherit;
+  color: var(--sniptale-color-text-primary);
+  background: transparent;
+}
+.sniptale-picker-select-menu [role='option']:is([aria-selected='true'], :hover, :focus-visible) {
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
+}
+.sniptale-picker-select-menu [role='option'] > span:last-child[aria-hidden='true'] {
+  display: none;
 }

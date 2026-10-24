@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { build } from 'vite';
 import { resolve } from 'node:path';
 import type { Server } from 'node:http';
@@ -8,6 +8,56 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 
 let server: Server | undefined;
 let origin: string;
+
+async function pickerToken(node: Locator, token: string) {
+  return node.evaluate((element, token) => {
+    const probe = element.ownerDocument.createElement('span');
+    probe.style.color = `var(${token})`;
+    element.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, token);
+}
+
+async function expectPickerSelect(page: Page, trigger: Locator) {
+  const input = await pickerToken(trigger, '--sniptale-color-surface-input');
+  const border = await pickerToken(trigger, '--sniptale-color-border-soft');
+  await page.mouse.move(0, 0);
+  await expect(trigger).toHaveCSS('background-color', input);
+  await expect(trigger).toHaveCSS('border-top-color', border);
+  await expect(trigger.locator('svg').last()).toHaveCSS('width', '12px');
+  await expect(trigger.locator('svg').last()).toHaveCSS('stroke-width', '1.75px');
+  await trigger.click();
+  await expect(trigger).toHaveCSS('border-top-color', border);
+  const menu = page.getByRole('listbox');
+  await expect(menu).toHaveCSS('border-radius', '4px');
+  await expect(menu).toHaveCSS('border-top-width', '0px');
+  await expect(menu).toHaveCSS('padding', '5px');
+  await expect(menu).toHaveCSS(
+    'background-color',
+    await pickerToken(menu, '--sniptale-color-surface-panel')
+  );
+  const option = menu.getByRole('option').first();
+  await expect(option).toHaveCSS('font-size', '13px');
+  await expect(option).toHaveCSS('font-weight', '400');
+  await expect(option).toHaveCSS('border-radius', '4px');
+  await expect(option).toHaveCSS('padding-left', '8px');
+  const selected = menu.getByRole('option', { selected: true });
+  await expect(selected).toHaveCSS(
+    'color',
+    await pickerToken(selected, '--sniptale-color-text-primary')
+  );
+  await expect(selected).toHaveCSS(
+    'background-color',
+    await pickerToken(selected, '--sniptale-color-surface-hover')
+  );
+  await option.hover();
+  await expect(option).toHaveCSS('cursor', 'pointer');
+  await option.press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveCSS('border-top-color', border);
+}
 
 test.use({ actionTimeout: 10_000 });
 
@@ -467,6 +517,13 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         'border-top-color',
         'rgb(255, 255, 255)'
       );
+      await expect
+        .soft(color.locator('.sniptale-color-plane-ring'))
+        .toHaveCSS('box-shadow', 'rgba(0, 0, 0, 0.4) 0px 0px 1px 1px');
+      const markerPosition = await color
+        .locator('.sniptale-color-plane-ring')
+        .evaluate((node) => parseFloat(node.style.left));
+      expect(markerPosition).not.toBe(Math.round(markerPosition));
       const initialHeight = (await color.boundingBox())!.height;
       expect(Math.abs(initialHeight - (short ? 418 : 466))).toBeLessThanOrEqual(1);
       const hex = color.getByRole('textbox', { name: 'HEX', exact: true });
@@ -488,7 +545,23 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(copy).toBeEnabled();
       await expect(copy).toHaveCSS('cursor', 'pointer');
       await color.getByRole('button', { name: 'RGB', exact: true }).click();
+      await expect(color.getByRole('button', { name: 'RGB', exact: true })).toHaveCSS(
+        'border-radius',
+        '4px'
+      );
       await expect(color.locator('.sniptale-picker-number')).toHaveCount(4);
+      const alphaValue = color.getByRole('spinbutton', { name: 'Прозрачность', exact: true });
+      const alphaBeforeHold = Number(await alphaValue.inputValue());
+      await color.getByRole('button', { name: 'Прозрачность +', exact: true }).focus();
+      await page.keyboard.down('Space');
+      try {
+        await expect
+          .poll(async () => Number(await alphaValue.inputValue()))
+          .toBeGreaterThan(alphaBeforeHold + 1);
+      } finally {
+        await page.keyboard.up('Space');
+      }
+      await color.getByRole('button', { name: 'Исходный', exact: true }).click();
       await color.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('picker-color-full.png'), fullPage: false });
       await color.getByRole('button', { name: 'Компактный режим', exact: true }).click();
@@ -502,11 +575,19 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       );
       await paint.scrollIntoViewIfNeeded();
       await expect(paint).toHaveCSS('width', '620px');
+      await expect(paint.getByRole('button', { name: 'Градиент', exact: true }).first()).toHaveCSS(
+        'border-radius',
+        '4px'
+      );
       await expect(paint.locator('[data-ui="shared.ui.paint-selector.canvas"]')).toHaveCSS(
         'height',
         '106px'
       );
       const direction = paint.locator('[data-gradient-handle="direction"]');
+      await expect(direction.locator('span')).toHaveCSS(
+        'box-shadow',
+        'rgba(0, 0, 0, 0.4) 0px 0px 1px 1px'
+      );
       const before = Number(await direction.getAttribute('aria-valuenow'));
       await direction.focus();
       await direction.press('ArrowRight');
@@ -527,16 +608,18 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .poll(() => direction.evaluate((element) => getComputedStyle(element).cursor))
         .not.toBe('none');
       await paint.getByRole('button', { name: 'Дополнительно', exact: true }).click();
+      const gradientNumber = paint
+        .locator('[data-ui="shared.ui.paint-selector.geometry"] .sniptale-picker-number')
+        .first();
+      await expect.soft(gradientNumber).toHaveCSS('font-size', '12px');
+      await expect.soft(gradientNumber).toHaveCSS('padding-left', '6px');
+      await expect.soft(gradientNumber.locator('svg').first()).toHaveCSS('width', '10px');
       const gradientChoices = paint.locator('button[aria-haspopup="listbox"]');
       await expect(gradientChoices).toHaveCount(3);
       for (const trigger of await gradientChoices.all()) {
         await trigger.hover();
         await expect.soft(trigger).toHaveCSS('cursor', 'pointer', { timeout: 100 });
-        await trigger.click();
-        const option = page.getByRole('option').first();
-        await option.hover();
-        await expect(option).toHaveCSS('cursor', 'pointer');
-        await option.press('Escape');
+        await expectPickerSelect(page, trigger);
       }
       await paint.getByRole('button', { name: 'Дополнительно', exact: true }).click();
       await paint.scrollIntoViewIfNeeded();
@@ -564,10 +647,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const filter = templates.getByRole('button', { name: 'Тип шаблона', exact: true });
       await filter.hover();
       await expect.soft(filter).toHaveCSS('cursor', 'pointer', { timeout: 100 });
-      await filter.click();
-      await page.getByRole('option').first().hover();
-      await expect(page.getByRole('option').first()).toHaveCSS('cursor', 'pointer');
-      await page.getByRole('option').first().press('Escape');
+      await expectPickerSelect(page, filter);
       await templates.getByRole('button', { name: 'Сетка', exact: true }).click();
       await templateSelection.hover({ position: { x: 8, y: 32 } });
       await expect(templateSelection).toHaveCSS('cursor', 'pointer');

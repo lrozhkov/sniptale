@@ -61,9 +61,7 @@ const COLOR_PANE_CLASS_NAME = [
   'min-w-0 max-[680px]:mx-auto max-[680px]:w-[280px] max-[680px]:max-w-full',
 ].join(' ');
 const SELECT_CLASS_NAME = [
-  'h-8! rounded-[4px]! px-2! text-xs! font-normal!',
-  'focus-visible:border-[color:var(--sniptale-color-text-secondary)]!',
-  'aria-expanded:border-[color:var(--sniptale-color-text-secondary)]!',
+  'sniptale-picker-select h-8! rounded-[4px]! px-2! text-xs! font-normal!',
 ].join(' ');
 
 interface GradientControlsProps {
@@ -83,7 +81,7 @@ function GradientNumericField(props: {
   value: number;
 }) {
   return (
-    <div className={props.className ?? 'w-full min-w-0'}>
+    <div className={`sniptale-gradient-number ${props.className ?? 'w-full min-w-0'}`}>
       <PickerNumberField
         ariaLabel={props.label}
         {...(props.max === undefined ? {} : { max: props.max })}
@@ -225,6 +223,7 @@ function GradientPrimaryControls({
           }))}
           onChange={onSelectStop}
           className={SELECT_CLASS_NAME}
+          menuClassName="sniptale-picker-select-menu"
         />
         <label className={STOP_POSITION_ROW_CLASS_NAME}>
           {translate('highlighter.paintPicker.position')}
@@ -344,6 +343,7 @@ function GradientAdvancedControls({
         <CompactSelect<PaintInterpolationSpace>
           aria-label={translate('highlighter.paintPicker.interpolation')}
           className={SELECT_CLASS_NAME}
+          menuClassName="sniptale-picker-select-menu"
           value={gradient.interpolation}
           options={[
             { value: 'srgb', label: translate('highlighter.paintPicker.interpolationSrgb') },
@@ -383,6 +383,7 @@ function GradientAdvancedControls({
         <CompactSelect
           aria-label={translate('highlighter.paintPicker.repeat')}
           className={SELECT_CLASS_NAME}
+          menuClassName="sniptale-picker-select-menu"
           value={gradient.repeat.enabled ? 'enabled' : 'disabled'}
           options={[
             {

@@ -90,10 +90,21 @@ test('custom background survives paint switches and reopening without duplicate 
       const picker = page.locator('[data-ui="shared.ui.paint-selector.popup"]');
       await picker
         .getByRole('button', {
+          name: translate('highlighter.paintPicker.gradient', 'en'),
+          exact: true,
+        })
+        .click();
+      await picker
+        .getByRole('button', {
           name: translate('highlighter.paintPicker.linear', 'en'),
           exact: true,
         })
         .click();
+      await expect(picker).toHaveCSS('width', '620px');
+      await page.screenshot({
+        path: info.outputPath('background-gradient-picker.png'),
+        fullPage: false,
+      });
       await picker
         .getByRole('button', { name: translate('shared.ui.colorSelectorApply', 'en'), exact: true })
         .click();
@@ -128,7 +139,14 @@ test('custom background survives paint switches and reopening without duplicate 
       .getByRole('button', { name: translate('common.actions.close', 'en'), exact: true })
       .click();
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .getByRole('button', {
+        name: new RegExp(`^${translate('gallery.preview.folderRecording', 'en')} \\d+$`),
+      })
+      .click();
+    const recording = page.getByRole('group', { name: 'beta-v1.webm', exact: true });
+    await expect(recording).toHaveCount(1);
+    await recording.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await dialog.getByRole('button', { name: 'Scene', exact: true }).click();
     await mode('Image').click();

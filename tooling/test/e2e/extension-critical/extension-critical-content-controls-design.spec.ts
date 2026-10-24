@@ -770,6 +770,10 @@ for (const width of [1280, 1920]) {
           'border-top-color',
           'rgb(255, 255, 255)'
         );
+        await expect(picker.locator('.sniptale-color-plane-ring')).toHaveCSS(
+          'box-shadow',
+          'rgba(0, 0, 0, 0.4) 0px 0px 1px 1px'
+        );
         const range = picker.locator('.sniptale-picker-range').first();
         await expect(range).toHaveCSS('appearance', 'none');
         await expect(range).toHaveCSS('height', '32px');

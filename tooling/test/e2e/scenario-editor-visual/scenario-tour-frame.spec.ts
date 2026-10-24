@@ -907,8 +907,20 @@ for (const [locale, theme, viewport] of [
         .click();
       const popup = page.locator('[data-ui="shared.ui.paint-selector.popup"]');
       await popup
-        .getByRole('button', { name: t(`highlighter.paintPicker.${mode}`), exact: true })
+        .getByRole('button', {
+          name: t(
+            mode === 'solid' ? 'highlighter.paintPicker.solid' : 'highlighter.paintPicker.gradient'
+          ),
+          exact: true,
+        })
         .click();
+      if (mode === 'linear') {
+        await popup
+          .getByRole('button', { name: t('highlighter.paintPicker.linear'), exact: true })
+          .click();
+      }
+      await expect(popup).toHaveCSS('width', mode === 'linear' ? '620px' : '300px');
+      await page.screenshot({ path: info.outputPath(`tour-${mode}-picker.png`), fullPage: false });
       const apply = popup.getByRole('button', {
         name: t('shared.ui.colorSelectorApply'),
         exact: true,

@@ -2,10 +2,16 @@
 
 import { act, useRef, useState, type MutableRefObject } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { clonePaint, createGradientPaint, serializePaintToCss } from '@sniptale/foundation/paint';
 import { usePaintHistory } from './history';
 import { usePaintModeState, type PaintModeDrafts } from './mode-state';
+import { CompactPaintSelector } from '.';
+
+vi.mock('../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/i18n')>()),
+  translate: (key: string) => key,
+}));
 
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -124,6 +130,43 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  vi.useRealTimers();
+});
+
+it('records each accelerated keyboard stepper hold as one undo action in the shared popup', () => {
+  vi.useFakeTimers();
+  act(() =>
+    root.render(
+      <CompactPaintSelector label="Fill" title="Fill" value={initial} onChange={vi.fn()} />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  act(() => vi.advanceTimersByTime(32));
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  const input = popup.querySelector<HTMLInputElement>(
+    'input[aria-label="highlighter.paintPicker.angle"]'
+  )!;
+  const up = input.closest('.sniptale-picker-number')!.querySelector('button')!;
+  const undo = popup.querySelector<HTMLButtonElement>(
+    'button[aria-label="highlighter.paintPicker.undo"]'
+  )!;
+  const hold = (key: string) => {
+    act(() => up.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+    act(() => vi.advanceTimersByTime(1000));
+    act(() => up.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true })));
+    act(() => vi.advanceTimersByTime(0));
+  };
+  act(() => up.focus());
+  hold('Enter');
+  const first = input.value;
+  expect(Number(first)).toBeGreaterThan(91);
+  hold(' ');
+  expect(Number(input.value)).toBeGreaterThan(Number(first));
+  act(() => undo.click());
+  expect(input.value).toBe(first);
+  act(() => undo.click());
+  expect(input.value).toBe('90');
+  expect(undo.disabled).toBe(true);
 });
 function render(open = true, cache?: MutableRefObject<PaintModeDrafts>) {
   act(() => root.render(<Editor open={open} {...(cache ? { cache } : {})} />));

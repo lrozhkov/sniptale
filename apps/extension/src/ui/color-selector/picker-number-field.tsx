@@ -101,17 +101,30 @@ function useNumberEditing(props: PickerNumberFieldProps) {
 
 function useNumberHold(
   input: RefObject<HTMLInputElement | null>,
-  step: (direction: number) => boolean
+  step: (direction: number) => boolean,
+  disabled = false
 ) {
   const hold = useRef<{ timer: ReturnType<typeof setTimeout> | null; step: typeof step }>({
     timer: null,
     step,
   });
   hold.current.step = step;
+  const keyboard = useRef<{
+    key: string | null;
+    clickTimer: ReturnType<typeof setTimeout> | null;
+    suppressClick: boolean;
+  }>({ key: null, clickTimer: null, suppressClick: false });
   const stop = useCallback(() => {
     if (hold.current.timer !== null) clearTimeout(hold.current.timer);
     hold.current.timer = null;
+    keyboard.current.key = null;
+    keyboard.current.suppressClick = false;
+    if (keyboard.current.clickTimer !== null) clearTimeout(keyboard.current.clickTimer);
+    keyboard.current.clickTimer = null;
   }, []);
+  useEffect(() => {
+    if (disabled) stop();
+  }, [disabled, stop]);
   useEffect(() => {
     const view = input.current?.ownerDocument.defaultView;
     const escape = (event: globalThis.KeyboardEvent) => {
@@ -143,13 +156,37 @@ function useNumberHold(
     };
     hold.current.timer = setTimeout(repeat, 280);
   };
-  return { start, stop };
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, direction: number) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    if (disabled || event.repeat || keyboard.current.key !== null) return;
+    start(direction);
+    keyboard.current.key = event.key;
+  };
+  const onKeyUp = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== keyboard.current.key) return;
+    event.preventDefault();
+    stop();
+    // Some hosts still synthesize a zero-detail click in the key-release task.
+    keyboard.current.suppressClick = true;
+    keyboard.current.clickTimer = setTimeout(() => {
+      keyboard.current.suppressClick = false;
+      keyboard.current.clickTimer = null;
+    }, 0);
+  };
+  const consumeKeyboardClick = () => {
+    if (keyboard.current.key !== null) return true;
+    if (!keyboard.current.suppressClick) return false;
+    stop();
+    return true;
+  };
+  return { start, stop, onKeyDown, onKeyUp, consumeKeyboardClick };
 }
 
 /** Numeric picker channel with a retained text draft and accelerated press-and-hold controls. */
 export function PickerNumberField(props: PickerNumberFieldProps) {
   const editing = useNumberEditing(props);
-  const hold = useNumberHold(editing.input, editing.changeStep);
+  const hold = useNumberHold(editing.input, editing.changeStep, props.disabled);
   return (
     <div className="sniptale-picker-number">
       {props.prefix ? <span aria-hidden="true">{props.prefix}</span> : null}
@@ -188,8 +225,10 @@ export function PickerNumberField(props: PickerNumberFieldProps) {
             onPointerLeave={hold.stop}
             onLostPointerCapture={hold.stop}
             onBlur={hold.stop}
+            onKeyDown={(event) => hold.onKeyDown(event, direction)}
+            onKeyUp={hold.onKeyUp}
             onClick={(event) => {
-              if (event.detail === 0) editing.changeStep(direction);
+              if (event.detail === 0 && !hold.consumeKeyboardClick()) editing.changeStep(direction);
             }}
           >
             <svg

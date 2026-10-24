@@ -91,3 +91,77 @@ it('retains invalid drafts without emitting and exposes empty input as invalid',
   });
   expect(input.getAttribute('aria-invalid')).toBe('true');
 });
+
+it.each(['Enter', ' '])(
+  'accelerates %j on a focused stepper without browser-repeat or click duplicates',
+  (key) => {
+    const onChange = vi.fn();
+    act(() =>
+      root.render(
+        <PickerNumberField ariaLabel="Opacity" value={0} max={1000} onChange={onChange} />
+      )
+    );
+    const up = host.querySelector('button')!;
+    act(() => up.focus());
+    act(() =>
+      up.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+    );
+    expect(onChange).toHaveBeenLastCalledWith('1');
+    act(() => up.dispatchEvent(new KeyboardEvent('keydown', { key, repeat: true, bubbles: true })));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(1000));
+    const first = onChange.mock.calls.length;
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onChange.mock.calls.length - first).toBeGreaterThan(first);
+    act(() =>
+      up.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true, cancelable: true }))
+    );
+    const stopped = onChange.mock.calls.length;
+    act(() => up.click());
+    expect(onChange).toHaveBeenCalledTimes(stopped);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onChange).toHaveBeenCalledTimes(stopped);
+    act(() => up.click());
+    expect(onChange).toHaveBeenCalledTimes(stopped + 1);
+  }
+);
+
+it.each(['blur', 'escape', 'window-blur', 'disabled', 'unmount'])(
+  'releases a keyboard hold on %s',
+  (stop) => {
+    const onChange = vi.fn();
+    const render = (disabled = false) =>
+      root.render(
+        <PickerNumberField ariaLabel="Opacity" value={50} onChange={onChange} disabled={disabled} />
+      );
+    act(() => render());
+    const down = host.querySelectorAll('button')[1]!;
+    act(() => down.focus());
+    act(() => down.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(onChange).toHaveBeenLastCalledWith('49');
+    act(() => {
+      if (stop === 'blur') down.blur();
+      if (stop === 'escape')
+        down.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      if (stop === 'window-blur') window.dispatchEvent(new Event('blur'));
+      if (stop === 'disabled') render(true);
+      if (stop === 'unmount') root.unmount();
+    });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+    if (stop === 'unmount') root = createRoot(host);
+  }
+);
+
+it('stops at bounds and preserves a standalone assistive click', () => {
+  const onChange = vi.fn();
+  act(() => root.render(<PickerNumberField ariaLabel="Opacity" value={99} onChange={onChange} />));
+  const up = host.querySelector('button')!;
+  act(() => up.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  act(() => vi.advanceTimersByTime(1000));
+  expect(onChange).toHaveBeenCalledExactlyOnceWith('100');
+  expect(vi.getTimerCount()).toBe(0);
+  act(() => host.querySelectorAll('button')[1]!.click());
+  expect(onChange).toHaveBeenLastCalledWith('99');
+});

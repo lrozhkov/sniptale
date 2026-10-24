@@ -189,7 +189,8 @@ function TemplateCatalogTools(props: {
           aria-label={translate('highlighter.paintPicker.filterTemplates')}
           value={props.type}
           onChange={props.onType}
-          className="h-7! min-h-7! rounded-[4px]! px-2! text-xs! font-normal!"
+          className="sniptale-picker-select h-7! min-h-7! rounded-[4px]! px-2! text-xs! font-normal!"
+          menuClassName="sniptale-picker-select-menu"
           options={[
             { value: 'all', label: translate('highlighter.paintPicker.allTemplateTypes') },
             ...(['linear', 'radial', 'conic'] as const)
