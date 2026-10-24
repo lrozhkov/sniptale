@@ -25,7 +25,8 @@ async function runCountdownCapture(
   args: CreateScreenshotControllerActionsArgs,
   runToken: number,
   contentIntentSource: ContentPrivilegedActionIntentSource | undefined,
-  showSuccessToast: boolean
+  showSuccessToast: boolean,
+  captureAction?: CaptureActionType
 ): Promise<void> {
   if (type === 'selection') {
     await runSelectionScreenshot(args.runtime, {
@@ -38,6 +39,7 @@ async function runCountdownCapture(
   }
 
   await runViewportScreenshot(type, args.runtime, {
+    ...(captureAction === undefined ? {} : { captureAction }),
     contentIntentSource,
     runToken,
     showSuccessToast,
@@ -93,7 +95,8 @@ export async function executeCountdownScreenshot(
   type: ScreenshotType,
   args: CreateScreenshotControllerActionsArgs,
   runToken: number,
-  contentIntentSource?: ContentPrivilegedActionIntentSource
+  contentIntentSource?: ContentPrivilegedActionIntentSource,
+  captureAction?: CaptureActionType
 ): Promise<void> {
   if (!isCurrentScreenshotRun(args.runtime, runToken)) {
     clearCountdownStateIfOwned(args, runToken);
@@ -113,7 +116,14 @@ export async function executeCountdownScreenshot(
       restoreWindowSize = await args.params.prepareWindowSize?.(contentIntentSource);
     }
     try {
-      await runCountdownCapture(type, args, runToken, contentIntentSource, !shouldCloseQuickAction);
+      await runCountdownCapture(
+        type,
+        args,
+        runToken,
+        contentIntentSource,
+        !shouldCloseQuickAction,
+        captureAction
+      );
     } finally {
       await restoreWindowSize?.();
     }

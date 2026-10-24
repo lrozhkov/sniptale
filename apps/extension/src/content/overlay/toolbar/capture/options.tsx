@@ -1,6 +1,6 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import React from 'react';
-import { AppWindow, Copy, Crop, Download, FolderInput, Library, Save } from 'lucide-react';
+import { Copy, Crop, Download, FolderInput, Library, Save } from 'lucide-react';
 import { PageControlVisibility } from '../controls/control-visibility';
 import { translate } from '../../../../platform/i18n';
 import type { CaptureActionType } from '../../../../contracts/settings';
@@ -9,6 +9,10 @@ import { PopoverCheckIcon } from '../../icons/icons';
 import type { ToolbarCaptureActionsProps } from '../types';
 import { getCaptureActionDescriptors } from '../../../../features/quick-actions-presets/catalog';
 import { FullPageCaptureSplitButton } from './full-page-menu';
+import { CaptureActionIcons } from './action-icons';
+import { ScreenshotCaptureSplitButton } from './screenshot-menu';
+import { NumericRow, SegmentedRow } from '../../../../ui/compact-inspector-controls';
+import { useToolbarImagePreferences } from './image-preferences';
 import { useFullPageCapturePreferences } from './full-page-preferences';
 import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 
@@ -17,10 +21,12 @@ export function renderMenuCheck() {
 }
 
 export function getCaptureActionOptions() {
-  return getCaptureActionDescriptors().map((option) => ({
-    ...option,
-    icon: getCaptureActionMenuIcon(option.value),
-  })) satisfies Array<{
+  return getCaptureActionDescriptors()
+    .filter((option) => option.value !== 'scenario')
+    .map((option) => ({
+      ...option,
+      icon: getCaptureActionMenuIcon(option.value),
+    })) satisfies Array<{
     value: CaptureActionType;
     label: string;
     hint: string;
@@ -125,6 +131,23 @@ export function ToolbarCaptureButtons(props: {
 }) {
   const handleTakeScreenshotClick = createTakeScreenshotClickHandler(props.onTakeScreenshot);
   const fullPage = useFullPageCapturePreferences();
+  const image = useToolbarImagePreferences();
+  const disabled = props.isLoading || image.saving || fullPage.saving;
+  const quickActions = (mode: 'visible' | 'full') => (
+    <CaptureActionIcons
+      label={translate('content.toolbar.captureQuickActionsTitle')}
+      dataUiPrefix={`content.toolbar.capture-${mode}-action`}
+      options={getCaptureActionOptions()}
+      disabled={disabled}
+      onSelect={(action, event) => {
+        const source = createTrustedContentActionIntentSource(event.nativeEvent);
+        if (!source) return;
+        props.toolbarMenuState.closeMenus();
+        props.onTakeScreenshot(mode, source, { captureAction: action });
+      }}
+    />
+  );
+  const imageParameters = <CaptureImageParameters image={image} />;
 
   return (
     <>
@@ -132,12 +155,31 @@ export function ToolbarCaptureButtons(props: {
         control="capture-visible"
         label={translate('content.toolbar.visibleArea')}
       >
-        <ToolbarViewportCaptureButton
-          dataUi="content.toolbar.capture-visible-button"
-          icon={<AppWindow size={20} strokeWidth={2} />}
-          onClick={handleTakeScreenshotClick('visible')}
-          title={translate('content.toolbar.visibleArea')}
-          disabled={props.isLoading}
+        <ScreenshotCaptureSplitButton
+          mode="visible"
+          compactMenus={props.compactMenus}
+          displayMode={props.displayMode}
+          disabled={disabled}
+          onPrimaryClick={handleTakeScreenshotClick('visible')}
+          toolbarMenuState={props.toolbarMenuState}
+          quickActions={quickActions('visible')}
+        >
+          {imageParameters}
+        </ScreenshotCaptureSplitButton>
+      </PageControlVisibility>
+      <PageControlVisibility control="capture-full" label={translate('content.toolbar.fullPage')}>
+        <FullPageCaptureSplitButton
+          compactMenus={props.compactMenus}
+          currentViewport={props.currentViewport}
+          disabled={disabled}
+          displayMode={props.displayMode}
+          onPrimaryClick={handleTakeScreenshotClick('full')}
+          onUpdate={fullPage.updatePreferences}
+          quickActions={quickActions('full')}
+          imageParameters={imageParameters}
+          preferences={fullPage.preferences}
+          saving={fullPage.saving}
+          toolbarMenuState={props.toolbarMenuState}
         />
       </PageControlVisibility>
       <PageControlVisibility
@@ -145,21 +187,8 @@ export function ToolbarCaptureButtons(props: {
         label={translate('content.toolbar.selectionArea')}
       >
         <ToolbarSelectionCaptureButton
-          disabled={props.isLoading}
+          disabled={disabled}
           onClick={handleTakeScreenshotClick('selection')}
-        />
-      </PageControlVisibility>
-      <PageControlVisibility control="capture-full" label={translate('content.toolbar.fullPage')}>
-        <FullPageCaptureSplitButton
-          compactMenus={props.compactMenus}
-          currentViewport={props.currentViewport}
-          disabled={props.isLoading}
-          displayMode={props.displayMode}
-          onPrimaryClick={handleTakeScreenshotClick('full')}
-          onUpdate={fullPage.updatePreferences}
-          preferences={fullPage.preferences}
-          saving={fullPage.saving}
-          toolbarMenuState={props.toolbarMenuState}
         />
       </PageControlVisibility>
     </>
@@ -179,25 +208,49 @@ function createTakeScreenshotClickHandler(
     };
 }
 
-function ToolbarViewportCaptureButton(props: {
-  dataUi: string;
-  icon: React.ReactNode;
-  onClick: React.MouseEventHandler<HTMLButtonElement>;
-  title: string;
-  disabled: boolean;
+function CaptureImageParameters({
+  image,
+}: {
+  image: ReturnType<typeof useToolbarImagePreferences>;
 }) {
+  const [quality, setQuality] = React.useState(image.imageQuality);
+  React.useEffect(() => {
+    if (!image.saving) setQuality(image.imageQuality);
+  }, [image.imageQuality, image.saving]);
   return (
-    <ContentToolbarButton
-      type="button"
-      data-content-command="true"
-      onClick={props.onClick}
-      title={props.title}
-      dataUi={props.dataUi}
-      data-sniptale-activation-bridge="defer"
-      disabled={props.disabled}
-    >
-      {props.icon}
-    </ContentToolbarButton>
+    <div className="sniptale-capture-image-parameters">
+      <span className="sniptale-capture-parameter-label">
+        {translate('imageSettings.section.formatLabel')}
+      </span>
+      <SegmentedRow
+        ariaLabel={translate('imageSettings.section.formatLabel')}
+        value={image.imageFormat}
+        options={[
+          { value: 'png', label: translate('imageSettings.section.formatPngLabel') },
+          { value: 'jpeg', label: translate('imageSettings.section.formatJpegLabel') },
+          { value: 'webp', label: translate('imageSettings.section.formatWebpLabel') },
+        ]}
+        onChange={(imageFormat) => void image.updatePreferences({ imageFormat })}
+      />
+      {image.imageFormat !== 'png' ? (
+        <NumericRow
+          appearance="plain"
+          label={translate('imageSettings.section.qualityLabel')}
+          value={quality}
+          min={1}
+          max={100}
+          step={1}
+          unit="%"
+          revealScrub
+          scrub={{ min: 1, max: 100, step: 1 }}
+          onPreviewValue={setQuality}
+          onCommitValue={(imageQuality) => {
+            setQuality(imageQuality);
+            void image.updatePreferences({ imageQuality });
+          }}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -208,6 +261,7 @@ function ToolbarSelectionCaptureButton(props: {
   return (
     <ContentToolbarButton
       type="button"
+      tone="property"
       data-content-command="true"
       onClick={props.onClick}
       title={translate('content.toolbar.selectionArea')}

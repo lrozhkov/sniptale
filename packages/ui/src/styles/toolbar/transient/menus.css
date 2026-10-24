@@ -250,3 +250,57 @@
     opacity: 0;
   }
 }
+
+/* Screenshot groups paint one neutral surface only while the pointer is over them. */
+.sniptale-content-toolbar-adopted .sniptale-screenshot-split-control {
+  background: transparent;
+}
+
+.sniptale-content-toolbar-adopted .sniptale-screenshot-split-control:has(> button:enabled:hover) {
+  background: var(--sniptale-color-surface-hover);
+}
+
+.sniptale-toolbar-root .sniptale-screenshot-split-control::after {
+  display: none;
+}
+
+.sniptale-screenshot-menu {
+  width: 300px;
+}
+
+.sniptale-capture-action-icons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px;
+}
+
+.sniptale-capture-action-icons .sniptale-capture-action-icon {
+  display: inline-flex;
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+
+.sniptale-capture-action-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sniptale-capture-image-parameters {
+  display: grid;
+  gap: 6px;
+  padding: 4px 8px 8px;
+}
+
+.sniptale-capture-parameter-label {
+  color: var(--sniptale-color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}

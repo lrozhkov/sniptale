@@ -34,7 +34,7 @@ export async function runViewportScreenshot(
   runtime: ScreenshotControllerRuntime,
   options: ScreenshotSuccessFeedbackOptions = {}
 ): Promise<void> {
-  const actionType = runtime.captureActionRef.current;
+  const actionType = options.captureAction ?? runtime.captureActionRef.current;
   const shouldSaveScenarioStep = shouldSaveScenarioCapture(actionType, runtime);
   try {
     assertCurrentScreenshotRun(runtime, options.runToken);

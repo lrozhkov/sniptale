@@ -411,6 +411,22 @@ export function subscribeToSettingsChanges(
   });
 }
 
+/** Observe canonical image preferences, including reset and removal of the settings key. */
+export function subscribeToImagePreferencesChanges(
+  listener: (preferences: Pick<NormalizedSettings, 'imageFormat' | 'imageQuality'>) => void
+): () => void {
+  if (typeof chrome === 'undefined') return () => undefined;
+  return browserStorage.subscribeToChanges((changes, areaName) => {
+    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
+    const change = changes[STORAGE_KEY];
+    const previous = normalizeLoadedSettings(parseStoredSettings(change?.oldValue).value);
+    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value);
+    if (previous.imageFormat === next.imageFormat && previous.imageQuality === next.imageQuality)
+      return;
+    listener({ imageFormat: next.imageFormat, imageQuality: next.imageQuality });
+  });
+}
+
 /** Observe canonical voice preferences, including reset and removal of the settings key. */
 export function subscribeToVoiceInputPreferencesChanges(
   listener: (preferences: VoiceInputPreferences) => void

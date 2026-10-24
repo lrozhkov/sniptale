@@ -21,9 +21,9 @@ vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
 import { getCaptureActionOptions, getCaptureActionTooltip, ToolbarCaptureButtons } from './options';
 import type { ToolbarCaptureActionsProps } from '../types';
 import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
-import type { ToolbarMenuState } from '../state/menu';
+import { useToolbarMenuState, type ToolbarMenuState } from '../state/menu';
 import { Library } from 'lucide-react';
-import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
+import { ImageEditorIcon } from '@sniptale/ui/editor-chrome';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -93,7 +93,6 @@ function registerCaptureActionOptionTests() {
       'edit',
       'ask_system',
       'ask_preset',
-      'scenario',
       'save_to_library',
     ]);
   });
@@ -103,9 +102,7 @@ function registerCaptureActionOptionTests() {
     expect(options.every((option) => 'icon' in option)).toBe(true);
     expect(options.find((option) => option.value === 'edit')?.icon.type).toBe(ImageEditorIcon);
     expect(options.find((option) => option.value === 'save_to_library')?.icon.type).toBe(Library);
-    expect(options.find((option) => option.value === 'scenario')?.icon.type).toBe(
-      ScenarioEditorIcon
-    );
+    expect(options.some((option) => option.value === 'scenario')).toBe(false);
   });
 
   it('returns the scenario tooltip label', () => {
@@ -132,16 +129,17 @@ function registerCaptureActionOptionTests() {
     ).toBe('defer');
   });
 
-  it('places selection capture immediately after visible-area capture', () => {
+  it('orders visible-area, full-page and selection capture with their arrows', () => {
     const buttons = Array.from(renderCaptureButtons().querySelectorAll('[data-ui]')).map((button) =>
       button.getAttribute('data-ui')
     );
 
     expect(buttons).toEqual([
       'content.toolbar.capture-visible-button',
-      'content.toolbar.capture-selection-button',
+      'content.toolbar.capture-visible-settings-button',
       'content.toolbar.capture-full-button',
       'content.toolbar.capture-full-settings-button',
+      'content.toolbar.capture-selection-button',
     ]);
   });
 
@@ -214,3 +212,70 @@ function renderCaptureButtonsWithHandler(
 
   return container;
 }
+
+function InteractiveCaptureButtons({
+  onTakeScreenshot,
+}: {
+  onTakeScreenshot: ToolbarCaptureActionsProps['onTakeScreenshot'];
+}) {
+  const toolbarMenuState = useToolbarMenuState();
+  return (
+    <ToolbarCaptureButtons
+      {...createCaptureButtonProps(onTakeScreenshot)}
+      toolbarMenuState={toolbarMenuState}
+    />
+  );
+}
+
+it.each(['visible', 'full'] as const)(
+  'runs each %s quick action only on trusted release and closes the menu',
+  async (mode) => {
+    const onTakeScreenshot = vi.fn();
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    await act(async () =>
+      root?.render(<InteractiveCaptureButtons onTakeScreenshot={onTakeScreenshot} />)
+    );
+    for (const option of getCaptureActionOptions()) {
+      act(() =>
+        container
+          ?.querySelector<HTMLButtonElement>(
+            `[data-ui="content.toolbar.capture-${mode}-settings-button"]`
+          )
+          ?.click()
+      );
+      const action = container?.querySelector<HTMLButtonElement>(
+        `[data-ui="content.toolbar.capture-${mode}-action.${option.value}"]`
+      );
+      expect(action).not.toBeNull();
+      act(() => action?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+      expect(onTakeScreenshot).not.toHaveBeenCalled();
+      act(() => action?.click());
+      expect(onTakeScreenshot).toHaveBeenCalledExactlyOnceWith(
+        mode,
+        { kind: 'trusted-content-event' },
+        { captureAction: option.value }
+      );
+      expect(container?.querySelector('.sniptale-screenshot-menu')).toBeNull();
+      onTakeScreenshot.mockClear();
+    }
+    act(() =>
+      container
+        ?.querySelector<HTMLButtonElement>(
+          `[data-ui="content.toolbar.capture-${mode}-settings-button"]`
+        )
+        ?.click()
+    );
+    trustedEventMocks.isTrustedDomEvent.mockReturnValue(false);
+    act(() =>
+      container
+        ?.querySelector<HTMLButtonElement>(
+          `[data-ui="content.toolbar.capture-${mode}-action.copy"]`
+        )
+        ?.click()
+    );
+    expect(onTakeScreenshot).not.toHaveBeenCalled();
+    expect(container?.querySelector('.sniptale-screenshot-menu')).not.toBeNull();
+  }
+);

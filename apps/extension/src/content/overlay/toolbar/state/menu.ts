@@ -6,6 +6,7 @@ export type ToolbarPopoverMenu =
   | 'annotations-export'
   | 'capture'
   | 'full-page'
+  | 'visible-page'
   | 'frame-style'
   | 'future-callout'
   | 'future-step-badge'

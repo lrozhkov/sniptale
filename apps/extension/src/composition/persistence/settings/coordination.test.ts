@@ -492,3 +492,47 @@ it('does not notify voice consumers for unrelated settings or storage areas', as
   );
   expect(listener).not.toHaveBeenCalled();
 });
+
+it('observes canonical image changes, reset, removal, and recreation without writing', async () => {
+  vi.stubGlobal('chrome', {});
+  const settings = await import('./index');
+  const listener = vi.fn();
+  const stop = vi.fn();
+  storage.subscribe.mockReturnValueOnce(stop);
+  const unsubscribe = settings.subscribeToImagePreferencesChanges(listener);
+  const notify = storage.subscribe.mock.calls[0]?.[0];
+  const image = { imageFormat: 'webp', imageQuality: 71 };
+  notify({ sniptale_settings: { oldValue: {}, newValue: image } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith(image);
+  notify({ sniptale_settings: { oldValue: image, newValue: settings.DEFAULT_SETTINGS } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith({ imageFormat: 'png', imageQuality: 100 });
+  notify({ sniptale_settings: { oldValue: image, newValue: undefined } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith({ imageFormat: 'png', imageQuality: 100 });
+  notify({ sniptale_settings: { oldValue: undefined, newValue: image } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith(image);
+  unsubscribe();
+  expect(stop).toHaveBeenCalledOnce();
+  expect(storage.set).not.toHaveBeenCalled();
+});
+
+it('filters unrelated image notifications and normalizes malformed image fields', async () => {
+  vi.stubGlobal('chrome', {});
+  const settings = await import('./index');
+  const listener = vi.fn();
+  settings.subscribeToImagePreferencesChanges(listener);
+  const notify = storage.subscribe.mock.calls[0]?.[0];
+  notify({ sniptale_settings: { oldValue: {}, newValue: { captureDelay: 3 } } }, 'sync');
+  notify({ another_key: { newValue: { imageQuality: 80 } } }, 'sync');
+  notify({ sniptale_settings: { newValue: { imageQuality: 80 } } }, 'local');
+  expect(listener).not.toHaveBeenCalled();
+  notify(
+    {
+      sniptale_settings: {
+        oldValue: { imageFormat: 'jpeg', imageQuality: 70 },
+        newValue: { imageFormat: 'gif', imageQuality: 'invalid' },
+      },
+    },
+    'sync'
+  );
+  expect(listener).toHaveBeenCalledExactlyOnceWith({ imageFormat: 'png', imageQuality: 100 });
+});

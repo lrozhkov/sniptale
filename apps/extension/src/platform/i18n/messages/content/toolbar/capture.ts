@@ -1,6 +1,12 @@
 import { defineMessageSource } from '../../source';
 
 export const contentToolbarCaptureMessages = defineMessageSource({
+  visiblePageSettingsTitle: {
+    ru: 'Параметры снимка видимой области',
+    en: 'Visible-area screenshot options',
+  },
+  captureParameters: { ru: 'Параметры', en: 'Options' },
+  captureQuickActionsTitle: { ru: 'Сделать снимок', en: 'Take screenshot' },
   captureDownloadLabel: {
     ru: 'Скачать',
     en: 'Download',

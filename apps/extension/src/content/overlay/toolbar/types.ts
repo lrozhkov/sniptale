@@ -1,3 +1,4 @@
+import type { ScreenshotStartContext } from '../screenshot/types';
 import type { PagePreparationResetScope } from '../../parser/page-preparation/history';
 import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
@@ -133,7 +134,8 @@ export interface ToolbarCaptureActionsProps {
   toolbarMenuState: ToolbarMenuState;
   onTakeScreenshot: (
     type: 'visible' | 'full' | 'selection',
-    contentIntentSource?: ContentPrivilegedActionIntentSource
+    contentIntentSource?: ContentPrivilegedActionIntentSource,
+    startContext?: ScreenshotStartContext
   ) => void;
   scenario?: ToolbarProps['scenario'];
 }
@@ -207,7 +209,8 @@ export interface ToolbarProps {
   ) => void;
   onTakeScreenshot: (
     type: 'visible' | 'full' | 'selection',
-    contentIntentSource?: ContentPrivilegedActionIntentSource
+    contentIntentSource?: ContentPrivilegedActionIntentSource,
+    startContext?: ScreenshotStartContext
   ) => void;
   onHide: (restoreFocus?: boolean) => void;
   onClearHighlights: () => void;

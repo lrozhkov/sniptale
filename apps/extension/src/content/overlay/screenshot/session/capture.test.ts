@@ -186,3 +186,29 @@ describe('screenshot-controller-action-capture', () => {
   it('runs immediate viewport capture when timerDelay is zero', verifyImmediateViewportBranch);
   it('passes auto-start context into screenshot preparation', verifyAutoStartContextBranch);
 });
+
+it('forwards a one-shot action and trusted source without changing the next capture', async () => {
+  const { args } = createArgs();
+  const source = { kind: 'trusted-content-event' } as const;
+  const capture = createHandleTakeScreenshot(args);
+  await capture('visible', source, { captureAction: 'copy' });
+  expect(runImmediateScreenshotMock).toHaveBeenLastCalledWith('visible', args, 1, source, 'copy');
+  await capture('full', source);
+  expect(runImmediateScreenshotMock).toHaveBeenLastCalledWith('full', args, 2, source);
+  expect(args.params.setCaptureAction).not.toHaveBeenCalled();
+  expect(args.params.captureActionRef.current).toBe('download_default');
+});
+
+it('binds the one-shot countdown action to its callback without changing a later countdown', async () => {
+  const { args } = createArgs({ params: createParams({ timerDelay: 3 }) });
+  const source = { kind: 'trusted-content-event' } as const;
+  const capture = createHandleTakeScreenshot(args);
+  await capture('full', source, { captureAction: 'edit' });
+  const first = startCountdownMock.mock.calls[0]?.[0];
+  await capture('visible', source);
+  first.onElapsed();
+  expect(executeCountdownScreenshotMock).toHaveBeenLastCalledWith('full', args, 1, source, 'edit');
+  startCountdownMock.mock.calls[1]?.[0].onElapsed();
+  expect(executeCountdownScreenshotMock).toHaveBeenLastCalledWith('visible', args, 2, source);
+  expect(args.params.setCaptureAction).not.toHaveBeenCalled();
+});
