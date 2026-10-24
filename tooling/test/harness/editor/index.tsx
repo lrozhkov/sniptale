@@ -1,6 +1,10 @@
 import type { FabricObject } from 'fabric';
 import { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../../apps/extension/src/ui/compact-inspector-controls/layout';
+import '../../../../apps/extension/src/ui/compact-inspector-controls/inspector-surface.css';
+import '../../../../apps/extension/src/editor/image-surface.css';
 import { harnessReady } from '../browser-mocks/browser-mocks';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';
@@ -180,18 +184,24 @@ void harnessReady.then(() => {
     : null;
 
   createRoot(document.getElementById('root')!).render(
-    <EditorPage
-      afterLayout={
-        <>
-          {dispatchBootstrapPayload ? (
-            <HarnessEditorBootstrapDispatch payload={bootstrapPayload} />
-          ) : null}
-          <HarnessEditorDebugBridge />
-          {autoApplyBrowserFrame ? (
-            <HarnessBrowserFrameAutoApply browserFrame={harnessBrowserFrame} />
-          ) : null}
-        </>
-      }
-    />
+    <CommandPressScope value={true}>
+      <InspectorLayout>
+        <div className="sniptale-compact-workspace sniptale-image-workspace sniptale-image-page">
+          <EditorPage
+            afterLayout={
+              <>
+                {dispatchBootstrapPayload ? (
+                  <HarnessEditorBootstrapDispatch payload={bootstrapPayload} />
+                ) : null}
+                <HarnessEditorDebugBridge />
+                {autoApplyBrowserFrame ? (
+                  <HarnessBrowserFrameAutoApply browserFrame={harnessBrowserFrame} />
+                ) : null}
+              </>
+            }
+          />
+        </div>
+      </InspectorLayout>
+    </CommandPressScope>
   );
 });

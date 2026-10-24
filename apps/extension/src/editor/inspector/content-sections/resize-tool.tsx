@@ -279,7 +279,7 @@ function ResizeToolDimensionRow(props: {
   updateLockedDraft: ResizeToolSectionProps['updateLockedDraft'];
 }) {
   return (
-    <div data-size-panel-dimensions className="sniptale-parameter-stack">
+    <div data-size-panel-dimensions className="sniptale-parameter-stack relative">
       {(['width', 'height'] as const).map((field) => {
         const label = translate(
           field === 'width' ? 'editor.compact.widthDimension' : 'editor.compact.heightDimension'
@@ -287,13 +287,6 @@ function ResizeToolDimensionRow(props: {
         return (
           <InspectorParameterRow key={field} label={label} valueMinimum={140}>
             <div className="flex w-full items-center justify-end gap-2">
-              {field === 'width' ? (
-                <AspectToggle
-                  compact
-                  checked={props.active.locked}
-                  onClick={() => props.active.setLocked((next) => !next)}
-                />
-              ) : null}
               <NumericValueField
                 label={label}
                 value={props.active.draft[field]}
@@ -309,6 +302,13 @@ function ResizeToolDimensionRow(props: {
           </InspectorParameterRow>
         );
       })}
+      <div className="absolute right-28 top-1/2 -translate-y-1/2 [&>button]:h-6 [&>button]:w-6 [&_svg]:size-3">
+        <AspectToggle
+          compact
+          checked={props.active.locked}
+          onClick={() => props.active.setLocked((next) => !next)}
+        />
+      </div>
     </div>
   );
 }

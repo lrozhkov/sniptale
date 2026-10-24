@@ -170,6 +170,10 @@ it.each(['image', 'canvas'] as const)('uses distinct dimension parameters in %s 
   const rows = dimensions.querySelectorAll('.sniptale-parameter-row');
   expect(rows).toHaveLength(2);
   for (const row of rows) expect(row.textContent).toContain('px');
+  const aspect = dimensions.querySelector('[data-ui="editor.size-controls.aspect-toggle"]');
+  expect(aspect).not.toBeNull();
+  expect(aspect?.closest('.sniptale-parameter-row')).toBeNull();
+  expect(aspect?.parentElement?.className).toContain('top-1/2');
 });
 
 it('keeps image resize free of mouse selection preview and applies a flattened image resize action', () => {

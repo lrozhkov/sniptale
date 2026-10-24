@@ -160,14 +160,17 @@ it('renders the solid color branch and forwards color updates', async () => {
   expect(
     container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
   ).toBe('solid,linear');
-  expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).not.toBeNull();
-  expect(container?.querySelector('[data-ui="editor.frame.gradient-presets"]')).not.toBeNull();
+  expect(container?.querySelectorAll('[data-ui="editor.frame.paint-presets"]')).toHaveLength(1);
+  expect(
+    container?.querySelectorAll(
+      `button[aria-label="${translate('settings.editor.backgrounds.showMore')}"]`
+    )
+  ).toHaveLength(1);
 
-  const colors = container!.querySelector('[data-ui="editor.frame.quick-colors"]')!;
-  expect(Array.from(colors.querySelectorAll('button'), (button) => button.title)).toEqual([
-    '#111111',
-    '#eeeeee',
-  ]);
+  const colors = container!.querySelector('[data-ui="editor.frame.paint-presets"]')!;
+  expect(
+    Array.from(colors.querySelectorAll('button'), (button) => button.title).slice(0, 2)
+  ).toEqual(['#111111', '#eeeeee']);
   await act(async () => colors.querySelector('button')!.click());
   expect(applyFramePatch).toHaveBeenCalledWith({
     backgroundColor: '#111111ff',
@@ -222,14 +225,20 @@ it('renders the gradient branch and forwards gradient actions', async () => {
   expect(
     container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
   ).toBe('solid,linear');
-  expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).not.toBeNull();
-  expect(container?.querySelector('[data-ui="editor.frame.gradient-presets"]')).not.toBeNull();
-  const presets = container?.querySelector('[data-ui="editor.frame.gradient-presets"]');
+  expect(container?.querySelectorAll('[data-ui="editor.frame.paint-presets"]')).toHaveLength(1);
+  expect(
+    container?.querySelectorAll(
+      `button[aria-label="${translate('settings.editor.backgrounds.showMore')}"]`
+    )
+  ).toHaveLength(1);
+  const presets = container?.querySelector('[data-ui="editor.frame.paint-presets"]');
   expect(presets?.className).toContain('grid-cols-5');
-  expect(presets?.querySelectorAll('button')).toHaveLength(5);
+  expect(presets?.querySelectorAll('button')).toHaveLength(10);
   await act(async () => {
     container
-      ?.querySelector<HTMLButtonElement>('[data-ui="editor.frame.gradient-presets"] button')
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="editor.frame.paint-presets"] button:nth-of-type(2)'
+      )
       ?.click();
   });
   expect(applyGradientPreset).toHaveBeenCalledOnce();

@@ -133,6 +133,55 @@ it('aligns the DOM scene to the canvas origin and excludes floating controls fro
   act(() => root.unmount());
 });
 
+it('keeps the scene aligned during zoom before projection observers refresh', () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const canvas = document.createElement('canvas');
+  const canvasRef = createRef<HTMLCanvasElement>();
+  canvasRef.current = canvas;
+  let displacement = 0;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    if (this === canvas)
+      return createRect({
+        left: 100 + displacement,
+        top: 150 + displacement,
+        width: 800,
+        height: 600,
+      });
+    if (this.dataset['ui'] === 'editor.frame-annotation-plane')
+      return createRect({
+        left: 20 + displacement,
+        top: 30 + displacement,
+        width: 1000,
+        height: 800,
+      });
+    return createRect({ left: 0, top: 0, width: 0, height: 0 });
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const render = () =>
+    root.render(
+      <EditorFrameAnnotationPlane
+        activeTool="frame-annotation"
+        canvasRef={canvasRef}
+        controller={createPlaneController()}
+        layers={[]}
+      />
+    );
+  act(render);
+  act(() => frames.splice(0).forEach((callback) => callback(0)));
+  const scene = host.querySelector<HTMLElement>('[data-ui="editor.frame-annotation-scene"]')!;
+  expect(scene.style).toMatchObject({ left: '80px', top: '120px' });
+  displacement = -250;
+  act(render);
+  expect(scene.style).toMatchObject({ left: '80px', top: '120px' });
+  act(() => root.unmount());
+});
+
 it('keeps frame comments and numbers above the crop mask in the same scaled scene', () => {
   interactionMocks.projected.push({
     object: {},
