@@ -67,12 +67,11 @@ describe('private capture admission and final delivery', () => {
       expect.objectContaining({ type: VoiceInputPortMessageType.FAILURE, errorCode: 'stale' })
     );
   });
-  it.each(['language', 'backend', 'token', 'model-raw'] as const)(
+  it.each(['language', 'token', 'model-raw'] as const)(
     'refuses mismatched capture %s before ASR',
     async (mismatch) => {
       const h = await harness();
       if (mismatch === 'language') h.session.preferences.language = 'en-US';
-      if (mismatch === 'backend') h.session.preferences.backend = 'browser';
       if (mismatch === 'token' && h.session.captureToken)
         h.session.captureToken.incarnation = 'different';
       await h.completion.handle({
@@ -125,26 +124,19 @@ describe('private capture admission and final delivery', () => {
     );
     expect(h.sessions.active).toBeNull();
   });
-  it('completes browser history without duplicating already streamed text', async () => {
-    const h = await harness('browser');
-    h.session.preferences.correction = { enabled: true, model: null };
-    expect(createIdleVoiceInputSnapshot(h.session.preferences).delivery).toBe('live');
-    h.run.mockImplementation(async (args) =>
-      h.history.complete(args.scope, {
-        rawTranscript: args.browserTranscript ?? '',
-        transcript: 'streamed',
-        correctionStatus: 'off',
-      })
-    );
+  it('ignores capture completion in Chrome without processing or storing streamed text', async () => {
+    const h = await harness();
+    h.session.preferences.backend = 'browser';
+    delete h.session.captureToken;
+    const original = await h.history.list();
     await h.completion.handle({
       type: 'VOICE_INPUT_CAPTURE_RELEASED',
       sessionId: 'private-session',
     });
     await h.completion.handle({ ...h.ready, rawTranscript: 'streamed' });
-    expect(h.owner.postMessage).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: VoiceInputPortMessageType.TRANSCRIPT })
-    );
-    expect((await h.history.list())[0]?.transcript).toBe('streamed');
+    expect(h.run).not.toHaveBeenCalled();
+    expect(await h.history.list()).toEqual(original);
+    expect(h.owner.postMessage).not.toHaveBeenCalled();
   });
   it('never inserts processing results after cancellation or session replacement', async () => {
     const h = await harness();

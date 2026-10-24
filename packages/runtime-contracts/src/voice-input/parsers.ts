@@ -64,6 +64,7 @@ export function parseVoiceInputPreferences(value: unknown): VoiceInputPreference
   if (
     !isRecord(value) ||
     !hasOnlyKeys(value, [
+      'enabled',
       'language',
       'microphoneDeviceId',
       'mode',
@@ -71,6 +72,7 @@ export function parseVoiceInputPreferences(value: unknown): VoiceInputPreference
       'transcription',
       'correction',
     ]) ||
+    (value['enabled'] !== undefined && typeof value['enabled'] !== 'boolean') ||
     !isVoiceInputLanguage(value['language']) ||
     (value['microphoneDeviceId'] !== undefined &&
       value['microphoneDeviceId'] !== null &&
@@ -88,6 +90,7 @@ export function parseVoiceInputPreferences(value: unknown): VoiceInputPreference
     return null;
   }
   return {
+    ...(value['enabled'] === undefined ? {} : { enabled: value['enabled'] }),
     language: value['language'],
     microphoneDeviceId:
       typeof value['microphoneDeviceId'] === 'string' ? value['microphoneDeviceId'] : null,
@@ -146,6 +149,7 @@ function parseVoiceCorrection(
 export function resolveVoiceInputPreferences(value: VoiceInputPreferences) {
   return {
     ...value,
+    enabled: value.enabled ?? true,
     backend: value.backend ?? 'browser',
     transcription: value.transcription ?? null,
     correction: value.correction ?? { enabled: false, model: null },
@@ -448,7 +452,11 @@ export function parseOffscreenVoiceInputRuntimeMessage(
   ) {
     const preferences = parseVoiceInputPreferences(value['preferences']);
     const captureToken = parseVoiceCaptureToken(value['captureToken']);
-    if (!preferences || !captureToken) return null;
+    if (
+      !preferences ||
+      (preferences.backend === 'model' ? !captureToken : value['captureToken'] !== null)
+    )
+      return null;
     return {
       captureToken,
       capabilityToken: value['capabilityToken'],

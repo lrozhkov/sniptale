@@ -196,3 +196,22 @@ it('denies only capture admission when orphan cleanup fails and accepts an expli
   expect(await history.list()).toHaveLength(2);
   expect(fixture.files.size).toBe(2);
 });
+
+it('retries failed legacy Chrome deletion without losing model audio', async () => {
+  const f = createHistoryFixture();
+  const h = f.create();
+  await h.initialize();
+  const model = await publish(h, 'model');
+  const browser = await publish(h, 'browser');
+  const catalog = f.peek()!;
+  catalog.entries.find((entry) => entry.entryId === browser.entryId)!.backend = 'browser';
+  f.replace(catalog);
+  f.audio.remove.mockRejectedValueOnce(new Error('unlink'));
+  await expect(h.initialize()).rejects.toMatchObject({ code: 'storage-failed' });
+  expect(await h.list()).toEqual([await h.get(model)]);
+  expect(f.peek()?.pendingDeletes).toHaveLength(1);
+  await h.recover();
+  expect(f.peek()?.pendingDeletes).toEqual([]);
+  expect(f.files.size).toBe(1);
+  expect((await h.readAudio(model)).size).toBe(5);
+});

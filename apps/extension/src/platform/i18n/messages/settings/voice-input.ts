@@ -13,7 +13,8 @@ export const settingsVoiceInputMessages = defineMessageSource({
   },
   backendLabel: { ru: 'Распознавание', en: 'Recognition' },
   backendBrowser: { ru: 'Chrome', en: 'Chrome' },
-  backendModel: { ru: 'Аудиомодель', en: 'Audio model' },
+  backendOff: { ru: 'Выключено', en: 'Off' },
+  backendModel: { ru: 'Своя AI-модель', en: 'Custom AI model' },
   transcriptionModel: { ru: 'Модель распознавания', en: 'Speech recognition model' },
   correctionLabel: { ru: 'Коррекция текста', en: 'Correct dictated text' },
   correctionModel: { ru: 'Модель коррекции', en: 'Text correction model' },
@@ -108,7 +109,7 @@ export const settingsVoiceInputMessages = defineMessageSource({
   modeLabel: { ru: 'Режим распознавания', en: 'Recognition mode' },
   modeLocalFirst: { ru: 'Сначала локально', en: 'Local first' },
   modeBrowserManaged: { ru: 'Управляется Chrome', en: 'Browser managed' },
-  testTitle: { ru: 'Тестовое поле', en: 'Test field' },
+  testTitle: { ru: 'Проверка микрофона', en: 'Microphone test' },
   testDescription: {
     ru: 'Короткое нажатие запускает ввод до 30 секунд. Удерживайте кнопку для push-to-talk и отпустите, чтобы остановить.',
     en: 'A short press starts input for up to 30 seconds. Hold for push-to-talk and release to stop.',

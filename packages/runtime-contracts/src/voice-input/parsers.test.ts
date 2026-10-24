@@ -41,13 +41,7 @@ describe('voice input boundary parsers', () => {
     ).not.toBeNull();
     const offscreenStart = {
       capabilityToken: 'capability',
-      captureToken: {
-        entryId: 'entry',
-        incarnation: 'incarnation',
-        epoch: 'epoch',
-        sequence: 1,
-        createdAt: 0,
-      },
+      captureToken: null,
       preferences: { language: 'ru-RU', mode: 'local-first' },
       quality: 'dictation',
       requestId: 'request-1',
@@ -263,4 +257,55 @@ it('requires capture admission and keeps private release ready events off public
       errorCode: 'stale',
     })
   ).not.toBeNull();
+});
+
+it('preserves disabled voice input and rejects malformed enabled flags', async () => {
+  const { parseVoiceInputPreferences, resolveVoiceInputPreferences } = await import('./parsers');
+  const legacy = {
+    language: 'ru-RU' as const,
+    mode: 'local-first' as const,
+    microphoneDeviceId: null,
+  };
+  expect(resolveVoiceInputPreferences(legacy).enabled).toBe(true);
+  expect(parseVoiceInputPreferences({ ...legacy, enabled: false })?.enabled).toBe(false);
+  expect(parseVoiceInputPreferences({ ...legacy, enabled: 'false' })).toBeNull();
+});
+
+it('admits capture tokens only for model sessions and requires null for Chrome', () => {
+  const token = {
+    entryId: 'entry',
+    incarnation: 'incarnation',
+    epoch: 'epoch',
+    sequence: 1,
+    createdAt: 1,
+  };
+  const base = {
+    capabilityToken: 'capability',
+    quality: 'dictation',
+    maxDurationMs: null,
+    requestId: 'start',
+    sessionId: 'session',
+    type: MessageType.OFFSCREEN_VOICE_INPUT_START,
+  };
+  const browser = { language: 'ru-RU', mode: 'local-first' };
+  expect(
+    parseOffscreenVoiceInputRuntimeMessage({ ...base, preferences: browser, captureToken: null })
+  ).not.toBeNull();
+  expect(
+    parseOffscreenVoiceInputRuntimeMessage({ ...base, preferences: browser, captureToken: token })
+  ).toBeNull();
+  expect(
+    parseOffscreenVoiceInputRuntimeMessage({
+      ...base,
+      preferences: { ...browser, backend: 'model' },
+      captureToken: token,
+    })
+  ).not.toBeNull();
+  expect(
+    parseOffscreenVoiceInputRuntimeMessage({
+      ...base,
+      preferences: { ...browser, backend: 'model' },
+      captureToken: null,
+    })
+  ).toBeNull();
 });

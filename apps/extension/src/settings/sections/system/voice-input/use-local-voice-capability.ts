@@ -22,10 +22,11 @@ export function useLocalVoiceCapability(args: {
   language: VoiceInputLanguage;
   mode: VoiceInputMode;
   backend?: 'browser' | 'model';
+  enabled?: boolean;
   setError: Dispatch<SetStateAction<VoiceInputSettingsError>>;
   setSnapshot: Dispatch<SetStateAction<VoiceInputSnapshot>>;
 }) {
-  const { language, mode, backend = 'browser', setError, setSnapshot } = args;
+  const { language, mode, backend = 'browser', enabled = true, setError, setSnapshot } = args;
   const [checking, setChecking] = useState(false);
   const capabilityGenerationRef = useRef(0);
   const availabilityGenerationRef = useRef(0);
@@ -40,7 +41,7 @@ export function useLocalVoiceCapability(args: {
   } = microphone.actions;
 
   const refreshAvailability = useCallback(async (): Promise<VoiceInputLocalAvailability> => {
-    if (backend === 'model') return 'unsupported';
+    if (!enabled || backend === 'model') return 'unsupported';
     const capabilityGeneration = capabilityGenerationRef.current;
     const generation = ++availabilityGenerationRef.current;
     const startedAt = performance.now();
@@ -98,14 +99,16 @@ export function useLocalVoiceCapability(args: {
         );
       }
     }
-  }, [backend, language, mode, setSnapshot]);
+  }, [backend, enabled, language, mode, setSnapshot]);
 
   const refresh = useCallback(async () => {
+    if (!enabled) return;
     await Promise.all([refreshMicrophone(), refreshAvailability()]);
-  }, [refreshAvailability, refreshMicrophone]);
+  }, [enabled, refreshAvailability, refreshMicrophone]);
 
   const requestMicrophone = useCallback(
     async (deviceId: string | null = null) => {
+      if (!enabled) return;
       setError(null);
       const state = await requestMicrophoneAccess(deviceId);
       logger.debug('Microphone permission request completed', { state });
@@ -115,7 +118,7 @@ export function useLocalVoiceCapability(args: {
       }
       await refreshAvailability();
     },
-    [refreshAvailability, requestMicrophoneAccess, setError]
+    [enabled, refreshAvailability, requestMicrophoneAccess, setError]
   );
 
   const installation = useLocalVoiceInstallation({

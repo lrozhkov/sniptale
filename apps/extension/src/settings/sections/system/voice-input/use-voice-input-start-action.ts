@@ -29,7 +29,7 @@ export function useVoiceInputStartAction(args: {
     setError,
   } = args;
   return useCallback(async () => {
-    if (authority.startPendingRef.current) return;
+    if (preferences.enabled === false || authority.startPendingRef.current) return;
     if (authority.microphoneAccessRef.current !== 'granted') {
       setError('permission');
       return;

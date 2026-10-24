@@ -4,7 +4,7 @@ import {
   type VoiceInputErrorCode,
   type VoiceInputServerEvent,
 } from '@sniptale/runtime-contracts/voice-input';
-import { loadSettings } from '../persistence/settings';
+import { loadSettings, subscribeToVoiceInputPreferencesChanges } from '../persistence/settings';
 import { createVoiceInputClient, type VoiceInputClient } from '../../workflows/voice-input';
 
 type VoiceInputPhase =
@@ -78,6 +78,7 @@ function isEventForSession(event: VoiceInputServerEvent, sessionId: string): boo
 function useClientLifecycle(args: {
   acceptingTranscriptRef: RefObject<boolean>;
   applyServerEvent(event: VoiceInputServerEvent): void;
+  cancel(): void;
   client: VoiceInputClient;
   generationRef: RefObject<number>;
   readActiveSessionId(): string | null;
@@ -86,6 +87,7 @@ function useClientLifecycle(args: {
   const {
     acceptingTranscriptRef,
     applyServerEvent,
+    cancel,
     client,
     generationRef,
     readActiveSessionId,
@@ -93,7 +95,11 @@ function useClientLifecycle(args: {
   } = args;
   useEffect(() => {
     const unsubscribe = client.subscribe(applyServerEvent);
+    const unsubscribePreferences = subscribeToVoiceInputPreferencesChanges((preferences) => {
+      if (preferences.enabled === false) cancel();
+    });
     return () => {
+      unsubscribePreferences();
       const sessionId = readActiveSessionId();
       generationRef.current += 1;
       acceptingTranscriptRef.current = false;
@@ -111,6 +117,7 @@ function useClientLifecycle(args: {
   }, [
     acceptingTranscriptRef,
     applyServerEvent,
+    cancel,
     client,
     generationRef,
     readActiveSessionId,
@@ -216,6 +223,7 @@ export function useVoiceInputSession(args: {
   useClientLifecycle({
     acceptingTranscriptRef,
     applyServerEvent,
+    cancel,
     client,
     generationRef,
     readActiveSessionId,
@@ -230,6 +238,11 @@ export function useVoiceInputSession(args: {
     try {
       const settings = await loadSettings();
       if (generation !== generationRef.current) return;
+      if (settings.voiceInput?.enabled === false) {
+        startPendingRef.current = false;
+        dispatch({ type: 'phase', value: 'idle' });
+        return;
+      }
       const sessionId = client.start(
         settings.voiceInput ?? {
           language: 'ru-RU',

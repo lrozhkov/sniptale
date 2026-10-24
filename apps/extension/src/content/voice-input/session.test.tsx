@@ -5,13 +5,15 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import {
   VoiceInputPortMessageType,
+  type VoiceInputPreferences,
   type VoiceInputServerEvent,
   type VoiceInputSnapshot,
 } from '@sniptale/runtime-contracts/voice-input';
 import type { VoiceInputClient, VoiceInputClientListener } from '../../workflows/voice-input';
 
 const settingsMocks = vi.hoisted(() => ({
-  loadSettings: vi.fn(async () => ({
+  subscribe: vi.fn(),
+  loadSettings: vi.fn<() => Promise<{ voiceInput: VoiceInputPreferences }>>(async () => ({
     voiceInput: { language: 'en-US', microphoneDeviceId: null, mode: 'browser-managed' },
   })),
 }));
@@ -19,6 +21,7 @@ const settingsMocks = vi.hoisted(() => ({
 vi.mock('../../composition/persistence/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/settings')>()),
   loadSettings: settingsMocks.loadSettings,
+  subscribeToVoiceInputPreferencesChanges: settingsMocks.subscribe,
 }));
 
 import { useContentVoiceInputSession } from './session';
@@ -58,6 +61,7 @@ function emit(event: VoiceInputServerEvent): void {
 beforeAll(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true));
 
 beforeEach(() => {
+  settingsMocks.subscribe.mockReset().mockReturnValue(() => undefined);
   settingsMocks.loadSettings.mockResolvedValue({
     voiceInput: { language: 'en-US', microphoneDeviceId: null, mode: 'browser-managed' },
   });
@@ -211,4 +215,58 @@ it('accepts one processed final after Stop and blocks duplicate insertion and ne
     type: VoiceInputPortMessageType.SNAPSHOT,
   });
   expect(latest?.state.pending).toBe(false);
+});
+
+it('does not start dictation when saved preferences disable it', async () => {
+  settingsMocks.loadSettings.mockResolvedValueOnce({
+    voiceInput: {
+      language: 'en-US',
+      microphoneDeviceId: null,
+      mode: 'browser-managed',
+      enabled: false,
+    },
+  });
+  await act(async () => latest?.actions.start());
+  expect(client.start).not.toHaveBeenCalled();
+  expect(latest?.state).toMatchObject({ phase: 'idle', active: false });
+});
+
+it('cancels capture and ignores late text when voice input is disabled', async () => {
+  await act(async () => latest?.actions.start());
+  const notify = settingsMocks.subscribe.mock.calls[0]?.[0];
+  act(() => notify({ enabled: false }));
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
+  emit({
+    type: VoiceInputPortMessageType.TRANSCRIPT,
+    sessionId: 'session-1',
+    text: 'late',
+    confidence: 1,
+    isFinal: true,
+    sequence: 0,
+  });
+  expect(onTranscript).not.toHaveBeenCalled();
+  expect(latest?.state).toMatchObject({ phase: 'idle', active: false, pending: false });
+});
+
+it('invalidates a delayed start when a newer disabled preference arrives', async () => {
+  let resolveSettings!: (value: Awaited<ReturnType<typeof settingsMocks.loadSettings>>) => void;
+  settingsMocks.loadSettings.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveSettings = resolve;
+    })
+  );
+  let start: Promise<void> | undefined;
+  act(() => {
+    start = latest?.actions.start();
+  });
+  const notify = settingsMocks.subscribe.mock.calls[0]?.[0];
+  act(() => notify({ enabled: false }));
+  await act(async () => {
+    resolveSettings({
+      voiceInput: { language: 'en-US', microphoneDeviceId: null, mode: 'browser-managed' },
+    });
+    await start;
+  });
+  expect(client.start).not.toHaveBeenCalled();
+  expect(latest?.state.phase).toBe('idle');
 });

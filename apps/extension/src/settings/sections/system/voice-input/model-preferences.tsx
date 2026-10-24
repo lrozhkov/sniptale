@@ -18,12 +18,17 @@ export function VoiceModelPreferences({
   const models = controller.models;
   return (
     <div className={`${settingsCompactWorkbenchClassName} space-y-3`}>
-      <SettingsControlRow label={translate('settings.voiceInput.backendLabel')}>
+      <SettingsControlRow label={translate('settings.voiceInput.backendLabel')} valueMinimum={360}>
         <div data-ui="settings.voice.backend">
           <CompactSegmentedSelector
             ariaLabel={translate('settings.voiceInput.backendLabel')}
-            columns={2}
+            columns={3}
             options={[
+              {
+                value: 'off',
+                label: translate('settings.voiceInput.backendOff'),
+                disabled: preferences.saving,
+              },
               {
                 value: 'browser',
                 label: translate('settings.voiceInput.backendBrowser'),
@@ -31,14 +36,14 @@ export function VoiceModelPreferences({
               },
               { value: 'model', label: translate('settings.voiceInput.backendModel'), disabled },
             ]}
-            value={preferences.backend}
+            value={preferences.enabled === false ? 'off' : preferences.backend}
             onChange={(value) => {
               void preferences.setBackend(value);
             }}
           />
         </div>
       </SettingsControlRow>
-      {preferences.backend === 'model' ? (
+      {preferences.enabled !== false && preferences.backend === 'model' ? (
         <>
           <SettingsControlRow
             label={translate('settings.voiceInput.transcriptionModel')}
@@ -106,12 +111,6 @@ export function VoiceModelPreferences({
               </ProductActionButton>
             </div>
           ) : null}
-          <a
-            className="text-xs text-[var(--sniptale-color-text-secondary)] underline"
-            href="?section=access-data&view=permissions"
-          >
-            {translate('settings.voiceInput.managePermissions')}
-          </a>
         </>
       ) : null}
     </div>

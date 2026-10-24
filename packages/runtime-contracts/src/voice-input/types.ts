@@ -96,6 +96,7 @@ export interface VoiceProviderSelection {
 }
 
 export interface VoiceInputPreferences {
+  enabled?: boolean;
   language: VoiceInputLanguage;
   microphoneDeviceId: string | null;
   mode: VoiceInputMode;
@@ -178,7 +179,7 @@ export type OffscreenVoiceInputCommand =
     }
   | {
       capabilityToken: string;
-      captureToken: VoiceCaptureToken;
+      captureToken: VoiceCaptureToken | null;
       maxDurationMs: typeof VOICE_INPUT_TEST_SESSION_DURATION_MS | null;
       type: typeof MessageType.OFFSCREEN_VOICE_INPUT_START;
       preferences: VoiceInputPreferences;

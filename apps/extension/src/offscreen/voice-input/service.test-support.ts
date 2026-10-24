@@ -165,13 +165,7 @@ export function start(
   maxDurationMs: number | null = null
 ) {
   return service.start({
-    captureToken: {
-      entryId: 'entry',
-      incarnation: 'incarnation',
-      epoch: 'epoch',
-      sequence: 1,
-      createdAt: 1,
-    },
+    captureToken: null,
     maxDurationMs,
     preferences: { language: 'ru-RU', microphoneDeviceId: null, mode: 'local-first' },
     requestId: `request-${sessionId}`,

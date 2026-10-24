@@ -64,7 +64,7 @@ type RecognitionRunCallbacks = {
 };
 
 type RecognitionRunArgs = {
-  captureToken: VoiceCaptureToken;
+  captureToken: VoiceCaptureToken | null;
   callbacks: RecognitionRunCallbacks;
   deps: VoiceInputRecognitionDeps;
   initialSnapshot: VoiceInputSnapshot;
@@ -323,7 +323,7 @@ class RecognitionRun implements VoiceInputRecognitionRun {
       }
       if (!this.isCurrent()) return;
       const scope = await this.args.deps.publishAudio(
-        this.args.captureToken,
+        this.args.captureToken!,
         {
           ...input,
           backend: this.preferences.backend ?? 'browser',
@@ -424,7 +424,8 @@ class RecognitionRun implements VoiceInputRecognitionRun {
         return false;
       }
       this.microphone = microphone;
-      this.capture = this.args.deps.createCapture(microphone.track, () => this.stop());
+      if (this.preferences.backend === 'model')
+        this.capture = this.args.deps.createCapture(microphone.track, () => this.stop());
       this.startMicrophoneLevelMonitor(microphone.track);
       logger.debug('Selected microphone acquired', {
         microphoneSelected: this.preferences.microphoneDeviceId !== null,

@@ -445,3 +445,50 @@ it('retains the last rapid Crop choice through the existing settings queue', asy
     dockEdge: 'bottom-left',
   });
 });
+
+it('observes voice-only changes and settings removal through canonical preferences', async () => {
+  vi.stubGlobal('chrome', {});
+  const settings = await import('./index');
+  const listener = vi.fn();
+  const unsubscribe = vi.fn();
+  storage.subscribe.mockReturnValueOnce(unsubscribe);
+  const stop = settings.subscribeToVoiceInputPreferencesChanges(listener);
+  const notify = storage.subscribe.mock.calls[0]?.[0];
+  const voice = {
+    language: 'en-US',
+    mode: 'browser-managed',
+    microphoneDeviceId: null,
+    enabled: false,
+  };
+  notify({ sniptale_settings: { oldValue: {}, newValue: { voiceInput: voice } } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith(voice);
+  notify({ sniptale_settings: { oldValue: { voiceInput: voice }, newValue: undefined } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith({
+    language: 'ru-RU',
+    mode: 'local-first',
+    microphoneDeviceId: null,
+  });
+  stop();
+  expect(unsubscribe).toHaveBeenCalledOnce();
+  expect(storage.set).not.toHaveBeenCalled();
+});
+
+it('does not notify voice consumers for unrelated settings or storage areas', async () => {
+  vi.stubGlobal('chrome', {});
+  const settings = await import('./index');
+  const listener = vi.fn();
+  settings.subscribeToVoiceInputPreferencesChanges(listener);
+  const notify = storage.subscribe.mock.calls[0]?.[0];
+  notify({ sniptale_settings: { oldValue: {}, newValue: { imageQuality: 80 } } }, 'sync');
+  notify({ another_key: { oldValue: {}, newValue: {} } }, 'sync');
+  notify(
+    {
+      sniptale_settings: {
+        oldValue: {},
+        newValue: { voiceInput: { language: 'en-US', mode: 'browser-managed', enabled: false } },
+      },
+    },
+    'local'
+  );
+  expect(listener).not.toHaveBeenCalled();
+});

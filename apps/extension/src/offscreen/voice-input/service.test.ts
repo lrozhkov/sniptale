@@ -546,7 +546,7 @@ describe('offscreen voice input media ownership', () => {
     first.callbacks.onResult(transcript('late'));
     await flushStart();
 
-    expect(harness.service.getSnapshot().phase).toBe('error');
+    expect(harness.service.getSnapshot().phase).toBe('ended');
     expect(harness.events).not.toContainEqual(expect.objectContaining({ text: 'late' }));
   });
 });

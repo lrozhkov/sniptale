@@ -15,7 +15,7 @@ import { useVoiceInputStartAction } from './use-voice-input-start-action';
 export function useVoiceInputSettings(
   createClient: () => VoiceInputClient = createVoiceInputClient
 ): VoiceInputSettingsController {
-  const { settings, updateSettings } = useSettingsStore();
+  const { settings, updateSettings, reconcileVoiceInputPreferences } = useSettingsStore();
   const preferences = useMemo(
     () =>
       resolveVoiceInputPreferences(
@@ -49,6 +49,7 @@ export function useVoiceInputSettings(
     language: preferences.language,
     mode: preferences.mode,
     backend: preferences.backend,
+    enabled: preferences.enabled,
     setError,
     setSnapshot,
   });
@@ -67,10 +68,13 @@ export function useVoiceInputSettings(
     activeSessionIdRef,
     applyServerEvent,
     client,
+    enabled: preferences.enabled,
+    setSnapshot,
     cancelSession: cancelOwnedSession,
     invalidateCapability,
     microphoneAccess,
     refreshCapability,
+    reconcileVoiceInputPreferences,
     setError,
     setMicrophoneAccess,
   });
@@ -163,7 +167,7 @@ function createVoicePreferenceActions({
     setBackend: (backend) => {
       cancel();
       invalidateCapability();
-      return updatePreference({ backend });
+      return updatePreference(backend === 'off' ? { enabled: false } : { enabled: true, backend });
     },
     setCorrectionEnabled: (enabled) => {
       cancel();

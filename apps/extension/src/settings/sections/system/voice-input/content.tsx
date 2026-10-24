@@ -13,7 +13,6 @@ import { VoiceModelPreferences } from './model-preferences';
 import { VoiceInputHistoryPanel } from './history';
 import type { VoiceInputSettingsController } from './controller-contract';
 
-const activeMicrophoneIndicatorClassName = 'text-[var(--sniptale-color-accent)]';
 function statusKey(value: string): TranslationKey {
   const keys: Record<string, TranslationKey> = {
     standard: 'settings.voiceInput.statusStandard',
@@ -293,25 +292,27 @@ function VoiceInputPreferencesPanel({
           ]}
         />
       </SettingsControlRow>
-      <SettingsControlRow label={translate('settings.voiceInput.languageLabel')}>
-        <ProductSelect
-          aria-label={translate('settings.voiceInput.languageLabel')}
-          disabled={
-            active ||
-            controller.preferences.saving ||
-            controller.status.checking ||
-            controller.status.installing
-          }
-          value={controller.preferences.language}
-          onChange={(value) => {
-            void controller.preferences.setLanguage(value === 'en-US' ? 'en-US' : 'ru-RU');
-          }}
-          options={[
-            { value: 'ru-RU', label: translate('settings.voiceInput.languageRu') },
-            { value: 'en-US', label: translate('settings.voiceInput.languageEn') },
-          ]}
-        />
-      </SettingsControlRow>
+      {controller.preferences.backend === 'browser' ? (
+        <SettingsControlRow label={translate('settings.voiceInput.languageLabel')}>
+          <ProductSelect
+            aria-label={translate('settings.voiceInput.languageLabel')}
+            disabled={
+              active ||
+              controller.preferences.saving ||
+              controller.status.checking ||
+              controller.status.installing
+            }
+            value={controller.preferences.language}
+            onChange={(value) => {
+              void controller.preferences.setLanguage(value === 'en-US' ? 'en-US' : 'ru-RU');
+            }}
+            options={[
+              { value: 'ru-RU', label: translate('settings.voiceInput.languageRu') },
+              { value: 'en-US', label: translate('settings.voiceInput.languageEn') },
+            ]}
+          />
+        </SettingsControlRow>
+      ) : null}
       {controller.preferences.backend === 'browser' ? (
         <SettingsControlRow label={translate('settings.voiceInput.modeLabel')}>
           <ProductSelect
@@ -406,35 +407,33 @@ function VoiceInputActions({
       <ProductActionButton
         compact
         tone="primary"
-        data-ui="settings.voice.start"
+        data-ui={active ? 'settings.voice.stop' : 'settings.voice.start'}
         disabled={!active && startDisabled}
         type="button"
         onClick={(event) => {
-          if (event.detail === 0 && !active) void controller.actions.start();
+          if (event.detail !== 0) return;
+          if (active) controller.actions.stop();
+          else void controller.actions.start();
         }}
         onPointerCancel={pushToTalk.onPointerCancel}
-        onPointerDown={pushToTalk.onPointerDown}
+        onPointerDown={(event) => {
+          if (active) {
+            if (event.button === 0) controller.actions.stop();
+          } else pushToTalk.onPointerDown(event);
+        }}
         onPointerUp={pushToTalk.onPointerUp}
       >
-        <Mic aria-hidden="true" className="h-4 w-4" />
+        {active ? (
+          <Square aria-hidden="true" className="h-4 w-4" />
+        ) : (
+          <Mic aria-hidden="true" className="h-4 w-4" />
+        )}
         {pushToTalk.holding
           ? translate('settings.voiceInput.releaseToStop')
           : active
-            ? translate('settings.voiceInput.microphoneActive')
+            ? translate('settings.voiceInput.stop')
             : translate('settings.voiceInput.start')}
       </ProductActionButton>
-      {active ? (
-        <ProductActionButton
-          compact
-          tone="secondary"
-          type="button"
-          data-ui="settings.voice.stop"
-          onClick={controller.actions.stop}
-        >
-          <Square aria-hidden="true" className="h-4 w-4" />
-          {translate('settings.voiceInput.stop')}
-        </ProductActionButton>
-      ) : null}
       {pending ? (
         <ProductActionButton
           compact
@@ -478,67 +477,26 @@ function VoiceInputLevelMeter({
       : translate('settings.voiceInput.signalIdle');
   return (
     <div
-      className={[
-        'flex items-center gap-2 rounded-[4px] px-2 py-2',
-        'bg-[var(--sniptale-color-surface-input)]',
-      ].join(' ')}
+      aria-label={translate('settings.voiceInput.signalAriaLabel')}
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={percent}
+      aria-valuetext={signalStatus}
+      className={
+        'relative flex h-10 items-center justify-center overflow-hidden rounded-[4px] ' +
+        'bg-[var(--sniptale-color-surface-input)] px-10'
+      }
+      role="meter"
     >
-      <span
-        aria-hidden="true"
-        className={[
-          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
-          active
-            ? activeMicrophoneIndicatorClassName
-            : 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-muted)]',
-        ].join(' ')}
-      >
-        <Mic className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="font-medium text-[var(--sniptale-color-text-primary)]">
-            {translate('settings.voiceInput.signalLabel')}
-          </span>
-          <span className="inline-flex items-center gap-1.5 text-[var(--sniptale-color-text-muted)]">
-            <span
-              aria-hidden="true"
-              className={[
-                'h-1.5 w-1.5 rounded-full transition-colors duration-100',
-                soundDetected
-                  ? 'bg-[var(--sniptale-color-accent)]'
-                  : active
-                    ? 'bg-[var(--sniptale-color-success)]'
-                    : 'bg-[var(--sniptale-color-text-muted)] opacity-50',
-              ].join(' ')}
-            />
-            {signalStatus}
-          </span>
-        </div>
-        <div
-          aria-label={translate('settings.voiceInput.signalAriaLabel')}
-          aria-valuemax={100}
-          aria-valuemin={0}
-          aria-valuenow={percent}
-          className={[
-            'relative mt-1 flex h-7 items-center justify-center overflow-hidden rounded-[4px] px-10',
-            'bg-[var(--sniptale-color-surface-hover)]',
-          ].join(' ')}
-          role="meter"
-        >
-          <AudioAmplitudeBars
-            active={active}
-            className="h-5"
-            peaks={peaks}
-            soundDetected={soundDetected}
-          />
-          <output className="absolute right-3 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-            {percent}%
-          </output>
-        </div>
-        <p className="mt-1.5 text-[11px] text-[var(--sniptale-color-text-muted)]">
-          {translate('settings.voiceInput.signalPrivacy')}
-        </p>
-      </div>
+      <AudioAmplitudeBars
+        active={active}
+        className="h-5"
+        peaks={peaks}
+        soundDetected={soundDetected}
+      />
+      <output className="absolute right-3 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+        {percent}%
+      </output>
     </div>
   );
 }
@@ -561,42 +519,43 @@ function VoiceInputTestPanel({
     (controller.status.snapshot.localAvailability === 'downloadable' ||
       controller.status.snapshot.localAvailability === 'downloading');
   return (
-    <div className={`${settingsCompactWorkbenchClassName} space-y-2`}>
-      <div>
-        <h2
-          className="text-[14px] leading-5 font-[var(--sniptale-font-weight-interface-heading)]
-            text-[var(--sniptale-color-text-secondary)]"
-        >
-          {translate('settings.voiceInput.testTitle')}
-        </h2>
-        <p className="mt-1 text-sm text-[var(--sniptale-color-text-secondary)]">
-          {translate('settings.voiceInput.testDescription')}
-        </p>
-      </div>
-      <label
-        className="block space-y-1 text-[13px] leading-[18px] font-normal
-          text-[var(--sniptale-color-text-secondary)]"
+    <div className={`${settingsCompactWorkbenchClassName} @container/voice-test`}>
+      <div
+        className="grid gap-4 @min-[640px]/voice-test:grid-cols-2"
+        data-ui="settings.voice.test-grid"
       >
-        <span>{translate('settings.voiceInput.textareaLabel')}</span>
-        <ProductTextarea
-          className="!min-h-20 w-full resize-y !text-[13px] !leading-5"
-          placeholder={translate('settings.voiceInput.textareaPlaceholder')}
-          readOnly={active || pending}
-          value={transcript}
-          onChange={(event) => controller.transcript.setFinalText(event.target.value)}
-        />
-      </label>
-      <VoiceInputLevelMeter
-        active={active}
-        level={controller.status.audioLevel}
-        peaks={controller.status.audioPeaks}
-      />
-      <VoiceInputActions
-        active={active}
-        controller={controller}
-        installAvailable={installAvailable}
-        pending={pending}
-      />
+        <label
+          className={
+            'flex min-w-0 flex-col gap-2 text-[13px] leading-[18px] ' +
+            'text-[var(--sniptale-color-text-secondary)]'
+          }
+        >
+          <span>{translate('settings.voiceInput.textareaLabel')}</span>
+          <ProductTextarea
+            className="!min-h-28 w-full flex-1 resize-y !text-[13px] !leading-5"
+            placeholder={translate('settings.voiceInput.textareaPlaceholder')}
+            readOnly={active || pending}
+            value={transcript}
+            onChange={(event) => controller.transcript.setFinalText(event.target.value)}
+          />
+        </label>
+        <div className="min-w-0 space-y-2" data-ui="settings.voice.microphone-test">
+          <h2 className="text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
+            {translate('settings.voiceInput.testTitle')}
+          </h2>
+          <VoiceInputLevelMeter
+            active={active}
+            level={controller.status.audioLevel}
+            peaks={controller.status.audioPeaks}
+          />
+          <VoiceInputActions
+            active={active}
+            controller={controller}
+            installAvailable={installAvailable}
+            pending={pending}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -617,45 +576,51 @@ export function VoiceInputSettingsContent(controller: VoiceInputSettingsControll
         controller={controller}
         disabled={active || pending || controller.preferences.saving}
       />
-      <VoiceInputPreferencesPanel active={active || pending} controller={controller} />
-      <VoiceInputTestPanel active={active} pending={pending} controller={controller} />
-      <VoiceInputHistoryPanel
-        showRetry={controller.preferences.backend === 'model'}
-        refreshToken={phase}
-        canRetry={controller.models.transcriptionSelectionId !== null}
-        retryModelLabel={
-          controller.models.transcription.models.find(
-            (model) => model.id === controller.models.transcriptionSelectionId
-          )?.displayName ?? null
-        }
-      />
+      {controller.preferences.enabled !== false ? (
+        <>
+          <VoiceInputPreferencesPanel active={active || pending} controller={controller} />
+          <VoiceInputTestPanel active={active} pending={pending} controller={controller} />
+          {controller.preferences.backend === 'model' ? (
+            <VoiceInputHistoryPanel
+              showRetry={controller.preferences.backend === 'model'}
+              refreshToken={phase}
+              canRetry={controller.models.transcriptionSelectionId !== null}
+              retryModelLabel={
+                controller.models.transcription.models.find(
+                  (model) => model.id === controller.models.transcriptionSelectionId
+                )?.displayName ?? null
+              }
+            />
+          ) : null}
 
-      <details className={`${settingsCompactWorkbenchClassName} group/voice-status`}>
-        <summary
-          className="flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-[4px] px-2
+          <details className={`${settingsCompactWorkbenchClassName} group/voice-status`}>
+            <summary
+              className="flex min-h-8 cursor-pointer list-none items-center gap-2 rounded-[4px] px-2
           text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]
           hover:bg-[var(--sniptale-color-surface-hover)] [&::-webkit-details-marker]:hidden"
-        >
-          <Info size={16} aria-hidden="true" className="shrink-0" />
-          <span className="min-w-0 flex-1">
-            {translate('settings.voiceInput.diagnosticsTitle')}
-          </span>
-          <ChevronDown
-            size={14}
-            aria-hidden="true"
-            className="group-open/voice-status:rotate-180"
-          />
-        </summary>
-        <div className="pl-[30px] pr-2 pt-2">
-          <VoiceInputStatusGrid controller={controller} />
-          {controller.preferences.backend === 'browser' ? (
-            <div className="space-y-1 pt-2 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
-              <p>{translate('settings.voiceInput.localDisclosure')}</p>
-              <p>{translate('settings.voiceInput.browserDisclosure')}</p>
+            >
+              <Info size={16} aria-hidden="true" className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                {translate('settings.voiceInput.diagnosticsTitle')}
+              </span>
+              <ChevronDown
+                size={14}
+                aria-hidden="true"
+                className="group-open/voice-status:rotate-180"
+              />
+            </summary>
+            <div className="pl-[30px] pr-2 pt-2">
+              <VoiceInputStatusGrid controller={controller} />
+              {controller.preferences.backend === 'browser' ? (
+                <div className="space-y-1 pt-2 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
+                  <p>{translate('settings.voiceInput.localDisclosure')}</p>
+                  <p>{translate('settings.voiceInput.browserDisclosure')}</p>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-      </details>
+          </details>
+        </>
+      ) : null}
     </section>
   );
 }

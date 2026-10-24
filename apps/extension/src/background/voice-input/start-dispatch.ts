@@ -85,10 +85,11 @@ export async function dispatchVoiceInputStart(args: {
 }): Promise<OffscreenVoiceInputResponse> {
   return args.gateway.withMediaMutationPermit(async () => {
     await args.gateway.ensureReady();
-    if (!args.isCurrent() || !args.session.captureToken) throw new Error('stale-voice-input-start');
+    if (!args.isCurrent() || (args.preferences.backend === 'model' && !args.session.captureToken))
+      throw new Error('stale-voice-input-start');
     try {
       const response = await args.gateway.send({
-        captureToken: args.session.captureToken,
+        captureToken: args.session.captureToken ?? null,
         maxDurationMs: args.session.maxDurationMs,
         preferences: args.preferences,
         quality: VOICE_INPUT_LOCAL_QUALITY,

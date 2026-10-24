@@ -192,3 +192,58 @@ it('waits for active publication before admission recovery and preserves its com
   await opener.publishAudio(next, recording('next audio'));
   expect(await writer.list()).toHaveLength(2);
 });
+
+it('removes legacy Chrome rows and bytes without changing model identity and rejects late Chrome writers', async () => {
+  const f = createHistoryFixture();
+  const h = f.create();
+  await h.initialize();
+  const model = await publish(h, 'model');
+  const old = await publish(h, 'chrome');
+  const catalog = f.peek()!;
+  catalog.entries.find((entry) => entry.entryId === old.entryId)!.backend = 'browser';
+  f.replace(catalog);
+  const pending = await h.beginCapture();
+  await h.initialize();
+  expect(await h.list()).toEqual([await h.get(model)]);
+  expect(f.files.size).toBe(1);
+  await expect(
+    h.complete(old, { rawTranscript: 'late', transcript: 'late', correctionStatus: 'off' })
+  ).rejects.toMatchObject({ code: 'stale' });
+  await expect(
+    h.publishAudio(pending, { ...recording(), backend: 'browser' })
+  ).rejects.toMatchObject({ code: 'stale' });
+});
+
+it('serializes legacy cleanup before a delayed Chrome result while preserving a parallel model capture', async () => {
+  const f = createHistoryFixture();
+  const cleanupOwner = f.create();
+  const writer = f.create();
+  await cleanupOwner.initialize();
+  const old = await publish(writer, 'chrome');
+  const catalog = f.peek()!;
+  catalog.entries[0]!.backend = 'browser';
+  f.replace(catalog);
+  const entered = deferred();
+  const release = deferred();
+  const write = f.catalog.write.getMockImplementation()!;
+  f.catalog.write.mockImplementationOnce(async (...args) => {
+    entered.resolve();
+    await release.promise;
+    await write(...args);
+  });
+  const cleanup = cleanupOwner.initialize();
+  await entered.promise;
+  const late = writer.complete(old, {
+    rawTranscript: 'late',
+    transcript: 'late',
+    correctionStatus: 'off',
+  });
+  const lateProof = expect(late).rejects.toMatchObject({ code: 'stale' });
+  const modelCapture = writer.beginCapture();
+  release.resolve();
+  await cleanup;
+  await lateProof;
+  const current = await writer.publishAudio(await modelCapture, recording('model'));
+  expect(await writer.list()).toEqual([await writer.get(current)]);
+  expect(f.files.size).toBe(1);
+});

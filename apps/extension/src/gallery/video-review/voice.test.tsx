@@ -14,6 +14,10 @@ const harness = vi.hoisted(() => ({
   pending: false,
   start: vi.fn(),
 }));
+vi.mock('../../composition/persistence/settings', () => ({
+  loadSettings: async () => ({ voiceInput: { enabled: true } }),
+  subscribeToVoiceInputPreferencesChanges: () => () => undefined,
+}));
 vi.mock('../../composition/voice-input/session', () => ({
   useVoiceInputSession: (args: { onTranscript: typeof harness.transcript }) => {
     harness.transcript = args.onTranscript;
@@ -82,7 +86,7 @@ it('inserts only final fragments once, preserves consecutive events, and rejects
   }
 });
 
-it('clears the review draft, stops dictation, and rejects a final transcript after Clear', () => {
+it('clears the review draft, stops dictation, and rejects a final transcript after Clear', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   harness.start.mockClear();
   harness.stop.mockClear();
@@ -122,7 +126,7 @@ it('clears the review draft, stops dictation, and rejects a final transcript aft
       confidence: 1,
     });
   try {
-    act(() => root.render(<Harness />));
+    await act(async () => root.render(<Harness />));
     const field = host.querySelector<HTMLTextAreaElement>('textarea')!;
     field.setSelectionRange(field.value.length, field.value.length);
     act(() =>

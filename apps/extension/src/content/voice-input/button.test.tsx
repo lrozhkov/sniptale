@@ -2,7 +2,16 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+
+const preferenceMocks = vi.hoisted(() => ({
+  loadSettings: vi.fn(),
+  subscribe: vi.fn(),
+}));
+vi.mock('../../composition/persistence/settings', () => ({
+  loadSettings: preferenceMocks.loadSettings,
+  subscribeToVoiceInputPreferencesChanges: preferenceMocks.subscribe,
+}));
 
 vi.mock('../../composition/voice-input/trusted-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/voice-input/trusted-events')>()),
@@ -16,6 +25,10 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 beforeAll(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true));
+beforeEach(() => {
+  preferenceMocks.loadSettings.mockReset().mockResolvedValue({ voiceInput: {} });
+  preferenceMocks.subscribe.mockReset().mockReturnValue(() => undefined);
+});
 
 afterEach(() => {
   act(() => root?.unmount());
@@ -24,11 +37,11 @@ afterEach(() => {
   container = null;
 });
 
-function renderButton(active: boolean, onStart = vi.fn(), onStop = vi.fn()) {
+async function renderButton(active: boolean, onStart = vi.fn(), onStop = vi.fn()) {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-  act(() => {
+  await act(async () => {
     root?.render(
       <ContentVoiceInputButton
         dataUi="voice-test"
@@ -49,8 +62,8 @@ function renderButton(active: boolean, onStart = vi.fn(), onStop = vi.fn()) {
   return { button: container.querySelector('button')!, onStart, onStop };
 }
 
-it('exposes the click toggle and renders audio-level feedback while active', () => {
-  const idle = renderButton(false);
+it('exposes the click toggle and renders audio-level feedback while active', async () => {
+  const idle = await renderButton(false);
   act(() => idle.button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })));
   expect(idle.onStart).toHaveBeenCalledOnce();
 
@@ -58,18 +71,18 @@ it('exposes the click toggle and renders audio-level feedback while active', () 
   root = null;
   container?.remove();
   container = null;
-  const active = renderButton(true);
+  const active = await renderButton(true);
   expect(active.button.getAttribute('aria-pressed')).toBe('true');
   expect(active.button.querySelector('span')).not.toBeNull();
   act(() => active.button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })));
   expect(active.onStop).toHaveBeenCalledOnce();
 });
 
-it('uses the contrast surface and inverse icon treatment above arbitrary page content', () => {
+it('uses the contrast surface and inverse icon treatment above arbitrary page content', async () => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-  act(() => {
+  await act(async () => {
     root?.render(
       <ContentVoiceInputButton
         appearance="contrast"
@@ -87,7 +100,7 @@ it('uses the contrast surface and inverse icon treatment above arbitrary page co
   expect(className).toContain('surface-contrast');
   expect(className).toContain('text-inverse');
 
-  act(() => {
+  await act(async () => {
     root?.render(
       <ContentVoiceInputButton
         appearance="contrast"
@@ -114,11 +127,11 @@ it('uses the contrast surface and inverse icon treatment above arbitrary page co
   expect(Number((contrastRing as HTMLElement | null)?.style.opacity)).toBeCloseTo(0.91);
 });
 
-it('keeps the pointer stable while an internal stop is settling', () => {
+it('keeps the pointer stable while an internal stop is settling', async () => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-  act(() => {
+  await act(async () => {
     root?.render(
       <ContentVoiceInputButton
         dataUi="voice-stopping-test"
@@ -137,14 +150,14 @@ it('keeps the pointer stable while an internal stop is settling', () => {
   expect(button?.className).toContain('disabled:opacity-100');
 });
 
-it('renders error and disabled states and stops an active pointer session', () => {
-  const active = renderButton(true);
+it('renders error and disabled states and stops an active pointer session', async () => {
+  const active = await renderButton(true);
   act(() =>
     active.button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
   );
   expect(active.onStop).toHaveBeenCalledOnce();
 
-  act(() => {
+  await act(async () => {
     root?.render(
       <ContentVoiceInputButton
         appearance="contrast"
@@ -169,13 +182,13 @@ it('renders error and disabled states and stops an active pointer session', () =
   expect(error?.className).toContain('disabled:opacity-45');
 });
 
-it('uses Cancel during processing and never restarts dictation', () => {
+it('uses Cancel during processing and never restarts dictation', async () => {
   const onCancel = vi.fn();
   const onStart = vi.fn();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-  act(() =>
+  await act(async () =>
     root?.render(
       <ContentVoiceInputButton
         dataUi="processing"
@@ -197,4 +210,59 @@ it('uses Cancel during processing and never restarts dictation', () => {
   act(() => container?.querySelector('button')?.click());
   expect(onCancel).toHaveBeenCalledOnce();
   expect(onStart).not.toHaveBeenCalled();
+});
+
+it('hides dictation before preferences load and follows live enable changes', async () => {
+  let resolveSettings!: (value: { voiceInput: { enabled: boolean } }) => void;
+  preferenceMocks.loadSettings.mockReturnValue(
+    new Promise((resolve) => {
+      resolveSettings = resolve;
+    })
+  );
+  await renderButton(false);
+  expect(container?.querySelector('button')).toBeNull();
+  await act(async () => resolveSettings({ voiceInput: { enabled: false } }));
+  expect(container?.querySelector('button')).toBeNull();
+  const notify = preferenceMocks.subscribe.mock.calls[0]?.[0];
+  act(() => notify({ enabled: true }));
+  expect(container?.querySelector('button')).not.toBeNull();
+  act(() => notify({ enabled: false }));
+  expect(container?.querySelector('button')).toBeNull();
+});
+
+it('does not overwrite a newer disabled preference with a delayed initial read', async () => {
+  let resolveSettings!: (value: { voiceInput: { enabled: boolean } }) => void;
+  preferenceMocks.loadSettings.mockReturnValue(
+    new Promise((resolve) => {
+      resolveSettings = resolve;
+    })
+  );
+  await renderButton(false);
+  const notify = preferenceMocks.subscribe.mock.calls[0]?.[0];
+  act(() => notify({ enabled: false }));
+  await act(async () => resolveSettings({ voiceInput: { enabled: true } }));
+  expect(container?.querySelector('button')).toBeNull();
+});
+
+it('keeps dictation hidden when the saved preference cannot be read', async () => {
+  preferenceMocks.loadSettings.mockRejectedValue(new Error('settings unavailable'));
+  await renderButton(false);
+  expect(container?.querySelector('button')).toBeNull();
+});
+
+it('resets an unfinished pointer press when dictation is disabled and enabled again', async () => {
+  const control = await renderButton(false);
+  act(() =>
+    control.button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+  );
+  expect(control.onStart).toHaveBeenCalledOnce();
+  const notify = preferenceMocks.subscribe.mock.calls[0]?.[0];
+  act(() => notify({ enabled: false }));
+  act(() => notify({ enabled: true }));
+  act(() =>
+    container
+      ?.querySelector('button')
+      ?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+  );
+  expect(control.onStart).toHaveBeenCalledTimes(2);
 });

@@ -435,7 +435,7 @@ export async function openNativeVoiceScenario(page: Page, extensionId: string) {
   await page.goto(
     `chrome-extension://${extensionId}/apps/extension/src/scenario-editor/index.html?projectId=${project.id}`
   );
-  const field = page.getByRole('textbox', { name: 'Step title', exact: true });
+  const field = page.getByRole('textbox', { name: /^(Step title|Заголовок шага)$/u });
   await expect(field).toHaveValue('Original title');
   return {
     field,

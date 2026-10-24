@@ -226,7 +226,7 @@ describe('background voice input coordinator', () => {
 });
 
 describe('canonical voice preferences', () => {
-  it('uses background preferences and background-issued history token instead of content model choices', async () => {
+  it('uses background browser preferences without admitting a content-requested history capture', async () => {
     runtimeDependencies.loadPreferences.mockResolvedValue({
       language: 'en-US',
       microphoneDeviceId: 'canonical-device',
@@ -263,14 +263,49 @@ describe('canonical voice preferences', () => {
           mode: 'browser-managed',
           backend: 'browser',
         },
-        captureToken: {
-          entryId: 'entry',
-          incarnation: 'incarnation',
-          epoch: 'epoch',
-          sequence: 1,
-          createdAt: 1,
-        },
+        captureToken: null,
       })
     );
   });
+});
+
+it('does not admit history or media when saved voice input is disabled', async () => {
+  runtimeDependencies.loadPreferences.mockResolvedValue({
+    language: 'ru-RU',
+    mode: 'local-first',
+    enabled: false,
+  });
+  const coordinator = createVoiceInputCoordinator();
+  const owner = createContentPort('disabled');
+  coordinator.registerPort(owner.port);
+  owner.onMessage.emit({
+    type: VoiceInputPortMessageType.START,
+    requestId: 'disabled-start',
+    sessionId: 'disabled',
+    preferences: { language: 'ru-RU', mode: 'local-first' },
+  });
+  await flush();
+  expect(runtimeDependencies.initialize).not.toHaveBeenCalled();
+  expect(runtimeDependencies.beginCapture).not.toHaveBeenCalled();
+  expect(mocks.ensureOffscreenDocument).not.toHaveBeenCalled();
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+});
+
+it('starts live Chrome without history admission even when history is unavailable', async () => {
+  runtimeDependencies.initialize.mockRejectedValue(new Error('storage-failed'));
+  const coordinator = createVoiceInputCoordinator();
+  const owner = createContentPort('chrome');
+  coordinator.registerPort(owner.port);
+  owner.onMessage.emit({
+    type: VoiceInputPortMessageType.START,
+    requestId: 'chrome-start',
+    sessionId: 'chrome',
+    preferences: { language: 'ru-RU', mode: 'local-first' },
+  });
+  await flush();
+  expect(runtimeDependencies.initialize).not.toHaveBeenCalled();
+  expect(runtimeDependencies.beginCapture).not.toHaveBeenCalled();
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ type: MessageType.OFFSCREEN_VOICE_INPUT_START, captureToken: null })
+  );
 });

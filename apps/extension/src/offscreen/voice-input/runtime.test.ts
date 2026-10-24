@@ -79,13 +79,7 @@ let generationSequence = 0;
 function startMessage() {
   return {
     capabilityToken: 'capability',
-    captureToken: {
-      entryId: 'entry',
-      incarnation: 'incarnation',
-      epoch: 'epoch',
-      sequence: 1,
-      createdAt: 1,
-    },
+    captureToken: null,
     maxDurationMs: null,
     preferences: {
       language: 'ru-RU' as const,

@@ -47,6 +47,7 @@ export function createVoiceInputHistoryPort(deps: {
       requests.add(request.requestId);
       void (async () => {
         if (request.type === 'list') {
+          await deps.history.initialize();
           post({ type: 'list', requestId: request.requestId, entries: await deps.history.list() });
         } else if (request.type === 'delete') {
           const scope = await deps.processing.cancelScope(request.scope);
@@ -55,7 +56,12 @@ export function createVoiceInputHistoryPort(deps: {
         } else {
           const preferences = await deps.loadPreferences();
           if (!connected) return;
-          if (!preferences.transcription) throw new Error('model-unavailable');
+          if (
+            preferences.enabled === false ||
+            preferences.backend !== 'model' ||
+            !preferences.transcription
+          )
+            throw new Error('model-unavailable');
           const entry = await deps.processing.run({
             owner: port,
             scope: request.scope,

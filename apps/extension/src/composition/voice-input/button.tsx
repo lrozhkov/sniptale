@@ -1,5 +1,6 @@
 import { Mic } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { loadSettings, subscribeToVoiceInputPreferencesChanges } from '../persistence/settings';
 import { usePushToTalk } from '@sniptale/ui/voice-input/use-push-to-talk';
 import { isTrustedMouseEvent, isTrustedPointerEvent } from './trusted-events';
 import type { VoiceInputState } from './session';
@@ -75,7 +76,32 @@ function VoiceInputActivity(props: { contrast: boolean; level: number }) {
   );
 }
 
-export function VoiceInputButton(props: VoiceInputButtonProps) {
+function useVoiceInputEnabled(): boolean {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    let current = true;
+    let preferenceChanged = false;
+    const unsubscribe = subscribeToVoiceInputPreferencesChanges((preferences) => {
+      preferenceChanged = true;
+      if (current) setEnabled(preferences.enabled !== false);
+    });
+    void loadSettings().then(
+      (settings) => {
+        if (current && !preferenceChanged) setEnabled(settings.voiceInput?.enabled !== false);
+      },
+      () => {
+        // Keep dictation hidden when its saved preference is unavailable.
+      }
+    );
+    return () => {
+      current = false;
+      unsubscribe();
+    };
+  }, []);
+  return enabled;
+}
+
+function EnabledVoiceInputButton(props: VoiceInputButtonProps) {
   const pushToTalk = usePushToTalk({
     active: props.state.active,
     disabled: props.disabled,
@@ -125,4 +151,9 @@ export function VoiceInputButton(props: VoiceInputButtonProps) {
       <Mic aria-hidden="true" size={14} strokeWidth={1.8} />
     </button>
   );
+}
+
+export function VoiceInputButton(props: VoiceInputButtonProps) {
+  const enabled = useVoiceInputEnabled();
+  return enabled ? <EnabledVoiceInputButton {...props} /> : null;
 }

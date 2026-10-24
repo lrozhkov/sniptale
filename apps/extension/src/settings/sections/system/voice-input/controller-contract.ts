@@ -23,10 +23,11 @@ export type VoiceInputSettingsController = {
   };
   models: VoiceModelSelectionController;
   preferences: {
+    enabled?: boolean;
     backend: 'browser' | 'model';
     transcription: VoiceProviderSelection | null;
     correction: { enabled: boolean; model: VoiceProviderSelection | null };
-    setBackend(backend: 'browser' | 'model'): Promise<void>;
+    setBackend(backend: 'off' | 'browser' | 'model'): Promise<void>;
     setCorrectionEnabled(enabled: boolean): Promise<void>;
     language: VoiceInputLanguage;
     microphoneDeviceId: string | null;

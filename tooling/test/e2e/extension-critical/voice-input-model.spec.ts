@@ -24,10 +24,13 @@ test.setTimeout(120_000);
 for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
   const locale = index === 0 ? 'en' : 'ru';
   test(`voice settings follow the selected recognition backend ${viewport.name} ${locale}`, async ({}, info) => {
-    await withVoiceBrowser(viewport.size, locale, async ({ page, provider }) => {
+    await withVoiceBrowser(viewport.size, locale, async ({ page, extensionId, provider }) => {
       const backend = ui(page, 'settings.voice.backend');
       const choose = (
-        key: 'settings.voiceInput.backendBrowser' | 'settings.voiceInput.backendModel'
+        key:
+          | 'settings.voiceInput.backendOff'
+          | 'settings.voiceInput.backendBrowser'
+          | 'settings.voiceInput.backendModel'
       ) => backend.getByRole('button', { name: translate(key, locale), exact: true });
       const draft = `${CORRECTION_PROMPT} Draft kept across recognition changes.`;
       await ui(page, 'settings.voice.correction-prompt').fill(draft);
@@ -64,6 +67,33 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       ).toBeVisible();
       await backend.scrollIntoViewIfNeeded();
       await voiceScreenshot(page, info, 'chrome-recognition-settings');
+      await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
+      await expect(
+        page.getByLabel(translate('settings.voiceInput.languageLabel', locale), { exact: true })
+      ).toBeVisible();
+      await choose('settings.voiceInput.backendOff').click();
+      await expect(choose('settings.voiceInput.backendOff')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await expect(ui(page, 'settings.voice.start')).toHaveCount(0);
+      await expect(page.locator('textarea')).toHaveCount(0);
+      await expect(page.getByRole('meter')).toHaveCount(0);
+      await expect(page.locator('svg.lucide-mic')).toHaveCount(0);
+      await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
+      await voiceScreenshot(page, info, 'disabled-recognition-settings');
+      const scenario = await page.context().newPage();
+      await scenario.goto(page.url());
+      const { field, microphone } = await openNativeVoiceScenario(scenario, extensionId);
+      await expect(field).toHaveValue('Original title');
+      await expect(microphone).toHaveCount(0);
+      await choose('settings.voiceInput.backendBrowser').click();
+      await scenario.bringToFront();
+      await field.focus();
+      await expect(microphone).toBeVisible();
+      await choose('settings.voiceInput.backendOff').click();
+      await expect(microphone).toHaveCount(0);
+      await scenario.close();
       await choose('settings.voiceInput.backendModel').click();
       await expect(ui(page, 'settings.voice.transcription-model')).toContainText(ASR_MODEL_NAME);
       await expect(ui(page, 'settings.voice.correction')).toHaveAttribute('aria-checked', 'true');
@@ -79,6 +109,26 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       ).toHaveCount(0);
       await backend.scrollIntoViewIfNeeded();
       await voiceScreenshot(page, info, 'audio-model-recognition-settings');
+      await expect(
+        page.getByLabel(translate('settings.voiceInput.languageLabel', locale), { exact: true })
+      ).toHaveCount(0);
+      await expect(page.locator('a[href="?section=access-data&view=permissions"]')).toHaveCount(0);
+      const grid = ui(page, 'settings.voice.test-grid');
+      const container = grid.locator('..');
+      for (const width of [639, 640, 641]) {
+        await container.evaluate((element, width) => {
+          element.style.width = `${width}px`;
+        }, width);
+        const columns = await grid.evaluate(
+          (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length
+        );
+        expect(columns).toBe(width < 640 ? 1 : 2);
+        await grid.scrollIntoViewIfNeeded();
+        await voiceScreenshot(page, info, `recognition-layout-${width}`);
+      }
+      await container.evaluate((element) => {
+        element.style.removeProperty('width');
+      });
       expect(provider.uploads).toHaveLength(0);
       expect(provider.corrections).toHaveLength(0);
     });
@@ -286,6 +336,55 @@ test('native correction failure preserves raw text and original audio for explic
   });
 });
 
+test('global Off reaches another Settings window during capture and model processing', async ({}, info) => {
+  await withVoiceBrowser(
+    PRIMARY_BROWSER_VIEWPORTS[1].size,
+    'en',
+    async ({ page, extensionId, provider }) => {
+      const field = page.getByRole('textbox', {
+        name: translate('settings.voiceInput.textareaLabel', 'en'),
+        exact: true,
+      });
+      provider.hold('asr');
+      await recordSettingsMicrophone(page);
+      await expect.poll(() => provider.uploads.length).toBe(1);
+      const other = await page.context().newPage();
+      await openVoiceSettings(other, extensionId);
+      const choose = (mode: 'backendOff' | 'backendModel') =>
+        ui(other, 'settings.voice.backend').getByRole('button', {
+          name: translate(`settings.voiceInput.${mode}`, 'en'),
+          exact: true,
+        });
+      await choose('backendOff').click();
+      await expect(
+        ui(page, 'settings.voice.backend').getByRole('button', {
+          name: translate('settings.voiceInput.backendOff', 'en'),
+          exact: true,
+        })
+      ).toHaveAttribute('aria-pressed', 'true');
+      await expect(field).toHaveCount(0);
+      await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
+      await expect(page.locator('svg.lucide-mic')).toHaveCount(0);
+      await expect.poll(async () => (await readVoiceEntries(page))[0]?.status).toBe('cancelled');
+      provider.respond('asr');
+      await choose('backendModel').click();
+      await expect(field).toHaveValue('');
+      expect(provider.corrections).toHaveLength(0);
+      await page.bringToFront();
+      await ui(page, 'settings.voice.start').click();
+      await expect(ui(page, 'settings.voice.stop')).toBeVisible();
+      await other.bringToFront();
+      await choose('backendOff').click();
+      await expect(ui(page, 'settings.voice.stop')).toHaveCount(0);
+      await expect(field).toHaveCount(0);
+      await expect.poll(async () => (await readVoiceEntries(page))[0]?.status).toBe('cancelled');
+      expect(provider.uploads).toHaveLength(1);
+      await voiceScreenshot(page, info, 'settings-global-off-revokes-other-window');
+      await other.close();
+    }
+  );
+});
+
 test('native scenario global model and Cancel prevent late insertion', async ({}, info) => {
   await withVoiceBrowser(
     PRIMARY_BROWSER_VIEWPORTS[1].size,
@@ -327,6 +426,28 @@ test('native scenario global model and Cancel prevent late insertion', async ({}
       expect(provider.corrections).toHaveLength(1);
       expect((await readVoiceStorage(page)).libraryCount).toBe(0);
       await voiceScreenshot(page, info, 'scenario-cancel-keeps-manual-text');
+      provider.hold('asr');
+      await microphone.click();
+      await expect(microphone).toHaveAttribute('aria-pressed', 'true');
+      await page.waitForTimeout(800);
+      await microphone.click();
+      await expect.poll(() => provider.uploads.length).toBe(3);
+      const settings = await page.context().newPage();
+      await openVoiceSettings(settings, extensionId);
+      await ui(settings, 'settings.voice.backend')
+        .getByRole('button', {
+          name: translate('settings.voiceInput.backendOff', 'en'),
+          exact: true,
+        })
+        .click();
+      await expect(microphone).toHaveCount(0);
+      await field.fill('Edited after global voice input was disabled');
+      provider.respond('asr');
+      await expect.poll(async () => (await readVoiceEntries(page))[0]?.status).toBe('cancelled');
+      await expect(field).toHaveValue('Edited after global voice input was disabled');
+      expect(provider.corrections).toHaveLength(1);
+      await voiceScreenshot(page, info, 'scenario-global-off-prevents-late-insertion');
+      await settings.close();
     }
   );
 });

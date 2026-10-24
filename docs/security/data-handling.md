@@ -40,11 +40,11 @@ Web Snapshots may retain sanitized HTML and CSS, non-credential form state, and 
 
 Disclose that screenshots may still contain visible private pixels from images, canvas, video, or closed shadow roots.
 
-Voice input uses the globally selected Chrome or model backend. Model recognition sends completed microphone audio to the configured transcription provider. Optional correction sends recognized text and the dedicated local prompt to the configured text provider. Neither stage includes page content, project context, or recording identifiers.
+Voice input has three global states: Off, Chrome, and a configured model. Off hides dictation controls and prevents recognition and retry. Model recognition sends completed microphone audio to the configured transcription provider. Optional correction sends recognized text and the dedicated local prompt to the configured text provider. Neither stage includes page content, project context, or recording identifiers.
 
-Private voice history retains at most twenty completed recordings, including failed recognition attempts. Audio resides under the separate `sniptale-voice-input` OPFS root. The canonical `voice_input_history` store retains bounded metadata and transcripts. Only Settings exposes this history. Library, ordinary media backups, project exports, sync, diagnostics, traces, and AI request history exclude it.
+Private voice history retains at most twenty completed model recordings, including failed recognition attempts. Chrome does not record audio or store transcripts in this history. History initialization removes legacy Chrome entries through the existing deletion queue. Audio resides under the separate `sniptale-voice-input` OPFS root. The canonical `voice_input_history` store retains bounded metadata and transcripts. Only Settings exposes this history. Library, ordinary media backups, project exports, sync, diagnostics, traces, and AI request history exclude it.
 
-Settings transfer changes the voice language and Chrome mode. It preserves the local microphone, recognition backend, model approvals, and correction switch. Correction instructions use the AI prompt domain.
+Settings transfer changes the Chrome language and mode. It preserves the local microphone, enabled state, recognition backend, model approvals, and correction switch. Model recognition uses the language from the selected model configuration. An unset model language permits automatic detection. Correction instructions use the AI prompt domain.
 
 An explicit retry uses the current configured models and does not renew the recording's retention order. Failed correction preserves the raw transcript. Failed recognition preserves admitted audio for retry. Stop ends capture and permits the pending result. Cancel, field invalidation, and disposal prevent late insertion. Privacy erasure aborts and drains capture and processing before deleting private voice data, including when preferences remain preserved.
 

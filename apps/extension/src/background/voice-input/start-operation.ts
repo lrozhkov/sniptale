@@ -67,13 +67,27 @@ export class VoiceInputStartOperation {
       const preferences = await this.loadPreferences();
       if (!this.ownsCaptureStart(session)) return;
       session.preferences = preferences;
-      await this.gateway.withMediaMutationPermit(async () => {
-        if (!this.ownsCaptureStart(session)) return;
-        await this.history.initialize();
-        if (!this.ownsCaptureStart(session)) return;
-        const captureToken = await this.history.beginCapture();
-        if (this.ownsCaptureStart(session)) session.captureToken = captureToken;
-      });
+      if (preferences.enabled === false) {
+        this.sessions.clearIf(session);
+        postVoiceInputPortEvent(
+          registration,
+          createVoiceInputFailureEvent({
+            errorCode: 'stopped',
+            preferences,
+            requestId: request.requestId,
+            sessionId: request.sessionId,
+          })
+        );
+        return;
+      }
+      if (preferences.backend === 'model')
+        await this.gateway.withMediaMutationPermit(async () => {
+          if (!this.ownsCaptureStart(session)) return;
+          await this.history.initialize();
+          if (!this.ownsCaptureStart(session)) return;
+          const captureToken = await this.history.beginCapture();
+          if (this.ownsCaptureStart(session)) session.captureToken = captureToken;
+        });
       if (!this.ownsCaptureStart(session)) return;
       const response = await dispatchVoiceInputStart({
         gateway: this.gateway,

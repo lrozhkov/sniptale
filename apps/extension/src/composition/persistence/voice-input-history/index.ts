@@ -153,9 +153,25 @@ class VoiceHistoryOwner {
     });
   }
 
+  private async retireBrowserEntries(
+    catalog: VoiceHistoryCatalog,
+    permit?: PersistenceMutationPermit
+  ): Promise<void> {
+    const browser = catalog.entries.filter((entry) => entry.backend === 'browser');
+    if (browser.length) {
+      catalog.entries = catalog.entries.filter((entry) => entry.backend === 'model');
+      catalog.pendingDeletes.push(...browser.map(audioIdentity));
+      await this.catalogStorage.write(catalog, permit);
+    }
+    await this.drain(catalog, permit);
+  }
+
   async initialize(): Promise<void> {
     await this.mutate(async (catalog, permit) => {
-      if (catalog) return;
+      if (catalog) {
+        await this.retireBrowserEntries(catalog, permit);
+        return;
+      }
       await this.catalogStorage.write(
         {
           id: 'catalog',
@@ -201,7 +217,8 @@ class VoiceHistoryOwner {
     },
     signal?: AbortSignal
   ): Promise<VoiceHistoryScope> {
-    if (!parseVoiceCaptureToken(token)) throw new VoiceHistoryError('stale');
+    if (input.backend !== 'model' || !parseVoiceCaptureToken(token))
+      throw new VoiceHistoryError('stale');
     const mimeType = input.audio.type;
     if (
       input.audio.size > VOICE_HISTORY_MAX_AUDIO_BYTES ||
@@ -357,6 +374,7 @@ class VoiceHistoryOwner {
   async recover(): Promise<void> {
     await this.mutate(async (catalog, permit) => {
       if (!catalog) return;
+      await this.retireBrowserEntries(catalog, permit);
       await this.recoverAudio(catalog, permit);
     });
   }

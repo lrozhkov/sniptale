@@ -29,7 +29,13 @@ export function createVoiceInputCaptureCompletion(deps: {
       session.stopCleanupPending = false;
       return;
     }
-    if (!session.captureReleased || session.processing || !session.captureToken) return;
+    if (
+      session.preferences.backend !== 'model' ||
+      !session.captureReleased ||
+      session.processing ||
+      !session.captureToken
+    )
+      return;
     session.processing = true;
     try {
       const entry = await deps.history.get(event.scope);

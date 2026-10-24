@@ -411,6 +411,23 @@ export function subscribeToSettingsChanges(
   });
 }
 
+/** Observe canonical voice preferences, including reset and removal of the settings key. */
+export function subscribeToVoiceInputPreferencesChanges(
+  listener: (preferences: VoiceInputPreferences) => void
+): () => void {
+  if (typeof chrome === 'undefined') return () => undefined;
+  return browserStorage.subscribeToChanges((changes, areaName) => {
+    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
+    const change = changes[STORAGE_KEY];
+    const previous = normalizeLoadedSettings(
+      parseStoredSettings(change?.oldValue).value
+    ).voiceInput;
+    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value).voiceInput;
+    if (JSON.stringify(previous) === JSON.stringify(next)) return;
+    listener(next ?? { ...DEFAULT_VOICE_INPUT_SETTINGS });
+  });
+}
+
 export async function clearSettings(): Promise<void> {
   await withSettingsMutation(async (permit) => {
     const stored = await browserStorage.sync.get([STORAGE_KEY]);

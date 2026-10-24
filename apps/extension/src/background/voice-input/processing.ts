@@ -13,7 +13,7 @@ import {
   type VoiceInputHistory,
 } from '../../composition/persistence/voice-input-history';
 import { loadVoiceInputCorrectionSystemPrompt } from '../../composition/persistence/ai-settings';
-import { resolveTranscriptionModelConfig, type AudioModelConfig } from '../ai/audio/model-config';
+import { resolveTranscriptionModelConfig } from '../ai/audio/model-config';
 import { requestTranscription } from '../ai/audio/request';
 import { correctVoiceTranscript } from '../ai/llm/voice-correction';
 
@@ -45,22 +45,8 @@ interface VoiceProcessingArgs {
   onRawTranscript?(text: string, scope: VoiceHistoryScope): void;
 }
 
-function applyVoiceLanguage(
-  config: AudioModelConfig,
-  language: VoiceInputLanguage
-): AudioModelConfig {
-  if (!config.transcription) throw new Error('model-unavailable');
-  return {
-    ...config,
-    transcription: { ...config.transcription, language: language === 'ru-RU' ? 'ru' : 'en' },
-  };
-}
-
 async function transcribeVoiceAudio(args: VoiceTranscriptionInput): Promise<string> {
-  const config = applyVoiceLanguage(
-    await resolveTranscriptionModelConfig(args.selection, args.signal),
-    args.language
-  );
+  const config = await resolveTranscriptionModelConfig(args.selection, args.signal);
   const input = new File(
     [args.input],
     args.input.type === 'audio/wav' ? 'dictation.wav' : 'dictation.webm',
@@ -82,10 +68,7 @@ async function transcribeVoiceAudio(args: VoiceTranscriptionInput): Promise<stri
       : {}),
     beforeSend: async () => {
       args.signal.throwIfAborted();
-      const current = applyVoiceLanguage(
-        await resolveTranscriptionModelConfig(args.selection, args.signal),
-        args.language
-      );
+      const current = await resolveTranscriptionModelConfig(args.selection, args.signal);
       if (JSON.stringify(config) !== JSON.stringify(current)) throw new Error('model-unavailable');
       args.signal.throwIfAborted();
       await args.beforeSend();

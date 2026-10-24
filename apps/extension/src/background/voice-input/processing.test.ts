@@ -276,11 +276,11 @@ it('refuses provider permission revoked after request preparation before POST', 
   ).rejects.toThrow('permission-denied');
   expect(post).not.toHaveBeenCalled();
 });
-it('uses the selected voice language and a generic upload filename without the history identity', async () => {
+it('uses the configured model language and a generic upload filename without the history identity', async () => {
   vi.mocked(resolveTranscriptionModelConfig).mockResolvedValue(config);
   vi.mocked(requestTranscription).mockImplementationOnce(async (args) => {
     expect(args.input.name).toBe('dictation.wav');
-    expect(args.config.transcription?.language).toBe('ru');
+    expect(args.config.transcription?.language).toBe('en');
     await args.beforeSend();
     return { text: 'Recognized', segments: [] };
   });
@@ -394,4 +394,24 @@ it('does not apply a saved model correction to Chrome dictation', async () => {
   expect(correct).not.toHaveBeenCalled();
   expect(loadCorrectionPrompt).not.toHaveBeenCalled();
   expect(saved.correction?.enabled).toBe(true);
+});
+
+it('preserves automatic model language when voice preferences select Russian', async () => {
+  const { language: _language, ...automatic } = config.transcription!;
+  vi.mocked(resolveTranscriptionModelConfig).mockResolvedValue({
+    ...config,
+    transcription: automatic,
+  });
+  vi.mocked(requestTranscription).mockImplementationOnce(async (args) => {
+    expect(args.config.transcription).not.toHaveProperty('language');
+    await args.beforeSend();
+    return { text: 'Automatic language', segments: [] };
+  });
+  await expect(
+    createVoiceInputProcessor({ history }).run({
+      scope,
+      preferences: { ...preferences, correction: { enabled: false, model: null } },
+      signal: new AbortController().signal,
+    })
+  ).resolves.toMatchObject({ transcript: 'Automatic language' });
 });

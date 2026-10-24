@@ -89,7 +89,7 @@ export function createOffscreenVoiceInputService(deps: VoiceInputRecognitionDeps
   }
 
   function start(args: {
-    captureToken: VoiceCaptureToken;
+    captureToken: VoiceCaptureToken | null;
     maxDurationMs: number | null;
     preferences: VoiceInputPreferences;
     requestId: string;

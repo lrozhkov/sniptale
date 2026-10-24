@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { VOICE_INPUT_HISTORY_PORT_NAME } from '@sniptale/runtime-contracts/voice-input';
+import {
+  VOICE_INPUT_HISTORY_PORT_NAME,
+  type VoiceInputPreferences,
+} from '@sniptale/runtime-contracts/voice-input';
 import { createRuntimePortFixture } from '../../../../../tooling/test/support/chrome-runtime-port';
 import {
   createHistoryFixture,
@@ -34,7 +37,7 @@ async function harness() {
     acquirePermit: () => vi.fn(),
     getGeneration: () => 0,
   });
-  const loadPreferences = vi.fn(async () => ({
+  const loadPreferences = vi.fn<() => Promise<VoiceInputPreferences>>(async () => ({
     transcription: {
       modelId: 'model',
       approvedProviderId: 'provider',
@@ -130,4 +133,37 @@ describe('private Settings voice history Port', () => {
     await flush();
     expect(client.postMessage).not.toHaveBeenCalled();
   });
+});
+
+it.each([false, true])(
+  'refuses history retry when enabled=%s and Chrome is selected',
+  async (enabled) => {
+    const h = await harness();
+    h.loadPreferences.mockResolvedValue({
+      ...(await h.loadPreferences()),
+      backend: 'browser',
+      enabled,
+    });
+    const client = port();
+    h.owner.registerPort(client.port);
+    client.onMessage.emit({ type: 'retry', requestId: 'disabled-retry', scope: h.scope });
+    await flush();
+    expect(h.run).not.toHaveBeenCalled();
+    expect(client.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'failure', code: 'model-unavailable' })
+    );
+  }
+);
+
+it('refuses model history retry while voice input is disabled', async () => {
+  const h = await harness();
+  h.loadPreferences.mockResolvedValue({ ...(await h.loadPreferences()), enabled: false });
+  const client = port();
+  h.owner.registerPort(client.port);
+  client.onMessage.emit({ type: 'retry', requestId: 'disabled-model-retry', scope: h.scope });
+  await flush();
+  expect(h.run).not.toHaveBeenCalled();
+  expect(client.postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ type: 'failure', code: 'model-unavailable' })
+  );
 });

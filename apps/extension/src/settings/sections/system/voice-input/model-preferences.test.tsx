@@ -96,9 +96,7 @@ it('shows configured model selectors and local correction prompt controls', () =
     container.querySelector<HTMLButtonElement>('[data-ui="settings.voice.prompt-save"]')?.click()
   );
   expect(controller.models.savePrompt).toHaveBeenCalledOnce();
-  expect(container.querySelector('a')?.getAttribute('href')).toBe(
-    '?section=access-data&view=permissions'
-  );
+  expect(container.querySelector('a')).toBeNull();
 });
 
 it('routes model selection, prompt editing and reset through their existing controllers', () => {
@@ -187,4 +185,18 @@ it('hides saved model correction and catalogue failures in Chrome and restores t
   expect(container.querySelector('textarea')?.value).toBe('Keep my words');
   expect(controller.preferences.setCorrectionEnabled).not.toHaveBeenCalled();
   expect(controller.models.setPrompt).not.toHaveBeenCalled();
+});
+
+it('offers Off, Chrome and custom AI while off hides retained model fields', () => {
+  const controller = createController();
+  controller.preferences.enabled = false;
+  controller.preferences.backend = 'model';
+  act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
+  const off = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'settings.voiceInput.backendOff'
+  );
+  expect(off?.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('[data-ui="settings.voice.transcription-model"]')).toBeNull();
+  act(() => off?.click());
+  expect(controller.preferences.setBackend).toHaveBeenCalledWith('off');
 });
