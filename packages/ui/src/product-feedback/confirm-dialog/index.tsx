@@ -188,6 +188,10 @@ function renderProductConfirmDialogModal(props: {
   );
 }
 
+function canRestoreFocus(element: Element | null): element is Element & Pick<HTMLElement, 'focus'> {
+  return Boolean(element?.isConnected && 'focus' in element && typeof element.focus === 'function');
+}
+
 function useConfirmationFocus(isOpen: boolean, onCancel: () => void) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef(onCancel);
@@ -222,11 +226,11 @@ function useConfirmationFocus(isOpen: boolean, onCancel: () => void) {
         (targets[next] ?? dialog).focus({ preventScroll: true });
       }
     };
-    window.addEventListener('keydown', onKeyDown, true);
+    const ownerWindow = dialog.ownerDocument.defaultView ?? window;
+    ownerWindow.addEventListener('keydown', onKeyDown, true);
     return () => {
-      window.removeEventListener('keydown', onKeyDown, true);
-      if (previous instanceof HTMLElement && previous.isConnected)
-        previous.focus({ preventScroll: true });
+      ownerWindow.removeEventListener('keydown', onKeyDown, true);
+      if (canRestoreFocus(previous)) previous.focus({ preventScroll: true });
     };
   }, [isOpen]);
   return containerRef;

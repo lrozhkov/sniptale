@@ -88,6 +88,7 @@
 }
 .guide-project-name {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 3rem;
   max-width: 100%;
   align-items: center;
@@ -749,8 +750,7 @@
 .guide-image-controls > p,
 .guide-image-controls > [role='group'],
 .guide-image-controls > .guide-image-description,
-.guide-image-controls > .guide-image-zoom,
-.guide-image-reset-actions {
+.guide-image-controls > .guide-image-zoom {
   grid-column: 1 / -1;
 }
 .guide-image-controls > p {
@@ -2589,7 +2589,7 @@ html[data-guide-height-resizing] * {
 }
 
 .sniptale-scenario-workspace .guide-project-name {
-  min-width: calc(8ch + 70px);
+  min-width: calc(4ch + 70px);
 }
 .sniptale-scenario-workspace .guide-project-name-measure {
   padding-inline-end: 8px;
@@ -2661,4 +2661,11 @@ html[data-guide-height-resizing] * {
   min-width: 32px;
   height: 32px;
   padding: 0;
+}
+
+/* Numeric entry uses the text role; displayed property values retain the UI role. */
+@layer utilities {
+  .sniptale-scenario-workspace .guide-page .sniptale-numeric-entry > input {
+    font-family: var(--sniptale-font-document-sans) !important;
+  }
 }

@@ -234,16 +234,16 @@ it('renders exactly one heading per section in both presentations and keeps nest
     const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
     expect(heading.textContent).toContain(label);
     expect(
-      host.querySelectorAll('.guide-inspector-group-heading'),
+      host.querySelectorAll('.guide-inspector-group-heading h3'),
       `${label} must not repeat the section heading inside its content`
     ).toHaveLength(0);
   }
   presentation = 'all';
   draw();
-  const groups = [...host.querySelectorAll('.guide-inspector-group')];
+  const groups = host.querySelectorAll('[data-level="section"]');
   expect(groups).toHaveLength(6);
   for (const group of groups)
-    expect(group.querySelectorAll('.guide-inspector-group-heading')).toHaveLength(1);
+    expect(group.firstElementChild?.className).toBe('guide-inspector-group-heading');
   scope = 'selection';
   selected = { kind: 'slide', slideId: 'nav', objectId: null };
   presentation = 'sections';
@@ -760,7 +760,7 @@ it('edits an action hold without exposing a branch destination', async () => {
 it('exposes region coordinates only in appearance and moves the visible region with its center', async () => {
   await click('Hotspot');
   await choose('Focus style', 'Highlight');
-  const content = host.querySelector('section[aria-label="Hotspot"]')!;
+  const content = host.querySelector('section[aria-label="Text"]')!;
   expect(content.querySelector('input[aria-label="X"]')).toBeNull();
   expect(host.querySelectorAll('input[aria-label="X"]')).toHaveLength(1);
   await fill('X', '25');

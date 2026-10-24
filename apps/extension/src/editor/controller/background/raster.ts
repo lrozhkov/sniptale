@@ -1,4 +1,10 @@
 import { FabricImage, StaticCanvas, type FabricObject } from 'fabric';
+import {
+  normalizePaintColor,
+  sampleGradient,
+  type LinearGradient,
+} from '@sniptale/foundation/paint';
+import type { EditorFrameSettings } from '../../../features/editor/document/types';
 
 import type { BackgroundCanvasSize } from './geometry';
 
@@ -114,4 +120,90 @@ export function rasterizeBlurredBackground(options: {
     return encoded;
   };
   return image;
+}
+
+function resolveRepeatedGradientPosition(gradient: LinearGradient, position: number): number {
+  if (!gradient.repeat.enabled) return position;
+  const first = gradient.stops[0]!.position;
+  const last = gradient.stops.at(-1)!.position;
+  const period = (last - first) * gradient.repeat.span;
+  return period > 0
+    ? first +
+        ((((position - first * gradient.repeat.span) % period) + period) % period) /
+          gradient.repeat.span
+    : last;
+}
+
+function createGradientColorLookup(gradient: LinearGradient, steps: number): Uint8ClampedArray {
+  const colors = new Uint8ClampedArray((steps + 1) * 4);
+  for (let index = 0; index <= steps; index++) {
+    const position = resolveRepeatedGradientPosition(gradient, index / steps);
+    const color = normalizePaintColor(sampleGradient(gradient, position))!;
+    for (let channel = 0; channel < 4; channel++) {
+      colors[index * 4 + channel] = Number.parseInt(
+        color.slice(1 + channel * 2, 3 + channel * 2),
+        16
+      );
+    }
+  }
+  return colors;
+}
+
+function paintGradientRaster(
+  image: ImageData,
+  size: BackgroundCanvasSize,
+  gradient: LinearGradient
+): void {
+  const angle = ((gradient.angle - 90) * Math.PI) / 180;
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const length = Math.abs(dx) * size.width + Math.abs(dy) * size.height;
+  // Quarter-raster-pixel lookup resolution bounds work independently of canvas area.
+  const steps = Math.max(1, Math.ceil(length * 4));
+  const colors = createGradientColorLookup(gradient, steps);
+  for (let y = 0; y < size.height; y++) {
+    for (let x = 0; x < size.width; x++) {
+      const position =
+        0.5 + ((x + 0.5 - size.width / 2) * dx + (y + 0.5 - size.height / 2) * dy) / length;
+      const sample = Math.max(0, Math.min(steps, Math.round(position * steps))) * 4;
+      const pixel = (y * size.width + x) * 4;
+      image.data[pixel] = colors[sample]!;
+      image.data[pixel + 1] = colors[sample + 1]!;
+      image.data[pixel + 2] = colors[sample + 2]!;
+      image.data[pixel + 3] = colors[sample + 3]!;
+    }
+  }
+}
+
+/** Render complete linear gradients within the existing background raster budget. */
+export function createAdvancedBackgroundImage(
+  size: BackgroundCanvasSize,
+  frame: EditorFrameSettings
+): FabricImage | null {
+  const gradient = frame.backgroundGradient;
+  if (
+    !gradient ||
+    (gradient.interpolation === 'srgb' &&
+      !gradient.repeat.enabled &&
+      gradient.stops.every((stop) => stop.midpoint === 0.5))
+  )
+    return null;
+  const raster = resolveBackgroundRasterSize(size);
+  const source = document.createElement('canvas');
+  source.width = raster.width;
+  source.height = raster.height;
+  const context = source.getContext('2d');
+  if (!context) throw new Error('Editor gradient raster context is unavailable');
+  const image = context.createImageData(source.width, source.height);
+  paintGradientRaster(image, raster, gradient);
+  context.putImageData(image, 0, 0);
+  return new FabricImage(source, {
+    left: 0,
+    top: 0,
+    originX: 'left',
+    originY: 'top',
+    strokeWidth: 0,
+    scaleX: size.width / source.width,
+    scaleY: size.height / source.height,
+  });
 }

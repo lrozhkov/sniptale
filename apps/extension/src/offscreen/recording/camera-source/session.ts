@@ -222,7 +222,7 @@ async function acquireCameraSourceLease(args: {
   closeSession: (target: CameraSourceSession) => void;
   ensureRequestedInput: (target: CameraSourceSession, deviceId: string | null) => Promise<void>;
   isCurrent: (target: CameraSourceSession) => boolean;
-  settings: VideoRecordingSettings;
+  deviceId: string | null;
   target: CameraSourceSession;
 }): Promise<CameraSourceLease> {
   const { target } = args;
@@ -230,7 +230,7 @@ async function acquireCameraSourceLease(args: {
   let leasedTrack: MediaStreamTrack | null = null;
   let stream: MediaStream | null = null;
   try {
-    await args.ensureRequestedInput(target, args.settings.webcamDeviceId ?? null);
+    await args.ensureRequestedInput(target, args.deviceId);
     if (!args.isCurrent(target)) throw new Error('Camera source is no longer active.');
     if (!target.output) throw new Error('Normalized camera source is not available.');
     const outputTrack = requireVideoTrack(
@@ -391,7 +391,25 @@ export function createCameraSourceOwner(deps: CameraSourceDependencies) {
         closeSession,
         ensureRequestedInput,
         isCurrent: (candidate) => session === candidate,
-        settings,
+        deviceId: settings.webcamDeviceId ?? null,
+        target,
+      });
+    },
+
+    async acquireCurrent(): Promise<CameraSourceLease> {
+      const target = session;
+      if (
+        !target ||
+        target.closed ||
+        !target.raw.getVideoTracks().some((track) => track.enabled && track.readyState !== 'ended')
+      ) {
+        throw new Error('Camera source is not active.');
+      }
+      return acquireCameraSourceLease({
+        closeSession,
+        ensureRequestedInput: async () => undefined,
+        isCurrent: (candidate) => session === candidate && !candidate.closed,
+        deviceId: target.requestedDeviceId,
         target,
       });
     },
@@ -429,5 +447,6 @@ const cameraSourceOwner = createCameraSourceOwner({
 });
 
 export const acquireCameraSource = cameraSourceOwner.acquire;
+export const acquireCurrentCameraSource = cameraSourceOwner.acquireCurrent;
 export const setCameraSourceEnabled = cameraSourceOwner.setEnabled;
 export const switchCameraSourceInput = cameraSourceOwner.switchInput;

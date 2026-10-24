@@ -308,3 +308,33 @@ it.each([
     })
   ).toMatchObject({ top: expectedTop });
 });
+
+it.each([8, 934])('keeps recording menus outside the scrolling vertical toolbar at x=%s', (x) => {
+  vi.stubGlobal('innerWidth', 1000);
+  vi.stubGlobal('innerHeight', 560);
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar';
+  toolbar.dataset['videoRecording'] = 'true';
+  const anchor = document.createElement('button');
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(new DOMRect(x, 8, 58, 544));
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(new DOMRect(x + 8, 350, 32, 32));
+  const style = resolveToolbarFloatingMenuStyle({
+    anchorEl: anchor,
+    displayMode: 'vertical',
+    placement: 'down',
+    menuWidth: 320,
+    menuHeight: 360,
+  });
+  expect(style).toMatchObject({ position: 'fixed', bottom: 'auto' });
+  if (x === 8) {
+    expect(style?.right).toBe('auto');
+    expect(Number(style?.left)).toBeGreaterThanOrEqual(x + 58 + 1);
+  } else {
+    expect(style?.left).toBe('auto');
+    expect(1000 - Number(style?.right)).toBeLessThanOrEqual(x - 1);
+  }
+  expect(Number(style?.top)).toBeGreaterThanOrEqual(8);
+  expect(Number(style?.top) + 360).toBeLessThanOrEqual(552);
+});

@@ -24,18 +24,25 @@ export function useDesignReviewCommentVoiceInput(args: {
     },
   });
   const startSession = session.actions.start;
+  const cancelSession = session.actions.cancel;
+  const cancel = useCallback(() => {
+    insertionRef.current = null;
+    setCaretPosition(null);
+    cancelSession();
+  }, [cancelSession]);
 
   const start = useCallback(
     (draft: string, caret: number) => {
+      if (session.state.active || session.state.pending) return Promise.resolve();
       insertionRef.current = createTextTranscriptInsertion(draft, caret);
       setCaretPosition(caret);
       return startSession();
     },
-    [startSession]
+    [session.state.active, session.state.pending, startSession]
   );
 
   return {
-    actions: { start, stop: session.actions.stop },
+    actions: { start, stop: session.actions.stop, cancel },
     state: { ...session.state, caretPosition },
   };
 }

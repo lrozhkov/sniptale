@@ -73,6 +73,7 @@ export function TourHotspotSettings({
           >
             <TourTextField
               label={t('scenario.editor.textLabel')}
+              headingOwnsLabel
               value={value.text}
               disabled={disabled}
               onChange={(text) => onChange({ ...value, text })}
@@ -370,6 +371,7 @@ export function TourAnnotationSettings({
         >
           <TourTextField
             label={t('scenario.editor.textLabel')}
+            headingOwnsLabel
             value={value.text}
             disabled={disabled}
             onChange={(text) => onChange({ ...value, text })}

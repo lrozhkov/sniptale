@@ -10,6 +10,7 @@ import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { useContext } from 'react';
 import { installContentUiActivationBridge } from '../../../runtime/ui-activation-bridge';
 import type { VideoRecordingToolbarState } from '../../video-recording/session/state';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
 const recordingPreferences = vi.hoisted(() => ({ ready: true, fadeDuringRecording: true }));
 
@@ -114,6 +115,129 @@ function renderToolbarShell(
     />
   );
 }
+
+describe('ToolbarShellContent recording crop', () => {
+  it('keeps the toolbar visible when its client bounds are wholly outside the actual crop', () => {
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(new DOMRect(24, 12, 400, 48));
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    try {
+      act(() =>
+        root.render(
+          <ToolbarShellContent
+            toolbarProps={
+              {
+                videoRecordingMode: true,
+                videoRecording: {
+                  state: {
+                    phase: 'recording',
+                    captureMode: CaptureMode.TAB_CROP,
+                    cropRegion: { x: 100, y: 100, width: 500, height: 300 },
+                  },
+                },
+              } as never
+            }
+            viewModel={
+              {
+                derivedState: {
+                  toolbarRef: { current: null },
+                  isDragging: false,
+                  displayMode: 'horizontal',
+                  position: { x: 24, y: 12 },
+                  positionReady: true,
+                  handleMouseDown: vi.fn(),
+                },
+                toolbarMenuState: { activeMenuType: null },
+              } as never
+            }
+            onHoverCapture={vi.fn()}
+            onViewportChange={vi.fn()}
+          />
+        )
+      );
+      expect(
+        container
+          .querySelector('[data-ui="content.toolbar.root"]')
+          ?.hasAttribute('data-recording-fade')
+      ).toBe(false);
+    } finally {
+      act(() => root.unmount());
+      bounds.mockRestore();
+    }
+  });
+
+  it('tracks actual scaled placement and recording authority rather than the local target choice', () => {
+    let clientBounds = new DOMRect(180, 120, 80, 40);
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(() => clientBounds);
+    useContentUiScaleMock.mockReturnValue(2);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    const toolbarRef = { current: null };
+    const render = (
+      captureMode: CaptureMode,
+      localTarget: 'TAB' | 'TAB_CROP',
+      menuOpen = false
+    ) => {
+      act(() =>
+        root.render(
+          <ToolbarShellContent
+            toolbarProps={
+              {
+                videoRecordingMode: true,
+                videoRecording: {
+                  captureMode: localTarget,
+                  state: {
+                    phase: 'recording',
+                    captureMode,
+                    cropRegion: { x: 200, y: 100, width: 200, height: 200 },
+                  },
+                },
+              } as never
+            }
+            viewModel={
+              {
+                derivedState: {
+                  toolbarRef,
+                  isDragging: false,
+                  displayMode: 'horizontal',
+                  position: { x: clientBounds.x / 2, y: clientBounds.y / 2 },
+                  positionReady: true,
+                  handleMouseDown: vi.fn(),
+                },
+                toolbarMenuState: { activeMenuType: menuOpen ? 'settings' : null },
+              } as never
+            }
+            onHoverCapture={vi.fn()}
+            onViewportChange={vi.fn()}
+          />
+        )
+      );
+    };
+    const toolbar = () => container.querySelector('[data-ui="content.toolbar.root"]');
+    try {
+      render(CaptureMode.TAB_CROP, 'TAB');
+      expect(toolbar()?.getAttribute('data-recording-fade')).toBe('true');
+      // A committed drag moves the measured, already-scaled shell beyond the crop edge.
+      clientBounds = new DOMRect(450, 120, 80, 40);
+      render(CaptureMode.TAB_CROP, 'TAB');
+      expect(toolbar()?.hasAttribute('data-recording-fade')).toBe(false);
+      render(CaptureMode.TAB, 'TAB_CROP');
+      expect(toolbar()?.getAttribute('data-recording-fade')).toBe('true');
+      clientBounds = new DOMRect(180, 120, 80, 40);
+      render(CaptureMode.TAB_CROP, 'TAB', true);
+      expect(toolbar()?.getAttribute('data-recording-fade')).toBe('true');
+      expect(toolbar()?.getAttribute('data-menu-open')).toBe('true');
+    } finally {
+      act(() => root.unmount());
+      bounds.mockRestore();
+      useContentUiScaleMock.mockReturnValue(1);
+    }
+  });
+});
 
 describe('ToolbarShellContent', () => {
   it.each(['idle', 'starting', 'recording', 'paused', 'stopping', 'error'] as const)(

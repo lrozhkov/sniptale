@@ -5,6 +5,7 @@ import { beginScreenshotRun, prepareScreenshotMode, syncCaptureAction } from '..
 import type { CreateScreenshotControllerActionsArgs } from './action-types';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 import type { ScreenshotStartContext, ScreenshotType } from '../types';
+import type { CaptureActionType } from '../../../../contracts/settings';
 
 export function createHandleTakeScreenshot(args: CreateScreenshotControllerActionsArgs) {
   return async (
@@ -22,7 +23,24 @@ export function createHandleTakeScreenshot(args: CreateScreenshotControllerActio
     const runToken = beginScreenshotRun(args.runtime);
 
     if (args.params.timerDelay > 0) {
-      startScreenshotCountdown(type, args, runToken, contentIntentSource);
+      startScreenshotCountdown(
+        type,
+        args,
+        runToken,
+        contentIntentSource,
+        startContext?.captureAction
+      );
+      return;
+    }
+
+    if (startContext?.captureAction !== undefined) {
+      await runImmediateScreenshot(
+        type,
+        args,
+        runToken,
+        contentIntentSource,
+        startContext.captureAction
+      );
       return;
     }
 
@@ -39,12 +57,17 @@ function startScreenshotCountdown(
   type: ScreenshotType,
   args: CreateScreenshotControllerActionsArgs,
   runToken: number,
-  contentIntentSource: ContentPrivilegedActionIntentSource | undefined
+  contentIntentSource: ContentPrivilegedActionIntentSource | undefined,
+  captureAction?: CaptureActionType
 ) {
   args.session.countdownRunToken = runToken;
   startCountdown({
     onElapsed: () => {
-      void executeCountdownScreenshot(type, args, runToken, contentIntentSource);
+      if (captureAction !== undefined) {
+        void executeCountdownScreenshot(type, args, runToken, contentIntentSource, captureAction);
+      } else {
+        void executeCountdownScreenshot(type, args, runToken, contentIntentSource);
+      }
     },
     session: args.session,
     setCountdown: args.setCountdown,

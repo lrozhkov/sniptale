@@ -58,6 +58,7 @@ function ModeToggleHarness(props: {
   aiPickMode: boolean;
   onDisableAiPickMode?: () => void;
   onToggleScreenshotMode?: (enabled: boolean) => void;
+  onToggleHighlighterMode?: (enabled: boolean) => void;
   screenshotMode?: boolean;
 }) {
   const { pendingInteractionMode, toggleMode } = useToolbarModeToggles({
@@ -68,7 +69,7 @@ function ModeToggleHarness(props: {
     quickEditMode: false,
     onAiPickContentStart: vi.fn(),
     onToggleScreenshotMode: props.onToggleScreenshotMode ?? vi.fn(),
-    onToggleHighlighterMode: vi.fn(),
+    onToggleHighlighterMode: props.onToggleHighlighterMode ?? vi.fn(),
     onToggleQuickEditDocumentMode: vi.fn(),
     onToggleQuickEditMode: vi.fn(),
     onClearHighlights: vi.fn(),
@@ -92,6 +93,13 @@ function ModeToggleHarness(props: {
         data-ui="test.quickedit-toggle"
         onClick={() => {
           void toggleMode('quickedit');
+        }}
+      />
+      <button
+        type="button"
+        data-ui="test.highlighter-toggle"
+        onClick={() => {
+          void toggleMode('highlighter');
         }}
       />
       <div data-ui="test.pending-mode">{pendingInteractionMode ?? 'none'}</div>
@@ -358,4 +366,26 @@ describe('useToolbarModeToggles', () => {
     expect(disableAiPickMode).toHaveBeenCalledTimes(1);
     expect(document.querySelector('[data-ui="test.pending-mode"]')?.textContent).toBe('none');
   });
+});
+
+it('clears pending annotation projection after a refused request without accepting the new mode', async () => {
+  const deferred = createDeferredResponse();
+  const onToggleHighlighterMode = vi.fn();
+  modeToggleMocks.sendRuntimeMessage.mockReturnValueOnce(deferred.promise);
+  await act(async () => {
+    root?.render(
+      <ModeToggleHarness aiPickMode={false} onToggleHighlighterMode={onToggleHighlighterMode} />
+    );
+  });
+  act(() => {
+    document.querySelector<HTMLButtonElement>('[data-ui="test.highlighter-toggle"]')?.click();
+  });
+  expect(document.querySelector('[data-ui="test.pending-mode"]')?.textContent).toBe('highlighter');
+  expect(onToggleHighlighterMode).not.toHaveBeenCalled();
+  await act(async () => {
+    deferred.resolve({ success: false });
+    await deferred.promise;
+  });
+  expect(document.querySelector('[data-ui="test.pending-mode"]')?.textContent).toBe('none');
+  expect(onToggleHighlighterMode).not.toHaveBeenCalled();
 });

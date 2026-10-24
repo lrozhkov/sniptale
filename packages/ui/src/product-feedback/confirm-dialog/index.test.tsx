@@ -7,6 +7,7 @@ import { ProductConfirmDialog } from './index';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+let frame: HTMLIFrameElement | null = null;
 
 function renderDialog() {
   container = document.createElement('div');
@@ -37,6 +38,8 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  frame?.remove();
+  frame = null;
   vi.unstubAllGlobals();
 });
 
@@ -61,6 +64,51 @@ function runProductConfirmDialogSuite() {
 }
 
 describe('ProductConfirmDialog', runProductConfirmDialogSuite);
+
+it.each(['owner', 'adopted'] as const)(
+  'handles keyboard and restores a %s trigger in another document',
+  (triggerOrigin) => {
+    frame = document.createElement('iframe');
+    document.body.append(frame);
+    const ownerDocument = frame.contentDocument!;
+    const ownerWindow = frame.contentWindow!;
+    const trigger = (triggerOrigin === 'adopted' ? document : ownerDocument).createElement(
+      'button'
+    );
+    ownerDocument.body.append(trigger);
+    trigger.focus();
+    container = ownerDocument.createElement('div');
+    ownerDocument.body.append(container);
+    root = createRoot(container);
+    const onCancel = vi.fn();
+    act(() =>
+      root?.render(
+        <ProductConfirmDialog
+          title="Delete"
+          message="Delete recording?"
+          confirmText="Delete"
+          cancelText="Cancel"
+          onCancel={onCancel}
+        />
+      )
+    );
+    const cancel = container.querySelector<HTMLButtonElement>('.sniptale-confirm-actions button')!;
+    const confirm = container.querySelector<HTMLButtonElement>(
+      '.sniptale-confirm-actions button:last-child'
+    )!;
+    expect(ownerDocument.activeElement).toBe(cancel);
+    act(() => cancel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+    expect(ownerDocument.activeElement).toBe(confirm);
+    act(() =>
+      confirm.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(onCancel).toHaveBeenCalledOnce();
+    act(() => root?.unmount());
+    root = null;
+    expect(ownerDocument.activeElement).toBe(trigger);
+    expect(ownerWindow.document).toBe(ownerDocument);
+  }
+);
 
 function verifyClosedDialogState() {
   container = document.createElement('div');

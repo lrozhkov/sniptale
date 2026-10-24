@@ -201,3 +201,17 @@ it('keeps the retained document interval when a windowed EFFECT placement change
   expect(next.effectInstances!.find(({ id }) => id === scene.id)).toEqual(original);
   expect(isHydratableVideoProject(next)).toBe(true);
 });
+
+it.each(['motion', 'background'])('retains normalized effect inputs after a %s edit', (kind) => {
+  const project = syncProjectDuration(createProjectWithEffects());
+  const before = structuredClone(project);
+  const edited =
+    kind === 'motion'
+      ? { ...project, motionRegions: [] }
+      : { ...project, sceneBackground: { kind: 'solid' as const, color: '#123456' } };
+  const next = syncProjectDuration(edited);
+  expect(next.clips).toBe(project.clips);
+  expect(next.effectInstances).toBe(project.effectInstances);
+  expect(next.effectSnapshots).toBe(project.effectSnapshots);
+  expect(project).toEqual(before);
+});

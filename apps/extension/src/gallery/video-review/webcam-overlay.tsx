@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   quickEditWebcamFrameAt,
+  quickEditWebcamScreenPlacementAt,
   quickEditWebcamBounds,
   type QuickEditWebcam,
   type QuickEditWebcamPlacement,
@@ -100,15 +101,20 @@ export function ReviewWebcamOverlay(props: {
     (props.onPreviewPlacement ?? props.manual?.onPreviewPlacement)?.(value);
   };
   const frame = quickEditWebcamFrameAt(settings, editor.time, shownResource.duration);
+  const screen = quickEditWebcamScreenPlacementAt(settings, editor.time);
+  const split = screen.width < 1 || screen.height < 1;
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-20"
+      className={[
+        'pointer-events-none absolute inset-0',
+        !manual && shownResource.phase === 'failed' ? 'z-50' : 'z-20',
+      ].join(' ')}
       data-ui="gallery.videoReview.webcamOverlay"
     >
       {!props.manual ? (
         <canvas ref={canvas} className="absolute inset-0 h-full w-full" aria-hidden="true" />
       ) : null}
-      {shownResource.phase !== 'ready' ? (
+      {!manual && shownResource.phase !== 'ready' ? (
         <div
           role={shownResource.phase === 'failed' ? 'alert' : 'status'}
           className="pointer-events-auto absolute inset-x-0 top-0 flex items-center gap-2
@@ -126,7 +132,7 @@ export function ReviewWebcamOverlay(props: {
           ) : null}
         </div>
       ) : null}
-      {frame && shownReady && !disabled ? (
+      {frame && shownReady && !disabled && !split ? (
         <ReviewFocusArea
           area={quickEditWebcamBounds(
             placement ?? frame.placement,

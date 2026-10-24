@@ -1,13 +1,13 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { MousePointer2, Play, RotateCcw, ScanSearch, SkipBack } from 'lucide-react';
+import { Play, ScanSearch, SkipBack } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
 
-export type TourView = 'edit' | 'frame' | 'preview';
+type TourView = 'edit' | 'frame' | 'preview';
 
-type TourViewMode = {
+export type TourViewMode = {
   view: TourView;
   replay: number;
   previewOrigin: 'selection' | 'beginning';
@@ -79,42 +79,17 @@ export function TourViewControls({
   t: Translate;
 }) {
   const previewButton = useRef<HTMLButtonElement>(null);
-  const returnButton = useRef<HTMLButtonElement>(null);
-  const pendingFocus = useRef(false);
+  const beginningButton = useRef<HTMLButtonElement>(null);
+  const previousView = useRef(mode.view);
   useLayoutEffect(() => {
-    if (!pendingFocus.current) return;
-    pendingFocus.current = false;
-    (mode.view === 'preview' ? returnButton : previewButton).current?.focus({
-      preventScroll: true,
-    });
-  }, [mode.view]);
-  const activate = (action: () => void) => () => {
-    pendingFocus.current = true;
-    action();
-  };
-  return mode.view === 'preview' ? (
-    <>
-      <ContentToolbarButton
-        className="guide-labeled-action"
-        ref={returnButton}
-        data-header-collapse="5"
-        title={t('scenario.editor.tourReturnToEditing')}
-        onClick={activate(mode.edit)}
-      >
-        <MousePointer2 size={16} aria-hidden="true" />
-        <span>{t('scenario.editor.tourReturnToEditing')}</span>
-      </ContentToolbarButton>
-      <ContentToolbarButton
-        className="guide-labeled-action"
-        title={t('scenario.editor.tourReplayPreview')}
-        data-header-collapse="4"
-        onClick={mode.replayPreview}
-      >
-        <RotateCcw size={16} aria-hidden="true" />
-        <span>{t('scenario.editor.tourReplayPreview')}</span>
-      </ContentToolbarButton>
-    </>
-  ) : (
+    const returning = previousView.current === 'preview' && mode.view === 'edit';
+    previousView.current = mode.view;
+    if (returning) {
+      const origin = mode.previewOrigin === 'beginning' ? beginningButton : previewButton;
+      origin.current?.focus({ preventScroll: true });
+    }
+  }, [mode.view, mode.previewOrigin]);
+  return mode.view === 'preview' ? null : (
     <>
       <ContentToolbarButton
         className="guide-labeled-action"
@@ -122,7 +97,7 @@ export function TourViewControls({
         data-header-collapse="5"
         title={t('scenario.editor.tourPreviewSlide')}
         disabled={previewDisabled}
-        onClick={activate(mode.preview)}
+        onClick={mode.preview}
       >
         <Play size={16} aria-hidden="true" />
         <span>{t('scenario.editor.tourPreviewSlide')}</span>
@@ -130,9 +105,10 @@ export function TourViewControls({
       <ContentToolbarButton
         className="guide-labeled-action"
         data-header-collapse="5"
+        ref={beginningButton}
         title={t('scenario.editor.tourPreviewStart')}
         disabled={beginningDisabled}
-        onClick={activate(mode.previewBeginning)}
+        onClick={mode.previewBeginning}
       >
         <SkipBack size={16} aria-hidden="true" />
         <span>{t('scenario.editor.tourPreviewStart')}</span>

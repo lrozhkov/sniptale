@@ -84,3 +84,22 @@ it('restores the tools tab as a persisted popup mode', async () => {
   await expect(loadScreenshotSetupState()).resolves.toMatchObject({ selectedMode: 'tools' });
   expect(setMock).not.toHaveBeenCalled();
 });
+
+it('normalizes a legacy tab scenario draft without writing or changing its other fields', async () => {
+  const legacy = {
+    ...DEFAULT_SCREENSHOT_SETUP_STATE.tab,
+    afterCapture: 'scenario',
+    screenshotMode: 'full',
+    viewportPresetId: 'wide',
+    delay: 5,
+    imageFormat: 'webp',
+    imageQuality: 71,
+    exitAfterCapture: true,
+  };
+  getMock.mockResolvedValue({ sniptale_screenshot_setup: { selectedMode: 'tab', tab: legacy } });
+  await expect(loadScreenshotSetupState()).resolves.toMatchObject({
+    selectedMode: 'tab',
+    tab: { ...legacy, afterCapture: 'download_default' },
+  });
+  expect(setMock).not.toHaveBeenCalled();
+});

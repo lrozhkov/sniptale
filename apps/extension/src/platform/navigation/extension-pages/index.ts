@@ -47,10 +47,15 @@ function buildVideoEditorPageUrl(): string {
   return runtimeInfo.getURL('apps/extension/src/video-editor/index.html');
 }
 
-function buildCameraRecorderPageUrl(params: { launchToken: string; recordingId: string }): string {
+function buildCameraRecorderPageUrl(params: {
+  launchToken: string;
+  recordingId: string;
+  teleprompter?: boolean;
+}): string {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/camera-recorder/index.html'));
   url.searchParams.set('recordingId', params.recordingId);
   url.searchParams.set('launchToken', params.launchToken);
+  if (params.teleprompter === true) url.searchParams.set('teleprompter', '1');
   return url.toString();
 }
 
@@ -232,21 +237,58 @@ export async function openVideoEditorPage(
   await browserTabs.create({ url: buildVideoEditorProjectUrl(projectId, recordingId, review) });
 }
 
+async function openRecordingCompanion(url: URL): Promise<void> {
+  const baseUrl = runtimeInfo.getURL('apps/extension/src/camera-recorder/index.html');
+  const candidates = await browserTabs.query({ url: `${baseUrl}*` });
+  const existing = candidates.find((tab) => {
+    if (typeof tab.id !== 'number' || !tab.url) return false;
+    try {
+      const candidate = new URL(tab.url);
+      const expected = new URL(baseUrl);
+      return (
+        candidate.origin === expected.origin &&
+        candidate.protocol === expected.protocol &&
+        candidate.host === expected.host &&
+        candidate.pathname === expected.pathname
+      );
+    } catch {
+      return false;
+    }
+  });
+  if (typeof existing?.id === 'number' && existing.url) {
+    const currentUrl = new URL(existing.url);
+    currentUrl.hash = url.searchParams.toString();
+    await browserTabs.update(existing.id, {
+      active: true,
+      url: currentUrl.toString(),
+    });
+    if (typeof existing.windowId === 'number') {
+      await browserWindows.update(existing.windowId, { focused: true });
+    }
+    return;
+  }
+  try {
+    await browserWindows.create({ height: 720, type: 'popup', url: url.toString(), width: 960 });
+  } catch {
+    await browserTabs.create({ url: url.toString() });
+  }
+}
+
+/** Reuses the companion document so its private script survives the next recording. */
 export async function openCameraRecorderPage(params: {
   launchToken: string;
   recordingId: string;
+  teleprompter?: boolean;
 }): Promise<void> {
-  const url = buildCameraRecorderPageUrl(params);
-  try {
-    await browserWindows.create({
-      height: 720,
-      type: 'popup',
-      url,
-      width: 960,
-    });
-  } catch {
-    await browserTabs.create({ url });
-  }
+  await openRecordingCompanion(new URL(buildCameraRecorderPageUrl(params)));
+}
+
+/** Opens a script draft without recording control authority. */
+export async function openTeleprompterPage(): Promise<void> {
+  const url = new URL(runtimeInfo.getURL('apps/extension/src/camera-recorder/index.html'));
+  url.searchParams.set('teleprompter', '1');
+  url.searchParams.set('draft', '1');
+  await openRecordingCompanion(url);
 }
 
 export async function openGalleryPage(

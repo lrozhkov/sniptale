@@ -4,13 +4,9 @@ import { useState, type ReactElement } from 'react';
 import { createSolidPaint, serializePaintToCss, type Paint } from '@sniptale/foundation/paint';
 
 import {
-  createEditorFrameGradientPatch,
-  normalizeEditorFrameGradientColorStops,
+  createEditorFramePaintGradientPatch,
+  resolveEditorFrameGradient,
 } from '../../../../features/editor/document/frame-gradient';
-import {
-  createEditorGradientColorStopColor,
-  createEditorGradientCssStops,
-} from '../../../../features/editor/document/gradient';
 import { translate } from '../../../../platform/i18n';
 import { CompactPaintSelector } from '../../../../ui/paint-selector';
 import { EditorInspectorFrameBackgroundImageEditor } from './image';
@@ -20,21 +16,7 @@ function frameToPaint(frame: EditorInspectorFrameBackgroundEditorProps['frameDra
   if (frame.backgroundMode !== 'gradient') {
     return createSolidPaint(frame.backgroundColor);
   }
-  return {
-    kind: 'gradient',
-    gradient: {
-      type: 'linear',
-      angle: frame.backgroundGradientAngle,
-      interpolation: 'srgb',
-      repeat: { enabled: false, span: 1 },
-      stops: normalizeEditorFrameGradientColorStops(frame).map((stop, index) => ({
-        id: `editor-background-stop-${index}`,
-        color: createEditorGradientColorStopColor(stop),
-        midpoint: 0.5,
-        position: stop.offset,
-      })),
-    },
-  };
+  return { kind: 'gradient', gradient: resolveEditorFrameGradient(frame) };
 }
 
 function paintToFramePatch(paint: Paint) {
@@ -44,69 +26,52 @@ function paintToFramePatch(paint: Paint) {
   if (paint.gradient.type !== 'linear') {
     return {};
   }
-  return {
-    backgroundGradientAngle: paint.gradient.angle,
-    backgroundMode: 'gradient' as const,
-    ...createEditorFrameGradientPatch(
-      {
-        backgroundGradientColorStops: undefined,
-        backgroundGradientFrom: paint.gradient.stops[0]?.color ?? '#00000000',
-        backgroundGradientStops: undefined,
-        backgroundGradientTo: paint.gradient.stops.at(-1)?.color ?? '#00000000',
-      },
-      paint.gradient.stops.map((stop) => ({ color: stop.color, offset: stop.position }))
-    ),
-  };
+  return createEditorFramePaintGradientPatch(paint.gradient);
 }
 
-function FrameGradientPresetChoices(props: EditorInspectorFrameBackgroundEditorProps) {
+function FrameBackgroundPresetChoices(props: EditorInspectorFrameBackgroundEditorProps) {
   const { presets } = useGradientPresetCatalog('highlighter-frame-fill');
-  const choices = presets
+  const gradients = presets
     .filter((preset) => preset.enabled && preset.gradient.type === 'linear')
     .sort((a, b) => a.order - b.order);
+  const colors = props.frameBackgroundPalette.map((color, index) => ({
+    id: `color:${index}`,
+    name: color,
+    groupLabel: index === 0 ? translate('editor.compact.frameBackgroundModeColor') : undefined,
+    active:
+      props.frameDraft.backgroundMode === 'color' &&
+      serializePaintToCss(createSolidPaint(color)) ===
+        serializePaintToCss(createSolidPaint(props.frameDraft.backgroundColor)),
+    style: { backgroundColor: color },
+  }));
+  const gradientChoices = gradients.map((preset, index) => {
+    return {
+      id: `gradient:${preset.id}`,
+      name: preset.name,
+      groupLabel: index === 0 ? translate('editor.compact.frameBackgroundModeGradient') : undefined,
+      active:
+        props.frameDraft.backgroundMode === 'gradient' &&
+        serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }) ===
+          serializePaintToCss(frameToPaint(props.frameDraft)),
+      style: {
+        backgroundImage: serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
+      },
+    };
+  });
   return (
     <BackgroundThumbnails
-      label={translate('editor.compact.frameBackgroundModeGradient')}
-      dataUi="editor.frame.gradient-presets"
-      initialCount={4}
-      items={choices.map((preset, index) => {
-        const angle = preset.gradient.type === 'linear' ? preset.gradient.angle : 0;
-        const stops = preset.gradient.stops.map((stop) => ({
-          color: stop.color,
-          offset: stop.position,
-        }));
-        return {
-          id: preset.id,
-          name: preset.name,
-          groupLabel:
-            index === 0 ? translate('editor.compact.frameBackgroundModeGradient') : undefined,
-          active:
-            props.frameDraft.backgroundMode === 'gradient' &&
-            preset.gradient.type === 'linear' &&
-            preset.gradient.angle === props.frameDraft.backgroundGradientAngle &&
-            JSON.stringify(
-              preset.gradient.stops.map((stop) => ({ color: stop.color, offset: stop.position }))
-            ) === JSON.stringify(normalizeEditorFrameGradientColorStops(props.frameDraft)),
-          style: {
-            backgroundImage: `linear-gradient(${angle}deg, ${createEditorGradientCssStops(stops)})`,
-          },
-        };
-      })}
+      label={translate('editor.scene.sceneBackgroundLabel')}
+      dataUi="editor.frame.paint-presets"
+      items={[...colors, ...gradientChoices]}
       onSelect={(id) => {
-        const preset = choices.find((item) => item.id === id);
+        const color = colors.find((item) => item.id === id);
+        if (color) {
+          props.applyFramePatch(paintToFramePatch(createSolidPaint(color.name)));
+          return;
+        }
+        const preset = gradients.find((item) => `gradient:${item.id}` === id);
         if (!preset || preset.gradient.type !== 'linear') return;
-        const stops = preset.gradient.stops.map((stop) => ({
-          color: stop.color,
-          offset: stop.position,
-        }));
-        props.applyGradientPreset({
-          id,
-          label: preset.name,
-          angle: preset.gradient.angle,
-          from: stops[0]!.color,
-          to: stops.at(-1)!.color,
-          stops,
-        });
+        props.applyFramePatch(createEditorFramePaintGradientPatch(preset.gradient));
       }}
     />
   );
@@ -125,7 +90,7 @@ export function EditorInspectorFrameBackgroundFillEditor(
       <CompactPaintSelector
         triggerVariant="swatch"
         allowedModes={['solid', 'linear']}
-        showGradientAdvancedControls={false}
+        showGradientAdvancedControls
         title={translate('editor.scene.sceneBackgroundTitle')}
         label={translate('editor.scene.sceneBackgroundLabel')}
         value={transactionValue ?? frameToPaint(props.frameDraft)}
@@ -139,27 +104,7 @@ export function EditorInspectorFrameBackgroundFillEditor(
         }
       />
       <div className="space-y-3 px-2">
-        <BackgroundThumbnails
-          label={translate('editor.compact.frameBackgroundModeColor')}
-          dataUi="editor.frame.quick-colors"
-          initialCount={4}
-          items={props.frameBackgroundPalette.map((color, index) => ({
-            id: String(index),
-            name: color,
-            groupLabel:
-              index === 0 ? translate('editor.compact.frameBackgroundModeColor') : undefined,
-            active:
-              props.frameDraft.backgroundMode === 'color' &&
-              serializePaintToCss(createSolidPaint(color)) ===
-                serializePaintToCss(createSolidPaint(props.frameDraft.backgroundColor)),
-            style: { backgroundColor: color },
-          }))}
-          onSelect={(id) => {
-            const color = props.frameBackgroundPalette[Number(id)];
-            if (color) props.applyFramePatch(paintToFramePatch(createSolidPaint(color)));
-          }}
-        />
-        <FrameGradientPresetChoices {...props} />
+        <FrameBackgroundPresetChoices {...props} />
       </div>
     </div>
   );

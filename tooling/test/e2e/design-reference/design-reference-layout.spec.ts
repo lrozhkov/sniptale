@@ -1,4 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+import { build } from 'vite';
+import { resolve } from 'node:path';
 import type { Server } from 'node:http';
 import { writeFile } from 'node:fs/promises';
 import { createDesignReferenceServer } from '../../../design-reference/server.mjs';
@@ -7,9 +9,63 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 let server: Server | undefined;
 let origin: string;
 
+async function pickerToken(node: Locator, token: string) {
+  return node.evaluate((element, token) => {
+    const probe = element.ownerDocument.createElement('span');
+    probe.style.color = `var(${token})`;
+    element.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, token);
+}
+
+async function expectPickerSelect(page: Page, trigger: Locator) {
+  const input = await pickerToken(trigger, '--sniptale-color-surface-input');
+  const border = await pickerToken(trigger, '--sniptale-color-border-soft');
+  await page.mouse.move(0, 0);
+  await expect(trigger).toHaveCSS('background-color', input);
+  await expect(trigger).toHaveCSS('border-top-color', border);
+  await expect(trigger.locator('svg').last()).toHaveCSS('width', '12px');
+  await expect(trigger.locator('svg').last()).toHaveCSS('stroke-width', '1.75px');
+  await trigger.click();
+  await expect(trigger).toHaveCSS('border-top-color', border);
+  const menu = page.getByRole('listbox');
+  await expect(menu).toHaveCSS('border-radius', '4px');
+  await expect(menu).toHaveCSS('border-top-width', '0px');
+  await expect(menu).toHaveCSS('padding', '5px');
+  await expect(menu).toHaveCSS(
+    'background-color',
+    await pickerToken(menu, '--sniptale-color-surface-panel')
+  );
+  const option = menu.getByRole('option').first();
+  await expect(option).toHaveCSS('font-size', '13px');
+  await expect(option).toHaveCSS('font-weight', '400');
+  await expect(option).toHaveCSS('border-radius', '4px');
+  await expect(option).toHaveCSS('padding-left', '8px');
+  const selected = menu.getByRole('option', { selected: true });
+  await expect(selected).toHaveCSS(
+    'color',
+    await pickerToken(selected, '--sniptale-color-text-primary')
+  );
+  await expect(selected).toHaveCSS(
+    'background-color',
+    await pickerToken(selected, '--sniptale-color-surface-hover')
+  );
+  await option.hover();
+  await expect(option).toHaveCSS('cursor', 'pointer');
+  await option.press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveCSS('border-top-color', border);
+}
+
 test.use({ actionTimeout: 10_000 });
 
 test.beforeAll(async () => {
+  await build({
+    configFile: resolve('tooling/design-reference/pickers/vite.config.ts'),
+    logLevel: 'error',
+  });
   server = createDesignReferenceServer();
   await new Promise<void>((resolve, reject) => {
     server!.once('error', reject);
@@ -427,6 +483,230 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         path: info.outputPath('composition-module-closure.png'),
         fullPage: false,
       });
+    });
+  }
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`reference picker geometry and editing ${viewport.name} ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await page.goto(`${origin}examples/layers/?view=${theme}&mode=examples&lang=ru`);
+      const color = page.locator(
+        '[data-picker-reference="color"] [data-ui="shared.ui.color-selector.picker"]'
+      );
+      await expect(color).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect(color).toHaveCSS('width', '304px');
+      const plane = color.locator('.sniptale-color-plane');
+      const short = viewport.size.height <= 650;
+      await expect(plane).toHaveCSS('height', short ? '106px' : '154px');
+      const swatch = color
+        .locator('[data-ui="shared.ui.color-selector.picker-palette"] button')
+        .first()
+        .locator('span')
+        .first();
+      await expect(swatch).toHaveCSS('width', '18px');
+      await expect(swatch).toHaveCSS('height', '18px');
+      expect(
+        await swatch.evaluate((element) => parseFloat(getComputedStyle(element).borderRadius))
+      ).toBeGreaterThanOrEqual(9);
+      await expect(color.locator('.sniptale-color-plane-ring')).toHaveCSS(
+        'border-top-color',
+        'rgb(255, 255, 255)'
+      );
+      await expect
+        .soft(color.locator('.sniptale-color-plane-ring'))
+        .toHaveCSS('box-shadow', 'rgba(0, 0, 0, 0.4) 0px 0px 1px 1px');
+      const markerPosition = await color
+        .locator('.sniptale-color-plane-ring')
+        .evaluate((node) => parseFloat(node.style.left));
+      expect(markerPosition).not.toBe(Math.round(markerPosition));
+      const initialHeight = (await color.boundingBox())!.height;
+      expect(Math.abs(initialHeight - (short ? 418 : 466))).toBeLessThanOrEqual(1);
+      const hex = color.getByRole('textbox', { name: 'HEX', exact: true });
+      await expect(hex).toHaveValue('#FA7116');
+      await expect(hex).toHaveCSS('border-top-width', '1px');
+      await hex.fill('#33669980');
+      await hex.press('Enter');
+      await expect(
+        color.getByRole('spinbutton', { name: 'Прозрачность', exact: true })
+      ).toHaveValue('50');
+      await color.getByRole('button', { name: 'Исходный', exact: true }).click();
+      await expect(hex).toHaveValue('#FA7116');
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+      const copy = color.getByRole('button', { name: 'Копировать цвет', exact: true });
+      await copy.click();
+      await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toBe('#FA7116A6');
+      await expect(copy).toBeEnabled();
+      await expect(copy).toHaveCSS('cursor', 'pointer');
+      await color.getByRole('button', { name: 'RGB', exact: true }).click();
+      await expect(color.getByRole('button', { name: 'RGB', exact: true })).toHaveCSS(
+        'border-radius',
+        '4px'
+      );
+      await expect(color.locator('.sniptale-picker-number')).toHaveCount(4);
+      const alphaValue = color.getByRole('spinbutton', { name: 'Прозрачность', exact: true });
+      const alphaBeforeHold = Number(await alphaValue.inputValue());
+      await color.getByRole('button', { name: 'Прозрачность +', exact: true }).focus();
+      await page.keyboard.down('Space');
+      try {
+        await expect
+          .poll(async () => Number(await alphaValue.inputValue()))
+          .toBeGreaterThan(alphaBeforeHold + 1);
+      } finally {
+        await page.keyboard.up('Space');
+      }
+      await color.getByRole('button', { name: 'Исходный', exact: true }).click();
+      await color.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('picker-color-full.png'), fullPage: false });
+      await color.getByRole('button', { name: 'Компактный режим', exact: true }).click();
+      await expect(color.getByRole('textbox', { name: 'HEX', exact: true })).toHaveCount(0);
+      expect(
+        Math.abs((await color.boundingBox())!.height - (short ? 290 : 338))
+      ).toBeLessThanOrEqual(1);
+      await color.getByRole('button', { name: 'Полный режим', exact: true }).click();
+      const paint = page.locator(
+        '[data-picker-reference="paint"] [data-ui="shared.ui.paint-selector.popup"]'
+      );
+      await paint.scrollIntoViewIfNeeded();
+      await expect(paint).toHaveCSS('width', '620px');
+      await expect(paint.getByRole('button', { name: 'Градиент', exact: true }).first()).toHaveCSS(
+        'border-radius',
+        '4px'
+      );
+      await expect(paint.locator('[data-ui="shared.ui.paint-selector.canvas"]')).toHaveCSS(
+        'height',
+        '106px'
+      );
+      const direction = paint.locator('[data-gradient-handle="direction"]');
+      await expect(direction.locator('span')).toHaveCSS(
+        'box-shadow',
+        'rgba(0, 0, 0, 0.4) 0px 0px 1px 1px'
+      );
+      const before = Number(await direction.getAttribute('aria-valuenow'));
+      await direction.focus();
+      await direction.press('ArrowRight');
+      await expect(direction).toHaveAttribute('aria-valuenow', String((before + 1) % 360));
+      await direction.press('Control+z');
+      await expect(direction).toHaveAttribute('aria-valuenow', String(before));
+      await direction.press('Control+Shift+z');
+      await expect(direction).toHaveAttribute('aria-valuenow', String((before + 1) % 360));
+      const handle = (await direction.boundingBox())!;
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+      await page.mouse.down();
+      await expect
+        .poll(() => direction.evaluate((element) => getComputedStyle(element).cursor))
+        .toBe('none');
+      await page.mouse.move(handle.x + 20, handle.y + 25);
+      await page.mouse.up();
+      await expect
+        .poll(() => direction.evaluate((element) => getComputedStyle(element).cursor))
+        .not.toBe('none');
+      await paint.getByRole('button', { name: 'Дополнительно', exact: true }).click();
+      const gradientNumber = paint
+        .locator('[data-ui="shared.ui.paint-selector.geometry"] .sniptale-picker-number')
+        .first();
+      await expect.soft(gradientNumber).toHaveCSS('font-size', '12px');
+      await expect.soft(gradientNumber).toHaveCSS('padding-left', '6px');
+      await expect.soft(gradientNumber.locator('svg').first()).toHaveCSS('width', '10px');
+      const gradientChoices = paint.locator('button[aria-haspopup="listbox"]');
+      await expect(gradientChoices).toHaveCount(3);
+      for (const trigger of await gradientChoices.all()) {
+        await trigger.hover();
+        await expect.soft(trigger).toHaveCSS('cursor', 'pointer', { timeout: 100 });
+        await expectPickerSelect(page, trigger);
+      }
+      await paint.getByRole('button', { name: 'Дополнительно', exact: true }).click();
+      await paint.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('picker-gradient-full.png'), fullPage: false });
+      const footerBefore = (await paint.boundingBox())!.height;
+      await paint.getByRole('button', { name: 'Сохранить в шаблоны', exact: true }).click();
+      const save = page.locator(
+        '[data-picker-reference="paint"] [data-ui="shared.ui.paint-selector.template-save"]'
+      );
+      await expect(save).toBeVisible();
+      await expect(save).toHaveCSS('height', '82px');
+      expect(Math.abs((await paint.boundingBox())!.height - footerBefore)).toBeLessThanOrEqual(1);
+      await save.getByRole('textbox').fill('Проверка миграции');
+      await save.getByRole('button', { name: 'Сохранить', exact: true }).click();
+      const templates = paint.locator('[data-ui="shared.ui.paint-selector.templates"]');
+      await expect(
+        templates.getByRole('button', { name: 'Проверка миграции', exact: true })
+      ).toBeVisible();
+      const templateSelection = templates.getByRole('button', {
+        name: 'Проверка миграции',
+        exact: true,
+      });
+      await templateSelection.hover();
+      await expect(templateSelection).toHaveCSS('cursor', 'pointer');
+      const filter = templates.getByRole('button', { name: 'Тип шаблона', exact: true });
+      await filter.hover();
+      await expect.soft(filter).toHaveCSS('cursor', 'pointer', { timeout: 100 });
+      await expectPickerSelect(page, filter);
+      await templates.getByRole('button', { name: 'Сетка', exact: true }).click();
+      await templateSelection.hover({ position: { x: 8, y: 32 } });
+      await expect(templateSelection).toHaveCSS('cursor', 'pointer');
+      const templateRow = templates.locator('[data-preset-id]').filter({
+        has: page.getByRole('button', { name: 'Проверка миграции', exact: true }),
+      });
+      for (const label of ['Настроить шаблон', 'Действия с шаблоном']) {
+        const command = templateRow.getByRole('button', {
+          name: `${label}: Проверка миграции`,
+          exact: true,
+        });
+        await templateRow.hover();
+        for (const state of ['hover', 'focus']) {
+          if (state === 'hover') await command.hover();
+          else {
+            await command.press('Tab');
+            await page.keyboard.press('Shift+Tab');
+            await page.mouse.move(0, 0);
+            await expect(command).toBeFocused();
+            await expect(command).toHaveCSS('outline-style', 'solid');
+          }
+          await expect
+            .poll(() =>
+              command.evaluate((node) => {
+                const context = document.createElement('canvas').getContext('2d')!;
+                context.fillStyle = getComputedStyle(node).backgroundColor;
+                context.fillRect(0, 0, 1, 1);
+                return context.getImageData(0, 0, 1, 1).data[3];
+              })
+            )
+            .toBe(255);
+        }
+      }
+      await paint.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('picker-templates.png'), fullPage: false });
+      await paint.getByRole('button', { name: 'Градиент', exact: true }).first().click();
+      await paint.getByRole('button', { name: 'Компактный режим', exact: true }).click();
+      await expect(paint.locator('[data-ui="shared.ui.paint-selector.canvas"]')).toHaveCSS(
+        'height',
+        '80px'
+      );
+      await page.screenshot({
+        path: info.outputPath('picker-gradient-compact.png'),
+        fullPage: false,
+      });
+      await page
+        .locator('[data-picker-reference="paint"]')
+        .getByRole('button', { name: 'Редактор шаблона', exact: true })
+        .click();
+      const toolbar = paint.locator('[data-ui="shared.ui.paint-selector.stop-toolbar"]');
+      const name = toolbar.getByRole('textbox', { name: 'Название шаблона', exact: true });
+      await name.fill('Мой градиент');
+      await expect(name).toHaveValue('Мой градиент');
+      await expect(name).toHaveCSS('height', '28px');
+      const nameBox = (await name.boundingBox())!;
+      const toolbarBox = (await toolbar.boundingBox())!;
+      expect(Math.abs(nameBox.y - toolbarBox.y)).toBeLessThanOrEqual(0.5);
+      expect(nameBox.x).toBeCloseTo(toolbarBox.x, 0);
+      await page.screenshot({ path: info.outputPath('picker-template-name.png'), fullPage: false });
     });
   }
 }

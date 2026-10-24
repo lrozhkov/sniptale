@@ -8,6 +8,7 @@ import {
   parseQuickEditWebcam,
   quickEditWebcamFrameAt,
   quickEditWebcamPlacementAt,
+  quickEditWebcamScreenPlacementAt,
   quickEditWebcamBounds,
   quickEditWebcamCropAt,
   moveQuickEditWebcamPosition,
@@ -65,6 +66,7 @@ describe('persisted boundary', () => {
     { shadow: { intensity: NaN, color: '#000000ff' } },
     { shadow: { intensity: 30, color: 'url(https://example.test)' } },
     { shadow: null },
+    { split: 'diagonal' },
     { appearance: { ...camera().appearance, shape: 'circle', zoom: 0 } },
   ])('rejects malformed camera content without dropping it: %j', (patch) => {
     const webcam = { ...camera(), ...patch };
@@ -86,6 +88,38 @@ describe('persisted boundary', () => {
     expect(parsed.appearance).not.toHaveProperty('arbitrary');
     expect(parseQuickEditWebcam(parsed)).toEqual(parsed);
   });
+});
+
+it('animates split to docked and restores the authored overlay rectangle', () => {
+  const webcam = camera();
+  webcam.split = 'left';
+  webcam.positions = [
+    {
+      id: 'dock',
+      time: 2,
+      placement: { x: 0.7, y: 0.7, width: 0.2, height: 0.2 },
+      split: null,
+      transition: { type: 'ease-in-out', duration: 2 },
+    },
+  ];
+  expect(quickEditWebcamPlacementAt(webcam, 1)).toEqual({ x: 0, y: 0, width: 0.49, height: 1 });
+  expect(quickEditWebcamScreenPlacementAt(webcam, 1)).toEqual({
+    x: 0.51,
+    y: 0,
+    width: 0.49,
+    height: 1,
+  });
+  expect(quickEditWebcamScreenPlacementAt(webcam, 3)).toEqual({
+    x: 0.255,
+    y: 0,
+    width: 0.745,
+    height: 1,
+  });
+  expect(quickEditWebcamPlacementAt(webcam, 4)).toEqual(webcam.positions[0]!.placement);
+  expect(quickEditWebcamScreenPlacementAt(webcam, 4)).toEqual({ x: 0, y: 0, width: 1, height: 1 });
+  expect(
+    parseQuickEditWebcam({ ...webcam, positions: [{ ...webcam.positions[0], split: 'unknown' }] })
+  ).toBeNull();
 });
 
 it('uses a signed offset and half-open coverage without frozen endpoint frames', () => {

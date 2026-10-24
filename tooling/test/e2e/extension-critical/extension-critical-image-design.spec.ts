@@ -137,12 +137,12 @@ async function inspectScene(page: Page, locale: Locale, bytes: string, info: Tes
   await panel.locator('[data-ui="shared.ui.paint-selector.trigger"]').first().click();
   const paint = ui(page, 'shared.ui.paint-selector.popup');
   await paint
-    .getByRole('button', { name: label('highlighter.paintPicker.linear'), exact: true })
+    .getByRole('button', { name: label('highlighter.paintPicker.gradient'), exact: true })
     .click();
   await paint
     .getByRole('button', { name: label('shared.ui.colorSelectorApply'), exact: true })
     .click();
-  await expect(ui(page, 'editor.frame.gradient-presets')).toBeVisible();
+  await expect(ui(page, 'editor.frame.paint-presets')).toBeVisible();
   await screenshot(page, info, 'scene-gradient');
   await choose('editor.compact.frameBackgroundModeImage');
   const picker = ui(page, 'background.image.picker');
@@ -696,30 +696,55 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(kinds.getByRole('button')).toHaveCount(3);
       const trigger = panel.locator('[data-ui="shared.ui.paint-selector.trigger"]').first();
       const popup = ui(page, 'shared.ui.paint-selector.popup');
-      const colors = ui(page, 'editor.frame.quick-colors');
-      const gradients = ui(page, 'editor.frame.gradient-presets');
-      await expect(colors).toBeVisible();
-      await expect(gradients).toBeVisible();
-      await gradients.getByRole('button').first().click();
-      await expect(gradients.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true');
-      await expect(colors.locator('[aria-pressed="true"]')).toHaveCount(0);
-      await colors.getByRole('button').first().click();
-      await expect(colors.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true');
-      await expect(gradients.locator('[aria-pressed="true"]')).toHaveCount(0);
+      const presets = ui(page, 'editor.frame.paint-presets');
+      await expect(presets).toBeVisible();
+      await expect(presets.getByRole('button')).toHaveCount(10);
+      await presets
+        .getByRole('button', {
+          name: translate('settings.editor.backgrounds.showMore', 'ru'),
+          exact: true,
+        })
+        .click();
+      const colors = presets.locator('button[style*="background-color:"]');
+      const gradients = presets.locator('button[style*="background-image:"]');
+      await expect(colors).toHaveCount(10);
+      await expect(gradients).toHaveCount(10);
+      await gradients.first().click();
+      await expect(gradients.first()).toHaveAttribute('aria-pressed', 'true');
+      await expect(gradients.first()).toBeInViewport();
+      await expect(
+        presets.locator('button[style*="background-color:"][aria-pressed="true"]')
+      ).toHaveCount(0);
+      await colors.first().click();
+      await expect(colors.first()).toHaveAttribute('aria-pressed', 'true');
+      await expect(
+        presets.locator('button[style*="background-image:"][aria-pressed="true"]')
+      ).toHaveCount(0);
+      await trigger.scrollIntoViewIfNeeded();
       await expect(trigger).toBeInViewport();
-      await expect(colors).toBeInViewport();
-      await expect(gradients).toBeInViewport();
-      await expect(colors.getByRole('button')).toHaveCount(5);
-      await expect(gradients.getByRole('button')).toHaveCount(5);
+      await expect(colors.first()).toBeInViewport();
       await screenshot(page, info, 'scene-immediate-palette');
+      const recentBefore = await page.evaluate(
+        async () =>
+          (await chrome.storage.local.get('sniptale_editor_recent_colors'))[
+            'sniptale_editor_recent_colors'
+          ] ?? []
+      );
       for (const accept of [false, true]) {
         await trigger.click();
         await popup
           .getByRole('button', {
-            name: translate('highlighter.paintPicker.linear', 'ru'),
+            name: translate('highlighter.paintPicker.gradient', 'ru'),
             exact: true,
           })
           .click();
+        const color = await popup
+          .getByRole('textbox', {
+            name: translate('shared.ui.colorSelectorHex', 'ru'),
+            exact: true,
+          })
+          .inputValue();
+        const rememberedColor = (color.length === 7 ? `${color}ff` : color).toLowerCase();
         await popup
           .getByRole('button', {
             name: translate(
@@ -730,11 +755,20 @@ for (const theme of ['light', 'dark'] as const) {
           })
           .click();
         await expect(trigger).toHaveAttribute('title', accept ? /Линейный/ : /^#/);
+        const recent = () =>
+          page.evaluate(
+            async () =>
+              (await chrome.storage.local.get('sniptale_editor_recent_colors'))[
+                'sniptale_editor_recent_colors'
+              ] ?? []
+          );
+        if (accept) await expect.poll(recent).toContain(rememberedColor);
+        else expect(await recent()).toEqual(recentBefore);
       }
       await chooseProperty(page, kinds, translate('editor.compact.frameBackgroundModeImage', 'ru'));
       await expect(ui(page, 'background.image.picker')).toBeVisible();
       await chooseProperty(page, kinds, translate('editor.compact.frameBackgroundModeColor', 'ru'));
-      await expect(ui(page, 'editor.frame.gradient-presets')).toBeVisible();
+      await expect(ui(page, 'editor.frame.paint-presets')).toBeVisible();
       await screenshot(page, info, 'scene-paint-gradient-restored');
       await chooseProperty(page, kinds, translate('editor.scene.backgroundNone', 'ru'));
       await expect(trigger).toHaveCount(0);

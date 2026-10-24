@@ -5,6 +5,8 @@ import { getMediaClipSourceTime } from '../project/timeline/rate';
 import { isExportReadyVideoProject, parseHydratableVideoProject } from '../project/validation/root';
 import type { VideoProject, VideoProjectVideoClip } from '../project/types/model';
 import { createQuickEditWebcam, quickEditWebcamFrameAt } from './advanced/webcam';
+import { quickEditWebcamScreenPlacementAt } from './advanced/webcam';
+import { resolveCameraSplitPresentation } from '../project/camera/split';
 import { planReviewProjectConversion } from './project-conversion';
 import { fixture } from './project-conversion.test-support';
 import type { ReviewProjectCameraResource } from './project-camera';
@@ -93,6 +95,44 @@ function cameras(project: VideoProject): VideoProjectVideoClip[] {
       project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
   );
 }
+
+it('preserves split panes and docked returns at sampled frames through Gallery migration and reload', () => {
+  const input = cameraFixture();
+  const webcam = input.document.advancedContent.webcam!;
+  webcam.split = 'right';
+  webcam.positions[0]!.split = 'left';
+  webcam.positions[1]!.split = null;
+  webcam.positions[2]!.split = 'top';
+  const converted = prepared(input).project;
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(converted)));
+  expect(reopened).not.toBeNull();
+  for (const project of [converted, reopened!]) {
+    for (const clip of cameras(project)) {
+      for (const fraction of [0, 0.08, 0.17, 0.32, 0.53, 0.71, 0.94]) {
+        const time = clip.startTime + clip.duration * fraction;
+        const sourceTime = clip.sourceStart + clip.sourceDuration * fraction;
+        const gallery = quickEditWebcamFrameAt(
+          webcam,
+          sourceTime,
+          input.camera.asset.metadata.duration!
+        );
+        if (!gallery) continue;
+        const screen = quickEditWebcamScreenPlacementAt(webcam, sourceTime);
+        const native = resolveCameraSplitPresentation(project, clip, time);
+        if (!native) {
+          expect(screen).toEqual({ x: 0, y: 0, width: 1, height: 1 });
+          continue;
+        }
+        for (const key of ['x', 'y', 'width', 'height'] as const) {
+          expect(native.screen[key]).toBeCloseTo(screen[key], 6);
+          expect(
+            native.camera[key] / (key === 'x' || key === 'width' ? project.width : project.height)
+          ).toBeCloseTo(gallery.placement[key], 6);
+        }
+      }
+    }
+  }
+});
 
 it.each([-2, 0, 2, 20, -20])(
   'matches actual Gallery frame clock, visibility, placement and crop at offset %s across cuts and rates',

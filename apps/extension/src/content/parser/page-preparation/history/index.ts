@@ -5,6 +5,7 @@ const pagePreparationHistoryStore = createPagePreparationHistoryStore();
 export const pagePreparationHistory = pagePreparationHistoryStore;
 
 export { addPagePreparationHistoryAppliedListener } from './store';
+export { getPagePreparationHistoryDomain } from './store-state';
 export {
   applyDomMutationBatch,
   captureDomElementState,
@@ -27,6 +28,7 @@ export type {
   PagePreparationHistoryDomEffectResult,
   PagePreparationSessionSnapshot,
   PagePreparationHistoryState,
+  PagePreparationHistoryDomain,
   PagePreparationDomElement,
   SerializableFrameData,
 } from './types';

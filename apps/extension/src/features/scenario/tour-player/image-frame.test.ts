@@ -75,7 +75,7 @@ it('keeps the existing full-stage projection when a legacy tour has no header', 
   });
 });
 
-it('makes Fit and Fill distinct inside a stage-aspect window without changing source data', () => {
+it('fits or crops the decorated image as a whole without changing source data', () => {
   const image = slide();
   const before = structuredClone(image.image);
   const viewport = { stageWidth: 640, stageHeight: 360, windowHeader: DEFAULT_WINDOW_HEADER };
@@ -84,7 +84,25 @@ it('makes Fit and Fill distinct inside a stage-aspect window without changing so
   const fill = resolveTourCamera(image, viewport, false)!;
   const content = resolveTourImageFrame(image, viewport).content;
   expect(fill.width).toBeGreaterThan(fit.width);
-  expect(fill.height).toBeGreaterThan(content.height);
-  expect(fit.height).toBeCloseTo(content.height);
+  expect(fill.height).toBeCloseTo(content.height);
+  expect(resolveTourImageFrame(image, viewport).window.height).toBeGreaterThan(
+    viewport.stageHeight
+  );
   expect(image.image).toEqual(before);
+});
+
+it('attaches the header to the fitted image instead of spanning the scene background', () => {
+  for (const [width, height] of [
+    [900, 1600],
+    [2400, 900],
+  ]) {
+    const image = slide(width, height);
+    const viewport = { stageWidth: 640, stageHeight: 360, windowHeader: DEFAULT_WINDOW_HEADER };
+    const frame = resolveTourImageFrame(image, viewport);
+    const box = resolveTourCamera(image, viewport, false)!;
+    expect(frame.header!.x).toBeCloseTo(box.x);
+    expect(frame.header!.width).toBeCloseTo(box.width);
+    expect(frame.header!.y + frame.header!.height).toBeCloseTo(box.y);
+    expect(frame.window.height).toBeCloseTo(box.height + frame.header!.height);
+  }
 });

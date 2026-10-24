@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import {
   createGuideProject,
@@ -8,7 +8,7 @@ import {
   applyTourCommands,
   applyGuideStructureOperation,
 } from '../../../features/scenario/project/public';
-import { reduceGuideHistory, type GuideHistory } from './history';
+import { createGuideHistoryReducer, reduceGuideHistory, type GuideHistory } from './history';
 
 function initial(): GuideHistory {
   return { present: createGuideProject('Original', 'guide', 1), past: [], future: [], group: null };
@@ -295,4 +295,29 @@ it('undoes and redoes frameless title and body together in one history entry', (
   expect(state.present).toEqual(source);
   state = reduceGuideHistory(state, { kind: 'redo' });
   expect(state.present).toEqual(changed);
+});
+
+it('does not repeatedly serialize retained snapshots when editing another snapshot', () => {
+  const reduce = createGuideHistoryReducer();
+  const project = createGuideProject('Original', 'measure', 1);
+  const stringify = vi.spyOn(JSON, 'stringify');
+  try {
+    let state: GuideHistory = { present: null, past: [], future: [], group: null };
+    state = reduce(state, { kind: 'reset', project });
+    for (let index = 0; index < 8; index++) {
+      state = reduce(state, {
+        kind: 'edit',
+        project: { ...project, name: `Edit ${index}` },
+        group: null,
+      });
+    }
+    expect(state.past).toHaveLength(8);
+    expect(stringify.mock.calls.filter(([value]) => value === project)).toHaveLength(1);
+    state = reduce(state, { kind: 'undo' });
+    expect(state.present?.name).toBe('Edit 6');
+    state = reduce(state, { kind: 'redo' });
+    expect(state.present?.name).toBe('Edit 7');
+  } finally {
+    stringify.mockRestore();
+  }
 });

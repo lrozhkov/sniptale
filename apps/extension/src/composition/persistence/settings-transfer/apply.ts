@@ -53,6 +53,7 @@ const LOCAL_KEYS = [
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
   'sniptale_ai_audio_transcription_prompt',
+  'sniptale_ai_voice_input_correction_prompt',
 ] as const;
 
 export class SettingsTransferQuotaError extends Error {}
@@ -269,6 +270,7 @@ function applySettingsWrites(context: WriteBuildContext): void {
   const voice = data('system.voice');
   if (voice) {
     nextSettings.voiceInput = {
+      ...nextSettings.voiceInput,
       language: (voice['language'] ?? nextSettings.voiceInput?.language ?? 'ru-RU') as NonNullable<
         NormalizedSettings['voiceInput']
       >['language'],
@@ -396,6 +398,7 @@ function applyAiWrites(context: WriteBuildContext): void {
     assign(localWrites, 'sniptale_ai_global_prompt', prompts['global']);
     assign(localWrites, 'sniptale_ai_scenario_editor_prompt', prompts['scenario']);
     assign(localWrites, 'sniptale_ai_audio_transcription_prompt', prompts['recognition']);
+    assign(localWrites, 'sniptale_ai_voice_input_correction_prompt', prompts['voiceCorrection']);
   }
 }
 

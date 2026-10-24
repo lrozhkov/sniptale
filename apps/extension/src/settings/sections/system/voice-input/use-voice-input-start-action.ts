@@ -29,7 +29,7 @@ export function useVoiceInputStartAction(args: {
     setError,
   } = args;
   return useCallback(async () => {
-    if (authority.startPendingRef.current) return;
+    if (preferences.enabled === false || authority.startPendingRef.current) return;
     if (authority.microphoneAccessRef.current !== 'granted') {
       setError('permission');
       return;
@@ -39,7 +39,8 @@ export function useVoiceInputStartAction(args: {
     authority.startPendingRef.current = true;
     setError(null);
     try {
-      if (preferences.mode === 'local-first') await ensureLocalPackage(localAvailability);
+      if (preferences.backend !== 'model' && preferences.mode === 'local-first')
+        await ensureLocalPackage(localAvailability);
       if (
         !authority.mountedRef.current ||
         lifecycleGeneration !== authority.lifecycleGenerationRef.current ||

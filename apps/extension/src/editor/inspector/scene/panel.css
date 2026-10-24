@@ -6,3 +6,15 @@
 [data-ui='editor.frame.padding-fields'] [data-padding-link] {
   border: 0;
 }
+
+[data-ui='editor.frame.padding-fields']
+  [data-ui='shared.linked-padding-fields']:has(> [data-ui='editor.frame.padding-slider']) {
+  gap: 0;
+}
+
+[data-ui='editor.frame.padding-fields']
+  [data-ui='shared.linked-padding-fields']:has(> [data-ui='editor.frame.padding-slider'])
+  > [data-padding-hover='all']:first-child {
+  min-height: 32px;
+  padding-bottom: 0;
+}

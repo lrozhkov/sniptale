@@ -11,12 +11,14 @@ import type { CreateScreenshotControllerActionsArgs } from './action-types';
 import type { ScreenshotType } from '../types';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 import { closeFailedQuickActionCapture } from './quick-action-cleanup';
+import type { CaptureActionType } from '../../../../contracts/settings';
 
 export async function runImmediateScreenshot(
   type: ScreenshotType,
   args: CreateScreenshotControllerActionsArgs,
   runToken: number,
-  contentIntentSource?: ContentPrivilegedActionIntentSource
+  contentIntentSource?: ContentPrivilegedActionIntentSource,
+  captureAction?: CaptureActionType
 ) {
   hideAllToasts();
 
@@ -34,9 +36,16 @@ export async function runImmediateScreenshot(
         }
       } else {
         if (contentIntentSource) {
-          await runViewportScreenshot(type, args.runtime, { contentIntentSource, runToken });
+          await runViewportScreenshot(type, args.runtime, {
+            contentIntentSource,
+            runToken,
+            ...(captureAction === undefined ? {} : { captureAction }),
+          });
         } else {
-          await runViewportScreenshot(type, args.runtime, { runToken });
+          await runViewportScreenshot(type, args.runtime, {
+            runToken,
+            ...(captureAction === undefined ? {} : { captureAction }),
+          });
         }
       }
     } finally {

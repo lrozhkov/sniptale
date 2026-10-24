@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ToolbarSecondaryControls, shouldProjectVideoRecordingControls } from './secondary';
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
@@ -56,6 +57,10 @@ vi.mock('./utilities', () => ({
   ),
 }));
 
+vi.mock('./drawing', () => ({
+  ToolbarDrawingControls: () => <div data-ui="test.drawing-controls" />,
+}));
+
 vi.mock('./design-review', () => ({
   ToolbarDesignReviewControls: (props: { panelOpen: boolean }) => (
     <div
@@ -85,10 +90,12 @@ afterEach(() => {
 function createToolbarProps(params?: {
   autoBlurEnabled?: boolean;
   designReviewPanelOpen?: boolean;
+  drawingMode?: boolean;
   isCursorMode?: boolean;
 }) {
   return {
     aiPickMode: false,
+    ...(params?.drawingMode ? { drawingMode: true, drawingController: {} } : {}),
     ...(params?.autoBlurEnabled === undefined
       ? {}
       : { autoBlur: { autoApplyEnabled: params.autoBlurEnabled } }),
@@ -118,7 +125,6 @@ function createToolbarProps(params?: {
     screenshotMode: true,
     scenario: {
       captureMode: 'manual' as const,
-      onCaptureActionSelected: vi.fn(),
       onCreateProject: vi.fn(),
       onFinishScenario: vi.fn(),
       onOpenEditor: vi.fn(),
@@ -191,6 +197,7 @@ async function renderSecondaryControls(params: {
   captureAction: 'download_default' | 'scenario';
   designReviewMode?: boolean;
   designReviewPanelOpen?: boolean;
+  drawingMode?: boolean;
   highlighterMode?: boolean;
   isCursorMode?: boolean;
   pendingInteractionMode?: 'quick-edit' | 'highlighter' | null;
@@ -201,13 +208,12 @@ async function renderSecondaryControls(params: {
     root = createRoot(container);
   }
 
-  const { ToolbarSecondaryControls } = await import('./secondary');
-
   act(() => {
     root?.render(
       <ToolbarSecondaryControls
         toolbarProps={
           createToolbarProps({
+            ...(params.drawingMode === undefined ? {} : { drawingMode: params.drawingMode }),
             ...(params.autoBlurEnabled === undefined
               ? {}
               : { autoBlurEnabled: params.autoBlurEnabled }),
@@ -241,7 +247,7 @@ async function verifiesScenarioCaptureForwarding() {
   await renderSecondaryControls({ captureAction: 'download_default' });
   expect(
     document.querySelector('[data-ui="test.capture-actions"]')?.getAttribute('data-scenario')
-  ).toBe('false');
+  ).toBe('true');
 
   await renderSecondaryControls({ captureAction: 'scenario' });
   expect(
@@ -347,7 +353,6 @@ async function verifiesDesignReviewControls() {
 
 describe('ToolbarSecondaryControls', () => {
   it('restores ordinary capture controls whenever another working mode conflicts with stale video state', async () => {
-    const { shouldProjectVideoRecordingControls } = await import('./secondary');
     const recording = { state: { phase: 'idle' } };
     const baseViewModel = {
       designReviewMode: false,
@@ -387,7 +392,7 @@ describe('ToolbarSecondaryControls', () => {
     }
   });
   it(
-    'passes scenario props to capture actions only when after-capture action is scenario',
+    'passes independent scenario controls for ordinary and legacy capture actions',
     verifiesScenarioCaptureForwarding
   );
   it(
@@ -411,3 +416,38 @@ describe('ToolbarSecondaryControls', () => {
     verifiesDesignReviewControls
   );
 });
+
+it.each(['design-review', 'drawing'] as const)(
+  'projects only requested annotation controls while leaving %s and restores it after refusal',
+  async (previousMode) => {
+    const previous = {
+      captureAction: 'download_default' as const,
+      designReviewMode: previousMode === 'design-review',
+      drawingMode: previousMode === 'drawing',
+    };
+    const oldControls = `[data-ui="test.${previousMode === 'design-review' ? 'design-review' : 'drawing'}-controls"]`;
+    await renderSecondaryControls(previous);
+    expect(document.querySelector(oldControls)).not.toBeNull();
+    await renderSecondaryControls({ ...previous, pendingInteractionMode: 'highlighter' });
+    expect(document.querySelector(oldControls)).toBeNull();
+    expect(
+      document
+        .querySelector('[data-ui="test.utility-buttons"]')
+        ?.getAttribute('data-highlighter-mode')
+    ).toBe('true');
+    expect(document.querySelector('[data-ui="test.capture-actions"]')).not.toBeNull();
+    await renderSecondaryControls({
+      ...previous,
+      highlighterMode: true,
+      pendingInteractionMode: 'highlighter',
+    });
+    expect(document.querySelector(oldControls)).toBeNull();
+    await renderSecondaryControls(previous);
+    expect(document.querySelector(oldControls)).not.toBeNull();
+    expect(
+      document
+        .querySelector('[data-ui="test.utility-buttons"]')
+        ?.getAttribute('data-highlighter-mode')
+    ).toBe('false');
+  }
+);

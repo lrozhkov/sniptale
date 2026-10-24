@@ -71,15 +71,17 @@ it('offers four independently editable sides without short inline sliders', asyn
   });
 });
 
-it('places the linked padding slider below its value with a complete focus outline', () => {
+it('allocates a lower strip for the linked slider after its value row', () => {
   const fields = container.querySelector('[data-ui="shared.linked-padding-fields"]');
   const row = fields?.firstElementChild;
   const range = fields?.querySelector('input[type="range"]');
   expect(row?.querySelector('input[type="text"]')).not.toBeNull();
   expect(range?.closest('[data-ui="editor.frame.padding-slider"]')).not.toBeNull();
-  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')?.className).toContain(
-    'absolute'
-  );
+  const slider = range?.closest('[data-ui="editor.frame.padding-slider"]');
+  expect(slider?.previousElementSibling).toBe(row);
+  expect(slider?.className).toContain('relative');
+  expect(slider?.className).not.toContain('absolute');
+  expect(slider?.className).toContain('h-2');
   expect(
     range
       ?.closest('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')

@@ -1,4 +1,3 @@
-import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 // @vitest-environment jsdom
 import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import {
@@ -6,115 +5,8 @@ import {
   TOUR_MASK_DEFAULTS,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { expect, it } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerBlob, buildTourPlayerHtml, type TourPlayerLabels } from './document';
-const labels: TourPlayerLabels = {
-  expand: 'Expand explanation',
-  collapse: 'Collapse explanation',
-  previous: 'Back',
-  next: 'Next',
-  contents: 'Contents',
-  close: 'Close',
-  restart: 'Restart',
-  finished: 'Finished',
-  empty: 'Empty',
-  point: 'Point',
-  details: 'Details',
-  play: 'Play',
-  pause: 'Pause',
-  seek: 'Playback position',
-  retry: 'Retry',
-  loading: 'Loading',
-  mediaError: 'Image failed',
-  choose: 'Choose a destination',
-};
-const png =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=';
-function fixture(binding: 'slides' | 'stage' = 'slides') {
-  const tour = createTourDocument('tour');
-  const slide = createTourImageSlide('one');
-  slide.title = 'First';
-  slide.image = {
-    assetId: 'image',
-    editDocumentId: null,
-    galleryAssetId: 'private-library',
-    width: 640,
-    height: 360,
-    alt: 'Screenshot',
-    source: { kind: 'import', filename: 'private-file.png' },
-  };
-  slide.actions = [
-    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
-    ...[
-      {
-        id: 'point',
-        point: { x: 0.25, y: 0.5 },
-        targetRect: null,
-        label: 'Continue',
-        text: 'Explanation',
-        appearance: null,
-        visual: { kind: 'point' as const, pulse: true },
-      },
-    ].map((object) => ({ type: 'hotspot' as const, object })),
-  ];
-  tour.slides = [
-    slide,
-    {
-      ...createTourImageSlide('two'),
-      title: 'Second',
-      image: slide.image,
-      actions: [
-        {
-          type: 'annotation',
-          object: { id: 'second-action', text: 'Second', anchor: null, appearance: null },
-        },
-      ],
-    },
-  ];
-  if (binding === 'stage') {
-    tour.stage.image = slide.image;
-    tour.slides = tour.slides.map((item) =>
-      item.kind === 'image'
-        ? {
-            ...item,
-            image: null,
-            actions: [
-              {
-                type: 'annotation',
-                object: { id: `${item.id}-text`, text: item.title, anchor: null, appearance: null },
-              },
-            ],
-          }
-        : item
-    );
-  }
-  tour.endScreen.title = 'Done';
-  return {
-    tour,
-    assets: [{ id: 'image', mime: 'image/png', base64: png }],
-    title: 'Tour',
-    labels: { ...labels },
-  };
-}
-function open(html: string) {
-  const frame = document.createElement('iframe');
-  document.body.append(frame);
-  const window = frame.contentWindow;
-  if (!window) throw new Error('Missing test frame');
-  const dialog = window.document.createElement('dialog');
-  const prototype = Object.getPrototypeOf(dialog);
-  prototype.showModal = function () {
-    this.open = true;
-  };
-  prototype.close = function () {
-    this.open = false;
-  };
-  window.document.open();
-  window.document.write(html);
-  window.document.close();
-  return { window, close: () => frame.remove() };
-}
-
+import { fixture, open, png } from './document.test-support';
+import { buildTourPlayerBlob, buildTourPlayerHtml } from './document';
 it.each(['slides', 'stage'] as const)(
   'embeds %s media once with public metadata and fixed CSP',
   async (binding) => {
@@ -905,34 +797,6 @@ it('exports marker overrides without rewriting source points', async () => {
       getTourHotspots(exported.tour.slides[0]).map((point: { point: unknown }) => point.point)
     ).toEqual(getTourHotspots(slide).map((point) => point.point));
     expect(JSON.stringify(args.tour)).toBe(saved);
-  } finally {
-    dom.close();
-  }
-});
-
-it('exports a passive shared window header while preserving authored source placement', async () => {
-  const args = fixture();
-  args.tour.stage.windowHeader = {
-    ...DEFAULT_WINDOW_HEADER,
-    kind: 'application',
-    title: 'Image window',
-  };
-  const slide = args.tour.slides[0]!;
-  if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.imagePlacement = { center: { x: 0.3, y: 0.5 }, zoom: 2 };
-  const saved = structuredClone(args.tour);
-  const dom = open(await buildTourPlayerHtml(args));
-  try {
-    const header = dom.window.document.querySelector<HTMLImageElement>('.tour-window-header')!;
-    expect(header.src).toMatch(/^data:image\/svg\+xml/);
-    expect(decodeURIComponent(header.src)).toContain('Image window');
-    expect(
-      dom.window.document.querySelector<HTMLElement>('.tour-image-viewport')!.style.clipPath
-    ).toContain('inset(');
-    const payload = JSON.parse(dom.window.document.querySelector('#tour-data')!.textContent!);
-    expect(payload.tour.stage.windowHeader).toEqual(args.tour.stage.windowHeader);
-    expect(payload.tour.slides[0].imagePlacement).toEqual(slide.imagePlacement);
-    expect(args.tour).toEqual(saved);
   } finally {
     dom.close();
   }

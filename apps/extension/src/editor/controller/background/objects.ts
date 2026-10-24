@@ -8,7 +8,11 @@ import {
   loadBackgroundImageElement,
   type BackgroundCanvasSize,
 } from './geometry';
-import { rasterizeBlurredBackground, resolveBackgroundRasterSize } from './raster';
+import {
+  createAdvancedBackgroundImage,
+  rasterizeBlurredBackground,
+  resolveBackgroundRasterSize,
+} from './raster';
 
 function createSolidBackground(
   size: BackgroundCanvasSize,
@@ -16,6 +20,11 @@ function createSolidBackground(
 ): FabricObject | null {
   if (frame.backgroundMode === 'color' && isTransparentColor(frame.backgroundColor)) {
     return null;
+  }
+
+  if (frame.backgroundMode === 'gradient') {
+    const raster = createAdvancedBackgroundImage(size, frame);
+    if (raster) return raster;
   }
 
   return new Rect({

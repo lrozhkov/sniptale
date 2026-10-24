@@ -657,7 +657,7 @@ describe('routeContentRuntimeWakeupMessage scenario restore', () => {
     expect(pinStorageMocks.readPinToTabSessionStorageState).toHaveBeenCalledWith(7);
     expect(pageAccessMocks.ensureActivePageAccessRuntime).toHaveBeenCalledWith(7);
     expect(runtimeState.scenarioSessionService.updateSurfaceState).toHaveBeenCalledWith(7, {
-      captureAction: 'scenario',
+      captureAction: 'copy',
       screenshotMode: true,
       toolbarVisible: false,
     });
@@ -750,3 +750,22 @@ describe('routeContentRuntimeWakeupMessage scenario surface restore', () => {
     expect(screenshotModeMocks.enableScreenshotMode).toHaveBeenCalledOnce();
   });
 });
+
+it.each(['copy', 'edit', 'save_to_library'] as const)(
+  'does not replace ordinary %s delivery when waking an enabled scenario',
+  async (captureAction) => {
+    const runtimeState = createRuntimeState({
+      scenarioEnabled: true,
+      scenarioSurface: { captureAction, screenshotMode: true },
+    });
+    readinessMocks.waitForContentToolbarReady.mockResolvedValue({
+      screenshotMode: true,
+      visible: false,
+    });
+    await expect(routeWakeup(runtimeState)).resolves.toMatchObject({
+      success: true,
+      reason: 'scenario',
+    });
+    expect(runtimeState.scenarioSessionService.updateSurfaceState).not.toHaveBeenCalled();
+  }
+);

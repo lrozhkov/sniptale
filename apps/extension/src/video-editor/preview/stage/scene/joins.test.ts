@@ -48,7 +48,8 @@ function fixture() {
   context.fillRect(0, 0, 16, 8);
   const renderFrame = vi.fn<VideoPreviewFrameMaterializer['renderFrame']>(async () => frame);
   const dispose = vi.fn();
-  media.create.mockReturnValue({ canvas: frame, renderFrame, dispose });
+  const updateProject = vi.fn(() => true);
+  media.create.mockReturnValue({ canvas: frame, renderFrame, dispose, updateProject });
   const live = document.createElement('video');
   live.src = 'blob:source-one';
   const raw = vi.fn<typeof renderPreviewScene>(async () => {});
@@ -66,7 +67,7 @@ function fixture() {
   };
   const pixel = (x: number, y: number) =>
     Array.from(canvas.getContext('2d')!.getImageData(x, y, 1, 1).data);
-  return { owner, input, raw, renderFrame, dispose, frame, live, pixel };
+  return { owner, input, raw, renderFrame, dispose, updateProject, frame, live, pixel };
 }
 
 it('publishes a completed viewport without duplicate alpha or live seeks', async () => {
@@ -162,5 +163,55 @@ it('uses the exact sampler for an active windowed video outside a join and relea
   expect(f.raw).not.toHaveBeenCalled();
   await f.owner.render({ ...f.input, currentTime: 3.1 });
   expect(f.raw).toHaveBeenCalledOnce();
+  expect(f.dispose).toHaveBeenCalledOnce();
+});
+
+it.each(['join', 'window'] as const)(
+  'retains admitted media for paused visual edits in a %s',
+  async (kind) => {
+    const f = fixture();
+    if (kind === 'window') {
+      f.input.project.compositionJoins = [];
+      f.input.project.clips.find(({ id }) => id === 'underlay')!.playbackWindow = {
+        offset: 0,
+        holdAt: 2.9,
+      };
+    }
+    await f.owner.render(f.input);
+    const project = { ...f.input.project, backgroundColor: '#ffffff' };
+    await f.owner.render({ ...f.input, project });
+    expect(media.create).toHaveBeenCalledOnce();
+    expect(f.dispose).not.toHaveBeenCalled();
+    expect(f.updateProject).toHaveBeenCalledWith(project);
+    expect(f.renderFrame).toHaveBeenCalledTimes(2);
+  }
+);
+
+it('replaces an incompatible source snapshot and releases the old owner', async () => {
+  const f = fixture();
+  await f.owner.render(f.input);
+  f.updateProject.mockReturnValueOnce(false);
+  const project = { ...f.input.project, id: 'another-project' };
+  await f.owner.render({ ...f.input, project });
+  expect(f.dispose).toHaveBeenCalledOnce();
+  expect(media.create).toHaveBeenCalledTimes(2);
+  expect(media.create.mock.lastCall![0].project).toBe(project);
+});
+
+it('cannot publish a late frame after an incompatible snapshot replaces its owner', async () => {
+  const f = fixture();
+  const pending = Promise.withResolvers<HTMLCanvasElement>();
+  f.renderFrame.mockReturnValueOnce(pending.promise);
+  const old = f.owner.render(f.input);
+  const oldSignal = f.renderFrame.mock.calls[0]![1];
+  f.updateProject.mockReturnValueOnce(false);
+  await f.owner.render({ ...f.input, project: { ...f.input.project, id: 'another-project' } });
+  expect(oldSignal.aborted).toBe(true);
+  const output = f.input.canvas.getContext('2d')!;
+  output.fillStyle = '#00ff00';
+  output.fillRect(0, 0, 16, 12);
+  pending.resolve(f.frame);
+  expect(await old).toBe(false);
+  expect(f.pixel(8, 5)).toEqual([0, 255, 0, 255]);
   expect(f.dispose).toHaveBeenCalledOnce();
 });

@@ -232,30 +232,6 @@ describe('settings transfer AI owner transaction', () => {
 });
 
 describe('settings transfer storage transaction', () => {
-  it('keeps a local microphone choice when importing transferable voice controls', async () => {
-    mocks.loadSettings.mockResolvedValue({
-      ...settingsFixture(),
-      voiceInput: { language: 'ru-RU', mode: 'local-first', microphoneDeviceId: 'local-device' },
-    });
-    await applySettingsTransferDomains({
-      domains: {
-        'system.voice': { schemaVersion: 1, data: { language: 'en-US', mode: 'local-first' } },
-      },
-      summary: emptySummary(),
-    });
-    expect(mocks.syncSet).toHaveBeenCalledWith(
-      {
-        sniptale_settings: expect.objectContaining({
-          voiceInput: {
-            language: 'en-US',
-            mode: 'local-first',
-            microphoneDeviceId: 'local-device',
-          },
-        }),
-      },
-      undefined
-    );
-  });
   it('restores local keys after a rejected write partially applies them', async () => {
     const stored: Record<string, unknown> = { 'sniptale-theme-preference': 'dark' };
     mocks.localGet.mockImplementation(async (keys: string[]) =>

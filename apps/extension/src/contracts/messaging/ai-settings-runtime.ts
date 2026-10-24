@@ -43,6 +43,7 @@ export type AISecretProtectionStatusPayload = {
 
 export type AISettingsPageRuntimeDataPayload = {
   audioTranscriptionSystemPrompt?: string | undefined;
+  voiceInputCorrectionSystemPrompt?: string | undefined;
   scenarioEditorSystemPrompt: string;
   secretProtectionStatus: AISecretProtectionStatusPayload;
   selectionBootstrap: AISettingsPageModelSelectionBootstrapPayload;
@@ -85,6 +86,8 @@ type AiSettingsMutationOperation =
   | 'delete-model'
   | 'move-model'
   | 'save-default-model'
+  | 'save-voice-input-correction-prompt'
+  | 'reset-voice-input-correction-prompt'
   | 'save-audio-transcription-prompt'
   | 'reset-audio-transcription-prompt'
   | 'save-global-prompt'
@@ -121,12 +124,18 @@ export type AiSettingsMutationMessage =
       defaultModelId: string | null;
     })
   | (AiSettingsMutationBase<
-      'save-global-prompt' | 'save-scenario-editor-prompt' | 'save-audio-transcription-prompt'
+      | 'save-global-prompt'
+      | 'save-scenario-editor-prompt'
+      | 'save-audio-transcription-prompt'
+      | 'save-voice-input-correction-prompt'
     > & {
       prompt: string;
     })
   | AiSettingsMutationBase<
-      'reset-global-prompt' | 'reset-scenario-editor-prompt' | 'reset-audio-transcription-prompt'
+      | 'reset-global-prompt'
+      | 'reset-scenario-editor-prompt'
+      | 'reset-audio-transcription-prompt'
+      | 'reset-voice-input-correction-prompt'
     >
   | (AiSettingsMutationBase<'save-chrome-ai-enabled'> & { enabled: boolean })
   | (AiSettingsMutationBase<'enable-secret-passphrase-protection'> & { passphrase: string })

@@ -1,3 +1,4 @@
+import { drawOpticalGlass } from './optical-lens';
 import type { ReviewClickFrame } from '../../review/click-animation';
 
 /** Original media pixels in the same coordinate plane as the feedback frame. */
@@ -91,13 +92,33 @@ function drawLens(
     context.save();
     try {
       context.clip();
-      source.draw(
-        context,
-        x + (source.rect.x - x) * lens.scale,
-        y + (source.rect.y - y) * lens.scale,
-        source.rect.width * lens.scale,
-        source.rect.height * lens.scale
-      );
+      const sharp = () =>
+        source.draw(
+          context,
+          x + (source.rect.x - x) * lens.scale,
+          y + (source.rect.y - y) * lens.scale,
+          source.rect.width * lens.scale,
+          source.rect.height * lens.scale
+        );
+      if (lens.optics === 'optical') {
+        const bounds = { x: x - radius, y: y - radius, width: radius * 2, height: radius * 2 };
+        drawOpticalGlass(
+          context,
+          bounds,
+          lens.scale,
+          lens.shape === 'circle' ? 'circle' : 0.18,
+          (sample) =>
+            source.draw(
+              sample,
+              source.rect.x - bounds.x,
+              source.rect.y - bounds.y,
+              source.rect.width,
+              source.rect.height
+            ),
+          sharp,
+          lens.edgeWidth
+        );
+      } else sharp();
     } finally {
       context.restore();
     }

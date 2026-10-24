@@ -34,6 +34,7 @@ it('adds only empty indexed history stores and publishes the current contracts a
     [SCENARIO_PROJECT_UNITS_STORE, { keyPath: ['projectId', 'unitId', 'revision'] }],
     [RECORDING_RECOVERY_SESSIONS_STORE, { keyPath: 'id' }],
     [RECORDING_RECOVERY_BLOCKS_STORE, { keyPath: ['id', 'index'] }],
+    ['voice_input_history', { keyPath: 'id' }],
   ]);
   expect(indexes.mock.calls).toEqual([
     ['aggregateId', 'aggregateId'],

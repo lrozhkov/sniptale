@@ -1,3 +1,4 @@
+import { normalizeConfigurableCaptureAction } from '../../../features/quick-actions-presets/policy';
 import {
   createRecommendedContextMenuSettings,
   parseContextMenuLayout,
@@ -175,11 +176,11 @@ export function createDefaultSettings(): NormalizedSettings {
   };
 }
 
-/** Normalize the legacy captureAction value `download` to `download_default`. */
+/** Normalize configurable capture actions and the legacy download spelling. */
 function resolveCaptureAction(value: unknown): CaptureActionType {
   if (value === 'download') return 'download_default';
   if (isCaptureActionTypeValue(value)) {
-    return value;
+    return normalizeConfigurableCaptureAction(value);
   }
   return 'download_default';
 }
@@ -231,7 +232,11 @@ async function writeSettings(settings: Settings, permit: PersistenceMutationPerm
         await browserStorage.sync.get(contextMenuLayoutChunkKeys(oldManifest))
       )
     : null;
-  const prepared = await prepareContextMenuSettingsSyncWrite(settings, oldManifest, previousLayout);
+  const prepared = await prepareContextMenuSettingsSyncWrite(
+    { ...settings, captureAction: resolveCaptureAction(settings.captureAction) },
+    oldManifest,
+    previousLayout
+  );
   let manifestWriteAttempted = false;
   try {
     if (prepared.newChunkKeys.length) await browserStorage.sync.set(prepared.chunkValues, permit);
@@ -408,6 +413,39 @@ export function subscribeToSettingsChanges(
     )
       return;
     listener(next);
+  });
+}
+
+/** Observe canonical image preferences, including reset and removal of the settings key. */
+export function subscribeToImagePreferencesChanges(
+  listener: (preferences: Pick<NormalizedSettings, 'imageFormat' | 'imageQuality'>) => void
+): () => void {
+  if (typeof chrome === 'undefined') return () => undefined;
+  return browserStorage.subscribeToChanges((changes, areaName) => {
+    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
+    const change = changes[STORAGE_KEY];
+    const previous = normalizeLoadedSettings(parseStoredSettings(change?.oldValue).value);
+    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value);
+    if (previous.imageFormat === next.imageFormat && previous.imageQuality === next.imageQuality)
+      return;
+    listener({ imageFormat: next.imageFormat, imageQuality: next.imageQuality });
+  });
+}
+
+/** Observe canonical voice preferences, including reset and removal of the settings key. */
+export function subscribeToVoiceInputPreferencesChanges(
+  listener: (preferences: VoiceInputPreferences) => void
+): () => void {
+  if (typeof chrome === 'undefined') return () => undefined;
+  return browserStorage.subscribeToChanges((changes, areaName) => {
+    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
+    const change = changes[STORAGE_KEY];
+    const previous = normalizeLoadedSettings(
+      parseStoredSettings(change?.oldValue).value
+    ).voiceInput;
+    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value).voiceInput;
+    if (JSON.stringify(previous) === JSON.stringify(next)) return;
+    listener(next ?? { ...DEFAULT_VOICE_INPUT_SETTINGS });
   });
 }
 

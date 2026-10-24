@@ -63,7 +63,6 @@ function createScenarioState() {
     byClickDisabled: false,
     captureMode: 'manual' as const,
     enabled: true,
-    onCaptureActionSelected: vi.fn(),
     onCreateProject: vi.fn(),
     onFinishScenario: vi.fn(),
     onOpenEditor: vi.fn(),

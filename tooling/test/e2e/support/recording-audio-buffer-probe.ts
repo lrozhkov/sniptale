@@ -7,11 +7,155 @@ import {
   Mp4OutputFormat,
   Output,
   WebMOutputFormat,
+  WavOutputFormat,
   canEncodeAudio,
 } from 'mediabunny';
 import { beginRecordingSession } from '../../../../apps/extension/src/composition/audio-recording/capture';
 import { resolveRecordingMimeType } from '../../../../apps/extension/src/composition/audio-recording/format';
 import type { RecordingSessionArgs } from '../../../../apps/extension/src/composition/audio-recording/session-types';
+
+/** Holds processing while a native reader delivers a controlled burst, then checks retained PCM. */
+export async function recordNativeAudioBurst(
+  packetFrames: number,
+  channels = 1,
+  mode: 'held-pcm' | 'native-opus' = 'held-pcm',
+  packets = mode === 'native-opus' ? 128 : 130
+) {
+  const original = globalThis.MediaStreamTrackProcessor;
+  const audio = new AudioContext({ sampleRate: 48000 });
+  const destination = audio.createMediaStreamDestination();
+  const track = destination.stream.getAudioTracks()[0]!;
+  let readerController!: ReadableStreamDefaultController<AudioData>;
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const processing = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let consumed!: () => void;
+  const consumption = new Promise<void>((resolve) => {
+    consumed = resolve;
+  });
+  let readPackets = 0;
+  const readable = new ReadableStream<AudioData>({
+    start(controller) {
+      readerController = controller;
+    },
+  });
+  Object.defineProperty(globalThis, 'MediaStreamTrackProcessor', {
+    configurable: true,
+    value: class {
+      readable = {
+        getReader() {
+          const reader = readable.getReader();
+          return {
+            closed: reader.closed,
+            async read() {
+              const next = await reader.read();
+              if (!next.done) readPackets += 1;
+              if (next.done || readPackets === packets) consumed();
+              return next;
+            },
+            cancel(reason?: unknown) {
+              consumed();
+              return reader.cancel(reason);
+            },
+            releaseLock() {
+              reader.releaseLock();
+            },
+          };
+        },
+      };
+    },
+  });
+  const target = new BufferTarget();
+  const output = new Output({
+    target,
+    format: mode === 'native-opus' ? new WebMOutputFormat() : new WavOutputFormat(),
+  });
+  let held = false;
+  const source = new MediaStreamAudioTrackSource(track, {
+    codec: mode === 'native-opus' ? 'opus' : 'pcm-s16',
+    ...(mode === 'native-opus' ? { bitrate: 128000 } : {}),
+    transform: {
+      process: async (sample) => {
+        if (mode === 'held-pcm' && !held) {
+          held = true;
+          entered();
+          await gate;
+        }
+        return sample;
+      },
+    },
+  });
+  let error: string | null = null;
+  void source.errorPromise.catch((failure: unknown) => {
+    error = failure instanceof Error ? failure.message : 'Audio source failed';
+  });
+  output.addAudioTrack(source);
+  const enqueue = (index: number) =>
+    readerController.enqueue(
+      new AudioData({
+        format: 'f32-planar',
+        sampleRate: 48000,
+        numberOfChannels: channels,
+        numberOfFrames: packetFrames,
+        timestamp: Math.round((index * packetFrames * 1e6) / 48000),
+        data: Float32Array.from({ length: packetFrames * channels }, (_, frame) =>
+          mode === 'native-opus'
+            ? 0.1 * Math.sin((2 * Math.PI * 440 * (index * packetFrames + frame)) / 48000)
+            : 0.25
+        ),
+      })
+    );
+  try {
+    await output.start();
+    enqueue(0);
+    if (mode === 'held-pcm') await processing;
+    for (let index = 1; index < packets; index += 1) enqueue(index);
+    readerController.close();
+    await consumption;
+    // Native input can arrive in one burst before asynchronous encoder startup finishes.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const heldError = error;
+    release();
+    if (heldError) {
+      await output.cancel();
+      return {
+        error: heldError,
+        frames: 0,
+        changed: 0,
+        rms: 0,
+        borrowedTrackState: track.readyState,
+      };
+    }
+    await output.finalize();
+    if (!target.buffer) throw new Error('Audio burst output is empty');
+    const decoded = await audio.decodeAudioData(target.buffer.slice(0));
+    const samples = decoded.getChannelData(0);
+    return {
+      error,
+      frames: samples.length,
+      rms: Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length),
+      changed: samples.reduce(
+        (count, value) => count + (Math.abs(value - 0.25) > 1 / 32768 ? 1 : 0),
+        0
+      ),
+      borrowedTrackState: track.readyState,
+    };
+  } finally {
+    release();
+    if (output.state !== 'finalized') await output.cancel();
+    Object.defineProperty(globalThis, 'MediaStreamTrackProcessor', {
+      configurable: true,
+      value: original,
+    });
+    destination.stream.getTracks().forEach((item) => item.stop());
+    await audio.close();
+  }
+}
 
 /** Records a continuous native audio track while the document thread performs long tasks. */
 export async function recordContinuousAudioUnderLoad(load: boolean, pause = false) {

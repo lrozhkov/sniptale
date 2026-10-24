@@ -882,3 +882,57 @@ it('retains one detailed renderer across native playback and waits for the new p
   expect(io.factory).toHaveBeenCalledOnce();
   expect(io.render.mock.lastCall![1].sourceTime).toBe(2);
 });
+
+it('does not publish again when persistence only reorders scene properties', async () => {
+  props.scene.background = {
+    enabled: true,
+    type: 'image',
+    assetId: 'background',
+    imageFit: 'cover',
+    layout: { blur: 8, padding: 40, cornerRadius: 12 },
+  };
+  await render();
+  await step(100);
+  const front = props.host.current!.firstChild;
+  expect(io.render).toHaveBeenCalledOnce();
+  props = {
+    ...props,
+    scene: {
+      ...props.scene,
+      background: {
+        type: 'image',
+        enabled: true,
+        imageFit: 'cover',
+        assetId: 'background',
+        layout: { padding: 40, cornerRadius: 12, blur: 8 },
+      },
+    },
+  };
+  await render();
+  await step(3000);
+  expect(io.factory).toHaveBeenCalledOnce();
+  expect(io.prepare).toHaveBeenCalledOnce();
+  expect(io.render).toHaveBeenCalledOnce();
+  expect(props.host.current!.firstChild).toBe(front);
+  props = {
+    ...props,
+    scene: {
+      ...props.scene,
+      background: {
+        enabled: true,
+        type: 'image',
+        assetId: 'background',
+        imageFit: 'cover',
+        layout: { padding: 45, cornerRadius: 12, blur: 8 },
+      },
+    },
+  };
+  await render();
+  await step(3100);
+  expect(io.prepare).toHaveBeenCalledTimes(2);
+  expect(io.render).toHaveBeenCalledTimes(2);
+  props = { ...props, canonical: { width: 300, height: 150 } };
+  await render();
+  await step(3200);
+  expect(io.render).toHaveBeenCalledTimes(3);
+});

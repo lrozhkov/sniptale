@@ -277,7 +277,7 @@ function EffectLaneHarness({
 
 it('keeps cursor draft geometry equal to composed commit and restores on Escape', () => {
   for (const finish of ['commit', 'cancel']) {
-    const project = createDraftSemanticsProject();
+    let project = createDraftSemanticsProject();
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -313,8 +313,15 @@ it('keeps cursor draft geometry equal to composed commit and restores on Escape'
       );
       if (finish === 'commit') {
         expect(cursorMove).toHaveBeenCalledWith('c2', 'c4', 3, 5);
-        project.cursorTrack.samples[1]!.time = 3;
-        project.cursorTrack.samples[2]!.time = 5;
+        project = {
+          ...project,
+          cursorTrack: {
+            ...project.cursorTrack,
+            samples: project.cursorTrack.samples.map((sample, index) =>
+              index === 1 ? { ...sample, time: 3 } : index === 2 ? { ...sample, time: 5 } : sample
+            ),
+          },
+        };
         act(() =>
           root.render(<EffectLaneHarness {...{ project, cursorMove, historyTransaction }} />)
         );

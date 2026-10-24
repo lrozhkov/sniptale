@@ -59,6 +59,7 @@ export interface PreviewRenderAllocationInput {
   };
   scene: {
     transitionRaster: Size | null;
+    splitRaster?: Size | null;
     windowRaster: Size | null;
     clickLens?: boolean;
     motionPass: Size | null;
@@ -295,6 +296,10 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
   const phases = [
     ...preparation(input, front),
     phase('scene', [...normal, ...window, ...motion]),
+    phase('camera-split', [
+      ...normal,
+      ...optionalCanvas('camera-split-source', input.scene.splitRaster ?? null),
+    ]),
     phase('spotlight-coverage', [...normal, ...window, ...masks.coverage]),
     phase('spotlight-composite', [...normal, ...window, ...masks.composite]),
     phase('border', [

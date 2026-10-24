@@ -1,5 +1,8 @@
 import { useEffect } from 'react';
-import type { VideoProjectMotionRegion } from '../../../../../features/video/project/types';
+import {
+  VideoMotionFocusMode,
+  type VideoProjectMotionRegion,
+} from '../../../../../features/video/project/types';
 import { getMotionBindingCandidates } from '../../../../../features/video/project/motion/source-binding';
 import { motionTransitionSettings } from '../../../../../features/video/project/motion/timing';
 import type { MotionTransitionPhaseEdit } from '../../../../../features/video/project/motion/transitions';
@@ -54,10 +57,16 @@ function useFocusEditing({ motionRegion, panel }: FocusProps) {
 }
 
 export function MotionEffectModeField({ motionRegion, panel }: FocusProps) {
-  const kind = motionRegion.border ? 'border' : motionRegion.spotlight ? 'spotlight' : 'camera';
+  const kind = motionRegion.border
+    ? 'border'
+    : motionRegion.spotlight?.effect === 'magnify'
+      ? 'lens'
+      : motionRegion.spotlight
+        ? 'spotlight'
+        : 'camera';
   return (
-    <SegmentedRow<'camera' | 'border' | 'spotlight'>
-      columns={3}
+    <SegmentedRow<'camera' | 'border' | 'spotlight' | 'lens'>
+      columns={4}
       layout="stacked"
       label={translate('gallery.videoReview.focusType')}
       ariaLabel={translate('gallery.videoReview.focusType')}
@@ -66,15 +75,41 @@ export function MotionEffectModeField({ motionRegion, panel }: FocusProps) {
         { value: 'camera', label: translate('gallery.videoReview.zoomRegionLabel') },
         { value: 'border', label: translate('gallery.videoReview.focusBorder') },
         { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+        { value: 'lens', label: translate('gallery.videoReview.focusLens') },
       ]}
-      onChange={(mode) =>
+      onChange={(mode) => {
+        if (mode === kind) return;
+        const focusEdit: MotionFocusEdit =
+          mode === 'camera'
+            ? {
+                kind: kind === 'spotlight' || kind === 'lens' ? 'spotlight' : 'border',
+                enabled: false,
+              }
+            : mode === 'border'
+              ? { kind: 'border', enabled: true }
+              : {
+                  kind: 'spotlight',
+                  enabled: true,
+                  settings:
+                    mode === 'lens'
+                      ? {
+                          effect: 'magnify',
+                          magnification: motionRegion.spotlight?.magnification ?? 2,
+                          lensOptics: motionRegion.spotlight?.lensOptics ?? 'flat',
+                          lensShape: motionRegion.spotlight?.lensShape ?? 'circle',
+                          ...(motionRegion.border
+                            ? {
+                                area: motionRegion.border.area,
+                                roundness: motionRegion.border.roundness,
+                              }
+                            : {}),
+                        }
+                      : { effect: 'dim' },
+                };
         panel.onUpdateMotionRegion(motionRegion.id, {
-          focusEdit: {
-            kind: mode === 'camera' ? (kind === 'spotlight' ? 'spotlight' : 'border') : mode,
-            enabled: mode !== 'camera',
-          },
-        })
-      }
+          focusEdit,
+        });
+      }}
     />
   );
 }
@@ -90,6 +125,25 @@ export function MotionFocusFields(props: FocusProps) {
       data-ui={border ? 'video-editor.motion.border' : 'video-editor.motion.spotlight'}
     >
       <MotionFocusTargetFields {...props} onEdit={editing.commit} />
+      {spotlight?.effect === 'magnify' ? (
+        <SegmentedRow<'fixed' | 'follow'>
+          columns={2}
+          layout="stacked"
+          label={translate('gallery.videoReview.focusLensPlacement')}
+          ariaLabel={translate('gallery.videoReview.focusLensPlacement')}
+          value={motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? 'follow' : 'fixed'}
+          options={[
+            { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
+            { value: 'follow', label: translate('videoEditor.sidebar.cursorFocusFollow') },
+          ]}
+          onChange={(mode) =>
+            props.panel.onUpdateMotionRegion(motionRegion.id, {
+              focusMode:
+                mode === 'follow' ? VideoMotionFocusMode.CURSOR : VideoMotionFocusMode.MANUAL,
+            })
+          }
+        />
+      ) : null}
       {border ? (
         <BorderAppearanceFields
           value={border}

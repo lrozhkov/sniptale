@@ -1,37 +1,32 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import { type GradientType, type Paint, type PaintStopIdFactory } from '@sniptale/foundation/paint';
 import { switchPaintMode } from '@sniptale/ui/paint-selector/operations';
+
+type Mode = 'solid' | GradientType;
+export type PaintModeDrafts = Partial<Record<Mode, Paint>>;
+const modeOf = (paint: Paint): Mode => (paint.kind === 'solid' ? 'solid' : paint.gradient.type);
 
 export function usePaintModeState(options: {
   createId: PaintStopIdFactory;
   draft: Paint;
   externalValue: Paint;
+  open?: boolean;
+  modeDrafts?: MutableRefObject<PaintModeDrafts>;
   preview: (paint: Paint) => void;
   selectStop: (id: string | null) => void;
 }) {
-  const solidDraftRef = useRef(options.draft.kind === 'solid' ? options.draft : null);
-  const gradientDraftRef = useRef(options.draft.kind === 'gradient' ? options.draft : null);
+  const localDrafts = useRef<PaintModeDrafts>({ [modeOf(options.draft)]: options.draft });
+  const drafts = options.modeDrafts ?? localDrafts;
   useEffect(() => {
-    if (options.draft.kind === 'solid') solidDraftRef.current = options.draft;
-    else gradientDraftRef.current = options.draft;
-  }, [options.draft]);
+    drafts.current[modeOf(options.draft)] = options.draft;
+  }, [options.draft, drafts]);
   useEffect(() => {
-    if (options.externalValue.kind === 'solid') {
-      solidDraftRef.current = options.externalValue;
-      gradientDraftRef.current = null;
-    } else {
-      gradientDraftRef.current = options.externalValue;
-      solidDraftRef.current = null;
-    }
-  }, [options.externalValue]);
+    drafts.current = { [modeOf(options.externalValue)]: options.externalValue };
+  }, [options.externalValue, options.open, drafts]);
 
-  return (next: 'solid' | GradientType) => {
-    const paint =
-      next === 'solid'
-        ? (solidDraftRef.current ?? switchPaintMode(options.draft, next, options.createId))
-        : gradientDraftRef.current
-          ? switchPaintMode(gradientDraftRef.current, next, options.createId)
-          : switchPaintMode(options.draft, next, options.createId);
+  return (next: Mode) => {
+    drafts.current[modeOf(options.draft)] = options.draft;
+    const paint = drafts.current[next] ?? switchPaintMode(options.draft, next, options.createId);
     options.preview(paint);
     options.selectStop(paint.kind === 'gradient' ? (paint.gradient.stops[0]?.id ?? null) : null);
   };

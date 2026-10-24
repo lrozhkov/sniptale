@@ -6,6 +6,7 @@ import { AUDIT_STORAGE_OWNER_MAPPINGS } from './audit-storage.mjs';
 import { BACKGROUND_STORAGE_OWNER_MAPPINGS } from './background-storage.mjs';
 import { BG_RUNTIME_MESSAGING_OWNER_MAPPINGS } from './background-runtime-messaging.mjs';
 import { CAST_CLEANUP_OWNER_MAPPINGS } from './cast-cleanup.mjs';
+import { CAMERA_SPLIT_OWNER_MAPPINGS } from './camera-split.mjs';
 import { CONTENT_ROOT_OWNER_MAPPINGS } from './content-root.mjs';
 import { CONTENT_SELECTION_OWNER_MAPPINGS } from './content-selection.mjs';
 import { COVERAGE_ROLLOUT_OWNER_MAPPINGS } from './coverage-rollout.mjs';
@@ -42,6 +43,7 @@ export const FOCUSED_COVERAGE_OWNER_MAPPINGS = [
   ...BG_RUNTIME_MESSAGING_OWNER_MAPPINGS,
   ...AS_NEVER_REMOVAL_OWNER_MAPPINGS,
   ...CAST_CLEANUP_OWNER_MAPPINGS,
+  ...CAMERA_SPLIT_OWNER_MAPPINGS,
   ...SCENARIO_OWNER_MAPPINGS,
   ...SCENARIO_STAGE_OWNER_MAPPINGS,
   ...AUDIT_OWNER_MAPPINGS,

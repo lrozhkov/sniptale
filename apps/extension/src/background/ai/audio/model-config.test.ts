@@ -8,7 +8,8 @@ import {
 import { activateStoredAIProviderSecretForUse } from '../../../composition/persistence/ai-settings/provider-secrets.store';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
 import type { AudioJobServerMessage, AudioJobStart } from '../../../contracts/ai/audio';
-import { resolveAudioModelConfig } from './model-config';
+import { resolveAudioModelConfig, resolveTranscriptionModelConfig } from './model-config';
+import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 import { createAudioJobService } from './service';
 
 vi.mock('../../../composition/persistence/ai-settings', () => ({
@@ -361,4 +362,67 @@ it('requires matching Scenario provider approval before permission and secret ac
     speech: request.profile,
   });
   expect(activateStoredAIProviderSecretForUse).toHaveBeenCalledExactlyOnceWith(provider);
+});
+
+async function selectVoiceModel() {
+  vi.mocked(loadAIModels).mockResolvedValue([
+    {
+      ...model,
+      operation: 'transcription',
+      modelCode: 'whisper',
+      audio: { transcription: { responseFormat: 'json', timestampGranularity: 'none' } },
+    },
+  ]);
+  return {
+    modelId: model.id,
+    approvedProviderId: provider.id,
+    approvedDestination: await createAIProviderDestinationBinding(provider),
+    approvedModelCode: 'whisper',
+  };
+}
+
+it('resolves an explicitly selected voice ASR model without an editor scope', async () => {
+  const selection = await selectVoiceModel();
+  await expect(
+    resolveTranscriptionModelConfig(selection, new AbortController().signal)
+  ).resolves.toMatchObject({
+    url: 'https://audio.example.test/custom/v1/audio/transcriptions',
+    apiKey: 'fixture-secret',
+    modelCode: 'whisper',
+  });
+  expect(permission).toHaveBeenCalledWith({ origins: ['https://audio.example.test/*'] });
+});
+
+it.each(['provider', 'destination', 'model'] as const)(
+  'refuses a changed voice %s binding before secret access',
+  async (change) => {
+    const selection = await selectVoiceModel();
+    const changed = {
+      ...selection,
+      ...(change === 'provider' ? { approvedProviderId: 'other' } : {}),
+      ...(change === 'destination' ? { approvedDestination: `sha256:${'0'.repeat(64)}` } : {}),
+      ...(change === 'model' ? { approvedModelCode: 'other' } : {}),
+    };
+    await expect(
+      resolveTranscriptionModelConfig(changed, new AbortController().signal)
+    ).rejects.toThrow('model-unavailable');
+    expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses a revoked voice provider permission before activating its secret', async () => {
+  const selection = await selectVoiceModel();
+  permission.mockResolvedValue(false);
+  await expect(
+    resolveTranscriptionModelConfig(selection, new AbortController().signal)
+  ).rejects.toThrow('permission-denied');
+  expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+});
+
+it('does not activate a voice model for a cancelled operation', async () => {
+  const selection = await selectVoiceModel();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(resolveTranscriptionModelConfig(selection, controller.signal)).rejects.toThrow();
+  expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
 });

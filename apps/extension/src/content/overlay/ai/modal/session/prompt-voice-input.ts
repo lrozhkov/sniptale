@@ -25,27 +25,31 @@ export function useAIModalPromptVoiceInput(args: {
     },
   });
   const startSession = session.actions.start;
+  const cancelSession = session.actions.cancel;
+  const cancel = useCallback(() => {
+    insertionRef.current = null;
+    setCaretPosition(null);
+    cancelSession();
+  }, [cancelSession]);
   const stop = session.actions.stop;
 
   const start = useCallback(
     (prompt: string, caret: number) => {
-      if (!args.enabled) return;
+      if (!args.enabled || session.state.active || session.state.pending) return;
       insertionRef.current = createTextTranscriptInsertion(prompt, caret);
       setCaretPosition(caret);
       void startSession();
     },
-    [args.enabled, startSession]
+    [args.enabled, session.state.active, session.state.pending, startSession]
   );
 
   useEffect(() => {
     if (args.enabled) return;
-    insertionRef.current = null;
-    setCaretPosition(null);
-    stop();
-  }, [args.enabled, stop]);
+    cancel();
+  }, [args.enabled, cancel]);
 
   return {
-    actions: { start, stop },
+    actions: { start, stop, cancel },
     state: { ...session.state, caretPosition },
   };
 }

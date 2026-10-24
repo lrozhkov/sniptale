@@ -194,9 +194,7 @@ export function TourWorkspace(props: TourWorkspaceProps) {
             <TourCanvas
               {...props}
               state={state}
-              view={view.view}
-              previewKey={view.replay}
-              previewOrigin={view.previewOrigin}
+              mode={view}
               onSelectObject={selectObject}
               generating={generating}
               onGenerationChange={setGenerating}

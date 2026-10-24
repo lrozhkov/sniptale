@@ -1,7 +1,7 @@
 import { ProjectCursorFocusKeys } from './cursor-focus-keys';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import { buildTimelineTelemetryLaneData } from '../../../project/operations/telemetry-lane';
-import { useContext } from 'react';
+import { useContext, useMemo } from 'react';
 import { TIMELINE_CURSOR_ROW_HEIGHT } from './history-layout';
 import { projectTimelineInterval, type TimelineProjection } from '../interaction-state/projection';
 import { buildHistoryCursorRuns } from '../../../../features/video/review/cursor-history';
@@ -60,18 +60,23 @@ export function ProjectTimelineCursorLane(props: {
   onBeginEffectInteraction: (event: React.PointerEvent, target: TimelineEffectDragTarget) => void;
 }) {
   const draft = useContext(TimelineEffectDraftContext);
-  const displayProject = resolveCursorDisplayProject(props.project, draft?.cursorSampleTimes);
-  const dwellRanges = (props.recordingTelemetry ?? []).flatMap((entry) =>
-    buildTimelineTelemetryLaneData(displayProject, entry.recordingId, entry).spans.filter(
-      (span) => span.kind === 'cursor-idle'
-    )
+  const displayProject = useMemo(
+    () => resolveCursorDisplayProject(props.project, draft?.cursorSampleTimes),
+    [props.project, draft?.cursorSampleTimes]
   );
-  const segments = buildHistoryCursorRuns(
-    displayProject.cursorTrack,
-    displayProject.duration,
-    dwellRanges
-  );
-  const cursorMetaById = buildCursorSegmentMeta(displayProject, segments);
+  const { segments, cursorMetaById } = useMemo(() => {
+    const dwellRanges = (props.recordingTelemetry ?? []).flatMap((entry) =>
+      buildTimelineTelemetryLaneData(displayProject, entry.recordingId, entry).spans.filter(
+        (span) => span.kind === 'cursor-idle'
+      )
+    );
+    const segments = buildHistoryCursorRuns(
+      displayProject.cursorTrack,
+      displayProject.duration,
+      dwellRanges
+    );
+    return { segments, cursorMetaById: buildCursorSegmentMeta(displayProject, segments) };
+  }, [displayProject, props.recordingTelemetry]);
 
   const unavailable =
     (props.recordingTelemetry?.length ?? 0) > 0 &&

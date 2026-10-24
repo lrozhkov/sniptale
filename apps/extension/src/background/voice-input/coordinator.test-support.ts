@@ -1,8 +1,10 @@
 import { beforeEach, vi } from 'vitest';
 import {
   VOICE_INPUT_PORT_NAME,
+  VoiceInputPortMessageType,
   type VoiceInputSnapshot,
 } from '@sniptale/runtime-contracts/voice-input';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createRuntimePortFixture } from '../../../../../tooling/test/support/chrome-runtime-port';
 import { voiceInputCoordinatorMocks } from '../../../../../tooling/test/support/voice-input-coordinator.test-support';
 
@@ -64,6 +66,25 @@ vi.mock('../offscreen-document/service', async () => {
     waitForOffscreenReady: runtimeMocks.waitForOffscreenReady,
   };
 });
+
+const runtimeDependencies = vi.hoisted(() => ({
+  initialize: vi.fn(),
+  beginCapture: vi.fn(),
+  get: vi.fn(),
+  list: vi.fn(),
+  run: vi.fn(),
+  loadPreferences: vi.fn(),
+}));
+vi.mock('../../composition/persistence/voice-input-history', () => ({
+  createVoiceInputHistory: () => runtimeDependencies,
+}));
+vi.mock('../../composition/persistence/settings', () => ({
+  loadSettings: async () => ({ voiceInput: await runtimeDependencies.loadPreferences() }),
+}));
+vi.mock('./processing', () => ({
+  createVoiceInputProcessor: () => ({ run: runtimeDependencies.run }),
+  getVoiceInputProcessingErrorCode: () => 'provider-failed',
+}));
 
 import { createVoiceInputCoordinator as createVoiceInputCoordinatorImplementation } from './coordinator';
 
@@ -150,6 +171,19 @@ export function createSnapshot(
 beforeEach(() => {
   internalSessionSequence = 0;
   vi.clearAllMocks();
+  runtimeDependencies.initialize.mockResolvedValue(undefined);
+  runtimeDependencies.beginCapture.mockResolvedValue({
+    entryId: 'entry',
+    incarnation: 'incarnation',
+    epoch: 'epoch',
+    sequence: 1,
+    createdAt: 1,
+  });
+  runtimeDependencies.loadPreferences.mockResolvedValue({
+    language: 'ru-RU',
+    microphoneDeviceId: null,
+    mode: 'local-first',
+  });
   mocks.acquireMediaMutationPermit.mockReturnValue(vi.fn());
   mocks.ensureOffscreenDocument.mockResolvedValue(true);
   mocks.getRuntimeContexts.mockResolvedValue([
@@ -165,3 +199,74 @@ beforeEach(() => {
   mocks.waitForOffscreenReady.mockResolvedValue(undefined);
   mocks.sendRuntimeMessage.mockResolvedValue({ success: true, result: 'accepted' });
 });
+
+export { runtimeDependencies };
+
+/** Holds model processing while a capture-era command response is delivered. */
+export async function createProcessingSessionFixture(
+  schedule?: (callback: () => void, delayMs: number) => void,
+  existingCoordinator?: ReturnType<typeof createVoiceInputCoordinator>
+) {
+  runtimeDependencies.loadPreferences.mockResolvedValue({
+    language: 'ru-RU',
+    microphoneDeviceId: null,
+    mode: 'local-first',
+    backend: 'model',
+  });
+  const scope = {
+    entryId: 'entry',
+    incarnation: 'incarnation',
+    epoch: 'epoch',
+    revision: 1,
+    audioDigest: 'sha256:' + 'a'.repeat(64),
+  };
+  const entry = {
+    ...scope,
+    sequence: 1,
+    createdAt: 1,
+    backend: 'model',
+    language: 'ru-RU',
+    durationSeconds: 1,
+    transcript: 'final',
+  };
+  runtimeDependencies.get.mockResolvedValue(entry);
+  let resolveProcessing!: (entry: unknown) => void;
+  runtimeDependencies.run.mockImplementation((args) => {
+    args.onPhase('processing-asr', scope);
+    return new Promise((resolve) => {
+      resolveProcessing = resolve;
+    });
+  });
+  const coordinator = existingCoordinator ?? createVoiceInputCoordinator(schedule);
+  const owner = createContentPort('processing');
+  coordinator.registerPort(owner.port);
+  owner.onMessage.emit({
+    type: VoiceInputPortMessageType.START,
+    requestId: 'start',
+    sessionId: 'client',
+    preferences: { language: 'ru-RU', mode: 'local-first' },
+  });
+  await flush();
+  return {
+    coordinator,
+    owner,
+    complete: () => resolveProcessing(entry),
+    async transfer() {
+      coordinator.handleOffscreenEvent({
+        type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
+        event: { type: 'VOICE_INPUT_CAPTURE_RELEASED', sessionId: 'offscreen-session-1' },
+      });
+      coordinator.handleOffscreenEvent({
+        type: MessageType.OFFSCREEN_VOICE_INPUT_EVENT,
+        event: {
+          type: 'VOICE_INPUT_CAPTURE_READY',
+          sessionId: 'offscreen-session-1',
+          scope,
+          rawTranscript: null,
+          durationSeconds: 1,
+        },
+      });
+      await flush();
+    },
+  };
+}

@@ -248,6 +248,7 @@ export function publishCompletedPreviewFrame(
   } finally {
     context.restore();
   }
+  presented.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
 }
 
 type CompletedCompositionPresentation = Pick<

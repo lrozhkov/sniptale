@@ -359,3 +359,26 @@ it('reveals a new attachment even when an earlier camera lane preference was hid
   expect(io.attach).toHaveBeenCalledOnce();
   expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.webcam).toBe(true);
 });
+
+it.each([null, undefined])(
+  'preserves an authored docked destination when adding a position (%s)',
+  async (split) => {
+    const camera = createQuickEditWebcam('project-asset:camera', source, source);
+    camera.split = 'left';
+    camera.positions = [
+      {
+        id: 'docked',
+        time: 2,
+        placement: camera.placement,
+        ...(split === null ? { split } : {}),
+        transition: { type: 'ease-in-out', duration: 0.5 },
+      },
+    ];
+    setup(camera);
+    await act(async () => {});
+    act(() => editor.addPosition());
+    expect(editor.selectedPosition).toMatchObject({ time: 3, split: null });
+    expect(editor.camera?.split).toBe('left');
+    expect(editor.camera?.positions[0]).toEqual(camera.positions[0]);
+  }
+);

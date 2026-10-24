@@ -3,12 +3,18 @@ import { isContentPrivilegedActionCapability } from '../../protocol/content-priv
 import { VideoMessageType } from '../messages';
 import { MICROPHONE_GAIN_MIN, MICROPHONE_GAIN_MAX } from './microphone-processing';
 import {
+  CaptureMode,
   VideoRecordingStatus,
   WebcamPresentationMode,
   WebcamPresentationShape,
   VIDEO_AUTO_FADE_DELAYS,
   isVideoCursorEffectSettings,
   isWebcamDockPosition,
+  isVideoOutputProfile,
+  parseVideoRecordingProfiles,
+  type VideoOutputProfile,
+  type VideoRecordingSettings,
+  type SelectedArea,
   type VideoCursorEffectSettings,
   type VideoAutoFadeDelay,
   type WebcamPresentationSettings,
@@ -46,7 +52,17 @@ export function isVideoRecordingStartFailureCode(
   return VIDEO_RECORDING_START_FAILURE_CODES.some((code) => code === value);
 }
 
+/** Saved output setup projected by the recording surface authority. */
+export type VideoRecordingSurfaceOutputSettings = Pick<
+  VideoRecordingSettings,
+  'outputProfile' | 'qualityProfileId' | 'qualityProfiles'
+>;
+
 export interface VideoRecordingSurfaceSnapshot {
+  outputSettings?: VideoRecordingSurfaceOutputSettings;
+  /** Actual source geometry for the recording owned by this surface. */
+  captureMode?: CaptureMode | null;
+  cropRegion?: SelectedArea | null;
   autoFadeDelay: VideoAutoFadeDelay;
   surfaceSessionId: string;
   documentGeneration: number;
@@ -86,6 +102,7 @@ export interface VideoRecordingSurfaceActivation {
 export interface StartSavedTabVideoRecordingMessage {
   type: typeof VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING;
   contentIntent: ContentPrivilegedActionCapability;
+  captureMode?: 'TAB' | 'TAB_CROP';
   confirmedWithoutMicrophone?: boolean;
   rememberWithoutMicrophone?: boolean;
 }
@@ -114,6 +131,8 @@ export type VideoRecordingSurfaceCommand =
       deviceKind: 'audioinput' | 'videoinput';
       requestPermission?: boolean;
     }
+  | { kind: 'select-quality-profile'; profileId: string }
+  | { kind: 'set-output-profile'; outputProfile: VideoOutputProfile }
   | { kind: 'set-toolbar-requested'; enabled: boolean }
   | { kind: 'set-auto-fade-delay'; delay: VideoAutoFadeDelay }
   | {
@@ -319,6 +338,9 @@ export function isVideoRecordingSurfaceSnapshot(
     !Object.keys(value).every((key) =>
       [
         'surfaceSessionId',
+        'outputSettings',
+        'captureMode',
+        'cropRegion',
         'autoFadeDelay',
         'documentGeneration',
         'lifecycle',
@@ -347,6 +369,13 @@ export function isVideoRecordingSurfaceSnapshot(
   }
 
   return (
+    (value['outputSettings'] === undefined || isSurfaceOutputSettings(value['outputSettings'])) &&
+    (value['captureMode'] === undefined ||
+      value['captureMode'] === null ||
+      Object.values(CaptureMode).some((mode) => mode === value['captureMode'])) &&
+    (value['cropRegion'] === undefined ||
+      value['cropRegion'] === null ||
+      isSurfaceCropRegion(value['cropRegion'])) &&
     typeof value['surfaceSessionId'] === 'string' &&
     VIDEO_AUTO_FADE_DELAYS.includes(value['autoFadeDelay'] as VideoAutoFadeDelay) &&
     isFiniteNonNegativeNumber(value['documentGeneration']) &&
@@ -393,11 +422,18 @@ export function isStartSavedTabVideoRecordingMessage(
   return (
     isRecord(value) &&
     Object.keys(value).every((key) =>
-      ['type', 'contentIntent', 'confirmedWithoutMicrophone', 'rememberWithoutMicrophone'].includes(
-        key
-      )
+      [
+        'type',
+        'contentIntent',
+        'captureMode',
+        'confirmedWithoutMicrophone',
+        'rememberWithoutMicrophone',
+      ].includes(key)
     ) &&
     value['type'] === VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING &&
+    (value['captureMode'] === undefined ||
+      value['captureMode'] === CaptureMode.TAB ||
+      value['captureMode'] === CaptureMode.TAB_CROP) &&
     (value['confirmedWithoutMicrophone'] === undefined ||
       typeof value['confirmedWithoutMicrophone'] === 'boolean') &&
     (value['rememberWithoutMicrophone'] === undefined ||
@@ -457,11 +493,59 @@ function isNormalizedPoint(value: unknown, minimum: number, maximum: number): bo
   );
 }
 
+function isSurfaceOutputProfile(value: unknown): value is VideoOutputProfile {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['container', 'codec', 'frameRate', 'quality', 'resolution']) &&
+    isVideoOutputProfile(value)
+  );
+}
+
+function isSurfaceOutputSettings(value: unknown): value is VideoRecordingSurfaceOutputSettings {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['outputProfile', 'qualityProfileId', 'qualityProfiles']) &&
+    isSurfaceOutputProfile(value['outputProfile']) &&
+    (value['qualityProfileId'] === null ||
+      (typeof value['qualityProfileId'] === 'string' &&
+        value['qualityProfileId'].length > 0 &&
+        value['qualityProfileId'].length <= 128)) &&
+    parseVideoRecordingProfiles(value['qualityProfiles']) !== null
+  );
+}
+
+function isSurfaceCropRegion(value: unknown): value is SelectedArea {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['x', 'y', 'width', 'height']) &&
+    isFiniteNonNegativeNumber(value['x']) &&
+    isFiniteNonNegativeNumber(value['y']) &&
+    isFiniteNonNegativeNumber(value['width']) &&
+    value['width'] > 0 &&
+    isFiniteNonNegativeNumber(value['height']) &&
+    value['height'] > 0
+  );
+}
+
 function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecordingSurfaceCommand {
   if (!isRecord(value) || typeof value['kind'] !== 'string') {
     return false;
   }
 
+  if (value['kind'] === 'select-quality-profile') {
+    return (
+      hasExactKeys(value, ['kind', 'profileId']) &&
+      typeof value['profileId'] === 'string' &&
+      value['profileId'].length > 0 &&
+      value['profileId'].length <= 128
+    );
+  }
+  if (value['kind'] === 'set-output-profile') {
+    return (
+      hasExactKeys(value, ['kind', 'outputProfile']) &&
+      isSurfaceOutputProfile(value['outputProfile'])
+    );
+  }
   if (['cancel-start', 'pause', 'resume', 'stop'].includes(value['kind'])) {
     return hasExactKeys(value, ['kind']);
   }

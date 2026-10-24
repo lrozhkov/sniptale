@@ -459,3 +459,26 @@ it('applies enabled state to every live lease and closes idempotently', async ()
   expect(raw.track.stop).toHaveBeenCalledOnce();
   expect(output.track.stop).toHaveBeenCalledOnce();
 });
+
+it('borrows the current camera without hardware acquisition or an input switch', async () => {
+  const raw = createTrackedStream({ frameRate: 30, width: 1280, height: 720 });
+  const output = createTrackedStream({ frameRate: 30, width: 1280, height: 720 });
+  createCanvasVideoOutputMock.mockReturnValue(createCanvasOutput(output));
+  const acquireRawStream = vi.fn().mockResolvedValue(raw);
+  const owner = createCameraSourceOwner({
+    acquireRawStream,
+    createVideo: () => createVideo(),
+    waitForMetadata: async () => undefined,
+  });
+  await expect(owner.acquireCurrent()).rejects.toThrow('not active');
+  expect(acquireRawStream).not.toHaveBeenCalled();
+  const recording = await owner.acquire(DEFAULT_VIDEO_SETTINGS);
+  const preview = await owner.acquireCurrent();
+  expect(acquireRawStream).toHaveBeenCalledOnce();
+  preview.release();
+  expect(raw.track.stop).not.toHaveBeenCalled();
+  recording.release();
+  expect(raw.track.stop).toHaveBeenCalledOnce();
+  await expect(owner.acquireCurrent()).rejects.toThrow('not active');
+  expect(acquireRawStream).toHaveBeenCalledOnce();
+});

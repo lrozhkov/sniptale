@@ -48,18 +48,18 @@ function useGuideVoiceField(props: VoiceFieldProps) {
       current.onValueChange(value);
     },
   });
-  const stopVoice = voice.actions.stop;
-  const stop = () => {
+  const cancelVoice = voice.actions.cancel;
+  const cancel = () => {
     insertion.current = null;
     caret.current = null;
-    stopVoice();
+    cancelVoice();
   };
   useEffect(() => {
     if (props.disabled) {
       insertion.current = null;
-      stopVoice();
+      cancelVoice();
     }
-  }, [props.disabled, stopVoice]);
+  }, [props.disabled, cancelVoice]);
   useLayoutEffect(() => {
     if (caret.current === null) return;
     field.current?.setSelectionRange(caret.current, caret.current);
@@ -70,10 +70,15 @@ function useGuideVoiceField(props: VoiceFieldProps) {
       field.current = node;
     },
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      cancel();
       latest.current = { ...latest.current, value: event.target.value };
       props.onValueChange(event.target.value);
     },
     onSelect: () => {
+      if (voice.state.pending) {
+        cancel();
+        return;
+      }
       if (!insertion.current || !field.current) return;
       insertion.current.start = field.current.selectionStart ?? props.value.length;
       insertion.current.end = field.current.selectionEnd ?? props.value.length;
@@ -83,17 +88,19 @@ function useGuideVoiceField(props: VoiceFieldProps) {
     bindings,
     field,
     voice,
-    stop,
+    cancel,
+    stop: voice.actions.stop,
     clear() {
       if (latest.current.disabled) return;
-      stop();
+      cancel();
       latest.current = { ...latest.current, value: '' };
       caret.current = 0;
       props.onValueChange('');
       field.current?.focus({ preventScroll: true });
     },
     start() {
-      if (latest.current.disabled || !field.current) return;
+      if (latest.current.disabled || !field.current || voice.state.active || voice.state.pending)
+        return;
       field.current.focus({ preventScroll: true });
       insertion.current = {
         start: field.current.selectionStart ?? latest.current.value.length,
@@ -108,7 +115,7 @@ function useGuideVoiceField(props: VoiceFieldProps) {
 /** Presents one compact microphone without covering the editable field or its block controls. */
 export function GuideVoiceField(props: VoiceFieldProps) {
   const compact = useContext(CommandPressScope);
-  const { bindings, field, voice, stop, start, clear } = useGuideVoiceField(props);
+  const { bindings, field, voice, stop, cancel, start, clear } = useGuideVoiceField(props);
   const Input = props.formControl ? ProductInput : 'input';
   const Textarea = props.formControl ? ProductTextarea : 'textarea';
   const attributes = {
@@ -127,10 +134,7 @@ export function GuideVoiceField(props: VoiceFieldProps) {
     <span
       className="guide-voice-field"
       data-voice-visible={
-        voice.state.active ||
-        voice.state.phase === 'stopping' ||
-        voice.state.errorCode !== null ||
-        undefined
+        voice.state.active || voice.state.pending || voice.state.errorCode !== null || undefined
       }
       data-clearable={(compact && props.clearable !== false) || undefined}
       data-single-line={props.singleLine || undefined}
@@ -140,10 +144,10 @@ export function GuideVoiceField(props: VoiceFieldProps) {
           event.target instanceof Element &&
           event.target.closest('.sniptale-field-clear')
         )
-          stop();
+          cancel();
       }}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) stop();
+        if (!event.currentTarget.contains(event.relatedTarget)) cancel();
       }}
     >
       {props.singleLine ? (
@@ -163,6 +167,7 @@ export function GuideVoiceField(props: VoiceFieldProps) {
           }}
           onStart={start}
           onStop={stop}
+          onCancel={cancel}
         />
         {!compact && props.clearable && (
           <ContentToolbarButton

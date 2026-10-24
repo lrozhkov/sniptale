@@ -64,6 +64,30 @@ describe('camera overlay placement', () => {
 
 // Camera layout changes use existing clip fields consumed by both renderers.
 describe('camera interval layout presets', () => {
+  it('returns from split to the saved dock without changing source or adjacent clips', () => {
+    const { project, camera, following } = createCameraIntervals();
+    const split = applyVideoProjectCameraLayout(
+      project,
+      camera.id,
+      VideoProjectCameraLayout.SPLIT_RIGHT
+    );
+    const splitClip = split.clips.find((item) => item.id === camera.id);
+    expect(splitClip).toMatchObject({ cameraSplit: 'right', transform: camera.transform });
+    expect(split.clips.find((item) => item.id === following.id)).toBe(following);
+    const docked = applyVideoProjectCameraLayout(
+      split,
+      camera.id,
+      VideoProjectCameraLayout.OVERLAY
+    );
+    const dockedClip = docked.clips.find((item) => item.id === camera.id);
+    expect(dockedClip).toMatchObject({
+      transform: camera.transform,
+      sourceStart: camera.sourceStart,
+    });
+    expect(resolveVideoProjectCameraLayout(project, dockedClip as typeof camera)).toBe(
+      VideoProjectCameraLayout.OVERLAY
+    );
+  });
   it('changes only the selected interval while preserving source timing and linked media', () => {
     const { project, camera, following, screen, audio } = createCameraIntervals();
     const next = applyVideoProjectCameraLayout(
@@ -220,3 +244,48 @@ function createCameraIntervals() {
   project.clips = [screen, camera, following, audio];
   return { project, camera, following, screen, audio };
 }
+
+it.each([false, true])(
+  'restores a hidden camera when selecting split at an active destination=%s',
+  (active) => {
+    const { project, camera } = createCameraIntervals();
+    if (active)
+      camera.cameraPositions = [
+        {
+          id: 'destination',
+          sourceTime: 5,
+          transform: { ...camera.transform },
+          fitMode: camera.fitMode,
+          transition: { kind: 'instant', duration: 0 },
+        },
+      ];
+    const hidden = applyVideoProjectCameraLayout(
+      project,
+      camera.id,
+      VideoProjectCameraLayout.HIDDEN,
+      undefined,
+      3
+    );
+    const split = applyVideoProjectCameraLayout(
+      hidden,
+      camera.id,
+      VideoProjectCameraLayout.SPLIT_RIGHT,
+      undefined,
+      3
+    );
+    const result = split.clips.find((item) => item.id === camera.id);
+    if (!result || result.type !== 'VIDEO') throw new Error('Missing camera result');
+    if (active) {
+      expect(result.cameraPositions?.[0]).toMatchObject({
+        cameraSplit: 'right',
+        transform: camera.transform,
+      });
+      expect(result.transform).toEqual(camera.transform);
+    } else {
+      expect(result).toMatchObject({ cameraSplit: 'right', transform: camera.transform });
+      expect(resolveVideoProjectCameraLayout(project, result)).toBe(
+        VideoProjectCameraLayout.SPLIT_RIGHT
+      );
+    }
+  }
+);

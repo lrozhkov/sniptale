@@ -22,32 +22,23 @@ function projectImagePoint(box, point) {
 }
 
 /** Window decoration and clipping share one passive DOM shell around the source plane. */
-function renderTourImageWindow(slide, viewport, { scene, element, headers }) {
-  const { stageWidth, stageHeight } = viewport;
+function renderTourImageWindow(slide, viewport, imageBox, { scene, element, headers }) {
   const frame = resolveTourImageFrame(slide, viewport);
   const clip = element('div', 'tour-image-viewport');
+  const plane = element('div', 'tour-image-plane');
   if (frame.header) {
-    const insets = [
-      frame.content.y,
-      stageWidth - frame.content.x - frame.content.width,
-      stageHeight - frame.content.y - frame.content.height,
-      frame.content.x,
-    ]
-      .map((value) => `${value}px`)
-      .join(' ');
-    clip.style.clipPath = `inset(${insets})`;
+    const height = (frame.header.height * imageBox.width) / frame.header.width;
     const header = element('img', 'tour-window-header');
     header.alt = '';
     header.src = headers[`${slide.image.width}x${slide.image.height}`] ?? '';
     Object.assign(header.style, {
-      left: `${frame.header.x}px`,
-      top: `${frame.header.y}px`,
-      width: `${frame.header.width}px`,
-      height: `${frame.header.height}px`,
+      left: `${imageBox.x}px`,
+      top: `${imageBox.y - height}px`,
+      width: `${imageBox.width}px`,
+      height: `${height}px`,
     });
-    scene.append(header);
+    plane.append(header);
   }
-  const plane = element('div', 'tour-image-plane');
   clip.append(plane);
   scene.append(clip);
   return { frame, plane, clip };
@@ -85,7 +76,7 @@ export function renderTourImage(
       ? resolveTourFullViewCamera(slide, viewport)
       : resolveTourCamera(slide, viewport, autoZoom);
   if (!imageBox) return null;
-  const { frame, plane, clip } = renderTourImageWindow(slide, viewport, {
+  const { plane, clip } = renderTourImageWindow(slide, viewport, imageBox, {
     scene,
     element,
     headers,
@@ -131,10 +122,10 @@ export function renderTourImage(
       button.style.setProperty('--tour-marker-size', `${marker.size}px`);
     button.dataset.pulse = String(hotspot.visual.kind === 'point' && hotspot.visual.pulse);
     button.hidden =
-      point.x < frame.content.x ||
-      point.y < frame.content.y ||
-      point.x > frame.content.x + frame.content.width ||
-      point.y > frame.content.y + frame.content.height;
+      point.x < Math.max(0, imageBox.x) ||
+      point.y < Math.max(0, imageBox.y) ||
+      point.x > Math.min(viewport.stageWidth, imageBox.x + imageBox.width) ||
+      point.y > Math.min(viewport.stageHeight, imageBox.y + imageBox.height);
     const title = getTourActionTitle(hotspot, `${labels.point} ${number + 1}`);
     button.title = title;
     button.setAttribute('aria-label', title);

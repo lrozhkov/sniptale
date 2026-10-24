@@ -2,6 +2,7 @@ import type { EXPECTED_STORES } from './core.stores';
 import type { DatabaseMigrationSource, UpgradeDatabase, UpgradeTransaction } from './upgrade/types';
 
 export type PersistenceDomainId =
+  | 'voiceInputHistory'
   | 'assetGraph'
   | 'diagnostics'
   | 'editorAssets'

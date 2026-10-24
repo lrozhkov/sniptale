@@ -77,15 +77,16 @@ function materialSlide(
     });
   else {
     if (source.kind !== 'import') issues.push({ kind: 'place-hotspot', sourceId });
-    slide.actions.push({
-      type: 'annotation',
-      object: {
-        id: nextId(),
-        text,
-        anchor: null,
-        appearance: null,
-      },
-    });
+    if (text.trim() || material.origin)
+      slide.actions.push({
+        type: 'annotation',
+        object: {
+          id: nextId(),
+          text,
+          anchor: null,
+          appearance: null,
+        },
+      });
   }
   return slide;
 }

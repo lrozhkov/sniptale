@@ -36,7 +36,7 @@ export function CompactWorkspacePopoverContent({
       className={[
         'sniptale-inspector-surface editor-inspector-surface',
         'max-h-[calc(100dvh-6.5rem)] max-[720px]:max-h-[calc(100dvh-10.5rem)]',
-        'overflow-y-auto overscroll-contain pb-3',
+        'min-w-0 max-w-full overflow-x-hidden overflow-y-auto overscroll-contain pb-3',
       ].join(' ')}
     >
       <section aria-label={translate('editor.toolbar.viewSettings')}>

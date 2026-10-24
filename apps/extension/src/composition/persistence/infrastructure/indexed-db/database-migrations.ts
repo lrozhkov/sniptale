@@ -1,6 +1,7 @@
 import { estimateUsageIndexBytes } from './usage-index-migration';
 import type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
+  VOICE_INPUT_HISTORY_STORE,
   ASSET_OPERATIONS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -801,6 +802,24 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         ].every((name) => db.objectStoreNames.contains(name))
       )
         throw new Error('Scenario framing stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'voiceInputHistory', from: 0, to: 1 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 34,
+    toDatabaseVersion: 35,
+    risk: 'additive',
+    stores: [VOICE_INPUT_HISTORY_STORE],
+    migrate(db) {
+      db.createObjectStore(VOICE_INPUT_HISTORY_STORE, { keyPath: 'id' });
+      return undefined;
+    },
+    validate(db) {
+      if (!db.objectStoreNames.contains(VOICE_INPUT_HISTORY_STORE))
+        throw new Error('Voice history store is unavailable.');
       return undefined;
     },
   },

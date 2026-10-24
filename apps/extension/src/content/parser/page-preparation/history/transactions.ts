@@ -59,13 +59,15 @@ function beginDeferredCommitBoundary(
   }
 
   state.deferredCommitId += 1;
-  state.deferredCommits.set(state.deferredCommitId, {
+  const id = state.deferredCommitId;
+  state.deferredCommits.set(id, {
     before,
-    id: state.deferredCommitId,
+    id,
     scope,
   });
   notifyHistoryReachabilityChanged(state);
-  return state.deferredCommitId;
+  publishHistoryState(state);
+  return id;
 }
 
 function commitTransactionEntry(args: {
@@ -182,8 +184,9 @@ function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
     flushDeferredCommits(): void {
       for (const id of [...state.deferredCommits.keys()]) {
         const entry = finalizeDeferredEntry({ id, state });
-        if (entry) {
-          if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
+        if (!entry || !pushHistoryEntry(state, entry)) {
+          notifyHistoryReachabilityChanged(state);
+          publishHistoryState(state);
         }
       }
     },
@@ -191,7 +194,10 @@ function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
       return beginDeferredCommitBoundary(state, scope);
     },
     cancelDeferredCommit(id: number): void {
-      if (state.deferredCommits.delete(id)) notifyHistoryReachabilityChanged(state);
+      if (state.deferredCommits.delete(id)) {
+        notifyHistoryReachabilityChanged(state);
+        publishHistoryState(state);
+      }
     },
     finalizeDeferredCommit(
       id: number,
@@ -199,10 +205,9 @@ function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
       domEffect: PagePreparationHistoryDomEffect | null = null
     ): void {
       const entry = finalizeDeferredEntry({ domBatch, domEffect, id, state });
-      if (entry) {
-        if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
-      } else {
+      if (!entry || !pushHistoryEntry(state, entry)) {
         notifyHistoryReachabilityChanged(state);
+        publishHistoryState(state);
       }
     },
   };

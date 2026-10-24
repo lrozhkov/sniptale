@@ -531,6 +531,16 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
   },
   {
+    owner: 'gallery-review-stage-presentation',
+    productionFile: 'apps/extension/src/gallery/video-review/stage-presentation.tsx',
+    reason:
+      'Mounted stage tests cover scene feedback; direct feedback tests cover camera failure and retry.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/stage.test.tsx',
+      'apps/extension/src/gallery/video-review/stage-presentation.test.tsx',
+    ],
+  },
+  {
     owner: 'gallery-review-preview-presentation-session',
     productionFile: 'apps/extension/src/gallery/video-review/preview-presentation-session.ts',
     reason: `Mounted preview hooks exercise the session acquisition, source callbacks, stale

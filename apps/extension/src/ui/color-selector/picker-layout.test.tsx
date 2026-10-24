@@ -54,7 +54,7 @@ function createProps() {
 it('renders the hex mode toolbar and hex field group', () => {
   const markup = renderToStaticMarkup(<PickerControls {...createProps()} formatMode="hex" />);
 
-  expect(markup).toContain('shared.ui.colorSelectorTransparent');
+  expect(markup).toContain('shared.ui.colorSelectorAlpha');
   expect(markup).toContain('shared.ui.colorSelectorHex');
   expect(markup).toContain('shared.ui.colorSelectorEyedropper');
   expect(markup).not.toContain('shared.ui.colorSelectorRed');
@@ -84,4 +84,12 @@ it('omits the eyedropper action when the runtime does not support it', () => {
   const markup = renderToStaticMarkup(<PickerControls {...props} formatMode="hex" />);
 
   expect(markup).not.toContain('shared.ui.colorSelectorEyedropper');
+});
+
+it('retains explicit transparent selection for opaque-color consumers that allow clearing', () => {
+  const markup = renderToStaticMarkup(
+    <PickerControls {...createProps()} formatMode="hex" allowAlpha={false} allowTransparent />
+  );
+  expect(markup).toContain('shared.ui.colorSelectorTransparent');
+  expect(markup).not.toContain('data-ui="shared.ui.color-selector.opacity"');
 });

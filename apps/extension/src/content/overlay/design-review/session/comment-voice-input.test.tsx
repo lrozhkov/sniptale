@@ -63,6 +63,7 @@ beforeEach(() => {
     refresh: vi.fn(() => 'refresh-1'),
     start: vi.fn(() => 'session-1'),
     stop: vi.fn(() => 'stop-1'),
+    cancel: vi.fn(() => 'cancel-1'),
     subscribe: vi.fn((listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -112,7 +113,7 @@ it('starts with persisted preferences and streams only the owning session into t
   expect(latest?.state.caretPosition).toBe(14);
 });
 
-it('cancels a pending start and ignores delayed transcript after stop', async () => {
+it('cancels a pending start and ignores delayed transcript after cancel', async () => {
   let resolveSettings:
     | ((value: Awaited<ReturnType<typeof settingsMocks.loadSettings>>) => void)
     | null = null;
@@ -126,7 +127,7 @@ it('cancels a pending start and ignores delayed transcript after stop', async ()
   act(() => {
     void latest?.actions.start('Keep', 4);
     void latest?.actions.start('Keep', 4);
-    latest?.actions.stop();
+    latest?.actions.cancel();
   });
   await act(async () => {
     resolveSettings?.({
@@ -146,7 +147,7 @@ it('cancels a pending start and ignores delayed transcript after stop', async ()
     text: ' heard',
     type: VoiceInputPortMessageType.TRANSCRIPT,
   });
-  act(() => latest?.actions.stop());
+  act(() => latest?.actions.cancel());
   emit({
     confidence: null,
     isFinal: true,
@@ -156,7 +157,7 @@ it('cancels a pending start and ignores delayed transcript after stop', async ()
     type: VoiceInputPortMessageType.TRANSCRIPT,
   });
 
-  expect(client.stop).toHaveBeenCalledWith('session-1');
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
   expect(updateDraft).toHaveBeenCalledOnce();
   expect(updateDraft).toHaveBeenCalledWith('Keep heard');
 });
@@ -208,7 +209,31 @@ it('stops the active session and disconnects the Port when its owner unmounts', 
   await act(async () => latest?.actions.start('', 0));
   act(() => root.unmount());
 
-  expect(client.stop).toHaveBeenCalledWith('session-1');
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
   expect(client.disconnect).toHaveBeenCalledOnce();
   root = createRoot(host);
+});
+
+it('keeps the original insertion while processing and accepts one final after Stop', async () => {
+  await act(async () => latest?.actions.start('Before after', 7));
+  act(() => latest?.actions.stop());
+  emit({
+    snapshot: { ...listeningSnapshot, phase: 'processing-asr', delivery: 'final' },
+    type: VoiceInputPortMessageType.SNAPSHOT,
+  });
+  expect(latest?.state.pending).toBe(true);
+  await act(async () => latest?.actions.start('Wrong target', 0));
+  const final: VoiceInputServerEvent = {
+    type: VoiceInputPortMessageType.TRANSCRIPT,
+    sessionId: 'session-1',
+    confidence: null,
+    sequence: 1,
+    text: 'Final words',
+    isFinal: true,
+  };
+  emit(final);
+  emit(final);
+  expect(client.start).toHaveBeenCalledOnce();
+  expect(client.stop).toHaveBeenCalledWith('session-1');
+  expect(updateDraft).toHaveBeenCalledExactlyOnceWith('Before Final words after');
 });

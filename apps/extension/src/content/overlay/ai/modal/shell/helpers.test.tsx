@@ -60,9 +60,10 @@ function createModalState() {
     textareaRef: { current: null },
     totalTokens: 12,
     voice: {
-      actions: { start: vi.fn(), stop: vi.fn() },
+      actions: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
       state: {
         active: false,
+        pending: false,
         audioLevel: 0,
         caretPosition: null,
         errorCode: null,

@@ -1,9 +1,9 @@
 {
   "group": "layers",
-  "version": "package-5",
+  "version": "package-6",
   "rules": "layers.md",
-  "component": "AnchoredLayer / CommandMenu / ModalDialog / ColorEditor / NativeHint",
-  "excludes": ["full production portals", "full color-space parser", "physical eyedropper proof"],
+  "component": "AnchoredLayer / CommandMenu / ModalDialog / ColorSelectorPickerPopover / PaintSelectorPopup / NativeHint",
+  "excludes": ["full production portals", "physical eyedropper proof"],
   "cases": [
     {
       "id": "layers.commands",
@@ -31,9 +31,42 @@
     },
     {
       "id": "layers.color",
-      "title": "Цвет, alpha и палитра",
-      "states": ["direct", "invalid", "palette", "alpha", "apply", "cancel", "eyedropper"],
-      "proof": "Valid color data survives invalid drafts. Browser eyedropper lifecycle remains browser-owned."
+      "title": "Пикер цвета",
+      "states": [
+        "full",
+        "compact",
+        "hex",
+        "rgb",
+        "hsl",
+        "palette",
+        "history",
+        "alpha",
+        "apply",
+        "cancel",
+        "eyedropper",
+        "keyboard"
+      ],
+      "proof": "The actual shared color panel preserves full and compact editing, draft transactions, and alpha."
+    },
+    {
+      "id": "layers.paint",
+      "title": "Градиенты и шаблоны",
+      "states": [
+        "linear",
+        "radial",
+        "conic",
+        "solid-linear",
+        "combined",
+        "compact",
+        "templates-list",
+        "templates-grid",
+        "save",
+        "rename",
+        "delete",
+        "undo",
+        "keyboard"
+      ],
+      "proof": "The actual shared Paint panel preserves geometry, stops, templates, and local history."
     },
     {
       "id": "layers.tooltip",

@@ -32,6 +32,29 @@
 [data-ui='video-editor.inspector.categories'] > div {
   padding: 0 12px;
 }
+
+.video-editor-inspector-all-groups {
+  min-width: 0;
+}
+
+.video-editor-inspector-all-groups > section + section {
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+
+@container inspector-surface (min-width: 524px) {
+  .video-editor-inspector-all-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 12px;
+  }
+
+  .video-editor-inspector-all-groups > section {
+    min-width: 0;
+    padding-block: 0;
+    border-top: 0;
+  }
+}
 [data-ui='video-editor.inspector.categories'] > nav button {
   border: 0;
   transition: color 120ms ease;

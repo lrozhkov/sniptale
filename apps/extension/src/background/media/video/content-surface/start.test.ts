@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { runSerializedVideoRecordingMediaMutation } from './mutation-queue';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
 const mocks = vi.hoisted(() => ({
@@ -178,4 +179,60 @@ it('cancels a remembered-choice write without starting after the write completes
   finishWrite({ ...DEFAULT_VIDEO_SETTINGS, warnWithoutMicrophone: false });
   await expect(started).resolves.toEqual({ success: false, failureCode: 'cancelled' });
   expect(mocks.startRecording).not.toHaveBeenCalled();
+});
+
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+  'starts the selected %s source through the canonical manager after confirmation',
+  async (captureMode) => {
+    await expect(
+      startSavedTabVideoRecording(12, 'https://example.test/page', 'doc-12', { captureMode })
+    ).resolves.toEqual({ success: true, confirmationRequired: true });
+    expect(mocks.startRecording).not.toHaveBeenCalled();
+    await startSavedTabVideoRecording(12, 'https://example.test/page', 'doc-12', {
+      captureMode,
+      confirmedWithoutMicrophone: true,
+    });
+    expect(mocks.startRecording).toHaveBeenCalledWith(
+      12,
+      DEFAULT_VIDEO_SETTINGS,
+      captureMode,
+      'preset-1',
+      'https://example.test/page',
+      'doc-12'
+    );
+  }
+);
+
+it('waits for an admitted output write before loading confirmed start settings', async () => {
+  let release!: () => void;
+  let entered!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const write = runSerializedVideoRecordingMediaMutation('surface-1', async () => {
+    entered();
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mocks.loadVideoSettings.mockResolvedValue({
+      ...DEFAULT_VIDEO_SETTINGS,
+      outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, frameRate: 60 },
+    });
+  });
+  await ready;
+  const starting = startSavedTabVideoRecording(12, 'https://example.test/page', 'doc-12', {
+    confirmedWithoutMicrophone: true,
+  });
+  expect(isSavedTabVideoRecordingStartPending(12)).toBe(true);
+  expect(mocks.loadVideoSettings).not.toHaveBeenCalled();
+  release();
+  await Promise.all([write, starting]);
+  expect(mocks.startRecording).toHaveBeenCalledWith(
+    12,
+    expect.objectContaining({ outputProfile: expect.objectContaining({ frameRate: 60 }) }),
+    CaptureMode.TAB,
+    'preset-1',
+    'https://example.test/page',
+    'doc-12'
+  );
 });

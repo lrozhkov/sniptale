@@ -1,4 +1,4 @@
-import { VideoTransitionKind } from '../../../project/types';
+import { VideoMotionFocusMode, VideoTransitionKind } from '../../../project/types';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../../project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../../project/motion';
@@ -14,6 +14,43 @@ import {
 } from '../../../project/timeline/project-meta.test.helpers';
 import { resolveVideoCompositionSpotlights } from './spotlights';
 import { resolveVideoCompositionFrame } from './index';
+
+it('samples a Native following lens from the project cursor path and retains a manual dock', () => {
+  const project = { ...createEmptyVideoProject('Lens'), duration: 4 };
+  project.cursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    smoothing: 0,
+    sensitivity: 0.5,
+    segments: [
+      {
+        id: 'path',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 4,
+        keys: [
+          { id: 'a', time: 0, x: 0.2, y: 0.3, anchor: 'manual', interpolation: 'linear' },
+          { id: 'b', time: 4, x: 0.8, y: 0.7, anchor: 'manual', interpolation: 'linear' },
+        ],
+      },
+    ],
+  };
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    duration: 4,
+    spotlight: { ...createQuickEditSpotlight(), effect: 'magnify' as const },
+    spotlightTarget: 'viewport' as const,
+    focusMode: VideoMotionFocusMode.CURSOR,
+  };
+  project.motionRegions = [region];
+  expect(resolveVideoCompositionSpotlights(project, 2).scene[0]?.lensFocus).toEqual({
+    x: 0.5,
+    y: 0.5,
+  });
+  project.motionRegions = [{ ...region, focusMode: VideoMotionFocusMode.MANUAL }];
+  expect(resolveVideoCompositionSpotlights(project, 2).scene[0]).not.toHaveProperty('lensFocus');
+});
 
 it.each<{ type: CameraTransitionType; progress: number }>([
   { type: 'none', progress: 1 },

@@ -187,3 +187,16 @@ describe('quick actions editor output', () => {
     ).not.toContain('copy');
   });
 });
+
+it('offers six ordinary after-capture actions in the tab quick-action editor', async () => {
+  await renderOutput(createState());
+  const options = Array.from(container?.querySelector('select')?.options ?? []);
+  expect(options.map((option) => option.value)).toEqual([
+    'download_default',
+    'ask_preset',
+    'ask_system',
+    'edit',
+    'copy',
+    'save_to_library',
+  ]);
+});

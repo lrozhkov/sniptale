@@ -24,8 +24,10 @@ function isStartRollbackResolved(snapshot: VoiceInputSnapshot): boolean {
 export async function compensateAmbiguousVoiceInputStart(
   gateway: VoiceInputOffscreenGateway,
   session: ActiveVoiceInputSession,
-  requestId: string
+  requestId: string,
+  isCurrent: () => boolean
 ): Promise<boolean> {
+  if (!isCurrent()) return false;
   try {
     const stopped = await gateway.send({
       force: true,
@@ -33,6 +35,7 @@ export async function compensateAmbiguousVoiceInputStart(
       sessionId: session.offscreenSessionId,
       type: MessageType.OFFSCREEN_VOICE_INPUT_STOP,
     });
+    if (!isCurrent()) return false;
     if (
       stopped?.success === true &&
       stopped.snapshot &&
@@ -42,16 +45,19 @@ export async function compensateAmbiguousVoiceInputStart(
       return true;
     }
   } catch {
+    if (!isCurrent()) return false;
     logger.warn('Compensating voice input stop response was unavailable', {
       sessionId: session.sessionId,
     });
   }
 
+  if (!isCurrent()) return false;
   try {
     const status = await gateway.send({
       requestId: `${requestId}:rollback-status`,
       type: MessageType.OFFSCREEN_VOICE_INPUT_STATUS,
     });
+    if (!isCurrent()) return false;
     const resolved =
       status?.success === true &&
       status.snapshot !== undefined &&
@@ -62,6 +68,7 @@ export async function compensateAmbiguousVoiceInputStart(
     });
     return resolved;
   } catch {
+    if (!isCurrent()) return false;
     logger.warn('Ambiguous voice input start status was unavailable', {
       sessionId: session.sessionId,
     });
@@ -78,9 +85,11 @@ export async function dispatchVoiceInputStart(args: {
 }): Promise<OffscreenVoiceInputResponse> {
   return args.gateway.withMediaMutationPermit(async () => {
     await args.gateway.ensureReady();
-    if (!args.isCurrent()) throw new Error('stale-voice-input-start');
+    if (!args.isCurrent() || (args.preferences.backend === 'model' && !args.session.captureToken))
+      throw new Error('stale-voice-input-start');
     try {
       const response = await args.gateway.send({
+        captureToken: args.session.captureToken ?? null,
         maxDurationMs: args.session.maxDurationMs,
         preferences: args.preferences,
         quality: VOICE_INPUT_LOCAL_QUALITY,
@@ -88,6 +97,7 @@ export async function dispatchVoiceInputStart(args: {
         sessionId: args.session.offscreenSessionId,
         type: MessageType.OFFSCREEN_VOICE_INPUT_START,
       });
+      if (!args.isCurrent()) return response;
       if (response?.success !== true) throw new Error('offscreen-start-rejected');
       if (
         response.snapshot &&
@@ -98,10 +108,12 @@ export async function dispatchVoiceInputStart(args: {
       }
       return response;
     } catch {
+      if (!args.isCurrent()) throw new VoiceInputStartDispatchError(false);
       const rollbackVerified = await compensateAmbiguousVoiceInputStart(
         args.gateway,
         args.session,
-        args.requestId
+        args.requestId,
+        args.isCurrent
       );
       throw new VoiceInputStartDispatchError(rollbackVerified);
     }

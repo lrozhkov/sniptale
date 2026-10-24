@@ -32,7 +32,7 @@ vi.mock('../../screenshot/bridge', async (importOriginal) => ({
 }));
 
 import {
-  applyScenarioCaptureAction,
+  applyScenarioRecorderPanelVisibility,
   applyScenarioCaptureMode,
   applyScenarioEnabledState,
   applyScenarioRememberSelection,
@@ -56,7 +56,7 @@ describe('scenario-controller-mode-actions', () => {
   beforeEach(resetModeActionMocks);
 
   it(
-    'routes capture action updates through surface and enabled state transport',
+    'activates the recorder panel without replacing the ordinary capture action',
     expectCaptureActionRouting
   );
 
@@ -86,26 +86,46 @@ describe('scenario-controller-mode-actions', () => {
   );
 });
 
-async function expectCaptureActionRouting() {
-  const applyScenarioResponse = vi.fn();
-
-  await applyScenarioCaptureAction({
-    actionType: 'scenario',
-    applyScenarioResponse,
+function createPanelArgs() {
+  return {
+    applyScenarioResponse: vi.fn(),
     currentSurface: {
-      captureAction: 'download_default',
+      captureAction: 'copy' as const,
       screenshotMode: false,
       toolbarVisible: false,
     },
-  });
+    currentSession: {
+      enabled: false,
+      captureMode: 'manual' as const,
+      projectId: 'project-1',
+      projectName: 'Project',
+      rememberProjectSelection: true,
+      pendingProjectSelection: false,
+      sidebarVisible: false,
+    },
+    refreshSession: vi.fn(async () => undefined),
+    screenshotMode: true,
+    visible: true,
+  };
+}
 
+async function expectCaptureActionRouting() {
+  const args = createPanelArgs();
+  await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(true);
   expect(transportMocks.updateScenarioSurfaceStateMock).toHaveBeenCalledWith({
-    captureAction: 'scenario',
+    captureAction: 'copy',
     screenshotMode: true,
     toolbarVisible: true,
   });
   expect(transportMocks.setScenarioEnabledMock).toHaveBeenCalledWith(true);
-  expect(applyScenarioResponse).toHaveBeenCalledTimes(2);
+  expect(transportMocks.setScenarioSidebarVisibleMock).toHaveBeenCalledWith(true);
+  expect(args.applyScenarioResponse).toHaveBeenCalledTimes(1);
+  expect(transportMocks.updateScenarioSurfaceStateMock.mock.invocationCallOrder[0]).toBeLessThan(
+    transportMocks.setScenarioSidebarVisibleMock.mock.invocationCallOrder[0]!
+  );
+  expect(transportMocks.setScenarioSidebarVisibleMock.mock.invocationCallOrder[0]).toBeLessThan(
+    transportMocks.setScenarioEnabledMock.mock.invocationCallOrder[0]!
+  );
 }
 
 async function expectCaptureModeOptimismAndRollback() {
@@ -191,8 +211,136 @@ async function expectSessionFlagUpdatesAndScreenshotDisable() {
   expect(transportMocks.setScenarioRememberSelectionMock).toHaveBeenCalledWith(false);
   expect(transportMocks.setScenarioSidebarVisibleMock).toHaveBeenCalledWith(false);
   expect(transportMocks.updateScenarioSurfaceStateMock).toHaveBeenCalledWith({
-    captureAction: 'download_default',
+    captureAction: 'scenario',
     screenshotMode: false,
     toolbarVisible: false,
   });
 }
+
+it.each(['enabled', 'sidebar'] as const)(
+  'reports refused %s changes without applying a successful state',
+  async (kind) => {
+    resetModeActionMocks();
+    const applyScenarioResponse = vi.fn();
+    const transport =
+      kind === 'enabled'
+        ? transportMocks.setScenarioEnabledMock
+        : transportMocks.setScenarioSidebarVisibleMock;
+    const apply = () =>
+      kind === 'enabled'
+        ? applyScenarioEnabledState({ applyScenarioResponse, enabled: true })
+        : applyScenarioSidebarVisibility({ applyScenarioResponse, sidebarVisible: true });
+    transport.mockResolvedValueOnce({ success: false, error: 'refused' });
+    await expect(apply()).resolves.toBe(false);
+    expect(applyScenarioResponse).not.toHaveBeenCalled();
+    expect(feedbackMocks.showToast).toHaveBeenCalledExactlyOnceWith(expect.any(String), 'error');
+    transport.mockRejectedValueOnce(new Error('Offline'));
+    await expect(apply()).resolves.toBe(false);
+    expect(applyScenarioResponse).not.toHaveBeenCalled();
+    expect(feedbackMocks.showToast).toHaveBeenCalledTimes(2);
+    await expect(apply()).resolves.toBe(true);
+    expect(applyScenarioResponse).toHaveBeenCalledOnce();
+  }
+);
+
+it('preserves an ordinary capture action when screenshot mode closes', async () => {
+  resetModeActionMocks();
+  await applyScenarioScreenshotModeDisabled({
+    applyScenarioResponse: vi.fn(),
+    currentSurface: { captureAction: 'edit', screenshotMode: true, toolbarVisible: true },
+  });
+  expect(transportMocks.updateScenarioSurfaceStateMock).toHaveBeenCalledWith({
+    captureAction: 'edit',
+    screenshotMode: false,
+    toolbarVisible: false,
+  });
+});
+
+it('restores the visible toolbar baseline when first-open showing fails before enabling', async () => {
+  resetModeActionMocks();
+  const args = createPanelArgs();
+  transportMocks.setScenarioSidebarVisibleMock.mockResolvedValueOnce({ success: false });
+  await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(false);
+  expect(transportMocks.setScenarioEnabledMock.mock.calls).toEqual([[false]]);
+  expect(transportMocks.setScenarioSidebarVisibleMock.mock.calls).toEqual([[true], [false]]);
+  expect(transportMocks.updateScenarioSurfaceStateMock).toHaveBeenLastCalledWith({
+    captureAction: 'copy',
+    screenshotMode: true,
+    toolbarVisible: true,
+  });
+  expect(args.currentSurface).toEqual({
+    captureAction: 'copy',
+    screenshotMode: false,
+    toolbarVisible: false,
+  });
+  expect(args.applyScenarioResponse).not.toHaveBeenCalled();
+  expect(args.refreshSession).toHaveBeenCalledOnce();
+  expect(feedbackMocks.showToast).toHaveBeenCalledExactlyOnceWith(expect.any(String), 'error');
+});
+
+it('preserves usable local UI when activation compensation also fails and permits retry', async () => {
+  resetModeActionMocks();
+  const args = createPanelArgs();
+  transportMocks.setScenarioSidebarVisibleMock.mockResolvedValueOnce({ success: false });
+  transportMocks.updateScenarioSurfaceStateMock
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ success: false });
+  await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(false);
+  expect(args.applyScenarioResponse).not.toHaveBeenCalled();
+  expect(args.refreshSession).not.toHaveBeenCalled();
+  await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(true);
+});
+
+it('changes only visibility for an already enabled recorder', async () => {
+  resetModeActionMocks();
+  const args = createPanelArgs();
+  args.currentSession.enabled = true;
+  args.visible = false;
+  await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(true);
+  expect(transportMocks.setScenarioSidebarVisibleMock).toHaveBeenCalledExactlyOnceWith(false);
+  expect(transportMocks.setScenarioEnabledMock).not.toHaveBeenCalled();
+  expect(transportMocks.updateScenarioSurfaceStateMock).not.toHaveBeenCalled();
+});
+
+it.each(['surface', 'enable'] as const)(
+  'refuses first-open %s failure without reporting success or changing project identity',
+  async (stage) => {
+    resetModeActionMocks();
+    const args = createPanelArgs();
+    const session = { ...args.currentSession };
+    if (stage === 'surface')
+      transportMocks.updateScenarioSurfaceStateMock.mockResolvedValueOnce({ success: false });
+    else transportMocks.setScenarioEnabledMock.mockResolvedValueOnce({ success: false });
+    await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(false);
+    expect(args.applyScenarioResponse).not.toHaveBeenCalled();
+    expect(args.currentSession).toEqual(session);
+    expect(transportMocks.setScenarioEnabledMock).toHaveBeenLastCalledWith(false);
+    expect(args.refreshSession).toHaveBeenCalledOnce();
+    expect(feedbackMocks.showToast).toHaveBeenCalledExactlyOnceWith(expect.any(String), 'error');
+  }
+);
+
+it('does not enable recording or apply a successful snapshot while showing the panel is pending', async () => {
+  resetModeActionMocks();
+  const args = createPanelArgs();
+  let resolveShow: (value: { success: boolean }) => void = () => undefined;
+  let markStarted: () => void = () => undefined;
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
+  const showing = new Promise<{ success: boolean }>((resolve) => {
+    resolveShow = resolve;
+  });
+  transportMocks.setScenarioSidebarVisibleMock.mockImplementationOnce(() => {
+    markStarted();
+    return showing;
+  });
+  const operation = applyScenarioRecorderPanelVisibility(args);
+  await started;
+  expect(transportMocks.setScenarioEnabledMock).not.toHaveBeenCalled();
+  expect(args.applyScenarioResponse).not.toHaveBeenCalled();
+  resolveShow({ success: true });
+  await expect(operation).resolves.toBe(true);
+  expect(transportMocks.setScenarioEnabledMock).toHaveBeenCalledExactlyOnceWith(true);
+  expect(args.applyScenarioResponse).toHaveBeenCalledOnce();
+});

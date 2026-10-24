@@ -1,6 +1,7 @@
 export { initializeAiStorageAccess, readAiStorageReadiness } from './init';
 export {
   loadAudioTranscriptionSystemPrompt,
+  loadVoiceInputCorrectionSystemPrompt,
   loadAIModels,
   loadAIProviders,
   loadChromeAiEnabled,

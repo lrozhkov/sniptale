@@ -1,3 +1,4 @@
+import { normalizeConfigurableCaptureAction } from '../../features/quick-actions-presets/policy';
 import { getAIModelOperation } from '../../contracts/settings/model-operation';
 import { z } from 'zod';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
@@ -124,7 +125,13 @@ function parseCoreDomain(
       const parsed = parseStoredQuickActions(value['items']);
       if (parsed.hasInvalidRoot || parsed.invalidEntryCount > 0)
         failSettingsTransferDomain(domainId);
-      return json({ items: parsed.actions ?? [] });
+      return json({
+        items: (parsed.actions ?? []).map((action) =>
+          action.afterCapture === 'scenario'
+            ? { ...action, afterCapture: normalizeConfigurableCaptureAction(action.afterCapture) }
+            : action
+        ),
+      });
     }
     case 'capture.viewport-presets': {
       if (Object.keys(value).some((key) => key !== 'items' && key !== 'defaultId'))
@@ -256,18 +263,27 @@ function parseAiDomain(
     case 'ai.prompts':
       if (
         Object.keys(value).some(
-          (key) => key !== 'global' && key !== 'scenario' && key !== 'recognition'
+          (key) =>
+            key !== 'global' &&
+            key !== 'scenario' &&
+            key !== 'recognition' &&
+            key !== 'voiceCorrection'
         ) ||
         (value['global'] !== undefined && typeof value['global'] !== 'string') ||
         (value['scenario'] !== undefined && typeof value['scenario'] !== 'string') ||
         (value['recognition'] !== undefined &&
-          (typeof value['recognition'] !== 'string' || value['recognition'].length > 10000))
+          (typeof value['recognition'] !== 'string' || value['recognition'].length > 10000)) ||
+        (value['voiceCorrection'] !== undefined &&
+          (typeof value['voiceCorrection'] !== 'string' || value['voiceCorrection'].length > 10000))
       )
         failSettingsTransferDomain(domainId);
       return json({
         ...(value['global'] === undefined ? {} : { global: value['global'] }),
         ...(value['scenario'] === undefined ? {} : { scenario: value['scenario'] }),
         ...(value['recognition'] === undefined ? {} : { recognition: value['recognition'] }),
+        ...(value['voiceCorrection'] === undefined
+          ? {}
+          : { voiceCorrection: value['voiceCorrection'] }),
       });
     case 'ai.prompt-templates': {
       const templates = parseStoredPromptTemplates(value['items']);

@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { requestAudio } from './request';
+import { requestAudio, requestTranscription } from './request';
+import { wrapPcmWav } from './pcm-wav';
 import {
   AUDIO_INPUT_MAX_BYTES,
   AUDIO_OUTPUT_MAX_BYTES,
@@ -637,3 +638,104 @@ it('sends Scenario text and profile without source scope metadata or video phras
     referrerPolicy: 'no-referrer',
   });
 });
+
+function privateTranscriptionInput() {
+  return new File([wrapPcmWav(new Uint8Array(48000))], 'dictation.wav', { type: 'audio/wav' });
+}
+
+it('transcribes private voice audio without a project scope after final admission', async () => {
+  const order: string[] = [];
+  const post = vi.fn<typeof fetch>(async (_url, init) => {
+    order.push('post');
+    expect(init).toMatchObject({
+      method: 'POST',
+      credentials: 'omit',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+    });
+    return Response.json({ text: 'Recognized words' });
+  });
+  vi.stubGlobal('fetch', post);
+  const result = await requestTranscription({
+    config: transcriptionConfig,
+    input: privateTranscriptionInput(),
+    durationSeconds: 1,
+    signal: new AbortController().signal,
+    beforeSend: async () => {
+      order.push('admit');
+    },
+    onReceiving() {},
+  });
+  expect(result.text).toBe('Recognized words');
+  expect(order).toEqual(['admit', 'post']);
+  expect(post).toHaveBeenCalledOnce();
+});
+
+it('preserves the private source when admission refuses the prepared transcription body', async () => {
+  const post = vi.fn<typeof fetch>();
+  vi.stubGlobal('fetch', post);
+  const audio = privateTranscriptionInput();
+  await expect(
+    requestTranscription({
+      config: transcriptionConfig,
+      input: audio,
+      durationSeconds: 1,
+      signal: new AbortController().signal,
+      beforeSend: async () => {
+        throw new Error('stale');
+      },
+      onReceiving() {},
+    })
+  ).rejects.toThrow('stale');
+  expect(post).not.toHaveBeenCalled();
+  expect(audio.size).toBe(48044);
+});
+
+it('keeps an original WebM usable for multipart transcription and refuses to label it WAV', async () => {
+  const post = vi.fn<typeof fetch>(async () => Response.json({ text: 'Original audio' }));
+  vi.stubGlobal('fetch', post);
+  const args = {
+    config: transcriptionConfig,
+    input: new File(['original'], 'dictation.webm', { type: 'audio/webm;codecs=opus' }),
+    durationSeconds: 1,
+    signal: new AbortController().signal,
+    beforeSend: async () => {},
+    onReceiving() {},
+  };
+  await expect(requestTranscription(args)).resolves.toMatchObject({ text: 'Original audio' });
+  await expect(
+    requestTranscription({
+      ...args,
+      config: {
+        ...transcriptionConfig,
+        transcription: {
+          ...transcriptionConfig.transcription!,
+          transport: 'audio-chat',
+          chatProtocol: 'openai',
+          structuredOutput: 'json_object',
+        },
+      },
+      recognition: { mode: 'transcribe', granularity: 'sentence', prompt: '' },
+    })
+  ).rejects.toThrow('invalid-request');
+  expect(post).toHaveBeenCalledOnce();
+});
+
+it.each([0, Number.POSITIVE_INFINITY, 800])(
+  'refuses unsupported private audio duration %s before POST',
+  async (durationSeconds) => {
+    const post = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', post);
+    await expect(
+      requestTranscription({
+        config: transcriptionConfig,
+        input: privateTranscriptionInput(),
+        durationSeconds,
+        signal: new AbortController().signal,
+        beforeSend: async () => {},
+        onReceiving() {},
+      })
+    ).rejects.toThrow('too-large');
+    expect(post).not.toHaveBeenCalled();
+  }
+);

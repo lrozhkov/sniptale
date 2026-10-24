@@ -17,7 +17,7 @@ function createContext(
   const project = { ...createEmptyVideoProject('Exact resume', 2, 2), duration: 0.1, fps: 10 };
   return {
     exactFrameCapacity: 2,
-    materializer: { canvas, dispose: vi.fn(), renderFrame },
+    materializer: { canvas, dispose: vi.fn(), updateProject: () => false, renderFrame },
     params: {
       assetUrls: {},
       cache,

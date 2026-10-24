@@ -257,12 +257,13 @@ export function planReviewProjectConversion(args: {
       ? [{ id: mute.id, start: mute.start, end: mute.end, volume: mute.volume }]
       : []
   );
+  const originalAudioEnabled = application.originalAudioApplied && !original.muted;
   const master = <T extends VideoProjectVideoClip | VideoProjectAudioClip>(clip: T) => ({
     ...clip,
     volume: original.volume,
     audioGainStart: original.volume,
     audioGainEnd: original.volume,
-    muted: clip.muted || original.muted || !application.originalAudioApplied,
+    muted: clip.muted || (clip.type === 'VIDEO' && !originalAudioEnabled),
   });
   const minimumVersion = externalAudio.clips.some((clip) => clip.transcript !== undefined)
     ? 44
@@ -313,7 +314,12 @@ export function planReviewProjectConversion(args: {
       ...camera.assets,
     ],
     tracks: [
-      ...structuredClone(seedTracks),
+      ...seedTracks.map((track) => ({
+        ...structuredClone(track),
+        ...(track.id === source.audio?.trackId
+          ? { visible: track.visible && originalAudioEnabled }
+          : {}),
+      })),
       ...externalAudio.tracks,
       ...camera.tracks,
       ...annotations.tracks,

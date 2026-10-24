@@ -412,3 +412,23 @@ it('accepts argument-free file handle reads without treating them as path litera
   );
   expect(targetOnlyPathErrors(root)).toEqual([]);
 });
+
+it('recognizes a registered qualified reference config while blocking retired root and unknown configs', () => {
+  const policy = readTargetOnlyPathPolicy(fixture());
+  expect(
+    targetOnlyReferenceRecords(
+      'tooling/design-reference/server.mjs',
+      "const file = resolve(root, 'tooling/design-reference/pickers/vite.config.ts');",
+      policy
+    )
+  ).toEqual([]);
+  for (const reference of ['vite.config.ts', './vite.config.ts', 'unknown/vite.config.ts']) {
+    expect(
+      targetOnlyReferenceRecords(
+        'tooling/design-reference/server.mjs',
+        `const file = '${reference}';`,
+        policy
+      )
+    ).toEqual([expect.objectContaining({ reference: 'vite.config.ts', disposition: 'rewrite' })]);
+  }
+});

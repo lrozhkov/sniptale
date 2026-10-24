@@ -17,6 +17,16 @@ function createStoredFrame() {
   return {
     ...DEFAULT_EDITOR_FRAME_SETTINGS,
     backgroundColor: '#123456',
+    backgroundGradient: {
+      type: 'linear' as const,
+      angle: 12,
+      interpolation: 'oklab' as const,
+      repeat: { enabled: true, span: 0.5 },
+      stops: [
+        { id: 'a', color: '#000000ff', position: 0, midpoint: 0.2 },
+        { id: 'b', color: '#ffffffff', position: 1, midpoint: 0.5 },
+      ],
+    },
     backgroundGradientAngle: 12,
     backgroundGradientFrom: '#abcdef',
     backgroundGradientStops: ['#abcdef', '#333333', '#fedcba'],
@@ -63,6 +73,7 @@ it('opens a fresh image with a clean scene frame and keeps browser metadata over
   expect(context.frame).toEqual({
     ...createStoredFrame(),
     backgroundColor: 'transparent',
+    backgroundGradient: undefined,
     backgroundGradientAngle: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientAngle,
     backgroundGradientFrom: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientFrom,
     backgroundGradientStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientStops,

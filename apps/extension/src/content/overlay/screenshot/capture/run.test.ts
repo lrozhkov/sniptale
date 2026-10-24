@@ -326,3 +326,41 @@ describe('screenshot-controller capture scenario gating', () => {
     expectSelectionFailureRestoresVisibleUiState
   );
 });
+
+it.each(['visible', 'full'] as const)(
+  'sends a one-shot %s action and retains the default for the next capture',
+  async (type) => {
+    const runtime = createRuntime('download_default');
+    const capture = runViewportScreenshot(type, runtime, { captureAction: 'edit' });
+    await settleCaptureTimers();
+    await capture;
+    expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
+      type: type === 'full' ? 'CAPTURE_FULL' : 'CAPTURE_VISIBLE',
+      actionType: 'edit',
+    });
+    expect(runtime.captureActionRef.current).toBe('download_default');
+    expect(runtime.setCaptureAction).not.toHaveBeenCalled();
+    const next = runViewportScreenshot(type, runtime);
+    await settleCaptureTimers();
+    await next;
+    expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
+      type: type === 'full' ? 'CAPTURE_FULL' : 'CAPTURE_VISIBLE',
+      actionType: 'download_default',
+    });
+  }
+);
+
+it('does not add a scenario step when a one-shot action overrides the scenario default', async () => {
+  const runtime = createRuntime('scenario');
+  const capture = runViewportScreenshot('visible', runtime, { captureAction: 'save_to_library' });
+  await settleCaptureTimers();
+  await capture;
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: 'CAPTURE_VISIBLE',
+    actionType: 'save_to_library',
+  });
+  expect(runtime.scenario.ensureCaptureReady).not.toHaveBeenCalled();
+  expect(runtime.scenario.buildCapturePayload).not.toHaveBeenCalled();
+  expect(runtime.scenario.refreshSession).not.toHaveBeenCalled();
+  expect(runtime.captureActionRef.current).toBe('scenario');
+});

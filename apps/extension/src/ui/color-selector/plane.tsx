@@ -95,8 +95,11 @@ function usePlaneSelection(props: ColorPlaneProps, planeElement: HTMLDivElement 
 function usePlanePointerLifecycle(
   planeElement: HTMLDivElement | null,
   activePointerIdRef: MutableRefObject<number | null>,
-  updatePlaneSelection: (event: PointerEvent) => void
+  updatePlaneSelection: (event: PointerEvent) => void,
+  restoreCursor: () => void
 ) {
+  const updateRef = useRef(updatePlaneSelection);
+  updateRef.current = updatePlaneSelection;
   useEffect(() => {
     if (!planeElement) {
       return;
@@ -104,31 +107,53 @@ function usePlanePointerLifecycle(
 
     const handlePointerMove = (event: PointerEvent) => {
       if (activePointerIdRef.current === event.pointerId) {
-        updatePlaneSelection(event);
+        updateRef.current(event);
       }
     };
     const handlePointerRelease = (event: PointerEvent) => {
+      if (activePointerIdRef.current !== event.pointerId) return;
       releasePlanePointer(planeElement, activePointerIdRef, event.pointerId);
+      restoreCursor();
     };
     const handleLostPointerCapture = () => {
       activePointerIdRef.current = null;
+      restoreCursor();
     };
+    const cancel = () => {
+      if (activePointerIdRef.current !== null)
+        releasePlanePointer(planeElement, activePointerIdRef, activePointerIdRef.current);
+      restoreCursor();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancel();
+    };
+    const view = planeElement.ownerDocument.defaultView;
+    view?.addEventListener('blur', cancel);
+    view?.addEventListener('keydown', escape);
 
     planeElement.addEventListener('pointermove', handlePointerMove);
     planeElement.addEventListener('pointerup', handlePointerRelease);
     planeElement.addEventListener('pointercancel', handlePointerRelease);
     planeElement.addEventListener('lostpointercapture', handleLostPointerCapture);
     return () => {
+      cancel();
+      view?.removeEventListener('blur', cancel);
+      view?.removeEventListener('keydown', escape);
       planeElement.removeEventListener('pointermove', handlePointerMove);
       planeElement.removeEventListener('pointerup', handlePointerRelease);
       planeElement.removeEventListener('pointercancel', handlePointerRelease);
       planeElement.removeEventListener('lostpointercapture', handleLostPointerCapture);
     };
-  }, [activePointerIdRef, planeElement, updatePlaneSelection]);
+  }, [activePointerIdRef, planeElement, restoreCursor]);
 }
 
 function usePlaneInteractions(props: ColorPlaneProps) {
   const activePointerIdRef = useRef<number | null>(null);
+  const cursorStyles = useRef<HTMLStyleElement[]>([]);
+  const restoreCursor = useCallback(() => {
+    cursorStyles.current.forEach((style) => style.remove());
+    cursorStyles.current = [];
+  }, []);
   const [planeElement, setPlaneElement] = useState<HTMLDivElement | null>(null);
   const updatePlaneSelection = usePlaneSelection(props, planeElement);
   const assignPlaneRef = useCallback(
@@ -140,16 +165,28 @@ function usePlaneInteractions(props: ColorPlaneProps) {
   );
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (!planeElement) {
+      if (!planeElement || event.button !== 0) {
         return;
       }
 
       event.preventDefault();
+      restoreCursor();
+      const style = planeElement.ownerDocument.createElement('style');
+      style.textContent = 'html,html *{cursor:none!important}';
+      planeElement.ownerDocument.head.append(style);
+      cursorStyles.current = [style];
+      const root = planeElement.getRootNode();
+      if (root instanceof ShadowRoot) {
+        const shadowStyle = planeElement.ownerDocument.createElement('style');
+        shadowStyle.textContent = '*{cursor:none!important}';
+        root.append(shadowStyle);
+        cursorStyles.current.push(shadowStyle);
+      }
       activePointerIdRef.current = event.pointerId;
       planeElement.setPointerCapture(event.pointerId);
       updatePlaneSelection(event);
     },
-    [planeElement, updatePlaneSelection]
+    [planeElement, updatePlaneSelection, restoreCursor]
   );
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -183,7 +220,7 @@ function usePlaneInteractions(props: ColorPlaneProps) {
     [props]
   );
 
-  usePlanePointerLifecycle(planeElement, activePointerIdRef, updatePlaneSelection);
+  usePlanePointerLifecycle(planeElement, activePointerIdRef, updatePlaneSelection, restoreCursor);
   return { assignPlaneRef, handleKeyDown, handlePointerDown };
 }
 
@@ -203,30 +240,21 @@ export function ColorPlane(props: ColorPlaneProps) {
       onKeyDown={interactions.handleKeyDown}
       onPointerDown={interactions.handlePointerDown}
       className={[
-        'relative h-36 rounded-[12px] border',
-        'border-[color:var(--sniptale-color-border-soft)] touch-none cursor-pointer',
-        'focus-visible:outline-2 focus-visible:outline-offset-2',
-        'focus-visible:outline-[color:var(--sniptale-color-border-strong)]',
+        'sniptale-color-plane relative h-[154px] rounded-[4px]',
+        'touch-none cursor-crosshair',
+        'focus-visible:outline-1 focus-visible:outline-offset-2',
+        'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       style={{ backgroundColor: props.planeColor }}
     >
-      <div className="absolute inset-0 rounded-[11px] bg-[linear-gradient(90deg,#fff,transparent)]" />
-      <div className="absolute inset-0 rounded-[11px] bg-[linear-gradient(0deg,#000,transparent)]" />
-      <svg
+      <div className="absolute inset-0 rounded-[3px] bg-[linear-gradient(90deg,#fff,transparent)]" />
+      <div className="absolute inset-0 rounded-[3px] bg-[linear-gradient(0deg,#000,transparent)]" />
+      <div
         data-ui="shared.ui.color-selector.plane-marker"
         aria-hidden="true"
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 overflow-visible"
-        style={{
-          left: `${props.saturation * 100}%`,
-          top: `${(1 - props.value) * 100}%`,
-        }}
-      >
-        <circle cx="8" cy="8" r="7" fill="none" stroke="#000" strokeWidth="2" />
-        <circle cx="8" cy="8" r="5" fill="none" stroke="#fff" strokeWidth="2" />
-      </svg>
+        className="sniptale-color-plane-ring pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
+        style={{ left: `${props.saturation * 100}%`, top: `${(1 - props.value) * 100}%` }}
+      />
     </div>
   );
 }

@@ -2,7 +2,13 @@ import type { QuickEditZoomRegion } from './types';
 
 /** The sole discriminator for the retained focus collection. */
 export function quickEditFocusType(region: Pick<QuickEditZoomRegion, 'spotlight' | 'border'>) {
-  return region.border ? 'border' : region.spotlight ? 'spotlight' : 'zoom';
+  return region.border
+    ? 'border'
+    : region.spotlight?.effect === 'magnify'
+      ? 'lens'
+      : region.spotlight
+        ? 'spotlight'
+        : 'zoom';
 }
 
 /** Authored intervals continue reserving source frames when a cut hides them. */

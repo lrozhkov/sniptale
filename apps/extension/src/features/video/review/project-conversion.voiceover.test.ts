@@ -193,9 +193,12 @@ it.each(['basic', 'voice-off', 'music-off', 'original-off'] as const)(
     const originals = result.project.clips.filter(
       (clip) => clip.type === 'AUDIO' && clip.assetId === input.seed.assets[0]!.id
     );
+    expect(originals.every((clip) => clip.type === 'AUDIO' && !clip.muted)).toBe(true);
     expect(
       originals.every(
-        (clip) => clip.type === 'AUDIO' && clip.muted === effective.originalAudio.muted
+        (clip) =>
+          result.project.tracks.find((track) => track.id === clip.trackId)?.visible ===
+          !effective.originalAudio.muted
       )
     ).toBe(true);
     expect(input).toEqual(before);

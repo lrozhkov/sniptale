@@ -255,3 +255,23 @@ it('does not capture when temporary sizing fails', async () => {
   expect(runViewportScreenshotMock).not.toHaveBeenCalled();
   expect(showScreenshotErrorMock).toHaveBeenCalled();
 });
+
+it('keeps a failed one-shot action local and forwards its trusted source', async () => {
+  const args = createArgs();
+  const source = { kind: 'trusted-content-event' } as const;
+  runViewportScreenshotMock.mockRejectedValueOnce(new Error('capture refused'));
+  await runImmediateScreenshot('full', args, 1, source, 'edit');
+  expect(runViewportScreenshotMock).toHaveBeenLastCalledWith('full', args.runtime, {
+    captureAction: 'edit',
+    contentIntentSource: source,
+    runToken: 1,
+  });
+  expect(showScreenshotErrorMock).toHaveBeenCalled();
+  await runImmediateScreenshot('visible', args, 1, source);
+  expect(runViewportScreenshotMock).toHaveBeenLastCalledWith('visible', args.runtime, {
+    contentIntentSource: source,
+    runToken: 1,
+  });
+  expect(args.params.setCaptureAction).not.toHaveBeenCalled();
+  expect(args.runtime.captureActionRef.current).toBe('download_default');
+});

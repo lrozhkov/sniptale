@@ -52,6 +52,37 @@ it('merges partial spotlight settings and area against accepted values while pre
   expect(region.spotlight).toEqual(createQuickEditSpotlight());
 });
 
+it('switches a Native focus to an optical lens and validates subsequent scale edits', () => {
+  const project = createEmptyVideoProject('Lens');
+  const initial = createVideoProjectMotionRegion(project, 0);
+  const lens = editMotionFocus(project, initial, {
+    kind: 'spotlight',
+    enabled: true,
+    settings: {
+      effect: 'magnify',
+      magnification: 2.5,
+      lensOptics: 'optical',
+      lensEdgeWidth: 4,
+      lensShape: 'circle',
+    },
+  })!;
+  expect(lens.spotlight).toMatchObject({
+    effect: 'magnify',
+    magnification: 2.5,
+    lensOptics: 'optical',
+    lensEdgeWidth: 4,
+    lensShape: 'circle',
+  });
+  expect(
+    editMotionFocus(project, lens, { kind: 'spotlight', settings: { magnification: 3 } })?.spotlight
+      ?.magnification
+  ).toBe(3);
+  expect(
+    editMotionFocus(project, lens, { kind: 'spotlight', settings: { magnification: 9 } })
+  ).toBeNull();
+  expect(lens.spotlight?.magnification).toBe(2.5);
+});
+
 it.each([
   ['kind', 'invalid'],
   ['enabled', 'yes'],
@@ -91,4 +122,17 @@ it('refuses unbound window and scene edits and disables only the requested activ
   ).toBeNull();
   expect(editMotionFocus(project, active, { kind: 'border', enabled: false })).toBe(active);
   expect(editMotionFocus(project, active, { kind: 'spotlight', enabled: false })).toEqual(region);
+});
+
+it.each([0, 31, NaN, Infinity])('refuses invalid lens rim width %s', (lensEdgeWidth) => {
+  const project = createEmptyVideoProject('Rim');
+  const region = createVideoProjectMotionRegion(project, 0);
+  expect(
+    editMotionFocus(project, region, {
+      kind: 'spotlight',
+      enabled: true,
+      settings: { effect: 'magnify', lensEdgeWidth },
+    })
+  ).toBeNull();
+  expect(region.spotlight).toBeUndefined();
 });

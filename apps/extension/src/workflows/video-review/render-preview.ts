@@ -2,10 +2,12 @@ import { reviewWatermarkAssets } from './asset-bytes';
 import type { PreviewScene as Scene, PreviewSceneDimensions as Dimensions } from './preview-scene';
 import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
 import {
-  presentationMainColorOpacity,
-  presentationMainColor,
-  type PresentationSequencePlan,
-} from '../../features/video/review/presentation-sequence';
+  paintPreviewOuterFade,
+  paintReviewCameraSplitScreen,
+  reviewSplitCameraStyle,
+  reviewSplitRasterAt,
+  reviewSplitScreenAt,
+} from './camera-split-screen';
 import type {
   RenderResources,
   RenderCanvasLease,
@@ -282,19 +284,7 @@ async function prepareAssets(
   signal.throwIfAborted();
   if (scene.captions) {
     admit(Boolean(scene.captions.settings?.enabled));
-    assets.captions = await prepareReviewCaptions({
-      ...scene.captions,
-      output: dimensions.canonical,
-      signal,
-      resources,
-      reservations: (context) =>
-        reviewCaptionReservations({
-          scene,
-          context,
-          output: dimensions.canonical,
-          watermarkBounds: assets.watermark?.bounds ?? { x: 0, y: 0, width: 0, height: 0 },
-        }),
-    });
+    assets.captions = await prepareSceneCaptions(prepared, assets, resources, signal);
     admit(false);
   }
   if (annotationScene) {
@@ -311,6 +301,41 @@ async function prepareAssets(
     });
     signal.throwIfAborted();
   }
+}
+
+function prepareSceneCaptions(
+  prepared: PreparedScene,
+  assets: Assets,
+  resources: RenderResources,
+  signal: AbortSignal
+) {
+  const { scene, dimensions } = prepared;
+  if (!scene.captions) return Promise.resolve(null);
+  return prepareReviewCaptions({
+    ...scene.captions,
+    output: dimensions.canonical,
+    signal,
+    resources,
+    reservations: (context) =>
+      reviewCaptionReservations({
+        scene,
+        context,
+        output: dimensions.canonical,
+        watermarkBounds: assets.watermark?.bounds ?? { x: 0, y: 0, width: 0, height: 0 },
+      }),
+  });
+}
+
+function prepareRetainedSceneCaptions(
+  prepared: PreparedScene,
+  assets: Assets,
+  resources: RenderResources,
+  allocation: Allocation | undefined,
+  signal: AbortSignal
+) {
+  const enabled = !!prepared.scene.captions?.settings?.enabled;
+  admitRender(allocation, prepared, assets, undefined, undefined, enabled);
+  return enabled ? prepareSceneCaptions(prepared, assets, resources, signal) : null;
 }
 
 async function drawPreparedFrame(
@@ -461,11 +486,13 @@ async function drawPreparedFrame(
       );
     } else await draw(context, canvas, frame, sample);
     signal.throwIfAborted();
+    const splitScreen = reviewSplitScreenAt(scene.webcam, frame.sourceTime, !!frame.camera);
+    paintReviewCameraSplitScreen(context, canvas, dimensions.backing, splitScreen, resources);
     if (frame.camera && scene.webcam)
       drawReviewWebcam(
         context,
         dimensions.backing,
-        scene.webcam,
+        reviewSplitCameraStyle(scene.webcam, splitScreen),
         frame.camera.placement,
         frame.camera.source,
         frame.camera.drawable,
@@ -487,33 +514,21 @@ async function drawPreparedFrame(
   }
 }
 
-/** One final backing-space fill, outside every camera, watermark and transition transform. */
-function paintPreviewOuterFade(
-  context: CanvasRenderingContext2D,
-  backing: Size,
-  plan: PresentationSequencePlan | undefined,
-  resultTime: number
-) {
-  if (!plan) return;
-  context.save();
-  try {
-    context.globalCompositeOperation = 'source-over';
-    context.globalAlpha = presentationMainColorOpacity(plan, resultTime);
-    context.fillStyle = presentationMainColor(plan, resultTime);
-    context.fillRect(0, 0, backing.width, backing.height);
-  } finally {
-    context.restore();
-  }
-}
-
 function admitRender(
   allocation: Allocation | undefined,
   prepared: PreparedScene,
   assets: Assets,
   frame?: Frame,
-  annotationBitmaps?: readonly Size[]
+  annotationBitmaps?: readonly Size[],
+  captionMeasurement = false
 ) {
   if (!allocation) return;
+  const splitRaster = reviewSplitRasterAt(
+    prepared.scene.webcam,
+    frame?.sourceTime ?? 0,
+    !!frame?.camera,
+    prepared.dimensions.backing
+  );
   const input = allocation.describe();
   const previousCache = assets.painter.retainedCacheSize;
   const base = {
@@ -521,7 +536,11 @@ function admitRender(
     publication: { ...input.publication, backing: prepared.dimensions.backing },
     assets: assets.allocation,
     background: input.background ? { ...input.background, previousCache } : null,
-    scene: { ...input.scene, ...(annotationBitmaps ? { annotationBitmaps } : {}) },
+    scene: {
+      ...input.scene,
+      splitRaster,
+      ...(annotationBitmaps ? { annotationBitmaps } : {}),
+    },
   };
   const candidates = [calculatePreviewRenderAllocation(base)];
   if (frame?.transition?.blend.plan.type === 'dissolve') {
@@ -554,6 +573,7 @@ function admitRender(
           scene: {
             ...graph.scene,
             transitionRaster: prepared.dimensions.backing,
+            splitRaster,
             ...(annotationBitmaps ? { annotationBitmaps } : {}),
           },
         })
@@ -561,9 +581,38 @@ function admitRender(
     }
   }
   allocation.replaceLimits({
-    maximumManagedBytes: Math.max(...candidates.map((value) => value.maximumManagedBytes)),
-    maximumCanvases: Math.max(...candidates.map((value) => value.maximumCanvases)),
+    // Caption refresh retains the scene resources while borrowing one 1×1 measurement canvas.
+    maximumManagedBytes:
+      Math.max(...candidates.map((value) => value.maximumManagedBytes)) +
+      (captionMeasurement ? 4 : 0),
+    maximumCanvases:
+      Math.max(...candidates.map((value) => value.maximumCanvases)) + (captionMeasurement ? 1 : 0),
   });
+}
+
+function needsSpatialRenderer(scene: Scene) {
+  return scene.zoomRegions.some(
+    (region) =>
+      !region.dormant &&
+      !region.border &&
+      !region.spotlight &&
+      (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
+  );
+}
+
+/** Persistence can reorder object properties without changing the rendered scene. */
+function orderedPreviewValue(_key: string, value: unknown) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
+    : value;
+}
+
+/** Camera motion refreshes caption reservations independently of the other prepared assets. */
+function preparationKey(scene: Scene, dimensions: Dimensions) {
+  return JSON.stringify(
+    [{ ...scene, zoomRegions: [] }, dimensions, needsSpatialRenderer(scene)],
+    orderedPreviewValue
+  );
 }
 
 /** One prepared scene owner; transport, immutable capture and publication remain with the caller. */
@@ -576,8 +625,14 @@ export function createReviewPreviewRenderer(args: {
 }) {
   let generation = 0;
   let disposed = false;
-  let current: { prepared: PreparedScene; assets: Assets; key: string } | null = null;
+  let current: {
+    prepared: PreparedScene;
+    assets: Assets;
+    key: string;
+    preparationKey: string;
+  } | null = null;
   let preparation: AbortController | null = null;
+  let captionRefresh: AbortController | null = null;
   let rendering = false;
   const leases = new Set<Prepared>();
   const clear = () => {
@@ -608,6 +663,8 @@ export function createReviewPreviewRenderer(args: {
       signal: AbortSignal
     ): Promise<Prepared> {
       if (disposed) throw new Error('Preview renderer is disposed.');
+      captionRefresh?.abort();
+      captionRefresh = null;
       const annotations = sourceScene.annotationEffects;
       const instances = annotations?.lane.enabled
         ? annotations.lane.instances.filter((instance) => instance.enabled)
@@ -629,10 +686,38 @@ export function createReviewPreviewRenderer(args: {
       validSize(dimensions.canonical);
       validSize(dimensions.backing);
       signal.throwIfAborted();
-      const key = JSON.stringify([scene, dimensions]);
+      const key = JSON.stringify([scene, dimensions], orderedPreviewValue);
       if (current?.key === key) {
         admitRender(args.allocation, current.prepared, current.assets);
         return lease(current.prepared, current.assets, signal);
+      }
+      const assetsKey = preparationKey(scene, dimensions);
+      if (current?.preparationKey === assetsKey) {
+        const captured = current;
+        const prepared = structuredClone({ generation: ++generation, scene, dimensions });
+        const controller = new AbortController();
+        captionRefresh = controller;
+        const abort = () => controller.abort(signal.reason);
+        signal.addEventListener('abort', abort, { once: true });
+        try {
+          const refresh = prepareRetainedSceneCaptions(
+            prepared,
+            captured.assets,
+            args.resources,
+            args.allocation,
+            controller.signal
+          );
+          const captions = refresh ? await refresh : captured.assets.captions;
+          controller.signal.throwIfAborted();
+          if (disposed || current !== captured) throw new Error('Preview scene is stale.');
+          if (refresh) admitRender(args.allocation, prepared, captured.assets);
+          captured.assets.captions = captions;
+          current = { ...captured, prepared, key };
+          return lease(prepared, current.assets, signal);
+        } finally {
+          signal.removeEventListener('abort', abort);
+          if (captionRefresh === controller) captionRefresh = null;
+        }
       }
       preparation?.abort();
       clear();
@@ -657,7 +742,8 @@ export function createReviewPreviewRenderer(args: {
         spatial: undefined,
         reservations: [],
       };
-      controller.signal.addEventListener('abort', () => disposeAssets(assets), { once: true });
+      const releaseAssets = () => disposeAssets(assets);
+      controller.signal.addEventListener('abort', releaseAssets, { once: true });
       try {
         await prepareAssets(
           prepared,
@@ -686,22 +772,15 @@ export function createReviewPreviewRenderer(args: {
         );
         controller.signal.throwIfAborted();
         admitRender(args.allocation, prepared, assets);
-        if (
-          prepared.scene.zoomRegions.some(
-            (region) =>
-              !region.dormant &&
-              !region.border &&
-              !region.spotlight &&
-              (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
-          )
-        )
+        if (needsSpatialRenderer(prepared.scene))
           assets.spatial = createReviewSpatialRenderer(args.onContextLost, args.resources);
-        current = { prepared, assets, key };
+        current = { prepared, assets, key, preparationKey: assetsKey };
         return lease(prepared, assets, signal);
       } catch (failure) {
         disposeAssets(assets);
         throw failure;
       } finally {
+        controller.signal.removeEventListener('abort', releaseAssets);
         signal.removeEventListener('abort', abort);
       }
     },
@@ -760,6 +839,8 @@ export function createReviewPreviewRenderer(args: {
     dispose() {
       if (disposed) return;
       disposed = true;
+      captionRefresh?.abort();
+      captionRefresh = null;
       for (const handle of leases) handle.release();
       preparation?.abort();
       preparation = null;

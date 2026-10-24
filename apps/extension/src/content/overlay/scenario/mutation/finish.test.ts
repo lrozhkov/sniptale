@@ -18,7 +18,7 @@ function createArgs() {
     applyScenarioResponse: vi.fn(),
     refreshSession: vi.fn(async () => undefined),
     currentSurface: {
-      captureAction: 'scenario' as const,
+      captureAction: 'copy' as const,
       screenshotMode: true,
       toolbarVisible: false,
     },
@@ -51,6 +51,11 @@ describe('finish recording transaction', () => {
     await finishScenarioRecording(args);
     expect(transport.open).toHaveBeenCalledExactlyOnceWith({ projectId: 'last-project' });
     expect(args.applyScenarioResponse).toHaveBeenCalledTimes(2);
+    expect(transport.surface).toHaveBeenCalledWith({
+      captureAction: 'copy',
+      screenshotMode: false,
+      toolbarVisible: false,
+    });
     expect(args.refreshSession).not.toHaveBeenCalled();
   });
   it('does not open the editor or hide UI when stopping is rejected', async () => {

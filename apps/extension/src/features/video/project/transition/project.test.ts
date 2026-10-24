@@ -210,3 +210,42 @@ function verifyLightSweepSegments() {
     }),
   ]);
 }
+
+it.each(['motion', 'background'])(
+  'retains normalized transition and clip identities after a %s edit',
+  (kind) => {
+    const project = syncProjectTransitions(createTransitionProject());
+    const edited =
+      kind === 'motion'
+        ? { ...project, motionRegions: [] }
+        : { ...project, sceneBackground: { kind: 'solid' as const, color: '#123456' } };
+    const next = syncProjectTransitions(edited);
+    expect(next.clips).toBe(project.clips);
+    expect(next.transitions).toBe(project.transitions);
+    expect(next.transitions![0]).toBe(project.transitions![0]);
+  }
+);
+
+it('updates changed flags and transition controls after preserving a normalized snapshot', () => {
+  const project = syncProjectTransitions(createTransitionProject());
+  const original = structuredClone(project);
+  const edited = {
+    ...project,
+    clips: project.clips.map((clip) => ({
+      ...clip,
+      transitionIn: 'NONE' as const,
+      transitionOut: 'NONE' as const,
+    })),
+    transitions: project.transitions!.map((transition) => ({
+      ...transition,
+      duration: 99,
+      highlightColor: '#123456',
+    })),
+  };
+  const next = syncProjectTransitions(edited);
+  expect(next.clips).not.toBe(edited.clips);
+  expect(next.transitions).not.toBe(edited.transitions);
+  expect(next.clips).toEqual(project.clips);
+  expect(next.transitions).toEqual(project.transitions);
+  expect(project).toEqual(original);
+});

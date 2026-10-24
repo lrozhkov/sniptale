@@ -1,17 +1,7 @@
-import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import React, { useCallback, useRef } from 'react';
+import type React from 'react';
+import { ScreenshotCaptureSplitButton } from './screenshot-menu';
+import { EyeOff, ImageDown, Pin, Repeat2, Snowflake } from 'lucide-react';
 import {
-  ChevronDown,
-  EyeOff,
-  ImageDown,
-  Pin,
-  Repeat2,
-  Snowflake,
-  UnfoldVertical,
-} from 'lucide-react';
-import {
-  ProductToolbarMenu,
   ProductToolbarMenuDetail,
   ProductToolbarMenuDivider,
   ProductToolbarMenuGroupLabel,
@@ -24,12 +14,11 @@ import type {
   FullPageFloatingElementsMode,
 } from '../../../../contracts/full-page-capture';
 import type { ToolbarMenuState } from '../state/menu';
-import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import { PopoverCheckIcon } from '../../icons/icons';
-import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
-import { useToolbarMenuDirection } from '../menu/direction';
 
 type FullPageMenuProps = {
+  quickActions?: React.ReactNode;
+  imageParameters?: React.ReactNode;
   compactMenus: boolean;
   currentViewport: { height: number; width: number } | null;
   disabled: boolean;
@@ -125,144 +114,49 @@ function BooleanPreferenceItem(props: {
   );
 }
 
-function resolveFullPageMenuLayout(props: {
-  displayMode: FullPageMenuProps['displayMode'];
-  triggerRef: React.RefObject<HTMLButtonElement | null>;
-}) {
-  const { menuPlacement, style } = resolveToolbarDropdownState({
-    anchorRef: props.triggerRef,
-    displayMode: props.displayMode,
-    getMenuPosition: (ref, height = 380) => {
-      const rect = ref.current?.getBoundingClientRect();
-      return rect &&
-        window.innerHeight - rect.bottom < height &&
-        rect.top > window.innerHeight - rect.bottom
-        ? 'up'
-        : 'down';
-    },
-    menuHeight: 380,
-    menuWidth: 300,
-  });
-  return { placement: menuPlacement, style };
-}
-
-function FullPagePreferencesMenu(
-  props: FullPageMenuProps & {
-    menuRef: React.RefObject<HTMLDivElement | null>;
-    triggerRef: React.RefObject<HTMLButtonElement | null>;
-  }
-) {
-  const adopted = React.useContext(CommandPressScope);
-  const { placement: menuPlacement, style } = resolveFullPageMenuLayout(props);
-  if (!style) return null;
-
-  return (
-    <ToolbarMenuDropdown dataUi="content.toolbar.full-page-menu" menuRef={props.menuRef}>
-      <ProductToolbarMenu
-        className={['sniptale-full-page-menu', adopted ? 'sniptale-content-menu-adopted' : ''].join(
-          ' '
-        )}
-        compact={props.compactMenus}
-        placement={menuPlacement}
-        style={style}
-        title={translate('content.toolbar.fullPageSettingsTitle')}
-        variant="capture"
-      >
-        <BooleanPreferenceItem
-          disabled={false}
-          hint={translate('content.toolbar.fullPageLazyContentHint')}
-          icon={<ImageDown aria-hidden="true" className="sniptale-popover-icon" />}
-          label={translate('content.toolbar.fullPageLazyContent')}
-          selected={props.preferences.preloadLazyContent}
-          onSelect={() =>
-            void props.onUpdate({ preloadLazyContent: !props.preferences.preloadLazyContent })
-          }
-        />
-        <BooleanPreferenceItem
-          disabled={false}
-          hint={translate('content.toolbar.fullPageFreezeMotionHint')}
-          icon={<Snowflake aria-hidden="true" className="sniptale-popover-icon" />}
-          label={translate('content.toolbar.fullPageFreezeMotion')}
-          selected={props.preferences.freezeMotion}
-          onSelect={() => void props.onUpdate({ freezeMotion: !props.preferences.freezeMotion })}
-        />
-        <ProductToolbarMenuDivider />
-        <ProductToolbarMenuGroupLabel>
-          {translate('content.toolbar.fullPageFloatingTitle')}
-        </ProductToolbarMenuGroupLabel>
-        <FloatingModeItems {...props} />
-        {props.currentViewport ? (
-          <>
-            <ProductToolbarMenuDivider />
-            <ProductToolbarMenuDetail id="sniptale-full-page-viewport-hint">
-              {translate('content.toolbar.fullPageCustomViewportHint')}
-            </ProductToolbarMenuDetail>
-          </>
-        ) : null}
-      </ProductToolbarMenu>
-    </ToolbarMenuDropdown>
-  );
-}
-
 export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuSide = useToolbarMenuDirection(() =>
-    resolveFullPageMenuLayout({ displayMode: props.displayMode, triggerRef })
-  );
-  const menuRef = useRef<HTMLDivElement>(null);
-  const open = props.toolbarMenuState.activeMenuType === 'full-page';
-  const closeMenu = useCallback(() => {
-    props.toolbarMenuState.closeMenu('full-page');
-  }, [props.toolbarMenuState]);
-  const closeMenuWithoutFocus = useCallback(() => {
-    props.toolbarMenuState.closeMenu('full-page');
-  }, [props.toolbarMenuState]);
-
-  useToolbarFloatingMenuDismissal({
-    closeOnFarPointer: true,
-    menuRef,
-    onClose: closeMenu,
-    onFarPointerClose: closeMenuWithoutFocus,
-    open,
-    triggerRef,
-  });
-
   return (
-    <div className="sniptale-split-action sniptale-full-page-wrapper">
-      <ContentToolbarButton
-        type="button"
-        data-content-command="true"
-        className="sniptale-split-action-start sniptale-full-page-primary"
-        data-sniptale-activation-bridge="defer"
-        dataUi="content.toolbar.capture-full-button"
-        disabled={props.disabled}
-        onClick={props.onPrimaryClick}
-        title={translate('content.toolbar.fullPage')}
-      >
-        <UnfoldVertical size={20} strokeWidth={2} />
-      </ContentToolbarButton>
-      <ContentToolbarButton
-        type="button"
-        data-content-command="true"
-        ref={triggerRef}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className="sniptale-split-action-end sniptale-full-page-chevron"
-        data-menu-open={open ? 'true' : 'false'}
-        data-menu-side={menuSide}
-        dataUi="content.toolbar.capture-full-settings-button"
-        disabled={props.disabled}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.toolbarMenuState.toggleMenu('full-page');
-        }}
-        title={translate('content.toolbar.fullPageSettingsTitle')}
-      >
-        <ChevronDown size={14} strokeWidth={2} />
-      </ContentToolbarButton>
-      {open ? (
-        <FullPagePreferencesMenu {...props} menuRef={menuRef} triggerRef={triggerRef} />
+    <ScreenshotCaptureSplitButton
+      compactMenus={props.compactMenus}
+      disabled={props.disabled}
+      displayMode={props.displayMode}
+      mode="full"
+      onPrimaryClick={props.onPrimaryClick}
+      toolbarMenuState={props.toolbarMenuState}
+      quickActions={props.quickActions}
+    >
+      {props.imageParameters}
+      <BooleanPreferenceItem
+        disabled={false}
+        hint={translate('content.toolbar.fullPageLazyContentHint')}
+        icon={<ImageDown aria-hidden="true" className="sniptale-popover-icon" />}
+        label={translate('content.toolbar.fullPageLazyContent')}
+        selected={props.preferences.preloadLazyContent}
+        onSelect={() =>
+          void props.onUpdate({ preloadLazyContent: !props.preferences.preloadLazyContent })
+        }
+      />
+      <BooleanPreferenceItem
+        disabled={false}
+        hint={translate('content.toolbar.fullPageFreezeMotionHint')}
+        icon={<Snowflake aria-hidden="true" className="sniptale-popover-icon" />}
+        label={translate('content.toolbar.fullPageFreezeMotion')}
+        selected={props.preferences.freezeMotion}
+        onSelect={() => void props.onUpdate({ freezeMotion: !props.preferences.freezeMotion })}
+      />
+      <ProductToolbarMenuDivider />
+      <ProductToolbarMenuGroupLabel>
+        {translate('content.toolbar.fullPageFloatingTitle')}
+      </ProductToolbarMenuGroupLabel>
+      <FloatingModeItems {...props} />
+      {props.currentViewport ? (
+        <>
+          <ProductToolbarMenuDivider />
+          <ProductToolbarMenuDetail id="sniptale-full-page-viewport-hint">
+            {translate('content.toolbar.fullPageCustomViewportHint')}
+          </ProductToolbarMenuDetail>
+        </>
       ) : null}
-    </div>
+    </ScreenshotCaptureSplitButton>
   );
 }

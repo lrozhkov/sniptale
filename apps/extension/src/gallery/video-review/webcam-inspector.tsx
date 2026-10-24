@@ -203,8 +203,28 @@ function WebcamLayout({ editor }: { editor: Editor }) {
         onChange={(id) => editor.navigate(id === 'base' ? null : id)}
       />
 
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('gallery.videoReview.webcamSplit')}
+        value={editor.split ?? 'docked'}
+        options={(['docked', 'left', 'right', 'top', 'bottom'] as const).map((side) => ({
+          value: side,
+          label: translate(`gallery.videoReview.webcamSplit_${side}`),
+        }))}
+        onChange={(side) => {
+          if (
+            side === 'docked' ||
+            side === 'left' ||
+            side === 'right' ||
+            side === 'top' ||
+            side === 'bottom'
+          )
+            editor.setSplit(side === 'docked' ? null : side);
+        }}
+      />
+
       <div className="review-inspector-columns">
-        <WebcamPlacement editor={editor} />
+        {!editor.split ? <WebcamPlacement editor={editor} /> : null}
         <WebcamCrop editor={editor} />
         {position ? (
           <div className="sniptale-parameter-stack">

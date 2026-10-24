@@ -25,11 +25,12 @@ let root: Root;
 const setPrompt = vi.fn();
 const start = vi.fn();
 const stop = vi.fn();
+const cancel = vi.fn();
 const submit = vi.fn();
 const textareaRef: { current: HTMLTextAreaElement | null } = { current: null };
 
 function createState(
-  args: { active?: boolean; caretPosition?: number | null; error?: boolean } = {}
+  args: { active?: boolean; pending?: boolean; caretPosition?: number | null; error?: boolean } = {}
 ): ComponentProps<typeof AIModalPromptField> {
   return {
     disabled: false,
@@ -43,9 +44,10 @@ function createState(
     templates: [],
     templatesLoading: false,
     voice: {
-      actions: { start, stop },
+      actions: { start, stop, cancel },
       state: {
         active: args.active ?? false,
+        pending: args.pending ?? false,
         audioLevel: 0,
         caretPosition: args.caretPosition ?? null,
         errorCode: args.error ? 'runtime' : null,
@@ -69,6 +71,7 @@ beforeEach(() => {
   setPrompt.mockClear();
   start.mockClear();
   stop.mockClear();
+  cancel.mockClear();
   submit.mockClear();
   textareaRef.current = null;
 });
@@ -99,22 +102,25 @@ describe('AI Modal prompt voice control', () => {
     ).toBe('default');
   });
 
-  it('stops active recognition before applying manual input', () => {
-    renderField(createState({ active: true }));
-    const textarea = container.querySelector<HTMLTextAreaElement>('#ai-prompt');
+  it.each([{ active: true }, { pending: true }])(
+    'cancels recognition before manual input (%j)',
+    (state) => {
+      renderField(createState(state));
+      const textarea = container.querySelector<HTMLTextAreaElement>('#ai-prompt');
 
-    act(() => {
-      const valueSetter = Object.getOwnPropertyDescriptor(
-        HTMLTextAreaElement.prototype,
-        'value'
-      )?.set;
-      valueSetter?.call(textarea, 'Manual value');
-      textarea?.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+      act(() => {
+        const valueSetter = Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          'value'
+        )?.set;
+        valueSetter?.call(textarea, 'Manual value');
+        textarea?.dispatchEvent(new Event('input', { bubbles: true }));
+      });
 
-    expect(stop).toHaveBeenCalledTimes(1);
-    expect(setPrompt).toHaveBeenCalledWith('Manual value');
-  });
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(setPrompt).toHaveBeenCalledWith('Manual value');
+    }
+  );
 
   it('restores the streamed caret and exposes errors accessibly', () => {
     renderField(createState({ caretPosition: 6, error: true }));

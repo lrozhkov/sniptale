@@ -17,7 +17,7 @@ const nativeSources = vi.hoisted(
 );
 
 vi.mock('mediabunny', () => ({
-  AppendOnlyStreamTarget: class {
+  StreamTarget: class {
     constructor(readonly stream: WritableStream<Uint8Array>) {}
   },
   MediaStreamAudioTrackSource: class {},

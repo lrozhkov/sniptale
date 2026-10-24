@@ -136,7 +136,9 @@ function beginHandleDrag(
   let next = anchors;
   let finished = false;
   let changed = false;
-  const move = (pointer: globalThis.PointerEvent) => {
+  let frame: number | null = null;
+  let latest: globalThis.PointerEvent | null = null;
+  const preview = (pointer: globalThis.PointerEvent) => {
     if (pointer.pointerId !== pointerId || !props.stageRef.current) return;
     const point = mapClientPointToCompositionPoint({
       camera: props.camera,
@@ -165,9 +167,19 @@ function beginHandleDrag(
     changed = true;
     props.onPreviewEffectAnchors?.(instanceId, next);
   };
+  const move = (pointer: globalThis.PointerEvent) => {
+    if (pointer.pointerId !== pointerId) return;
+    latest = pointer;
+    if (frame !== null) return;
+    frame = requestAnimationFrame(() => {
+      frame = null;
+      if (!finished && latest) preview(latest);
+    });
+  };
   const finish = (commit: boolean) => {
     if (finished) return;
     finished = true;
+    if (frame !== null) cancelAnimationFrame(frame);
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', cancel);
@@ -178,7 +190,7 @@ function beginHandleDrag(
   };
   const up = (pointer: globalThis.PointerEvent) => {
     if (pointer.pointerId === pointerId) {
-      if (changed) move(pointer);
+      if (changed || latest) preview(pointer);
       finish(true);
     }
   };

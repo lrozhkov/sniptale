@@ -319,6 +319,7 @@ function setTourHintCopy(current) {
 
 /** Keep the explanation clear of the floating controls without resizing the stage. */
 function avoidTourToolbar(root, viewport, hint, position, presentation, fit) {
+  if (presentation === 'caption-bottom') return;
   const toolbar = root.querySelector('.tour-toolbar');
   if (!toolbar) return;
   const controls = toolbar.getBoundingClientRect();

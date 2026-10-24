@@ -5,9 +5,5 @@ export function shouldRenderContentScenarioRecorderSidebar(args: {
   isToolbarVisible: boolean;
   scenario: Pick<ContentAppLayoutScenarioProps, 'state'>;
 }) {
-  return (
-    !args.isCompletelyHidden &&
-    args.scenario.state.captureAction === 'scenario' &&
-    args.scenario.state.scenarioEnabled
-  );
+  return !args.isCompletelyHidden && args.scenario.state.scenarioEnabled;
 }

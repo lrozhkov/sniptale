@@ -130,18 +130,21 @@ describe('AIModalContent keyboard shortcuts', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('stops voice input on the first Escape and closes on the second', async () => {
-    const onClose = vi.fn();
-    const onStopVoice = vi.fn();
+  it.each([{ voiceActive: true }, { voicePending: true }])(
+    'cancels voice on the first Escape and closes on the second (%j)',
+    async (voice) => {
+      const onClose = vi.fn();
+      const onStopVoice = vi.fn();
 
-    await renderBodyHarness({ onClose, onStopVoice, voiceActive: true });
-    await dispatchBodyModalEscape();
+      await renderBodyHarness({ onClose, onStopVoice, ...voice });
+      await dispatchBodyModalEscape();
 
-    expect(onStopVoice).toHaveBeenCalledTimes(1);
-    expect(onClose).not.toHaveBeenCalled();
+      expect(onStopVoice).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
 
-    await dispatchBodyModalEscape();
+      await dispatchBodyModalEscape();
 
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    }
+  );
 });

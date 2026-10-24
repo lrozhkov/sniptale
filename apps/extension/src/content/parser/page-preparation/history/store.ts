@@ -1,6 +1,8 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   applyHistoryEntry,
+  getPagePreparationHistoryDomain,
+  isHistoryDomainBlocked,
   createHistoryStoreState,
   notifyHistoryReachabilityChanged,
   publishHistoryState,
@@ -20,6 +22,7 @@ import type {
   PagePreparationChangeScope,
   PagePreparationHistoryBridge,
   PagePreparationHistoryState,
+  PagePreparationHistoryDomain,
   PagePreparationDomElement,
   PageDomElementState,
 } from './types';
@@ -58,8 +61,8 @@ function createHistoryStoreStateApi(state: HistoryStoreRuntimeState) {
       }
       return null;
     },
-    getState(): PagePreparationHistoryState {
-      return readHistoryState(state);
+    getState(domain?: PagePreparationHistoryDomain): PagePreparationHistoryState {
+      return readHistoryState(state, domain);
     },
     hasOpenTransactions(scope?: PagePreparationChangeScope): boolean {
       return [...state.transactions.values()].some(
@@ -104,13 +107,26 @@ function createHistoryStoreStateApi(state: HistoryStoreRuntimeState) {
 
 function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
   return {
-    redo(): void {
-      if (state.isApplying) {
+    redo(domain?: PagePreparationHistoryDomain): void {
+      if (
+        state.isApplying ||
+        (domain !== undefined &&
+          (state.transactions.size > 0 ||
+            state.deferredCommits.size > 0 ||
+            isHistoryDomainBlocked(state, domain) ||
+            state.past.some((entry) => entry.domEffect?.recoveryOnly === true)))
+      ) {
         return;
       }
       const previousPast = state.past;
       const previousFuture = state.future;
-      const next = previousFuture[0];
+      const index =
+        domain === undefined
+          ? 0
+          : previousFuture.findIndex(
+              (entry) => getPagePreparationHistoryDomain(entry.scope) === domain
+            );
+      const next = previousFuture[index];
       if (!next) {
         return;
       }
@@ -128,20 +144,32 @@ function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
       state.future =
         outcome.status === 'recovery'
           ? outcome.replaceCurrent
-            ? [outcome.entry, ...previousFuture.slice(1)]
+            ? [...previousFuture.slice(0, index), outcome.entry, ...previousFuture.slice(index + 1)]
             : previousFuture
-          : previousFuture.slice(1);
+          : [...previousFuture.slice(0, index), ...previousFuture.slice(index + 1)];
 
       notifyHistoryReachabilityChanged(state);
       publishHistoryState(state);
     },
-    undo(): void {
-      if (state.isApplying) {
+    undo(domain?: PagePreparationHistoryDomain): void {
+      if (
+        state.isApplying ||
+        (domain !== undefined &&
+          (state.transactions.size > 0 ||
+            state.deferredCommits.size > 0 ||
+            isHistoryDomainBlocked(state, domain)))
+      ) {
         return;
       }
       const previousPast = state.past;
       const previousFuture = state.future;
-      const next = previousPast[previousPast.length - 1];
+      const index =
+        domain === undefined
+          ? previousPast.length - 1
+          : previousPast.findLastIndex(
+              (entry) => getPagePreparationHistoryDomain(entry.scope) === domain
+            );
+      const next = previousPast[index];
       if (!next) {
         return;
       }
@@ -153,9 +181,9 @@ function createHistoryStoreNavigationApi(state: HistoryStoreRuntimeState) {
       state.past =
         outcome.status === 'recovery'
           ? outcome.replaceCurrent
-            ? [...previousPast.slice(0, -1), outcome.entry]
+            ? [...previousPast.slice(0, index), ...previousPast.slice(index + 1), outcome.entry]
             : [...previousPast, outcome.entry]
-          : previousPast.slice(0, -1);
+          : [...previousPast.slice(0, index), ...previousPast.slice(index + 1)];
       state.future =
         outcome.status === 'recovery' || next.domEffect?.recoveryOnly
           ? previousFuture

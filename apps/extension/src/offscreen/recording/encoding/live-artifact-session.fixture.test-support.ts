@@ -23,9 +23,9 @@ const MediaStreamAudioTrackSource = vi.hoisted(
 );
 
 const mediabunny = vi.hoisted(() => {
-  class AppendOnlyStreamTarget {
-    readonly writer: WritableStreamDefaultWriter<Uint8Array>;
-    constructor(stream: WritableStream<Uint8Array>) {
+  class StreamTarget {
+    readonly writer: WritableStreamDefaultWriter<{ data: Uint8Array; position: number }>;
+    constructor(stream: WritableStream<{ data: Uint8Array; position: number }>) {
       this.writer = stream.getWriter();
     }
   }
@@ -118,17 +118,17 @@ const mediabunny = vi.hoisted(() => {
       await this.target.writer.close();
     });
     readonly start = vi.fn(async () => {
-      await this.target.writer.write(new Uint8Array([1, 2, 3]));
+      await this.target.writer.write({ data: new Uint8Array([1, 2, 3]), position: 0 });
     });
     videoMetadata: { frameRate?: number } | null = null;
     videoSource: VideoSampleSource | null = null;
 
-    constructor(readonly input: { target: AppendOnlyStreamTarget }) {
+    constructor(readonly input: { target: StreamTarget }) {
       this.target = input.target;
       Output.instances.push(this);
     }
 
-    readonly target: AppendOnlyStreamTarget;
+    readonly target: StreamTarget;
 
     addVideoTrack(source: VideoSampleSource, metadata: { frameRate?: number } = {}) {
       this.videoSource = source;
@@ -140,7 +140,7 @@ const mediabunny = vi.hoisted(() => {
   }
 
   return {
-    AppendOnlyStreamTarget,
+    StreamTarget,
     MediaStreamAudioTrackSource,
     Mp4OutputFormat: class {},
     Output,

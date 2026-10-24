@@ -1,0 +1,47 @@
+@import '../../../packages/ui/src/styles/tailwind.css';
+
+@source './entry.tsx';
+
+.sniptale-picker-reference {
+  min-width: 0;
+  max-width: 100%;
+  font-family: var(--sniptale-font-interface);
+  --sniptale-font-interface: var(--font-ui);
+}
+
+.sniptale-picker-reference > * {
+  min-width: 0;
+}
+
+.sniptale-reference-profiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.sniptale-reference-profiles button {
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 4px;
+  background: var(--sniptale-color-surface-panel);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.sniptale-reference-profiles button[aria-pressed='true'] {
+  background: var(--sniptale-color-surface-hover);
+  border-color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-reference-name {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  font-size: 12px;
+  padding: 0 8px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 4px;
+  background: var(--sniptale-color-surface-input);
+}

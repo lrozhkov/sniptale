@@ -37,6 +37,7 @@ export interface LocalExtensionDataErasureDeps {
   extensionPageLocalStorage?: ExtensionPageLocalStorageErasureAdapter;
   videoPreviewCache: VideoPreviewCacheErasureAdapter;
   eventHistory: { erase(): Promise<void>; verifyEmpty(): Promise<boolean> };
+  voiceInputHistory: { erase(): Promise<void>; verifyEmpty(): Promise<boolean> };
 }
 
 interface PersistentErasureParticipantExecution {
@@ -122,6 +123,23 @@ function buildErasureParticipants(
         const empty = await deps.eventHistory.verifyEmpty();
         return {
           id: 'indexed-db:event-history',
+          severity: 'required',
+          status: empty ? 'verified-empty' : 'failed',
+          remainingCount: empty ? 0 : 1,
+        };
+      },
+    },
+    {
+      id: 'opfs:voice-input-history',
+      severity: 'required',
+      async erase() {
+        await deps.voiceInputHistory.erase();
+        return { id: 'opfs:voice-input-history', severity: 'required', status: 'erased' };
+      },
+      async verifyEmpty() {
+        const empty = await deps.voiceInputHistory.verifyEmpty();
+        return {
+          id: 'opfs:voice-input-history',
           severity: 'required',
           status: empty ? 'verified-empty' : 'failed',
           remainingCount: empty ? 0 : 1,

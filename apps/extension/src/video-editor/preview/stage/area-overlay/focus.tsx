@@ -8,11 +8,15 @@ import {
 } from 'react';
 import {
   clampQuickEditSpotlightArea,
+  resolveQuickEditLensArea,
+  authorQuickEditLensArea,
+  areQuickEditSpotlightAreasEqual,
   type QuickEditSpotlight,
 } from '../../../../features/video/project/scene/focus-appearance';
 import { resolveVideoCompositionVisualLayers } from '../../../../features/video/composition/timeline/frame/layers';
 import {
   mapWindowNormalizedPointToVisualLayer,
+  getVisualLayerMappingWindow,
   mapVisualLayerPointToWindowNormalized,
   type VisualLayerSourcePointMapping,
 } from '../../../../features/video/composition/draw/fitted-media';
@@ -63,7 +67,9 @@ export function PreviewStageFocusAreaOverlay(params: AreaOverlayParams) {
     !params.onPreviewMotion
   )
     return null;
-  const area = displayedAppearance.area;
+  const area = displayed?.spotlight
+    ? resolveQuickEditLensArea(displayed.spotlight, mapping.window)
+    : displayedAppearance.area;
   const corners = [
     ['nw', { x: area.x, y: area.y }],
     ['ne', { x: area.x + area.width, y: area.y }],
@@ -131,14 +137,23 @@ function useFocusAreaEditing(
   const appearance = region?.border ?? region?.spotlight;
   if (!region || !appearance || !mapping) return null;
   const kind = region.border ? 'border' : 'spotlight';
+  const originArea = region.spotlight
+    ? resolveQuickEditLensArea(region.spotlight, mapping.window)
+    : appearance.area;
+  const circleRatio =
+    region.spotlight?.effect === 'magnify' && region.spotlight.lensShape === 'circle'
+      ? mapping.window.height / mapping.window.width
+      : undefined;
+  const authoredArea = (area: Area) =>
+    region.spotlight ? authorQuickEditLensArea(region.spotlight, area) : area;
   const preview = (next: Area | null) =>
     params.onPreviewMotion?.(
-      next
+      next && !areQuickEditSpotlightAreasEqual(next, originArea)
         ? {
             project: accepted,
             regionId: region.id,
             kind: 'focus',
-            edit: { kind, settings: { area: next } },
+            edit: { kind, settings: { area: authoredArea(next) } },
           }
         : null
     );
@@ -148,14 +163,11 @@ function useFocusAreaEditing(
     !getVideoProjectUtilityLanes(live.current.motionProject ?? live.current.project).camera.locked;
   const commit = (next: Area) => {
     preview(null);
-    if (
-      isCurrent() &&
-      Object.keys(next).some(
-        (key) => next[key as keyof Area] !== appearance.area[key as keyof Area]
-      )
-    )
+    if (areQuickEditSpotlightAreasEqual(next, originArea)) return;
+    const area = authoredArea(next);
+    if (isCurrent() && !areQuickEditSpotlightAreasEqual(area, authoredArea(originArea)))
       params.onUpdateMotionRegion(region.id, {
-        focusEdit: { kind, settings: { area: next } },
+        focusEdit: { kind, settings: { area } },
       });
   };
   const begin = (
@@ -171,7 +183,7 @@ function useFocusAreaEditing(
     const node = event.currentTarget;
     node.focus();
     const pointerId = event.pointerId;
-    const origin = appearance.area;
+    const origin = originArea;
     let next = origin;
     const cleanup = () => {
       window.removeEventListener('pointermove', move);
@@ -196,8 +208,10 @@ function useFocusAreaEditing(
         dy = point.y - start.y;
       next =
         mode === 'move'
-          ? clampQuickEditSpotlightArea({ ...origin, x: origin.x + dx, y: origin.y + dy })
-          : resizeFocusArea(origin, mode, dx, dy);
+          ? circleRatio
+            ? { ...origin, x: origin.x + dx, y: origin.y + dy }
+            : clampQuickEditSpotlightArea({ ...origin, x: origin.x + dx, y: origin.y + dy })
+          : resizeFocusArea(origin, mode, dx, dy, circleRatio);
       preview(next);
     };
     const finish = (input: PointerEvent) => {
@@ -228,19 +242,32 @@ function useFocusAreaEditing(
     if (!dx && !dy) return;
     event.preventDefault();
     event.stopPropagation();
-    const origin = appearance.area;
+    const origin = originArea;
     commit(
       corner
-        ? resizeFocusArea(origin, corner, dx, dy)
-        : clampQuickEditSpotlightArea({ ...origin, x: origin.x + dx, y: origin.y + dy })
+        ? resizeFocusArea(origin, corner, dx, dy, circleRatio)
+        : circleRatio
+          ? { ...origin, x: origin.x + dx, y: origin.y + dy }
+          : clampQuickEditSpotlightArea({ ...origin, x: origin.x + dx, y: origin.y + dy })
     );
   };
   return { begin, keyboard, cancel: () => session.current?.() };
 }
 
-function resizeFocusArea(area: Area, corner: Corner, dx: number, dy: number): Area {
+function resizeFocusArea(area: Area, corner: Corner, dx: number, dy: number, ratio?: number): Area {
   const right = area.x + area.width,
     bottom = area.y + area.height;
+  if (ratio) {
+    const west = corner.endsWith('w'),
+      north = corner.startsWith('n');
+    const horizontal = area.width + (west ? -dx : dx);
+    const vertical = (area.height + (north ? -dy : dy)) * ratio;
+    const preferred = Math.abs(dx) >= Math.abs(dy * ratio) ? horizontal : vertical;
+    const maximum = Math.min(west ? right : 1 - area.x, (north ? bottom : 1 - area.y) * ratio);
+    const width = Math.min(maximum, Math.max(0.01 * Math.min(1, ratio), preferred));
+    const height = width / ratio;
+    return { x: west ? right - width : area.x, y: north ? bottom - height : area.y, width, height };
+  }
   const x = corner.endsWith('w') ? Math.max(0, Math.min(right - 0.01, area.x + dx)) : area.x;
   const y = corner.startsWith('n') ? Math.max(0, Math.min(bottom - 0.01, area.y + dy)) : area.y;
   return {
@@ -270,6 +297,9 @@ function focusTargetMapping(params: AreaOverlayParams, stage: HTMLDivElement) {
     lock = shouldLockPreviewClipToViewport(layer.clip, params.camera, project);
   }
   return {
+    window: mapping
+      ? getVisualLayerMappingWindow(mapping)
+      : { x: 0, y: 0, width: project.width, height: project.height },
     toStage(point: Point): Point | null {
       const scene = mapping
         ? mapWindowNormalizedPointToVisualLayer({ ...mapping, point })

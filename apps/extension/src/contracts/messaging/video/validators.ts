@@ -5,6 +5,7 @@ import {
   parseVideoRecordingProfiles,
   VIDEO_AUTO_FADE_DELAYS,
   VideoResolutionPreset,
+  VideoDisplaySurface,
   type CaptureMode as CaptureModeValue,
   type VideoRecordingLiveMediaState,
   type VideoMicrophoneActivity,
@@ -51,6 +52,7 @@ const videoExportScopeSet = new Set<string>(Object.values(VideoExportScope));
 const videoMp4CodecSet = new Set<string>(Object.values(VideoMp4Codec));
 const videoWebmCodecSet = new Set<string>(Object.values(VideoWebmCodec));
 const videoResolutionPresetSet = new Set<string>(Object.values(VideoResolutionPreset));
+const videoDisplaySurfaceSet = new Set<string>(Object.values(VideoDisplaySurface));
 const captureModeSet = new Set<string>(Object.values(CaptureMode));
 const videoAutoFadeDelaySet = new Set<number>(VIDEO_AUTO_FADE_DELAYS);
 
@@ -96,6 +98,7 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
     !Object.hasOwn(value, 'output') &&
     isBoolean(value['microphoneEnabled']) &&
     hasOptionalField(value, 'warnWithoutMicrophone', isBoolean) &&
+    hasOptionalField(value, 'teleprompterEnabled', isBoolean) &&
     (value['microphoneDeviceId'] === null || isString(value['microphoneDeviceId'])) &&
     hasOptionalField(value, 'echoCancellation', isBoolean) &&
     hasOptionalField(value, 'noiseSuppression', isBoolean) &&
@@ -173,6 +176,9 @@ export function isVideoMicrophoneActivity(value: unknown): value is VideoMicroph
 export function isVideoRecordingRuntimeState(value: unknown): value is VideoRecordingRuntimeState {
   return (
     isRecord(value) &&
+    (value['displaySurface'] === undefined ||
+      value['displaySurface'] === null ||
+      isEnumValue(value['displaySurface'], videoDisplaySurfaceSet)) &&
     (value['outputProfile'] === undefined ||
       value['outputProfile'] === null ||
       isVideoOutputProfile(value['outputProfile'])) &&

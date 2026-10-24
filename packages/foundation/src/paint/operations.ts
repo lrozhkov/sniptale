@@ -113,7 +113,15 @@ export function removeGradientStop(gradient: Gradient, id: string): Gradient {
 export function reverseGradient(gradient: Gradient): Gradient {
   return {
     ...structuredClone(gradient),
-    stops: gradient.stops.map((stop) => ({ ...stop, position: 1 - stop.position })).reverse(),
+    stops: gradient.stops
+      .map((stop, index) => ({
+        ...stop,
+        position: 1 - stop.position,
+        // A midpoint belongs to the outgoing segment, whose other endpoint leads after reversal.
+        midpoint:
+          index > 0 ? 1 - gradient.stops[index - 1]!.midpoint : gradient.stops.at(-1)!.midpoint,
+      }))
+      .reverse(),
   };
 }
 

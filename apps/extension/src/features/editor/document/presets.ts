@@ -1,3 +1,4 @@
+import type { LinearGradient } from '@sniptale/foundation/paint';
 import type { EditorFrameSettings } from './types';
 import type { EditorGradientColorStop } from './gradient';
 import type { EditorStepSettings } from './step-types';
@@ -31,6 +32,8 @@ export interface EditorSceneBackgroundSettings {
   backgroundGradientStops?: string[] | undefined;
   backgroundGradientColorStops?: EditorGradientColorStop[] | undefined;
   backgroundGradientAngle: number;
+  /** Complete gradient; omitted for legacy documents. */
+  backgroundGradient?: LinearGradient | undefined;
   backgroundImageData: EditorFrameSettings['backgroundImageData'];
   backgroundImageFit: EditorFrameSettings['backgroundImageFit'];
   sourceImage?: EditorFrameSettings['sourceImage'];

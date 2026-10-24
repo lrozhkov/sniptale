@@ -58,6 +58,7 @@ beforeEach(() => {
     refresh: vi.fn(() => 'refresh-1'),
     start: vi.fn(() => 'session-1'),
     stop: vi.fn(() => 'stop-1'),
+    cancel: vi.fn(() => 'cancel-1'),
     subscribe: vi.fn((listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -99,7 +100,7 @@ it('stops the active session and rejects later transcript when the modal becomes
   await act(async () => latest?.actions.start('Before after', 7));
   renderHarness(false);
 
-  expect(client.stop).toHaveBeenCalledWith('session-1');
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
   expect(latest?.state.caretPosition).toBeNull();
 
   emit({
@@ -122,7 +123,7 @@ it('prevents a session started during template loading from overwriting the reso
         resolveTemplate = resolve;
       }),
     setPrompt: (nextPrompt) => latestSetPrompt?.(nextPrompt),
-    stopVoiceInput: () => latest?.actions.stop(),
+    stopVoiceInput: () => latest?.actions.cancel(),
     textareaRef: { current: null },
   });
   const pendingSelection = selection({
@@ -145,6 +146,40 @@ it('prevents a session started during template loading from overwriting the reso
     type: VoiceInputPortMessageType.TRANSCRIPT,
   });
 
-  expect(client.stop).toHaveBeenCalledWith('session-1');
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
   expect(latestPrompt).toBe('Resolved template\n\nBefore after');
+});
+
+it('retains its caret after Stop until the final transcript arrives', async () => {
+  await act(async () => latest?.actions.start('Before after', 7));
+  act(() => latest?.actions.stop());
+  expect(latest?.state.pending).toBe(true);
+  await act(async () => latest?.actions.start('Wrong target', 0));
+  emit({
+    type: VoiceInputPortMessageType.TRANSCRIPT,
+    sessionId: 'session-1',
+    confidence: null,
+    sequence: 1,
+    text: 'final',
+    isFinal: true,
+  });
+  expect(client.start).toHaveBeenCalledOnce();
+  expect(client.stop).toHaveBeenCalledWith('session-1');
+  expect(latestPrompt).toBe('Before final after');
+});
+
+it('rejects processing output when the owner cancels', async () => {
+  await act(async () => latest?.actions.start('Before after', 7));
+  act(() => latest?.actions.stop());
+  act(() => latest?.actions.cancel());
+  emit({
+    type: VoiceInputPortMessageType.TRANSCRIPT,
+    sessionId: 'session-1',
+    confidence: null,
+    sequence: 1,
+    text: 'late',
+    isFinal: true,
+  });
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
+  expect(latestPrompt).toBe('Before after');
 });

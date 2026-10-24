@@ -51,7 +51,15 @@ vi.mock('../../features/highlighter/frame-annotation/step-badge/interactive-surf
     ) : null,
 }));
 vi.mock('./callout-projection', () => ({
-  EditorFrameCallout: () => null,
+  EditorFrameCallout: (props: {
+    calloutIndex: number;
+    onSettingsOpen: (anchor: HTMLButtonElement) => void;
+  }) => (
+    <button
+      data-callout-index={props.calloutIndex}
+      onClick={(event) => props.onSettingsOpen(event.currentTarget)}
+    />
+  ),
   resolveCalloutCenter: () => null,
 }));
 
@@ -245,7 +253,8 @@ it('opens the same numbering settings session from the inline badge handle', () 
 it('adds comments through the fifth, deletes one, and routes primary settings to index zero', () => {
   const host = document.createElement('div');
   const controlsRoot = document.createElement('div');
-  document.body.append(host, controlsRoot);
+  const sceneRoot = document.createElement('div');
+  document.body.append(host, controlsRoot, sceneRoot);
   const root = createRoot(host);
   const initial = createFrameAnnotationSnapshot(
     {
@@ -277,7 +286,7 @@ it('adds comments through the fifth, deletes one, and routes primary settings to
         controlsRoot={controlsRoot}
         interactive
         object={object}
-        sceneRoot={null}
+        sceneRoot={sceneRoot}
         selected
         scale={1}
         snapshot={snapshot}
@@ -303,26 +312,22 @@ it('adds comments through the fifth, deletes one, and routes primary settings to
   for (let count = 2; count <= 5; count += 1) {
     act(() => add.click());
     expect(latest.additionalCallouts).toHaveLength(count - 1);
-    expect(
-      document.querySelector('[data-ui="callout-settings-open"]')?.getAttribute('data-instance-id')
-    ).toBe(latest.additionalCallouts?.at(-1)?.instanceId);
+    expect(document.querySelector('[data-ui="callout-settings-open"]')).toBeNull();
   }
   expect(add.disabled).toBe(true);
+  const primary = Array.from(controlsRoot.querySelectorAll('button')).find(
+    (button) => button.title === translate('content.interactiveFrame.calloutSettings')
+  );
+  act(() => document.querySelector<HTMLButtonElement>('[data-callout-index="4"]')?.click());
   act(() => document.querySelector<HTMLButtonElement>('[data-ui="delete-callout"]')?.click());
   expect(latest.additionalCallouts).toHaveLength(3);
   expect(add.disabled).toBe(false);
   act(() => add.click());
   expect(latest.additionalCallouts).toHaveLength(4);
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  expect(document.activeElement).toBeInstanceOf(HTMLButtonElement);
-  expect((document.activeElement as HTMLButtonElement).disabled).toBe(false);
-
-  const primary = Array.from(controlsRoot.querySelectorAll('button')).find(
-    (button) => button.title === translate('content.interactiveFrame.calloutSettings')
-  );
+  expect(document.querySelector('[data-ui="callout-settings-open"]')).toBeNull();
   act(() => primary?.click());
   expect(
     document.querySelector('[data-ui="callout-settings-open"]')?.getAttribute('data-instance-id')
-  ).toBe(initial.callout?.instanceId);
+  ).toBe(latest.callout?.instanceId);
   act(() => root.unmount());
 });

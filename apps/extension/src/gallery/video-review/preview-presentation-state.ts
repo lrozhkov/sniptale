@@ -80,23 +80,31 @@ export function resolvePresentationDescription(
       position: comments[comment.id] ?? comment.position,
     })),
   };
-  const key = JSON.stringify([
-    scene,
-    input.canonical,
-    input.css,
-    input.preferences,
-    input.sourceFrameRate,
-    input.seekRevision,
-    input.backgroundPending,
-    input.playing,
-    interacting,
-    !input.playing && input.cameraTransform,
-    !input.playing && input.pausedSourceTime,
-    !input.playing && input.pausedResultTime,
-    placement,
-    input.webcam?.editor.crop,
-    input.webcam?.editor.placement,
-  ]);
+  const key = JSON.stringify(
+    [
+      scene,
+      input.canonical,
+      input.css,
+      input.preferences,
+      input.sourceFrameRate,
+      input.seekRevision,
+      input.backgroundPending,
+      input.playing,
+      interacting,
+      !input.playing && input.cameraTransform,
+      !input.playing && input.pausedSourceTime,
+      !input.playing && input.pausedResultTime,
+      placement,
+      input.webcam?.editor.crop,
+      input.webcam?.editor.placement,
+    ],
+    (_key, value: unknown) =>
+      value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(
+            Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+          )
+        : value
+  );
   if (previous?.key !== key) {
     const backing = resolveQuickPreviewRasterSize({
       canonical: input.canonical,

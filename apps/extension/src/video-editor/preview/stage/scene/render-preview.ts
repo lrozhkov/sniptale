@@ -3,7 +3,16 @@ import {
   type VideoCompositionMediaSource,
   type VideoCompositionFrameSource,
 } from '../../../../features/video/composition/draw/media-source';
-import { publishCompletedPreviewFrame } from './canvas';
+import {
+  beginPreviewViewportClip,
+  publishCompletedPreviewFrame,
+  type PreparedPreviewSceneCanvas,
+} from './canvas';
+import {
+  drawDeferredCameraSplitSpotlights,
+  paintCameraSplitScreen,
+  resolveActiveCameraSplit,
+} from '../../../../features/video/composition/camera-split';
 import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
 import { drawCompositionBorders } from '../../../../features/video/composition/draw/border';
@@ -16,6 +25,9 @@ import { drawSpatialSceneOverlays } from '../../../../features/video/composition
 import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 import {
+  createEffectRuntimeDrawState,
+  drawCompositionVisualLayer,
+  drawEffectRuntimeVisualLayer,
   drawSceneActionCompositionStates,
   drawCursorCompositionState,
 } from '../../../../features/video/composition/draw';
@@ -262,8 +274,12 @@ async function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): Promise
     args.renderPasses.overlayFrame,
     ...args.renderPasses.visualPasses.map((pass) => pass.frame),
   ].some((frame) => frame.camera.spatial !== undefined);
-  if (!spatial && !args.watermark && !args.effectRuntimeFrames?.prepareVisualPass)
-    return drawResolvedPreviewSceneContent(args);
+  if (!spatial && !args.watermark && !args.effectRuntimeFrames?.prepareVisualPass) {
+    const drawn = await drawResolvedPreviewSceneContent(args);
+    if (drawn)
+      args.params.canvas.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
+    return drawn;
+  }
   const presented = args.params.canvas;
   const owned = !args.params.stagingCanvas;
   const staging = args.params.stagingCanvas?.() ?? presented.ownerDocument.createElement('canvas');
@@ -283,6 +299,28 @@ async function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): Promise
       staging.height = 0;
     }
   }
+}
+
+function drawPreviewDeferredCameraSpotlights(
+  args: ResolvedPreviewSceneArgs,
+  prepared: PreparedPreviewSceneCanvas,
+  split: NonNullable<ReturnType<typeof resolveActiveCameraSplit>>
+) {
+  const { context, viewport } = prepared;
+  drawDeferredCameraSplitSpotlights({
+    context,
+    split,
+    frame: args.renderPasses.overlayFrame,
+    project: args.params.project,
+    images: args.params.imageBank,
+    viewport: {
+      x: viewport.offsetX,
+      y: viewport.offsetY,
+      width: viewport.width,
+      height: viewport.height,
+    },
+    composition: { x: viewport.offsetX, y: viewport.offsetY, scale: viewport.scale },
+  });
 }
 
 async function drawResolvedPreviewSceneContent(
@@ -345,6 +383,48 @@ async function drawResolvedPreviewSceneContent(
     spatialRenderer: args.params.spatialRenderer,
   });
   const { context, viewport } = overlayPrepared;
+  const split = resolveActiveCameraSplit(
+    args.params.project,
+    args.params.currentTime,
+    args.renderPasses.overlayFrame.visualLayers
+  );
+  if (split) {
+    paintCameraSplitScreen(
+      context,
+      {
+        x: viewport.offsetX * overlayPrepared.dpr,
+        y: viewport.offsetY * overlayPrepared.dpr,
+        width: viewport.width * overlayPrepared.dpr,
+        height: viewport.height * overlayPrepared.dpr,
+      },
+      split.screen,
+      args.params.canvas.ownerDocument
+    );
+    beginPreviewViewportClip(overlayPrepared);
+    try {
+      if (
+        !drawEffectRuntimeVisualLayer({
+          context,
+          frames: args.effectRuntimeFrames?.overlayFrames,
+          layer: split.layer,
+          scaleX: viewport.scale,
+          scaleY: viewport.scale,
+          state: createEffectRuntimeDrawState(),
+        })
+      )
+        drawCompositionVisualLayer(
+          context,
+          split.layer,
+          viewport.scale,
+          viewport.scale,
+          args.params.imageBank,
+          args.clipMediaElements
+        );
+    } finally {
+      context.restore();
+    }
+    drawPreviewDeferredCameraSpotlights(args, overlayPrepared, split);
+  }
   if (args.captions.plan.cues.length || args.watermark) {
     context.save();
     try {

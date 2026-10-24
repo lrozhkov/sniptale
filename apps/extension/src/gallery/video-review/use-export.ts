@@ -9,7 +9,7 @@ import { useReviewSizeEstimate } from './use-size-estimate';
 import { useReviewExportSettings } from './use-review-export-settings';
 import { configuredReviewExportPlan } from '../../workflows/video-review/export-configuration';
 import { createReviewFragment } from '../../features/video/review/fragment';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   inspectReviewMedia,
   type ReviewMediaIndex,
@@ -237,7 +237,7 @@ export function useReviewExport(resource: LoadedReview) {
   );
   const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
     reviewExportPlan(resource, index, renderSettings, selection);
-  const choices = reviewExportChoices(resource, index, renderSettings);
+  const choices = useReviewExportChoices(resource, index, renderSettings);
   const sizeEstimate = useReviewSizeEstimate({
     resource,
     index,
@@ -365,20 +365,33 @@ export function useReviewExport(resource: LoadedReview) {
   };
 }
 
-/** Source preservation and size-probe intent follow the same committed export plan. */
-function reviewExportChoices(
+type ExportDocument = ReturnType<LoadedReview['session']['getSnapshot']>['document'];
+type ExportUi = ReturnType<
+  LoadedReview['session']['getSnapshot']
+>['snapshot']['workspace']['advanced']['ui'];
+
+/** Advisory choices use explicit immutable inputs; export actions read the session again. */
+function useReviewExportChoices(
   resource: LoadedReview,
   index: ReviewMediaIndex | null,
   settings: ReviewRenderSettings
 ) {
-  const current = reviewExportPlan(resource, index, settings);
-  const { quality: _quality, ...sourceSettings } = settings;
-  const source =
-    settings.quality === undefined ? current : reviewExportPlan(resource, index, sourceSettings);
-  return {
-    sourceVideoAvailable: source.kind === 'ready' && source.video === 'copy',
-    rendering: current.kind === 'ready' && current.video === 'render',
-  };
+  const { document, snapshot } = resource.session.getSnapshot();
+  const ui = snapshot.workspace.advanced.ui;
+  const telemetry = resource.telemetry;
+  const duration = resource.source.duration;
+  return useMemo(() => {
+    const current = reviewExportInputPlan(document, ui, telemetry, duration, index, settings);
+    const { quality: _quality, ...sourceSettings } = settings;
+    const source =
+      settings.quality === undefined
+        ? current
+        : reviewExportInputPlan(document, ui, telemetry, duration, index, sourceSettings);
+    return {
+      sourceVideoAvailable: source.kind === 'ready' && source.video === 'copy',
+      rendering: current.kind === 'ready' && current.video === 'render',
+    };
+  }, [document, ui, telemetry, duration, index, settings]);
 }
 
 /** Successful resource recovery clears only the corresponding export reason. */
@@ -396,22 +409,40 @@ function reviewExportPlan(
   selection?: Extract<ReviewAnchor, { kind: 'range' }>
 ): QuickEditExportPlan {
   const state = resource.session.getSnapshot();
+  return reviewExportInputPlan(
+    state.document,
+    state.snapshot.workspace.advanced.ui,
+    resource.telemetry,
+    resource.source.duration,
+    index,
+    renderSettings,
+    selection
+  );
+}
+
+function reviewExportInputPlan(
+  document: ExportDocument,
+  ui: ExportUi,
+  telemetry: LoadedReview['telemetry'],
+  duration: number,
+  index: ReviewMediaIndex | null,
+  renderSettings: ReviewRenderSettings,
+  selection?: Extract<ReviewAnchor, { kind: 'range' }>
+): QuickEditExportPlan {
   const fragment =
     selection && index
       ? createReviewFragment({
           selection,
           duration: index.duration,
           boundaries: index.boundaries,
-          snapToKeyframes: state.snapshot.workspace.advanced.ui.mode !== 'advanced',
-          edits: state.document.edits,
+          snapToKeyframes: ui.mode !== 'advanced',
+          edits: document.edits,
         })
       : null;
-  const advanced = { ui: state.snapshot.workspace.advanced.ui, ...state.document.advancedContent };
-  const fullMap = buildReviewTimeMap(resource.source.duration, state.document.edits);
+  const advanced = { ui: ui, ...document.advancedContent };
+  const fullMap = buildReviewTimeMap(duration, document.edits);
   const actionPlan = buildReviewActionAudioPlan({
-    markers: resource.telemetry
-      ? projectReviewTelemetry(resource.telemetry, resource.source.duration).markers
-      : [],
+    markers: telemetry ? projectReviewTelemetry(telemetry, duration).markers : [],
     settings: advanced.actionAudio ?? [],
     segments: fullMap,
     applied: resolveQuickEditEffectiveFeatures(advanced).actionsApplied,
@@ -430,7 +461,7 @@ function reviewExportPlan(
     includeBookends: !selection,
     index,
     renderSettings,
-    document: fragment ? { ...state.document, edits: fragment.edits } : state.document,
+    document: fragment ? { ...document, edits: fragment.edits } : document,
     advanced,
     actionAudioPresent,
     ...(index ? { videoCopyBoundaries: index.boundaries } : {}),

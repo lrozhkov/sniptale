@@ -332,13 +332,18 @@ function parseProject(
   ) {
     return { status: 'unsupported', version };
   }
+  let admittedTour: GuideProject['tour'];
   if (value['tour'] !== undefined) {
     const tour = parseTourDocument(value['tour']);
     if (tour.status === 'unsupported') return { ...tour, representation: 'tour' };
     if (tour.status !== 'ok') return { status: 'invalid' };
+    admittedTour = tour.document;
   }
-  const result = schema.safeParse(value);
-  if (!result.success || !hasUniqueGuideIds(result.data)) return { status: 'invalid' };
+  // The detached tour has already passed its schema and reference checks.
+  const result = schema.safeParse(admittedTour ? { ...value, tour: undefined } : value);
+  if (!result.success) return { status: 'invalid' };
+  if (admittedTour) result.data.tour = admittedTour;
+  if (!hasUniqueGuideIds(result.data)) return { status: 'invalid' };
   if (
     result.data.purpose === 'step-template' &&
     (result.data.tour !== undefined ||

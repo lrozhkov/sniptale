@@ -95,7 +95,13 @@ export function createCompositionCutSampleSource(params: {
   };
   return {
     dispose,
-    async sample(time: number, signal: AbortSignal, fallback: 'first' | 'last') {
+    /** The explicit snapshot is fixed for this request; source decoders remain keyed by URL. */
+    async sample(
+      time: number,
+      signal: AbortSignal,
+      fallback: 'first' | 'last',
+      project: VideoProject = params.project
+    ) {
       const owned: { close(): void }[] = [];
       const media = new Map<string, VideoCompositionFrameSource>();
       let released = false;
@@ -112,7 +118,7 @@ export function createCompositionCutSampleSource(params: {
       if (signal.aborted) dispose();
       try {
         check();
-        const passes = resolveVideoCompositionRenderPasses(params.project, time);
+        const passes = resolveVideoCompositionRenderPasses(project, time);
         const needed = new Set(
           [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)].flatMap((frame) =>
             frame.visualLayers
@@ -120,12 +126,12 @@ export function createCompositionCutSampleSource(params: {
               .map((layer) => layer.clipId)
           )
         );
-        for (const clip of params.project.clips) {
+        for (const clip of project.clips) {
           if (
             clip.type !== 'VIDEO' ||
             !needed.has(clip.id) ||
             !isClipActiveAtTime(clip, time) ||
-            !hasCameraMediaAt(params.project, clip, time)
+            !hasCameraMediaAt(project, clip, time)
           )
             continue;
           const url = params.sourceUrl(clip);

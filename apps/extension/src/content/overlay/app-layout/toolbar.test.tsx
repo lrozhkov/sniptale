@@ -198,29 +198,40 @@ async function verifiesToolbarForwardsFutureFrameStyleSession() {
 
 async function verifiesScenarioSidebarPreloadOnIntent() {
   const props = createProps();
+  props.scenario.state.scenarioEnabled = false;
+  props.scenario.state.sidebarVisible = true;
+  props.toolbar.captureAction = 'copy';
   await renderShell(props);
-
-  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
-    scenario: {
-      onCaptureActionSelected: (action: 'scenario' | 'copy') => Promise<void> | void;
-      onToggleSidebar: () => Promise<void> | void;
+  const toolbarProps = () =>
+    toolbarMock.mock.calls.at(-1)?.[0] as {
+      captureAction: string;
+      onCaptureActionChange: (action: 'copy') => void;
+      scenario: { sidebarVisible: boolean; onToggleSidebar: () => Promise<boolean> };
     };
-  };
-
-  await lastToolbarProps.scenario.onCaptureActionSelected('scenario');
+  expect(toolbarProps().scenario.sidebarVisible).toBe(false);
+  await expect(toolbarProps().scenario.onToggleSidebar()).resolves.toBe(true);
+  expect(props.scenario.actions.setRecorderPanelVisible).toHaveBeenLastCalledWith(true);
   expect(preloadContentScenarioRecorderSidebarMock).toHaveBeenCalledTimes(1);
+  expect(props.toolbar.setCaptureAction).not.toHaveBeenCalled();
+  expect(toolbarProps().captureAction).toBe('copy');
   expect(props.toolbar.modeController.handleEnableCursorMode).not.toHaveBeenCalled();
+
+  props.scenario.state.scenarioEnabled = true;
+  await renderShell(props);
+  expect(toolbarProps().scenario.sidebarVisible).toBe(true);
+  await expect(toolbarProps().scenario.onToggleSidebar()).resolves.toBe(true);
+  expect(props.scenario.actions.setRecorderPanelVisible).toHaveBeenLastCalledWith(false);
+  expect(preloadContentScenarioRecorderSidebarMock).toHaveBeenCalledTimes(1);
 
   props.scenario.state.sidebarVisible = false;
   await renderShell(props);
-  const rerenderedToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
-    scenario: {
-      onToggleSidebar: () => Promise<void> | void;
-    };
-  };
-
-  await rerenderedToolbarProps.scenario.onToggleSidebar();
+  await expect(toolbarProps().scenario.onToggleSidebar()).resolves.toBe(true);
+  expect(props.scenario.actions.setRecorderPanelVisible).toHaveBeenLastCalledWith(true);
   expect(preloadContentScenarioRecorderSidebarMock).toHaveBeenCalledTimes(2);
+  const toggles = vi.mocked(props.scenario.actions.setRecorderPanelVisible).mock.calls.length;
+  toolbarProps().onCaptureActionChange('copy');
+  expect(props.toolbar.setCaptureAction).toHaveBeenCalledExactlyOnceWith('copy');
+  expect(props.scenario.actions.setRecorderPanelVisible).toHaveBeenCalledTimes(toggles);
 }
 
 async function verifiesScenarioFinishUsesExplicitScreenshotExit() {
@@ -304,6 +315,59 @@ async function verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface() {
 
 describe('ContentToolbarShell', () => {
   useContentToolbarShellTestScope();
+  it('clears the recording surface request before hiding and allows retry after refusal', async () => {
+    const props = createProps();
+    props.toolbar.modes.videoRecordingMode = true;
+    const drawingOwner = createRecordingDrawingOwner();
+    let resolveHide!: () => void;
+    const onHide = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Surface command refused'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveHide = resolve;
+          })
+      );
+    const emptyAction = vi.fn();
+    props.toolbar.videoRecording = {
+      drawingOwner,
+      state: INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
+      onActivate: () => true,
+      onCancelStart: emptyAction,
+      onCameraEnabledChange: emptyAction,
+      onCameraGeometryChange: emptyAction,
+      onCameraOffer: async () => 'answer',
+      onCameraPeerClose: emptyAction,
+      onDeactivate: () => true,
+      onHide,
+      onInteractionChange: emptyAction,
+      onMicrophoneEnabledChange: emptyAction,
+      onPause: emptyAction,
+      onResume: emptyAction,
+      onSpotlightEnabledChange: emptyAction,
+      onStart: emptyAction,
+      onStop: emptyAction,
+    };
+    await renderShell(props);
+    const toolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as { onHide: () => void };
+    await act(async () => {
+      toolbarProps.onHide();
+    });
+    expect(onHide).toHaveBeenCalledOnce();
+    expect(props.toolbar.setPinnedToolbarVisible).not.toHaveBeenCalled();
+    expect(showToastMock).toHaveBeenCalledOnce();
+    await act(async () => {
+      toolbarProps.onHide();
+    });
+    expect(onHide).toHaveBeenCalledTimes(2);
+    expect(props.toolbar.setPinnedToolbarVisible).not.toHaveBeenCalled();
+    await act(async () => resolveHide());
+    expect(props.toolbar.setPinnedToolbarVisible).toHaveBeenCalledWith(false);
+    expect(props.toolbar.videoRecording.onStop).not.toHaveBeenCalled();
+    expect(props.toolbar.videoRecording.onCameraEnabledChange).not.toHaveBeenCalled();
+    drawingOwner.dispose();
+  });
   it.each([true, false])(
     'restores collapsed toolbar focus only for keyboard activation: %s',
     verifiesCollapseFocus

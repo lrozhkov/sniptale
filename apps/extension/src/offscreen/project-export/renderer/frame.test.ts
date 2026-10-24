@@ -17,6 +17,9 @@ const {
   drawExportSceneBackgroundMock,
   drawTransitionOverlayMock,
   resolveVideoCompositionRenderPassesMock,
+  cameraSplitMock,
+  cameraSplitPaintMock,
+  deferredSpotlightMock,
 } = vi.hoisted(() => ({
   drawSceneActionCompositionStatesMock: vi.fn(),
   drawCompositionLayerMock: vi.fn(),
@@ -24,6 +27,15 @@ const {
   drawExportSceneBackgroundMock: vi.fn(),
   drawTransitionOverlayMock: vi.fn(),
   resolveVideoCompositionRenderPassesMock: vi.fn(),
+  cameraSplitMock: vi.fn(() => null),
+  cameraSplitPaintMock: vi.fn(),
+  deferredSpotlightMock: vi.fn(),
+}));
+
+vi.mock('../../../features/video/composition/camera-split', () => ({
+  resolveActiveCameraSplit: cameraSplitMock,
+  paintCameraSplitScreen: cameraSplitPaintMock,
+  drawDeferredCameraSplitSpotlights: deferredSpotlightMock,
 }));
 
 vi.mock('../../../features/video/composition/draw', async (importOriginal) => ({
@@ -77,6 +89,30 @@ function createContext() {
     translate: vi.fn(),
   } as unknown as CanvasRenderingContext2D;
 }
+
+it('applies deferred camera spotlight masks after painting the split camera in export', async () => {
+  const { drawProjectFrame } = await import('./frame');
+  const context = createContext();
+  const { frame, project } = createRenderedFrame();
+  const camera = frame.visualLayers[0]!;
+  const split = {
+    clipId: camera.clipId,
+    layer: camera,
+    screen: { x: 0.51, y: 0, width: 0.49, height: 1 },
+    camera: { x: 0, y: 0, width: 0.49, height: 1 },
+  };
+  cameraSplitMock.mockReturnValueOnce(split as never).mockReturnValueOnce(split as never);
+  resolveVideoCompositionRenderPassesMock.mockReturnValue({
+    overlayFrame: frame,
+    visualPasses: [{ alpha: 1, frame, time: 0, transitionOverlays: [] }],
+  });
+  await drawProjectFrame(context, project, { width: 200, height: 100 } as never, 1, {}, new Map());
+  expect(cameraSplitPaintMock).toHaveBeenCalledOnce();
+  expect(deferredSpotlightMock).toHaveBeenCalledWith(expect.objectContaining({ context, split }));
+  expect(drawCompositionLayerMock.mock.invocationCallOrder.at(-1)!).toBeLessThan(
+    deferredSpotlightMock.mock.invocationCallOrder[0]!
+  );
+});
 
 function createTransformTrackingContext() {
   let translationX = 0;

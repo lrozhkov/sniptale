@@ -1,5 +1,9 @@
+import { useVideoEditorStore } from '../../../state/store';
 import { describe, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createVideoProjectFromRecording,
+  createEmptyVideoProject,
+} from '../../../../features/video/project/factories/creation';
 import {
   VideoClipLinkMode,
   VideoMediaFitMode,
@@ -154,4 +158,40 @@ describe('transferred audio envelope editing', () => {
     expect(store.getState().project?.clips[0]?.audioGainEnd).toBe(0.4);
     expect(project.clips[0]?.playbackWindow).toEqual(window);
   });
+});
+
+it('restores transferred muted AUDIO through one positive-volume history action', () => {
+  const store = useVideoEditorStore;
+  const initial = store.getState();
+  try {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'recording',
+      filename: 'Source',
+      duration: 4,
+      width: 640,
+      height: 360,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: true,
+    });
+    const audio = project.clips.find((clip) => clip.type === 'AUDIO')!;
+    const video = project.clips.find((clip) => clip.type === 'VIDEO')!;
+    audio.muted = true;
+    store.getState().setProject(project);
+    const history = store.getState().projectHistory.past.length;
+    store.getState().updateClipVolume(audio.id, 0.6);
+    expect(store.getState().project!.clips.find((clip) => clip.id === audio.id)).toMatchObject({
+      muted: false,
+      audioGainStart: 0.6,
+      audioGainEnd: 0.6,
+    });
+    expect(store.getState().projectHistory.past.length).toBe(history + 1);
+    expect(store.getState().project!.clips.find((clip) => clip.id === video.id)?.muted).toBe(true);
+    store.getState().undoProject();
+    expect(store.getState().project!.clips.find((clip) => clip.id === audio.id)?.muted).toBe(true);
+    store.getState().redoProject();
+    expect(store.getState().project!.clips.find((clip) => clip.id === audio.id)?.muted).toBe(false);
+  } finally {
+    store.setState(initial, true);
+  }
 });

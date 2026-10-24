@@ -343,7 +343,7 @@ it.each(['annotation', 'hotspot'] as const)(
   }
 );
 
-it('keeps a bottom caption clear of floating toolbar controls without changing stage geometry', async () => {
+it('keeps a bottom caption anchored beneath floating toolbar controls without changing stage geometry', async () => {
   const { player, root } = await mount();
   const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
   const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
@@ -360,7 +360,7 @@ it('keeps a bottom caption clear of floating toolbar controls without changing s
       type: 'annotation',
       object: {
         id: 'caption',
-        text: 'Caption above controls',
+        text: 'Caption beneath controls',
         anchor: null,
         appearance: null,
       },
@@ -368,7 +368,7 @@ it('keeps a bottom caption clear of floating toolbar controls without changing s
   ];
   player.update(input);
   expect(hint.hidden).toBe(false);
-  expect(360 - Number.parseFloat(hint.style.bottom)).toBe(292);
+  expect(Number.parseFloat(hint.style.bottom)).toBe(0);
   const dimensions = root.querySelector<HTMLElement>('[data-tour-stage]')!.style.cssText;
   const toggle = root.querySelector<HTMLButtonElement>('[data-tour-hints]')!;
   toggle.click();
@@ -377,7 +377,7 @@ it('keeps a bottom caption clear of floating toolbar controls without changing s
   expect(hint.hidden).toBe(true);
   toggle.click();
   expect(hint.hidden).toBe(false);
-  expect(360 - Number.parseFloat(hint.style.bottom)).toBe(292);
+  expect(Number.parseFloat(hint.style.bottom)).toBe(0);
   expect(root.querySelector<HTMLElement>('[data-tour-stage]')!.style.cssText).toBe(dimensions);
 });
 

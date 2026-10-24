@@ -64,3 +64,6 @@ test-results/
 /AGENTS.md
 /DESIGN.md
 /.agents/
+
+# Built local design-reference picker panels
+/tooling/design-reference/.generated/

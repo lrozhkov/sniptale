@@ -27,7 +27,12 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
   })),
 }));
 
-import { createDefaultSettings, patchSettings, resetSettingsToDefaults } from './index';
+import {
+  createDefaultSettings,
+  patchSettings,
+  saveSettings,
+  resetSettingsToDefaults,
+} from './index';
 
 describe('settings mutations', () => {
   beforeEach(() => {
@@ -81,5 +86,24 @@ describe('settings mutations', () => {
       },
       expect.anything()
     );
+  });
+
+  it('normalizes deprecated configurable actions through canonical saves and patches', async () => {
+    await saveSettings({ ...createDefaultSettings(), captureAction: 'scenario', imageQuality: 71 });
+    expect(browserStorageSyncSetMock).toHaveBeenLastCalledWith(
+      {
+        sniptale_settings: expect.objectContaining({
+          captureAction: 'download_default',
+          imageQuality: 71,
+        }),
+      },
+      expect.anything()
+    );
+    await expect(
+      patchSettings({ captureAction: 'scenario', imageQuality: 72 })
+    ).resolves.toMatchObject({
+      captureAction: 'download_default',
+      imageQuality: 72,
+    });
   });
 });

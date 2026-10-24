@@ -1,3 +1,4 @@
+import { ScenarioPanelToggle } from './scenario-panel-toggle';
 import { ToolbarCaptureActionMenu, ToolbarTimerMenu, ToolbarViewportMenu } from './menus';
 import type { ToolbarCaptureActionsProps } from '../types';
 import { getCaptureActionIcon, getCaptureActionOptions, getTimerOptions } from './options';
@@ -123,6 +124,7 @@ export function ToolbarCaptureMenuGroup(
       >
         {viewportMenu}
       </PageControlVisibility>
+      {captureProps.scenario ? <ScenarioPanelToggle scenario={captureProps.scenario} /> : null}
     </>
   );
 }

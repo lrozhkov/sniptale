@@ -1,4 +1,7 @@
-import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -77,6 +80,41 @@ it('places keyboard-accessible targets over the decorated window and excludes th
     ]);
     act(() => button.click());
     expect(select).toHaveBeenCalledWith('a');
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('matches the unselected circular lens target to its physical circle bounds', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'circle', at: 0 }),
+    spotlight: {
+      ...createQuickEditSpotlight(),
+      effect: 'magnify' as const,
+      lensShape: 'circle' as const,
+    },
+  };
+  try {
+    act(() =>
+      root.render(
+        <ReviewStageFocusTargets
+          video={{ x: 0, y: 0, width: 400, height: 200 }}
+          output={{ width: 400, height: 200 }}
+          picker={{ regions: [region], onSelect: vi.fn() }}
+        />
+      )
+    );
+    const button = host.querySelector('button')!;
+    expect([button.style.left, button.style.top, button.style.width, button.style.height]).toEqual([
+      '150px',
+      '50px',
+      '100px',
+      '100px',
+    ]);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

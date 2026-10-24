@@ -250,3 +250,104 @@
     opacity: 0;
   }
 }
+
+/* Screenshot groups paint one neutral surface only while the pointer is over them. */
+.sniptale-content-toolbar-adopted .sniptale-screenshot-split-control {
+  background: transparent;
+}
+
+.sniptale-content-toolbar-adopted .sniptale-screenshot-split-control:has(> button:enabled:hover) {
+  background: var(--sniptale-color-surface-hover);
+}
+
+.sniptale-toolbar-root .sniptale-screenshot-split-control::after {
+  display: none;
+}
+
+.sniptale-screenshot-menu {
+  width: 300px;
+}
+
+.sniptale-capture-action-icons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px;
+}
+
+.sniptale-capture-action-icons .sniptale-capture-action-icon {
+  display: inline-flex;
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+
+.sniptale-capture-action-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sniptale-capture-image-parameters {
+  display: grid;
+  gap: 12px;
+  padding: 4px 8px 8px;
+}
+
+.sniptale-capture-parameter-label {
+  color: var(--sniptale-color-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.sniptale-capture-parameter-field {
+  display: grid;
+  gap: 6px;
+}
+
+.sniptale-capture-quality-input {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm, 4px);
+  background: var(--sniptale-color-surface-input);
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-capture-quality-input > input,
+.sniptale-capture-quality-input > span {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.sniptale-capture-quality-input > input {
+  text-align: start;
+}
+
+.sniptale-capture-quality-input:hover,
+.sniptale-capture-quality-input:focus-within {
+  border-color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-capture-quality-input:has(input:focus-visible) {
+  outline: 1px solid var(--sniptale-color-text-secondary);
+  outline-offset: 1px;
+}
+
+.sniptale-selection-capture-menu {
+  width: 260px;
+  min-width: 260px;
+}
+
+.sniptale-selection-capture-menu.sniptale-content-menu-adopted
+  .sniptale-capture-action-icons
+  .sniptale-capture-action-icon {
+  min-height: 32px;
+  padding: 0;
+  justify-content: center;
+}

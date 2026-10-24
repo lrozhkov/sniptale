@@ -133,6 +133,8 @@ export function loadImageMetadata(blob: Blob): Promise<LoadedImageMetadata> {
     const image = new Image();
 
     const cleanup = () => {
+      image.onload = null;
+      image.onerror = null;
       URL.revokeObjectURL(url);
       image.src = '';
     };

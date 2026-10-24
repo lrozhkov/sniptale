@@ -184,3 +184,17 @@ it('projects validated surface and runtime subscriptions', () => {
   expect(surfaceListener).toHaveBeenCalledWith(expect.any(Object), 'token-1');
   expect(runtimeListener).toHaveBeenCalledOnce();
 });
+
+it('forwards the selected page area target with a fresh trusted start intent', async () => {
+  sendRuntimeMessage.mockResolvedValue({ success: true });
+  await startSavedTabVideoRecording(new Event('click'), {
+    captureMode: 'TAB_CROP',
+    confirmedWithoutMicrophone: true,
+  });
+  expect(sendRuntimeMessage).toHaveBeenCalledWith({
+    type: 'START_SAVED_TAB_VIDEO_RECORDING',
+    captureMode: 'TAB_CROP',
+    confirmedWithoutMicrophone: true,
+    contentIntent: { requestId: 'request-1', token: 'intent-1' },
+  });
+});

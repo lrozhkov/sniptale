@@ -46,8 +46,8 @@ function CaptureActionDropdownItems(props: {
       <ProductToolbarMenuItem
         key={option.value}
         dataUi={`content.toolbar.capture-action-option.${option.value}`}
-        onMouseDown={createToolbarMenuItemClickHandler(() => props.onSelect(option.value))}
-        onClick={preventToolbarMenuClick}
+        onMouseDown={preventToolbarMenuClick}
+        onClick={createToolbarMenuItemClickHandler(() => props.onSelect(option.value))}
         selected={isSelected}
       >
         {option.icon}
@@ -62,13 +62,14 @@ export function resolveCaptureActionMenuLayout(
   props: Pick<
     CaptureActionDropdownProps,
     'captureButtonRef' | 'displayMode' | 'getMenuPosition' | 'viewportRightInset'
-  >
+  >,
+  menuHeight = 340
 ) {
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.captureButtonRef,
     displayMode: props.displayMode,
     getMenuPosition: props.getMenuPosition,
-    menuHeight: 340,
+    menuHeight,
     menuWidth: 280,
     ...(props.viewportRightInset === undefined
       ? {}
@@ -80,7 +81,19 @@ export function resolveCaptureActionMenuLayout(
 
 export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
   const adopted = React.useContext(CommandPressScope);
-  const { placement: menuPlacement, style } = resolveCaptureActionMenuLayout(props);
+  const [menuHeight, setMenuHeight] = React.useState(340);
+  React.useLayoutEffect(() => {
+    const surface = props.captureDropdownMenuRef.current?.firstElementChild;
+    if (!(surface instanceof HTMLElement)) return;
+    const measure = () => {
+      if (surface.offsetHeight) setMenuHeight(surface.offsetHeight);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(surface);
+    return () => observer?.disconnect();
+  }, [props.captureDropdownMenuRef, props.compactMenus]);
+  const { placement: menuPlacement, style } = resolveCaptureActionMenuLayout(props, menuHeight);
 
   if (!style) {
     return null;
@@ -97,7 +110,7 @@ export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
         title={translate('content.toolbar.afterCaptureTitle')}
         variant="capture"
         placement={menuPlacement}
-        style={style}
+        style={{ ...style, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}
       >
         <CaptureActionDropdownItems
           captureAction={props.captureAction}

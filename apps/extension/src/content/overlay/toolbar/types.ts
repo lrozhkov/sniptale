@@ -1,3 +1,4 @@
+import type { ScreenshotStartContext } from '../screenshot/types';
 import type { PagePreparationResetScope } from '../../parser/page-preparation/history';
 import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
@@ -20,11 +21,17 @@ import type {
   RecordingDrawingOwner,
 } from './video-recording/drawing-session';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import type { VideoOutputProfile } from '@sniptale/runtime-contracts/video/types/types';
 import type { WebcamPresentationPatch } from '../../../features/video/recording/webcam-presentation';
 
 export interface ToolbarVideoRecordingProps {
   drawingOwner: RecordingDrawingOwner;
   state: VideoRecordingToolbarState;
+  setupPending?: boolean;
+  captureMode?: 'TAB' | 'TAB_CROP';
+  onCaptureModeChange?: (mode: 'TAB' | 'TAB_CROP') => void;
+  onQualityProfileChange?: (profileId: string) => Promise<void>;
+  onOutputProfileChange?: (outputProfile: VideoOutputProfile) => Promise<void>;
   onActivate: (activationEvent?: Event) => Promise<boolean> | boolean;
   onCancelStart: () => Promise<void> | void;
   onCameraEnabledChange: (enabled: boolean) => Promise<void> | void;
@@ -41,6 +48,7 @@ export interface ToolbarVideoRecordingProps {
   onCameraOffer: (sdp: string) => Promise<string>;
   onCameraPeerClose: () => Promise<void> | void;
   onDeactivate: () => Promise<boolean> | boolean;
+  onHide?: () => Promise<void>;
   onAutoHideDelayChange?: (delay: RecordingDrawingAutoHideDelay) => Promise<void> | void;
   onInteractionChange: (interaction: VideoRecordingToolbarInteraction) => void;
   onMicrophoneEnabledChange: (enabled: boolean) => Promise<void> | void;
@@ -126,7 +134,8 @@ export interface ToolbarCaptureActionsProps {
   toolbarMenuState: ToolbarMenuState;
   onTakeScreenshot: (
     type: 'visible' | 'full' | 'selection',
-    contentIntentSource?: ContentPrivilegedActionIntentSource
+    contentIntentSource?: ContentPrivilegedActionIntentSource,
+    startContext?: ScreenshotStartContext
   ) => void;
   scenario?: ToolbarProps['scenario'];
 }
@@ -200,7 +209,8 @@ export interface ToolbarProps {
   ) => void;
   onTakeScreenshot: (
     type: 'visible' | 'full' | 'selection',
-    contentIntentSource?: ContentPrivilegedActionIntentSource
+    contentIntentSource?: ContentPrivilegedActionIntentSource,
+    startContext?: ScreenshotStartContext
   ) => void;
   onHide: (restoreFocus?: boolean) => void;
   onClearHighlights: () => void;
@@ -223,14 +233,13 @@ export interface ToolbarProps {
     byClickDisabled: boolean;
     captureMode: 'manual' | 'by-click';
     enabled: boolean;
-    onCaptureActionSelected: (action: CaptureActionType) => Promise<void> | void;
     onCreateProject: (name: string) => Promise<void> | void;
     onFinishScenario: () => Promise<void> | void;
     onOpenEditor: (stepId?: string | null) => void;
     onProjectSelect: (projectId: string) => Promise<void> | void;
     onRememberProjectSelectionChange?: (value: boolean) => Promise<void> | void;
     onSetCaptureMode: (captureMode: 'manual' | 'by-click') => void;
-    onToggleSidebar: () => void;
+    onToggleSidebar: () => Promise<boolean> | boolean | void;
     projectId: string | null;
     projectName: string | null;
     projects: Array<{ id: string; name: string }>;

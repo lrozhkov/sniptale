@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 import { createVideoPreviewFrameMaterializer } from '../../../../preview/cache/materializer';
 import { createVideoPreviewRenderIdentity } from '../../../../preview/cache/revision';
@@ -10,19 +10,16 @@ export function useFramingFrame(
   camera: VideoCompositionCameraState
 ) {
   const { project, region, assetUrls } = props;
-  const identity = useMemo(
-    () => createVideoPreviewRenderIdentity({ ...project, motionRegions: [] }),
-    [project]
-  );
+  const identity = useFramingSourceIdentity(project);
   const time = Math.min(project.duration, region.startTime + region.duration / 2);
   const key = JSON.stringify([
-    identity,
     time,
     Object.entries(assetUrls).sort(([a], [b]) => a.localeCompare(b)),
   ]);
-  const [request, setRequest] = useState(() => ({ key, project, assetUrls, time }));
+  const [request, setRequest] = useState(() => ({ key, identity, project, assetUrls, time }));
   // Camera edits change composition, not the decoded source frame or its runtime.
-  if (request.key !== key) setRequest({ key, project, assetUrls, time });
+  if (request.key !== key || request.identity !== identity)
+    setRequest({ key, identity, project, assetUrls, time });
   const [frame, setFrame] = useState<{
     request: typeof request;
     hasFrame: boolean;
@@ -109,4 +106,23 @@ function createFramingRenderQueue(params: {
     latest = { camera, key };
     if (!running) void drain();
   };
+}
+
+/** Immutable editor snapshots replace changed fields; motion and metadata do not change this source. */
+function useFramingSourceIdentity(project: FramingPreviewProps['project']) {
+  const previous = useRef<{ inputs: Map<string, unknown>; identity: string } | null>(null);
+  const inputs = Object.entries(project).filter(
+    ([key]) => !['motionRegions', 'name', 'createdAt', 'updatedAt'].includes(key)
+  );
+  if (
+    !previous.current ||
+    previous.current.inputs.size !== inputs.length ||
+    inputs.some(([key, value]) => !Object.is(previous.current!.inputs.get(key), value))
+  ) {
+    previous.current = {
+      inputs: new Map(inputs),
+      identity: createVideoPreviewRenderIdentity({ ...project, motionRegions: [] }),
+    };
+  }
+  return previous.current.identity;
 }

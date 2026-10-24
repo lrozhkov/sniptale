@@ -99,6 +99,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
     throw new Error('Use --port with an integer from 0 to 65535.');
   }
+  const { build } = await import('vite');
+  await build({
+    configFile: resolve(repositoryRoot, 'tooling/design-reference/pickers/vite.config.ts'),
+  });
   const server = createDesignReferenceServer();
   server.on('error', (error) => {
     process.stderr.write(`Design reference server: ${error.message}\n`);

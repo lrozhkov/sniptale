@@ -92,6 +92,60 @@ describe('preview stage zoom navigator', () => {
     ).toEqual({ left: 1000, top: 600 });
   });
 
+  it('updates completed frames without repainting idle or scrolled thumbnails', () => {
+    vi.useFakeTimers();
+    const drawImage = vi.fn();
+    const context = { clearRect: vi.fn(), drawImage };
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    const viewport = document.createElement('div');
+    const content = document.createElement('div');
+    const source = document.createElement('canvas');
+    source.setAttribute('data-preview-stage-canvas', '');
+    content.append(source);
+    Object.defineProperties(viewport, {
+      clientHeight: { value: 300 },
+      clientWidth: { value: 500 },
+      scrollHeight: { configurable: true, value: 900 },
+      scrollWidth: { value: 1500 },
+    });
+    try {
+      act(() =>
+        root?.render(
+          <PreviewStageZoomNavigator
+            contentRef={{ current: content }}
+            viewportRef={{ current: viewport }}
+          />
+        )
+      );
+      expect(drawImage).toHaveBeenCalledOnce();
+      act(() => vi.advanceTimersByTime(1000));
+      expect(drawImage).toHaveBeenCalledOnce();
+      act(() => viewport.dispatchEvent(new Event('scroll')));
+      expect(drawImage).toHaveBeenCalledOnce();
+      act(() => source.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true })));
+      expect(drawImage).toHaveBeenCalledOnce();
+      act(() => {
+        source.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
+        vi.advanceTimersByTime(250);
+      });
+      expect(drawImage).toHaveBeenCalledTimes(2);
+      Object.defineProperty(viewport, 'scrollHeight', { value: 1800 });
+      act(() => window.dispatchEvent(new Event('resize')));
+      expect(drawImage).toHaveBeenCalledTimes(3);
+      act(() => source.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true })));
+      act(() => root?.unmount());
+      root = null;
+      act(() => vi.advanceTimersByTime(1000));
+      source.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
+      expect(drawImage).toHaveBeenCalledTimes(3);
+    } finally {
+      getContext.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('starts drag navigation and releases the window pointer session on unmount', () => {
     const viewport = document.createElement('div');
     const content = document.createElement('div');

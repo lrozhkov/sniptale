@@ -334,3 +334,39 @@ it('freezes area selection only when invoked by the elapsed countdown', async ()
     expect.objectContaining({ freezeSelection: true, runToken: 1 })
   );
 });
+
+it('forwards a delayed one-shot action without retaining it after a capture failure', async () => {
+  const args = createArgs();
+  const source = { kind: 'trusted-content-event' } as const;
+  runViewportScreenshotMock.mockRejectedValueOnce(new Error('capture refused'));
+  await executeCountdownScreenshot('full', args, 1, source, 'copy');
+  expect(runViewportScreenshotMock).toHaveBeenLastCalledWith('full', args.runtime, {
+    captureAction: 'copy',
+    contentIntentSource: source,
+    runToken: 1,
+    showSuccessToast: true,
+  });
+  expect(showScreenshotErrorMock).toHaveBeenCalled();
+  await executeCountdownScreenshot('visible', args, 1, source);
+  expect(runViewportScreenshotMock).toHaveBeenLastCalledWith('visible', args.runtime, {
+    contentIntentSource: source,
+    runToken: 1,
+    showSuccessToast: true,
+  });
+  expect(args.params.setCaptureAction).not.toHaveBeenCalled();
+  expect(args.runtime.captureActionRef.current).toBe('download_default');
+});
+
+it('refuses a cancelled countdown override before another ordinary capture', async () => {
+  const args = createArgs();
+  args.session.runGeneration = 2;
+  await executeCountdownScreenshot('full', args, 1, undefined, 'copy');
+  expect(runViewportScreenshotMock).not.toHaveBeenCalled();
+  await executeCountdownScreenshot('visible', args, 2);
+  expect(runViewportScreenshotMock).toHaveBeenCalledExactlyOnceWith('visible', args.runtime, {
+    contentIntentSource: undefined,
+    runToken: 2,
+    showSuccessToast: true,
+  });
+  expect(args.runtime.captureActionRef.current).toBe('download_default');
+});

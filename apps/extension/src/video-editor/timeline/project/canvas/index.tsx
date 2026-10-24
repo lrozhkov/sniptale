@@ -1,9 +1,10 @@
+import { TimelineEffectDraftContext } from '../effect-lanes/segment';
 import { getTimelineHistoryLayout } from '../effect-lanes/history-layout';
 import { ProjectTimelineCursorLane } from '../effect-lanes/cursor-lane';
 import { projectTimelinePoint, type TimelineProjection } from '../interaction-state/projection';
 import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import { useCallback, useState, type MutableRefObject } from 'react';
+import { useCallback, useContext, useState, type MutableRefObject } from 'react';
 import type { VideoProject } from '../../../../features/video/project/types';
 import type { VideoEditorImportPlacement } from '../../../contracts/insertion';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
@@ -128,6 +129,7 @@ function resolveTimelinePlayheadHeight(params: {
 
 export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
   const model = useProjectTimelineCanvasModel(props);
+  const effectDraft = useContext(TimelineEffectDraftContext);
 
   return (
     <div
@@ -135,7 +137,7 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
       data-ui="video-editor.timeline.canvas-scroll"
       tabIndex={-1}
       onPointerDownCapture={focusTimelineWorkingSurface}
-      className="relative min-w-0 overflow-auto outline-none"
+      className="relative isolate min-w-0 overflow-auto outline-none"
       onClick={createCanvasSeekHandler(
         props.consumeCompletedScrubClick,
         props.onSelectScene,
@@ -154,6 +156,8 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
         cursorLaneVisible={model.cursorLaneVisible}
         telemetryLaneVisible={model.telemetryLaneVisible}
         hoverTime={model.hoverPreview.hoverTime}
+        hoverPointer={model.hoverPreview.pointer}
+        timingFeedback={props.dragGhost?.timingFeedback ?? effectDraft?.timingFeedback}
         onClearHoverPreview={model.hoverPreview.clearHoverPreview}
         playheadHeight={model.playheadHeight}
         playheadX={
@@ -245,6 +249,8 @@ function ProjectTimelineCanvasContent(
   props: ProjectTimelineCanvasProps & {
     cursorLaneVisible: boolean;
     hoverTime: number | null;
+    hoverPointer: { clientX: number; clientY: number } | null;
+    timingFeedback: TimelineClipDragGhost['timingFeedback'] | undefined;
     onClearHoverPreview: () => void;
     playheadHeight: number;
     playheadX: number | null;
@@ -283,6 +289,9 @@ function ProjectTimelineCanvasContent(
         <ProjectTimelineHoverPreview
           height={props.playheadHeight}
           hoverTime={props.hoverTime}
+          pointer={props.hoverPointer}
+          timingFeedback={props.timingFeedback}
+          timelineRef={props.timelineRef}
           pixelsPerSecond={props.pixelsPerSecond}
           projection={props.projection}
         />

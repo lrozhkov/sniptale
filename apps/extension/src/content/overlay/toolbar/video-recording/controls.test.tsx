@@ -448,3 +448,14 @@ it('groups auto-hide, eraser, clear, and cursor spotlight in that order', () => 
     'content.toolbar.video-recording.cursor-settings',
   ]);
 });
+
+for (const phase of ['idle', 'error', 'starting', 'recording', 'paused', 'stopping'] as const) {
+  it(`shows output and target setup only before capture: ${phase}`, () => {
+    renderPhase(phase);
+    const setupVisible = phase === 'idle' || phase === 'error';
+    expect(Boolean(queryButton('content.toolbar.video-recording.quality.menu'))).toBe(setupVisible);
+    expect(Boolean(queryButton('content.toolbar.video-recording.capture-target.menu'))).toBe(
+      setupVisible
+    );
+  });
+}

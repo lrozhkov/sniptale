@@ -1,6 +1,16 @@
 import { defineMessageSource } from '../source';
 
 export const sharedUiMessages = defineMessageSource({
+  colorSelectorOriginal: { ru: 'Исходный', en: 'Original' },
+  colorSelectorCurrent: { ru: 'Новый', en: 'New' },
+  colorSelectorCopy: { ru: 'Копировать цвет', en: 'Copy color' },
+  colorSelectorCopied: { ru: 'Цвет скопирован', en: 'Color copied' },
+  colorSelectorCopyFailed: {
+    ru: 'Не удалось скопировать. Выделите значение и скопируйте вручную.',
+    en: 'Could not copy. Select the value and copy it manually.',
+  },
+  colorSelectorCompactMode: { ru: 'Компактный режим', en: 'Compact mode' },
+  colorSelectorFullMode: { ru: 'Полный режим', en: 'Full mode' },
   numericOutsideSliderRange: { ru: 'Вне шкалы слайдера', en: 'Outside slider range' },
   clearField: {
     ru: 'Очистить поле «{field}»',

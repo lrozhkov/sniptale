@@ -13,13 +13,14 @@ import {
   setDefaultGradientPresetForSurface,
   resetGradientPreset,
   reorderGradientPresetCatalog,
+  renameGradientPreset,
   updateGradientPreset,
   type GradientPresetCatalog,
   type GradientPresetMutationOutcome,
   type GradientPresetSurface,
 } from '../persistence/gradient-presets';
 
-const createPresetId = () =>
+export const createGradientPresetId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? `gradient-${crypto.randomUUID()}`
     : `gradient-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -57,8 +58,14 @@ export function useGradientPresetCatalog(surface: GradientPresetSurface) {
           return false;
         }
         const generation = ++publicationGenerationRef.current;
-        const next = await loadGradientPresetCatalog();
-        if (activeRef.current && generation === publicationGenerationRef.current) setCatalog(next);
+        try {
+          const next = await loadGradientPresetCatalog();
+          if (activeRef.current && generation === publicationGenerationRef.current)
+            setCatalog(next);
+        } catch {
+          // The mutation is accepted. A failed refresh must not invite a duplicate save.
+          if (activeRef.current) showToast(translate('highlighter.paintPicker.loadError'), 'error');
+        }
         return true;
       } catch {
         showToast(translate('highlighter.paintPicker.saveError'), 'error');
@@ -76,12 +83,12 @@ export function useGradientPresetCatalog(surface: GradientPresetSurface) {
         isDefault: catalog?.defaultPresetIdBySurface[surface] === preset.id,
       })),
       actions: {
-        onSave: (name: string, gradient: Gradient) =>
+        onSave: (name: string, gradient: Gradient, id = createGradientPresetId()) =>
           run(() =>
             addGradientPreset({
               customized: false,
               enabled: true,
-              id: createPresetId(),
+              id,
               name,
               order: catalog?.presets.length ?? 0,
               origin: 'user',
@@ -98,14 +105,11 @@ export function useGradientPresetCatalog(surface: GradientPresetSurface) {
         onSetDefault: (id: string) => run(() => setDefaultGradientPresetForSurface(surface, id)),
         onResetPreset: (id: string) => run(() => resetGradientPreset(id)),
         onReorder: (ids: readonly string[]) => run(() => reorderGradientPresetCatalog(ids)),
-        onRename: (id: string, name: string) => {
-          const preset = catalog?.presets.find((item) => item.id === id);
-          return preset
-            ? run(() => updateGradientPreset(id, preset.gradient, name))
-            : Promise.resolve(false);
-        },
+        onRename: (id: string, name: string) => run(() => renameGradientPreset(id, name)),
       },
     }),
     [catalog, locale, run, surface]
   );
 }
+
+export type GradientTemplateResources = ReturnType<typeof useGradientPresetCatalog>;

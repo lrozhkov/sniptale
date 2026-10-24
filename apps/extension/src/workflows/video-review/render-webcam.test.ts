@@ -3,7 +3,7 @@ import { createQuickEditWebcam } from '../../features/video/review/advanced/webc
 import {
   createReviewWebcamRenderer,
   drawReviewWebcam,
-  inspectReviewWebcamFrameDuration,
+  inspectReviewWebcamMetadata,
 } from './render-webcam';
 
 const state = vi.hoisted(() => ({
@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   stats: vi.fn(),
   declaredDuration: 3,
   actualDuration: 3,
+  duration: vi.fn<() => Promise<number>>(),
 }));
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
@@ -24,7 +25,7 @@ vi.mock('mediabunny', () => ({
       return {
         canDecode: async () => true,
         getDecoderConfig: async () => ({ codec: 'avc1.42001e' }),
-        computeDuration: async () => state.actualDuration,
+        computeDuration: state.duration,
         getDisplayWidth: async () => 640,
         getDisplayHeight: async () => 480,
         getTimeResolution: async () => 1000,
@@ -83,13 +84,15 @@ beforeEach(() => {
   state.missing = false;
   state.declaredDuration = 3;
   state.actualDuration = 3;
+  state.duration.mockImplementation(async () => state.actualDuration);
   state.stats.mockResolvedValue({ averagePacketRate: 10 });
 });
 
 it('seeds native seek tolerance from bounded metadata without decoding the camera', async () => {
-  expect(await inspectReviewWebcamFrameDuration(await read(), new AbortController().signal)).toBe(
-    0.1
-  );
+  expect(await inspectReviewWebcamMetadata(await read(), new AbortController().signal)).toEqual({
+    duration: 3,
+    frameDuration: 0.1,
+  });
   expect(state.stats).toHaveBeenCalledWith(60, { metadataOnly: true });
   expect(state.samples).toHaveLength(0);
   expect(state.disposed).toHaveBeenCalledOnce();
@@ -98,14 +101,14 @@ it('seeds native seek tolerance from bounded metadata without decoding the camer
 it('releases cadence inspection after invalid metadata and cancellation', async () => {
   state.stats.mockResolvedValueOnce({ averagePacketRate: 0 });
   await expect(
-    inspectReviewWebcamFrameDuration(await read(), new AbortController().signal)
+    inspectReviewWebcamMetadata(await read(), new AbortController().signal)
   ).rejects.toThrow('cadence');
   const abort = new AbortController();
   state.stats.mockImplementationOnce(async () => {
     abort.abort();
     return { averagePacketRate: 30 };
   });
-  await expect(inspectReviewWebcamFrameDuration(await read(), abort.signal)).rejects.toThrow();
+  await expect(inspectReviewWebcamMetadata(await read(), abort.signal)).rejects.toThrow();
   expect(state.samples).toHaveLength(0);
   expect(state.disposed).toHaveBeenCalled();
 });
@@ -266,4 +269,26 @@ it('exports the evaluated per-point crop using the same painter as live preview'
   );
   expect(state.samples[0]!.draw.mock.calls[0]).toEqual(reference.mock.calls[0]);
   renderer.dispose();
+});
+
+it.each([Infinity, NaN, 0, -1])(
+  'rejects invalid inspected track duration %s and releases input',
+  async (duration) => {
+    state.actualDuration = duration;
+    await expect(
+      inspectReviewWebcamMetadata(await read(), new AbortController().signal)
+    ).rejects.toThrow('duration');
+    expect(state.disposed).toHaveBeenCalledOnce();
+  }
+);
+
+it('releases metadata input when the camera is cancelled during duration inspection', async () => {
+  const abort = new AbortController();
+  state.duration.mockImplementationOnce(async () => {
+    abort.abort();
+    return 3;
+  });
+  await expect(inspectReviewWebcamMetadata(await read(), abort.signal)).rejects.toThrow();
+  expect(state.disposed).toHaveBeenCalled();
+  expect(state.samples).toHaveLength(0);
 });

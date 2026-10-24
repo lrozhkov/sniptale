@@ -42,10 +42,7 @@ export function usePreviewStageCanvasRender(
     params.effectRuntimeFeedback.onFailure,
     params.effectRuntimeFeedback.onRecovery,
     params.previewExactFrameCache,
-    params.effectRuntimeFeedback.retryVersion,
-    params.project,
-    params.previewRasterSize,
-    params.assetUrls
+    params.effectRuntimeFeedback.retryVersion
   );
 
   usePreviewStageRenderEffect(params, effectRuntimeRef, renderRevision, renderSchedulerRef);
@@ -161,10 +158,7 @@ function usePreviewRenderSchedulerRef(
   onFailure: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onFailure'],
   onRecovery: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onRecovery'],
   exactFrameCache: PreviewStageCanvasSceneParams['previewExactFrameCache'],
-  retryVersion: number,
-  project: PreviewStageCanvasSceneParams['project'],
-  rasterSize: PreviewStageCanvasSceneParams['previewRasterSize'],
-  assetUrls: PreviewStageCanvasSceneParams['assetUrls']
+  retryVersion: number
 ): MutableRefObject<ReturnType<typeof createPreviewSceneRenderScheduler>> {
   const frameRate = usePreviewFrameRate();
   const frameRateRef = useRef(frameRate);
@@ -240,10 +234,6 @@ function usePreviewRenderSchedulerRef(
       },
     });
   }
-  useLayoutEffect(
-    () => () => joinsRef.current?.clear(),
-    [project, rasterSize?.width, rasterSize?.height, assetUrls]
-  );
   useLayoutEffect(() => {
     if (retryRef.current === retryVersion) return;
     retryRef.current = retryVersion;

@@ -1,3 +1,4 @@
+import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const settingsFixture = {
@@ -325,3 +326,52 @@ function runUseSettingsStoreClearSuite() {
 describe('useSettingsStore load paths', runUseSettingsStoreLoadSuite);
 describe('useSettingsStore update paths', runUseSettingsStoreUpdateSuite);
 describe('useSettingsStore clear paths', runUseSettingsStoreClearSuite);
+
+const enabledVoice: VoiceInputPreferences = {
+  language: 'en-US',
+  microphoneDeviceId: null,
+  mode: 'browser-managed',
+  backend: 'model',
+  enabled: true,
+};
+
+it('preserves a canonical Off event over a delayed initial Settings load', async () => {
+  const store = await loadStore();
+  const initialLoad = createDeferred<
+    typeof settingsFixture & { voiceInput: VoiceInputPreferences }
+  >();
+  loadSettingsRuntimeStateMock.mockReturnValueOnce(initialLoad.promise);
+  const loading = store.getState().loadSettings();
+  store.getState().reconcileVoiceInputPreferences({ ...enabledVoice, enabled: false });
+  initialLoad.resolve({ ...settingsFixture, imageQuality: 73, voiceInput: enabledVoice });
+  await loading;
+  expect(store.getState().settings.voiceInput).toEqual({ ...enabledVoice, enabled: false });
+  expect(store.getState().settings.imageQuality).toBe(73);
+  expect(store.getState().hasLoaded).toBe(true);
+});
+
+it('preserves canonical Off over a delayed saved response without dropping other saved fields', async () => {
+  const store = await loadStore();
+  const saved = createDeferred<typeof settingsFixture & { voiceInput: VoiceInputPreferences }>();
+  updateSettingsRuntimeStateMock.mockReturnValueOnce(saved.promise);
+  const update = store.getState().updateSettings({ imageQuality: 81 });
+  await Promise.resolve();
+  store.getState().reconcileVoiceInputPreferences({ ...enabledVoice, enabled: false });
+  saved.resolve({ ...settingsFixture, imageQuality: 81, voiceInput: enabledVoice });
+  await update;
+  expect(store.getState().settings.voiceInput).toEqual({ ...enabledVoice, enabled: false });
+  expect(store.getState().settings.imageQuality).toBe(81);
+  expect(updateSettingsRuntimeStateMock).toHaveBeenCalledOnce();
+});
+
+it('keeps a newer canonical voice choice when a Settings reset response arrives late', async () => {
+  const store = await loadStore();
+  const reset = createDeferred<typeof settingsFixture>();
+  resetSettingsRuntimeStateMock.mockReturnValueOnce(reset.promise);
+  const resetting = store.getState().clearSettings();
+  await Promise.resolve();
+  store.getState().reconcileVoiceInputPreferences({ ...enabledVoice, enabled: false });
+  reset.resolve(settingsFixture);
+  await resetting;
+  expect(store.getState().settings.voiceInput?.enabled).toBe(false);
+});

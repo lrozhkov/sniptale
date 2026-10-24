@@ -22,6 +22,7 @@ import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-pref
 
 it('uses the canonical IndexedDB store inventory for local data erasure', () => {
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toEqual(EXPECTED_STORES);
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('voice_input_history');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('image_workspaces');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspace_history');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('video_workspaces');
@@ -39,6 +40,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   });
 
   expect(plan.local).not.toContain('sniptale-theme-preference');
+  expect(plan.local).not.toContain('sniptale_picker_compact');
   expect(plan.local).not.toContain('sniptale_ai_modal_spoiler_open');
   expect(plan.local).not.toContain('sniptale_editor_file_menu_save_to_folder_open');
   expect(plan.local).not.toContain(POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY);
@@ -58,6 +60,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).toContain('sniptale_runtime_diagnostic_log');
   expect(plan.local).toContain('sniptale_prompt_templates');
   expect(plan.local).toContain('sniptale_ai_audio_transcription_prompt');
+  expect(plan.local).toContain('sniptale_ai_voice_input_correction_prompt');
   expect(plan.local).toContain('sniptale.gallery.command-palette');
   expect(plan.local).toContain('sniptale.settings.command-palette');
   expect(plan.local).toContain('sniptale.video-editor.command-palette');
@@ -90,6 +93,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   });
 
   expect(plan.local).toContain('sniptale-theme-preference');
+  expect(plan.local).toContain('sniptale_picker_compact');
   expect(plan.local).toContain('sniptale_ai_modal_spoiler_open');
   expect(plan.local).toContain('sniptale_export_json_spoiler_open');
   expect(plan.local).toContain('sniptale_export_md_spoiler_open');

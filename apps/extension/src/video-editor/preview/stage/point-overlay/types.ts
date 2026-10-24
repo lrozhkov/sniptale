@@ -20,6 +20,7 @@ export type PointPlacementParams = Pick<
 export type PointOverlayParams = Pick<
   PreviewStageCanvasProps,
   | 'camera'
+  | 'motionProject'
   | 'grid'
   | 'placementMode'
   | 'project'

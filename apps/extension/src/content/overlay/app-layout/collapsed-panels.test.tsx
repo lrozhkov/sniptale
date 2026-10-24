@@ -26,7 +26,7 @@ function createProps() {
       setPinnedToolbarVisible: vi.fn(),
     },
     scenario: {
-      state: { captureAction: 'scenario' as const, scenarioEnabled: true, sidebarVisible: false },
+      state: { captureAction: 'copy' as const, scenarioEnabled: true, sidebarVisible: false },
       actions: { setSidebarVisible: vi.fn() },
     },
   };

@@ -57,6 +57,15 @@ function isCameraOfferSource(value: unknown): boolean {
   if (value['kind'] === 'surface') {
     return Object.keys(value).length === 2 && isVideoRecordingSettings(value['settings']);
   }
+  if (value['kind'] === 'recording-preview') {
+    return (
+      Object.keys(value).length === 5 &&
+      isNonEmptyString(value['recordingId']) &&
+      isPeerGeneration(value['generation']) &&
+      isNonEmptyString(value['streamInstanceId']) &&
+      isBoolean(value['cameraOnly'])
+    );
+  }
   return (
     value['kind'] === 'countdown' &&
     Object.keys(value).length === 4 &&
@@ -297,6 +306,7 @@ export const runtimeVideoSessionMessageContracts = {
       createRuntimeResponseGuard({
         optional: {
           cameraLaunchToken: isString,
+          cameraRecorderOpened: isBoolean,
           controlToken: isString,
           recordingId: isString,
           result: isString,

@@ -9,6 +9,8 @@ export type ControlCapability = {
 };
 
 export type CameraRecorderRouteState = {
+  draft?: boolean;
+  teleprompter?: boolean;
   registrationToken: string | null;
   recordingId: string | null;
   routeError: string | null;

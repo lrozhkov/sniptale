@@ -239,6 +239,91 @@ for (const [index, size] of [
       await expect
         .poll(async () => (await read()).motionRegions![0]!.spotlightTarget)
         .toBe('window');
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.focusType'),
+        label('gallery.videoReview.focusLens')
+      );
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight?.effect)
+        .toBe('magnify');
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight?.lensShape)
+        .toBe('circle');
+      const diameter = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.focusLensDiameter'),
+        exact: true,
+      });
+      const initialDiameter = (await read()).motionRegions![0]!.spotlight!.area.width;
+      await diameter.fill('40');
+      await diameter.press('Enter');
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight!.area.width)
+        .toBe(0.4);
+      await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight!.area.width)
+        .toBe(initialDiameter);
+      await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight!.area.width)
+        .toBe(0.4);
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.clickLensShape'),
+        label('gallery.videoReview.focusLensRounded')
+      );
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.focusRoundness'),
+          exact: true,
+        })
+      ).toBeVisible();
+      await expect(diameter).toHaveCount(0);
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.clickLensShape'),
+        label('gallery.videoReview.clickLens_circle')
+      );
+      await expect(diameter).toHaveValue('40');
+      await diameter.scrollIntoViewIfNeeded();
+      await checkInspectorParameterRows(inspector);
+      await page.screenshot({
+        path: info.outputPath('native-circle-lens-size.png'),
+        fullPage: false,
+      });
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.clickLensOptics'),
+        label('gallery.videoReview.clickLensOptics_optical')
+      );
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight?.lensOptics)
+        .toBe('optical');
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.focusLensPlacement'),
+        label('videoEditor.sidebar.cursorFocusFollow')
+      );
+      await expect.poll(async () => (await read()).motionRegions![0]!.focusMode).toBe('CURSOR');
+      await page.screenshot({ path: info.outputPath('native-optical-lens.png'), fullPage: false });
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.focusLensPlacement'),
+        label('videoEditor.sidebar.cursorFocusFixed')
+      );
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.focusType'),
+        label('gallery.videoReview.focusSpotlight')
+      );
       const targetLabel = label('videoEditor.sidebar.spotlightTarget');
       const targetGroup = inspector.getByRole('group', { name: targetLabel, exact: true });
       if (await targetGroup.count()) {
@@ -521,6 +606,9 @@ for (const [index, size] of [
         .poll(async () => (await read()).motionRegions![0]!.spotlightTarget)
         .toBe('scene');
       await expect.poll(async () => (await read()).motionRegions![0]!.spotlight!.blur).toBe(18);
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight!.lensShape)
+        .toBe('circle');
       await expect.poll(async () => (await read()).motionRegions![0]!.zoomInDuration).toBe(0.3);
       if (index === 0) {
         await page.setViewportSize({ width: 1100, height: 560 });

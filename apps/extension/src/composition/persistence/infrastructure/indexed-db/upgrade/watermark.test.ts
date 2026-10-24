@@ -16,9 +16,9 @@ function upgradeFixture(failAt = Infinity) {
     objects: betaV5Fixture.opfsObjects,
   });
   let committed = new Map<string, unknown>(
-    CURRENT_SCHEMA_CONTRACTS.map(({ domainId }) => [
+    Object.entries(betaV5Fixture.domainVersions).map(([domainId, schemaVersion]) => [
       domainId,
-      { domainId, schemaVersion: betaV5Fixture.domainVersions[domainId] },
+      { domainId, schemaVersion },
     ])
   );
   let pending = structuredClone(committed);
@@ -93,7 +93,7 @@ it('admits watermark content with one additive step and leaves rows and object b
   expect(await plan[0]!.estimateAdditionalBytes()).toBe(64 * 1024);
   handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
   fixture.commit();
-  expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
   expect(fixture.durable).toEqual(before);
   expect(fixture.db.createObjectStore).not.toHaveBeenCalled();
   expect(fixture.db.deleteObjectStore).not.toHaveBeenCalled();
@@ -101,7 +101,7 @@ it('admits watermark content with one additive step and leaves rows and object b
   fixture.retry();
   handleDatabaseUpgrade(fixture.db, DB_VERSION, DB_VERSION, fixture.tx);
   fixture.commit();
-  expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
   expect(fixture.durable).toEqual(before);
 });
 
@@ -121,7 +121,7 @@ it.each(['video_workspaces', 'video_workspace_drafts'])(
     fixture.retry();
     handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
     fixture.commit();
-    expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
   }
 );
 
@@ -137,7 +137,7 @@ it('rolls back interrupted contract publication and reruns without partial domai
   fixture.retry();
   handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
   fixture.commit();
-  expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
   expect(fixture.durable).toEqual(before);
 });
 

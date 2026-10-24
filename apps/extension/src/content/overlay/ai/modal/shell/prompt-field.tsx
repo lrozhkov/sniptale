@@ -52,7 +52,7 @@ export function AIModalPromptField(props: {
           id="ai-prompt"
           value={props.prompt}
           onChange={(event) => {
-            if (props.voice.state.active) props.voice.actions.stop();
+            if (props.voice.state.active || props.voice.state.pending) props.voice.actions.cancel();
             resizePromptTextarea(event.currentTarget);
             props.setPrompt(event.target.value);
           }}

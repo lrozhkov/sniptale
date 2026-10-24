@@ -262,9 +262,11 @@ function MotionSegments(
     const label = translate(
       border
         ? 'gallery.videoReview.focusBorder'
-        : spotlight
-          ? 'gallery.videoReview.focusSpotlight'
-          : 'videoEditor.timeline.motionSegment'
+        : spotlight?.effect === 'magnify'
+          ? 'gallery.videoReview.focusLens'
+          : spotlight
+            ? 'gallery.videoReview.focusSpotlight'
+            : 'videoEditor.timeline.motionSegment'
     );
     const scale =
       segment.region.focusMode === VideoMotionFocusMode.MANUAL_AREA && segment.region.focusArea

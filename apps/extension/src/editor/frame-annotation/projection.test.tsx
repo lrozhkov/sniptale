@@ -88,6 +88,72 @@ it('projects logical frame geometry with CSS left and top coordinates', () => {
   host.remove();
 });
 
+it.each([0.5, 2])('keeps resize handles below the number at zoom %s', (scale) => {
+  const host = document.createElement('div');
+  const controlsRoot = document.createElement('div');
+  const sceneRoot = document.createElement('div');
+  document.body.append(host, controlsRoot, sceneRoot);
+  const root = createRoot(host);
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'numbered-frame',
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 160,
+      stepBadge: { ...createDefaultFrameStepBadge(), enabled: true },
+    },
+    0
+  );
+  const object = createFrameAnnotationProxy({ frame: snapshot, label: 'Frame', ordering: 0 });
+  const onResizeStart = vi.fn();
+  act(() =>
+    root.render(
+      <FrameProjection
+        coordinateSpace={createScaledFrameAnnotationCoordinateSpace({
+          origin: { x: 20, y: 30 },
+          scale,
+          viewport: { width: 1000, height: 800 },
+        })}
+        controlsRoot={controlsRoot}
+        sceneRoot={sceneRoot}
+        interactive
+        object={object}
+        selected
+        scale={scale}
+        snapshot={snapshot}
+        settingsAnchor={null}
+        settingsMenu={null}
+        onCommand={vi.fn()}
+        onDraftCommit={vi.fn()}
+        onCloseSettings={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onMoveStart={vi.fn()}
+        onResizeStart={onResizeStart}
+        onSnapshotChange={vi.fn()}
+        onSnapshotPreview={vi.fn()}
+        onStepBadgeReorder={vi.fn()}
+      />
+    )
+  );
+  const handle = sceneRoot.querySelector<HTMLElement>(
+    '[data-frame-control="resize-handle"][data-direction="se"]'
+  );
+  const badgeLayer = sceneRoot.querySelector<HTMLElement>('.sniptale-step-badge-layer');
+  expect(handle).not.toBeNull();
+  expect(badgeLayer).not.toBeNull();
+  expect(Number(handle!.parentElement!.style.zIndex)).toBeLessThan(
+    Number(badgeLayer!.style.zIndex)
+  );
+  expect(handle!.style.position).toBe('absolute');
+  expect(handle!.parentElement!.style.transform).toBe(`scale(${1 / scale})`);
+  expect(handle!.style.width).toBe('11px');
+  act(() => handle!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(onResizeStart).toHaveBeenCalledWith(expect.anything(), 'se', null);
+  act(() => root.unmount());
+  document.body.replaceChildren();
+});
+
 it('does not mount any interactive overlay for a locked selected frame', () => {
   const host = document.createElement('div');
   const controlsRoot = document.createElement('div');
@@ -331,6 +397,70 @@ it('omits disabled frame visuals and tolerates an unavailable crop scene', async
     root.render(<FrameProjectionReadOnlyOverlays {...props} sceneRoot={sceneRoot} />)
   );
   expect(sceneRoot.childElementCount).toBe(0);
+  act(() => root.unmount());
+  document.body.replaceChildren();
+});
+
+it('focuses a new empty comment without opening its style settings', async () => {
+  const host = document.createElement('div');
+  const controlsRoot = document.createElement('div');
+  const sceneRoot = document.createElement('div');
+  document.body.append(host, controlsRoot, sceneRoot);
+  const root = createRoot(host);
+  const initial = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-new-comment',
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 160,
+      callout: {
+        ...createDefaultFrameCallout(),
+        enabled: true,
+        content: { bodyHtml: 'Existing comment', titleText: '' },
+      },
+    },
+    0
+  );
+  const object = createFrameAnnotationProxy({ frame: initial, label: 'Frame', ordering: 0 });
+  const onOpenSettings = vi.fn();
+  function Harness() {
+    const [snapshot, setSnapshot] = useState(initial);
+    return (
+      <FrameProjection
+        coordinateSpace={identityFrameAnnotationCoordinateSpace}
+        controlsRoot={controlsRoot}
+        sceneRoot={sceneRoot}
+        interactive
+        object={object}
+        selected
+        scale={1}
+        snapshot={snapshot}
+        settingsAnchor={null}
+        settingsMenu={null}
+        onCommand={vi.fn()}
+        onDraftCommit={vi.fn()}
+        onCloseSettings={vi.fn()}
+        onOpenSettings={onOpenSettings}
+        onMoveStart={vi.fn()}
+        onResizeStart={vi.fn()}
+        onSnapshotChange={setSnapshot}
+        onSnapshotPreview={setSnapshot}
+        onStepBadgeReorder={vi.fn()}
+      />
+    );
+  }
+  await act(async () => root.render(<Harness />));
+  await act(async () =>
+    controlsRoot
+      .querySelector<HTMLButtonElement>('[data-ui="content.interactive-frame.add-callout"]')!
+      .click()
+  );
+  const comments = sceneRoot.querySelectorAll<HTMLElement>('[contenteditable]');
+  expect(comments).toHaveLength(2);
+  expect(comments[1]!.getAttribute('contenteditable')).toBe('true');
+  expect(document.activeElement).toBe(comments[1]);
+  expect(onOpenSettings).not.toHaveBeenCalled();
   act(() => root.unmount());
   document.body.replaceChildren();
 });

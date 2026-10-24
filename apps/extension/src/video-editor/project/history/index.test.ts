@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { useVideoEditorStore } from '../../state/store';
 import {
@@ -195,4 +195,37 @@ it('admits an exclusive typing lease only while history is idle', () => {
   expect(typing).not.toBeNull();
   expect(typing).not.toBe(foreign);
   store.getState().endProjectHistoryTransaction(typing!);
+});
+
+it('does not clone a snapshot discarded by the existing history byte budget', () => {
+  const project = createEmptyVideoProject('x'.repeat(9 * 1024 * 1024));
+  const next = { ...project, updatedAt: project.updatedAt + 1 };
+  const clone = vi.spyOn(globalThis, 'structuredClone');
+  try {
+    const result = recordVideoEditorProjectHistory(
+      resetVideoEditorProjectHistory(project.id),
+      project,
+      next
+    );
+    expect(result.past).toEqual([]);
+    expect(result.future).toEqual([]);
+    expect(result.error).toBeNull();
+    expect(clone).not.toHaveBeenCalled();
+  } finally {
+    clone.mockRestore();
+  }
+});
+
+it('keeps admitted history isolated from later mutation of the source snapshot', () => {
+  const project = createEmptyVideoProject('Original');
+  const next = { ...project, name: 'Changed' };
+  const history = recordVideoEditorProjectHistory(
+    resetVideoEditorProjectHistory(project.id),
+    project,
+    next
+  );
+  project.name = 'External mutation';
+  const result = undoVideoEditorProjectHistory(history, next);
+  expect(result?.status).toBe('applied');
+  if (result?.status === 'applied') expect(result.project.name).toBe('Original');
 });

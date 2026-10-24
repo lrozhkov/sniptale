@@ -1,6 +1,11 @@
 import { Fragment, useEffect, useState } from 'react';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
-import { ToggleField, SegmentedRow, StatusRow } from '../../ui/compact-inspector-controls';
+import {
+  ToggleField,
+  SegmentedRow,
+  StatusRow,
+  SelectField,
+} from '../../ui/compact-inspector-controls';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   GuideBlock,
@@ -10,19 +15,10 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ScenarioInspectorBackButton } from './inspector-actions';
-import {
-  RotateCcw,
-  Type,
-  Columns2,
-  MessageSquare,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-} from 'lucide-react';
+import { RotateCcw, Type, Columns2, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { resolveGuideBlockWidth } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideInspectorGroup, InspectorCategorizedContent } from './inspector';
-import { CompactSelect } from '../../ui/compact-inspector-controls/select';
 import { CompactSegmentedSelector } from '../../ui/compact-inspector-controls/control-renderers';
 import { NumericRow } from '../../ui/compact-inspector-controls/numeric';
 import { guideNoteTypes } from './note-block';
@@ -61,31 +57,6 @@ export function GuideBlockInspector({
         />
       ),
     },
-    ...(block.kind === 'note'
-      ? [
-          {
-            id: 'noteType',
-            label: t('scenario.editor.guideNoteType'),
-            icon: MessageSquare,
-            content: (
-              <GuideInspectorGroup
-                id="noteType"
-                collapsible={false}
-                icon={MessageSquare}
-                title={t('scenario.editor.guideNoteType')}
-              >
-                <CompactSelect
-                  aria-label={t('scenario.editor.guideNoteType')}
-                  value={block.tone}
-                  options={guideNoteTypes.map(({ tone, key }) => ({ value: tone, label: t(key) }))}
-                  onChange={(tone) => onChange({ ...block, tone }, null)}
-                  disabled={disabled}
-                />
-              </GuideInspectorGroup>
-            ),
-          },
-        ]
-      : []),
     ...(block.kind === 'text' || block.kind === 'heading' || block.kind === 'note'
       ? [
           {
@@ -104,7 +75,7 @@ export function GuideBlockInspector({
         onBack={onClose}
       />
       <fieldset className="guide-style-fields" disabled={disabled}>
-        {presentation === 'sections' && block.kind === 'text' ? (
+        {presentation === 'sections' && sections.length > 1 ? (
           <CategorizedInspector
             dataUi="scenario-editor.inspector-categories"
             ariaLabel={t('scenario.editor.guideAddText')}
@@ -141,6 +112,14 @@ function GuideTextSettings({
     onChange({ ...block, textStyle: { ...style, ...patch } }, null);
   return (
     <GuideInspectorGroup id="addText" icon={Type} title={t('scenario.editor.guideAddText')}>
+      {block.kind === 'note' && (
+        <SelectField
+          label={t('scenario.editor.guideNoteType')}
+          value={block.tone}
+          options={guideNoteTypes.map(({ tone, key }) => ({ value: tone, label: t(key) }))}
+          onChange={(tone) => onChange({ ...block, tone }, null)}
+        />
+      )}
       <SegmentedRow
         label={t('scenario.editor.guideTextSize')}
         columns={3}

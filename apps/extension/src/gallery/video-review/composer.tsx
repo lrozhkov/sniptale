@@ -24,10 +24,10 @@ export function ReviewComposer(props: {
       if (!props.busy) props.onChange({ ...props.annotation, text });
     },
   });
-  const stopVoice = useRef(voice.stop);
-  stopVoice.current = voice.stop;
+  const cancelVoice = useRef(voice.cancel);
+  cancelVoice.current = voice.cancel;
   useEffect(() => {
-    if (props.busy) stopVoice.current();
+    if (props.busy) cancelVoice.current();
   }, [props.busy]);
   useEffect(() => {
     textarea.current?.focus({ preventScroll: true });
@@ -41,6 +41,7 @@ export function ReviewComposer(props: {
         if (!(target instanceof Element) || event.currentTarget.contains(target)) return;
         if (target.closest('[data-ui="gallery.videoReview.stage"], [data-review-panel-resize]'))
           return;
+        voice.cancel();
         props.onLeave?.();
       }}
       data-ui="gallery.videoReview.commentComposer"
@@ -62,7 +63,7 @@ export function ReviewComposer(props: {
           rows={4}
           maxLength={100_000}
           onChange={(text) => {
-            voice.stop();
+            voice.cancel();
             props.onChange({ ...props.annotation, text });
           }}
           onSelect={voice.moveCaret}
@@ -79,13 +80,14 @@ export function ReviewComposer(props: {
             }}
             onStart={voice.start}
             onStop={voice.stop}
+            onCancel={voice.cancel}
           />
           <div className="ml-auto flex items-center gap-1">
             <ReviewButton
               label={translate('gallery.videoReview.discard')}
               disabled={props.busy}
               onClick={() => {
-                voice.stop();
+                voice.cancel();
                 props.onDiscard();
               }}
             />
@@ -94,7 +96,7 @@ export function ReviewComposer(props: {
               primary
               disabled={props.busy || !props.annotation.text.trim()}
               onClick={() => {
-                voice.stop();
+                voice.cancel();
                 props.onSave();
               }}
             />

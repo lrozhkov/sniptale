@@ -5,7 +5,7 @@ import {
   FolderOpen,
   Image,
   MessageSquare,
-  Mic,
+  Speech,
   RectangleHorizontal,
   AppWindow,
   PanelsTopLeft,
@@ -133,7 +133,7 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
         id: 'voice-input',
         description: 'settings.navigation.descriptions.voiceInput',
         label: 'settings.navigation.voiceInput',
-        icon: Mic,
+        icon: Speech,
       },
       {
         id: 'native-app',

@@ -35,8 +35,6 @@ type ScenarioControllerStateArgs = {
 export function useScenarioControllerState(args: ScenarioControllerStateArgs) {
   const state = useScenarioControllerMutableState();
   const applySurfaceState = useScenarioSurfaceStateApplier({
-    captureActionRef: args.captureActionRef,
-    setCaptureAction: args.setCaptureAction,
     setIsToolbarVisible: args.setIsToolbarVisible,
     setScreenshotMode: args.setScreenshotMode,
     setSurface: state.setSurface,

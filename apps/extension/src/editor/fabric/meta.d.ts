@@ -33,6 +33,7 @@ declare module 'fabric' {
     sniptaleBackgroundGradientTo?: string;
     sniptaleBackgroundGradientStops?: string[] | undefined;
     sniptaleBackgroundGradientColorStops?: EditorGradientColorStop[] | undefined;
+    sniptaleBackgroundGradient?: EditorFrameSettings['backgroundGradient'] | undefined;
     sniptaleBackgroundGradientAngle?: number;
     sniptaleCropGuideMode?: 'preview' | 'selection';
     sniptaleBorderPresetId?: string | null;

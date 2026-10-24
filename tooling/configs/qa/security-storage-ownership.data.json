@@ -129,6 +129,68 @@
   ],
   "sensitiveRetentionOwners": [
     {
+      "file": "apps/extension/src/composition/persistence/voice-input-history/catalog.ts",
+      "owner": "voice-input-history",
+      "justification": "Retains the private dictation catalogue and transcripts for Settings recovery.",
+      "reviewNote": "Keep at most twenty recordings in capture order. Each transcript is limited to 100000 characters. Capture tokens, epoch, incarnation, digest and revision checks fence writes. Recover orphan audio and deletion intents before admitting more capture. Verified local-data erasure removes all records even when preferences are preserved. Exclude history from Library, backup, project export, sync, logs and diagnostics.",
+      "storageWrites": [
+        {
+          "sink": "tx.store.put",
+          "keys": [
+            "VOICE_INPUT_HISTORY_STORE"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/voice-input-history/opfs.ts",
+      "owner": "voice-input-history",
+      "justification": "Writes immutable dictation audio inside the dedicated private OPFS root.",
+      "reviewNote": "Audio is limited to 24 MiB per recording and twenty retained recordings. The catalogue owns capture order, identity, admission and deletion. Recover orphan files and pending deletions before admitting more capture. Delete audio with its history entry and during verified local-data erasure, including when preferences are preserved. Exclude audio from Library, backup, project export, sync, logs and diagnostics.",
+      "storageWrites": [
+        {
+          "sink": "writer.write",
+          "keys": [
+            "sniptale-voice-input"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/ai-settings/core.ts",
+      "owner": "ai-settings",
+      "justification": "Stores the dedicated local voice correction prompt.",
+      "reviewNote": "Limit the prompt to 10000 characters. Save and Reset reserve erasure coordination before queue admission and release it after the complete command. Include the prompt only in explicit sensitive AI-prompt settings transfer. Exclude it from sync, Library, media backup, project export, logs and diagnostics. Verified local-data erasure removes it even when preferences are preserved.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "AI_VOICE_INPUT_CORRECTION_PROMPT_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/settings-transfer/apply.ts",
+      "owner": "settings-transfer",
+      "justification": "Applies and compensates explicit sensitive AI-prompt settings transfers for the local voice correction prompt.",
+      "reviewNote": "Transfer requires explicit inclusion of sensitive AI prompts. Validate the 10000-character prompt limit before writing. Hold the existing persistence permit through commit and verified rollback. Restore the prior local value or absence after failure. Exclude the prompt from sync, Library, media backup, project export, logs and diagnostics. Verified local-data erasure removes it even when preferences are preserved.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "sniptale_ai_voice_input_correction_prompt"
+          ]
+        },
+        {
+          "sink": "adapter.set",
+          "keys": [
+            "sniptale_ai_voice_input_correction_prompt"
+          ]
+        }
+      ]
+    },
+    {
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
       "owner": "review-workspaces",
       "justification": "Owns user-authored video review history and recoverable comment field text across restarts.",

@@ -40,11 +40,6 @@ export function getCaptureActionDescriptors(): CaptureActionDescriptor[] {
       hint: translate('content.toolbar.captureAskPresetHint'),
     },
     {
-      value: 'scenario',
-      label: translate('content.toolbar.captureScenarioLabel'),
-      hint: translate('content.toolbar.captureScenarioHint'),
-    },
-    {
       value: 'save_to_library',
       label: translate('content.toolbar.captureSaveToLibraryLabel'),
       hint: translate('content.toolbar.captureSaveToLibraryHint'),

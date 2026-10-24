@@ -1,5 +1,5 @@
 import { projectWindowHeaderImages } from '../../../../features/video/composition/draw/window-header';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getProjectSceneBackgroundImageAssetId } from '../../../../features/video/project/scene/background';
 import { isVideoClip } from '../../../../features/video/project/timeline';
 import type {
@@ -12,16 +12,6 @@ interface PreviewStageVideoBankProps {
   assetUrls: Record<string, string>;
   bankClips: VideoProjectClip[];
   videoRefs: PreviewStageVideoRefs;
-}
-
-function getImageAssetPlanKey(
-  project: VideoProject,
-  activeClips: VideoProjectClip[],
-  assetUrls: Record<string, string>
-): string {
-  return [...resolveActiveImageAssetIds(project, activeClips)]
-    .map((assetId) => `${assetId}:${assetUrls[assetId] ?? ''}`)
-    .join('|');
 }
 
 function resolveActiveImageAssetIds(
@@ -112,25 +102,29 @@ export function usePreviewStageImageBank(
 ): Record<string, HTMLImageElement> {
   const [images, setImages] = useState<Record<string, HTMLImageElement>>({});
   const cacheRef = useRef<Record<string, HTMLImageElement>>({});
-  const imagePlanKey = useMemo(
-    () => getImageAssetPlanKey(project, activeClips, assetUrls),
-    [project, activeClips, assetUrls]
-  );
+  const headerImages = projectWindowHeaderImages(project, activeClips);
+  const sources = {
+    ...assetUrls,
+    ...Object.fromEntries(headerImages.map(({ key, src }) => [key, src])),
+  };
+  const activeIds = resolveActiveImageAssetIds(project, activeClips);
+  headerImages.forEach(({ key }) => activeIds.add(key));
+  const nextPlan = [...activeIds].sort().map((assetId) => ({
+    assetId,
+    src: sources[assetId] ?? '',
+    header: headerImages.some(({ key }) => key === assetId),
+  }));
+  const planRef = useRef(nextPlan);
+  if (JSON.stringify(planRef.current) !== JSON.stringify(nextPlan)) planRef.current = nextPlan;
+  const imagePlan = planRef.current;
 
   useEffect(() => {
-    const headerImages = projectWindowHeaderImages(project, activeClips);
-    const sources = {
-      ...assetUrls,
-      ...Object.fromEntries(headerImages.map(({ key, src }) => [key, src])),
-    };
-    const activeImageAssetIds = resolveActiveImageAssetIds(project, activeClips);
-    headerImages.forEach(({ key }) => activeImageAssetIds.add(key));
+    const activeImageAssetIds = new Set(imagePlan.map(({ assetId }) => assetId));
     pruneInactiveImages(cacheRef, activeImageAssetIds);
     setImages({ ...cacheRef.current });
 
     let cancelled = false;
-    activeImageAssetIds.forEach((assetId) => {
-      const src = sources[assetId];
+    imagePlan.forEach(({ assetId, src, header }) => {
       if (!src || cacheRef.current[assetId]?.src === src) {
         return;
       }
@@ -144,7 +138,7 @@ export function usePreviewStageImageBank(
         cacheRef.current[assetId] = image;
         setImages({ ...cacheRef.current });
       };
-      if (headerImages.some(({ key }) => key === assetId)) {
+      if (header) {
         image.onerror = () => {
           if (cancelled) return;
           cacheRef.current[assetId] = image;
@@ -157,7 +151,7 @@ export function usePreviewStageImageBank(
     return () => {
       cancelled = true;
     };
-  }, [project, activeClips, assetUrls, imagePlanKey]);
+  }, [imagePlan]);
 
   return images;
 }

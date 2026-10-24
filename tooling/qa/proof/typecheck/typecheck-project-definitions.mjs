@@ -121,9 +121,12 @@ export const PRODUCTION_TYPECHECK_PROJECTS = [
   },
   {
     id: 'design-system',
-    include: ['apps/extension/src/design-system/**/*'],
+    include: [
+      'apps/extension/src/design-system/**/*',
+      'tooling/design-reference/pickers/entry.tsx',
+    ],
     references: ['app-core'],
-    rootPrefixes: ['apps/extension/src/design-system'],
+    rootPrefixes: ['apps/extension/src/design-system', 'tooling/design-reference/pickers/'],
   },
   {
     id: 'camera-recorder',
@@ -195,11 +198,22 @@ export const NODE_TYPECHECK_PROJECT = {
   rootPrefixes: [],
 };
 
+export const REFERENCE_NODE_TYPECHECK_PROJECT = {
+  id: 'design-reference-node',
+  files: [
+    'tooling/design-reference/pickers/vite.config.ts',
+    'tooling/design-reference/pickers/shadow-properties.ts',
+  ],
+  references: [],
+  rootPrefixes: [],
+};
+
 export const TYPECHECK_PROJECTS = [
   ...PRODUCTION_TYPECHECK_PROJECTS,
   ...OWNER_TEST_TYPECHECK_PROJECTS,
   TEST_HARNESS_TYPECHECK_PROJECT,
   NODE_TYPECHECK_PROJECT,
+  REFERENCE_NODE_TYPECHECK_PROJECT,
 ];
 
 export const FULL_TYPECHECK_PROJECT_IDS = TYPECHECK_PROJECTS.map((project) => project.id);

@@ -473,7 +473,7 @@ for (const [locale, theme, size] of [
     await page.screenshot({ path: info.outputPath('action-preview-menu.png'), fullPage: false });
     await page.keyboard.press('Escape');
     await page
-      .locator('.tour-header-controls')
+      .locator('dialog.tour-preview-dialog[data-preview=\"true\"]')
       .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true })
       .click();
     await expect
@@ -486,12 +486,12 @@ for (const [locale, theme, size] of [
     await expect(player.locator('[data-tour-counter]')).toHaveText('1 / 9');
     await player.locator('[data-tour-next]').click();
     await page
-      .locator('.tour-header-controls')
+      .locator('dialog.tour-preview-dialog[data-preview=\"true\"]')
       .getByRole('button', { name: t('scenario.editor.tourReplayPreview'), exact: true })
       .click();
     await expect(player.locator('[data-tour-counter]')).toHaveText('1 / 9');
     await page
-      .locator('.tour-header-controls')
+      .locator('dialog.tour-preview-dialog[data-preview=\"true\"]')
       .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true })
       .click();
     await expect

@@ -72,6 +72,18 @@ it('retains manual camera controls and forwards their draft without a hybrid dec
   expect(place).toHaveBeenCalledExactlyOnceWith(draft);
   act(() => area.onPreview(null));
   expect(preview).toHaveBeenLastCalledWith(null);
+  await act(async () =>
+    root.render(
+      <ReviewWebcamOverlay
+        binding={binding}
+        main={main}
+        output={{ width: 800, height: 450 }}
+        manual={{ phase: 'failed', duration: 0, ready: false, onPreviewPlacement: preview }}
+      />
+    )
+  );
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(host.textContent).not.toContain('Could not load camera');
 });
 
 it('clears a drag draft through the independent callback after detailed mode switches to hybrid', async () => {

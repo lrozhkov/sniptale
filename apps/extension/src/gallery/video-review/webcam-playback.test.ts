@@ -5,7 +5,15 @@ import { createReviewWebcamPlayback } from './webcam-playback';
 
 function media(frames = true) {
   const node = document.createElement('video');
-  const state = { time: 0, paused: true, seeking: false, ended: false, ready: 2, rate: 1 };
+  const state = {
+    time: 0,
+    paused: true,
+    seeking: false,
+    ended: false,
+    ready: 2,
+    rate: 1,
+    duration: 10,
+  };
   const callbacks = new Map<number, VideoFrameRequestCallback>();
   let serial = 0;
   const seeks: number[] = [];
@@ -24,7 +32,7 @@ function media(frames = true) {
         seeks.push(time);
       },
     },
-    duration: { get: () => 10 },
+    duration: { get: () => state.duration },
     paused: { get: () => state.paused },
     seeking: { get: () => state.seeking },
     ended: { get: () => state.ended },
@@ -121,6 +129,7 @@ function setup(frameCallbacks = true, frameDuration = 1 / 30) {
   const failed = vi.fn();
   const stop = createReviewWebcamPlayback({
     frameDuration,
+    duration: 10,
     main: main.node,
     camera: camera.node,
     settings: () => settings,
@@ -131,32 +140,36 @@ function setup(frameCallbacks = true, frameDuration = 1 / 30) {
   return { main, camera, settings, paint, failed, stop };
 }
 
-it('enters positive-offset coverage during continuous playback and matches main rate', async () => {
-  const { main, camera, settings, paint } = setup();
-  settings.offsetSeconds = 2;
-  main.state.paused = false;
-  main.state.rate = 0.25;
-  main.state.time = 1.9;
-  tick();
-  expect(paint).toHaveBeenLastCalledWith(null);
-  expect(camera.seeks).toEqual([]);
-  main.state.time = 2.1;
-  tick();
-  expect(camera.seeks[0]).toBeCloseTo(0.1);
-  camera.decode(0.1);
-  camera.seeked();
-  tick();
-  expect(paint.mock.lastCall?.[0]?.time).toBeCloseTo(0.1);
-  expect(camera.play).toHaveBeenCalledTimes(1);
-  expect(camera.state.rate).toBe(0.25);
-  expect(camera.node.muted).toBe(true);
-  expect(camera.node.volume).toBe(0);
-  await Promise.resolve();
-  main.state.time = 12;
-  tick();
-  expect(paint).toHaveBeenLastCalledWith(null);
-  expect(camera.state.paused).toBe(true);
-});
+it.each([10, Infinity])(
+  'uses inspected duration at offset coverage boundaries with native duration %s',
+  async (duration) => {
+    const { main, camera, settings, paint } = setup();
+    camera.state.duration = duration;
+    settings.offsetSeconds = 2;
+    main.state.paused = false;
+    main.state.rate = 0.25;
+    main.state.time = 1.9;
+    tick();
+    expect(paint).toHaveBeenLastCalledWith(null);
+    expect(camera.seeks).toEqual([]);
+    main.state.time = 2.1;
+    tick();
+    expect(camera.seeks[0]).toBeCloseTo(0.1);
+    camera.decode(0.1);
+    camera.seeked();
+    tick();
+    expect(paint.mock.lastCall?.[0]?.time).toBeCloseTo(0.1);
+    expect(camera.play).toHaveBeenCalledTimes(1);
+    expect(camera.state.rate).toBe(0.25);
+    expect(camera.node.muted).toBe(true);
+    expect(camera.node.volume).toBe(0);
+    await Promise.resolve();
+    main.state.time = 12;
+    tick();
+    expect(paint).toHaveBeenLastCalledWith(null);
+    expect(camera.state.paused).toBe(true);
+  }
+);
 
 it('does not seek an aligned running decoder just because its frame callback is late', () => {
   const { main, camera, paint } = setup();

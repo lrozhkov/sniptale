@@ -1,6 +1,6 @@
 // policyStateId: gradient-preset-mutation-queue - durable sync storage remains authoritative;
 // this disposable queue only preserves mutation order within one runtime.
-import type { Gradient } from '@sniptale/foundation/paint';
+import { arePaintsEqual, type Gradient } from '@sniptale/foundation/paint';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
 import { createStorageWriteQueue } from '../infrastructure/write-queue';
@@ -11,7 +11,7 @@ import {
   type GradientPresetSurface,
   type NewGradientPreset,
 } from './contracts';
-import { cloneGradientPresetCatalog } from './defaults';
+import { cloneGradientPresetCatalog, normalizeGradientPresetPaint } from './defaults';
 import {
   addUserGradientPreset,
   deleteUserGradientPreset,
@@ -65,7 +65,23 @@ async function mutate(
   );
 }
 export const addGradientPreset = (preset: NewGradientPreset) =>
-  mutate((catalog) => addUserGradientPreset(catalog, preset));
+  mutate((catalog) => {
+    const existing = catalog.presets.find((item) => item.id === preset.id);
+    if (existing) {
+      const gradient = normalizeGradientPresetPaint(preset.gradient);
+      return gradient !== null &&
+        existing.origin === 'user' &&
+        preset.origin === 'user' &&
+        existing.name === preset.name.trim() &&
+        arePaintsEqual(
+          { kind: 'gradient', gradient: existing.gradient },
+          { kind: 'gradient', gradient }
+        )
+        ? catalog
+        : null;
+    }
+    return addUserGradientPreset(catalog, preset);
+  });
 export const updateGradientPreset = (id: string, gradient: Gradient, name?: string) =>
   mutate((catalog) => updateGradientPresetValues(catalog, id, gradient, name));
 export const renameGradientPreset = (id: string, name: string) =>

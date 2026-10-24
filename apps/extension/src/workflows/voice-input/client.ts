@@ -16,6 +16,7 @@ const SESSION_RECONCILIATION_INTERVAL_MS = 2_000;
 export type VoiceInputClientListener = (event: VoiceInputServerEvent) => void;
 
 export interface VoiceInputClient {
+  cancel(sessionId: string): string;
   disconnect(): void;
   refresh(): string;
   start(preferences: VoiceInputPreferences): string;
@@ -150,6 +151,12 @@ export function createVoiceInputClient(deps: Partial<VoiceInputClientDeps> = {})
   }
 
   return {
+    cancel(sessionId) {
+      const requestId = resolvedDeps.createId();
+      if (activeSessionId === sessionId) activeSessionId = null;
+      postMessage({ type: VoiceInputPortMessageType.CANCEL, requestId, sessionId });
+      return requestId;
+    },
     disconnect() {
       disposed = true;
       const currentPort = port;

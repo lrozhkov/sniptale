@@ -1,6 +1,7 @@
 import { projectPresetCollectionFlags, dispatchPresetCollectionAction } from '../preset-collection';
 import { movePresetOrder } from '../preset-order';
 import { useState } from 'react';
+import { DEFAULT_DRAWING_COLORS } from '../../../../../features/drawing/public';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { translate } from '../../../../../platform/i18n';
 import { useGradientPresetCatalog } from '../../../../../composition/gradient-preset-resources/use-gradient-preset-catalog';
@@ -50,6 +51,8 @@ export function GradientPresetsSettings() {
         state={resources.presets.length > 0 ? 'ready' : 'loading'}
       />
       <GradientPresetEditor
+        resources={resources}
+        palette={DEFAULT_DRAWING_COLORS}
         onClose={() => setEditor(null)}
         onSave={(name, gradient) =>
           editor === 'new'

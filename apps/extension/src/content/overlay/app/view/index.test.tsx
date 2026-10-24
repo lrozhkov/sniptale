@@ -101,7 +101,7 @@ function createModeState() {
 
 function createScenarioController() {
   return {
-    applyCaptureAction: vi.fn(async () => undefined),
+    setRecorderPanelVisible: vi.fn(async () => true),
     captureAction: 'download_default' as const,
     createProject: vi.fn(async () => undefined),
     deleteRecentStep: vi.fn(async () => undefined),

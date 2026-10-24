@@ -99,7 +99,6 @@ describe('quick-actions-presets after-capture catalog', () => {
       'edit',
       'ask_system',
       'ask_preset',
-      'scenario',
       'save_to_library',
     ]);
     expect(descriptors[0]).toEqual({

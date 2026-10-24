@@ -395,6 +395,9 @@ for (const [locale, theme, viewport] of [
         },
       });
     });
+    await page
+      .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true })
+      .click();
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
     await page
       .locator('.guide-export-stage')

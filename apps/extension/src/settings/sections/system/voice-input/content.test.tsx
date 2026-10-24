@@ -30,6 +30,10 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
   },
 }));
 
+vi.mock('./history', () => ({
+  VoiceInputHistoryPanel: () => <div data-ui="test.voice-history" />,
+}));
+
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -73,9 +77,44 @@ function createController(overrides: ControllerOverrides = {}): VoiceInputSettin
       requestMicrophone: vi.fn().mockResolvedValue(undefined),
       start: vi.fn().mockResolvedValue(undefined),
       stop: vi.fn(),
+      cancel: vi.fn(),
       ...overrides.actions,
     },
+    models: {
+      transcription: {
+        models: [],
+        providers: [],
+        chromeAiEnabled: false,
+        defaultModelId: null,
+        globalSystemPrompt: '',
+      },
+      correction: {
+        models: [],
+        providers: [],
+        chromeAiEnabled: false,
+        defaultModelId: null,
+        globalSystemPrompt: '',
+      },
+      transcriptionSelectionId: null,
+      correctionSelectionId: null,
+      loading: false,
+      error: false,
+      prompt: '',
+      promptSaving: false,
+      promptDirty: false,
+      refresh: vi.fn().mockResolvedValue(undefined),
+      setPrompt: vi.fn(),
+      savePrompt: vi.fn().mockResolvedValue(undefined),
+      resetPrompt: vi.fn().mockResolvedValue(undefined),
+      selectTranscription: vi.fn().mockResolvedValue(undefined),
+      selectCorrection: vi.fn().mockResolvedValue(undefined),
+    },
     preferences: {
+      backend: 'browser',
+      transcription: null,
+      correction: { enabled: false, model: null },
+      setBackend: vi.fn().mockResolvedValue(undefined),
+      setCorrectionEnabled: vi.fn().mockResolvedValue(undefined),
       language: 'ru-RU',
       microphoneDeviceId: null,
       mode: 'local-first',
@@ -223,7 +262,7 @@ describe('voice input Settings content', () => {
     });
     render(controller);
 
-    expect(button('settings.voiceInput.microphoneActive')).toBeTruthy();
+    expect(button('settings.voiceInput.microphoneActive')).toBeUndefined();
     expect(button('settings.voiceInput.stop')).toBeTruthy();
     act(() => button('settings.voiceInput.stop')?.click());
     expect(controller.actions.stop).toHaveBeenCalledOnce();
@@ -345,6 +384,59 @@ describe('voice input Settings content', () => {
     expect(meter?.getAttribute('aria-valuenow')).toBe('42');
     expect(meter?.querySelectorAll('[data-audio-peak]')).toHaveLength(16);
     expect(container.textContent).toContain('42%');
-    expect(container.textContent).toContain('settings.voiceInput.signalDetected');
+    expect(meter?.getAttribute('aria-valuetext')).toBe('settings.voiceInput.signalDetected');
+    expect(container.textContent).not.toContain('settings.voiceInput.signalPrivacy');
+    expect(container.textContent).not.toContain('settings.voiceInput.signalLabel');
   });
+});
+
+it('omits Chrome mode, API and local package diagnostics for the model backend', () => {
+  render(createController({ preferences: { backend: 'model' } }));
+  expect(container.querySelector('[aria-label="settings.voiceInput.modeLabel"]')).toBeNull();
+  expect(container.textContent).not.toContain('settings.voiceInput.apiStatus');
+  expect(container.textContent).not.toContain('settings.voiceInput.packageStatus');
+  expect(container.textContent).not.toContain('settings.voiceInput.localDisclosure');
+  expect(container.textContent).not.toContain('settings.voiceInput.browserDisclosure');
+  expect(container.textContent).toContain('settings.voiceInput.microphoneStatus');
+});
+
+it('lets Chrome start despite a dormant enabled correction without a configured model', () => {
+  const controller = createController({
+    preferences: { backend: 'browser', correction: { enabled: true, model: null } },
+    status: { microphoneAccess: 'granted' },
+  });
+  render(controller);
+  expect(button('settings.voiceInput.start')?.disabled).toBe(false);
+  expect(container.querySelector('[data-ui="settings.voice.correction"]')).toBeNull();
+});
+
+it('does not mount history or history controls for Chrome', () => {
+  render(createController({ preferences: { backend: 'browser' } }));
+  expect(container.querySelector('[data-ui="test.voice-history"]')).toBeNull();
+});
+it('shows only the selector when voice input is off and retains model settings', () => {
+  render(createController({ preferences: { enabled: false, backend: 'model' } }));
+  expect(container.querySelector('[data-ui="settings.voice.backend"]')).not.toBeNull();
+  expect(container.querySelector('textarea')).toBeNull();
+  expect(container.querySelector('[role="meter"]')).toBeNull();
+  expect(container.querySelector('[data-ui="test.voice-history"]')).toBeNull();
+  expect(container.querySelector('[data-ui="settings.voice.transcription-model"]')).toBeNull();
+});
+it('keeps recognition language inside Chrome settings and model language inside the model', () => {
+  render(createController({ preferences: { backend: 'model' } }));
+  expect(container.querySelector('[aria-label="settings.voiceInput.languageLabel"]')).toBeNull();
+  expect(container.querySelector('[data-ui="test.voice-history"]')).not.toBeNull();
+});
+
+it('stops the compact active microphone control on a real pointer press', () => {
+  const controller = createController({
+    status: {
+      microphoneAccess: 'granted',
+      snapshot: { phase: 'listening', sessionId: 'active-pointer' },
+    },
+  });
+  render(controller);
+  const stop = container.querySelector('[data-ui="settings.voice.stop"]');
+  act(() => stop?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })));
+  expect(controller.actions.stop).toHaveBeenCalledOnce();
 });

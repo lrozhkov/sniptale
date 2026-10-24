@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import * as telemetryProjection from '../../features/video/review/telemetry';
 import { translate } from '../../platform/i18n';
 import { QuickEditExportUnavailable } from '../../workflows/video-review/export-lifecycle';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -695,6 +696,63 @@ it('shows full sequence duration without a fragment bookend option', async () =>
     expect(fixture.hook.presentationDuration?.totalDurationUs).toBe(9_000_000);
     expect(fixture.host.querySelectorAll('[aria-haspopup="listbox"]')).toHaveLength(5);
   } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('reuses advisory export inputs during playback and refreshes changed inputs', async () => {
+  const fixture = setup((advanced) => {
+    advanced.ui.mode = 'advanced';
+  });
+  fixture.resource.telemetry = {
+    recordingId: 'recording',
+    createdAt: 0,
+    updatedAt: 0,
+    captureMode: null,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+  };
+  const projection = vi.spyOn(telemetryProjection, 'projectReviewTelemetry');
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    const index = fixture.hook.index;
+    projection.mockClear();
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    expect(fixture.hook.index).toBe(index);
+    expect(projection).not.toHaveBeenCalled();
+    await act(async () => fixture.hook.setRenderSettings({ frameRate: 0, quality: 'HIGH' }));
+    expect(projection).toHaveBeenCalled();
+    projection.mockClear();
+    fixture.resource.telemetry = {
+      recordingId: 'recording',
+      createdAt: 0,
+      updatedAt: 0,
+      captureMode: null,
+      viewport: null,
+      cursorTrack: null,
+      actionEvents: [],
+      signals: [],
+    };
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    expect(projection).toHaveBeenCalled();
+    projection.mockClear();
+    const state = fixture.resource.session.getSnapshot();
+    vi.spyOn(fixture.resource.session, 'getSnapshot').mockReturnValue({
+      ...state,
+      document: {
+        ...state.document,
+        edits: [{ id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 }],
+      },
+    });
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    expect(projection).toHaveBeenCalled();
+    projection.mockClear();
+    fixture.hook.plan();
+    expect(projection).toHaveBeenCalled();
+  } finally {
+    projection.mockRestore();
     await fixture.cleanup();
   }
 });

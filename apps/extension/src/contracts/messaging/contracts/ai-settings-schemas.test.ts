@@ -218,3 +218,27 @@ it.each(['mp3', 'wav', 'pcm'])(
     ).toBe(false);
   }
 );
+
+it('admits bounded correction prompts and rejects payloads on reset', () => {
+  const message = {
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'save-voice-input-correction-prompt',
+    prompt: 'Keep my meaning',
+  };
+  expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
+  expect(() =>
+    aiSettingsMutationMessageSchema.parse({ ...message, prompt: 'x'.repeat(10001) })
+  ).toThrow();
+  expect(() =>
+    aiSettingsMutationMessageSchema.parse({
+      ...message,
+      operation: 'reset-voice-input-correction-prompt',
+    })
+  ).toThrow();
+  expect(
+    aiSettingsMutationMessageSchema.parse({
+      type: message.type,
+      operation: 'reset-voice-input-correction-prompt',
+    })
+  ).toEqual({ type: message.type, operation: 'reset-voice-input-correction-prompt' });
+});

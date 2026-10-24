@@ -43,6 +43,9 @@ export interface ReviewClickStyle {
   effect: 'off' | 'ripple' | 'press' | 'glow' | 'magnify';
   magnification?: number;
   lensShape?: 'circle' | 'rounded';
+  lensOptics?: 'flat' | 'optical';
+  /** Glass shoulder width as a percentage of the lens radius. */
+  lensEdgeWidth?: number;
   lensShadow?: number;
   gestureAppearance?: 'halo' | 'path' | 'area';
   gestureArea?: { x: number; y: number; width: number; height: number };

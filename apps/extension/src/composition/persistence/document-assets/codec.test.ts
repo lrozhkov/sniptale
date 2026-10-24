@@ -431,3 +431,50 @@ it.each([undefined, 'Displayed caption'])(
     hydrated.release();
   }
 );
+
+it('roundtrips an advanced gradient background through raster assets and legacy document transfer', async () => {
+  const document = createEditorDocumentFixture();
+  const backgroundGradient = {
+    type: 'linear' as const,
+    angle: 61,
+    interpolation: 'oklab' as const,
+    repeat: { enabled: true, span: 0.25 },
+    stops: [
+      { id: 'a', color: '#ff000080', position: 0, midpoint: 0.2 },
+      { id: 'b', color: '#0000ffff', position: 1, midpoint: 0.5 },
+    ],
+  };
+  document.frame.backgroundGradient = backgroundGradient;
+  document.frame.backgroundMode = 'gradient';
+  // FabricImage is the established resource slot for generated background rasters.
+  document.canvasJson = JSON.stringify({
+    version: '7.2.0',
+    objects: [
+      {
+        type: 'image',
+        src: 'data:image/png;base64,YmFja2dyb3VuZA==',
+        sniptaleRole: 'background',
+        sniptaleType: 'background',
+        sniptaleBackgroundGradient: backgroundGradient,
+      },
+    ],
+  });
+  const prepared = await preparePersistedEditorDocument(document);
+  expect(prepared.document.frame.backgroundGradient).toEqual(backgroundGradient);
+  expect(prepared.document.assets.map((asset) => asset.role)).toEqual([
+    'source-image',
+    'canvas:$.objects[0].src',
+  ]);
+  expect(JSON.stringify(prepared.document)).not.toMatch(/data:|blob:|base64/i);
+  expect(parsePersistedEditorDocument(prepared.document)?.frame.backgroundGradient).toEqual(
+    backgroundGradient
+  );
+  mocks.readAssetFile.mockResolvedValue(new File(['raster'], 'raster.png', { type: 'image/png' }));
+  const restored = await materializePersistedEditorDocumentForLegacyTransfer({
+    document: prepared.document,
+    refs: prepared.refs,
+  });
+  expect(restored.frame.backgroundGradient).toEqual(backgroundGradient);
+  expect(restored.canvasJson).toContain('data:image/png;base64,');
+  expect(restored.canvasJson).toContain('sniptaleBackgroundGradient');
+});

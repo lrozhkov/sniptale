@@ -1,6 +1,7 @@
 import { resolveProjectCameraConflicts } from '../composition/motion/project-follow';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../project/factories/creation';
+import { VideoMotionFocusMode } from '../project/types';
 import { normalizeVideoProjectCursorSkin } from '../project/cursor';
 import { hydrateVideoProject } from '../project/hydration';
 import { isExportReadyVideoProject } from '../project/validation/root';
@@ -103,6 +104,38 @@ function motionFixture(anchored = true, follow = false) {
     });
   return input;
 }
+
+it('carries a following optical lens from Gallery into a reopened Native project', () => {
+  const input = motionFixture(true, true);
+  const authored = input.document.advancedContent.zoom.regions[0]!;
+  authored.spotlight = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify',
+    magnification: 2.5,
+    lensOptics: 'optical',
+    lensEdgeWidth: 4,
+    lensShape: 'circle',
+  };
+  const before = structuredClone(input);
+  const plan = planReviewProjectConversion(input);
+  if (plan.status !== 'prepared') throw new Error(JSON.stringify(plan));
+  const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(plan.project)));
+  expect(isExportReadyVideoProject(reopened)).toBe(true);
+  expect(
+    reopened.motionRegions?.some(
+      (region) =>
+        region.spotlight?.effect === 'magnify' &&
+        region.spotlight.lensOptics === 'optical' &&
+        region.spotlight.lensEdgeWidth === 4 &&
+        region.spotlight.lensShape === 'circle' &&
+        region.focusMode === VideoMotionFocusMode.CURSOR
+    )
+  ).toBe(true);
+  const frame = resolveVideoCompositionFrame(reopened, 2);
+  expect(frame.sceneSpotlights?.some((state) => state.spotlight.effect === 'magnify')).toBe(true);
+  expect(frame.sceneSpotlights?.some((state) => state.lensFocus !== undefined)).toBe(true);
+  expect(input).toEqual(before);
+});
 
 it.each([
   ...[true, false].flatMap((anchor) =>
@@ -344,7 +377,7 @@ it.each(
 
 it.each(
   [true, false].flatMap((anchored) =>
-    (['camera', 'border', 'spotlight'] as const).map((kind) => [anchored, kind] as const)
+    (['camera', 'border', 'spotlight', 'lens'] as const).map((kind) => [anchored, kind] as const)
   )
 )(
   'retains dormant sourceAnchor=%s %s without activating it after conversion and reopen',
@@ -354,6 +387,13 @@ it.each(
     raw.dormant = true;
     if (kind === 'border') raw.border = createQuickEditBorder();
     if (kind === 'spotlight') raw.spotlight = createQuickEditSpotlight();
+    if (kind === 'lens')
+      raw.spotlight = {
+        ...createQuickEditSpotlight(),
+        effect: 'magnify',
+        magnification: 2.5,
+        lensOptics: 'optical',
+      };
     const before = structuredClone(input);
     const plan = planReviewProjectConversion(input);
     if (plan.status !== 'prepared') throw new Error(JSON.stringify(plan));
@@ -377,7 +417,7 @@ it.each(
       }
       expect(region.phaseTransitions).toEqual({ enter: raw.enter.type, exit: raw.exit.type });
       if (kind === 'border') expect(region.border).toEqual(raw.border);
-      if (kind === 'spotlight') expect(region.spotlight).toEqual(raw.spotlight);
+      if (kind === 'spotlight' || kind === 'lens') expect(region.spotlight).toEqual(raw.spotlight);
     }
     for (const time of [0, 0.5, 2, 4]) {
       const frame = resolveVideoCompositionFrame(reopened, time);

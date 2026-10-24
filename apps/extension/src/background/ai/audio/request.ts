@@ -1,12 +1,15 @@
 import {
   AUDIO_INPUT_MAX_BYTES,
+  AUDIO_INPUT_MAX_SECONDS,
+  type AudioRecognitionOptions,
+  type AudioTranscriptResult,
   AUDIO_OUTPUT_MAX_BYTES,
   isAudioSourceJobScope,
   isProjectAudioJobScope,
   type AudioJobStart,
 } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
-import { parseAudioTranscriptResponse } from './response';
+import { parseAudioTranscriptResponse, validateAudioUpload } from './response';
 import { encodeChatTranscription, parseChatTranscription } from './chat-transcription';
 import { isSupportedPcmContentType, PCM_WAV_HEADER_BYTES, wrapPcmWav } from './pcm-wav';
 
@@ -18,6 +21,39 @@ interface AudioRequest {
   onReceiving(): void;
   /** The coordinator rechecks source and provider authority after asynchronous body preparation. */
   beforeSend?(): Promise<void>;
+}
+
+/** Transcribes one admitted private audio input without an editor project scope. */
+interface TranscriptionRequest {
+  config: AudioModelConfig;
+  input: File;
+  durationSeconds: number;
+  recognition?: AudioRecognitionOptions;
+  signal: AbortSignal;
+  beforeSend(): Promise<void>;
+  onReceiving(): void;
+}
+
+type TranscriptionInput = Omit<TranscriptionRequest, 'beforeSend'> & {
+  beforeSend?: () => Promise<void>;
+};
+
+function transcriptionInput(args: AudioRequest): TranscriptionInput {
+  if (
+    args.request.operation !== 'transcription' ||
+    !isAudioSourceJobScope(args.request.scope) ||
+    !args.input
+  )
+    throw new Error('invalid-request');
+  return {
+    config: args.config,
+    input: args.input,
+    durationSeconds: args.request.scope.nativeEnd - args.request.scope.nativeStart,
+    ...(args.request.recognition ? { recognition: args.request.recognition } : {}),
+    signal: args.signal,
+    ...(args.beforeSend ? { beforeSend: args.beforeSend } : {}),
+    onReceiving: args.onReceiving,
+  };
 }
 
 async function readBounded(
@@ -62,7 +98,7 @@ async function readBounded(
 }
 
 async function encodeTranscription(
-  args: AudioRequest,
+  args: TranscriptionInput,
   headers: Record<string, string>
 ): Promise<ArrayBuffer> {
   const params = args.config.transcription;
@@ -70,12 +106,7 @@ async function encodeTranscription(
   if (args.input.size > AUDIO_INPUT_MAX_BYTES) throw new Error('too-large');
   args.signal.throwIfAborted();
   if (params.transport === 'audio-chat') {
-    if (
-      args.request.operation !== 'transcription' ||
-      !args.request.recognition ||
-      !isAudioSourceJobScope(args.request.scope)
-    )
-      throw new Error('invalid-request');
+    if (!args.recognition) throw new Error('invalid-request');
     const bytes = new Uint8Array(await args.input.arrayBuffer());
     args.signal.throwIfAborted();
     // Bounded blocks avoid spreading the complete audio into the JavaScript argument stack.
@@ -85,8 +116,8 @@ async function encodeTranscription(
       parts.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + 32766))));
     const payload = encodeChatTranscription(
       args.config,
-      args.request.recognition,
-      args.request.scope.nativeEnd - args.request.scope.nativeStart,
+      args.recognition,
+      args.durationSeconds,
       parts.join('')
     );
     args.signal.throwIfAborted();
@@ -141,9 +172,7 @@ async function assertResponseStatus(response: Response): Promise<void> {
   throw new Error('provider-failed');
 }
 
-async function decodeTranscription(response: Response, args: AudioRequest) {
-  const scope = args.request.scope;
-  if (!isAudioSourceJobScope(scope)) throw new Error('invalid-request');
+async function decodeTranscription(response: Response, args: TranscriptionInput) {
   const bytes = await readBounded(response, 1024 * 1024, args.signal);
   let raw: unknown;
   try {
@@ -153,12 +182,12 @@ async function decodeTranscription(response: Response, args: AudioRequest) {
   }
   const result =
     args.config.transcription?.transport === 'audio-chat'
-      ? args.request.operation === 'transcription' && args.request.recognition
-        ? parseChatTranscription(raw, scope.nativeEnd - scope.nativeStart, args.request.recognition)
+      ? args.recognition
+        ? parseChatTranscription(raw, args.durationSeconds, args.recognition)
         : null
-      : parseAudioTranscriptResponse(raw, scope.nativeEnd - scope.nativeStart);
+      : parseAudioTranscriptResponse(raw, args.durationSeconds);
   if (!result) throw new Error('invalid-response');
-  return { kind: 'transcript' as const, result };
+  return result;
 }
 
 async function decodeResponse(response: Response, args: AudioRequest) {
@@ -178,33 +207,29 @@ async function decodeResponse(response: Response, args: AudioRequest) {
     return { kind: 'audio' as const, blob };
   }
   const mime = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase();
-  const expected =
-    args.request.operation === 'transcription'
-      ? 'application/json'
-      : args.config.speech?.responseFormat === 'wav'
-        ? 'audio/wav'
-        : 'audio/mpeg';
+  const expected = args.config.speech?.responseFormat === 'wav' ? 'audio/wav' : 'audio/mpeg';
   const matches = mime === expected || (expected === 'audio/wav' && mime === 'audio/x-wav');
   if (!matches) {
     await response.body?.cancel();
     throw new Error('invalid-response');
   }
-  if (args.request.operation === 'transcription') return decodeTranscription(response, args);
   const bytes = await readBounded(response, AUDIO_OUTPUT_MAX_BYTES, args.signal);
   if (bytes.byteLength < 4) throw new Error('invalid-response');
   return { kind: 'audio' as const, blob: new Blob([bytes], { type: expected }) };
 }
 
-/** Only this owner constructs bearer headers; requests are never redirected or retried. */
-export async function requestAudio(args: AudioRequest) {
-  if (isProjectAudioJobScope(args.request.scope) && !args.beforeSend)
-    throw new Error('unauthorized');
-  const headers: Record<string, string> = { Authorization: `Bearer ${args.config.apiKey}` };
-  const body =
-    args.request.operation === 'transcription'
-      ? await encodeTranscription(args, headers)
-      : encodeSpeech(args);
-  if (args.request.operation === 'speech') headers['Content-Type'] = 'application/json';
+interface AudioProviderRequest {
+  config: AudioModelConfig;
+  signal: AbortSignal;
+  beforeSend?: () => Promise<void>;
+  onReceiving(): void;
+}
+
+async function postAudioProvider(
+  args: AudioProviderRequest,
+  headers: Record<string, string>,
+  body: ArrayBuffer | string
+): Promise<Response> {
   args.signal.throwIfAborted();
   await args.beforeSend?.();
   args.signal.throwIfAborted();
@@ -223,5 +248,64 @@ export async function requestAudio(args: AudioRequest) {
   });
   await assertResponseStatus(response);
   args.onReceiving();
+  return response;
+}
+
+async function performTranscription(args: TranscriptionInput): Promise<AudioTranscriptResult> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${args.config.apiKey}` };
+  const body = await encodeTranscription(args, headers);
+  const response = await postAudioProvider(args, headers, body);
+  if (
+    response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json'
+  ) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error('invalid-response');
+  }
+  return decodeTranscription(response, args);
+}
+
+/** Rechecks caller authority after upload preparation. This request never redirects or retries. */
+export async function requestTranscription(
+  args: TranscriptionRequest
+): Promise<AudioTranscriptResult> {
+  args.signal.throwIfAborted();
+  if (
+    !Number.isFinite(args.durationSeconds) ||
+    args.durationSeconds <= 0 ||
+    args.durationSeconds > AUDIO_INPUT_MAX_SECONDS ||
+    args.input.size === 0 ||
+    args.input.size > AUDIO_INPUT_MAX_BYTES
+  )
+    throw new Error('too-large');
+  const wav = args.input.type === 'audio/wav';
+  const mediaTypeParts = args.input.type.toLowerCase().split(';');
+  const webm =
+    mediaTypeParts[0] === 'audio/webm' &&
+    (mediaTypeParts.length === 1 ||
+      (mediaTypeParts.length === 2 && mediaTypeParts[1]?.trimStart() === 'codecs=opus'));
+  if (
+    (!wav && !webm) ||
+    (wav && !(await validateAudioUpload(args.input, args.durationSeconds))) ||
+    (!wav && args.config.transcription?.transport === 'audio-chat')
+  )
+    throw new Error('invalid-request');
+  return performTranscription(args);
+}
+
+/** Editor callers retain their real source scope and existing coordinator admission. */
+export async function requestAudio(args: AudioRequest) {
+  if (isProjectAudioJobScope(args.request.scope) && !args.beforeSend)
+    throw new Error('unauthorized');
+  if (args.request.operation === 'transcription') {
+    return {
+      kind: 'transcript' as const,
+      result: await performTranscription(transcriptionInput(args)),
+    };
+  }
+  const headers = {
+    Authorization: `Bearer ${args.config.apiKey}`,
+    'Content-Type': 'application/json',
+  };
+  const response = await postAudioProvider(args, headers, encodeSpeech(args));
   return decodeResponse(response, args);
 }

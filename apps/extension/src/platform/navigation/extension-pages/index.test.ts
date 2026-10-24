@@ -507,3 +507,68 @@ it('opens the selected saved Gallery review generation in the full editor', asyn
       '&reviewSourceAssetId=source-body-7',
   });
 });
+
+it('opens the camera companion with teleprompter enabled', async () => {
+  const { openCameraRecorderPage } = await import('./index');
+  await openCameraRecorderPage({
+    launchToken: 'token-1',
+    recordingId: 'recording-1',
+    teleprompter: true,
+  });
+  expect(browserWindowsCreateMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      url:
+        'chrome-extension://test/apps/extension/src/camera-recorder/index.html?' +
+        'recordingId=recording-1&launchToken=token-1&teleprompter=1',
+    })
+  );
+});
+
+it('rebinds an owned companion with a fragment and keeps its document URL', async () => {
+  const { openCameraRecorderPage } = await import('./index');
+  const base = 'chrome-extension://test/apps/extension/src/camera-recorder/index.html';
+  browserTabsQueryMock.mockResolvedValueOnce([{ id: 20, windowId: 9, url: `${base}?draft=1` }]);
+  await openCameraRecorderPage({
+    launchToken: 'fresh-token',
+    recordingId: 'rec-2',
+    teleprompter: true,
+  });
+  expect(browserTabsUpdateMock).toHaveBeenCalledWith(20, {
+    active: true,
+    url: `${base}?draft=1#recordingId=rec-2&launchToken=fresh-token&teleprompter=1`,
+  });
+  expect(browserWindowsUpdateMock).toHaveBeenCalledWith(9, { focused: true });
+  expect(browserWindowsCreateMock).not.toHaveBeenCalled();
+});
+
+it('opens a draft without recording tokens and returns an existing companion to its retained script', async () => {
+  const { openTeleprompterPage } = await import('./index');
+  await openTeleprompterPage();
+  expect(browserWindowsCreateMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      url: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html?teleprompter=1&draft=1',
+    })
+  );
+  browserTabsQueryMock.mockResolvedValueOnce([
+    {
+      id: 21,
+      windowId: 10,
+      url: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html',
+    },
+  ]);
+  await openTeleprompterPage();
+  expect(browserTabsUpdateMock).toHaveBeenCalledWith(21, {
+    active: true,
+    url: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html#teleprompter=1&draft=1',
+  });
+});
+
+it('does not send fresh recording tokens to a lookalike companion path', async () => {
+  const { openCameraRecorderPage } = await import('./index');
+  browserTabsQueryMock.mockResolvedValueOnce([
+    { id: 22, url: 'chrome-extension://test/apps/extension/src/camera-recorder/index.html.evil' },
+  ]);
+  await openCameraRecorderPage({ launchToken: 'private-token', recordingId: 'rec-3' });
+  expect(browserTabsUpdateMock).not.toHaveBeenCalled();
+  expect(browserWindowsCreateMock).toHaveBeenCalledOnce();
+});

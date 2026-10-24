@@ -27,7 +27,7 @@ import {
 } from '../floating-interactions/scale';
 
 const COLOR_SELECTOR_LAYER_WIDTH = 224;
-const COLOR_SELECTOR_PICKER_LAYER_WIDTH = 280;
+const COLOR_SELECTOR_PICKER_LAYER_WIDTH = 304;
 const COLOR_SELECTOR_LAYER_GAP = 8;
 const COLOR_SELECTOR_VIEWPORT_PADDING = 8;
 
@@ -100,11 +100,21 @@ function resolveVerticalLayerSpace(args: {
 }) {
   const belowRoom = args.viewportHeight - args.boundaryBottom - COLOR_SELECTOR_VIEWPORT_PADDING;
   const aboveRoom = args.boundaryTop - COLOR_SELECTOR_VIEWPORT_PADDING;
+  if (Math.max(belowRoom, aboveRoom) < Math.min(args.layerHeight, 420)) {
+    return {
+      maxHeight: Math.max(
+        0,
+        Math.min(620, args.viewportHeight - COLOR_SELECTOR_VIEWPORT_PADDING * 2)
+      ),
+      placeAbove: false,
+      y: COLOR_SELECTOR_VIEWPORT_PADDING,
+    };
+  }
   const placeAbove = belowRoom < args.layerHeight && aboveRoom > belowRoom;
   return {
     maxHeight: Math.max(
       180,
-      Math.min(420, (placeAbove ? aboveRoom : belowRoom) - COLOR_SELECTOR_LAYER_GAP)
+      Math.min(620, (placeAbove ? aboveRoom : belowRoom) - COLOR_SELECTOR_LAYER_GAP)
     ),
     placeAbove,
     y: placeAbove

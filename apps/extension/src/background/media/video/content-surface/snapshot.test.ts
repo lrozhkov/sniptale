@@ -77,3 +77,25 @@ it.each([
     webcamDeviceId: 'recording-camera',
   });
 });
+
+it('projects saved output setup and only the owned recording capture geometry', () => {
+  const cropRegion = { x: 80, y: 40, width: 400, height: 240 };
+  mocks.runtimeState.mockReturnValue({
+    status: VideoRecordingStatus.RECORDING,
+    captureMode: 'TAB_CROP',
+    cropRegion,
+    duration: 7,
+    error: null,
+  });
+  const idle = createVideoRecordingSurfaceSnapshot(lease, DEFAULT_VIDEO_SETTINGS);
+  expect(idle).toMatchObject({
+    captureMode: null,
+    cropRegion: null,
+    outputSettings: { outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile },
+  });
+  const active = createVideoRecordingSurfaceSnapshot(
+    { ...lease, recordingId: 'recording-1' },
+    DEFAULT_VIDEO_SETTINGS
+  );
+  expect(active).toMatchObject({ captureMode: 'TAB_CROP', cropRegion });
+});

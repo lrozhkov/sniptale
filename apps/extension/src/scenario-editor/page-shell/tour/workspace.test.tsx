@@ -17,6 +17,8 @@ import {
 import { createTranslator } from '../../../platform/i18n';
 import { useGuidePanels } from '../panel-layout';
 import { TourWorkspace } from './workspace';
+import { fixture } from './workspace.test-support';
+import { stubTourPreviewDialog } from './preview.test-support';
 import type { ScenarioNarrationAccess } from './use-narration-ai';
 const prepare = vi.hoisted(() => vi.fn());
 const narrationCatalog = vi.hoisted(() => vi.fn());
@@ -26,6 +28,7 @@ vi.mock('../../../workflows/ai-settings/query', () => ({
 vi.mock('../../../workflows/scenario-capture-edit/tour-materials', () => ({
   prepareTourFromGuide: prepare,
 }));
+let restoreDialog: () => void;
 let host: HTMLDivElement;
 let root: Root;
 let current: GuideProject;
@@ -68,6 +71,7 @@ function Probe({
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('innerWidth', 1280);
+  restoreDialog = stubTourPreviewDialog();
   changed.mockReset();
   edited.mockReset();
   imported.mockReset();
@@ -82,39 +86,9 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  restoreDialog();
   vi.unstubAllGlobals();
 });
-function fixture() {
-  const project = createGuideProject('Project');
-  project.items = [createGuideStep('Keep guide')];
-  project.tour = createTourDocument();
-  const first = createTourImageSlide('first');
-  first.title = 'First';
-  first.image = {
-    assetId: 'image',
-    width: 100,
-    height: 100,
-    alt: 'Image',
-    galleryAssetId: null,
-    editDocumentId: null,
-    source: { kind: 'import', filename: 'test.png' },
-  };
-  const second = { ...createTourImageSlide('second'), title: 'Second', image: first.image };
-  second.actions.push({
-    type: 'hotspot',
-    object: {
-      id: 'link',
-      label: 'Go first',
-      text: '',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      appearance: null,
-      visual: { kind: 'point', pulse: false },
-    },
-  });
-  project.tour.slides = [first, second];
-  return project;
-}
 async function render(project = fixture(), locked = false) {
   await act(async () => root.render(<Probe initial={project} locked={locked} />));
 }
@@ -459,7 +433,7 @@ it('shows object narration without slide narration in the selected-object drill-
     'true'
   );
   await click('Show all settings', inspector);
-  expect(inspector.textContent).toContain('Object narration');
+  expect(inspector.querySelectorAll('.tour-audio-acquisition')).toHaveLength(1);
   expect(inspector.textContent).not.toContain('Slide narration');
   expect([...inspector.querySelectorAll('button')].some((b) => b.textContent === 'Record')).toBe(
     true
@@ -482,7 +456,7 @@ it('uses the header presentation switch and keeps grouped objects switchable wit
   expect(panel().querySelector('[title="Show all settings"]')).not.toBeNull();
   await click('Show all settings', panel());
   expect(panel().querySelector('nav')).toBeNull();
-  expect(panel().textContent).toContain('Object narration');
+  expect(panel().querySelectorAll('.tour-audio-acquisition')).toHaveLength(1);
   expect(panel().textContent).not.toContain('Slide narration');
   await click('Show settings sections', panel());
   expect(panel().querySelector('nav')).not.toBeNull();

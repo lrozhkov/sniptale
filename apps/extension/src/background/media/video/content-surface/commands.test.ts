@@ -316,3 +316,59 @@ it('keeps full lease admission ahead of permission discovery', async () => {
   ).rejects.toThrow('Unauthorized or stale');
   expect(navigator.permissions.query).not.toHaveBeenCalled();
 });
+
+it.each(['pending-start', 'active-recording', 'bound-recording'] as const)(
+  'refuses output setup for %s before entering persistence',
+  async (condition) => {
+    if (condition === 'pending-start') mocks.pendingStart.mockReturnValue(true);
+    if (condition === 'active-recording')
+      mocks.runtimeState.mockReturnValue({ status: 'RECORDING' });
+    await expect(
+      runVideoRecordingSurfaceCommand(12, {
+        ...base,
+        ...(condition === 'bound-recording' ? { recordingId: 'recording-1' } : {}),
+        command: { kind: 'select-quality-profile', profileId: 'builtin:compact' },
+      })
+    ).rejects.toThrow('Output settings cannot change');
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  }
+);
+
+it('rechecks output setup authority after a queued media command completes', async () => {
+  let release!: () => void;
+  mocks.patch.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      })
+  );
+  const first = runVideoRecordingSurfaceCommand(12, {
+    ...base,
+    command: { kind: 'set-microphone-gain', gain: 1.5 },
+  });
+  await vi.waitFor(() => expect(mocks.patch).toHaveBeenCalledOnce());
+  const queued = runVideoRecordingSurfaceCommand(12, {
+    ...base,
+    command: { kind: 'select-quality-profile', profileId: 'builtin:compact' },
+  });
+  const outcome = expect(queued).rejects.toThrow('Unauthorized or stale');
+  mocks.validate.mockReturnValue(false);
+  release();
+  await first;
+  await outcome;
+  expect(mocks.mutate).not.toHaveBeenCalled();
+});
+
+it('refuses output mutation if Start takes admission while waiting for the persistence permit', async () => {
+  mocks.mutate.mockImplementationOnce(async (mutation) => {
+    mocks.pendingStart.mockReturnValue(true);
+    return mutation(DEFAULT_VIDEO_SETTINGS);
+  });
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      ...base,
+      command: { kind: 'set-output-profile', outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile },
+    })
+  ).rejects.toThrow('Output settings cannot change');
+  expect(mocks.patch).not.toHaveBeenCalled();
+});

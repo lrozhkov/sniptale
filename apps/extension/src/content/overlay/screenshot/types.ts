@@ -10,6 +10,7 @@ type SaveDialogState = {
 };
 
 export type ScreenshotSuccessFeedbackOptions = {
+  captureAction?: CaptureActionType | undefined;
   freezeSelection?: boolean;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   runToken?: number | undefined;
@@ -17,6 +18,7 @@ export type ScreenshotSuccessFeedbackOptions = {
 };
 
 export type ScreenshotStartContext = {
+  captureAction?: CaptureActionType | undefined;
   runGeneration?: number | undefined;
   navigationLockBaseline?: boolean | undefined;
   preparationBaseline?: ScreenshotPreparationBaseline | undefined;

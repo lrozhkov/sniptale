@@ -305,6 +305,8 @@ export interface WebcamPresentationSettings {
 export interface VideoRecordingSettings {
   microphoneEnabled: boolean;
   warnWithoutMicrophone?: boolean;
+  /** Opens the recording companion with a private scrolling script. */
+  teleprompterEnabled?: boolean;
   microphoneDeviceId: string | null;
   echoCancellation?: boolean;
   noiseSuppression?: boolean;
@@ -447,6 +449,8 @@ export interface VideoMicrophoneActivity {
 }
 
 export interface VideoRecordingRuntimeState {
+  /** Actual source reported by capture; absent or null when the source is unknown. */
+  displaySurface?: VideoDisplaySurface | null;
   outputProfile?: VideoOutputProfile | null;
   microphoneActivity?: VideoMicrophoneActivity | null;
   completion?: VideoRecordingCompletionState | null;

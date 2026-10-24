@@ -23,3 +23,17 @@
 .sniptale-image-workspace button[data-command-icon='tool'][data-active='true']:hover {
   border-color: color-mix(in srgb, var(--sniptale-color-accent) 35%, transparent);
 }
+
+.sniptale-image-workspace
+  [data-ui='editor.floating.tool-rail']
+  .sniptale-annotation-effect-options {
+  padding: 0;
+}
+.sniptale-image-workspace [data-ui='editor.floating.view-controls.popover.workspace'] {
+  background: rgb(from var(--sniptale-color-surface-panel) r g b / 1);
+}
+.sniptale-image-workspace
+  :is([data-ui='editor.floating.tool-rail'], [data-ui='editor.floating.view-controls'])
+  > .sniptale-glass-toolbar-divider {
+  margin-block: 0;
+}

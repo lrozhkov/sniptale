@@ -28,3 +28,17 @@ export function createBridgedMouseEvent(
 export function isBridgedMouseEvent(event: Event): boolean {
   return bridgedMouseEvents.has(event);
 }
+
+/** Authorizes only the original synchronous dispatch; retained page events cannot be replayed. */
+export function dispatchBridgedMouseEvent(
+  target: EventTarget,
+  type: BridgedMouseEventType,
+  source: Parameters<typeof createBridgedMouseEvent>[1]
+): boolean {
+  const event = createBridgedMouseEvent(type, source);
+  try {
+    return target.dispatchEvent(event);
+  } finally {
+    bridgedMouseEvents.delete(event);
+  }
+}

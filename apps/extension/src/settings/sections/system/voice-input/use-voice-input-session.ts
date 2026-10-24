@@ -45,12 +45,12 @@ export function useVoiceInputSessionState(args: {
   );
   const [finalText, setFinalText] = useState('');
   const [interimText, setInterimText] = useState('');
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [audioPeaks, setAudioPeaks] = useState(() =>
-    Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0)
-  );
+  const { audioLevel, audioPeaks, setAudioLevel, setAudioPeaks, resetMeter } = useVoiceInputMeter();
   const activeSessionIdRef = useRef<string | null>(null);
   const lastSequenceRef = useRef(-1);
+  const deliveryRef = useRef<'live' | 'final'>('live');
+  const finalAcceptedRef = useRef(false);
+  const cancelledSessionRef = useRef<string | null>(null);
 
   const applyServerEvent = useCallback(
     (event: VoiceInputServerEvent) => {
@@ -62,12 +62,14 @@ export function useVoiceInputSessionState(args: {
       }
       if (event.type === VoiceInputPortMessageType.SNAPSHOT) {
         if (
-          activeSessionIdRef.current !== null &&
           event.snapshot.sessionId !== null &&
-          event.snapshot.sessionId !== activeSessionIdRef.current
+          (event.snapshot.sessionId === cancelledSessionRef.current ||
+            (activeSessionIdRef.current !== null &&
+              event.snapshot.sessionId !== activeSessionIdRef.current))
         ) {
           return;
         }
+        deliveryRef.current = event.snapshot.delivery ?? 'live';
         setSnapshot((current) =>
           event.snapshot.localAvailability === 'unknown' && event.snapshot.effectiveMode === null
             ? {
@@ -87,37 +89,33 @@ export function useVoiceInputSessionState(args: {
           event.snapshot.phase === 'error'
         ) {
           activeSessionIdRef.current = null;
-          setAudioLevel(0);
-          setAudioPeaks(Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0));
+          resetMeter();
           setInterimText('');
         }
         return;
       }
       if (event.type === VoiceInputPortMessageType.FAILURE) {
         const failedSessionId = event.sessionId ?? event.snapshot.sessionId;
-        if (
-          activeSessionIdRef.current !== null &&
-          failedSessionId !== null &&
-          failedSessionId !== activeSessionIdRef.current
-        ) {
+        if (failedSessionId !== null && failedSessionId !== activeSessionIdRef.current) {
           return;
         }
         setSnapshot(event.snapshot);
         activeSessionIdRef.current = null;
-        setAudioLevel(0);
-        setAudioPeaks(Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0));
+        resetMeter();
         setInterimText('');
         onRuntimeFailure();
         return;
       }
       if (
         event.sessionId !== activeSessionIdRef.current ||
+        finalAcceptedRef.current ||
         event.sequence <= lastSequenceRef.current
       ) {
         return;
       }
       lastSequenceRef.current = event.sequence;
       if (event.isFinal) {
+        if (deliveryRef.current === 'final') finalAcceptedRef.current = true;
         setFinalText((current) =>
           `${current}${event.text}`.slice(0, VOICE_INPUT_TRANSCRIPT_MAX_CHARS)
         );
@@ -126,16 +124,18 @@ export function useVoiceInputSessionState(args: {
         setInterimText(event.text);
       }
     },
-    [onRuntimeFailure]
+    [onRuntimeFailure, resetMeter, setAudioLevel, setAudioPeaks]
   );
 
   const begin = useCallback(
     (client: VoiceInputClient, preferences: VoiceInputPreferences): string => {
       setFinalText('');
       setInterimText('');
-      setAudioLevel(0);
-      setAudioPeaks(Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0));
+      resetMeter();
       lastSequenceRef.current = -1;
+      deliveryRef.current = 'live';
+      finalAcceptedRef.current = false;
+      cancelledSessionRef.current = null;
       const sessionId = client.start(preferences);
       activeSessionIdRef.current = sessionId;
       setSnapshot((current) => ({
@@ -148,7 +148,7 @@ export function useVoiceInputSessionState(args: {
       }));
       return sessionId;
     },
-    []
+    [resetMeter]
   );
 
   const stop = useCallback((client: VoiceInputClient) => {
@@ -158,8 +158,21 @@ export function useVoiceInputSessionState(args: {
     setSnapshot((current) => ({ ...current, phase: 'stopping' }));
   }, []);
 
+  const cancel = useCallback(
+    (client: VoiceInputClient) => {
+      const sessionId = activeSessionIdRef.current;
+      cancelledSessionRef.current = sessionId;
+      activeSessionIdRef.current = null;
+      finalAcceptedRef.current = true;
+      setInterimText('');
+      resetMeter();
+      setSnapshot((current) => ({ ...current, sessionId: null, phase: 'idle' }));
+      if (sessionId) client.cancel(sessionId);
+    },
+    [resetMeter]
+  );
   return {
-    connection: { activeSessionIdRef, applyServerEvent, begin, stop },
+    connection: { activeSessionIdRef, applyServerEvent, begin, stop, cancel },
     snapshotState: { audioLevel, audioPeaks, setSnapshot, snapshot },
     transcript: {
       finalText,
@@ -167,4 +180,17 @@ export function useVoiceInputSessionState(args: {
       setFinalText,
     },
   };
+}
+
+function useVoiceInputMeter() {
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [audioPeaks, setAudioPeaks] = useState(() =>
+    Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0)
+  );
+  const resetMeter = useCallback(() => {
+    setAudioLevel(0);
+    setAudioPeaks(Array.from({ length: VOICE_INPUT_LEVEL_PEAK_COUNT }, () => 0));
+  }, []);
+
+  return { audioLevel, audioPeaks, setAudioLevel, setAudioPeaks, resetMeter };
 }

@@ -231,3 +231,44 @@ it('extends endpoint colors outside stop bounds and keeps fully transparent blen
     expect(sampleGradient({ ...gradient, interpolation }, 0.5)).toBe('#00000000');
   }
 });
+
+describe('Gradient reversal', () => {
+  it('moves and inverts asymmetric segment midpoints while preserving stable stop IDs and terminal metadata', () => {
+    const gradient: Gradient = {
+      type: 'linear',
+      angle: 90,
+      interpolation: 'srgb',
+      repeat: { enabled: false, span: 1 },
+      stops: [
+        { id: 'red', color: '#ff0000ff', position: 0, midpoint: 0.2 },
+        { id: 'green', color: '#00ff00ff', position: 0.4, midpoint: 0.7 },
+        { id: 'blue', color: '#0000ffff', position: 1, midpoint: 0.37 },
+      ],
+    };
+    const reversed = reverseGradient(gradient);
+    expect(reversed.stops.map((stop) => stop.id)).toEqual(['blue', 'green', 'red']);
+    expect(reversed.stops[0]?.midpoint).toBeCloseTo(0.3);
+    expect(reversed.stops[1]?.midpoint).toBeCloseTo(0.8);
+    expect(reversed.stops[2]?.midpoint).toBe(0.37);
+    for (const position of [0, 0.18, 0.6, 0.92, 1]) {
+      const actual = sampleGradient(reversed, position);
+      const expected = sampleGradient(gradient, 1 - position);
+      // Binary midpoint rounding can move an 8-bit channel across its half-byte boundary.
+      for (const offset of [1, 3, 5, 7]) {
+        expect(
+          Math.abs(
+            parseInt(actual.slice(offset, offset + 2), 16) -
+              parseInt(expected.slice(offset, offset + 2), 16)
+          )
+        ).toBeLessThanOrEqual(1);
+      }
+    }
+    const restored = reverseGradient(reversed);
+    restored.stops.forEach((stop, index) => {
+      expect(stop.id).toBe(gradient.stops[index]?.id);
+      expect(stop.position).toBeCloseTo(gradient.stops[index]!.position);
+      expect(stop.midpoint).toBeCloseTo(gradient.stops[index]!.midpoint);
+      expect(stop.color).toBe(gradient.stops[index]?.color);
+    });
+  });
+});

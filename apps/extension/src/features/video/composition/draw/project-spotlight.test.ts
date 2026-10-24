@@ -1,3 +1,4 @@
+import { resolveSceneSpotlightTarget, sceneSpotlightOpeningPath } from '../scene-spotlight';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createQuickEditSpotlight } from '../../project/scene/focus-appearance';
 import { sampleCompositionSpotlightLayer } from './project-spotlight';
@@ -30,6 +31,23 @@ it('keeps authored protection while a contracting entrance covers a wider openin
   expect(frame.opening.width).toBeGreaterThan(200);
   expect(frame.presence).toBe(0.25);
   expect(frame.openingClipProgress).toBe(0.25);
+});
+
+it('places the Native lens on the sampled cursor without changing its authored dock', () => {
+  const spotlight = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify' as const,
+    area: { x: 0.1, y: 0.2, width: 0.2, height: 0.2 },
+    magnification: 2.5,
+    lensOptics: 'optical' as const,
+  };
+  const frame = sampleCompositionSpotlightLayer({
+    ...geometry,
+    state: { id: 'lens', spotlight, phase: 'hold', progress: 1, lensFocus: { x: 0.75, y: 0.5 } },
+  });
+  expect(frame.opening).toEqual({ x: 260, y: 80, width: 80, height: 40 });
+  expect(frame.lens).toEqual({ scale: 2.5, optics: 'optical' });
+  expect(spotlight.area).toEqual({ x: 0.1, y: 0.2, width: 0.2, height: 0.2 });
 });
 it('uses the moving opening as full-strength protection throughout a linked morph', () => {
   const from = {
@@ -305,5 +323,27 @@ it.each(['dim', 'blur'] as const)(
       expect(layers.map((layer) => layer.blur)).toEqual([48, 48]);
     }
     expect(args.frame).toEqual(before);
+  }
+);
+
+it.each([false, true])(
+  'preserves mixed lens contour endpoints through the Native consumer (reverse=%s)',
+  (reverse) => {
+    const legacy = { ...createQuickEditSpotlight(), effect: 'magnify' as const, roundness: 0.5 };
+    const circle = { ...legacy, lensShape: 'circle' as const };
+    const from = reverse ? circle : legacy,
+      spotlight = reverse ? legacy : circle;
+    for (const progress of [0, 1]) {
+      const frame = sampleCompositionSpotlightLayer({
+        ...geometry,
+        state: { id: 'link', spotlight, from, phase: 'enter', progress },
+      });
+      const target = resolveSceneSpotlightTarget(
+        progress ? spotlight : from,
+        geometry.window,
+        geometry.scale
+      );
+      expect(sceneSpotlightOpeningPath(frame)).toBe(sceneSpotlightOpeningPath(target));
+    }
   }
 );

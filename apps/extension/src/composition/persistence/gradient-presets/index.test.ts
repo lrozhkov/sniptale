@@ -449,6 +449,44 @@ describe('gradient preset persistence authority', () => {
     ).toHaveLength(2);
   });
 
+  it('accepts an identical same-identity retry without overwriting or writing twice', async () => {
+    const module = await import('./index');
+    const gradient = createDefaultGradientPresetCatalog().presets[0]!.gradient;
+    const preset = { id: 'retry-id', name: 'Mine', order: 0, origin: 'user' as const, gradient };
+    await expect(module.addGradientPreset(preset)).resolves.toBe('applied');
+    await expect(module.addGradientPreset(structuredClone(preset))).resolves.toBe('unchanged');
+    await expect(module.addGradientPreset({ ...preset, name: 'Different' })).resolves.toBe(
+      'rejected'
+    );
+    await expect(
+      module.addGradientPreset({ ...preset, gradient: { ...gradient, stops: [] } })
+    ).resolves.toBe('rejected');
+    expect(syncSetMock).toHaveBeenCalledTimes(1);
+    await expect(module.renameGradientPreset(preset.id, 'Renamed')).resolves.toBe('applied');
+    await expect(module.addGradientPreset(preset)).resolves.toBe('rejected');
+    expect(
+      (await module.loadGradientPresetCatalog()).presets.find((item) => item.id === preset.id)?.name
+    ).toBe('Renamed');
+  });
+
+  it('rejects delayed rename after deletion without recreating the preset', async () => {
+    const module = await import('./index');
+    const gradient = createDefaultGradientPresetCatalog().presets[0]!.gradient;
+    await module.addGradientPreset({
+      id: 'delete-then-rename',
+      name: 'Mine',
+      order: 0,
+      origin: 'user',
+      gradient,
+    });
+    await module.deleteGradientPreset('delete-then-rename');
+    const writes = syncSetMock.mock.calls.length;
+    await expect(module.renameGradientPreset('delete-then-rename', 'Late')).resolves.toBe(
+      'rejected'
+    );
+    expect(syncSetMock).toHaveBeenCalledTimes(writes);
+  });
+
   it('rejects stale/newer revisions and surfaces failed writes to callers', async () => {
     const module = await import('./index');
     storage.value = { revision: 99, presets: [] };

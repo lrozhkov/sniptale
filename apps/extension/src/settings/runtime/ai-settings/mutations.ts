@@ -168,3 +168,15 @@ export function resetAudioTranscriptionSystemPrompt(): Promise<void> {
     () => undefined
   );
 }
+
+/** Saves the local dictated-text prompt through the serialized background owner. */
+export function saveVoiceInputCorrectionSystemPrompt(prompt: string): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'save-voice-input-correction-prompt', prompt }).then(
+    () => undefined
+  );
+}
+export function resetVoiceInputCorrectionSystemPrompt(): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'reset-voice-input-correction-prompt' }).then(
+    () => undefined
+  );
+}

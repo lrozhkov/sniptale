@@ -9,6 +9,7 @@ import {
 import type { VideoProjectClip, VideoProjectVideoClip, VideoProject } from '../types';
 import type { VideoProjectTransform } from '../types/layout';
 import type { VideoMediaFitMode } from '../types/media';
+import { resolveCameraSplitPresentation } from './split';
 
 type CameraPosition = NonNullable<VideoProjectVideoClip['cameraPositions']>[number];
 
@@ -150,10 +151,33 @@ export function resolveCameraVisualClip(
   )
     return clip;
   const visual = resolveCameraClip(clip, time);
+  const split = resolveCameraSplitPresentation(project, clip, time);
+  const presented = split
+    ? {
+        ...visual,
+        transform: split.camera,
+        fitMode:
+          split.screen.width < 1 || split.screen.height < 1 ? ('COVER' as const) : visual.fitMode,
+        ...(split.screen.width < 1 || split.screen.height < 1
+          ? {
+              cameraAppearance: {
+                ...appearanceForSplit(visual),
+                shape: 'rounded' as const,
+                roundness: 0,
+              },
+              shadowIntensity: 0,
+            }
+          : {}),
+      }
+    : visual;
   return !hasCameraMediaAt(project, clip, time) ||
     isCameraHiddenAt(clip.cameraHiddenRanges ?? [], cameraSourceTime(clip, time))
-    ? { ...visual, transform: { ...visual.transform, opacity: 0 } }
-    : visual;
+    ? { ...presented, transform: { ...presented.transform, opacity: 0 } }
+    : presented;
+}
+
+function appearanceForSplit(clip: VideoProjectVideoClip): CameraAppearance {
+  return clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
 }
 
 /** Edits a destination; interpolation is only a render concern. */

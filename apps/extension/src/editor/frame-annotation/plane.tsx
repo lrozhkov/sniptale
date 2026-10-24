@@ -70,7 +70,8 @@ export function EditorFrameAnnotationPlane(props: {
   const [sceneRoot, setSceneRoot] = React.useState<HTMLDivElement | null>(null);
   const [controlsRoot, setControlsRoot] = React.useState<HTMLDivElement | null>(null);
   const canvasRect = useProjectionRect(props.canvasRef);
-  const planeRect = useProjectionRect(planeRef);
+  const observedPlaneRect = useProjectionRect(planeRef);
+  const planeRect = planeRef.current?.getBoundingClientRect() ?? observedPlaneRect;
   const documentRect = getEditorDocumentClientRect(
     props.canvasRef.current,
     documentSize,

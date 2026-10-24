@@ -177,7 +177,7 @@ it('renders a non-interactive marker and touch-safe plane surface', () => {
   const { plane, planeRef } = renderPlane();
 
   expect(plane.className).toContain('touch-none');
-  expect(plane.className).toContain('cursor-pointer');
+  expect(plane.className).toContain('cursor-crosshair');
   expect(planeRef.current).toBe(plane);
   expect(plane.querySelector('.pointer-events-none')).not.toBeNull();
 });
@@ -187,12 +187,11 @@ it('keeps the selection marker above both color gradients and visible at the cor
   const marker = plane.querySelector('[data-ui="shared.ui.color-selector.plane-marker"]');
 
   expect(marker?.getAttribute('class')).toContain('z-10');
-  expect(marker?.querySelector('circle[stroke="#000"]')).not.toBeNull();
-  expect(marker?.querySelector('circle[stroke="#fff"]')).not.toBeNull();
+  expect(marker?.className).toContain('sniptale-color-plane-ring');
+  expect(marker?.querySelector('circle[stroke="#000"]')).toBeNull();
   expect((marker as HTMLElement).style.left).toBe('0%');
   expect(plane.className).not.toContain('overflow-hidden');
-  expect(marker?.querySelectorAll('circle')).toHaveLength(2);
-  expect(marker?.getAttribute('width')).toBe('16');
+  expect(marker?.querySelectorAll('circle')).toHaveLength(0);
 });
 
 it('supports focused keyboard selection and keeps the marker synchronized', () => {
@@ -220,4 +219,31 @@ it('supports focused keyboard selection and keeps the marker synchronized', () =
     '[data-ui="shared.ui.color-selector.plane-marker"]'
   );
   expect(marker?.style.left).toBe('51%');
+});
+
+it('hides the cursor only during primary dragging and restores it on all interruption paths', () => {
+  const { plane } = renderPlane();
+  const cursorRules = () =>
+    Array.from(document.head.querySelectorAll('style')).filter((style) =>
+      style.textContent?.includes('cursor:none!important')
+    );
+  for (const release of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur', 'Escape']) {
+    act(() =>
+      dispatchPointerEvent(plane, 'pointerdown', { pointerId: 7, clientX: 20, clientY: 20 })
+    );
+    expect(cursorRules()).toHaveLength(1);
+    act(() => {
+      if (release === 'blur') window.dispatchEvent(new Event('blur'));
+      else if (release === 'Escape')
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      else if (release === 'lostpointercapture') plane.dispatchEvent(new Event(release));
+      else dispatchPointerEvent(plane, release as 'pointerup' | 'pointercancel', { pointerId: 7 });
+    });
+    expect(cursorRules()).toHaveLength(0);
+  }
+  act(() => dispatchPointerEvent(plane, 'pointerdown', { pointerId: 7 }));
+  expect(cursorRules()).toHaveLength(1);
+  act(() => root?.unmount());
+  root = null;
+  expect(cursorRules()).toHaveLength(0);
 });

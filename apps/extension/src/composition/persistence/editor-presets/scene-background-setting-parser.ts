@@ -1,5 +1,8 @@
 import type { EditorSceneBackgroundSettings } from '../../../features/editor/document/presets';
-import { normalizeEditorFrameGradientStops } from '../../../features/editor/document/frame-gradient';
+import {
+  normalizeEditorFrameGradientStops,
+  parseEditorFrameGradient,
+} from '../../../features/editor/document/frame-gradient';
 import {
   MAX_EDITOR_BACKGROUND_BLUR_AMOUNT,
   normalizeEditorImageSettings,
@@ -105,6 +108,7 @@ function resolveSceneBackgroundVisuals(value: Record<string, unknown>) {
 }
 
 function resolveSceneColorAndGradient(value: Record<string, unknown>) {
+  const backgroundGradient = parseEditorFrameGradient(value['backgroundGradient']);
   const backgroundGradientFrom = value['backgroundGradientFrom'];
   const backgroundGradientTo = value['backgroundGradientTo'];
   const fallbackGradientFrom =
@@ -129,6 +133,7 @@ function resolveSceneColorAndGradient(value: Record<string, unknown>) {
       typeof value['backgroundColor'] === 'string'
         ? value['backgroundColor']
         : DEFAULT_SCENE_BACKGROUND_PRESET_SETTINGS.backgroundColor,
+    ...(backgroundGradient ? { backgroundGradient } : {}),
     backgroundGradientFrom: normalizedGradientStops[0] ?? fallbackGradientFrom,
     backgroundGradientTo: normalizedGradientStops.at(-1) ?? fallbackGradientTo,
     backgroundGradientStops: normalizedGradientStops,
@@ -191,6 +196,7 @@ export function parseSceneBackgroundSettings(value: unknown): EditorSceneBackgro
     !isString(value['backgroundGradientFrom']) ||
     !isString(value['backgroundGradientTo']) ||
     !hasValidSceneGradientStops(value) ||
+    parseEditorFrameGradient(value['backgroundGradient']) === null ||
     !isNumber(value['backgroundGradientAngle']) ||
     !hasValidSceneBackgroundImage(value) ||
     !hasValidSceneLayoutMode(value)

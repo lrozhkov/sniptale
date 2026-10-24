@@ -13,6 +13,11 @@ const trustedEventMocks = vi.hoisted(() => ({
   isTrustedPointerEvent: vi.fn(() => true),
 }));
 
+vi.mock('../../../../composition/persistence/settings', () => ({
+  loadSettings: async () => ({ voiceInput: { enabled: true } }),
+  subscribeToVoiceInputPreferencesChanges: () => () => undefined,
+}));
+
 vi.mock('../../../../composition/voice-input/trusted-events', async (importOriginal) => ({
   ...(await importOriginal()),
   isTrustedMouseEvent: trustedEventMocks.isTrustedMouseEvent,
@@ -90,7 +95,7 @@ function createActions(): DesignReviewActions['comment'] & {
     endComposition: vi.fn(),
     startComposition: vi.fn(),
     updateDraft: vi.fn(),
-    voice: { start: vi.fn(), stop: vi.fn() },
+    voice: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
   };
 }
 
@@ -107,19 +112,20 @@ function createState(
 
 const idleVoiceState: DesignReviewViewState['voice'] = {
   active: false,
+  pending: false,
   audioLevel: 0,
   caretPosition: null,
   errorCode: null,
   phase: 'idle',
 };
 
-function renderField(
+async function renderField(
   state = createState(),
   actions = createActions(),
   voice = idleVoiceState,
   footer?: ReactNode
 ) {
-  act(() => {
+  await act(async () => {
     root.render(
       <PageStyleCommentField
         actions={actions}
@@ -150,8 +156,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('binds the comment draft, marker number, blur commit, and IME lifecycle actions', () => {
-  const { actions } = renderField();
+it('binds the comment draft, marker number, blur commit, and IME lifecycle actions', async () => {
+  const { actions } = await renderField();
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
 
   expect(textarea?.value).toBe('Review this');
@@ -193,8 +199,8 @@ it('binds the comment draft, marker number, blur commit, and IME lifecycle actio
   expect(actions.commit).toHaveBeenCalledOnce();
 });
 
-it('keeps a neutral field surface while action buttons are pressed and focus changes', () => {
-  renderField();
+it('keeps a neutral field surface while action buttons are pressed and focus changes', async () => {
+  await renderField();
   const field = host.querySelector<HTMLElement>(
     '[data-ui="content.design-review.comment"] textarea'
   )?.parentElement;
@@ -219,8 +225,8 @@ it('keeps a neutral field surface while action buttons are pressed and focus cha
   expect(field.className).not.toContain('focus-within:ring-2');
 });
 
-it('grows from two lines with the draft and caps long comments inside the composer', () => {
-  const { actions } = renderField(createState({ draft: '' }));
+it('grows from two lines with the draft and caps long comments inside the composer', async () => {
+  const { actions } = await renderField(createState({ draft: '' }));
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
   if (!textarea) throw new Error('Expected Design Review comment field');
   let scrollHeight = 104;
@@ -254,8 +260,8 @@ it('grows from two lines with the draft and caps long comments inside the compos
   expect(actions.updateDraft).toHaveBeenCalledTimes(2);
 });
 
-it('closes on Enter while preserving Shift+Enter for a new line', () => {
-  const { actions } = renderField();
+it('closes on Enter while preserving Shift+Enter for a new line', async () => {
+  const { actions } = await renderField();
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
   if (!textarea) throw new Error('Expected Design Review comment field');
 
@@ -279,8 +285,8 @@ it('closes on Enter while preserving Shift+Enter for a new line', () => {
   expect(actions.close).toHaveBeenCalledOnce();
 });
 
-it('closes the active comment editor on Escape', () => {
-  const { actions } = renderField();
+it('closes the active comment editor on Escape', async () => {
+  const { actions } = await renderField();
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
   if (!textarea) throw new Error('Expected Design Review comment field');
 
@@ -293,10 +299,10 @@ it('closes the active comment editor on Escape', () => {
   expect(actions.close).toHaveBeenCalledOnce();
 });
 
-it('starts at the current caret, supports push-to-talk, and renders before the Enter hint', () => {
+it('starts at the current caret, supports push-to-talk, and renders before the Enter hint', async () => {
   vi.useFakeTimers();
   const actions = createActions();
-  renderField(
+  await renderField(
     createState({ draft: 'Keep this text' }),
     actions,
     idleVoiceState,
@@ -328,10 +334,10 @@ it('starts at the current caret, supports push-to-talk, and renders before the E
   vi.useRealTimers();
 });
 
-it('keeps listening after a short microphone click until the same control is used again', () => {
+it('keeps listening after a short microphone click until the same control is used again', async () => {
   vi.useFakeTimers();
   const actions = createActions();
-  renderField(createState(), actions, idleVoiceState, <span>Action</span>);
+  await renderField(createState(), actions, idleVoiceState, <span>Action</span>);
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
   const button = document.querySelector<HTMLButtonElement>(
     '[data-ui="content.design-review.comment-voice-input"]'
@@ -352,11 +358,11 @@ it('keeps listening after a short microphone click until the same control is use
   vi.useRealTimers();
 });
 
-it('rejects synthetic pointer and keyboard-style click starts from the host page', () => {
+it('rejects synthetic pointer and keyboard-style click starts from the host page', async () => {
   const actions = createActions();
   trustedEventMocks.isTrustedMouseEvent.mockReturnValue(false);
   trustedEventMocks.isTrustedPointerEvent.mockReturnValue(false);
-  renderField(createState(), actions, idleVoiceState, <span>Action</span>);
+  await renderField(createState(), actions, idleVoiceState, <span>Action</span>);
   const button = document.querySelector<HTMLButtonElement>(
     '[data-ui="content.design-review.comment-voice-input"]'
   );
@@ -370,9 +376,9 @@ it('rejects synthetic pointer and keyboard-style click starts from the host page
   expect(actions.voice.start).not.toHaveBeenCalled();
 });
 
-it('accepts a trusted keyboard-style click start', () => {
+it('accepts a trusted keyboard-style click start', async () => {
   const actions = createActions();
-  renderField(createState(), actions, idleVoiceState, <span>Action</span>);
+  await renderField(createState(), actions, idleVoiceState, <span>Action</span>);
   const button = document.querySelector<HTMLButtonElement>(
     '[data-ui="content.design-review.comment-voice-input"]'
   );
@@ -383,13 +389,14 @@ it('accepts a trusted keyboard-style click start', () => {
   expect(actions.voice.start).toHaveBeenCalledOnce();
 });
 
-it('shows an audio-reactive active ring and stops from the same microphone button', () => {
+it('shows an audio-reactive active ring and stops from the same microphone button', async () => {
   const actions = createActions();
-  renderField(
+  await renderField(
     createState(),
     actions,
     {
       active: true,
+      pending: false,
       audioLevel: 0.5,
       caretPosition: 4,
       errorCode: null,
@@ -412,12 +419,13 @@ it('shows an audio-reactive active ring and stops from the same microphone butto
   expect(actions.voice.stop).toHaveBeenCalledOnce();
 });
 
-it('surfaces a localized voice failure without discarding the comment draft', () => {
-  renderField(
+it('surfaces a localized voice failure without discarding the comment draft', async () => {
+  await renderField(
     createState({ draft: 'Still here' }),
     createActions(),
     {
       active: false,
+      pending: false,
       audioLevel: 0,
       caretPosition: null,
       errorCode: 'permission-denied',
@@ -430,8 +438,8 @@ it('surfaces a localized voice failure without discarding the comment draft', ()
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('Проверьте микрофон');
 });
 
-it('keeps the recoverable localized error associated with the textarea', () => {
-  renderField(createState({ commitFailed: true }));
+it('keeps the recoverable localized error associated with the textarea', async () => {
+  await renderField(createState({ commitFailed: true }));
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
   const alert = document.querySelector<HTMLElement>('[role="alert"]');
 
@@ -439,8 +447,8 @@ it('keeps the recoverable localized error associated with the textarea', () => {
   expect(textarea?.getAttribute('aria-describedby')?.split(' ')).toContain(alert?.id);
 });
 
-it('uses AA secondary text pairs for marker, placeholder, and hint copy in both themes', () => {
-  renderField();
+it('uses AA secondary text pairs for marker, placeholder, and hint copy in both themes', async () => {
+  await renderField();
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
   const marker = document.querySelector<HTMLElement>('section div span');
   const hintId = textarea?.getAttribute('aria-describedby')?.split(' ')[0];
@@ -465,7 +473,7 @@ it('uses AA secondary text pairs for marker, placeholder, and hint copy in both 
   });
 });
 
-it('disables editing when no page target is selected', () => {
+it('disables editing when no page target is selected', async () => {
   const actions = createActions();
   act(() => {
     root.render(
@@ -481,7 +489,7 @@ it('disables editing when no page target is selected', () => {
   expect(document.querySelector<HTMLTextAreaElement>('textarea')?.disabled).toBe(true);
 });
 
-it('ships the comment field and marker copy in both supported locales', () => {
+it('ships the comment field and marker copy in both supported locales', async () => {
   expect(translate('content.designReview.commentLabel', 'ru')).toBe('Комментарий к элементу');
   expect(translate('content.designReview.commentLabel', 'en')).toBe('Element comment');
   expect(translate('content.designReview.commentCommitFailed', 'en')).toContain(
@@ -489,4 +497,40 @@ it('ships the comment field and marker copy in both supported locales', () => {
   );
   expect(translate('content.designReview.voiceInputStart', 'ru')).toContain('Удерживайте');
   expect(translate('content.designReview.voiceInputError', 'en')).toContain('voice input settings');
+});
+
+it('cancels processing before applying a manually edited comment', async () => {
+  const actions = createActions();
+  await renderField(createState(), actions, {
+    ...idleVoiceState,
+    pending: true,
+    phase: 'processing-text',
+  });
+  const textarea = host.querySelector('textarea');
+  if (!textarea) throw new Error('Expected comment textarea');
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(textarea, 'Manual');
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(actions.voice.cancel).toHaveBeenCalledOnce();
+  expect(actions.updateDraft).toHaveBeenCalledWith('Manual');
+});
+
+it('cancels pending processing from the same microphone control', async () => {
+  const actions = createActions();
+  await renderField(
+    createState(),
+    actions,
+    { ...idleVoiceState, pending: true, phase: 'processing-asr' },
+    <span>Action</span>
+  );
+  const button = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.design-review.comment-voice-input"]'
+  );
+  if (!button) throw new Error('Expected comment microphone');
+  expect(button.disabled).toBe(false);
+  act(() => button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })));
+  expect(actions.voice.cancel).toHaveBeenCalledOnce();
+  expect(actions.voice.start).not.toHaveBeenCalled();
 });

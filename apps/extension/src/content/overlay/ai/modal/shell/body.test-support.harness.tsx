@@ -13,6 +13,7 @@ type BodyHarnessProps = {
   onStopVoice?: () => void;
   onSubmit?: (...args: unknown[]) => void;
   voiceActive?: boolean;
+  voicePending?: boolean;
 };
 
 let container: HTMLDivElement | null = null;
@@ -49,6 +50,7 @@ function createBodyState(args: {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   totalTokens: number;
   voiceActive: boolean;
+  voicePending: boolean;
   stopVoice(): void;
 }) {
   return {
@@ -76,9 +78,10 @@ function createBodyState(args: {
     textareaRef: args.textareaRef,
     totalTokens: args.totalTokens,
     voice: {
-      actions: { start: vi.fn(), stop: args.stopVoice },
+      actions: { start: vi.fn(), stop: args.stopVoice, cancel: args.stopVoice },
       state: {
         active: args.voiceActive,
+        pending: args.voicePending,
         audioLevel: 0,
         caretPosition: null,
         errorCode: null,
@@ -93,6 +96,7 @@ function BodyHarness(props: BodyHarnessProps) {
   const [selectedData, setSelectedData] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<string | null>('model-1');
   const [voiceActive, setVoiceActive] = useState(props.voiceActive ?? false);
+  const [voicePending, setVoicePending] = useState(props.voicePending ?? false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const totalTokens = useMemo(
     () => estimateTokens(prompt) + estimateTokens(selectedData),
@@ -117,9 +121,11 @@ function BodyHarness(props: BodyHarnessProps) {
           textareaRef,
           totalTokens,
           voiceActive,
+          voicePending,
           stopVoice: () => {
             props.onStopVoice?.();
             setVoiceActive(false);
+            setVoicePending(false);
           },
         })}
         treeData={integrationTreeData}

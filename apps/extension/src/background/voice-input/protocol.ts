@@ -5,6 +5,7 @@ import {
   VoiceInputPortMessageType,
   type VoiceInputErrorCode,
   type VoiceInputPreferences,
+  type VoiceCaptureToken,
   type VoiceInputServerEvent,
   type VoiceInputSnapshot,
 } from '@sniptale/runtime-contracts/voice-input';
@@ -20,6 +21,10 @@ export type VoiceInputPortRegistration = {
 };
 
 export type ActiveVoiceInputSession = VoiceInputPortRegistration & {
+  captureToken?: VoiceCaptureToken;
+  captureReleased?: boolean;
+  processing?: boolean;
+  cancelled?: boolean;
   offscreenObserved: boolean;
   offscreenSessionId: string;
   preferences: VoiceInputPreferences;
@@ -38,6 +43,7 @@ export function createIdleVoiceInputSnapshot(
   preferences = DEFAULT_PREFERENCES
 ): VoiceInputSnapshot {
   return {
+    delivery: preferences.backend === 'model' ? 'final' : 'live',
     apiFlavor: 'unsupported',
     busyOwner: null,
     effectiveMode: null,
@@ -113,7 +119,9 @@ export function isActiveVoiceInputSnapshot(snapshot: VoiceInputSnapshot): boolea
     snapshot.phase === 'checking' ||
     snapshot.phase === 'starting' ||
     snapshot.phase === 'listening' ||
-    snapshot.phase === 'stopping'
+    snapshot.phase === 'stopping' ||
+    snapshot.phase === 'processing-asr' ||
+    snapshot.phase === 'processing-text'
   );
 }
 

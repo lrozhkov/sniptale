@@ -1,5 +1,5 @@
 import { expect } from '../support/extension-fixture';
-import type { BrowserContext } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 export async function openDesignReview(
   context: BrowserContext,
@@ -69,4 +69,10 @@ export async function openDesignReview(
     document.body.append(parent);
   });
   return { page, popup };
+}
+
+export async function restoreScenarioRecorderFixture(page: Page, _popup: Page): Promise<void> {
+  await page.bringToFront();
+  await page.locator('[data-ui="content.toolbar.scenario-panel-button"]').click();
+  await expect(page.locator('[data-ui="content.scenario.sidebar"]')).toBeVisible();
 }

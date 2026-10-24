@@ -1,4 +1,6 @@
+import { setColorAlpha } from '@sniptale/foundation/color';
 import { useEffect, useId } from 'react';
+import { usePickerPreferences } from '../../composition/picker-preferences/use-picker-preferences';
 import { createPortal } from 'react-dom';
 import { useAppLocale } from '../../platform/i18n';
 import {
@@ -23,6 +25,7 @@ function PickerLayer(props: {
   ownerId: string;
 }) {
   const { state, options } = props;
+  const preferences = usePickerPreferences(options.density);
   const rootNode = state.rootRef.current;
   const portalTarget =
     typeof document === 'undefined' ? null : resolveThemeSafePortalTarget(rootNode);
@@ -33,12 +36,15 @@ function PickerLayer(props: {
     options.floatingPlacement ?? 'auto',
     options.floatingBoundaryRef?.current ?? null,
     state.layerRef,
-    'picker'
+    'picker',
+    preferences.compact ? 320 : 520
   );
   if (!state.pickerOpen || !portalTarget) return null;
   const finish = (apply: boolean) => {
-    if (apply) state.handlePickerApply();
-    else state.handlePickerCancel();
+    if (apply) {
+      preferences.rememberColor(state.draftColor);
+      state.handlePickerApply();
+    } else state.handlePickerCancel();
     state.rootRef.current?.querySelector('button')?.focus({ preventScroll: true });
   };
   return createPortal(
@@ -53,14 +59,25 @@ function PickerLayer(props: {
         allowAlpha={options.allowAlpha !== false}
         allowTransparent={options.allowTransparent !== false}
         color={state.draftColor}
+        originalColor={options.value}
+        compact={preferences.compact}
+        onToggleCompact={() => preferences.setCompact(!preferences.compact)}
         formatMode={state.formatMode}
         eyedropper={state.eyedropper}
         palette={state.normalizedPalette}
-        recentColors={state.normalizedRecentColors}
+        recentColors={
+          options.recentColors ? state.normalizedRecentColors : preferences.recentColors
+        }
         title={options.title}
         onApply={() => finish(true)}
         onCancel={() => finish(false)}
-        onColorChange={state.handleDraftColorChange}
+        onColorChange={(color) =>
+          state.handleDraftColorChange(
+            options.allowAlpha === false && color !== 'transparent'
+              ? (setColorAlpha(color, 1) ?? color)
+              : color
+          )
+        }
         onCycleFormatMode={state.cycleFormatMode}
         onSelectTransparent={state.handleSelectTransparent}
       />

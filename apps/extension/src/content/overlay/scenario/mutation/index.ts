@@ -1,5 +1,4 @@
 export {
-  applyScenarioCaptureAction,
   applyScenarioCaptureMode,
   applyScenarioEnabledState,
   applyScenarioRememberSelection,

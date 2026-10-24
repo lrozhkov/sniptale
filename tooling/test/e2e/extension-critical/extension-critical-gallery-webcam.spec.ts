@@ -18,16 +18,20 @@ for (const variant of [
       ')',
     ].join(''),
     async ({ page }, info) => {
+      test.setTimeout(180_000);
       if ('viewport' in variant) await page.setViewportSize(variant.viewport);
       const host = await startHostServer();
       const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
-      const toggle = () =>
-        dialog
-          .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
-          .and(dialog.locator('[aria-label]'));
+      const toggle = async () => {
+        const enabled = dialog.getByRole('switch', {
+          name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.webcam')}`,
+        });
+        if (!(await enabled.isVisible())) await button('gallery.videoReview.trackSettings').click();
+        await enabled.click();
+      };
       try {
         await applyHarnessBootstrap(page, {
           preserveMediaLibrary: true,
@@ -53,12 +57,13 @@ for (const variant of [
             .evaluate((video) => {
               video.currentTime = 0.09;
             });
-        await toggle().click();
+        await toggle();
+        await button('gallery.videoReview.webcamSettings').click();
         const track = dialog.locator('[data-ui="gallery.videoReview.webcamTrack"]');
         const overlay = dialog.locator('[data-ui="gallery.videoReview.webcamOverlay"]');
         const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
         await expect(track).toBeVisible();
-        await expect(track).toHaveCSS('height', '40px');
+        await expect(track).toHaveCSS('height', '36px');
         await button('gallery.videoReview.compactTrackHeight').click();
         await expect(track).toHaveCSS('height', '28px');
         await expect(inspector).toBeVisible();
@@ -90,10 +95,10 @@ for (const variant of [
           })
         ).toBeVisible();
         await refineCameraPoint(page, variant.locale, info);
-        await toggle().click();
-        await expect(track).toHaveCount(0);
+        await toggle();
+        await expect(track).toBeVisible();
         await expect(overlay).toHaveCount(0);
-        await toggle().click();
+        await toggle();
         await expect(
           track.getByRole('button', {
             name: `${label('gallery.videoReview.webcamPosition')} 1`,
@@ -266,9 +271,33 @@ for (const variant of [
           path: info.outputPath('webcam-hidden-inspector.png'),
           fullPage: false,
         });
+        if (!('lowCadence' in variant) && variant.locale === 'en') {
+          await hidden.click();
+          const resize = dialog.getByRole('separator', {
+            name: label('videoEditor.sidebar.resizeInspector'),
+          });
+          await resize.focus();
+          await resize.press('End');
+          const sections = inspector.locator('[data-ui="gallery.videoReview.inspectorSections"]');
+          await expect(sections.locator('.review-inspector-section')).toHaveCount(1);
+          await expect
+            .poll(() =>
+              sections.evaluate(
+                (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length
+              )
+            )
+            .toBe(1);
+          const section = (await sections.locator('.review-inspector-section').boundingBox())!;
+          const available = (await sections.boundingBox())!;
+          expect(section.width).toBeCloseTo(available.width, 0);
+          await page.screenshot({
+            path: info.outputPath('webcam-hidden-wide.png'),
+            fullPage: false,
+          });
+          await resize.press('Home');
+        }
         await page.reload();
-        await page.getByRole('button', { name: /: Screen$/ }).click();
-        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await expect(dialog).toBeVisible();
         await expect(hidden).toHaveCount(1);
         await dialog
           .locator('video')
@@ -363,8 +392,7 @@ for (const variant of [
           fullPage: false,
         });
         await page.reload();
-        await page.getByRole('button', { name: /: Screen$/ }).click();
-        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await expect(dialog).toBeVisible();
         await button('gallery.videoReview.webcamSettings').click();
         await expect(
           inspector.getByRole('textbox', {
@@ -390,6 +418,7 @@ for (const variant of [
 test('webcam inspector preserves controls across adaptive columns and panel heights', async ({
   page,
 }, info) => {
+  test.setTimeout(120_000);
   const host = await startHostServer();
   const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
   const dialog = page.locator('dialog');
@@ -407,7 +436,13 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
     await page.getByRole('button', { name: /: Screen$/ }).click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await button('gallery.videoReview.advancedEditing').click();
-    await button('gallery.videoReview.webcam').click();
+    await button('gallery.videoReview.trackSettings').click();
+    await dialog
+      .getByRole('switch', {
+        name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.webcam')}`,
+      })
+      .click();
+    await button('gallery.videoReview.webcamSettings').click();
     const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
     const sections = inspector.locator('[data-ui="gallery.videoReview.inspectorSections"]');
     const width = dialog.getByRole('separator', {
@@ -459,7 +494,11 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
         })
       ).toHaveCount(0);
       await select('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeSoft');
-      await select('gallery.videoReview.webcamMirror', 'gallery.videoReview.webcamMirrorOn');
+      const mirror = inspector.getByRole('switch', {
+        name: label('gallery.videoReview.webcamMirror'),
+      });
+      if ((await mirror.getAttribute('aria-checked')) === 'false') await mirror.click();
+      await expect(mirror).toHaveAttribute('aria-checked', 'true');
       await inspector
         .getByRole('button', { name: label('gallery.videoReview.webcamLayout'), exact: true })
         .click();
@@ -499,7 +538,13 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
         fullPage: false,
       });
       await button('scenario.editor.inspectorShowAll').click();
-      await expect(sections.locator('.review-inspector-section')).toHaveCount(3);
+      await expect
+        .poll(() =>
+          sections
+            .locator('.review-inspector-section')
+            .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-section')))
+        )
+        .toEqual(['webcam-layout', 'webcam-appearance', 'webcam-timing', 'actions']);
       await button('gallery.videoReview.webcamDisable').scrollIntoViewIfNeeded();
       await expect(button('gallery.videoReview.webcamDisable')).toBeInViewport();
     }
@@ -586,4 +631,177 @@ async function refineCameraPoint(page: Page, locale: 'en' | 'ru', info: TestInfo
         : undefined;
     })
     .toBe(2);
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  for (const manual of [false, true]) {
+    test(`camera retry restores durationless WebM ${viewport.width} manual=${manual}`, async ({
+      page,
+    }, info) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize(viewport);
+      const host = await startHostServer();
+      const locale = viewport.width === 1280 ? 'ru' : 'en';
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+      try {
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          storage: {
+            'sniptale-locale-preference': locale,
+            'sniptale-theme-preference': 'dark',
+            sniptale_quick_preview_preferences: {
+              rasterPreset: 'current',
+              frameRate: 'current',
+              pausedQuality: manual ? 'detailed' : 'same',
+              showFrameRate: false,
+            },
+          },
+        });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=dark`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedReviewWebcamBundle(page);
+        await page.evaluate(async () => {
+          const objects = await (
+            await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
+          ).getDirectoryHandle('objects');
+          const handle = await objects.getFileHandle('webcam-clock-asset');
+          const bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer());
+          const index = bytes.findIndex(
+            (value, i) => value === 0x44 && bytes[i + 1] === 0x89 && bytes[i + 2] === 0x88
+          );
+          if (index < 0) throw new Error('Fixture duration element not found');
+          // Replace the 11-byte Duration element with an equal-length EBML Void.
+          bytes[index] = 0xec;
+          bytes[index + 1] = 0x89;
+          const video = document.createElement('video');
+          video.src = URL.createObjectURL(new Blob([bytes], { type: 'video/webm' }));
+          await new Promise<void>((resolve, reject) => {
+            video.onloadedmetadata = () => resolve();
+            video.onerror = reject;
+          });
+          if (video.duration !== Infinity) throw new Error('Fixture must omit native duration');
+          URL.revokeObjectURL(video.src);
+          const writer = await handle.createWritable();
+          await writer.write(bytes);
+          await writer.close();
+        });
+        await page.reload();
+        await page.getByRole('button', { name: /: Screen$/ }).click();
+        const dialog = page.locator('dialog');
+        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await dialog
+          .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+          .click();
+        const enabled = dialog.getByRole('switch', {
+          name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.webcam')}`,
+        });
+        if (!(await enabled.isVisible()))
+          await dialog
+            .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
+            .click();
+        const cameras = await page.evaluateHandle(() => {
+          const videos: HTMLVideoElement[] = [];
+          document.createElement = new Proxy(document.createElement, {
+            apply(target, receiver, args) {
+              const element = Reflect.apply(target, receiver, args);
+              if (element instanceof HTMLVideoElement) videos.push(element);
+              return element;
+            },
+          });
+          return videos;
+        });
+        await enabled.click();
+        await expect
+          .poll(() =>
+            cameras.evaluate((videos) =>
+              videos.some(
+                (video) =>
+                  !video.isConnected && video.readyState >= 2 && video.src.startsWith('blob:')
+              )
+            )
+          )
+          .toBe(true);
+        const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+        const canvas = manual
+          ? stage.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+          : stage.locator('[data-ui="gallery.videoReview.webcamOverlay"] canvas');
+        const painted = async () =>
+          canvas.evaluateAll((nodes) =>
+            nodes.some((node) => {
+              if (!(node instanceof HTMLCanvasElement) || !node.width || !node.height) return false;
+              return (
+                node
+                  .getContext('2d')!
+                  .getImageData(Math.floor(node.width * 0.85), Math.floor(node.height * 0.85), 1, 1)
+                  .data[3] === 255
+              );
+            })
+          );
+        await expect.poll(painted).toBe(true);
+        await cameras.evaluate((videos) => {
+          const video = videos.findLast(
+            (video) =>
+              !video.isConnected && video.duration === Infinity && video.src.startsWith('blob:')
+          );
+          if (!video) throw new Error('Camera decoder missing');
+          video.dispatchEvent(new Event('error'));
+        });
+        const failure = stage.getByRole('alert');
+        await expect(failure).toHaveCount(1);
+        await expect(failure).toContainText(label('gallery.videoReview.webcamFailed'));
+        await expect(
+          stage.getByText(label('gallery.videoReview.previewFailed'), { exact: true })
+        ).toHaveCount(0);
+        const notice = await failure.screenshot();
+        const noticeVisible = await page.evaluate(async (bytes) => {
+          const bitmap = await createImageBitmap(
+            new Blob([Uint8Array.from(bytes)], { type: 'image/png' })
+          );
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const context = canvas.getContext('2d')!;
+            context.drawImage(bitmap, 0, 0);
+            return context
+              .getImageData(0, 0, canvas.width, canvas.height)
+              .data.some((value, index) => index % 4 !== 3 && value > 8);
+          } finally {
+            bitmap.close();
+          }
+        }, Array.from(notice));
+        expect(noticeVisible, 'Camera recovery must remain visible above the initial fade').toBe(
+          true
+        );
+        await page.screenshot({
+          path: info.outputPath('camera-single-failure.png'),
+          fullPage: false,
+        });
+        await failure
+          .getByRole('button', { name: label('gallery.videoReview.retry'), exact: true })
+          .click();
+        await expect(stage.getByRole('alert')).toHaveCount(0);
+        await expect.poll(painted).toBe(true);
+        await stage
+          .locator('video')
+          .first()
+          .evaluate((video) => {
+            video.currentTime = 5;
+          });
+        await expect.poll(painted).toBe(true);
+        await expect(stage.getByRole('alert')).toHaveCount(0);
+        await page.screenshot({
+          path: info.outputPath('camera-durationless-restored.png'),
+          fullPage: false,
+        });
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    });
+  }
 }

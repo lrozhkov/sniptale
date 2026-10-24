@@ -369,6 +369,17 @@ it('bounds source traversal to preparation and replans gesture appearance on a n
     },
   }));
   const facts = structuredClone(samples);
+  let sourceReads = 0;
+  for (const sample of samples) {
+    const point = sample.recordingPoint;
+    Object.defineProperty(sample, 'recordingPoint', {
+      enumerable: true,
+      get() {
+        sourceReads++;
+        return point;
+      },
+    });
+  }
   project.cursorTrack = {
     captureMode: 'embedded-fallback',
     skin: {
@@ -391,10 +402,13 @@ it('bounds source traversal to preparation and replans gesture appearance on a n
   const first = evaluateProjectGestureFeedback(project, 2);
   expect(first).toHaveLength(1);
   const preparationReads = reads;
+  const preparedSourceReads = sourceReads;
   expect(preparationReads).toBeGreaterThan(0);
   expect(evaluateProjectGestureFeedback(project, 4)).toHaveLength(1);
   expect(evaluateProjectGestureFeedback(project, 2)).toEqual(first);
   expect(reads).toBe(preparationReads);
+  expect(evaluateProjectGestureFeedback({ ...project }, 2)).toEqual(first);
+  expect(sourceReads).toBe(preparedSourceReads);
   const updated = {
     ...project,
     actionFeedback: project.actionFeedback!.map((group) => ({
@@ -404,7 +418,14 @@ it('bounds source traversal to preparation and replans gesture appearance on a n
   };
   expect(evaluateProjectGestureFeedback(updated, 2)[0]!.frame.color).toBe('#22cc88ff');
   expect(reads).toBeGreaterThan(preparationReads);
+  expect(sourceReads).toBe(preparedSourceReads);
   expect(evaluateProjectGestureFeedback(project, 2)).toEqual(first);
+  const replacedSource = {
+    ...project,
+    cursorTrack: { ...project.cursorTrack, samples: [...samples] },
+  };
+  expect(evaluateProjectGestureFeedback(replacedSource, 2)).toEqual(first);
+  expect(sourceReads).toBeGreaterThan(preparedSourceReads);
   expect(samples).toEqual(facts);
 });
 

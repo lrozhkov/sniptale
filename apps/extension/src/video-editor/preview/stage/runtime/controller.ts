@@ -109,8 +109,27 @@ function usePreviewStageTimeline(params: PreviewStageProps) {
   return { presentation, transient };
 }
 
+function usePreviewCompositionProject(project: VideoProject): VideoProject {
+  const retained = useRef(project);
+  const previous = retained.current;
+  // Autosave replaces only updatedAt. Composition consumes the same immutable values.
+  if (previous !== project) {
+    const keys = Object.keys(project);
+    const revisionOnly =
+      keys.length === Object.keys(previous).length &&
+      keys.every(
+        (key) =>
+          Object.hasOwn(previous, key) &&
+          (key === 'updatedAt' || Object.is(Reflect.get(previous, key), Reflect.get(project, key)))
+      );
+    if (!revisionOnly) retained.current = project;
+  }
+  return retained.current;
+}
+
 export function usePreviewStageRuntime(params: PreviewStageProps) {
-  const { presentation, transient } = usePreviewStageTimeline(params);
+  const project = usePreviewCompositionProject(params.project);
+  const { presentation, transient } = usePreviewStageTimeline({ ...params, project });
   const previewProject = useMemo(
     () => ({
       ...transient.previewProject,

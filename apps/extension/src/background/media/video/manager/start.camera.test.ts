@@ -15,6 +15,7 @@ const {
   runCountdownMock,
   scheduleRecordingStartActivationWatchdogMock,
   sendRuntimeMessageMock,
+  openCompanionMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
   acknowledgePendingVideoPostRecordResultMock: vi.fn(),
@@ -30,11 +31,16 @@ const {
   runCountdownMock: vi.fn(),
   scheduleRecordingStartActivationWatchdogMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
+  openCompanionMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ error: vi.fn(), log: vi.fn(), warn: vi.fn() }),
+}));
+vi.mock('../../../../platform/navigation/extension-pages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/navigation/extension-pages')>()),
+  openCameraRecorderPage: openCompanionMock,
 }));
 vi.mock('../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session-state')>()),
@@ -116,6 +122,7 @@ beforeEach(() => {
   });
   readStoredVideoPostRecordResultMock.mockReset().mockResolvedValue(null);
   issueCameraRecorderLaunchTokenMock.mockResolvedValue('recording-1');
+  openCompanionMock.mockResolvedValue(undefined);
 });
 
 it('preserves the admitted camera launch when a duplicate saved-result acknowledgement finishes late', async () => {
@@ -231,6 +238,7 @@ it('finalizes a camera recording with a launch token and control capability', as
     startRecording(undefined, defaultSettings, CaptureMode.CAMERA, undefined, ownerSenderUrl)
   ).resolves.toEqual({
     cameraLaunchToken: 'recording-1',
+    cameraRecorderOpened: true,
     controlToken: 'control-token-1',
     recordingId: 'recording-1',
     result: 'accepted',
@@ -242,6 +250,10 @@ it('finalizes a camera recording with a launch token and control capability', as
     null
   );
   expect(runCountdownMock).toHaveBeenCalledWith(null, CaptureMode.CAMERA, cameraSettings);
+  expect(openCompanionMock).toHaveBeenCalledWith({
+    launchToken: 'recording-1',
+    recordingId: 'recording-1',
+  });
   expect(issuePreparedVideoRecordingLeaseMock).toHaveBeenCalledWith({
     captureMode: CaptureMode.CAMERA,
     cropRegion: null,

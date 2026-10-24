@@ -111,7 +111,7 @@ function createDialogProps(
 function createScenarioProps(): ContentAppLayoutProps['scenario'] {
   return {
     actions: {
-      applyCaptureAction: vi.fn(async () => undefined),
+      setRecorderPanelVisible: vi.fn(async () => true),
       createProject: vi.fn(async () => undefined),
       deleteRecentStep: vi.fn(async () => undefined),
       finishRecording: vi.fn(async () => undefined),

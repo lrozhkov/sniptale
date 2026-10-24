@@ -25,7 +25,6 @@ import {
   getFrameCallout,
   getFrameCalloutKey,
   getFrameCallouts,
-  MAX_FRAME_CALLOUTS,
 } from '../../features/highlighter/frame-annotation/callout/collection';
 import { createDefaultFrameCallout } from '../../features/highlighter/frame-annotation/defaults';
 import { translate } from '../../platform/i18n';
@@ -119,12 +118,12 @@ export function FrameProjection(props: {
           scene={scene}
           snapshot={props.snapshot}
           onCommand={props.onCommand}
-          onAddCallout={(anchor) => {
+          onAddCallout={() => {
             const next = appendFrameCallout(props.snapshot, createDefaultFrameCallout());
             if (!next) return;
             setActiveCalloutIndex(next.calloutIndex);
             props.onSnapshotChange(next.frame);
-            props.onOpenSettings('callout', anchor);
+            props.onCloseSettings();
           }}
         />
       ) : null}
@@ -205,24 +204,40 @@ function FrameProjectionOverlays(
 type FrameProjectionOverlayProps = Parameters<typeof FrameProjectionOverlays>[0];
 
 function FrameResizeOverlay(props: FrameProjectionOverlayProps) {
-  if (!props.selected || props.settingsMenu !== null || !props.controlsRoot) return null;
+  if (!props.selected || props.settingsMenu !== null || !props.sceneRoot) return null;
   return createPortal(
-    <FrameAnnotationResizeHandleLayer
-      borderColor={props.scene.borderColor}
-      frameId={props.snapshot.id}
-      frameRect={props.coordinateSpace.logicalRectToClient(props.frameRect)}
-      handleSize={Math.min(16, Math.max(10, 8 + props.scene.borderWidth))}
-      strokeWidth={props.scene.surface.strokeVisible ? props.scene.borderWidth * props.scale : 0}
-      position="fixed"
-      onResizeStart={(event, direction) =>
-        props.onResizeStart(
-          event,
-          direction,
-          resolveCalloutCenter(props.snapshot.id, props.coordinateSpace, props.activeCalloutIndex)
-        )
-      }
-    />,
-    props.controlsRoot
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+        transform: `scale(${1 / props.scale})`,
+        transformOrigin: 'top left',
+      }}
+    >
+      <FrameAnnotationResizeHandleLayer
+        borderColor={props.scene.borderColor}
+        frameId={props.snapshot.id}
+        frameRect={{
+          x: props.frameRect.x * props.scale,
+          y: props.frameRect.y * props.scale,
+          width: props.frameRect.width * props.scale,
+          height: props.frameRect.height * props.scale,
+        }}
+        handleSize={Math.min(16, Math.max(10, 8 + props.scene.borderWidth))}
+        strokeWidth={props.scene.surface.strokeVisible ? props.scene.borderWidth * props.scale : 0}
+        position="absolute"
+        onResizeStart={(event, direction) =>
+          props.onResizeStart(
+            event,
+            direction,
+            resolveCalloutCenter(props.snapshot.id, props.coordinateSpace, props.activeCalloutIndex)
+          )
+        }
+      />
+    </div>,
+    props.sceneRoot
   );
 }
 
@@ -296,7 +311,7 @@ function FrameProjectionToolbar(props: {
   scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
   snapshot: FrameAnnotationSnapshotV1;
   onCommand: (command: FrameAnnotationCommandId) => void;
-  onAddCallout: (anchor: HTMLButtonElement) => void;
+  onAddCallout: () => void;
 }) {
   const toolbarRef = React.useRef<HTMLDivElement | null>(null);
   const [, refreshPlacement] = React.useReducer((value) => value + 1, 0);
@@ -389,14 +404,7 @@ function FrameProjectionToolbar(props: {
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                if (!(event.currentTarget instanceof HTMLButtonElement)) return;
-                const anchor =
-                  getFrameCallouts(props.snapshot).length === MAX_FRAME_CALLOUTS - 1
-                    ? (toolbarRef.current?.querySelector<HTMLButtonElement>(
-                        'button:not(:disabled)'
-                      ) ?? event.currentTarget)
-                    : event.currentTarget;
-                props.onAddCallout(anchor);
+                props.onAddCallout();
               }}
             />
           ) : null

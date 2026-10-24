@@ -389,11 +389,11 @@ function readAgentToolingSources(repositoryRoot) {
       mode: lstatSync(source).mode & 0o777,
     });
   }
-  validateAgentToolingMarkdownLinks(sources);
+  validateAgentToolingMarkdownLinks(sources, repositoryRoot);
   return sources;
 }
 
-function validateAgentToolingMarkdownLinks(sources) {
+function validateAgentToolingMarkdownLinks(sources, repositoryRoot) {
   const markdownLinkPattern = /\[[^\]]*\]\(([^)]+)\)/gu;
   for (const [relativePath, entry] of sources) {
     if (!relativePath.endsWith('.md')) continue;
@@ -404,8 +404,20 @@ function validateAgentToolingMarkdownLinks(sources) {
       const resolved = path.posix.normalize(
         path.posix.join(path.posix.dirname(relativePath), target)
       );
-      if (!sources.has(resolved)) {
+      if (sources.has(resolved)) continue;
+      const repositoryTarget = path.join(repositoryRoot, resolved);
+      const isRepositoryReference = resolved.startsWith('docs/') || resolved.startsWith('tooling/');
+      if (!isRepositoryReference || !existsSync(repositoryTarget)) {
         throw new Error(`Agent tooling Markdown link is unresolved: ${relativePath} -> ${target}`);
+      }
+      assertSafeOwnedDirectory(
+        repositoryRoot,
+        path.dirname(repositoryTarget),
+        'Agent tooling Markdown link'
+      );
+      const stats = lstatSync(repositoryTarget);
+      if (!stats.isFile() || stats.isSymbolicLink()) {
+        throw new Error(`Agent tooling Markdown link is unsafe: ${relativePath} -> ${target}`);
       }
     }
   }

@@ -52,6 +52,7 @@ beforeEach(() => {
   HTMLElement.prototype.hasPointerCapture = vi.fn(() => true);
   HTMLElement.prototype.releasePointerCapture = vi.fn();
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: vi.fn(),
     clearRect: vi.fn(),
     save: vi.fn(),
     translate: vi.fn(),
@@ -80,7 +81,38 @@ afterEach(async () => {
 });
 const output = { width: 200, height: 100 };
 const rect = { x: 0, y: 0, ...output };
-function render(disabled = false) {
+it('reuses the paused source frame while the lens opening moves', () => {
+  const initial = createQuickEditSpotlight();
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'lens', at: 0 }),
+    spotlight: { ...initial, effect: 'magnify' as const, magnification: 2 },
+  };
+  const frame = { image: document.createElement('canvas'), ...output };
+  const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
+  const renderLens = (area: typeof initial.area) =>
+    act(() =>
+      root.render(
+        <ReviewSpotlightPreview
+          region={{ ...region, spotlight: { ...region.spotlight, area } }}
+          camera={{ scale: 1, centerX: 0.5, centerY: 0.5 }}
+          view="area"
+          frame={frame}
+          output={output}
+          layout={layout}
+          cornerRadius={4}
+          scale={1}
+          disabled={false}
+          onChange={vi.fn()}
+        />
+      )
+    );
+  renderLens(initial.area);
+  expect(paint).toHaveBeenCalledOnce();
+  renderLens({ ...initial.area, x: 0.3 });
+  expect(paint).toHaveBeenCalledOnce();
+});
+
+function render(disabled = false, spotlight = createQuickEditSpotlight()) {
   const onChange = vi.fn();
   const onPreview = vi.fn();
   act(() =>
@@ -88,7 +120,7 @@ function render(disabled = false) {
       <ReviewSpotlightPreview
         region={{
           ...createQuickEditZoomRegion({ id: 's', at: 0 }),
-          spotlight: createQuickEditSpotlight(),
+          spotlight,
         }}
         camera={{ scale: 1, centerX: 0.5, centerY: 0.5 }}
         view="area"
@@ -123,11 +155,28 @@ async function key(target: Element, key: string, shiftKey = false) {
   );
 }
 it('commits one bounded move or resize and discards cancelled drafts', async () => {
+  let nextFrame = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+    frames.delete(id);
+  });
+  const flushFrame = () =>
+    act(() => {
+      const callbacks = [...frames.values()];
+      frames.clear();
+      callbacks.forEach((callback) => callback(0));
+    });
+
   const view = render();
   expect(paint).toHaveBeenCalled();
   await pointer(view.plane, 'pointermove', 60);
   await pointer(view.group, 'pointerdown', 50);
   await pointer(view.plane, 'pointermove', 70);
+  flushFrame();
   expect(view.onChange).not.toHaveBeenCalled();
   expect(view.onPreview).toHaveBeenLastCalledWith(
     expect.objectContaining({
@@ -572,3 +621,135 @@ it('lets Escape reach fullscreen dismissal when no area gesture is active', () =
   act(() => view.group.dispatchEvent(event));
   expect(event.defaultPrevented).toBe(false);
 });
+
+it('shows a physical circle and preserves its aspect while resizing the Gallery lens', async () => {
+  const view = render(false, {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify',
+    lensShape: 'circle',
+  });
+  expect(view.group.style.width).toBe('25%');
+  expect(view.group.style.height).toBe('50%');
+  await pointer(view.group, 'pointerdown', 100, 50);
+  await pointer(view.plane, 'pointerup', 100, 50);
+  expect(view.onChange).not.toHaveBeenCalled();
+  await pointer(view.group.querySelector('[data-resize="se"]')!, 'pointerdown', 125, 75);
+  await pointer(view.plane, 'pointermove', 135, 76);
+  await pointer(view.plane, 'pointerup', 135, 76);
+  const area = view.onChange.mock.lastCall?.[0].spotlight.area;
+  expect(area.width).toBeCloseTo(0.6);
+  expect(area.height).toBeCloseTo(0.6);
+});
+
+it.each([
+  { direction: 'right', delta: 60, left: '62.5%', authoredX: 0.5 },
+  { direction: 'left', delta: -60, left: '12.5%', authoredX: 0 },
+])(
+  'keeps the $direction edge circle preview and selection equal to its committed position',
+  async ({ delta, left, authoredX }) => {
+    let frame: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frame = callback;
+      return 1;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const spotlight = {
+      ...createQuickEditSpotlight(),
+      effect: 'magnify' as const,
+      lensShape: 'circle' as const,
+    };
+    const view = render(false, spotlight);
+    await pointer(view.group, 'pointerdown', 100, 50);
+    await pointer(view.plane, 'pointermove', 100 + delta, 50);
+    act(() => frame?.(0));
+    expect(view.group.style.left).toBe(left);
+    const preview = view.onPreview.mock.lastCall?.[0].spotlight;
+    expect(preview.area.x).toBe(authoredX);
+    await pointer(view.plane, 'pointerup', 100 + delta, 50);
+    expect(view.onChange.mock.lastCall?.[0].spotlight).toEqual(preview);
+    const accepted = render(false, preview);
+    expect(accepted.group.style.left).toBe(left);
+  }
+);
+
+it('keeps the minimum circle centered and unchanged for body/corner no-op and return gestures', async () => {
+  const view = render(false, {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify',
+    lensShape: 'circle',
+    area: { x: 0.495, y: 0.495, width: 0.01, height: 0.01 },
+  });
+  for (const target of [view.group, view.group.querySelector('[data-resize="se"]')!]) {
+    await pointer(target, 'pointerdown', 100, 50);
+    await pointer(view.plane, 'pointermove', 100, 50);
+    await pointer(view.plane, 'pointerup', 100, 50);
+    expect(view.onChange).not.toHaveBeenCalled();
+    await pointer(target, 'pointerdown', 100, 50);
+    await pointer(view.plane, 'pointermove', 101, 51);
+    await pointer(view.plane, 'pointermove', 100, 50);
+    await pointer(view.plane, 'pointerup', 100, 50);
+    expect(view.onChange).not.toHaveBeenCalled();
+  }
+  await pointer(view.group, 'pointerdown', 100, 50);
+  await pointer(view.plane, 'pointermove', 110, 50);
+  await pointer(view.plane, 'pointerup', 110, 50);
+  const area = view.onChange.mock.lastCall?.[0].spotlight.area;
+  expect(area.width).toBeCloseTo(0.01, 12);
+  expect(area.height).toBeCloseTo(0.01, 12);
+  expect(area.x).toBeCloseTo(0.545, 12);
+});
+
+it('preserves an admitted non-square circle center when a gesture starts and returns unchanged', async () => {
+  const view = render(false, {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify',
+    lensShape: 'circle',
+    area: { x: 0.2, y: 0.7, width: 0.6, height: 0.2 },
+  });
+  expect(parseFloat(view.group.style.top)).toBeCloseTo(50, 10);
+  await pointer(view.group, 'pointerdown', 100, 80);
+  expect(parseFloat(view.group.style.top)).toBeCloseTo(50, 10);
+  await pointer(view.plane, 'pointermove', 100, 80);
+  await pointer(view.plane, 'pointerup', 100, 80);
+  expect(view.onChange).not.toHaveBeenCalled();
+  expect(parseFloat(view.group.style.top)).toBeCloseTo(50, 10);
+});
+
+it.each([0.5, 0.01])(
+  'uses circle geometry and unchanged size on the main Gallery stage (diameter=%s)',
+  async (diameter) => {
+    const onChange = vi.fn(),
+      onPreview = vi.fn();
+    const region = {
+      ...createQuickEditZoomRegion({ id: 'stage-circle', at: 0 }),
+      spotlight: {
+        ...createQuickEditSpotlight(),
+        effect: 'magnify' as const,
+        lensShape: 'circle' as const,
+        area: { x: 0.5 - diameter / 2, y: 0.5 - diameter / 2, width: diameter, height: diameter },
+      },
+    };
+    act(() =>
+      root.render(
+        <ReviewStageFocusControl
+          focus={{ region, onChange, onPreview, onInteract: vi.fn() }}
+          layout={{ contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect }}
+          output={output}
+        />
+      )
+    );
+    const group = host.querySelector<HTMLElement>('[data-focus-frame]')!,
+      plane = host.querySelector('[data-ui="gallery.videoReview.focusArea"]')!;
+    expect(parseFloat(group.style.width)).toBeCloseTo(diameter * 50, 10);
+    expect(parseFloat(group.style.height)).toBeCloseTo(diameter * 100, 10);
+    await pointer(group, 'pointerdown', 100, 50);
+    await pointer(plane, 'pointermove', 100, 50);
+    await pointer(plane, 'pointerup', 100, 50);
+    expect(onChange).not.toHaveBeenCalled();
+    await key(group, 'ArrowRight');
+    const area = onChange.mock.lastCall?.[0].spotlight.area;
+    expect(area.width).toBeCloseTo(diameter, 12);
+    expect(area.height).toBeCloseTo(diameter, 12);
+    expect(area.x).toBeCloseTo(0.51 - diameter / 2, 12);
+  }
+);

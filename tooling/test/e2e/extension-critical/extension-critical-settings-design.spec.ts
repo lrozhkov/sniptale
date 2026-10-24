@@ -14,6 +14,94 @@ type Locale = 'ru' | 'en';
 type Theme = 'light' | 'dark';
 const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
 
+for (const width of [1280, 1920]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`direct settings gradient editor ${width} ${theme}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
+      await configure(page, extensionId, 'ru', theme);
+      await route(page, extensionId, 'editor-resources', 'gradients');
+      const t = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
+      await page
+        .getByRole('button', { name: t('settings.editor.gradients.add'), exact: true })
+        .click();
+      const panel = ui(page, 'shared.ui.paint-selector.popup');
+      await expect(panel).toBeVisible();
+      await expect(page.getByRole('dialog')).toHaveCount(1);
+      await expect(panel.locator('[data-ui="shared.ui.paint-selector.trigger"]')).toHaveCount(0);
+      await expect(
+        panel.getByRole('button', { name: t('highlighter.paintPicker.solid'), exact: true })
+      ).toHaveCount(0);
+      await expect(
+        panel.getByRole('button', { name: t('highlighter.paintPicker.saveTemplate'), exact: true })
+      ).toHaveCount(0);
+      const name = panel.getByRole('textbox', {
+        name: t('settings.editor.presetName'),
+        exact: true,
+      });
+      const save = panel.getByRole('button', { name: t('common.actions.save'), exact: true });
+      await expect(name).toHaveCSS('height', '28px');
+      await expect(panel.locator('.sniptale-paint-color > div:first-child button')).toHaveCount(10);
+      await expect(save).toBeDisabled();
+      const pointChoice = panel.locator('button[aria-haspopup="listbox"]').first();
+      await pointChoice.click();
+      await page.getByRole('option').first().press('Escape');
+      await expect(panel).toBeVisible();
+      await expect(pointChoice).toBeFocused();
+      await expect(
+        panel.locator('[data-ui="shared.ui.paint-selector.stop-toolbar"]').getByRole('textbox')
+      ).toHaveAttribute('aria-label', t('settings.editor.presetName'));
+      const presetName = `Проверка градиента ${width} ${theme}`;
+      await name.fill(presetName);
+      await panel
+        .getByRole('button', { name: t('highlighter.paintPicker.radial'), exact: true })
+        .click();
+      const radius = panel.getByRole('spinbutton', {
+        name: t('highlighter.paintPicker.radiusX'),
+        exact: true,
+      });
+      await radius.fill('67');
+      await radius.press('Enter');
+      await expect(save).toBeEnabled();
+      await screenshot(page, info, 'gradient-settings-direct');
+      await expect(save).toBeInViewport({ ratio: 1 });
+      const bounds = (await panel.boundingBox())!;
+      expect(bounds.y).toBeGreaterThanOrEqual(0);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(width === 1280 ? 560 : 900);
+      await save.click();
+      await expect(panel).toHaveCount(0);
+      await page.reload();
+      await contentReady(page);
+      const row = page.locator('[data-settings-collection-item]').filter({ hasText: presetName });
+      await expect(row).toHaveCount(1);
+      const edit = row.getByRole('button', {
+        name: t('settings.collection.actions.edit'),
+        exact: true,
+      });
+      await edit.click();
+      await expect(name).toHaveValue(presetName);
+      await expect(radius).toHaveValue('67');
+      await name.fill('Отменённое изменение');
+      await radius.fill('40');
+      await radius.press('Enter');
+      await panel.getByRole('button', { name: t('common.actions.cancel'), exact: true }).click();
+      await edit.click();
+      await expect(name).toHaveValue(presetName);
+      await expect(radius).toHaveValue('67');
+      await panel.getByRole('button', { name: t('common.actions.cancel'), exact: true }).click();
+      await row
+        .getByRole('button', { name: t('settings.collection.actions.menu'), exact: true })
+        .click();
+      await row
+        .getByRole('button', { name: t('settings.collection.actions.delete'), exact: true })
+        .click();
+      await expect(row).toHaveCount(0);
+    });
+  }
+}
+
 test.use({ actionTimeout: 10_000 });
 
 async function settle(page: Page) {

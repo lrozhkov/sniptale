@@ -11,7 +11,12 @@ import {
   subscribeToMicrophoneAccessChanges,
   type MicrophoneAccessState,
 } from '@sniptale/platform/browser/user-media';
-import type { VoiceInputServerEvent } from '@sniptale/runtime-contracts/voice-input';
+import type {
+  VoiceInputPreferences,
+  VoiceInputServerEvent,
+  VoiceInputSnapshot,
+} from '@sniptale/runtime-contracts/voice-input';
+import { subscribeToVoiceInputPreferencesChanges } from '../../../../composition/persistence/settings';
 import type { VoiceInputClient } from '../../../../workflows/voice-input';
 import type { VoiceInputSettingsError } from './controller-contract';
 
@@ -27,9 +32,13 @@ export function useVoiceInputOwnerLifecycle(args: {
   activeSessionIdRef: RefObject<string | null>;
   applyServerEvent(event: VoiceInputServerEvent): void;
   client: VoiceInputClient;
+  enabled: boolean;
+  setSnapshot: Dispatch<SetStateAction<VoiceInputSnapshot>>;
+  cancelSession(): void;
   invalidateCapability(): void;
   microphoneAccess: MicrophoneAccessState;
   refreshCapability(): Promise<void>;
+  reconcileVoiceInputPreferences(preferences: VoiceInputPreferences): void;
   setError: Dispatch<SetStateAction<VoiceInputSettingsError>>;
   setMicrophoneAccess: Dispatch<SetStateAction<MicrophoneAccessState>>;
 }) {
@@ -37,12 +46,18 @@ export function useVoiceInputOwnerLifecycle(args: {
     activeSessionIdRef,
     applyServerEvent,
     client,
+    enabled,
+    setSnapshot,
+    cancelSession,
     invalidateCapability,
     microphoneAccess,
     refreshCapability,
+    reconcileVoiceInputPreferences,
     setError,
     setMicrophoneAccess,
   } = args;
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
   const mountedRef = useRef(false);
   const lifecycleGenerationRef = useRef(0);
   const startGenerationRef = useRef(0);
@@ -61,7 +76,38 @@ export function useVoiceInputOwnerLifecycle(args: {
   useEffect(() => {
     const lifecycleGeneration = ++lifecycleGenerationRef.current;
     mountedRef.current = true;
-    const unsubscribe = client.subscribe(applyServerEvent);
+    const unsubscribe = client.subscribe((event) => {
+      if (
+        !enabledRef.current &&
+        (!('snapshot' in event) || !['idle', 'ended', 'error'].includes(event.snapshot.phase))
+      )
+        return;
+      applyServerEvent(event);
+    });
+    const unsubscribeVoicePreferences = subscribeToVoiceInputPreferencesChanges((preferences) => {
+      if (!mountedRef.current || lifecycleGeneration !== lifecycleGenerationRef.current) return;
+      enabledRef.current = preferences.enabled !== false;
+      reconcileVoiceInputPreferences(preferences);
+      if (preferences.enabled !== false) return;
+      const ownsWork = activeSessionIdRef.current !== null || startPendingRef.current;
+      startGenerationRef.current += 1;
+      startPendingRef.current = false;
+      invalidateCapability();
+      setSnapshot((current) => ({
+        ...current,
+        phase: 'idle',
+        sessionId: null,
+        busyOwner: null,
+        errorCode: null,
+      }));
+      if (ownsWork) {
+        try {
+          cancelSession();
+        } catch {
+          setError('runtime');
+        }
+      }
+    });
     void refresh();
     let unsubscribePermission: () => void = () => undefined;
     void subscribeToMicrophoneAccessChanges((state) => {
@@ -71,7 +117,7 @@ export function useVoiceInputOwnerLifecycle(args: {
       if (state !== 'granted') {
         startGenerationRef.current += 1;
         startPendingRef.current = false;
-        if (activeSessionIdRef.current) client.stop(activeSessionIdRef.current);
+        if (activeSessionIdRef.current) cancelSession();
       }
     }).then((nextUnsubscribe) => {
       if (!mountedRef.current || lifecycleGeneration !== lifecycleGenerationRef.current) {
@@ -87,6 +133,15 @@ export function useVoiceInputOwnerLifecycle(args: {
       startPendingRef.current = false;
       invalidateCapability();
       unsubscribePermission();
+      unsubscribeVoicePreferences();
+      if (activeSessionIdRef.current) {
+        try {
+          client.cancel(activeSessionIdRef.current);
+        } catch {
+          /* Disconnect still revokes authority. */
+        }
+        activeSessionIdRef.current = null;
+      }
       unsubscribe();
       client.disconnect();
     };
@@ -94,9 +149,13 @@ export function useVoiceInputOwnerLifecycle(args: {
     activeSessionIdRef,
     applyServerEvent,
     client,
+    cancelSession,
     invalidateCapability,
+    reconcileVoiceInputPreferences,
     refresh,
+    setError,
     setMicrophoneAccess,
+    setSnapshot,
   ]);
 
   const authority = useMemo<VoiceInputOwnerAuthority>(

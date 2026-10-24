@@ -40,3 +40,19 @@ it('sends prompt resets through the typed AI settings mutation boundary', async 
     type: MessageType.AI_SETTINGS_MUTATION,
   });
 });
+
+it('routes correction prompt writes through the background authority', async () => {
+  const { saveVoiceInputCorrectionSystemPrompt, resetVoiceInputCorrectionSystemPrompt } =
+    await import('./mutations');
+  await saveVoiceInputCorrectionSystemPrompt('Keep my meaning');
+  await resetVoiceInputCorrectionSystemPrompt();
+  expect(sendRuntimeMessageMock).toHaveBeenNthCalledWith(1, {
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'save-voice-input-correction-prompt',
+    prompt: 'Keep my meaning',
+  });
+  expect(sendRuntimeMessageMock).toHaveBeenNthCalledWith(2, {
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'reset-voice-input-correction-prompt',
+  });
+});

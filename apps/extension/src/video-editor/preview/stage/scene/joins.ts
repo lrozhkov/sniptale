@@ -48,7 +48,6 @@ export function createVideoPreviewCompositionJoinRenderer(
       input.signal?.throwIfAborted();
       if (disposed) throw new Error('Preview composition owner is disposed.');
       if (projection?.project !== input.project) {
-        clear();
         projection = {
           project: input.project,
           plans: resolveVideoProjectCompositionJoinPlans(input.project),
@@ -74,7 +73,12 @@ export function createVideoPreviewCompositionJoinRenderer(
       if (!rasterSize) return false;
       const assetUrls = input.assetUrls ?? {};
       const key = JSON.stringify({ rasterSize, assetUrls });
-      if (!sampler || sampler.document !== input.canvas.ownerDocument || sampler.key !== key) {
+      if (
+        !sampler ||
+        sampler.document !== input.canvas.ownerDocument ||
+        sampler.key !== key ||
+        !sampler.materializer.updateProject(input.project)
+      ) {
         releaseSampler();
         sampler = {
           document: input.canvas.ownerDocument,

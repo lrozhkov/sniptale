@@ -234,7 +234,7 @@ it('keeps spotlight settings when the active type is selected again', async () =
   );
   const group = host.querySelector('[data-ui="gallery.videoReview.focusType"]')!;
   expect(group.querySelector('[aria-label="gallery.videoReview.focusType"]')).not.toBeNull();
-  expect(group.querySelectorAll('button')).toHaveLength(3);
+  expect(group.querySelectorAll('button')).toHaveLength(4);
   const active = group.querySelector<HTMLButtonElement>(
     '[title="gallery.videoReview.focusSpotlight"]'
   )!;

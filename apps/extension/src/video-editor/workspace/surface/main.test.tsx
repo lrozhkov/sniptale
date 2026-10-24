@@ -446,7 +446,7 @@ it('continues measuring the visible frame after switching projects', async () =>
         if (target?.isConnected) notify();
       })
     );
-    expect(inspectorSpy.mock.lastCall?.[0].resize.max).toBe(520);
+    expect(inspectorSpy.mock.lastCall?.[0].resize.max).toBe(800);
     frameWidth = 1280;
     act(() =>
       observers.forEach(({ target, notify }) => {

@@ -283,15 +283,33 @@ function ReviewFocusParameters(props: FocusParameterProps) {
     );
   if (region.spotlight)
     return (
-      <SpotlightAppearanceFields
-        value={region.spotlight}
-        Details={ReviewDetails}
-        preferenceId="gallery.videoReview.preciseArea"
-        onChange={(patch) => onChange(reviewSpotlightPatch(region.spotlight!, patch))}
-        onPreview={(patch) =>
-          props.onPreview?.(patch ? reviewSpotlightPatch(region.spotlight!, patch) : null)
-        }
-      />
+      <>
+        {region.spotlight.effect === 'magnify' ? (
+          <SelectField
+            className={reviewSelectFieldClassName}
+            label={translate('gallery.videoReview.focusLensPlacement')}
+            value={props.followCursor ? 'follow' : 'fixed'}
+            options={[
+              { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
+              {
+                value: 'follow',
+                label: translate('videoEditor.sidebar.cursorFocusFollow'),
+                disabled: !props.cursorAvailable,
+              },
+            ]}
+            onChange={(mode) => onChange({ followCursor: mode === 'follow' })}
+          />
+        ) : null}
+        <SpotlightAppearanceFields
+          value={region.spotlight}
+          Details={ReviewDetails}
+          preferenceId="gallery.videoReview.preciseArea"
+          onChange={(patch) => onChange(reviewSpotlightPatch(region.spotlight!, patch))}
+          onPreview={(patch) =>
+            props.onPreview?.(patch ? reviewSpotlightPatch(region.spotlight!, patch) : null)
+          }
+        />
+      </>
     );
   if (props.tool === 'position') return <ReviewZoomPositionFields {...props} />;
   return (
@@ -583,7 +601,7 @@ function ReviewFocusType({
       <SegmentedRow<FocusType>
         label={translate('gallery.videoReview.focusType')}
         layout="stacked"
-        columns={3}
+        columns={4}
         ariaLabel={translate('gallery.videoReview.focusType')}
         value={quickEditFocusType(region)}
         options={[
@@ -593,6 +611,7 @@ function ReviewFocusType({
             disabled: blocked,
           },
           { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+          { value: 'lens', label: translate('gallery.videoReview.focusLens') },
           { value: 'border', label: translate('gallery.videoReview.focusBorder') },
         ]}
         onChange={(type) => {

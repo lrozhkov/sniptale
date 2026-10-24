@@ -40,6 +40,7 @@ import {
 import { createRecordingDrawingOwner } from '../../toolbar/video-recording/drawing-session';
 import type { EmbeddedCameraGeometry } from '../camera/geometry';
 import { projectVideoRecordingSurfaceSnapshot } from './snapshot-projection';
+import { useRecordingSetup, type RecordingSetupState } from './setup';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../../../platform/i18n';
@@ -151,6 +152,9 @@ function useSurfaceRuntimeSubscriptions(
         const recordingId =
           runtimeState.status === VideoRecordingStatus.IDLE ? null : identity.recordingId;
         applySnapshot({
+          ...(state.outputSettings ? { outputSettings: state.outputSettings } : {}),
+          captureMode: recordingId ? runtimeState.captureMode : null,
+          cropRegion: recordingId ? (runtimeState.cropRegion ?? null) : null,
           autoFadeDelay: drawingOwner.getAutoHideDelay(),
           capabilityEpoch: identity.capabilityEpoch,
           cursorSpotlightEnabled: state.spotlightEnabled,
@@ -236,7 +240,8 @@ function useSurfaceActivation(applySnapshot: ApplySurfaceSnapshot) {
 
 function useSurfaceStart(
   applySnapshot: ApplySurfaceSnapshot,
-  dispatch: Dispatch<VideoRecordingToolbarStateAction>
+  dispatch: Dispatch<VideoRecordingToolbarStateAction>,
+  setupRef: MutableRefObject<RecordingSetupState>
 ) {
   const startAttemptRef = useRef(0);
   const start = useCallback(
@@ -248,10 +253,14 @@ function useSurfaceStart(
       > = {}
     ) => {
       if (!event) return;
+      if (setupRef.current.pending) return 'failed' as const;
       const attempt = ++startAttemptRef.current;
       dispatch({ type: 'starting' });
       try {
-        const response = await startSavedTabVideoRecording(event, confirmation);
+        const response = await startSavedTabVideoRecording(event, {
+          ...confirmation,
+          captureMode: setupRef.current.captureMode,
+        });
         if (attempt !== startAttemptRef.current) return;
         if (response?.success && response.confirmationRequired === true) {
           dispatch({ type: 'idle' });
@@ -284,7 +293,7 @@ function useSurfaceStart(
         return 'failed' as const;
       }
     },
-    [applySnapshot, dispatch]
+    [applySnapshot, dispatch, setupRef]
   );
   return { start, startAttemptRef };
 }
@@ -295,11 +304,22 @@ function useSurfaceCommandController(args: {
   identityRef: MutableRefObject<SurfaceIdentity | null>;
   stateRef: MutableRefObject<VideoRecordingToolbarState>;
   permissionOwner: ReturnType<typeof createRecordingPermissionFrameOwner>;
+  setupRef: MutableRefObject<RecordingSetupState>;
 }) {
   const commandWithResult = useCallback(
     async (value: Parameters<typeof sendVideoRecordingSurfaceCommand>[1], projectError = true) => {
       const identity = args.identityRef.current;
       if (!identity) throw new Error('Recording surface is unavailable');
+      const outputSetup =
+        value.kind === 'select-quality-profile' || value.kind === 'set-output-profile';
+      const outputGeneration = args.setupRef.current.outputGeneration;
+      const outputPending = args.setupRef.current.pending;
+      const canProject = () =>
+        !outputSetup ||
+        (args.identityRef.current?.surfaceSessionId === identity.surfaceSessionId &&
+          args.identityRef.current.documentGeneration === identity.documentGeneration &&
+          args.identityRef.current.capabilityEpoch === identity.capabilityEpoch &&
+          args.identityRef.current.recordingId === identity.recordingId);
       args.dispatch({ type: 'clear-error' });
       try {
         const response = (await sendVideoRecordingSurfaceCommand(identity, value)) as {
@@ -307,12 +327,27 @@ function useSurfaceCommandController(args: {
           snapshot?: VideoRecordingSurfaceSnapshot;
         };
         if (!response.snapshot) throw new Error('Recording command returned no surface state');
-        args.applySnapshot(response.snapshot);
+        if (canProject()) {
+          const currentOutput = args.stateRef.current.outputSettings;
+          // A response requested before output admission cannot undo the confirmed local choice.
+          const preserveOutput =
+            !outputSetup &&
+            currentOutput &&
+            (outputPending || outputGeneration !== args.setupRef.current.outputGeneration) &&
+            args.stateRef.current.surfaceSessionId === identity.surfaceSessionId &&
+            response.snapshot.surfaceSessionId === identity.surfaceSessionId &&
+            response.snapshot.documentGeneration === identity.documentGeneration;
+          args.applySnapshot(
+            preserveOutput
+              ? { ...response.snapshot, outputSettings: currentOutput }
+              : response.snapshot
+          );
+        }
         return response.result;
       } catch (error) {
         logger.warn('Video recording surface command failed', error);
         const errorMessage = recordingActionError();
-        if (projectError) {
+        if (projectError && canProject()) {
           args.dispatch(
             value.kind === 'cancel-start' && args.stateRef.current.phase === 'starting'
               ? { type: 'failed', error: errorMessage }
@@ -485,6 +520,7 @@ function useVideoRecordingSurfaceDeactivation(args: {
 }
 
 type SurfaceControllerProjectionArgs = {
+  setup: ReturnType<typeof useRecordingSetup>;
   stateRef: MutableRefObject<VideoRecordingToolbarState>;
   activate: ReturnType<typeof useSurfaceActivation>;
   cameraOffer: ReturnType<typeof useCameraPeerActions>['cameraOffer'];
@@ -568,6 +604,7 @@ function useSurfaceControllerProjection(args: SurfaceControllerProjectionArgs) {
     const media = createSurfaceMediaActions(args);
     const preview = cameraPreview?.sessionId === args.state.surfaceSessionId ? cameraPreview : null;
     return {
+      ...args.setup,
       drawingOwner: args.drawingOwner,
       state: preview
         ? {
@@ -605,6 +642,7 @@ function useSurfaceControllerProjection(args: SurfaceControllerProjectionArgs) {
         args.startAttemptRef.current += 1;
       },
       onDeactivate: args.deactivate,
+      onHide: () => args.command({ kind: 'set-toolbar-requested', enabled: false }, false),
       onPause: () => args.command({ kind: 'pause' }),
       onResume: () => args.command({ kind: 'resume' }),
       onStart: args.start,
@@ -635,7 +673,12 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
   );
 
   const activate = useSurfaceActivation(applySnapshot);
-  const { start, startAttemptRef } = useSurfaceStart(applySnapshot, dispatch);
+  const setupRef = useRef<RecordingSetupState>({
+    captureMode: 'TAB',
+    pending: false,
+    outputGeneration: 0,
+  });
+  const { start, startAttemptRef } = useSurfaceStart(applySnapshot, dispatch, setupRef);
   const permissionOwner = useMemo(() => createRecordingPermissionFrameOwner(), []);
   const recordingOwnsSourcesRef = useRef(false);
   useEffect(() => () => permissionOwner.release(), [permissionOwner, state.surfaceSessionId]);
@@ -646,11 +689,12 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
   }, [permissionOwner, state.phase]);
 
   const commandControllerArgs = useMemo(
-    () => ({ applySnapshot, dispatch, identityRef, stateRef, permissionOwner }),
-    [applySnapshot, dispatch, identityRef, stateRef, permissionOwner]
+    () => ({ applySnapshot, dispatch, identityRef, stateRef, permissionOwner, setupRef }),
+    [applySnapshot, dispatch, identityRef, stateRef, permissionOwner, setupRef]
   );
   const { command, runMediaCommand, setMediaEnabled } =
     useSurfaceCommandController(commandControllerArgs);
+  const setup = useRecordingSetup(command, stateRef, setupRef, recordingActionError);
   const loadMediaDevices = useCallback(
     async (
       deviceKind: 'audioinput' | 'videoinput',
@@ -715,6 +759,7 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
   );
   const projectionArgs = useMemo(
     () => ({
+      setup,
       activate,
       cameraOffer,
       cameraPeerClose,
@@ -730,6 +775,7 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
       stateRef,
     }),
     [
+      setup,
       activate,
       cameraOffer,
       cameraPeerClose,

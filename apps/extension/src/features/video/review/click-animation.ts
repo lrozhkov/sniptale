@@ -31,7 +31,13 @@ export interface ReviewClickFrame {
   opacity: number;
   path?: readonly { x: number; y: number }[];
   area?: { x: number; y: number; width: number; height: number };
-  lens?: { scale: number; shape: 'circle' | 'rounded'; shadow: number };
+  lens?: {
+    scale: number;
+    shape: 'circle' | 'rounded';
+    shadow: number;
+    optics?: 'flat' | 'optical';
+    edgeWidth?: number;
+  };
 }
 
 /** Resolve once per edit revision, in global result time; only cuts bound the lifetime. */
@@ -198,7 +204,13 @@ export function evaluateReviewClicks(
           radius: s.radius * scale,
           stroke: s.stroke,
           opacity: strength * s.opacity,
-          lens: { scale, shape: s.lensShape ?? 'circle', shadow: (s.lensShadow ?? 20) * strength },
+          lens: {
+            scale,
+            shape: s.lensShape ?? 'circle',
+            shadow: (s.lensShadow ?? 20) * strength,
+            optics: s.lensOptics ?? 'flat',
+            ...(s.lensEdgeWidth === undefined ? {} : { edgeWidth: s.lensEdgeWidth }),
+          },
         },
       ];
     }

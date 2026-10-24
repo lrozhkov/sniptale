@@ -21,6 +21,10 @@ import {
   type ZoomPreviewLayout,
 } from './zoom-preview-paint';
 import type { ZoomPreviewFrame } from './use-zoom-preview-source';
+import {
+  drawSceneSpotlights,
+  type SceneSpotlightLayer,
+} from '../../features/video/composition/draw/spotlight';
 
 type ZoomCanvasProps = {
   background: QuickEditBackgroundSettings;
@@ -29,6 +33,7 @@ type ZoomCanvasProps = {
   camera: QuickEditZoomRegion['transform'];
   disabled?: boolean | undefined;
   frame: ZoomPreviewFrame | null;
+  lensFrames?: readonly SceneSpotlightLayer[] | undefined;
   live?: boolean | undefined;
   layout: ZoomPreviewLayout;
   output: { width: number; height: number };
@@ -254,15 +259,112 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
   };
 }
 
+function areaRasterKey(
+  props: Pick<ZoomCanvasProps, 'background' | 'layout' | 'cornerRadius'> & {
+    previewScale: number | undefined;
+  },
+  canvas: HTMLCanvasElement,
+  retry: number
+) {
+  return JSON.stringify([
+    props.background,
+    props.layout.videoRect,
+    props.layout.windowRect,
+    props.layout.visibleVideoRect,
+    props.layout.sourceCrop,
+    props.cornerRadius,
+    props.previewScale,
+    canvas.width,
+    canvas.height,
+    retry,
+  ]);
+}
+
+type ZoomPaintCache = {
+  painted: {
+    key: string;
+    frame: ZoomCanvasProps['frame'];
+    header: ZoomCanvasProps['headerImage'];
+  } | null;
+  lensBase: HTMLCanvasElement | null;
+};
+
+function releaseZoomLensBase(cache: ZoomPaintCache) {
+  if (cache.lensBase) cache.lensBase.width = cache.lensBase.height = 0;
+  cache.lensBase = null;
+}
+
+function zoomPaintKey(props: ZoomCanvasProps, canvas: HTMLCanvasElement, retry: number) {
+  if (props.live) return null;
+  if (props.view === 'area')
+    return areaRasterKey(
+      {
+        background: props.background,
+        layout: props.layout,
+        cornerRadius: props.cornerRadius,
+        previewScale: props.previewScale,
+      },
+      canvas,
+      retry
+    );
+  if (!props.lensFrames?.length) return null;
+  return JSON.stringify([
+    props.background,
+    props.layout,
+    props.camera,
+    props.cornerRadius,
+    props.previewScale,
+    canvas.width,
+    canvas.height,
+    retry,
+  ]);
+}
+
+function restoreZoomPaint(
+  context: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  cache: ZoomPaintCache,
+  key: string | null,
+  props: ZoomCanvasProps
+) {
+  if (
+    key === null ||
+    cache.painted?.key !== key ||
+    cache.painted.frame !== props.frame ||
+    cache.painted.header !== props.headerImage
+  )
+    return false;
+  if (props.view === 'area') return true;
+  if (!cache.lensBase || !props.lensFrames?.length) return false;
+  context.drawImage(cache.lensBase, 0, 0);
+  drawSceneSpotlights(context, canvas, null, props.lensFrames);
+  return true;
+}
+
+function captureZoomLensBase(canvas: HTMLCanvasElement, cache: ZoomPaintCache) {
+  const base = cache.lensBase ?? canvas.ownerDocument.createElement('canvas');
+  base.width = canvas.width;
+  base.height = canvas.height;
+  base.getContext('2d')?.drawImage(canvas, 0, 0);
+  cache.lensBase = base;
+}
+
 /** Imperative painting has one canvas resource and follows actual frame/camera updates. */
 function useZoomCanvasPaint(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   props: ZoomCanvasProps
 ) {
   const renderer = useRef<ReturnType<typeof createReviewSpatialRenderer> | null>(null);
+  const cache = useRef<ZoomPaintCache>({ painted: null, lensBase: null });
   const [spatialFailure, setFailure] = useState(false);
   const [retry, setRetry] = useState(0);
   const spatial = props.view === 'result' && !!props.camera.spatial;
+  useEffect(
+    () => () => {
+      releaseZoomLensBase(cache.current);
+    },
+    []
+  );
   useEffect(() => {
     if (!spatial) {
       setFailure(false);
@@ -284,6 +386,11 @@ function useZoomCanvasPaint(
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
     const paint = () => {
+      const cacheLensBase = props.view === 'result' && !props.live && !!props.lensFrames?.length;
+      if (!cacheLensBase) releaseZoomLensBase(cache.current);
+      const key = zoomPaintKey(props, canvas, retry);
+      if (restoreZoomPaint(context, canvas, cache.current, key, props)) return;
+      cache.current.painted = null;
       try {
         paintZoomPreview(context, {
           spatialRenderer: renderer.current ?? undefined,
@@ -302,6 +409,10 @@ function useZoomCanvasPaint(
           showControls: false,
           width: canvas.width,
         });
+        if (cacheLensBase) captureZoomLensBase(canvas, cache.current);
+        if (props.lensFrames?.length) drawSceneSpotlights(context, canvas, null, props.lensFrames);
+        if (key !== null)
+          cache.current.painted = { key, frame: props.frame, header: props.headerImage };
       } catch {
         context.clearRect(0, 0, canvas.width, canvas.height);
         setFailure(true);
@@ -318,6 +429,7 @@ function useZoomCanvasPaint(
     return () => cancelAnimationFrame(request);
   }, [
     canvasRef,
+    props,
     props.layout,
     props.frame,
     props.headerImage,
@@ -327,6 +439,7 @@ function useZoomCanvasPaint(
     props.previewScale,
     props.background,
     props.live,
+    props.lensFrames,
     retry,
   ]);
   return { spatialFailure, retrySpatial: () => setRetry((v) => v + 1) };

@@ -170,3 +170,29 @@ it('preserves legacy null favicon source without adding or coercing decoration d
   const expected = { ...document, browserFrame: { ...document.browserFrame, faviconSource: null } };
   expect(parsePersistedEditorDocument(expected)).toEqual(expected);
 });
+
+it('retains complete linear gradients through persisted document parsing and JSON reload', () => {
+  const backgroundGradient = {
+    type: 'linear',
+    angle: 37,
+    interpolation: 'oklch',
+    repeat: { enabled: true, span: 0.3 },
+    stops: [
+      { id: 'start', color: '#ff000080', position: 0, midpoint: 0.2 },
+      { id: 'end', color: '#0000ffff', position: 1, midpoint: 0.5 },
+    ],
+  };
+  const source = createPersistedDocument();
+  const document = { ...source, frame: { ...source.frame, backgroundGradient } };
+  const parsed = parsePersistedEditorDocument(JSON.parse(JSON.stringify(document)));
+  expect(parsed?.frame.backgroundGradient).toEqual(backgroundGradient);
+  expect(
+    parsePersistedEditorDocument({
+      ...document,
+      frame: {
+        ...document.frame,
+        backgroundGradient: { ...backgroundGradient, interpolation: 'invalid' },
+      },
+    })
+  ).toBeNull();
+});

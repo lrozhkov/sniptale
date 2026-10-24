@@ -24,6 +24,7 @@ function createState(values: DesignReviewViewState['values']): DesignReviewViewS
     values,
     voice: {
       active: false,
+      pending: false,
       audioLevel: 0,
       caretPosition: null,
       errorCode: null,

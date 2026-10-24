@@ -43,6 +43,7 @@ let current: SessionState | null;
 let root: Root;
 const onRuntimeFailure = vi.fn();
 const client: VoiceInputClient = {
+  cancel: vi.fn().mockReturnValue('cancel-1'),
   disconnect: vi.fn(),
   refresh: vi.fn().mockReturnValue('refresh-1'),
   start: vi.fn().mockReturnValue('session-1'),
@@ -229,4 +230,34 @@ describe('voice input session state', () => {
     act(() => current?.transcript.setFinalText('editable'));
     expect(current?.transcript.finalText).toBe('editable');
   });
+});
+
+it('accepts one final after Stop during processing and rejects results after Cancel', () => {
+  act(() =>
+    current?.connection.begin(client, {
+      language: 'ru-RU',
+      microphoneDeviceId: null,
+      mode: 'local-first',
+    })
+  );
+  apply({
+    type: VoiceInputPortMessageType.SNAPSHOT,
+    snapshot: { ...availableSnapshot, phase: 'processing-asr', delivery: 'final' },
+  });
+  act(() => current?.connection.stop(client));
+  const final = {
+    type: VoiceInputPortMessageType.TRANSCRIPT,
+    confidence: null,
+    isFinal: true,
+    sequence: 0,
+    sessionId: 'session-1',
+    text: 'final text',
+  } as const;
+  apply(final);
+  apply({ ...final, sequence: 1 });
+  expect(current?.transcript.finalText).toBe('final text');
+  act(() => current?.connection.cancel(client));
+  apply({ ...final, sequence: 2, text: 'late' });
+  expect(current?.transcript.finalText).toBe('final text');
+  expect(client.cancel).toHaveBeenCalledWith('session-1');
 });

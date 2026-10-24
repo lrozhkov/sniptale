@@ -54,7 +54,12 @@ async function createFixtureImage(): Promise<Blob> {
   );
 }
 
-async function seedGuide(projectId: string, withTour: boolean, withAccent: boolean): Promise<void> {
+async function seedGuide(
+  projectId: string,
+  withTour: boolean,
+  withAccent: boolean,
+  performanceFixture = false
+): Promise<void> {
   if (await getScenarioProject(projectId)) return;
   const project = createGuideProject('Local step guide', projectId);
   const { assetEntry } = await createScenarioAssetEntryFromBlob({
@@ -108,7 +113,10 @@ async function seedGuide(projectId: string, withTour: boolean, withAccent: boole
   if (withTour) {
     project.tour = {
       ...createTourDocument('fixture-tour'),
-      slides: ['before', 'after'].map((id) => {
+      slides: (performanceFixture
+        ? Array.from({ length: 100 }, (_, index) => `performance-${index}`)
+        : ['before', 'after']
+      ).map((id) => {
         const slide = createTourImageSlide(`tour-${id}`);
         slide.title = `Tour ${id}`;
         slide.image = {
@@ -120,6 +128,18 @@ async function seedGuide(projectId: string, withTour: boolean, withAccent: boole
           editDocumentId: null,
           source: { kind: 'import', filename: 'example.png' },
         };
+        if (performanceFixture)
+          slide.actions = [
+            {
+              type: 'annotation',
+              object: {
+                id: `action-${id}`,
+                text: 'Description '.repeat(300),
+                anchor: null,
+                appearance: null,
+              },
+            },
+          ];
         return slide;
       }),
     };
@@ -182,7 +202,8 @@ async function mountGuideHarness(): Promise<void> {
     await seedGuide(
       projectId,
       params.get('tourFixture') === '1',
-      params.get('accentFixture') === '1'
+      params.get('accentFixture') === '1',
+      params.get('performanceFixture') === '1'
     );
   if (params.get('clearHistory') === '1') {
     const project = await getScenarioProject(projectId);

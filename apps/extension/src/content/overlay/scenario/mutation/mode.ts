@@ -1,6 +1,8 @@
-import type { CaptureActionType } from '../../../../contracts/settings';
 import type { ScenarioCaptureMode } from '@sniptale/runtime-contracts/scenario/types/base';
-import type { ScenarioRecorderSurfaceState } from '@sniptale/runtime-contracts/scenario/types/session';
+import type {
+  ScenarioRecorderSurfaceState,
+  ScenarioSessionState,
+} from '@sniptale/runtime-contracts/scenario/types/session';
 import {
   setScenarioCaptureMode,
   setScenarioEnabled,
@@ -13,34 +15,52 @@ import { restoreNavigationLockState } from '../../screenshot/bridge';
 import { translate } from '../../../../platform/i18n';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 
-export async function applyScenarioCaptureAction(args: {
-  actionType: CaptureActionType;
+export async function applyScenarioRecorderPanelVisibility(args: {
   applyScenarioResponse: (response: ScenarioControllerResponse) => void;
+  currentSession: ScenarioSessionState;
   currentSurface: ScenarioRecorderSurfaceState;
-}) {
-  const enabled = args.actionType === 'scenario';
-  const nextSurface: ScenarioRecorderSurfaceState = {
+  refreshSession: () => Promise<void>;
+  screenshotMode: boolean;
+  visible: boolean;
+}): Promise<boolean> {
+  if (args.currentSession.enabled || !args.visible) {
+    return applyScenarioSidebarVisibility({
+      applyScenarioResponse: args.applyScenarioResponse,
+      sidebarVisible: args.visible,
+    });
+  }
+
+  const baselineSurface: ScenarioRecorderSurfaceState = {
     ...args.currentSurface,
-    captureAction: args.actionType,
-    screenshotMode: enabled ? true : args.currentSurface.screenshotMode,
-    toolbarVisible: enabled ? true : args.currentSurface.toolbarVisible,
+    screenshotMode: args.screenshotMode,
+    toolbarVisible: true,
   };
-  const surfaceResponse = await updateScenarioSurfaceState(nextSurface);
-  if (!surfaceResponse?.success) {
-    return;
-  }
-
-  args.applyScenarioResponse(surfaceResponse);
-  const response = await setScenarioEnabled(enabled);
-  if (response?.success) {
+  try {
+    await requireScenarioPanelResponse(updateScenarioSurfaceState(baselineSurface));
+    await requireScenarioPanelResponse(setScenarioSidebarVisible(true));
+    const response = await requireScenarioPanelResponse(setScenarioEnabled(true));
     args.applyScenarioResponse(response);
-    return;
+    return true;
+  } catch {
+    try {
+      await requireScenarioPanelResponse(updateScenarioSurfaceState(baselineSurface));
+      await requireScenarioPanelResponse(
+        setScenarioSidebarVisible(args.currentSession.sidebarVisible)
+      );
+      await requireScenarioPanelResponse(setScenarioEnabled(args.currentSession.enabled));
+      await args.refreshSession();
+    } catch {
+      // A failed compensation must not hide the usable toolbar through an older stored snapshot.
+    }
+    showToast(translate('common.errors.saveFailed'), 'error');
+    return false;
   }
+}
 
-  const rollbackResponse = await updateScenarioSurfaceState(args.currentSurface);
-  if (rollbackResponse?.success) {
-    args.applyScenarioResponse(rollbackResponse);
-  }
+async function requireScenarioPanelResponse(request: Promise<ScenarioControllerResponse>) {
+  const response = await request;
+  if (!response?.success) throw new Error('Scenario panel state change failed');
+  return response;
 }
 
 export async function applyScenarioCaptureMode(args: {
@@ -78,10 +98,17 @@ export async function applyScenarioEnabledState(args: {
   applyScenarioResponse: (response: ScenarioControllerResponse) => void;
   enabled: boolean;
 }) {
-  const response = await setScenarioEnabled(args.enabled);
-  if (response?.success) {
-    args.applyScenarioResponse(response);
+  try {
+    const response = await setScenarioEnabled(args.enabled);
+    if (response?.success) {
+      args.applyScenarioResponse(response);
+      return true;
+    }
+  } catch {
+    // Retain the last accepted session when the transport cannot commit the change.
   }
+  showToast(translate('common.errors.saveFailed'), 'error');
+  return false;
 }
 
 export async function applyScenarioRememberSelection(args: {
@@ -98,10 +125,17 @@ export async function applyScenarioSidebarVisibility(args: {
   applyScenarioResponse: (response: ScenarioControllerResponse) => void;
   sidebarVisible: boolean;
 }) {
-  const response = await setScenarioSidebarVisible(args.sidebarVisible);
-  if (response?.success) {
-    args.applyScenarioResponse(response);
+  try {
+    const response = await setScenarioSidebarVisible(args.sidebarVisible);
+    if (response?.success) {
+      args.applyScenarioResponse(response);
+      return true;
+    }
+  } catch {
+    // Retain the visible state until the session owner accepts a replacement.
   }
+  showToast(translate('common.errors.saveFailed'), 'error');
+  return false;
 }
 
 export async function applyScenarioScreenshotModeDisabled(args: {
@@ -110,7 +144,6 @@ export async function applyScenarioScreenshotModeDisabled(args: {
 }) {
   const surfaceResponse = await updateScenarioSurfaceState({
     ...args.currentSurface,
-    captureAction: 'download_default',
     screenshotMode: false,
     toolbarVisible: false,
   });

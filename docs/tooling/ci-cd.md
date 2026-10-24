@@ -40,7 +40,11 @@ Recovery is a fresh `npm ci --ignore-scripts` followed by normalization. A proce
 
 `source.patch` is the reviewable five-file upstream TypeScript delta. The payload includes those complete modified source files and regenerated distribution entrypoints. Keep upstream MPL headers and this LICENSE. Supply the upstream corresponding source together with the modifications and reconstruction instructions in release source distribution. Upstream registry tarball integrity identifies the starting artifact, not the modified result.
 
-Live audio capture sets `MediaStreamTrackProcessor.maxBufferSize` to 128 frames. This bounded buffer retains samples during short document stalls. A separate queue holds at most 128 admitted samples while the encoder or writer waits. Queue overflow rejects `errorPromise`. Capture continues to discard paused samples independently of the writer. Resume replaces the native reader on the same track to discard its paused buffer. Timestamp, codec, pause, and finalization contracts remain unchanged.
+Live audio capture sets `MediaStreamTrackProcessor.maxBufferSize` to 128 native packets. This bounded buffer retains samples during short document stalls.
+
+Native admission permits one second of PCM or 129 packets, whichever admits more data. The extra packet covers an encoder sample pending before the native backlog arrives. The fallback keeps the one-second limit. A separate limit always bounds admitted PCM to 4 MiB. PCM size uses four bytes per sample per channel. Queue overflow rejects `errorPromise`.
+
+Capture continues to discard paused samples independently of the writer. Resume replaces the native reader on the same track to discard its paused buffer. Timestamp, codec, pause, and finalization contracts remain unchanged.
 
 Reconstruction uses Node 24.21.0, TypeScript 6.0.3 and esbuild 0.28.2. Compile the five modified TS modules as ES2022/ESNext, preserving explicit `.js` relative imports. Emit their declarations/maps through a full TypeScript program using shipped shared declarations for the tarball's omitted shared TS source. Rebuild the package's five browser/Node CJS/ESM bundles from the resulting ESM index. Browser builds retain upstream's Node/fs exclusion.
 

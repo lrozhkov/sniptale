@@ -13,7 +13,7 @@ import {
   createScenarioSelectionCaptureSaver,
   type ScenarioCaptureSourceAdapter,
 } from '../capture/source';
-import { createScenarioControllerActions } from './actions';
+import { createScenarioControllerActions, type ScenarioPanelPendingOperation } from './actions';
 import type { ScenarioControllerResponse } from '../types';
 
 export { buildScenarioControllerViewState } from '../view-state';
@@ -52,8 +52,10 @@ export function useScenarioControllerRuntime(args: {
     buildCapturePayload,
   });
   const finishPendingRef = useRef<Promise<void> | null>(null);
+  const panelPendingRef = useRef<ScenarioPanelPendingOperation | null>(null);
   const controllerActions = createScenarioControllerActions({
     finishPendingRef,
+    panelPendingRef,
     applyScenarioResponse: args.applyScenarioResponse,
     currentSurfaceRef: args.currentSurfaceRef,
     navigationLockEnabled: args.navigationLockEnabled,

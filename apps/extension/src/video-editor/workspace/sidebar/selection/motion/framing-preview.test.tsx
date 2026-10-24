@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
+import * as previewRevision from '../../../../preview/cache/revision';
 import { DEFAULT_CAMERA_PERSPECTIVE } from '../../../../../features/video/project/motion/spatial';
 import { translate } from '../../../../../platform/i18n';
 import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
@@ -601,4 +603,37 @@ it('resizes a converted scene area along its retained edges with one commit', as
     height: expect.closeTo(180, 8),
   });
   expect(next).toEqual(before);
+});
+
+it('does not serialize the project identity again for framing camera updates', async () => {
+  render();
+  await ready();
+  const stringify = vi.spyOn(JSON, 'stringify');
+  render(false, project, { ...region, scale: 3 });
+  const wrappedIdentities = stringify.mock.calls.filter(
+    ([value]) =>
+      Array.isArray(value) && typeof value[0] === 'string' && value[0].includes('"cursorTrack"')
+  );
+  expect(wrappedIdentities).toHaveLength(0);
+  expect(mocks.create).toHaveBeenCalledOnce();
+});
+
+it('reuses immutable framing source identity through motion-only project updates', async () => {
+  const identity = vi.spyOn(previewRevision, 'createVideoPreviewRenderIdentity');
+  render();
+  await ready();
+  identity.mockClear();
+  for (const scale of [2.1, 2.2, 2.3]) {
+    const next = { ...region, scale };
+    render(false, { ...project, motionRegions: [next], updatedAt: project.updatedAt + 1 }, next);
+  }
+  expect(identity).not.toHaveBeenCalled();
+  expect(mocks.create).toHaveBeenCalledOnce();
+  const changed = { ...project, backgroundColor: '#123456' };
+  render(false, changed, region);
+  expect(identity).toHaveBeenCalledOnce();
+  expect(mocks.create).toHaveBeenCalledTimes(2);
+  identity.mockClear();
+  render(false, { ...changed, cursorTrack: createVideoProjectCursorTrack() }, region);
+  expect(identity).toHaveBeenCalledOnce();
 });

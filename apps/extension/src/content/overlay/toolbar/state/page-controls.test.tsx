@@ -120,7 +120,8 @@ it.each([
     await act(async () => controls.resetOverrides());
     const reset =
       persistence.patch.mock.calls.at(-1)![0].contentToolbar!.pageControlOverrides![mode]!;
-    expect(Object.keys(reset)).toHaveLength(7);
+    expect(Object.keys(reset)).toHaveLength(8);
+    expect(reset['scenario-panel']).toBeNull();
     expect(reset[tool]).toBeUndefined();
     expect(reset['capture-full']).toBeNull();
     expect(controls.isVisible(tool)).toBe(false);

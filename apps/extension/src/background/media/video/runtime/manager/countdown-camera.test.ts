@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { routeCountdownCamera } from './countdown-camera';
 
 const mocks = vi.hoisted(() => ({
@@ -8,8 +8,11 @@ const mocks = vi.hoisted(() => ({
   state: vi.fn(),
   sender: vi.fn(),
   hydrate: vi.fn(),
+  cache: vi.fn(),
   send: vi.fn(),
   contexts: vi.fn(),
+  cameraSender: vi.fn(),
+  admitted: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/runtime', () => ({
@@ -18,12 +21,19 @@ vi.mock('@sniptale/platform/browser/runtime', () => ({
 
 vi.mock('../../recording-control-lease', () => ({
   getActiveVideoRecordingLeaseSnapshot: mocks.lease,
+  ensureVideoRecordingLeaseCache: mocks.cache,
 }));
 vi.mock('../recording-completion', () => ({
   ensureActiveVideoRecordingLeaseHydrated: mocks.hydrate,
 }));
 vi.mock('../session-state', () => ({ getVideoRecordingRuntimeState: mocks.state }));
-vi.mock('../sender-policy', () => ({ resolveTrustedPopupRuntimeSenderUrl: mocks.sender }));
+vi.mock('../sender-policy', () => ({
+  resolveTrustedPopupRuntimeSenderUrl: mocks.sender,
+  resolveTrustedCameraRecorderRuntimeSenderUrl: mocks.cameraSender,
+}));
+vi.mock('../camera-recorder-control', () => ({
+  isAuthorizedCameraRecorderDocument: mocks.admitted,
+}));
 vi.mock('../../../../routing-contracts/runtime-messaging/services', () => ({
   getBackgroundRuntimeMessaging: () => ({ sendRuntimeMessage: mocks.send }),
 }));
@@ -39,8 +49,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   sequence += 1;
   activeRecordingId = `recording-${sequence}`;
-  mocks.hydrate.mockResolvedValue(null);
+  mocks.hydrate.mockReset().mockResolvedValue(null);
+  mocks.cache.mockReset().mockResolvedValue(null);
   mocks.sender.mockReturnValue('popup-url');
+  mocks.cameraSender.mockReturnValue(null);
+  mocks.admitted.mockReturnValue(false);
   mocks.lease.mockReturnValue({
     phase: 'prepared',
     expiresAt: Date.now() + 100_000,
@@ -84,6 +97,8 @@ it('negotiates only the prepared source and derives document-bound peer identity
     },
   });
   expect(reply).toHaveBeenCalledWith({ success: true, sdp: 'answer' });
+  expect(mocks.hydrate).toHaveBeenCalledOnce();
+  expect(mocks.cache).not.toHaveBeenCalled();
   expect(mocks.contexts).not.toHaveBeenCalled();
 });
 
@@ -335,4 +350,128 @@ it('retires an answer that crosses BEGIN and permits matching cleanup afterward'
   });
   await flush();
   expect(closeReply).toHaveBeenCalledWith({ success: true });
+});
+
+function activateRecorder() {
+  mocks.sender.mockReturnValue(null);
+  mocks.cameraSender.mockReturnValue('camera-url');
+  mocks.admitted.mockReturnValue(true);
+  mocks.lease.mockReturnValue({ ...mocks.lease(), phase: 'active' });
+  mocks.state.mockReturnValue({
+    status: VideoRecordingStatus.RECORDING,
+    captureMode: CaptureMode.CAMERA,
+  });
+}
+it('allows an admitted recorder to borrow the active camera recording source', async () => {
+  activateRecorder();
+  const response = Promise.withResolvers<unknown>();
+  routeCountdownCamera({
+    message: command(),
+    sender: {
+      ...sender,
+      tab: {
+        id: 7,
+        active: true,
+        autoDiscardable: true,
+        discarded: false,
+        highlighted: true,
+        incognito: false,
+        index: 0,
+        pinned: false,
+        selected: true,
+        windowId: 1,
+        groupId: -1,
+        frozen: false,
+        lastAccessed: 0,
+      },
+    },
+    sendResponse: response.resolve,
+  });
+  await expect(response.promise).resolves.toEqual({ success: true, sdp: 'answer' });
+  expect(mocks.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      source: {
+        kind: 'recording-preview',
+        recordingId: activeRecordingId,
+        generation: 1,
+        streamInstanceId: 'stream',
+        cameraOnly: true,
+      },
+    })
+  );
+});
+it('rejects an unregistered recorder before preview effects', async () => {
+  activateRecorder();
+  mocks.admitted.mockReturnValue(false);
+  const response = Promise.withResolvers<unknown>();
+  routeCountdownCamera({ message: command(), sender, sendResponse: response.resolve });
+  await expect(response.promise).resolves.toEqual(expect.objectContaining({ success: false }));
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+it('retires a preview if recorder authorization changes during negotiation', async () => {
+  activateRecorder();
+  mocks.send.mockImplementationOnce(async () => {
+    mocks.admitted.mockReturnValue(false);
+    return { success: true, sdp: 'answer' };
+  });
+  const response = Promise.withResolvers<unknown>();
+  routeCountdownCamera({ message: command(), sender, sendResponse: response.resolve });
+  await expect(response.promise).resolves.toEqual(expect.objectContaining({ success: false }));
+  expect(mocks.send).toHaveBeenLastCalledWith(
+    expect.objectContaining({ type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE })
+  );
+});
+
+it.each(['popup', 'recorder'] as const)(
+  'keeps the runtime failure intact when %s camera cleanup closes a peer',
+  async (owner) => {
+    const failureState = { status: VideoRecordingStatus.IDLE, error: 'Audio buffer failure' };
+    mocks.state.mockReturnValue(failureState);
+    mocks.lease.mockReturnValue({ ...mocks.lease(), phase: 'active' });
+    mocks.hydrate.mockImplementationOnce(async () => {
+      mocks.state.mockReturnValue({ status: VideoRecordingStatus.RECORDING, error: null });
+    });
+    if (owner === 'recorder') {
+      mocks.sender.mockReturnValue(null);
+      mocks.cameraSender.mockReturnValue('camera-recorder-url');
+      mocks.admitted.mockReturnValue(true);
+    }
+    const response = Promise.withResolvers<unknown>();
+    routeCountdownCamera({
+      message: { ...command(), type: VideoMessageType.COUNTDOWN_CAMERA_CLOSE },
+      sender,
+      sendResponse: response.resolve,
+    });
+    await expect(response.promise).resolves.toEqual({ success: true });
+    expect(mocks.state()).toBe(failureState);
+    expect(mocks.hydrate).not.toHaveBeenCalled();
+    expect(mocks.cache).toHaveBeenCalledOnce();
+    expect(mocks.send).toHaveBeenCalledWith({
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE,
+      peerId:
+        `${owner === 'recorder' ? 'recording-preview' : 'countdown'}:` +
+        JSON.stringify([activeRecordingId, sender.documentId, 0]),
+    });
+  }
+);
+
+it('loads cold authority for camera cleanup without projecting it into runtime state', async () => {
+  const lease = { ...mocks.lease(), phase: 'active' };
+  mocks.lease.mockReturnValue(null);
+  mocks.cache.mockImplementationOnce(async () => {
+    mocks.lease.mockReturnValue(lease);
+    return lease;
+  });
+  const failureState = { status: VideoRecordingStatus.IDLE, error: 'Audio buffer failure' };
+  mocks.state.mockReturnValue(failureState);
+  const response = Promise.withResolvers<unknown>();
+  routeCountdownCamera({
+    message: { ...command(), type: VideoMessageType.COUNTDOWN_CAMERA_CLOSE },
+    sender,
+    sendResponse: response.resolve,
+  });
+  await expect(response.promise).resolves.toEqual({ success: true });
+  expect(mocks.cache).toHaveBeenCalledOnce();
+  expect(mocks.hydrate).not.toHaveBeenCalled();
+  expect(mocks.state()).toBe(failureState);
 });

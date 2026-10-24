@@ -1,3 +1,4 @@
+import { restoreScenarioRecorderFixture } from './extension-critical-page-toolbar.helpers';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   CaptureMode,
@@ -417,8 +418,7 @@ async function scenario(
   await page.bringToFront();
   await ui(page, 'content.toolbar.mode-selector-button').click();
   await ui(page, 'content.toolbar.mode-option.cursor').click();
-  await ui(page, 'content.toolbar.capture-action-button').click();
-  await ui(page, 'content.toolbar.capture-action-option.scenario').click();
+  await restoreScenarioRecorderFixture(page, popup);
   await expect(ui(page, 'content.scenario.sidebar')).toBeVisible();
   await createProject(page, c, info);
   await scenarioSteps(page, c, info);

@@ -162,6 +162,7 @@ async function handleOffscreenRecordingStartedIfCurrent(message?: {
   const currentState = getVideoRecordingRuntimeState();
   setVideoRecordingRuntimeState({
     status: VideoRecordingStatus.RECORDING,
+    displaySurface: message.displaySurface ?? null,
     countdownEndsAt: null,
     error: null,
     ...(message.webcamSettings === undefined || currentState.liveMedia == null

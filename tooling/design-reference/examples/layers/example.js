@@ -6,8 +6,15 @@ import { AnchoredLayer } from '../shared/layers.js';
 import { CommandMenu } from '../shared/command-menu.js';
 import { ModalDialog } from '../shared/modal-dialog.js';
 import { NativeHint } from '../shared/native-hint.js';
-import { ColorEditor } from '../shared/color-editor.js';
-export function render(root, { manifest }) {
+let pickerModule;
+async function loadPickers() {
+  if (!pickerModule) {
+    pickerModule = import('../../.generated/pickers.js');
+  }
+  return pickerModule;
+}
+
+export async function render(root, { manifest, theme }) {
   const add = (key) => {
     const stage = el('div', { class: 'case-stage' });
     root.append(
@@ -126,7 +133,10 @@ export function render(root, { manifest }) {
     onCancel: () => inner.cancel(),
   });
   innerOpen.addEventListener('click', () => innerModal.open(innerOpen));
-  ColorEditor({ parent: add('color') });
+  const { mountPickerReferences } = await loadPickers();
+  const locale = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'ru';
+  await mountPickerReferences(add('color'), { theme, locale, kind: 'color' });
+  await mountPickerReferences(add('paint'), { theme, locale, kind: 'paint' });
   const tooltipStage = add('tooltip'),
     tipTrigger = ActionButton({
       label: 'Сведения о горячей клавише',

@@ -1,8 +1,10 @@
 import { Mic } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { loadSettings, subscribeToVoiceInputPreferencesChanges } from '../persistence/settings';
 import { usePushToTalk } from '@sniptale/ui/voice-input/use-push-to-talk';
 import { isTrustedMouseEvent, isTrustedPointerEvent } from './trusted-events';
 import type { VoiceInputState } from './session';
+import { translate } from '../../platform/i18n';
 
 type VoiceInputButtonProps = {
   appearance?: 'contrast' | 'default';
@@ -12,11 +14,13 @@ type VoiceInputButtonProps = {
   labels: { error: string; start: string; stop: string };
   onStart(): void;
   onStop(): void;
+  onCancel?(): void;
   state: VoiceInputState;
   style?: CSSProperties;
 };
 
 function resolveVoiceButtonLabel(props: VoiceInputButtonProps): string {
+  if (props.state.pending) return translate('settings.voiceInput.cancel');
   if (props.state.errorCode !== null) return props.labels.error;
   return props.state.active ? props.labels.stop : props.labels.start;
 }
@@ -72,14 +76,39 @@ function VoiceInputActivity(props: { contrast: boolean; level: number }) {
   );
 }
 
-export function VoiceInputButton(props: VoiceInputButtonProps) {
+function useVoiceInputEnabled(): boolean {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    let current = true;
+    let preferenceChanged = false;
+    const unsubscribe = subscribeToVoiceInputPreferencesChanges((preferences) => {
+      preferenceChanged = true;
+      if (current) setEnabled(preferences.enabled !== false);
+    });
+    void loadSettings().then(
+      (settings) => {
+        if (current && !preferenceChanged) setEnabled(settings.voiceInput?.enabled !== false);
+      },
+      () => {
+        // Keep dictation hidden when its saved preference is unavailable.
+      }
+    );
+    return () => {
+      current = false;
+      unsubscribe();
+    };
+  }, []);
+  return enabled;
+}
+
+function EnabledVoiceInputButton(props: VoiceInputButtonProps) {
   const pushToTalk = usePushToTalk({
     active: props.state.active,
     disabled: props.disabled,
     onStart: props.onStart,
     onStop: props.onStop,
   });
-  const stopping = props.state.phase === 'stopping';
+  const stopping = props.state.pending;
   const contrast = props.appearance === 'contrast';
   const label = resolveVoiceButtonLabel(props);
   const level = Math.max(0, Math.min(props.state.audioLevel, 1));
@@ -90,17 +119,25 @@ export function VoiceInputButton(props: VoiceInputButtonProps) {
       aria-pressed={props.state.active}
       className={getVoiceButtonClassName(props)}
       data-ui={props.dataUi}
-      disabled={props.disabled || stopping}
+      disabled={props.disabled || (stopping && !props.onCancel)}
       style={props.style}
       title={label}
       type="button"
       onClick={(event) => {
         if (event.detail !== 0) return;
+        if (props.state.pending) {
+          props.onCancel?.();
+          return;
+        }
         if (props.state.active) props.onStop();
         else if (isTrustedMouseEvent(event.nativeEvent)) props.onStart();
       }}
       onPointerCancel={pushToTalk.onPointerCancel}
       onPointerDown={(event) => {
+        if (props.state.pending) {
+          if (event.button === 0) props.onCancel?.();
+          return;
+        }
         if (props.state.active) {
           if (event.button === 0) props.onStop();
           return;
@@ -114,4 +151,9 @@ export function VoiceInputButton(props: VoiceInputButtonProps) {
       <Mic aria-hidden="true" size={14} strokeWidth={1.8} />
     </button>
   );
+}
+
+export function VoiceInputButton(props: VoiceInputButtonProps) {
+  const enabled = useVoiceInputEnabled();
+  return enabled ? <EnabledVoiceInputButton {...props} /> : null;
 }

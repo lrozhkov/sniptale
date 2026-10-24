@@ -64,6 +64,7 @@ export function PointerFeedbackFields(props: PointerFeedbackFieldsProps) {
           magnify={magnify}
           color={color}
           lensShape={common('lensShape')}
+          lensOptics={common('lensOptics')}
           stroke={
             props.gesture
               ? common('gestureAppearance') === 'path' || common('gestureAppearance') === 'area'
@@ -137,10 +138,12 @@ const CLICK_BOUNDS = {
   ...REVIEW_CLICK_BOUNDS,
   magnification: [1, 3],
   lensShadow: [0, 100],
+  lensEdgeWidth: [1, 30],
 } as const;
 const CLICK_SCRUB = {
   magnification: [1, 2.5, 0.1],
   lensShadow: [0, 50, 1],
+  lensEdgeWidth: [1, 30, 1],
   radius: [2, 80, 1],
   stroke: [0.5, 8, 0.5],
   opacity: [0, 1, 0.01],
@@ -212,7 +215,9 @@ function clickFieldValues(styles: readonly ReviewClickStyle[]) {
   const values = styles.map((value) => ({
     magnification: 1.6,
     lensShadow: 20,
+    lensEdgeWidth: 8,
     lensShape: 'circle' as const,
+    lensOptics: 'flat' as const,
     ...value,
   }));
   const magnify = values.every((value) => value.effect === 'magnify');
@@ -235,6 +240,7 @@ function ClickAppearance({
   magnify,
   color,
   lensShape,
+  lensOptics,
   stroke,
   number,
   onChange,
@@ -242,6 +248,7 @@ function ClickAppearance({
   magnify: boolean;
   color: string | undefined;
   lensShape: ReviewClickStyle['lensShape'] | null;
+  lensOptics: ReviewClickStyle['lensOptics'] | null;
   stroke: boolean;
   onChange: PointerFeedbackFieldsProps['onChange'];
   number(
@@ -256,6 +263,18 @@ function ClickAppearance({
       {magnify ? (
         <>
           {number('magnification', 'gallery.videoReview.clickMagnification', 1, 'x')}
+          <PointerChoice
+            label={translate('gallery.videoReview.clickLensOptics')}
+            value={lensOptics ?? ''}
+            options={(['flat', 'optical'] as const).map((value) => ({
+              value,
+              label: translate(`gallery.videoReview.clickLensOptics_${value}`),
+            }))}
+            onChange={(lensOptics: 'flat' | 'optical') => onChange({ lensOptics })}
+          />
+          {lensOptics === 'optical'
+            ? number('lensEdgeWidth', 'gallery.videoReview.clickLensEdgeWidth', 1, '%')
+            : null}
           <PointerChoice
             label={translate('gallery.videoReview.clickLensShape')}
             value={lensShape ?? ''}

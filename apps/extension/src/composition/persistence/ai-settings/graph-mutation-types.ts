@@ -15,14 +15,16 @@ export type AISettingsMutationCommand =
       operation:
         | 'save-global-prompt'
         | 'save-scenario-editor-prompt'
-        | 'save-audio-transcription-prompt';
+        | 'save-audio-transcription-prompt'
+        | 'save-voice-input-correction-prompt';
       prompt: string;
     }
   | {
       operation:
         | 'reset-global-prompt'
         | 'reset-scenario-editor-prompt'
-        | 'reset-audio-transcription-prompt';
+        | 'reset-audio-transcription-prompt'
+        | 'reset-voice-input-correction-prompt';
     }
   | { operation: 'save-chrome-ai-enabled'; enabled: boolean }
   | { operation: 'enable-secret-passphrase-protection'; passphrase: string }

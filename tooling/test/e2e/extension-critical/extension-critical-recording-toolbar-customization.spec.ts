@@ -83,6 +83,63 @@ for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((vie
         await vertical.click();
         await page.keyboard.press('Escape');
       }
+      if (orientation === 'vertical') {
+        const centers = await page
+          .locator('[data-ui="content.toolbar.drawing-tools-group"] button')
+          .evaluateAll((buttons) =>
+            buttons.map((button) => {
+              const bounds = button.getBoundingClientRect();
+              return bounds.x + bounds.width / 2;
+            })
+          );
+        expect(centers.length).toBeGreaterThan(1);
+        expect(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(1);
+        const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+        const bounds = (await toolbar.boundingBox())!;
+        expect(bounds.width).toBeLessThanOrEqual(60);
+        expect(bounds.y).toBeGreaterThanOrEqual(0);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(size.height);
+        await page.screenshot({
+          path: info.outputPath('vertical-single-column-preparation.png'),
+          fullPage: false,
+        });
+      }
+      if (orientation === 'vertical') {
+        const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+        await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+        const options = page.locator('[data-ui="content.toolbar.drawing-options.pencil"]');
+        await expect(options).toBeVisible();
+        await options.getByRole('button').first().click();
+        expect(await toolbar.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+        await page.mouse.move(420, 320);
+        await page.mouse.down();
+        await page.mouse.move(550, 360, { steps: 8 });
+        await page.mouse.up();
+        await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+        await page.mouse.click(485, 340);
+        const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
+        const actions = page.locator('[data-ui="drawing.selection.actions"]');
+        await expect(actions).toBeVisible();
+        await actions.locator('[data-ui="drawing.selection.actions.duplicate"]').click();
+        await expect(actions.locator('[data-ui="drawing.selection.actions.front"]')).toBeEnabled();
+        expect(await toolbar.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+        const pairBounds = (await pair.boundingBox())!;
+        expect(pairBounds.x).toBeGreaterThanOrEqual(0);
+        expect(pairBounds.y).toBeGreaterThanOrEqual(0);
+        expect(pairBounds.x + pairBounds.width).toBeLessThanOrEqual(size.width);
+        expect(pairBounds.y + pairBounds.height).toBeLessThanOrEqual(size.height);
+        await page.screenshot({
+          path: info.outputPath('vertical-floating-drawing-actions.png'),
+          fullPage: false,
+        });
+        await actions.locator('[data-ui="content.toolbar.drawing-options.deselect"]').click();
+        await page.locator('[data-ui="content.toolbar.video-recording.navigation"]').click();
+        await page.locator('[data-ui="content.toolbar.video-recording.auto-hide"]').click();
+        await page.locator('[data-ui="content.toolbar.video-recording.auto-hide-5"]').click();
+        await page.locator('[data-ui="content.toolbar.video-recording.auto-hide"]').click();
+        await page.locator('[data-ui="content.toolbar.video-recording.auto-hide-0"]').click();
+        expect(await toolbar.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+      }
       const toggle = page.locator('[data-ui="content.toolbar.video-recording.camera.toggle"]');
       await expect(toggle).toHaveAttribute('aria-pressed', 'false');
       await page.locator('[data-ui="content.toolbar.video-recording.camera.menu"]').click();
@@ -202,6 +259,22 @@ for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((vie
           return result.postRecordResult?.recordingId ?? null;
         })
         .not.toBeNull();
+      if (orientation === 'vertical' && size.width === 1280) {
+        await page.setViewportSize({ width: 960, height: 560 });
+        const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+        await toolbar.locator('[data-ui="content.toolbar.settings-button"]').click();
+        await page.keyboard.press('Escape');
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+        ).toBe(true);
+        const bounds = (await toolbar.boundingBox())!;
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(960);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(560);
+        await page.screenshot({
+          path: info.outputPath('vertical-single-column-960.png'),
+          fullPage: false,
+        });
+      }
     } finally {
       const worker = launched.context.serviceWorkers()[0];
       if (worker) {

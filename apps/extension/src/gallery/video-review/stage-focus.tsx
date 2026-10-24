@@ -1,3 +1,4 @@
+import { resolveQuickEditLensArea } from '../../features/video/project/scene/focus-appearance';
 import type { QuickEditHomography } from '../../features/video/composition/motion/spatial-geometry';
 import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
@@ -10,7 +11,7 @@ import {
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { translate } from '../../platform/i18n';
-import { ReviewFocusArea } from './focus-area';
+import { ReviewRegionFocusArea } from './region-focus-area';
 import { useReviewCameraGesture } from './camera-gesture';
 import type { ZoomPreviewLayout } from './zoom-preview-paint';
 
@@ -59,33 +60,14 @@ export function ReviewStageFocusControl(props: {
   if (overlay)
     return (
       <div className="pointer-events-none absolute inset-0" style={{ clipPath }}>
-        <ReviewFocusArea
+        <ReviewRegionFocusArea
+          region={focus.region}
           projection={props.projection}
-          area={overlay.area}
-          label={translate(
-            focus.region.border
-              ? 'gallery.videoReview.focusBorder'
-              : 'gallery.videoReview.focusSpotlight'
-          )}
           output={output}
           video={computeQuickEditSourceWindowTransform(layout)}
           onInteract={focus.onInteract}
-          onPreview={(area) =>
-            focus.onPreview(
-              area
-                ? focus.region.border
-                  ? { border: { ...focus.region.border, area } }
-                  : { spotlight: { ...focus.region.spotlight!, area } }
-                : null
-            )
-          }
-          onChange={(area) =>
-            focus.onChange(
-              focus.region.border
-                ? { border: { ...focus.region.border, area } }
-                : { spotlight: { ...focus.region.spotlight!, area } }
-            )
-          }
+          onPreview={focus.onPreview}
+          onChange={focus.onChange}
         />
       </div>
     );
@@ -158,18 +140,23 @@ export function ReviewStageFocusTargets(props: {
           (a, b) => Number(!!(a.border || a.spotlight)) - Number(!!(b.border || b.spotlight))
         )
         .map((region) => {
-          const area = (region.border ?? region.spotlight)?.area ?? {
-            x: 0,
-            y: 0,
-            width: 1,
-            height: 1,
-          };
+          const area = region.border?.area ??
+            (region.spotlight
+              ? resolveQuickEditLensArea(region.spotlight, props.video)
+              : undefined) ?? {
+              x: 0,
+              y: 0,
+              width: 1,
+              height: 1,
+            };
           const label = translate(
             region.border
               ? 'gallery.videoReview.focusBorder'
-              : region.spotlight
-                ? 'gallery.videoReview.focusSpotlight'
-                : 'gallery.videoReview.zoomRegionLabel'
+              : region.spotlight?.effect === 'magnify'
+                ? 'gallery.videoReview.focusLens'
+                : region.spotlight
+                  ? 'gallery.videoReview.focusSpotlight'
+                  : 'gallery.videoReview.zoomRegionLabel'
           );
           return (
             <button

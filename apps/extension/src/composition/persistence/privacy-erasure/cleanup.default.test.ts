@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
+  eraseVoiceHistoryMock,
+  verifyVoiceHistoryMock,
   browserStorageAreaMock,
   consumePersistedEditorBootstrapPayloadMock,
   eraseEditorBootstrapRetentionDataMock,
@@ -16,6 +18,8 @@ const {
   invalidateAndAbortActiveRecordingStagingMock,
   eraseAssetStorageMock,
 } = vi.hoisted(() => ({
+  eraseVoiceHistoryMock: vi.fn(),
+  verifyVoiceHistoryMock: vi.fn(),
   browserStorageAreaMock: {
     get: vi.fn(),
     isAvailable: vi.fn(),
@@ -75,10 +79,19 @@ vi.mock('../assets', async (importOriginal) => ({
   eraseAssetStorage: eraseAssetStorageMock,
 }));
 
+vi.mock('../voice-input-history/privacy-erasure', () => ({
+  createVoiceHistoryPrivacyErasure: () => ({
+    erase: eraseVoiceHistoryMock,
+    verifyEmpty: verifyVoiceHistoryMock,
+  }),
+}));
+
 import { erasePersistentLocalExtensionData } from './cleanup';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  eraseVoiceHistoryMock.mockResolvedValue(undefined);
+  verifyVoiceHistoryMock.mockResolvedValue(true);
   browserStorageAreaMock.get.mockResolvedValue({});
   browserStorageAreaMock.isAvailable.mockReturnValue(true);
   browserStorageAreaMock.remove.mockResolvedValue(undefined);
@@ -99,6 +112,8 @@ it('clears IndexedDB through the default database adapter', async () => {
     preservePreferences: true,
   });
 
+  expect(eraseVoiceHistoryMock).toHaveBeenCalledOnce();
+  expect(verifyVoiceHistoryMock).toHaveBeenCalledTimes(2);
   expect(eraseSniptaleDatabaseForPrivacyErasureMock).toHaveBeenCalledOnce();
   expect(verifySniptaleDatabaseAbsentAfterPrivacyErasureMock).toHaveBeenCalledTimes(2);
   expect(eraseEditorBootstrapRetentionDataMock).toHaveBeenCalledOnce();

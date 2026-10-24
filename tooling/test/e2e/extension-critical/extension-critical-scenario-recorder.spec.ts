@@ -1,5 +1,8 @@
 import { expect, test, terminateExtensionServiceWorker } from '../support/extension-fixture';
-import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+import {
+  openDesignReview,
+  restoreScenarioRecorderFixture,
+} from './extension-critical-page-toolbar.helpers';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { triggerExtensionAction } from '../support/recording-action';
 
@@ -28,8 +31,7 @@ for (const theme of ['light', 'dark'] as const) {
         );
         await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
         await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
-        await page.locator('[data-ui="content.toolbar.capture-action-button"]').click();
-        await page.locator('[data-ui="content.toolbar.capture-action-option.scenario"]').click();
+        await restoreScenarioRecorderFixture(page, popup);
         const sidebar = page.locator('[data-ui="content.scenario.sidebar"]');
         const collapseSidebar = page.locator('[data-ui="content.scenario.sidebar.collapse"]');
         const collapseToolbar = page.locator('[data-ui="content.toolbar.navigation.collapse"]');
@@ -273,8 +275,7 @@ test('scenario and capture panels collapse and restore independently', async ({
   const { page, popup } = await openDesignReview(context, extensionId, hostOrigin);
   await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
   await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
-  await page.locator('[data-ui="content.toolbar.capture-action-button"]').click();
-  await page.locator('[data-ui="content.toolbar.capture-action-option.scenario"]').click();
+  await restoreScenarioRecorderFixture(page, popup);
   const sidebar = page.locator('[data-ui="content.scenario.sidebar"]');
   const toolbar = page.locator('[data-ui="content.toolbar.navigation.collapse"]');
   await expect(sidebar).toBeVisible();
@@ -328,8 +329,7 @@ test('pinned scenario survives navigation with its project and collapsed capture
   await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
   await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
   const pin = page.locator('[data-ui="content.toolbar.navigation.pin-to-tab"]');
-  await page.locator('[data-ui="content.toolbar.capture-action-button"]').click();
-  await page.locator('[data-ui="content.toolbar.capture-action-option.scenario"]').click();
+  await restoreScenarioRecorderFixture(page, popup);
   const sidebar = page.locator('[data-ui="content.scenario.sidebar"]');
   await expect(sidebar).toBeVisible();
   await expect(pin).toHaveAttribute('aria-pressed', 'false');
@@ -399,8 +399,7 @@ for (const [locale, theme] of [
     await page.bringToFront();
     await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
     await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
-    await page.locator('[data-ui="content.toolbar.capture-action-button"]').click();
-    await page.locator('[data-ui="content.toolbar.capture-action-option.scenario"]').click();
+    await restoreScenarioRecorderFixture(page, popup);
     const sidebar = page.locator('[data-ui="content.scenario.sidebar"]');
     await page.locator('[data-ui="content.scenario.sidebar.project-button"]').click();
     const picker = page.locator('[data-ui="content.scenario.sidebar.project-picker"]');

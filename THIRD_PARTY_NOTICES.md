@@ -277,9 +277,9 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - MPL-2.0 corresponding source: https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz
 - Modified source archive: [sniptale-dependency-source-0.5.1.zip](https://github.com/lrozhkov/sniptale/releases/download/v0.5.1/sniptale-dependency-source-0.5.1.zip)
 - Files inside that source archive (combine with upstream source above):
-  - `LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz` (SHA-256: 7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980)
-  - `LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json` (SHA-256: f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856)
-  - `LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch` (SHA-256: 9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00)
+  - `LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz` (SHA-256: c93dd9b7ed6c9faf20747903c8a2411c32ad3434397b0c353055154a1d106daa)
+  - `LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json` (SHA-256: e10e6612cd3999826d6bc89f66e7f0ab542f1039097df87e33dcbf55e131e15d)
+  - `LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch` (SHA-256: 8cb6755bd04a52f3efcb655fcd9472de49a1c0a01f1753b2bc6fc6c0aa411407)
   - `LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE` (SHA-256: 3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04)
   - `LICENSES/dependencies/mediabunny-1.61.3-modified/README.md` (SHA-256: c3a87c3784618c36512562995abacccdf5bdc09511e7ff5f87548d72f317341a)
 - Original package integrity: sha512-kUqLKVXQVwHR62GkOJxYosAmXERJbqnXBgJDTtRlxHEYviVkMg/Evhl9XN6kedqS5LP1tV4kFKyzY/V4a4ofow==

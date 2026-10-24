@@ -1,520 +1,74 @@
-import { writeFile } from 'node:fs/promises';
-import {
-  expect,
-  test,
-  type BrowserContext,
-  type Locator,
-  type Page,
-  type TestInfo,
-} from '@playwright/test';
-import {
-  translate,
-  type AppLocale,
-  type TranslationKey,
-} from '../../../../apps/extension/src/platform/i18n';
-import { closeExtensionBrowser, launchExtensionBrowser } from '../support/extension-browser-launch';
-import { startHostServer } from '../support/host-server';
+import { expect, test } from '@playwright/test';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   evaluateInTarget,
   openRealPopup,
   triggerExtensionAction,
 } from '../support/recording-action';
-
-const START = '[data-ui="popup.video-setup.start-recording-button"]';
-const CAMERA_ROUTE = '/apps/extension/src/camera-recorder/index.html';
-const interfaceBackingFace = 'Golos UI';
-const sizes = [
-  { width: 960, height: 720 },
-  { width: 1280, height: 560 },
-  { width: 1920, height: 900 },
-];
-type Composition = { locale: AppLocale; theme: 'light' | 'dark' };
-type FontResponse = { url: string; status: number; bytes: number };
-const tr = (composition: Composition, key: TranslationKey) => translate(key, composition.locale);
-const command = (page: Page, composition: Composition, key: TranslationKey) =>
-  page.getByRole('button', { name: tr(composition, key), exact: true });
+import {
+  CAMERA_ROUTE,
+  sizes,
+  tr,
+  command,
+  scrollStart,
+  capture,
+  launchCamera,
+  nativeWindow,
+  geometry,
+  fontProof,
+  playbackLabel,
+  controls,
+  savedResult,
+  withBrowser,
+  clickNativeStart,
+} from './camera-recorder-design.test-support';
 
 test.use({ actionTimeout: 10_000 });
 test.setTimeout(150_000);
 
-async function capture(page: Page, info: TestInfo, name: string) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-    );
-  });
-  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
-}
-
-async function configure(context: BrowserContext, extensionId: string, composition: Composition) {
-  const settings = await context.newPage();
-  await settings.setViewportSize(sizes[1]!);
-  try {
-    await settings.goto(
-      `chrome-extension://${extensionId}/apps/extension/src/settings/index.html` +
-        '?section=interface-browser&view=interface'
-    );
-    const language = settings.locator('#settings-interface-language');
-    await expect(language).toBeEnabled();
-    await expect
-      .poll(() =>
-        settings.evaluate(
-          async () =>
-            typeof (await chrome.storage.local.get('sniptale-locale-preference'))[
-              'sniptale-locale-preference'
-            ]
-        )
-      )
-      .toBe('string');
-    await language.click();
-    await settings
-      .getByRole('option', {
-        name: composition.locale === 'en' ? 'English' : /^(Russian|Русский)$/u,
-        exact: true,
-      })
-      .click();
-    await expect
-      .poll(() =>
-        settings.evaluate(
-          async () =>
-            (await chrome.storage.local.get('sniptale-locale-preference'))[
-              'sniptale-locale-preference'
-            ]
-        )
-      )
-      .toBe(composition.locale);
-    await settings.evaluate(async (theme) => {
-      await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
-      localStorage.setItem('sniptale-theme-preference', theme);
-    }, composition.theme);
-  } finally {
-    await settings.close();
-  }
-}
-
-async function clickNativeStart(context: BrowserContext, targetId: string) {
-  await expect
-    .poll(() =>
-      evaluateInTarget(
-        context,
-        targetId,
-        `Boolean(document.querySelector(${JSON.stringify(START)})?.matches(':enabled'))`
-      )
-    )
-    .toBe(true);
-  const point = await evaluateInTarget(
-    context,
-    targetId,
-    `(() => {
-    const button = document.querySelector(${JSON.stringify(START)});
-    button.scrollIntoView({ block: 'center' });
-    const rect = button.getBoundingClientRect();
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-  })()`
-  );
-  if (
-    typeof point !== 'object' ||
-    point === null ||
-    !('x' in point) ||
-    !('y' in point) ||
-    typeof point.x !== 'number' ||
-    typeof point.y !== 'number'
-  ) {
-    throw new Error('Native Start button does not have a usable pointer target');
-  }
-  const browser = context.browser();
-  if (!browser) throw new Error('Native action popup has no browser owner');
-  const session = await browser.newBrowserCDPSession();
-  const attached = await session.send('Target.attachToTarget', { targetId, flatten: false });
-  try {
-    for (const [index, type] of ['mousePressed', 'mouseReleased'].entries()) {
-      await session.send('Target.sendMessageToTarget', {
-        sessionId: attached.sessionId,
-        message: JSON.stringify({
-          id: index + 1,
-          method: 'Input.dispatchMouseEvent',
-          params: { type, x: point.x, y: point.y, button: 'left', clickCount: 1 },
-        }),
-      });
-    }
-  } finally {
-    await session
-      .send('Target.detachFromTarget', { sessionId: attached.sessionId })
-      .catch(() => undefined);
-    await session.detach();
-  }
-}
-
-async function launchCamera(
-  context: BrowserContext,
-  extensionId: string,
-  origin: string,
-  c: Composition
-) {
-  const target = await context.newPage();
-  await target.setViewportSize(sizes[0]!);
-  await target.goto(`${origin}/fixtures/host-page.html`);
-  const popup = await openRealPopup(context, extensionId);
-  await popup.locator('[data-ui="popup.app.tabs"] button[data-page="video"]').click();
-  for (const key of [
-    'popup.video.webcamToggleLabel',
-    'popup.video.microphoneToggleLabel',
-  ] as const) {
-    const toggle = popup.locator('[data-ui="popup.icon-state-button"]').and(command(popup, c, key));
-    await expect(toggle).toBeEnabled();
-    if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  }
-  const camera = popup
-    .locator('button:not([data-ui="popup.icon-state-button"])')
-    .and(command(popup, c, 'popup.video.modeCameraLabel'));
-  await expect(camera).toBeEnabled();
-  await camera.click();
-  await expect(camera).toHaveAttribute('aria-pressed', 'true');
-  await expect(popup.locator(START)).toBeEnabled();
-  await target.bringToFront();
-  const actionTarget = await triggerExtensionAction(context, extensionId, target);
-  await expect
-    .poll(() =>
-      evaluateInTarget(
-        context,
-        actionTarget,
-        `Boolean(document.querySelector('button:not([data-ui="popup.icon-state-button"])'
-      + ':is([aria-label="Camera"],[aria-label="Камера"])[aria-pressed="true"]'))`
-      )
-    )
-    .toBe(true);
-  await clickNativeStart(context, actionTarget);
-  await expect
-    .poll(() => context.pages().some((page) => new URL(page.url()).pathname === CAMERA_ROUTE))
-    .toBe(true);
-  const recorder = context.pages().find((page) => new URL(page.url()).pathname === CAMERA_ROUTE);
-  if (!recorder) throw new Error('Actual Camera launch did not create a recorder page');
-  await expect.poll(() => recorder.evaluate(() => location.search)).toBe('');
-  await expect(recorder.locator('html')).toHaveAttribute('data-theme', c.theme);
-  await expect(command(recorder, c, 'popup.video.pauseButton')).toBeEnabled();
-  await expect(recorder.getByRole('status')).toHaveText(tr(c, 'popup.labels.statusRecording'));
-  await expect
-    .poll(() =>
-      recorder.locator('video').evaluate((video: HTMLVideoElement) => ({
-        ready: video.readyState >= 2,
-        width: video.videoWidth,
-        height: video.videoHeight,
-        tracks:
-          video.srcObject instanceof MediaStream ? video.srcObject.getVideoTracks().length : 0,
-      }))
-    )
-    .toEqual({ ready: true, width: 640, height: 480, tracks: 1 });
-  return recorder;
-}
-
-async function nativeWindow(context: BrowserContext, page: Page, info: TestInfo) {
-  const before = await page.evaluate(async () => {
-    const tab = await chrome.tabs.getCurrent();
-    if (tab?.windowId === undefined) throw new Error('Recorder window owner missing');
-    const window = await chrome.windows.get(tab.windowId);
-    return {
-      outer: { width: window.width, height: window.height, type: window.type },
-      inheritedCss: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
-      queryConsumed: location.search === '',
-    };
-  });
-  expect(before.outer).toEqual({ width: 960, height: 720, type: 'popup' });
-  expect(before.queryConsumed).toBe(true);
-  const session = await context.newCDPSession(page);
-  await session.send('Emulation.clearDeviceMetricsOverride');
-  const nativeCss = await page.evaluate(() => ({
-    width: innerWidth,
-    height: innerHeight,
-    dpr: devicePixelRatio,
-  }));
-  await session.detach();
-  expect(nativeCss.width).toBeGreaterThan(0);
-  expect(nativeCss.height).toBeGreaterThan(0);
-  expect(nativeCss.dpr).toBe(1);
-  await writeFile(
-    info.outputPath('native-window.json'),
-    JSON.stringify({ ...before, nativeCss }, null, 2)
-  );
-  await capture(page, info, 'native-window-live');
-}
-
-async function geometry(page: Page) {
-  const main = page.getByRole('main');
-  await expect(main).toBeVisible();
-  const heading = main.getByRole('heading', { level: 1 });
-  await expect(heading).toHaveCSS('font-size', '14px');
-  await expect(heading).toHaveCSS('line-height', '20px');
-  await expect.soft(heading).toHaveCSS('font-weight', '500', { timeout: 500 });
-  if ((await heading.getAttribute('id')) === 'camera-recorder-title') {
-    const devices = main.locator('div.select-text[title]');
-    await expect(devices).toHaveCount(2);
-    for (const device of await devices.all()) {
-      await expect.soft(device).toHaveCSS('font-weight', '400', { timeout: 500 });
-    }
-  }
-  expect(await main.locator('button[data-command-press]').count()).toBeGreaterThanOrEqual(4);
-  for (const button of await main.locator('button[data-command-press]').all()) {
-    await expect(button).toHaveCSS('height', '32px');
-    await expect(button).toHaveCSS('border-radius', '4px');
-    await expect(button).toHaveCSS('font-size', '13px');
-    await expect(button).toHaveCSS('line-height', '18px');
-    await expect(button).toHaveCSS(
-      'font-weight',
-      (await button.getAttribute('data-active')) === 'true' ? '500' : '400'
-    );
-    const rect = await button.boundingBox();
-    expect(rect).not.toBeNull();
-    expect(rect!.x).toBeGreaterThanOrEqual(0);
-    expect(rect!.x + rect!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
-  }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  const footer = main.locator('footer');
-  if (await footer.count()) {
-    await footer.scrollIntoViewIfNeeded();
-    const box = await footer.boundingBox();
-    const viewport = await page.evaluate(() => innerHeight);
-    expect(box!.y).toBeGreaterThanOrEqual(0);
-    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport + 1);
-  }
-  if (await page.locator('video').count()) {
-    await expect(page.getByRole('timer')).toHaveCSS('font-size', '24px');
-    await expect(page.getByRole('timer')).toHaveAttribute('aria-live', 'off');
-    await expect(page.locator('video')).toHaveCSS('object-fit', 'contain');
-    expect(
-      await page
-        .locator('video')
-        .evaluate((video: HTMLVideoElement) => [video.videoWidth, video.videoHeight])
-    ).toEqual([640, 480]);
-  }
-}
-
-async function fontProof(
-  context: BrowserContext,
-  page: Page,
-  info: TestInfo,
-  responses: FontResponse[]
-) {
-  await page.evaluate(() => document.fonts.ready);
-  const role = await page.getByRole('main').evaluate((node) => {
-    const probe = node.ownerDocument.createElement('span');
-    probe.style.fontFamily = 'var(--sniptale-font-interface)';
-    node.append(probe);
-    const family = getComputedStyle(probe).fontFamily;
-    probe.remove();
-    return family;
-  });
-  await expect(page.getByRole('main')).toHaveCSS('font-family', role);
-  const sources = await page.evaluate((family) => {
-    const alias = family.split(',')[0]!.replaceAll(/["']/gu, '').trim();
-    if (
-      !Array.from(document.fonts).some(
-        (face) => face.family.replaceAll(/["']/gu, '') === alias && face.status === 'loaded'
-      )
-    ) {
-      throw new Error('Resolved interface face is not registered and loaded');
-    }
-    return Array.from(document.styleSheets).flatMap((sheet) =>
-      Array.from(sheet.cssRules).flatMap((rule) => {
-        if (
-          !(rule instanceof CSSFontFaceRule) ||
-          rule.style.getPropertyValue('font-family').replaceAll(/["']/gu, '').trim() !== alias
-        )
-          return [];
-        return Array.from(
-          rule.style.getPropertyValue('src').matchAll(/url\(["']?([^"')]+)["']?\)/gu)
-        ).map((match) => new URL(match[1]!, sheet.href ?? document.baseURI).href);
-      })
-    );
-  }, role);
-  await expect
-    .poll(() =>
-      responses.some(
-        (response) =>
-          sources.includes(response.url) && response.status === 200 && response.bytes > 0
-      )
-    )
-    .toBe(true);
-  const session = await context.newCDPSession(page);
-  try {
-    await session.send('DOM.enable');
-    await session.send('CSS.enable');
-    const { nodes } = await session.send('DOM.getFlattenedDocument', { depth: -1, pierce: true });
-    const samples = nodes
-      .filter((node) => node.nodeName === '#text' && node.nodeValue.trim())
-      .slice(0, 30);
-    const fonts = await Promise.all(
-      samples.map(async (node) => ({
-        text: node.nodeValue,
-        fonts: (await session.send('CSS.getPlatformFontsForNode', { nodeId: node.parentId! }))
-          .fonts,
-      }))
-    );
-    await writeFile(
-      info.outputPath('interface-font.json'),
-      JSON.stringify({ role, sources, responses, fonts }, null, 2)
-    );
-    expect(
-      fonts.some((sample) =>
-        sample.fonts.some(
-          (face) =>
-            face.isCustomFont &&
-            face.familyName.includes(interfaceBackingFace) &&
-            face.glyphCount > 0
-        )
-      )
-    ).toBe(true);
-  } finally {
-    await session.detach();
-  }
-}
-
-async function keyboardPaint(button: Locator) {
-  await expect(button).toBeFocused();
-  expect(await button.evaluate((node) => node.matches(':focus-visible'))).toBe(true);
-  await expect(button).toHaveCSS('outline-width', '2px');
-  await expect(button).toHaveCSS('outline-style', 'solid');
-  const color = await button.evaluate((node) => {
-    const probe = node.ownerDocument.createElement('span');
-    probe.style.color = 'var(--sniptale-color-accent)';
-    node.append(probe);
-    const resolved = getComputedStyle(probe).color;
-    probe.remove();
-    return resolved;
-  });
-  await expect(button).toHaveCSS('outline-color', color);
-}
-
-async function movePointer(page: Page, target: Locator) {
-  await target.scrollIntoViewIfNeeded();
-  const box = await target.boundingBox();
-  if (!box) throw new Error('Command has no actual pointer bounds');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-}
-
-async function controls(page: Page, c: Composition, info: TestInfo) {
-  const pause = command(page, c, 'popup.video.pauseButton');
-  const timer = page.getByRole('timer');
-  const before = await timer.innerText();
-  await expect.poll(() => timer.innerText()).not.toBe(before);
-  await movePointer(page, pause);
-  await page.mouse.down();
-  await expect(pause).toHaveAttribute('data-pressing', 'true');
-  await expect(command(page, c, 'popup.video.resumeButton')).toHaveCount(0);
-  await page.mouse.move(1, 1);
-  await page.mouse.up();
-  await expect(pause).not.toHaveAttribute('data-pressing', 'true');
-  await expect(page.getByRole('status')).toHaveText(tr(c, 'popup.labels.statusRecording'));
-  await movePointer(page, pause);
-  await page.mouse.down();
-  await expect(command(page, c, 'popup.video.resumeButton')).toHaveCount(0);
-  await page.mouse.up();
-  const resume = command(page, c, 'popup.video.resumeButton');
-  await expect(resume).toBeFocused();
-  expect(await resume.evaluate((node) => node.matches(':focus-visible'))).toBe(false);
-  await expect(resume).toHaveCSS('outline-style', 'none');
-  await expect(page.getByRole('status')).toHaveText(tr(c, 'popup.labels.statusPaused'));
-  await page.keyboard.press('Tab');
-  const stop = command(page, c, 'popup.video.stopButton');
-  await keyboardPaint(stop);
-  await page.keyboard.press('Shift+Tab');
-  await keyboardPaint(resume);
-  await capture(page, info, 'keyboard-command-focus');
-  await page.keyboard.press('Space');
-  await expect(pause).toBeEnabled();
-  await expect(page.getByRole('status')).toHaveText(tr(c, 'popup.labels.statusRecording'));
-  const mute = command(page, c, 'popup.video.activeMicrophoneMute');
-  await expect(mute).toHaveAttribute('aria-pressed', 'true');
-  await mute.click();
-  const unmute = command(page, c, 'popup.video.activeMicrophoneUnmute');
-  await expect(unmute).toHaveAttribute('aria-pressed', 'false');
-  await unmute.click();
-  await expect(mute).toHaveAttribute('aria-pressed', 'true');
-  const cancel = command(page, c, 'popup.video.cancelButton');
-  await cancel.click();
-  const continueRecording = command(page, c, 'popup.video.cancelContinueRecording');
-  await expect(continueRecording).toBeFocused();
-  await page.keyboard.press('Tab');
-  await keyboardPaint(command(page, c, 'popup.video.cancelDeleteRecording'));
-  await page.keyboard.press('Shift+Tab');
-  await keyboardPaint(continueRecording);
-  await capture(page, info, 'cancel-confirmation-keyboard');
-  await continueRecording.press('Enter');
-  await expect(continueRecording).toHaveCount(0);
-  await expect(cancel).toBeFocused();
-  await expect(stop).toBeVisible();
-  await page.keyboard.press('Shift+Tab');
-  await keyboardPaint(stop);
-  await expect(page.getByRole('alert')).toHaveCount(0);
-}
-
-async function savedResult(page: Page, c: Composition, info: TestInfo) {
-  await command(page, c, 'popup.video.stopButton').click();
-  const close = command(page, c, 'popup.video.postRecordClose');
-  await expect(close).toBeEnabled({ timeout: 30_000 });
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    tr(c, 'popup.video.postRecordTitle')
-  );
-  for (const size of sizes) {
-    await page.setViewportSize(size);
-    await geometry(page);
-    await close.scrollIntoViewIfNeeded();
-    const box = await close.boundingBox();
-    expect(box!.y + box!.height).toBeLessThanOrEqual(size.height + 1);
-    await expect(command(page, c, 'popup.video.postRecordDownload')).toBeEnabled();
-    await capture(page, info, `result-${size.width}x${size.height}`);
-  }
-  await close.click();
-  await expect.poll(() => page.isClosed()).toBe(true);
-}
-
-async function withBrowser(
-  c: Composition,
-  info: TestInfo,
-  use: (
-    context: BrowserContext,
-    extensionId: string,
-    origin: string,
-    fonts: FontResponse[]
-  ) => Promise<void>
-) {
-  const host = await startHostServer();
-  let launched: Awaited<ReturnType<typeof launchExtensionBrowser>> | undefined;
-  try {
-    launched = await launchExtensionBrowser({ viewport: sizes[0]!, fakeMediaDevices: true });
-    const { context, extensionId } = launched;
-    context.setDefaultTimeout(10_000);
-    const fonts: FontResponse[] = [];
-    context.on('response', (response) => {
-      if (
-        !response.url().startsWith(`chrome-extension://${extensionId}/`) ||
-        !response.url().includes('.woff2')
-      )
-        return;
-      const record = { url: response.url(), status: response.status(), bytes: 0 };
-      fonts.push(record);
-      void response
-        .body()
-        .then((body) => {
-          record.bytes = body.length;
-        })
-        .catch(() => undefined);
+for (const stopBeforeFloat of [false, true]) {
+  test(`native Camera result confirmation works in the floating window (Stop before Float: ${stopBeforeFloat})`, async ({}, info) => {
+    const c = { locale: 'en', theme: 'dark' } as const;
+    await withBrowser(c, info, async (context, extensionId, origin) => {
+      const page = await launchCamera(context, extensionId, origin, c);
+      if (stopBeforeFloat) {
+        await command(page, c, 'popup.video.stopButton').click();
+        await expect(command(page, c, 'popup.video.postRecordDelete')).toBeEnabled({
+          timeout: 30_000,
+        });
+      }
+      const [pip] = await Promise.all([
+        context.waitForEvent('page'),
+        command(page, c, 'popup.video.teleprompterFloat').click(),
+      ]);
+      await pip.setViewportSize({ width: 480, height: 640 });
+      if (!stopBeforeFloat) await command(pip, c, 'popup.video.stopButton').click();
+      const trigger = command(pip, c, 'popup.video.postRecordDelete');
+      await expect(trigger).toBeEnabled({ timeout: 30_000 });
+      await trigger.click();
+      await expect(pip.getByRole('alertdialog')).toBeVisible();
+      await expect(
+        pip.getByRole('button', { name: tr(c, 'common.actions.cancel'), exact: true })
+      ).toBeFocused();
+      await capture(pip, info, 'result-floating-delete-confirmation');
+      await pip.keyboard.press('Escape');
+      await expect(pip.getByRole('alertdialog')).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+      await capture(pip, info, 'result-floating');
+      await trigger.click();
+      await expect(pip.getByRole('alertdialog')).toBeVisible();
+      await pip.close();
+      await expect(page.getByRole('alertdialog')).toHaveCount(0);
+      const dockedTrigger = command(page, c, 'popup.video.postRecordDelete');
+      await expect(command(page, c, 'popup.video.teleprompterFloat')).toBeFocused();
+      await dockedTrigger.click();
+      await expect(page.getByRole('alertdialog')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('alertdialog')).toHaveCount(0);
+      await expect(dockedTrigger).toBeFocused();
+      await capture(page, info, 'result-restored-after-confirmation');
     });
-    await configure(context, extensionId, c);
-    await use(context, extensionId, host.origin, fonts);
-  } catch (error) {
-    const page = launched?.context
-      .pages()
-      .find((candidate) => new URL(candidate.url()).pathname === CAMERA_ROUTE);
-    if (page && !page.isClosed()) await capture(page, info, 'failure-ui').catch(() => undefined);
-    throw error;
-  } finally {
-    if (launched) await closeExtensionBrowser(launched, { removeUserDataDir: true });
-    await new Promise<void>((resolve, reject) =>
-      host.server.close((error) => (error ? reject(error) : resolve()))
-    );
-  }
+  });
 }
 
 for (const locale of ['ru', 'en'] as const) {
@@ -570,4 +124,496 @@ test('native Camera narrow boundary and unregistered route keep authority unavai
     await expect(unregistered.getByRole('timer')).toHaveText('00:00');
     await capture(unregistered, info, 'unregistered-route');
   });
+});
+
+for (const locale of ['en', 'ru'] as const) {
+  test(`native Camera teleprompter ${locale} editing, reading and floating-window recovery`, async ({}, info) => {
+    const c = { locale, theme: 'dark' } as const;
+    await withBrowser(c, info, async (context, extensionId, origin) => {
+      const page = await launchCamera(context, extensionId, origin, c);
+      await page.setViewportSize({ width: 1280, height: 560 });
+      await command(page, c, 'popup.video.teleprompterShow').click();
+      const resize = page.getByRole('separator', {
+        name: tr(c, 'popup.video.teleprompterResizeCamera'),
+      });
+      const cameraArea = page.locator('[data-ui="camera-recorder.preview-layout"]');
+      await expect(resize).toBeVisible();
+      const cameraBefore = (await cameraArea.boundingBox())!.height;
+      await resize.focus();
+      await resize.press('ArrowDown');
+      await expect
+        .poll(async () => (await cameraArea.boundingBox())!.height)
+        .toBeGreaterThan(cameraBefore);
+      const grip = (await resize.boundingBox())!;
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2 + 32);
+      await page.mouse.up();
+      await expect
+        .poll(async () => (await cameraArea.boundingBox())!.height)
+        .toBeGreaterThan(cameraBefore + 8);
+      await resize.dblclick();
+      await expect
+        .poll(async () => (await cameraArea.boundingBox())!.height)
+        .toBeLessThanOrEqual(cameraBefore + 1);
+      const script = Array.from(
+        { length: 80 },
+        (_, index) => `Line ${index + 1}: Read this script while the camera keeps recording.`
+      ).join('\n');
+      const editor = page.getByRole('textbox', { name: tr(c, 'popup.video.teleprompterScript') });
+      await expect(command(page, c, 'popup.video.teleprompterRead')).toBeDisabled();
+      await editor.fill(script);
+      await command(page, c, 'popup.video.teleprompterRead').click();
+      const reader = page.getByRole('region', {
+        name: tr(c, 'popup.video.teleprompterScript'),
+        exact: true,
+      });
+      await expect(reader).toHaveText(script);
+      await command(page, c, 'popup.video.teleprompterSettings').click();
+      const speed = page.getByRole('slider', { name: tr(c, 'popup.video.teleprompterSpeed') });
+      await speed.focus();
+      await speed.press('End');
+      await expect(speed).toHaveValue('300');
+      const font = page.getByRole('slider', { name: tr(c, 'popup.video.teleprompterFontSize') });
+      await font.focus();
+      await font.press('End');
+      await expect(reader).toHaveCSS('font-size', '72px');
+      await font.press('Home');
+      await expect(reader).toHaveCSS('font-size', '20px');
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('slider')).toHaveCount(0);
+      await scrollStart(page, c).click();
+      await expect.poll(() => reader.evaluate((node) => node.scrollTop)).toBeGreaterThan(12);
+      await command(page, c, 'popup.video.teleprompterPause').click();
+      const stopped = await reader.evaluate((node) => node.scrollTop);
+      await page.evaluate(async () => {
+        for (let frame = 0; frame < 8; frame++) {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        }
+      });
+      expect(await reader.evaluate((node) => node.scrollTop)).toBe(stopped);
+      await command(page, c, 'popup.video.teleprompterReset').click();
+      await expect.poll(() => reader.evaluate((node) => node.scrollTop)).toBe(0);
+      await scrollStart(page, c).click();
+      await expect.poll(() => reader.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await command(page, c, 'popup.video.pauseButton').click();
+      await expect(scrollStart(page, c)).toBeDisabled();
+      await expect(page.locator('[data-ui="camera-recorder.controls"] [role="status"]')).toHaveText(
+        tr(c, 'popup.labels.statusPaused')
+      );
+      await command(page, c, 'popup.video.resumeButton').click();
+      await expect(command(page, c, 'popup.video.teleprompterPause')).toBeEnabled();
+      await command(page, c, 'popup.video.teleprompterPause').click();
+      await expect(scrollStart(page, c)).toBeEnabled();
+      await command(page, c, 'popup.video.teleprompterHide').click();
+      await expect(reader).toBeHidden();
+      await command(page, c, 'popup.video.teleprompterShow').click();
+      await expect(reader).toHaveText(script);
+      await command(page, c, 'popup.video.teleprompterEdit').click();
+      await expect(editor).toHaveValue(script);
+      await editor.fill(`${script}\nFinal line added after reading.`);
+      await command(page, c, 'popup.video.teleprompterRead').click();
+      await expect(reader).toContainText('Final line added after reading.');
+      await command(page, c, 'popup.video.teleprompterSettings').click();
+      await page.getByRole('switch', { name: tr(c, 'popup.video.teleprompterFocusGuide') }).click();
+      await page.keyboard.press('Escape');
+      const guide = reader.locator('..').locator('[data-teleprompter-guide]');
+      await expect(guide.locator('svg')).toBeVisible();
+      await command(page, c, 'popup.video.teleprompterReset').click();
+      await expect(reader.locator('..').locator('[data-teleprompter-fade=top]')).toHaveCount(0);
+      await expect(reader.locator('..').locator('[data-teleprompter-fade=bottom]')).toHaveCount(1);
+      await reader.evaluate((node) => {
+        const range = node.ownerDocument.createRange();
+        range.selectNodeContents(node);
+        const selection = node.ownerDocument.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        node.ownerDocument.dispatchEvent(new Event('selectionchange'));
+      });
+      await expect(guide).toHaveCount(0);
+      await expect(reader.locator('..').locator('[data-teleprompter-fade]')).toHaveCount(0);
+      await reader.evaluate((node) => {
+        node.ownerDocument.getSelection()?.removeAllRanges();
+        node.ownerDocument.dispatchEvent(new Event('selectionchange'));
+      });
+      await expect(guide.locator('svg')).toBeVisible();
+
+      const controlInset = await page
+        .locator('[data-ui="camera-recorder.controls"]')
+        .evaluate((node) => {
+          const style = getComputedStyle(node);
+          return (
+            innerWidth -
+            (node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight))
+          );
+        });
+      const controlBreakpoint = Math.round(controlInset) + 600;
+      const headerInset = await page
+        .locator('.camera-teleprompter-header')
+        .evaluate((node) => innerWidth - node.clientWidth);
+      const headerBreakpoints = [400, 500, 650].map((width) => Math.round(headerInset) + width);
+      const captureSizes = [
+        { width: 1280, height: 560 },
+        { width: 1920, height: 900 },
+        { width: 480, height: 640 },
+        { width: 375, height: 640 },
+        ...[
+          controlBreakpoint - 1,
+          controlBreakpoint,
+          controlBreakpoint + 1,
+          ...headerBreakpoints.flatMap((width) => [width - 1, width, width + 1]),
+        ].map((width) => ({
+          width,
+          height: 560,
+        })),
+      ];
+      for (const { size, theme, captureSettings } of [
+        ...captureSizes.map((size) => ({
+          size,
+          theme: 'dark',
+          captureSettings: [1280, 375].includes(size.width),
+        })),
+        ...captureSizes
+          .filter((size) => [1280, 1920, 375].includes(size.width))
+          .map((size) => ({
+            size,
+            theme: 'light',
+            captureSettings: true,
+          })),
+      ]) {
+        await page.evaluate(async (value) => {
+          await chrome.storage.local.set({ 'sniptale-theme-preference': value });
+          localStorage.setItem('sniptale-theme-preference', value);
+        }, theme);
+        await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+        const suffix = theme === 'light' ? '-light' : '';
+        await page.setViewportSize(size);
+        await command(page, c, 'popup.video.teleprompterReset').click();
+        await expect(reader).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true
+        );
+        for (const key of [
+          'popup.video.teleprompterPlay',
+          'popup.video.teleprompterReset',
+          'popup.video.stopButton',
+        ] as const) {
+          const control = command(page, c, key);
+          await control.scrollIntoViewIfNeeded();
+          const box = await control.boundingBox();
+          expect(box).not.toBeNull();
+          expect(box!.x).toBeGreaterThanOrEqual(0);
+          expect(box!.y).toBeGreaterThanOrEqual(0);
+          expect(box!.x + box!.width).toBeLessThanOrEqual(size.width + 1);
+          expect(box!.y + box!.height).toBeLessThanOrEqual(size.height + 1);
+        }
+        const scriptPanel = page.getByRole('region', {
+          name: tr(c, 'popup.video.teleprompterTitle'),
+          exact: true,
+        });
+        await expect(scriptPanel.getByRole('heading')).toHaveCount(0);
+        const header = scriptPanel.locator('.camera-teleprompter-header');
+        for (const key of [
+          'popup.video.teleprompterPlay',
+          'popup.video.teleprompterReset',
+          'popup.video.teleprompterEdit',
+          'popup.video.teleprompterSettings',
+        ] as const) {
+          await expect(header.getByRole('button', { name: tr(c, key), exact: true })).toBeVisible();
+        }
+        const headerWidth = await header.evaluate((node) => node.clientWidth);
+        const resetLabel = command(page, c, 'popup.video.teleprompterReset').locator(
+          '.camera-recording-command-label'
+        );
+        if (headerWidth <= 649) await expect(resetLabel).toBeHidden();
+        else await expect(resetLabel).toBeVisible();
+        const editLabel = command(page, c, 'popup.video.teleprompterEdit').locator(
+          '.camera-recording-command-label'
+        );
+        if (headerWidth <= 399) await expect(editLabel).toBeHidden();
+        else await expect(editLabel).toBeVisible();
+        const scriptBox = await scriptPanel.boundingBox();
+        const detailsBox = await page.locator('[data-ui="camera-recorder.controls"]').boundingBox();
+        expect(scriptBox).not.toBeNull();
+        expect(detailsBox).not.toBeNull();
+        expect(detailsBox!.height).toBeLessThanOrEqual(64);
+        const micBox = await command(page, c, 'popup.video.activeMicrophoneMute').boundingBox();
+        const stopBox = await command(page, c, 'popup.video.stopButton').boundingBox();
+        expect(Math.abs(micBox!.y - stopBox!.y)).toBeLessThanOrEqual(1);
+        expect(scriptBox!.y + scriptBox!.height).toBeLessThanOrEqual(detailsBox!.y + 1);
+        const playBounds = await scrollStart(page, c).boundingBox();
+        expect(playBounds!.width).toBeLessThanOrEqual(180);
+        await playbackLabel(page, c, 'popup.video.teleprompterPlay');
+        await expect(page.getByRole('slider')).toHaveCount(0);
+        await capture(page, info, `teleprompter${suffix}-${size.width}x${size.height}`);
+        await command(page, c, 'popup.video.teleprompterSettings').click();
+        const settingsSlider = page.getByRole('slider', {
+          name: tr(c, 'popup.video.teleprompterSpeed'),
+          exact: true,
+        });
+        await expect(settingsSlider).toBeVisible();
+        await expect(settingsSlider).toHaveValue('300');
+        const settingsBounds = await settingsSlider.boundingBox();
+        expect(settingsBounds!.width).toBeLessThanOrEqual(280);
+        expect(settingsBounds!.x).toBeGreaterThanOrEqual(0);
+        expect(settingsBounds!.x + settingsBounds!.width).toBeLessThanOrEqual(size.width);
+        if (captureSettings)
+          await capture(page, info, `teleprompter-settings${suffix}-${size.width}x${size.height}`);
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('slider')).toHaveCount(0);
+      }
+      await page.evaluate(async () => {
+        await chrome.storage.local.set({ 'sniptale-theme-preference': 'dark' });
+        localStorage.setItem('sniptale-theme-preference', 'dark');
+      });
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+      await page.setViewportSize({ width: 1280, height: 560 });
+      const floating = command(page, c, 'popup.video.teleprompterFloat');
+      if (await page.evaluate(() => 'documentPictureInPicture' in window)) {
+        const [pip] = await Promise.all([context.waitForEvent('page'), floating.click()]);
+        await pip.setViewportSize({ width: 480, height: 640 });
+        const floatingReader = pip.getByRole('region', {
+          name: tr(c, 'popup.video.teleprompterScript'),
+          exact: true,
+        });
+        await expect(floatingReader).toContainText('Final line added after reading.');
+        await command(pip, c, 'popup.video.teleprompterPlay').click();
+        await expect
+          .poll(() => floatingReader.evaluate((node) => node.scrollTop))
+          .toBeGreaterThan(0);
+        await playbackLabel(pip, c, 'popup.video.teleprompterPause');
+        await command(pip, c, 'popup.video.teleprompterPause').click();
+        await playbackLabel(pip, c, 'popup.video.teleprompterResume');
+        await capture(pip, info, 'teleprompter-floating-480x640');
+        await command(pip, c, 'popup.video.teleprompterSettings').click();
+        await expect(pip.getByRole('slider')).toHaveCount(3);
+        await capture(pip, info, 'teleprompter-floating-settings-480x640');
+        await pip.keyboard.press('Escape');
+        await expect(pip.getByRole('slider')).toHaveCount(0);
+        await pip.close();
+        await expect(reader).toContainText('Final line added after reading.');
+        await expect(floating).toBeEnabled();
+        await command(page, c, 'popup.video.teleprompterEdit').click();
+        await expect(editor).toHaveValue(`${script}\nFinal line added after reading.`);
+        await capture(page, info, 'teleprompter-restored-after-floating-close');
+      } else {
+        await expect(floating).toBeDisabled();
+      }
+      await savedResult(page, c, info);
+    });
+  });
+}
+
+test(
+  'native Camera teleprompter automatic playback ' +
+    'reuses the prepared script for each recording',
+  async ({}, info) => {
+    const c = { locale: 'en', theme: 'dark' } as const;
+    await withBrowser(c, info, async (context, extensionId, origin) => {
+      const script = Array.from(
+        { length: 60 },
+        (_, index) => `Prepared line ${index + 1}: Speak naturally while looking toward the camera.`
+      ).join('\n');
+      let preparedOrigin = 0;
+      const page = await launchCamera(context, extensionId, origin, c, async (popup) => {
+        const toggle = command(popup, c, 'popup.video.teleprompterLabel');
+        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+        await toggle.click();
+        await expect
+          .poll(() =>
+            context.pages().some((candidate) => new URL(candidate.url()).pathname === CAMERA_ROUTE)
+          )
+          .toBe(true);
+        const draft = context
+          .pages()
+          .find((candidate) => new URL(candidate.url()).pathname === CAMERA_ROUTE);
+        if (!draft) throw new Error('Draft teleprompter did not open');
+        await expect(command(draft, c, 'popup.video.stopButton')).toBeDisabled();
+        await draft
+          .getByRole('textbox', { name: tr(c, 'popup.video.teleprompterScript') })
+          .fill(script);
+        await command(draft, c, 'popup.video.teleprompterSettings').click();
+        await draft
+          .getByRole('button', {
+            name: tr(c, 'popup.video.teleprompterWithRecording'),
+            exact: true,
+          })
+          .click();
+        await draft.keyboard.press('Escape');
+        await command(draft, c, 'popup.video.teleprompterRead').click();
+        await expect(
+          draft.getByRole('region', { name: tr(c, 'popup.video.teleprompterScript'), exact: true })
+        ).toBeVisible();
+        await scrollStart(draft, c).click();
+        await expect
+          .poll(() =>
+            draft
+              .getByRole('region', { name: tr(c, 'popup.video.teleprompterScript'), exact: true })
+              .evaluate((node) => node.scrollTop)
+          )
+          .toBeGreaterThan(12);
+        preparedOrigin = await draft.evaluate(() => performance.timeOrigin);
+      });
+      expect(await page.evaluate(() => performance.timeOrigin)).toBe(preparedOrigin);
+      const reader = page.getByRole('region', {
+        name: tr(c, 'popup.video.teleprompterScript'),
+        exact: true,
+      });
+      await expect(reader).toHaveText(script);
+      await expect(command(page, c, 'popup.video.teleprompterPause')).toBeEnabled();
+      await expect.poll(() => reader.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await command(page, c, 'popup.video.pauseButton').click();
+      await expect(scrollStart(page, c)).toBeDisabled();
+      await command(page, c, 'popup.video.resumeButton').click();
+      await expect(command(page, c, 'popup.video.teleprompterPause')).toBeEnabled();
+      await page.setViewportSize({ width: 1920, height: 900 });
+      await scrollStart(page, c).click();
+      await expect(command(page, c, 'popup.video.teleprompterPause')).toBeEnabled();
+      await command(page, c, 'popup.video.teleprompterPause').click();
+      await capture(page, info, 'automatic-layout-1920x900');
+      const column = reader.locator('[data-teleprompter-column]');
+      const columnBox = await column.boundingBox();
+      const readerBox = await reader.boundingBox();
+      expect(columnBox!.width).toBeLessThan(readerBox!.width * 0.8);
+      await command(page, c, 'popup.video.teleprompterSettings').click();
+      await page
+        .getByRole('slider', { name: tr(c, 'popup.video.teleprompterColumnWidth') })
+        .press('Home');
+      await page.getByRole('switch', { name: tr(c, 'popup.video.teleprompterFocusGuide') }).click();
+      await page.keyboard.press('Escape');
+      await expect(reader.locator('..').locator('[data-teleprompter-fade=bottom]')).toHaveCount(1);
+      await expect(reader.locator('..').locator('[data-teleprompter-guide]')).toHaveCount(1);
+      await capture(page, info, 'manual-column-and-guide');
+      await command(page, c, 'popup.video.teleprompterSettings').click();
+      await command(page, c, 'popup.video.teleprompterResetLayout').click();
+      await page.keyboard.press('Escape');
+      await command(page, c, 'popup.video.pauseButton').click();
+      await command(page, c, 'popup.video.teleprompterSettings').click();
+      await expect(page.locator('[popover]')).toBeVisible();
+      const externalPopup = await openRealPopup(context, extensionId);
+      await command(externalPopup, c, 'popup.video.stopButton').click();
+      await externalPopup.close();
+      await expect(command(page, c, 'popup.video.postRecordClose')).toBeEnabled({
+        timeout: 30_000,
+      });
+      await expect(page.locator('[popover]')).toHaveCount(0);
+      await command(page, c, 'popup.video.postRecordNext').click();
+      await expect(scrollStart(page, c)).toBeEnabled();
+      await command(page, c, 'popup.video.teleprompterEdit').click();
+      await expect(
+        page.getByRole('textbox', { name: tr(c, 'popup.video.teleprompterScript') })
+      ).toHaveValue(script);
+      const second = await launchCamera(context, extensionId, origin, c, undefined, true);
+      expect(second).toBe(page);
+      expect(await second.evaluate(() => performance.timeOrigin)).toBe(preparedOrigin);
+      await expect(reader).toHaveText(script);
+      await expect(command(second, c, 'popup.video.teleprompterPause')).toBeEnabled();
+      await expect.poll(() => reader.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      expect(
+        context.pages().filter((candidate) => new URL(candidate.url()).pathname === CAMERA_ROUTE)
+      ).toHaveLength(1);
+      await savedResult(second, c, info);
+    });
+  }
+);
+
+test('native TAB retains teleprompter across popup reopen and admits the prepared companion', async ({}, info) => {
+  const c = { locale: 'en', theme: 'dark' } as const;
+  await withBrowser(
+    c,
+    info,
+    async (context, extensionId, origin) => {
+      const target = await context.newPage();
+      await target.setViewportSize({ width: 1280, height: 560 });
+      await target.goto(`${origin}/fixtures/host-page.html`);
+      let popup = await openRealPopup(context, extensionId);
+      await popup.evaluate(
+        async (settings) => {
+          await chrome.storage.local.set({ sniptale_video_settings: settings });
+        },
+        {
+          ...DEFAULT_VIDEO_SETTINGS,
+          microphoneEnabled: false,
+          webcamEnabled: false,
+          systemAudioEnabled: false,
+          warnWithoutMicrophone: false,
+          countdownSeconds: 0,
+        }
+      );
+      await popup.reload();
+      await popup.locator('[data-ui="popup.app.tabs"] button[data-page="video"]').click();
+      await expect(command(popup, c, 'popup.video.modeTabLabel')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      const toggle = command(popup, c, 'popup.video.teleprompterLabel');
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await toggle.click();
+      await expect
+        .poll(() => context.pages().some((page) => new URL(page.url()).pathname === CAMERA_ROUTE))
+        .toBe(true);
+      const companion = context
+        .pages()
+        .find((page) => new URL(page.url()).pathname === CAMERA_ROUTE);
+      if (!companion) throw new Error('TAB teleprompter draft did not open');
+      const editor = companion.getByRole('textbox', {
+        name: tr(c, 'popup.video.teleprompterScript'),
+      });
+      const script = 'A prepared script for a silent tab recording.';
+      await editor.fill(script);
+      const timeOrigin = await companion.evaluate(() => performance.timeOrigin);
+      await expect(command(companion, c, 'popup.video.stopButton')).toBeDisabled();
+      await expect
+        .poll(() =>
+          popup.evaluate(
+            async () =>
+              (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
+                ?.teleprompterEnabled
+          )
+        )
+        .toBe(true);
+      await popup.close();
+      popup = await openRealPopup(context, extensionId);
+      await popup.locator('[data-ui="popup.app.tabs"] button[data-page="video"]').click();
+      await expect(command(popup, c, 'popup.video.teleprompterLabel')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await expect(command(popup, c, 'popup.video.modeTabLabel')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await popup.close();
+      await target.bringToFront();
+      const action = await triggerExtensionAction(context, extensionId, target);
+      await expect
+        .poll(() =>
+          evaluateInTarget(
+            context,
+            action,
+            `Boolean(document.querySelector('[data-ui="popup.video.teleprompter-toggle"][aria-pressed="true"]'))`
+          )
+        )
+        .toBe(true);
+      await clickNativeStart(context, action);
+      await expect(command(companion, c, 'popup.video.pauseButton')).toBeEnabled();
+      await expect(command(companion, c, 'popup.video.stopButton')).toBeEnabled();
+      await expect(companion.getByRole('status')).toHaveText(tr(c, 'popup.labels.statusRecording'));
+      expect(await companion.evaluate(() => performance.timeOrigin)).toBe(timeOrigin);
+      expect(await companion.evaluate(() => location.search + location.hash)).toBe('');
+      expect(
+        context.pages().filter((page) => new URL(page.url()).pathname === CAMERA_ROUTE)
+      ).toHaveLength(1);
+      await expect(editor).toHaveValue(script);
+      await expect(companion.locator('video')).toHaveCount(0);
+      await command(companion, c, 'popup.video.pauseButton').click();
+      await expect(command(companion, c, 'popup.video.resumeButton')).toBeEnabled();
+      await command(companion, c, 'popup.video.resumeButton').click();
+      await expect(command(companion, c, 'popup.video.pauseButton')).toBeEnabled();
+      await capture(companion, info, 'tab-teleprompter-retained-and-admitted');
+      await savedResult(companion, c, info);
+    },
+    { fakeMediaDevices: false }
+  );
 });

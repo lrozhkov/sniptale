@@ -28,7 +28,7 @@ const actions: DesignReviewActions = {
   setSideFieldLinked: vi.fn(),
   updateValue: vi.fn(),
   updateValues: vi.fn(),
-  voice: { start: vi.fn(), stop: vi.fn() },
+  voice: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
 };
 
 afterEach(() => {
@@ -53,6 +53,7 @@ it('keeps direct appearance controls and omits background asset and gradient inp
     values: { 'background-color': '#ffffff', 'box-shadow': 'none' },
     voice: {
       active: false,
+      pending: false,
       audioLevel: 0,
       caretPosition: null,
       errorCode: null,
@@ -96,6 +97,7 @@ it('applies a selected background color from the picker', () => {
           values: { 'background-color': '#ffffff' },
           voice: {
             active: false,
+            pending: false,
             audioLevel: 0,
             caretPosition: null,
             errorCode: null,

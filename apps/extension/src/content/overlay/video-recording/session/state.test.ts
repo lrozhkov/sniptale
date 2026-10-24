@@ -201,3 +201,38 @@ it('does not carry preview suppression into a replacement surface session', () =
   expect(next.cameraPreviewSuppressed).toBe(false);
   expect(next.surfaceSessionId).toBe('surface-2');
 });
+
+it('keeps accepted output setup in the same surface and clears it when the surface changes', () => {
+  const outputSettings = {
+    outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
+    qualityProfileId: 'builtin:compact',
+    qualityProfiles: [],
+  };
+  const cropRegion = { x: 80, y: 40, width: 400, height: 240 };
+  const configured = reduceVideoRecordingToolbarState(INITIAL_VIDEO_RECORDING_TOOLBAR_STATE, {
+    type: 'snapshot',
+    snapshot: {
+      ...snapshot(VideoRecordingStatus.RECORDING, 'recording-1'),
+      outputSettings,
+      captureMode: 'TAB_CROP',
+      cropRegion,
+    },
+    surfaceToken: 'token-1',
+    error: null,
+  });
+  expect(configured).toMatchObject({ outputSettings, captureMode: 'TAB_CROP', cropRegion });
+  const idle = reduceVideoRecordingToolbarState(configured, {
+    type: 'snapshot',
+    snapshot: snapshot(VideoRecordingStatus.IDLE),
+    surfaceToken: 'token-1',
+    error: null,
+  });
+  expect(idle).toMatchObject({ outputSettings, captureMode: null, cropRegion: null });
+  const replaced = reduceVideoRecordingToolbarState(idle, {
+    type: 'snapshot',
+    snapshot: { ...snapshot(VideoRecordingStatus.IDLE), surfaceSessionId: 'surface-2' },
+    surfaceToken: 'token-2',
+    error: null,
+  });
+  expect(replaced.outputSettings).toBeNull();
+});

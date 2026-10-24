@@ -32,6 +32,7 @@ it('adds only an empty scenario history store before publishing the current cont
     [SCENARIO_PROJECT_UNITS_STORE, { keyPath: ['projectId', 'unitId', 'revision'] }],
     [RECORDING_RECOVERY_SESSIONS_STORE, { keyPath: 'id' }],
     [RECORDING_RECOVERY_BLOCKS_STORE, { keyPath: ['id', 'index'] }],
+    ['voice_input_history', { keyPath: 'id' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],

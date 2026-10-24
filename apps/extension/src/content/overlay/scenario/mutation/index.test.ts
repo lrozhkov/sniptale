@@ -57,7 +57,6 @@ vi.mock('../../screenshot/bridge', async (importOriginal) => ({
 }));
 
 import {
-  applyScenarioCaptureAction,
   applyScenarioCaptureMode,
   applyScenarioDeleteRecentStep,
   applyScenarioEnabledState,
@@ -88,28 +87,6 @@ function resetScenarioActionMocks() {
   });
   transportMocks.deleteScenarioStepMock.mockResolvedValue({ success: true });
   transportMocks.moveScenarioStepMock.mockResolvedValue({ success: true });
-}
-
-async function expectCaptureActionRouting() {
-  const applyScenarioResponse = vi.fn();
-
-  await applyScenarioCaptureAction({
-    actionType: 'scenario',
-    applyScenarioResponse,
-    currentSurface: {
-      captureAction: 'download_default',
-      screenshotMode: false,
-      toolbarVisible: false,
-    },
-  });
-
-  expect(transportMocks.updateScenarioSurfaceStateMock).toHaveBeenCalledWith({
-    captureAction: 'scenario',
-    screenshotMode: true,
-    toolbarVisible: true,
-  });
-  expect(transportMocks.setScenarioEnabledMock).toHaveBeenCalledWith(true);
-  expect(applyScenarioResponse).toHaveBeenCalledTimes(2);
 }
 
 async function expectCaptureModeOptimismAndRollback() {
@@ -205,7 +182,7 @@ async function expectScreenshotModeDisableFlow() {
   });
 
   expect(transportMocks.updateScenarioSurfaceStateMock).toHaveBeenCalledWith({
-    captureAction: 'download_default',
+    captureAction: 'scenario',
     screenshotMode: false,
     toolbarVisible: false,
   });
@@ -260,10 +237,6 @@ async function expectProjectCreationSuccessAndFailure() {
 
 describe('useScenarioController.actions', () => {
   beforeEach(resetScenarioActionMocks);
-
-  it('routes capture action updates through the transport owner and applies both responses', async () => {
-    await expectCaptureActionRouting();
-  });
 
   it('handles capture-mode optimism, restore lock, and failed rollback', async () => {
     await expectCaptureModeOptimismAndRollback();

@@ -4,6 +4,8 @@ import { PickerModeLabelRow, PickerNumericInputField } from './picker-controls';
 
 type PickerChannelField = {
   ariaLabel: string;
+  prefix?: string | undefined;
+  unit?: string | undefined;
   max: number;
   onChange: (value: string) => void;
   value: number | string;
@@ -11,12 +13,14 @@ type PickerChannelField = {
 
 function PickerChannelFieldGrid(props: { fields: readonly PickerChannelField[] }) {
   return (
-    <div className="grid min-w-0 grid-cols-3 gap-1">
+    <div className="grid min-w-0 grid-cols-3 gap-2">
       {props.fields.map((field) => (
         <PickerNumericInputField
           key={field.ariaLabel}
           ariaLabel={field.ariaLabel}
           max={field.max}
+          prefix={field.prefix}
+          unit={field.unit}
           value={field.value}
           onChange={field.onChange}
         />
@@ -36,24 +40,27 @@ export function PickerRgbFields(props: {
   red: number | string;
 }) {
   return (
-    <div className="grid items-center gap-1 @min-[240px]/picker:grid-cols-[3.5rem_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-2">
       <PickerModeLabelRow mode={props.mode} onCycle={props.onCycle} />
       <PickerChannelFieldGrid
         fields={[
           {
             ariaLabel: translate('shared.ui.colorSelectorRed'),
+            unit: 'R',
             max: 255,
             value: props.red,
             onChange: props.onRedChange,
           },
           {
             ariaLabel: translate('shared.ui.colorSelectorGreen'),
+            unit: 'G',
             max: 255,
             value: props.green,
             onChange: props.onGreenChange,
           },
           {
             ariaLabel: translate('shared.ui.colorSelectorBlue'),
+            unit: 'B',
             max: 255,
             value: props.blue,
             onChange: props.onBlueChange,
@@ -75,24 +82,27 @@ export function PickerHslFields(props: {
   saturation: number | string;
 }) {
   return (
-    <div className="grid items-center gap-1 @min-[240px]/picker:grid-cols-[3.5rem_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-2">
       <PickerModeLabelRow mode={props.mode} onCycle={props.onCycle} />
       <PickerChannelFieldGrid
         fields={[
           {
             ariaLabel: translate('shared.ui.colorSelectorHue'),
+            unit: 'H°',
             max: 359,
             value: props.hue,
             onChange: props.onHueChange,
           },
           {
             ariaLabel: translate('shared.ui.colorSelectorSaturation'),
+            unit: 'S%',
             max: 100,
             value: props.saturation,
             onChange: props.onSaturationChange,
           },
           {
             ariaLabel: translate('shared.ui.colorSelectorLightness'),
+            unit: 'L%',
             max: 100,
             value: props.lightness,
             onChange: props.onLightnessChange,

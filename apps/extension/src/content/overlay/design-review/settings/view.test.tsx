@@ -28,7 +28,7 @@ const actions: DesignReviewActions = {
   setSideFieldLinked: vi.fn(),
   updateValue: vi.fn(),
   updateValues: vi.fn(),
-  voice: { start: vi.fn(), stop: vi.fn() },
+  voice: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
 };
 
 const state: DesignReviewViewState = {
@@ -53,6 +53,7 @@ const state: DesignReviewViewState = {
   values: { color: 'rgb(0, 0, 0)', height: '40px', width: '120px' },
   voice: {
     active: false,
+    pending: false,
     audioLevel: 0,
     caretPosition: null,
     errorCode: null,

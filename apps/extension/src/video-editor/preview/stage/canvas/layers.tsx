@@ -139,6 +139,7 @@ function PreviewStageInteractiveOverlays(params: Parameters<typeof PreviewStageO
         {...guideProps}
       />
       <PreviewStagePointOverlay
+        motionProject={params.motionProject}
         camera={params.camera}
         currentTime={params.currentTime}
         onClearPlacementMode={params.onClearPlacementMode}

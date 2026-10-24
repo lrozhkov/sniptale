@@ -21,6 +21,9 @@ vi.mock('../../../../../features/quick-actions-presets/catalog', async (importOr
     { value: 'copy', label: 'Copy', hint: 'Copy image' },
     { value: 'scenario', label: 'Scenario', hint: 'Add to scenario' },
     { value: 'edit', label: 'Edit', hint: 'Open editor' },
+    { value: 'ask_system', label: 'Save as', hint: 'Choose system folder' },
+    { value: 'ask_preset', label: 'Choose preset', hint: 'Choose preset folder' },
+    { value: 'save_to_library', label: 'Library', hint: 'Save to library' },
   ],
 }));
 
@@ -349,7 +352,7 @@ describe('selection-mode capture menu placement and density', () => {
     const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
     const below = top === 100;
     expect(menu?.classList).toContain('sniptale-content-menu-adopted');
-    expect(Number.parseFloat(menu?.style.top ?? '')).toBe(below ? top + 46 + 1 : top - 1 - 284);
+    expect(Number.parseFloat(menu?.style.top ?? '')).toBe(below ? top + 46 + 1 : top - 1 - 84);
     expect(trigger.dataset['menuSide']).toBe(below ? 'down' : 'up');
     expect(trigger.style.width).toBe('18px');
   });
@@ -412,6 +415,24 @@ describe('selection-mode capture action menu', () => {
       'content.toolbar.selectionCaptureActionTitle'
     );
     expect(menu?.querySelector('[data-ui$=".scenario"]')).toBeNull();
+    const row = menu?.querySelector('.sniptale-capture-action-icons');
+    const icons = Array.from(row?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+    expect(icons).toHaveLength(6);
+    expect(icons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Download',
+      'Copy',
+      'Edit',
+      'Save as',
+      'Choose preset',
+      'Library',
+    ]);
+    for (const button of icons) {
+      expect(button.title).toBe(button.getAttribute('aria-label'));
+      expect(button.classList).toContain('sniptale-capture-action-icon');
+      expect(button.querySelector('svg')).not.toBeNull();
+      expect(button.textContent).toBe('');
+    }
+
     const copyEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
     menu?.querySelector<HTMLButtonElement>('[data-ui$=".copy"]')?.dispatchEvent(copyEvent);
     document.removeEventListener('click', captureGuard, true);
@@ -509,22 +530,26 @@ describe('selection-mode capture action menu', () => {
     const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
     const items = Array.from(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
 
-    expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1]);
+    expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
     items[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
     expect(document.activeElement).toBe(items[1]);
     items[1]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End' }));
-    expect(document.activeElement).toBe(items[2]);
-    items[2]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Home' }));
+    expect(document.activeElement).toBe(items[5]);
+    items[5]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Home' }));
     expect(document.activeElement).toBe(items[0]);
     items[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp' }));
-    expect(document.activeElement).toBe(items[2]);
+    expect(document.activeElement).toBe(items[5]);
+    items[5]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+    expect(document.activeElement).toBe(items[0]);
+    items[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+    expect(document.activeElement).toBe(items[5]);
 
     const tabEvent = new KeyboardEvent('keydown', {
       bubbles: true,
       cancelable: true,
       key: 'Tab',
     });
-    items[2]?.dispatchEvent(tabEvent);
+    items[5]?.dispatchEvent(tabEvent);
     expect(tabEvent.defaultPrevented).toBe(false);
     expect(menu?.isConnected).toBe(false);
   });
@@ -577,11 +602,11 @@ describe('selection-mode capture action menu', () => {
 
     trigger.click();
     const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
-    expect(menu?.style.left).toBe('992px');
+    expect(menu?.style.left).toBe('1012px');
 
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 500 });
     window.dispatchEvent(new Event('resize'));
-    expect(menu?.style.left).toBe('212px');
+    expect(menu?.style.left).toBe('232px');
     expect(anchorRectSpy).toHaveBeenCalledTimes(2);
 
     trigger.click();

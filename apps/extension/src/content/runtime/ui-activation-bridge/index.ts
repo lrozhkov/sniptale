@@ -1,6 +1,6 @@
 import { scheduleDeferredActivation } from './deferred';
 import {
-  createBridgedMouseEvent,
+  dispatchBridgedMouseEvent,
   isBridgedMouseEvent,
 } from '../../platform/trusted-events/synthetic-mouse';
 import {
@@ -245,11 +245,11 @@ type BridgedActivation = {
 };
 
 function dispatchSyntheticActivation(target: Element, event: PointerEvent): void {
-  const shouldApplyFocus = target.dispatchEvent(createBridgedMouseEvent('mousedown', event));
+  const shouldApplyFocus = dispatchBridgedMouseEvent(target, 'mousedown', event);
   if (shouldApplyFocus && target instanceof HTMLElement && target.tabIndex >= 0) {
     target.focus({ preventScroll: true });
   }
-  target.dispatchEvent(createBridgedMouseEvent('click', event));
+  dispatchBridgedMouseEvent(target, 'click', event);
 }
 
 function shouldSuppressFollowUpEvent(

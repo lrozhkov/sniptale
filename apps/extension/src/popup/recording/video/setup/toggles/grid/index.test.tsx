@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const { openTeleprompterPageMock } = vi.hoisted(() => ({
+  openTeleprompterPageMock: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../../../../../platform/navigation/extension-pages', () => ({
+  openTeleprompterPage: openTeleprompterPageMock,
+}));
+
 vi.mock('../../../../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => `t:${key}`,
 }));
@@ -47,8 +54,8 @@ describe('video toggle grid view', () => {
       onSettingsChange,
     });
 
-    expect(element.props.className).toContain('grid-cols-5');
-    expect(element.props.children).toHaveLength(5);
+    expect(element.props.className).toContain('grid-cols-6');
+    expect(element.props.children).toHaveLength(6);
     expect(element.props.children[3].props.disabled).toBe(true);
     expect(element.props.children[4].props.disabled).toBe(true);
     expect(element.props.children[4].props.disabledReason).toBe('unsupported');
@@ -67,13 +74,13 @@ describe('video toggle grid view', () => {
 
     for (const captureMode of [CaptureMode.TAB, CaptureMode.TAB_CROP]) {
       const element = VideoToggleGrid({ ...sharedProps, captureMode });
-      expect(element.props.className).toContain('grid-cols-5');
-      expect(element.props.children).toHaveLength(5);
+      expect(element.props.className).toContain('grid-cols-6');
+      expect(element.props.children).toHaveLength(6);
       expect(element.props.children[3]).not.toBeNull();
     }
 
     const camera = VideoToggleGrid({ ...sharedProps, captureMode: CaptureMode.CAMERA });
-    expect(camera.props.className).toContain('grid-cols-5');
+    expect(camera.props.className).toContain('grid-cols-6');
     expect(camera.props.children[3].props.disabled).toBe(true);
   });
 
@@ -94,3 +101,30 @@ describe('video toggle grid view', () => {
     expect(element.props.children[1].props.disabled).toBe(true);
   });
 });
+
+it.each(Object.values(CaptureMode))(
+  'toggles the companion script for %s capture',
+  (captureMode) => {
+    openTeleprompterPageMock.mockClear();
+    const onSettingsChange = vi.fn();
+    const render = (teleprompterEnabled: boolean) =>
+      VideoToggleGrid({
+        captureMode,
+        settings: { ...createSettings(), teleprompterEnabled },
+        controlledCursorDisabled: false,
+        controlledCursorDisabledReason: null,
+        systemAudioDisabled: false,
+        onToggleMicrophone: vi.fn(),
+        onToggleWebcam: vi.fn(),
+        onSettingsChange,
+      });
+    const toggle = render(false).props.children[5];
+    expect(toggle.props.label).toBe('t:popup.video.teleprompterLabel');
+    expect(toggle.props.active).toBe(false);
+    toggle.props.onClick();
+    expect(onSettingsChange).toHaveBeenLastCalledWith({ teleprompterEnabled: true });
+    render(true).props.children[5].props.onClick();
+    expect(onSettingsChange).toHaveBeenLastCalledWith({ teleprompterEnabled: false });
+    expect(openTeleprompterPageMock).toHaveBeenCalledTimes(1);
+  }
+);

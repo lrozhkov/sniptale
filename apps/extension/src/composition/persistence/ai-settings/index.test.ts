@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const coreMocks = vi.hoisted(() => ({
   loadAudioTranscriptionSystemPrompt: vi.fn(),
+  loadVoiceInputCorrectionSystemPrompt: vi.fn(),
   loadAIModels: vi.fn(),
   loadAIProviders: vi.fn(),
   loadChromeAiEnabled: vi.fn(),
@@ -20,6 +21,7 @@ import { loadAISettings } from './index';
 beforeEach(() => {
   vi.clearAllMocks();
   coreMocks.loadAudioTranscriptionSystemPrompt.mockResolvedValue('Transcription prompt');
+  coreMocks.loadVoiceInputCorrectionSystemPrompt.mockResolvedValue('Voice correction prompt');
   coreMocks.loadAIProviders.mockResolvedValue([{ id: 'provider-1' }]);
   coreMocks.loadAIModels.mockResolvedValue([{ id: 'model-1' }]);
   coreMocks.loadDefaultModelId.mockResolvedValue('model-1');
@@ -37,6 +39,7 @@ it('aggregates every stored AI settings field without mutating storage', async (
     models: [{ id: 'model-1' }],
     providers: [{ id: 'provider-1' }],
     scenarioEditorSystemPrompt: 'Scenario prompt',
+    voiceInputCorrectionSystemPrompt: 'Voice correction prompt',
   });
   for (const loader of Object.values(coreMocks)) {
     expect(loader).toHaveBeenCalledOnce();

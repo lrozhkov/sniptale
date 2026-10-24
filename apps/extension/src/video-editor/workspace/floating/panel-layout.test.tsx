@@ -82,12 +82,12 @@ it('keeps a usable HD viewer when both panes expand and the viewport narrows', (
     frameWidth = 1920;
     measure();
   });
-  for (let index = 0; index < 12; index += 1) {
+  for (let index = 0; index < 20; index += 1) {
     key('materials', 'ArrowRight');
     key('inspector', 'ArrowLeft');
   }
   expect(width('materials')).toBe(360);
-  expect(width('inspector')).toBe(520);
+  expect(width('inspector')).toBe(800);
   act(() => {
     frameWidth = 1280;
     measure();

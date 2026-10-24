@@ -34,6 +34,22 @@ it('generates occurrences in selection order without copying media or changing s
   expect(first).toEqual(original);
   expect(result.issues).toEqual([]);
 });
+it('adds imported image slides without empty annotation actions', () => {
+  const result = generateTourFromMaterials(
+    [
+      { image, title: 'Image', description: '' },
+      { image, title: 'Whitespace', description: '  \n  ' },
+    ],
+    ids()
+  );
+  expect(result.tour.slides).toHaveLength(2);
+  for (const slide of result.tour.slides) {
+    expect(slide.kind).toBe('image');
+    if (slide.kind === 'image') expect(slide.actions).toEqual([]);
+  }
+  expect(result.issues).toEqual([]);
+});
+
 it('uses normalized video clicks and requires placement for edited video or key actions', () => {
   const source = {
     kind: 'video-frame',

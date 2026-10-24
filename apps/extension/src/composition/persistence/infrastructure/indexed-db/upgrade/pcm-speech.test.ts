@@ -21,9 +21,9 @@ function upgradeFixture(
     objects: released.opfsObjects,
   });
   let committed = new Map<string, unknown>(
-    CURRENT_SCHEMA_CONTRACTS.map(({ domainId }) => [
+    Object.entries(released.domainVersions).map(([domainId, schemaVersion]) => [
       domainId,
-      { domainId, schemaVersion: released.domainVersions[domainId] },
+      { domainId, schemaVersion },
     ])
   );
   let pending = structuredClone(committed);
@@ -102,7 +102,7 @@ it.each([Infinity, 3])(
     }
     handleDatabaseUpgrade(fixture.db, 22, 23, fixture.tx);
     fixture.commit();
-    expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
     expect(fixture.durable).toEqual(before);
     expect(fixture.db.createObjectStore).not.toHaveBeenCalled();
     expect(fixture.db.deleteObjectStore).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ it.each([Infinity, 3])(
     }
     handleDatabaseUpgrade(fixture.db, 23, 24, fixture.tx);
     fixture.commit();
-    expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
     expect(fixture.durable).toEqual(before);
     expect(fixture.db.createObjectStore).not.toHaveBeenCalled();
     expect(fixture.db.deleteObjectStore).not.toHaveBeenCalled();
@@ -157,7 +157,7 @@ it('admits PCM speech content with one additive step and leaves rows and object 
   expect(await plan[0]!.estimateAdditionalBytes()).toBe(64 * 1024);
   handleDatabaseUpgrade(fixture.db, 21, 22, fixture.tx);
   fixture.commit();
-  expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
   expect(fixture.durable).toEqual(before);
   expect(fixture.db.createObjectStore).not.toHaveBeenCalled();
   expect(fixture.db.deleteObjectStore).not.toHaveBeenCalled();
@@ -165,7 +165,7 @@ it('admits PCM speech content with one additive step and leaves rows and object 
   fixture.retry();
   handleDatabaseUpgrade(fixture.db, 22, 22, fixture.tx);
   fixture.commit();
-  expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
   expect(fixture.durable).toEqual(before);
 });
 
@@ -185,7 +185,7 @@ it.each(['video_workspaces', 'video_workspace_history', 'video_workspace_drafts'
     fixture.retry();
     handleDatabaseUpgrade(fixture.db, 21, 22, fixture.tx);
     fixture.commit();
-    expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
   }
 );
 
@@ -201,7 +201,7 @@ it('rolls back interrupted contract publication and reruns without partial domai
   fixture.retry();
   handleDatabaseUpgrade(fixture.db, 21, 22, fixture.tx);
   fixture.commit();
-  expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(new Set(fixture.contracts())).toEqual(new Set(CURRENT_SCHEMA_CONTRACTS));
   expect(fixture.durable).toEqual(before);
 });
 

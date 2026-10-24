@@ -101,7 +101,7 @@ function TourSlideCategories({
         },
         {
           id: 'objects',
-          icon: Crosshair,
+          icon: MousePointer2,
           label: t('scenario.editor.tourObjects'),
           categorized: true,
           headingControl: objectControl,
@@ -110,7 +110,7 @@ function TourSlideCategories({
     : [
         {
           id: 'content',
-          icon: Image,
+          icon: List,
           label: t('scenario.editor.tourAddNavigation'),
           categorized: true,
         },

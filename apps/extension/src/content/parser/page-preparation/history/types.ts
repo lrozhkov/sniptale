@@ -79,6 +79,9 @@ export type PagePreparationChangeScope =
   | 'design-review'
   | 'drawing';
 
+/** Independent navigation domains; page text and design share exact DOM targets. */
+export type PagePreparationHistoryDomain = 'annotation' | 'drawing' | 'page-editing';
+
 export type PagePreparationResetScope = PagePreparationChangeScope | 'all';
 
 export interface PagePreparationHistoryEntry {

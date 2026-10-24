@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import { projectWindowHeaderImages } from '../../../../features/video/composition/draw/window-header';
+
+vi.mock('../../../../features/video/composition/draw/window-header', () => ({
+  projectWindowHeaderImages: vi.fn(() => []),
+}));
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -10,7 +15,8 @@ import {
   VideoMediaFitMode,
   VideoProjectClipType,
 } from '../../../../features/video/project/types';
-import { PreviewStageVideoBank } from './video-bank';
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import { PreviewStageVideoBank, usePreviewStageImageBank } from './video-bank';
 import type { PreviewStageVideoRefs } from '../types';
 
 let container: HTMLDivElement | null = null;
@@ -56,6 +62,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
+  vi.mocked(projectWindowHeaderImages).mockReturnValue([]);
 });
 
 it('registers hidden preview videos with muted defaults for runtime-owned playback', async () => {
@@ -120,4 +127,74 @@ it('releases removed video sources without resetting players on ordinary frame u
     pause.mockRestore();
     load.mockRestore();
   }
+});
+
+it('keeps pending image requests across equivalent frame plans and ignores stale sources', () => {
+  const project = createEmptyVideoProject();
+  const requested: HTMLImageElement[] = [];
+  vi.stubGlobal('Image', function () {
+    const image = document.createElement('img');
+    if (requested.length > 10) throw new Error('Repeated image requests for unchanged frame');
+    requested.push(image);
+    return image;
+  });
+  const clip = { ...createVideoClip(), type: VideoProjectClipType.IMAGE };
+  let images: Record<string, HTMLImageElement> = {};
+  function Probe({ source }: { source: string }) {
+    images = usePreviewStageImageBank(project, [clip], { [clip.assetId]: source });
+    return null;
+  }
+  const render = (source: string) => act(() => root!.render(<Probe source={source} />));
+  render('blob:first');
+  render('blob:first');
+  expect(requested).toHaveLength(1);
+  render('blob:second');
+  expect(requested).toHaveLength(2);
+  act(() => requested[0]!.dispatchEvent(new Event('load')));
+  expect(images[clip.assetId]).toBeUndefined();
+  act(() => requested[1]!.dispatchEvent(new Event('load')));
+  expect(images[clip.assetId]).toBe(requested[1]);
+  render('blob:second');
+  expect(requested).toHaveLength(2);
+});
+
+it('retains a failed header image across equivalent frame renders', () => {
+  const project = createEmptyVideoProject();
+  vi.mocked(projectWindowHeaderImages).mockReturnValue([{ key: 'header', src: 'blob:header' }]);
+  const requested: HTMLImageElement[] = [];
+  vi.stubGlobal('Image', function () {
+    const image = document.createElement('img');
+    if (requested.length > 10) throw new Error('Repeated header request');
+    requested.push(image);
+    return image;
+  });
+  let images: Record<string, HTMLImageElement> = {};
+  let renders = 0;
+  function Probe() {
+    if (++renders > 20) throw new Error('Repeated image bank render');
+    images = usePreviewStageImageBank(project, [], {});
+    return null;
+  }
+  act(() => root!.render(<Probe />));
+  expect(requested).toHaveLength(1);
+  act(() => requested[0]!.dispatchEvent(new Event('error')));
+  const afterError = renders;
+  act(() => root!.render(<Probe />));
+  expect(renders).toBe(afterError + 1);
+  expect(images['header']).toBe(requested[0]);
+  expect(requested).toHaveLength(1);
+});
+
+it('does not schedule image state updates for equivalent empty frame plans', () => {
+  const project = createEmptyVideoProject();
+  let renders = 0;
+  function Probe() {
+    if (++renders > 20) throw new Error('Repeated empty bank render');
+    usePreviewStageImageBank(project, [], {});
+    return null;
+  }
+  act(() => root!.render(<Probe />));
+  const initial = renders;
+  act(() => root!.render(<Probe />));
+  expect(renders).toBe(initial + 1);
 });

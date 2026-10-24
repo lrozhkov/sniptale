@@ -217,8 +217,17 @@ export const contentToolbarModesMessages = defineMessageSource({
   },
   videoRecordingStart: { ru: 'Записать видео', en: 'Record video' },
   videoRecordingStartHint: {
-    ru: 'Начать запись с текущими настройками из раздела «Видео» во всплывающем окне',
-    en: 'Start recording with the current settings from the Video tab in the popup',
+    ru: 'Начать запись с выбранными настройками',
+    en: 'Start recording with the selected settings',
+  },
+  videoRecordingSetup: { ru: 'Настройки записи', en: 'Recording setup' },
+  videoRecordingQualityProfiles: { ru: 'Профили качества', en: 'Quality profiles' },
+  videoRecordingTarget: { ru: 'Область записи', en: 'Recording area' },
+  videoRecordingTargetTab: { ru: 'Вся вкладка', en: 'Full tab' },
+  videoRecordingTargetArea: { ru: 'Область', en: 'Area' },
+  videoRecordingTargetAreaHint: {
+    ru: 'После нажатия «Записать» выберите область и подтвердите начало записи.',
+    en: 'After you click Record, select an area and confirm to start recording.',
   },
   videoRecordingCancelStart: { ru: 'Отменить запуск', en: 'Cancel start' },
   videoRecordingPause: { ru: 'Пауза', en: 'Pause' },
@@ -400,6 +409,30 @@ export const contentToolbarModesMessages = defineMessageSource({
   highlighterEnable: {
     ru: 'Выбирайте элементы страницы и добавляйте к ним рамки, выноски и номера',
     en: 'Select page elements and add frames, callouts, and numbers to them',
+  },
+  undoDrawing: {
+    ru: 'Отменить действие рисования',
+    en: 'Undo drawing change',
+  },
+  redoDrawing: {
+    ru: 'Повторить действие рисования',
+    en: 'Redo drawing change',
+  },
+  undoAnnotation: {
+    ru: 'Отменить аннотацию',
+    en: 'Undo annotation change',
+  },
+  redoAnnotation: {
+    ru: 'Повторить аннотацию',
+    en: 'Redo annotation change',
+  },
+  undoPageEdit: {
+    ru: 'Отменить правку страницы: текст и дизайн',
+    en: 'Undo page change: text and design',
+  },
+  redoPageEdit: {
+    ru: 'Повторить правку страницы: текст и дизайн',
+    en: 'Redo page change: text and design',
   },
   clearPagePreparation: {
     ru: 'Сбросить всё',

@@ -1,4 +1,5 @@
 import {
+  VOICE_INPUT_HISTORY_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -142,6 +143,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, ASSET_REFS_STORE, 'assetId', ['createdAt']);
   createStore(db, ASSET_OWNERS_STORE, ['ownerKind', 'ownerId', 'role'], ['assetId']);
   createStore(db, ASSET_OPERATIONS_STORE, 'operationId', ['status', 'updatedAt']);
+  createStore(db, VOICE_INPUT_HISTORY_STORE, 'id');
   const contracts = db.createObjectStore(SCHEMA_CONTRACTS_STORE, { keyPath: 'domainId' });
   for (const contract of CURRENT_SCHEMA_CONTRACTS) contracts.put(contract);
 }

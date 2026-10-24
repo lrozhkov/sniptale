@@ -66,6 +66,11 @@ beforeEach(() => {
     selectedPosition: undefined,
     hidden: undefined,
     placement: camera.placement,
+    split: null,
+    setSplit: vi.fn((split) => {
+      editor.split = split;
+      render();
+    }),
     scene: source,
     crop: {
       zoom: camera.appearance.zoom,
@@ -189,6 +194,19 @@ it('edits camera placement, appearance and signed timing through inspector contr
   expect(editor.hide).toHaveBeenCalledWith({ start: 4, end: 6 });
   click('webcamDisable');
   expect(editor.remove).toHaveBeenCalledOnce();
+});
+
+it('selects a split pane and restores docked placement without rewriting its authored rectangle', async () => {
+  render = () => root.render(<ReviewWebcamInspector editor={editor} />);
+  act(render);
+  const dock = editor.placement;
+  await choose(label('webcamSplit'), label('webcamSplit_left'));
+  expect(editor.setSplit).toHaveBeenCalledWith('left');
+  expect(field(label('webcamPlacement'))).toBeNull();
+  await choose(label('webcamSplit'), label('webcamSplit_docked'));
+  expect(editor.setSplit).toHaveBeenCalledWith(null);
+  expect(editor.placement).toEqual(dock);
+  expect(field(label('webcamPlacement'))).not.toBeNull();
 });
 
 it('edits an authored position and respects neighboring time bounds and transition visibility', async () => {
@@ -324,6 +342,22 @@ it('cancels camera range drags on Escape, pointer cancellation and blur without 
 });
 
 it('binds preview resource recovery and canvas edits while hiding controls during export', () => {
+  let nextFrame = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+    frames.delete(id);
+  });
+  const flushFrame = () =>
+    act(() => {
+      const callbacks = [...frames.values()];
+      frames.clear();
+      callbacks.forEach((callback) => callback(0));
+    });
+
   const dispose = vi.fn();
   vi.mocked(mountReviewWebcamPreview).mockReset().mockReturnValue(dispose);
   const main = { current: document.createElement('video') };
@@ -356,6 +390,7 @@ it('binds preview resource recovery and canvas edits while hiding controls durin
   expect(args()[2]().placement).toEqual(editor.placement);
   pointer(field(label('webcamSettings')), 'pointerdown', 900);
   pointer(host.querySelector('[data-ui="gallery.videoReview.focusArea"]')!, 'pointermove', 800);
+  flushFrame();
   expect(args()[2]().placement!.x).toBeLessThan(editor.placement!.x);
   pointer(host.querySelector('[data-ui="gallery.videoReview.focusArea"]')!, 'pointerup', 800);
   expect(editor.place).toHaveBeenCalledTimes(2);

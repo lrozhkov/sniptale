@@ -53,26 +53,33 @@ export function TourTextField({
   onChange,
   disabled,
   singleLine = false,
+  headingOwnsLabel = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
   singleLine?: boolean;
+  headingOwnsLabel?: boolean;
 }) {
-  return (
+  const field = (
+    <GuideVoiceField
+      formControl
+      clearable
+      singleLine={singleLine}
+      aria-label={label}
+      value={value}
+      disabled={disabled}
+      rows={3}
+      maxLength={singleLine ? GUIDE_LIMITS.maxLabelLength : TOUR_LIMITS.maxTextLength}
+      onValueChange={onChange}
+    />
+  );
+  return headingOwnsLabel ? (
+    <div className="tour-heading-text-field">{field}</div>
+  ) : (
     <InspectorParameterRow label={label} stacked={!singleLine} valueMinimum={200}>
-      <GuideVoiceField
-        formControl
-        clearable
-        singleLine={singleLine}
-        aria-label={label}
-        value={value}
-        disabled={disabled}
-        rows={3}
-        maxLength={singleLine ? GUIDE_LIMITS.maxLabelLength : TOUR_LIMITS.maxTextLength}
-        onValueChange={onChange}
-      />
+      {field}
     </InspectorParameterRow>
   );
 }

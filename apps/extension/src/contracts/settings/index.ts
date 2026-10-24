@@ -94,6 +94,7 @@ export const PAGE_TOOLBAR_CONTROLS = [
   'after-capture',
   'capture-delay',
   'capture-size',
+  'scenario-panel',
   'drawing-pencil',
   'drawing-marker',
   'drawing-text',
@@ -256,6 +257,7 @@ export interface AISettings {
   globalSystemPrompt: string;
   scenarioEditorSystemPrompt: string;
   audioTranscriptionSystemPrompt?: string;
+  voiceInputCorrectionSystemPrompt?: string;
 }
 
 export interface PromptTemplate {

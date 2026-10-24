@@ -1,6 +1,95 @@
 import { defineMessageSource } from '../source';
 
 export const settingsVoiceInputMessages = defineMessageSource({
+  historyRetryModel: { ru: 'Модель для сохранённого аудио', en: 'Saved audio recognition model' },
+  reloadModels: { ru: 'Загрузить настройки заново', en: 'Reload model settings' },
+  historyRetryUnavailable: {
+    ru: 'Для повторного распознавания сохранённого аудио выберите модель распознавания.',
+    en: 'Choose a speech recognition model to transcribe saved audio again.',
+  },
+  historyCorrectionFailed: {
+    ru: 'Коррекция не завершилась. Сохранён исходный текст.',
+    en: 'Correction failed. The original text was kept.',
+  },
+  backendLabel: { ru: 'Распознавание', en: 'Recognition' },
+  backendBrowser: { ru: 'Chrome', en: 'Chrome' },
+  backendOff: { ru: 'Выключено', en: 'Off' },
+  backendModel: { ru: 'Своя AI-модель', en: 'Custom AI model' },
+  transcriptionModel: { ru: 'Модель распознавания', en: 'Speech recognition model' },
+  correctionLabel: { ru: 'Коррекция текста', en: 'Correct dictated text' },
+  correctionModel: { ru: 'Модель коррекции', en: 'Text correction model' },
+  correctionPrompt: { ru: 'Инструкция для коррекции', en: 'Correction instructions' },
+  correctionPromptPlaceholder: {
+    ru: 'Укажите, как исправлять распознанный текст',
+    en: 'Describe how to correct the recognized text',
+  },
+  savePrompt: { ru: 'Сохранить инструкцию', en: 'Save instructions' },
+  resetPrompt: { ru: 'Вернуть стандартную инструкцию', en: 'Restore default instructions' },
+  modelsError: {
+    ru: 'Не удалось загрузить или сохранить настройки модели. Повторите попытку.',
+    en: 'Could not load or save model settings. Try again.',
+  },
+  audioDisclosure: {
+    ru: 'Аудио отправляется выбранному провайдеру после остановки записи.',
+    en: 'Audio is sent to the selected provider after capture stops.',
+  },
+  textDisclosure: {
+    ru: 'Распознанный текст отправляется выбранной модели. При ошибке сохранится исходный текст.',
+    en: 'Recognized text is sent to the selected model. If correction fails, the original text is kept.',
+  },
+  managePermissions: {
+    ru: 'Управление разрешениями провайдеров',
+    en: 'Manage provider permissions',
+  },
+  cancel: { ru: 'Отменить ввод', en: 'Cancel dictation' },
+  phaseProcessingAsr: { ru: 'Распознавание аудио', en: 'Transcribing audio' },
+  phaseProcessingText: { ru: 'Коррекция текста', en: 'Correcting text' },
+  phaseProcessingAsrDescription: {
+    ru: 'Микрофон освобождён. Ожидаем результат выбранной модели.',
+    en: 'The microphone is released. Waiting for the selected model.',
+  },
+  phaseProcessingTextDescription: {
+    ru: 'Микрофон освобождён. Исправляем распознанный текст.',
+    en: 'The microphone is released. Correcting the recognized text.',
+  },
+  effectiveModel: { ru: 'Выбранная модель распознавания', en: 'Selected speech recognition model' },
+  errorModel: {
+    ru: 'Выберите доступную модель и проверьте разрешения провайдера.',
+    en: 'Select an available model and check its provider permissions.',
+  },
+  errorProvider: {
+    ru: 'Провайдер не завершил обработку. Аудио доступно в истории для повтора.',
+    en: 'The provider could not finish processing. Retry the saved audio from history.',
+  },
+  historyTitle: { ru: 'История голосового ввода', en: 'Voice history' },
+  historyDescription: {
+    ru: 'Последние 20 аудиозаписей хранятся только в этом браузере.',
+    en: 'The last 20 audio recordings are stored only in this browser.',
+  },
+  historyEmpty: { ru: 'История пока пуста', en: 'No voice history yet' },
+  historyLoading: { ru: 'Загрузка истории…', en: 'Loading history…' },
+  historyRefresh: { ru: 'Обновить историю', en: 'Refresh history' },
+  historyPlay: { ru: 'Воспроизвести', en: 'Play' },
+  historyStop: { ru: 'Остановить воспроизведение', en: 'Stop playback' },
+  historyCopy: { ru: 'Копировать текст', en: 'Copy text' },
+  historyRetry: { ru: 'Распознать заново', en: 'Transcribe again' },
+  historyDelete: { ru: 'Удалить запись', en: 'Delete recording' },
+  historyDeleteConfirm: {
+    ru: 'Удалить аудио и текст без возможности восстановления?',
+    en: 'Permanently delete this audio and text?',
+  },
+  historyCancel: { ru: 'Отмена', en: 'Cancel' },
+  historyError: {
+    ru: 'Не удалось выполнить действие с историей. Сохранённые записи остаются доступны. Повторите попытку.',
+    en: 'The history action failed. Saved recordings remain available. Try again.',
+  },
+  historyCopied: { ru: 'Текст скопирован', en: 'Text copied' },
+  historyStatusRecorded: { ru: 'Сохранено аудио', en: 'Audio saved' },
+  historyStatusProcessing: { ru: 'Ожидает обработки', en: 'Awaiting processing' },
+  historyStatusReady: { ru: 'Готово', en: 'Ready' },
+  historyStatusFailed: { ru: 'Ошибка обработки', en: 'Processing failed' },
+  historyStatusCancelled: { ru: 'Ввод отменён', en: 'Dictation cancelled' },
+
   kicker: { ru: 'Речь и ввод', en: 'Speech and input' },
   title: { ru: 'Голосовой ввод', en: 'Voice input' },
   description: {
@@ -20,7 +109,7 @@ export const settingsVoiceInputMessages = defineMessageSource({
   modeLabel: { ru: 'Режим распознавания', en: 'Recognition mode' },
   modeLocalFirst: { ru: 'Сначала локально', en: 'Local first' },
   modeBrowserManaged: { ru: 'Управляется Chrome', en: 'Browser managed' },
-  testTitle: { ru: 'Тестовое поле', en: 'Test field' },
+  testTitle: { ru: 'Проверка микрофона', en: 'Microphone test' },
   testDescription: {
     ru: 'Короткое нажатие запускает ввод до 30 секунд. Удерживайте кнопку для push-to-talk и отпустите, чтобы остановить.',
     en: 'A short press starts input for up to 30 seconds. Hold for push-to-talk and release to stop.',
@@ -121,7 +210,10 @@ export const settingsVoiceInputMessages = defineMessageSource({
     en: 'Local start failed; using Chrome-managed mode',
   },
   signalLabel: { ru: 'Уровень микрофона', en: 'Microphone level' },
-  signalPrivacy: { ru: 'Аудио не сохраняется', en: 'Audio is not saved' },
+  signalPrivacy: {
+    ru: 'Аудио сохраняется в локальной истории голосового ввода',
+    en: 'Audio is saved in local voice history',
+  },
   signalIdle: { ru: 'Микрофон неактивен', en: 'Microphone idle' },
   signalListening: { ru: 'Ожидаю речь', en: 'Listening for speech' },
   signalDetected: { ru: 'Речь обнаружена', en: 'Voice detected' },
@@ -141,12 +233,12 @@ export const settingsVoiceInputMessages = defineMessageSource({
     en: 'This Chrome does not support the quality parameter',
   },
   localDisclosure: {
-    ru: 'При локальном режиме звук и распознанная речь обрабатываются на устройстве.',
-    en: 'In local mode, audio and recognized speech are processed on the device.',
+    ru: 'Локальное распознавание Chrome обрабатывает аудио на устройстве.',
+    en: 'Chrome local recognition processes audio on the device.',
   },
   browserDisclosure: {
-    ru: 'В режиме, управляемом Chrome, браузер сам выбирает локальную или серверную обработку. Расширение не использует API-ключ и платный API; квоты, SLA и серверный провайдер не гарантируются.',
-    en: 'In browser-managed mode, Chrome chooses local or server processing. The extension uses no API key or paid API; quotas, SLA, and server provider are not guaranteed.',
+    ru: 'В режиме, управляемом Chrome, браузер выбирает локальное или серверное распознавание.',
+    en: 'In browser-managed mode, Chrome chooses local or server recognition.',
   },
   permissionError: {
     ru: 'Разрешите доступ к микрофону в настройках Chrome.',

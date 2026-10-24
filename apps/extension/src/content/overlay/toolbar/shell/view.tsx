@@ -1,6 +1,7 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React from 'react';
 import { ToolbarDockingGuides } from './docking-guides';
+import { useRecordingCaptureVisibility } from './recording-capture-visibility';
 import { ContentToolbarDragHandle, ContentToolbarShell } from '@sniptale/ui/content-toolbar';
 import { ToolbarPrimaryControls } from '../controls/primary';
 import { ToolbarSecondaryControls } from '../controls/secondary';
@@ -73,14 +74,7 @@ function useCustomizationFocus(
   }, [editing, recording, toolbarRef, menuOpen]);
 }
 
-export function ToolbarShellContent(props: {
-  toolbarProps: ToolbarProps;
-  viewModel: ToolbarViewModel;
-  onHoverCapture: (event: React.MouseEvent<HTMLDivElement>) => void;
-  onViewportChange: (viewport: { width: number; height: number } | null) => void;
-}) {
-  const { toolbarProps, viewModel, onHoverCapture, onViewportChange } = props;
-  const { derivedState } = viewModel;
+function useToolbarDragGesture(derivedState: ToolbarViewModel['derivedState']) {
   const [hasDragged, setHasDragged] = React.useState(false);
   const dragFocus = React.useRef<{ positioner: HTMLElement; previous: HTMLElement | null } | null>(
     null
@@ -94,6 +88,35 @@ export function ToolbarShellContent(props: {
     if (previous?.isConnected && !previous.closest('[inert]'))
       previous.focus({ preventScroll: true });
   }, [derivedState.isDragging]);
+
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!derivedState.freePlacement) {
+      const positioner = event.currentTarget.closest<HTMLElement>('.sniptale-toolbar-positioner');
+      if (positioner) {
+        const root = positioner.getRootNode();
+        const focused = root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+        dragFocus.current = {
+          positioner,
+          previous: focused instanceof HTMLElement && focused !== positioner ? focused : null,
+        };
+        positioner.focus({ preventScroll: true });
+      }
+    }
+    setHasDragged(true);
+    derivedState.handleMouseDown(event);
+  };
+  return { hasDragged, onPointerDown };
+}
+
+export function ToolbarShellContent(props: {
+  toolbarProps: ToolbarProps;
+  viewModel: ToolbarViewModel;
+  onHoverCapture: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onViewportChange: (viewport: { width: number; height: number } | null) => void;
+}) {
+  const { toolbarProps, viewModel, onHoverCapture, onViewportChange } = props;
+  const { derivedState } = viewModel;
+  const dragGesture = useToolbarDragGesture(derivedState);
   const uiScale = useContentUiScale();
   const menuOpen = viewModel.toolbarMenuState.activeMenuType !== null;
   const pageControls = usePageToolbarControls(
@@ -114,6 +137,19 @@ export function ToolbarShellContent(props: {
       toolbarProps.videoRecording.state.phase !== 'error'
     )
   );
+  const fadeDuringRecording = Boolean(
+    toolbarProps.videoRecordingMode &&
+    recordingControls.ready &&
+    recordingControls.fadeDuringRecording &&
+    toolbarProps.videoRecording?.state.phase === 'recording'
+  );
+  const outsideRecordingCrop = useRecordingCaptureVisibility({
+    active: fadeDuringRecording,
+    captureMode: toolbarProps.videoRecording?.state.captureMode,
+    cropRegion: toolbarProps.videoRecording?.state.cropRegion,
+    positionReady: derivedState.positionReady,
+    toolbarRef: derivedState.toolbarRef,
+  });
   useToolbarEventDeliveryDiagnostics(derivedState.toolbarRef);
 
   return (
@@ -131,7 +167,7 @@ export function ToolbarShellContent(props: {
           className="sniptale-toolbar-positioner"
           tabIndex={-1}
           data-dragging={derivedState.isDragging ? 'true' : 'false'}
-          data-drag-started={hasDragged ? 'true' : undefined}
+          data-drag-started={dragGesture.hasDragged ? 'true' : undefined}
           style={getToolbarVisibilityStyle(
             derivedState.positionReady,
             derivedState.position,
@@ -161,40 +197,14 @@ export function ToolbarShellContent(props: {
               data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
               data-page-controls={toolbarProps.videoRecordingMode ? undefined : 'true'}
               data-recording-fade={
-                toolbarProps.videoRecordingMode &&
-                recordingControls.ready &&
-                recordingControls.fadeDuringRecording &&
-                toolbarProps.videoRecording?.state.phase === 'recording'
-                  ? 'true'
-                  : undefined
+                fadeDuringRecording && !outsideRecordingCrop ? 'true' : undefined
               }
               data-menu-open={menuOpen ? 'true' : undefined}
               onPointerDownCapture={blurPointerActivatedToolbarFocus}
               onMouseDownCapture={preventPointerActivatedToolbarFocus}
               onMouseOverCapture={onHoverCapture}
             >
-              <ContentToolbarDragHandle
-                onPointerDown={(event) => {
-                  if (!derivedState.freePlacement) {
-                    const positioner = event.currentTarget.closest<HTMLElement>(
-                      '.sniptale-toolbar-positioner'
-                    );
-                    if (positioner) {
-                      const root = positioner.getRootNode();
-                      const focused =
-                        root instanceof ShadowRoot ? root.activeElement : document.activeElement;
-                      dragFocus.current = {
-                        positioner,
-                        previous:
-                          focused instanceof HTMLElement && focused !== positioner ? focused : null,
-                      };
-                      positioner.focus({ preventScroll: true });
-                    }
-                  }
-                  setHasDragged(true);
-                  derivedState.handleMouseDown(event);
-                }}
-              >
+              <ContentToolbarDragHandle onPointerDown={dragGesture.onPointerDown}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
                   <circle cx="9" cy="12" r="1" />
                   <circle cx="9" cy="5" r="1" />

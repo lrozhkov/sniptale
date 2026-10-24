@@ -10,14 +10,26 @@ const harness = vi.hoisted(() => ({
     | null
     | ((event: Extract<VoiceInputServerEvent, { type: 'VOICE_INPUT_TRANSCRIPT' }>) => void),
   stop: vi.fn(),
+  cancel: vi.fn(),
+  pending: false,
   start: vi.fn(),
+}));
+vi.mock('../../composition/persistence/settings', () => ({
+  loadSettings: async () => ({ voiceInput: { enabled: true } }),
+  subscribeToVoiceInputPreferencesChanges: () => () => undefined,
 }));
 vi.mock('../../composition/voice-input/session', () => ({
   useVoiceInputSession: (args: { onTranscript: typeof harness.transcript }) => {
     harness.transcript = args.onTranscript;
     return {
-      state: { active: false, phase: 'idle', errorCode: null, audioLevel: 0 },
-      actions: { start: harness.start, stop: harness.stop },
+      state: {
+        active: false,
+        pending: harness.pending,
+        phase: 'idle',
+        errorCode: null,
+        audioLevel: 0,
+      },
+      actions: { start: harness.start, stop: harness.stop, cancel: harness.cancel },
     };
   },
 }));
@@ -74,10 +86,11 @@ it('inserts only final fragments once, preserves consecutive events, and rejects
   }
 });
 
-it('clears the review draft, stops dictation, and rejects a final transcript after Clear', () => {
+it('clears the review draft, stops dictation, and rejects a final transcript after Clear', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   harness.start.mockClear();
   harness.stop.mockClear();
+  harness.cancel.mockClear();
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -113,7 +126,7 @@ it('clears the review draft, stops dictation, and rejects a final transcript aft
       confidence: 1,
     });
   try {
-    act(() => root.render(<Harness />));
+    await act(async () => root.render(<Harness />));
     const field = host.querySelector<HTMLTextAreaElement>('textarea')!;
     field.setSelectionRange(field.value.length, field.value.length);
     act(() =>
@@ -130,7 +143,7 @@ it('clears the review draft, stops dictation, and rejects a final transcript aft
     act(() => emit(2, 'late final'));
     expect(field.value).toBe('');
     expect(document.activeElement).toBe(field);
-    expect(harness.stop).toHaveBeenCalledTimes(1);
+    expect(harness.cancel).toHaveBeenCalledTimes(2);
     act(() =>
       host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.voice"]')!.click()
     );
@@ -143,6 +156,52 @@ it('clears the review draft, stops dictation, and rejects a final transcript aft
   } finally {
     act(() => root.unmount());
     host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('preserves a pending review insertion after Stop and drops it on Cancel', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  harness.start.mockClear();
+  harness.cancel.mockClear();
+  let voice!: ReturnType<typeof useReviewVoice>;
+  let text = '';
+  const root = createRoot(document.createElement('div'));
+  function Harness() {
+    const [value, setValue] = useState('Draft ');
+    text = value;
+    voice = useReviewVoice({
+      annotation: { id: 'a', text: value, anchor: { kind: 'point', time: 0 } },
+      textarea: useRef(null),
+      onText: setValue,
+    });
+    return null;
+  }
+  const emit = (sequence: number, text: string) =>
+    harness.transcript?.({
+      type: 'VOICE_INPUT_TRANSCRIPT',
+      sessionId: 'session',
+      confidence: null,
+      isFinal: true,
+      sequence,
+      text,
+    });
+  try {
+    act(() => root.render(<Harness />));
+    act(() => voice.start());
+    act(() => voice.stop());
+    harness.pending = true;
+    act(() => root.render(<Harness />));
+    act(() => voice.start());
+    act(() => emit(1, 'final'));
+    expect(text).toBe('Draft final');
+    expect(harness.start).toHaveBeenCalledOnce();
+    act(() => voice.cancel());
+    act(() => emit(2, 'late'));
+    expect(text).toBe('Draft final');
+  } finally {
+    harness.pending = false;
+    act(() => root.unmount());
     vi.unstubAllGlobals();
   }
 });

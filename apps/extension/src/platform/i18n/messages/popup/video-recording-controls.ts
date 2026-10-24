@@ -156,6 +156,11 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     ru: 'Удалить',
     en: 'Delete',
   },
+  postRecordDeleteTitle: { ru: 'Удалить запись?', en: 'Delete recording?' },
+  postRecordDeleteMessage: {
+    ru: 'Сохранённая запись и связанный с ней видеопроект, если он есть, будут удалены.',
+    en: 'The saved recording and its video project, if present, will be deleted.',
+  },
   postRecordDeleteConfirm: {
     ru: 'Нажмите ещё раз для удаления',
     en: 'Click again to delete',

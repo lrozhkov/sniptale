@@ -5,11 +5,11 @@ import {
   moveQuickEditWebcamPosition,
   type QuickEditWebcamCrop,
   parseQuickEditWebcam,
-  quickEditWebcamPlacementAt,
   quickEditWebcamBounds,
   type QuickEditWebcam,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
+import type { CameraSplitSide } from '../../features/video/project/camera/split';
 import type { ReviewSelection } from '../../features/video/review/types';
 import {
   attachReviewWebcam,
@@ -38,6 +38,21 @@ export function removeReviewWebcamItem(
     ...camera,
     hiddenRanges: camera.hiddenRanges.filter((item) => item.id !== selection.id),
   };
+}
+
+function setReviewWebcamSplit(
+  camera: QuickEditWebcam,
+  positionId: string | undefined,
+  split: CameraSplitSide | null
+): QuickEditWebcam {
+  if (positionId)
+    return {
+      ...camera,
+      positions: camera.positions.map((position) =>
+        position.id === positionId ? { ...position, split } : position
+      ),
+    };
+  return split ? { ...camera, split } : { ...camera, split: undefined };
 }
 
 type WebcamEditorArgs = {
@@ -112,6 +127,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     selectedPosition,
     hidden,
     placement,
+    split: selectedPosition ? (selectedPosition.split ?? null) : (camera?.split ?? null),
     scene: args.scene,
     crop:
       selectedPosition?.crop ??
@@ -134,6 +150,8 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     patch: (patch: Partial<QuickEditWebcam>) => mutate((current) => ({ ...current, ...patch })),
     place: (placement: QuickEditWebcamPlacement) =>
       mutate((current) => frameReviewWebcam(current, selectedPosition?.id, { placement })),
+    setSplit: (split: CameraSplitSide | null) =>
+      mutate((current) => setReviewWebcamSplit(current, selectedPosition?.id, split)),
     addPosition: () => {
       if (!camera || !latest.current.allowed()) return;
       const time = Math.round(args.time * 1000) / 1000;
@@ -144,19 +162,23 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
         return;
       }
       const id = crypto.randomUUID();
-      mutate((current) => ({
-        ...current,
-        positions: [
-          ...current.positions,
-          {
-            id,
-            time,
-            placement: quickEditWebcamPlacementAt(current, time),
-            crop: quickEditWebcamCropAt(current, time),
-            transition: { type: 'ease-in-out' as const, duration: 0.5 },
-          },
-        ].sort((a, b) => a.time - b.time),
-      }));
+      mutate((current) => {
+        const previous = current.positions.findLast((item) => item.time <= time);
+        return {
+          ...current,
+          positions: [
+            ...current.positions,
+            {
+              id,
+              time,
+              placement: previous?.placement ?? current.placement,
+              split: previous ? (previous.split ?? null) : (current.split ?? null),
+              crop: quickEditWebcamCropAt(current, time),
+              transition: { type: 'ease-in-out' as const, duration: 0.5 },
+            },
+          ].sort((a, b) => a.time - b.time),
+        };
+      });
       choose({ kind: 'webcam-position', id });
     },
     navigate: (id: string | null) => {

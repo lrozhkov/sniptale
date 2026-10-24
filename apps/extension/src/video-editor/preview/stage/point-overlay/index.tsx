@@ -1,3 +1,4 @@
+import { useMotionFocusDrag } from './motion-focus-drag';
 import { PreviewCursorPathOverlay } from './cursor-path';
 import type React from 'react';
 
@@ -74,7 +75,8 @@ export function handleStagePointPlacement(
 }
 
 export function PreviewStagePointOverlay(params: PointOverlayParams) {
-  const point = getSelectedPoint(params);
+  const motionDrag = useMotionFocusDrag(params);
+  const point = motionDrag.point ?? getSelectedPoint(params);
   const pointTarget = getSelectedPointTarget(params);
   const placementHint = getPlacementHint(params.placementMode);
   const stage = params.stageRef.current;
@@ -98,6 +100,10 @@ export function PreviewStagePointOverlay(params: PointOverlayParams) {
               return;
             }
 
+            if (pointTarget.kind === 'motion-focus') {
+              motionDrag.begin(event);
+              return;
+            }
             beginPointHandleDrag({ ...params, event, point, target: pointTarget });
           }}
         />

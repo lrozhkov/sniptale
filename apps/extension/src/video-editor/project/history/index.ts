@@ -143,18 +143,21 @@ export function recordVideoEditorProjectHistory(
   }
 
   try {
-    return retainProjectHistory(
+    const before = { project: currentProject, selection };
+    const retained = retainProjectHistory(
       {
         projectId: currentProject.id,
-        past: [...history.past, structuredClone({ project: currentProject, selection })].slice(
-          -VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT
-        ),
+        past: [...history.past, before].slice(-VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT),
         future: [],
         error: null,
         transaction: null,
       },
       { project: nextProject, selection }
     );
+    if (retained.past.at(-1) === before) {
+      retained.past[retained.past.length - 1] = structuredClone(before);
+    }
+    return retained;
   } catch {
     return failedHistory(nextProject.id, 'snapshotFailed');
   }

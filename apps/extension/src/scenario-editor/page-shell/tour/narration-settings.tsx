@@ -1,4 +1,4 @@
-import { Mic, Unlink } from 'lucide-react';
+import { AudioLines, Unlink } from 'lucide-react';
 import type {
   TourAudioResource,
   TourNarration,
@@ -62,7 +62,7 @@ export function TourNarrationSettings({
     objectId ? 'scenario.editor.tourObjectNarration' : 'scenario.editor.tourSlideNarration'
   );
   return (
-    <GuideInspectorGroup id="narration" icon={Mic} title={title}>
+    <GuideInspectorGroup id="narration" icon={AudioLines} title={title}>
       {onGenerate && (
         <ScenarioInspectorActionButton
           disabled={importDisabled}

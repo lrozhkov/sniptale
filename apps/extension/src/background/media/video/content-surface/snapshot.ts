@@ -18,6 +18,13 @@ export function createVideoRecordingSurfaceSnapshot(
   const ownsRecording = lease.recordingId !== null;
   const liveMedia = ownsRecording ? state.liveMedia : null;
   return {
+    outputSettings: {
+      outputProfile: { ...settings.outputProfile },
+      qualityProfileId: settings.qualityProfileId ?? null,
+      qualityProfiles: settings.qualityProfiles ?? [],
+    },
+    captureMode: ownsRecording ? (state.captureMode ?? null) : null,
+    cropRegion: ownsRecording ? (state.cropRegion ?? null) : null,
     autoFadeDelay: VIDEO_AUTO_FADE_DELAYS.includes(settings.autoFadeDelay as VideoAutoFadeDelay)
       ? (settings.autoFadeDelay as VideoAutoFadeDelay)
       : 0,

@@ -23,7 +23,7 @@ const actions: DesignReviewActions = {
   setSettingsOpen: vi.fn(),
   updateValue: vi.fn(),
   updateValues: vi.fn(),
-  voice: { start: vi.fn(), stop: vi.fn() },
+  voice: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
 };
 
 it('gives long width values the whole available field row', () => {
@@ -39,7 +39,14 @@ it('gives long width values the whole available field row', () => {
     selection: null,
     settingsOpen: true,
     values: { width: '1234567px', height: '12345px' },
-    voice: { active: false, audioLevel: 0, caretPosition: null, errorCode: null, phase: 'idle' },
+    voice: {
+      active: false,
+      pending: false,
+      audioLevel: 0,
+      caretPosition: null,
+      errorCode: null,
+      phase: 'idle',
+    },
   };
   const root = document.createElement('div');
   root.innerHTML = renderToStaticMarkup(

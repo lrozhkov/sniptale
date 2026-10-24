@@ -1,4 +1,5 @@
 import { activeCameraPosition, updateCameraPositionVisual } from './animation';
+import { isCameraSplitSide } from './split';
 import type { VideoProjectTransform } from '../types/layout';
 import { applyVideoProjectClipsPatch } from '../mutation';
 import {
@@ -14,6 +15,10 @@ export const VideoProjectCameraLayout = {
   OVERLAY: 'OVERLAY',
   FULLFRAME: 'FULLFRAME',
   HIDDEN: 'HIDDEN',
+  SPLIT_LEFT: 'SPLIT_LEFT',
+  SPLIT_RIGHT: 'SPLIT_RIGHT',
+  SPLIT_TOP: 'SPLIT_TOP',
+  SPLIT_BOTTOM: 'SPLIT_BOTTOM',
 } as const;
 
 export type VideoProjectCameraLayout =
@@ -36,8 +41,12 @@ export function resolveVideoProjectCameraLayout(
   project: Pick<VideoProject, 'width' | 'height'>,
   clip: VideoProjectVideoClip
 ): VideoProjectCameraLayout {
+  if (clip.transform.opacity === 0) return VideoProjectCameraLayout.HIDDEN;
+  if (clip.cameraSplit === 'left') return VideoProjectCameraLayout.SPLIT_LEFT;
+  if (clip.cameraSplit === 'right') return VideoProjectCameraLayout.SPLIT_RIGHT;
+  if (clip.cameraSplit === 'top') return VideoProjectCameraLayout.SPLIT_TOP;
+  if (clip.cameraSplit === 'bottom') return VideoProjectCameraLayout.SPLIT_BOTTOM;
   const { transform } = clip;
-  if (transform.opacity === 0) return VideoProjectCameraLayout.HIDDEN;
   if (
     transform.x === 0 &&
     transform.y === 0 &&
@@ -55,7 +64,7 @@ export function applyVideoProjectCameraLayout(
   project: VideoProject,
   clipId: string,
   layout: VideoProjectCameraLayout,
-  placement: VideoProjectCameraPlacement = VideoProjectCameraPlacement.BOTTOM_RIGHT,
+  placement?: VideoProjectCameraPlacement,
   time: number = 0
 ): VideoProject {
   const clip = project.clips.find((item) => item.id === clipId);
@@ -68,14 +77,50 @@ export function applyVideoProjectCameraLayout(
   )
     return project;
 
+  if (layout.startsWith('SPLIT_')) {
+    const side = layout.slice('SPLIT_'.length).toLowerCase();
+    if (!isCameraSplitSide(side)) return project;
+    const active = activeCameraPosition(clip, time);
+    const updated = active
+      ? {
+          ...clip,
+          cameraPositions: clip.cameraPositions!.map((item) =>
+            item.id === active.id ? { ...item, cameraSplit: side } : item
+          ),
+        }
+      : { ...clip, cameraSplit: side };
+    return applyVideoProjectClipsPatch(
+      project,
+      project.clips.map((item) =>
+        item.id === clipId
+          ? updateCameraPositionVisual(updated, time, { transform: { opacity: 1 } })
+          : item
+      )
+    );
+  }
+
+  const active = activeCameraPosition(clip, time);
+  const withoutSplit = active
+    ? {
+        ...clip,
+        cameraPositions: clip.cameraPositions!.map((item) =>
+          item.id === active.id ? { ...item, cameraSplit: null } : item
+        ),
+      }
+    : { ...clip, cameraSplit: undefined };
+
   if (layout === VideoProjectCameraLayout.HIDDEN) {
-    if ((activeCameraPosition(clip, time)?.transform ?? clip.transform).opacity === 0)
+    if (
+      (activeCameraPosition(clip, time)?.transform ?? clip.transform).opacity === 0 &&
+      !clip.cameraSplit &&
+      !active?.cameraSplit
+    )
       return project;
     return applyVideoProjectClipsPatch(
       project,
       project.clips.map((item) =>
         item.id === clipId
-          ? updateCameraPositionVisual(clip, time, { transform: { opacity: 0 } })
+          ? updateCameraPositionVisual(withoutSplit, time, { transform: { opacity: 0 } })
           : item
       )
     );
@@ -84,23 +129,27 @@ export function applyVideoProjectCameraLayout(
   const frame =
     layout === VideoProjectCameraLayout.FULLFRAME
       ? { x: 0, y: 0, width: project.width, height: project.height }
-      : resolveVideoProjectCameraPlacement({
-          placement,
-          projectWidth: project.width,
-          projectHeight: project.height,
-          sourceWidth: asset?.metadata.width ?? clip.transform.width,
-          sourceHeight: asset?.metadata.height ?? clip.transform.height,
-        });
+      : placement
+        ? resolveVideoProjectCameraPlacement({
+            placement,
+            projectWidth: project.width,
+            projectHeight: project.height,
+            sourceWidth: asset?.metadata.width ?? clip.transform.width,
+            sourceHeight: asset?.metadata.height ?? clip.transform.height,
+          })
+        : (active?.transform ?? clip.transform);
   return applyVideoProjectClipsPatch(
     project,
     project.clips.map((item) =>
       item.id === clipId
         ? {
-            ...updateCameraPositionVisual(clip, time, {
+            ...updateCameraPositionVisual(withoutSplit, time, {
               fitMode:
                 layout === VideoProjectCameraLayout.FULLFRAME
                   ? VideoMediaFitMode.COVER
-                  : VideoMediaFitMode.CONTAIN,
+                  : placement
+                    ? VideoMediaFitMode.CONTAIN
+                    : (active?.fitMode ?? clip.fitMode),
               transform: { ...frame, rotation: 0, opacity: 1 },
             }),
             fitScalePercent: 100,

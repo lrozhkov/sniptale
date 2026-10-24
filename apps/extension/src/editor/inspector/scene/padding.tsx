@@ -85,7 +85,7 @@ export function FramePaddingFields(props: {
         onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
         renderUniformField={({ onChange, value }) => (
           <div
-            className="pointer-events-none absolute inset-x-0 top-8"
+            className="pointer-events-none relative h-2"
             data-ui="editor.frame.padding-slider"
             data-padding-hover="all"
           >

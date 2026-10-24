@@ -17,6 +17,7 @@ const io = vi.hoisted(() => ({
   list: vi.fn(),
   enter: vi.fn(),
   importImages: vi.fn(),
+  asset: vi.fn(),
 }));
 vi.mock('../../../composition/persistence/scenario/store/public', async (original) => ({
   ...(await original<typeof import('../../../composition/persistence/scenario/store/public')>()),
@@ -30,7 +31,7 @@ vi.mock('../../../composition/persistence/scenario/history', () => ({
   getScenarioSavedVersions: io.load,
 }));
 vi.mock('../../../composition/persistence/scenario/store/project-records/assets', () => ({
-  getScenarioAssetBlob: async () => undefined,
+  getScenarioAssetBlob: io.asset,
 }));
 vi.mock('../../platform/browser-driver', () => ({ replaceScenarioEditorSelectionInUrl: vi.fn() }));
 
@@ -54,6 +55,7 @@ function Probe() {
 beforeEach(() => {
   vi.clearAllMocks();
   io.enter.mockResolvedValue(true);
+  io.asset.mockResolvedValue(undefined);
   io.list.mockResolvedValue([{ id: 'guide', availability: 'available' }]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
@@ -323,4 +325,121 @@ it('retries a refused stage background without duplicate page publication', asyn
   act(() => state.undo());
   expect(state.project?.name).toBe('Tour');
   expect(state.canUndo).toBe(false);
+});
+
+it('keeps loaded slide media while a newly referenced stage background is loading', async () => {
+  let nextUrl = 0;
+  const create = vi.fn(() => `blob:media-${++nextUrl}`);
+  const revoke = vi.fn();
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = create;
+      static revokeObjectURL = revoke;
+    }
+  );
+  const project = createGuideProject('Media', 'guide', 1);
+  const tour = createTourDocument();
+  const slide = createTourImageSlide('slide');
+  slide.image = {
+    assetId: 'image',
+    width: 100,
+    height: 100,
+    galleryAssetId: null,
+    editDocumentId: null,
+    alt: '',
+    source: { kind: 'import', filename: 'image.png' },
+  };
+  tour.slides = [slide];
+  project.tour = tour;
+  io.load.mockResolvedValue({
+    currentRevision: 1,
+    versions: [{ project, revision: 1, savedAt: 1 }],
+  });
+  let finish!: (blob: Blob) => void;
+  io.asset.mockImplementation((id: string) =>
+    id === 'background'
+      ? new Promise<Blob>((resolve) => {
+          finish = resolve;
+        })
+      : Promise.resolve(new Blob(['image'], { type: 'image/png' }))
+  );
+  await mount();
+  const source = state.images['image'];
+  expect(source).toBeTruthy();
+  await act(async () =>
+    state.update({
+      ...state.project!,
+      tour: {
+        ...tour,
+        stage: { ...tour.stage, image: { ...slide.image!, assetId: 'background' } },
+      },
+    })
+  );
+  expect(state.images['image']).toBe(source);
+  expect(revoke).not.toHaveBeenCalledWith(source);
+  await act(async () => finish(new Blob(['background'], { type: 'image/png' })));
+  expect(state.images['image']).toBe(source);
+  expect(state.images['background']).toBeTruthy();
+  expect(io.asset.mock.calls.filter(([id]) => id === 'image')).toHaveLength(1);
+});
+
+it('rejects obsolete media reads and releases only removed or unmounted resources', async () => {
+  let nextUrl = 0;
+  const create = vi.fn(() => `blob:resource-${++nextUrl}`);
+  const revoke = vi.fn();
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = create;
+      static revokeObjectURL = revoke;
+    }
+  );
+  const project = createGuideProject('Media', 'guide', 1);
+  const tour = createTourDocument();
+  const slide = createTourImageSlide('slide');
+  slide.image = {
+    assetId: 'image',
+    width: 100,
+    height: 100,
+    galleryAssetId: null,
+    editDocumentId: null,
+    alt: '',
+    source: { kind: 'import', filename: 'image.png' },
+  };
+  tour.slides = [slide];
+  project.tour = tour;
+  io.load.mockResolvedValue({
+    currentRevision: 1,
+    versions: [{ project, revision: 1, savedAt: 1 }],
+  });
+  const pending = new Map<string, (blob: Blob) => void>();
+  io.asset.mockImplementation((id: string) =>
+    id === 'image'
+      ? Promise.resolve(new Blob(['image']))
+      : new Promise<Blob>((resolve) => pending.set(id, resolve))
+  );
+  await mount();
+  const source = state.images['image'];
+  const background = (assetId: string | null) => ({
+    ...state.project!,
+    tour: {
+      ...tour,
+      stage: { ...tour.stage, image: assetId ? { ...slide.image!, assetId } : null },
+    },
+  });
+  await act(async () => state.update(background('obsolete')));
+  await act(async () => state.update(background('accepted')));
+  await act(async () => pending.get('obsolete')!(new Blob(['obsolete'])));
+  expect(state.images['obsolete']).toBeUndefined();
+  expect(create).toHaveBeenCalledTimes(1);
+  await act(async () => pending.get('accepted')!(new Blob(['accepted'])));
+  const accepted = state.images['accepted'];
+  expect(accepted).toBeTruthy();
+  await act(async () => state.update(background(null)));
+  expect(revoke).toHaveBeenCalledWith(accepted);
+  expect(revoke).not.toHaveBeenCalledWith(source);
+  expect(state.images['image']).toBe(source);
+  await act(async () => root.unmount());
+  expect(revoke).toHaveBeenCalledWith(source);
 });

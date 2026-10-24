@@ -683,3 +683,48 @@ html[data-tour-reordering] * {
   padding-top: 8px;
   overflow-wrap: anywhere;
 }
+
+.tour-preview-dialog[data-preview='false'],
+.tour-preview-dialog[data-preview='false'] > .tour-preview-player {
+  display: contents;
+}
+.tour-preview-dialog[data-preview='true'] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sniptale-radius-md);
+  width: min(1600px, calc(100vw - 32px));
+  max-width: none;
+  height: min(900px, calc(100dvh - 32px));
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--sniptale-color-surface-panel);
+  color: var(--sniptale-color-text-primary);
+}
+.tour-preview-dialog::backdrop {
+  background: color-mix(in srgb, var(--sniptale-color-overlay) 20%, transparent);
+}
+.tour-preview-dialog:focus {
+  outline: none;
+}
+.tour-preview-header {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 16px;
+}
+.tour-preview-header[hidden] {
+  display: none;
+}
+.tour-preview-player {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.tour-preview-player .tour-camera-editor {
+  width: 100%;
+}

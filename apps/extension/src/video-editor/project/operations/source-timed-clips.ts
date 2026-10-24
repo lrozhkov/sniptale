@@ -239,6 +239,14 @@ function reconcileCursorTrack(
     return nextProject.cursorTrack;
   }
 
+  if (
+    !splitLineage?.size &&
+    previousProject.clips === nextProject.clips &&
+    previousProject.assets === nextProject.assets &&
+    previousProject.cursorTrack === nextProject.cursorTrack
+  )
+    return nextProject.cursorTrack;
+
   const samples = nextProject.cursorTrack.samples
     .flatMap((sample) => {
       if (!sample.sourceAnchor) {

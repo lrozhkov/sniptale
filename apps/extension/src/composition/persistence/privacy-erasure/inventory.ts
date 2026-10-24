@@ -6,6 +6,7 @@ import {
 } from '../infrastructure/indexed-db/core.stores.ts';
 import {
   AI_CHROME_ENABLED_KEY,
+  AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
   AI_DEFAULT_MODEL_KEY,
   AI_LOCAL_SECRET_KEY_STORAGE_KEY,
   AI_MODELS_KEY,
@@ -25,6 +26,7 @@ import type {
 } from '@sniptale/runtime-contracts/privacy-erasure/types';
 import { QUICK_PREVIEW_PREFERENCES_STORAGE_KEY } from '../quick-preview-preferences';
 import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-preferences';
+import { PICKER_COMPACT_STORAGE_KEY } from '../picker-preferences';
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale-theme-preference',
@@ -45,6 +47,7 @@ const localPreferenceKeys = [
   'sniptale-theme-preference',
   'sniptale-locale-preference',
   'sniptale_ai_modal_spoiler_open',
+  PICKER_COMPACT_STORAGE_KEY,
   'sniptale_export_json_spoiler_open',
   'sniptale_export_md_spoiler_open',
   'sniptale_editor_file_menu_save_to_folder_open',
@@ -106,6 +109,7 @@ const localSensitiveKeys = [
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
   'sniptale_ai_audio_transcription_prompt',
+  AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
   'sniptale_last_save_as_dir',
   'sniptale_prompt_templates',
   'sniptale_template_order',

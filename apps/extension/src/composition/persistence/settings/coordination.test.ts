@@ -445,3 +445,94 @@ it('retains the last rapid Crop choice through the existing settings queue', asy
     dockEdge: 'bottom-left',
   });
 });
+
+it('observes voice-only changes and settings removal through canonical preferences', async () => {
+  vi.stubGlobal('chrome', {});
+  const settings = await import('./index');
+  const listener = vi.fn();
+  const unsubscribe = vi.fn();
+  storage.subscribe.mockReturnValueOnce(unsubscribe);
+  const stop = settings.subscribeToVoiceInputPreferencesChanges(listener);
+  const notify = storage.subscribe.mock.calls[0]?.[0];
+  const voice = {
+    language: 'en-US',
+    mode: 'browser-managed',
+    microphoneDeviceId: null,
+    enabled: false,
+  };
+  notify({ sniptale_settings: { oldValue: {}, newValue: { voiceInput: voice } } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith(voice);
+  notify({ sniptale_settings: { oldValue: { voiceInput: voice }, newValue: undefined } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith({
+    language: 'ru-RU',
+    mode: 'local-first',
+    microphoneDeviceId: null,
+  });
+  stop();
+  expect(unsubscribe).toHaveBeenCalledOnce();
+  expect(storage.set).not.toHaveBeenCalled();
+});
+
+it('does not notify voice consumers for unrelated settings or storage areas', async () => {
+  vi.stubGlobal('chrome', {});
+  const settings = await import('./index');
+  const listener = vi.fn();
+  settings.subscribeToVoiceInputPreferencesChanges(listener);
+  const notify = storage.subscribe.mock.calls[0]?.[0];
+  notify({ sniptale_settings: { oldValue: {}, newValue: { imageQuality: 80 } } }, 'sync');
+  notify({ another_key: { oldValue: {}, newValue: {} } }, 'sync');
+  notify(
+    {
+      sniptale_settings: {
+        oldValue: {},
+        newValue: { voiceInput: { language: 'en-US', mode: 'browser-managed', enabled: false } },
+      },
+    },
+    'local'
+  );
+  expect(listener).not.toHaveBeenCalled();
+});
+
+it('observes canonical image changes, reset, removal, and recreation without writing', async () => {
+  vi.stubGlobal('chrome', {});
+  const settings = await import('./index');
+  const listener = vi.fn();
+  const stop = vi.fn();
+  storage.subscribe.mockReturnValueOnce(stop);
+  const unsubscribe = settings.subscribeToImagePreferencesChanges(listener);
+  const notify = storage.subscribe.mock.calls[0]?.[0];
+  const image = { imageFormat: 'webp', imageQuality: 71 };
+  notify({ sniptale_settings: { oldValue: {}, newValue: image } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith(image);
+  notify({ sniptale_settings: { oldValue: image, newValue: settings.DEFAULT_SETTINGS } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith({ imageFormat: 'png', imageQuality: 100 });
+  notify({ sniptale_settings: { oldValue: image, newValue: undefined } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith({ imageFormat: 'png', imageQuality: 100 });
+  notify({ sniptale_settings: { oldValue: undefined, newValue: image } }, 'sync');
+  expect(listener).toHaveBeenLastCalledWith(image);
+  unsubscribe();
+  expect(stop).toHaveBeenCalledOnce();
+  expect(storage.set).not.toHaveBeenCalled();
+});
+
+it('filters unrelated image notifications and normalizes malformed image fields', async () => {
+  vi.stubGlobal('chrome', {});
+  const settings = await import('./index');
+  const listener = vi.fn();
+  settings.subscribeToImagePreferencesChanges(listener);
+  const notify = storage.subscribe.mock.calls[0]?.[0];
+  notify({ sniptale_settings: { oldValue: {}, newValue: { captureDelay: 3 } } }, 'sync');
+  notify({ another_key: { newValue: { imageQuality: 80 } } }, 'sync');
+  notify({ sniptale_settings: { newValue: { imageQuality: 80 } } }, 'local');
+  expect(listener).not.toHaveBeenCalled();
+  notify(
+    {
+      sniptale_settings: {
+        oldValue: { imageFormat: 'jpeg', imageQuality: 70 },
+        newValue: { imageFormat: 'gif', imageQuality: 'invalid' },
+      },
+    },
+    'sync'
+  );
+  expect(listener).toHaveBeenCalledExactlyOnceWith({ imageFormat: 'png', imageQuality: 100 });
+});

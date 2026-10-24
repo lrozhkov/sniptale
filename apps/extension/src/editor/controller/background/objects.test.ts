@@ -7,7 +7,8 @@ const mocks = vi.hoisted(() => ({
   rasterize: vi.fn(() => ({ kind: 'blurred-background' })),
 }));
 
-vi.mock('./raster', () => ({
+vi.mock('./raster', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./raster')>()),
   rasterizeBlurredBackground: mocks.rasterize,
   resolveBackgroundRasterSize: (size: unknown) => size,
 }));

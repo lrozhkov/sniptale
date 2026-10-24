@@ -85,6 +85,7 @@ export function editCameraPosition(
   if (edit.kind === 'add') {
     if (!canAddCameraPosition(project, clipId, time)) return project;
     const visual = resolveCameraClip(clip, time);
+    const activeLayout = activeCameraPosition(clip, time);
     const crop = visual.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
     const duration =
       Math.max(0, Math.min(0.5, clip.startTime + clip.duration - 1 / project.fps - time)) *
@@ -97,6 +98,11 @@ export function editCameraPosition(
           ? { crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY } }
           : {}),
         sourceTime: cameraSourceTime(clip, time),
+        ...(activeLayout
+          ? { cameraSplit: activeLayout.cameraSplit ?? null }
+          : clip.cameraSplit
+            ? { cameraSplit: clip.cameraSplit }
+            : {}),
         transform: { ...visual.transform },
         fitMode: visual.fitMode,
         transition: {

@@ -71,6 +71,24 @@ function button(suffix: string) {
 }
 
 describe('camera interval controls', () => {
+  it('offers all split directions and a docked return for an active split', () => {
+    const props = createProps();
+    act(() => root.render(<CameraLayoutControls {...props} />));
+    for (const side of ['left', 'right', 'top', 'bottom'] as const) {
+      const choice = button(`layout-split_${side}`);
+      expect(choice.getAttribute('aria-label')).toBe(`gallery.videoReview.webcamSplit_${side}`);
+      act(() => choice.click());
+      expect(props.onApplyCameraLayout).toHaveBeenLastCalledWith(
+        props.clip.id,
+        `SPLIT_${side.toUpperCase()}`
+      );
+    }
+    props.clip.cameraSplit = 'left';
+    act(() => root.render(<CameraLayoutControls {...props} />));
+    expect(button('layout-split_left').getAttribute('aria-pressed')).toBe('true');
+    act(() => button('layout-overlay').click());
+    expect(props.onApplyCameraLayout).toHaveBeenLastCalledWith(props.clip.id, 'OVERLAY');
+  });
   it('restores a hidden camera through the full-frame preset', () => {
     const props = createProps();
     props.clip.transform.opacity = 0;

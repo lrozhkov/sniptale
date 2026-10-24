@@ -121,7 +121,7 @@ function createModeController() {
 
 function createScenarioController() {
   return {
-    applyCaptureAction: vi.fn(async () => undefined),
+    setRecorderPanelVisible: vi.fn(async () => true),
     captureAction: 'download_default' as const,
     createProject: vi.fn(async () => undefined),
     deleteRecentStep: vi.fn(async () => undefined),
@@ -154,7 +154,7 @@ function createScenarioProps() {
 
   return {
     actions: {
-      applyCaptureAction: controller.applyCaptureAction,
+      setRecorderPanelVisible: controller.setRecorderPanelVisible,
       createProject: controller.createProject,
       deleteRecentStep: controller.deleteRecentStep,
       finishRecording: controller.finishRecording,
@@ -323,6 +323,9 @@ async function verifiesSidebarOwnerSurvivesToolbarCollapse() {
   );
 
   props.scenario.state.captureAction = 'download_default';
+  await renderLayout(props);
+  expect(container?.querySelector('[data-ui="content.layout.sidebar"]')).not.toBeNull();
+  props.scenario.state.scenarioEnabled = false;
   await renderLayout(props);
   expect(container?.querySelector('[data-ui="content.layout.sidebar"]')).toBeNull();
 }

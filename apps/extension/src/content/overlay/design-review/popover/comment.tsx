@@ -92,7 +92,7 @@ export function PageStyleCommentField(props: {
           id={inputId}
           onBlur={props.actions.commit}
           onChange={(event) => {
-            if (props.voice.active) props.actions.voice.stop();
+            if (props.voice.active || props.voice.pending) props.actions.voice.cancel();
             resizeCommentTextarea(event.currentTarget);
             props.actions.updateDraft(event.currentTarget.value);
           }}
@@ -126,6 +126,7 @@ export function PageStyleCommentField(props: {
                 props.actions.voice.start(textarea?.selectionStart ?? props.state.draft.length);
               }}
               onStop={props.actions.voice.stop}
+              onCancel={props.actions.voice.cancel}
               state={props.voice}
             />
             <span

@@ -23,6 +23,7 @@ export function AIModalPromptVoiceButton(props: {
         }}
         onStart={props.onStart}
         onStop={props.voice.actions.stop}
+        onCancel={props.voice.actions.cancel}
         state={props.voice.state}
       />
     </div>

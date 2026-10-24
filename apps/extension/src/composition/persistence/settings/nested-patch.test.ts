@@ -133,3 +133,35 @@ describe('settings nested patch persistence', () => {
     expectPersistedNestedMerge();
   });
 });
+
+it('retains model selection and correction when a legacy partial patch changes language', async () => {
+  resetSettingsNestedPatchMocks();
+  const selection = {
+    modelId: 'asr',
+    approvedProviderId: 'provider',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+    approvedModelCode: 'asr-model',
+  };
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: {
+      ...createDefaultSettings(),
+      voiceInput: {
+        language: 'ru-RU',
+        microphoneDeviceId: null,
+        mode: 'local-first',
+        backend: 'model',
+        transcription: selection,
+        correction: { enabled: true, model: selection },
+      },
+    },
+  });
+  const saved = await patchSettings({ voiceInput: { language: 'en-US' } });
+  expect(saved.voiceInput).toEqual({
+    language: 'en-US',
+    microphoneDeviceId: null,
+    mode: 'local-first',
+    backend: 'model',
+    transcription: selection,
+    correction: { enabled: true, model: selection },
+  });
+});

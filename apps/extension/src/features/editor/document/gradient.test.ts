@@ -1,3 +1,5 @@
+import { normalizeEditorFrameSettings } from './constants';
+import { createEditorFramePaintGradientPatch, resolveEditorFrameGradient } from './frame-gradient';
 import { describe, expect, it } from 'vitest';
 import {
   addEditorGradientStop,
@@ -148,3 +150,41 @@ function registerFrameGradientNormalizationTests() {
     ]);
   });
 }
+
+it('preserves the complete canonical linear gradient through frame normalization', () => {
+  const backgroundGradient = {
+    type: 'linear' as const,
+    angle: 37,
+    interpolation: 'oklch' as const,
+    repeat: { enabled: true, span: 0.3 },
+    stops: [
+      { id: 'start', color: '#ff000080', position: 0, midpoint: 0.2 },
+      { id: 'end', color: '#0000ffff', position: 1, midpoint: 0.5 },
+    ],
+  };
+  expect(normalizeEditorFrameSettings({ backgroundGradient })).toMatchObject({
+    backgroundGradient,
+  });
+});
+
+it('retains complete paint properties through frame projection and clears them for a legacy replacement', () => {
+  const gradient = {
+    type: 'linear' as const,
+    angle: 61,
+    interpolation: 'oklab' as const,
+    repeat: { enabled: true, span: 0.12 },
+    stops: [
+      { id: 'a', color: '#ff000080', position: 0, midpoint: 0.17 },
+      { id: 'b', color: '#0000ffff', position: 1, midpoint: 0.5 },
+    ],
+  };
+  const frame = normalizeEditorFrameSettings(createEditorFramePaintGradientPatch(gradient));
+  expect(resolveEditorFrameGradient(frame)).toEqual(gradient);
+  expect(createEditorFrameGradientCss(frame)).toContain('repeating-linear-gradient(61deg in oklab');
+  const replaced = { ...frame, ...createEditorFrameGradientPatch(frame, ['#000000', '#ffffff']) };
+  expect(resolveEditorFrameGradient(replaced)).toMatchObject({
+    interpolation: 'srgb',
+    repeat: { enabled: false },
+  });
+  expect(resolveEditorFrameGradient(frame)).toEqual(gradient);
+});

@@ -23,7 +23,6 @@ function createScenario(): NonNullable<ToolbarProps['scenario']> {
     byClickDisabled: false,
     captureMode: 'manual',
     enabled: true,
-    onCaptureActionSelected: vi.fn(),
     onCreateProject: vi.fn(),
     onFinishScenario: vi.fn(),
     onOpenEditor: vi.fn(),
@@ -44,7 +43,7 @@ function MenuGroupHarness(props: { scenario?: ToolbarProps['scenario'] }) {
 
   return (
     <ToolbarCaptureMenuGroup
-      captureAction={props.scenario ? 'scenario' : 'download_default'}
+      captureAction="copy"
       compactMenus={false}
       currentViewport={null}
       displayMode="horizontal"
@@ -94,8 +93,48 @@ it('keeps scenario project and capture-mode controls off the main toolbar', () =
   const order = Array.from(container.querySelectorAll('[data-ui]')).map((element) =>
     element.getAttribute('data-ui')
   );
-  expect(order).toEqual(['test.capture-action', 'test.timer', 'test.viewport']);
+  expect(order).toEqual([
+    'test.capture-action',
+    'test.timer',
+    'test.viewport',
+    'content.toolbar.scenario-panel-button',
+  ]);
 
   renderMenuGroup();
   expect(container.querySelector('[data-ui="test.capture-action"]')).not.toBeNull();
+});
+
+it('toggles the independent panel once while activation is pending and permits retry', async () => {
+  let settle!: (accepted: boolean) => void;
+  const scenario = createScenario();
+  scenario.enabled = false;
+  scenario.sidebarVisible = false;
+  const toggle = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        settle = resolve;
+      })
+  );
+  scenario.onToggleSidebar = toggle;
+  renderMenuGroup(scenario);
+  const button = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.scenario-panel-button"]'
+  )!;
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  act(() => {
+    button.click();
+    button.click();
+  });
+  expect(toggle).toHaveBeenCalledOnce();
+  expect(button.disabled).toBe(true);
+  await act(async () => settle(false));
+  expect(button.disabled).toBe(false);
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  act(() => button.click());
+  expect(toggle).toHaveBeenCalledTimes(2);
+  await act(async () => settle(true));
+  scenario.enabled = true;
+  scenario.sidebarVisible = true;
+  renderMenuGroup(scenario);
+  expect(button.getAttribute('aria-pressed')).toBe('true');
 });
