@@ -387,24 +387,30 @@ it('paints watermark without captions and publishes only a completed overlay fra
     };
   });
   const presented = job.canvas.getContext('2d')!;
+  const notified = vi.fn();
+  job.canvas.addEventListener('sniptale-preview-frame', notified);
   const publish = vi.spyOn(presented, 'drawImage');
   await renderPreviewScene({ ...job, watermarkRenderer });
   expect(draw).toHaveBeenCalledTimes(1);
   expect(observed[0]).not.toBe(job.canvas);
   expect(publish).toHaveBeenCalledTimes(1);
+  expect(notified).toHaveBeenCalledTimes(1);
   expect(prepare).toHaveBeenCalledWith(job.project, job.project, undefined);
   draw.mockImplementationOnce(() => {
     throw new Error('Overlay failed');
   });
   await expect(renderPreviewScene({ ...job, watermarkRenderer })).rejects.toThrow('Overlay failed');
   expect(publish).toHaveBeenCalledTimes(1);
+  expect(notified).toHaveBeenCalledTimes(1);
   await renderPreviewScene({ ...job, watermarkRenderer });
   expect(publish).toHaveBeenCalledTimes(2);
+  expect(notified).toHaveBeenCalledTimes(2);
   prepare.mockRejectedValueOnce(new Error('Logo unavailable'));
   await expect(renderPreviewScene({ ...job, watermarkRenderer })).rejects.toThrow(
     'Logo unavailable'
   );
   expect(publish).toHaveBeenCalledTimes(2);
+  expect(notified).toHaveBeenCalledTimes(2);
   expect(watermarkRenderer.clear).not.toHaveBeenCalled();
   job.project.watermark.mode = 'none';
   await renderPreviewScene({ ...job, watermarkRenderer });
@@ -543,3 +549,14 @@ it.each(['seek', 'abort'] as const)(
     expect(job.canvas.height).toBe(180);
   }
 );
+
+it('notifies thumbnail consumers only after a completed frame', async () => {
+  const { job, video } = setup();
+  const presented = vi.fn();
+  job.canvas.addEventListener('sniptale-preview-frame', presented);
+  await renderPreviewScene(job);
+  expect(presented).toHaveBeenCalledOnce();
+  Object.defineProperty(video, 'seeking', { value: true });
+  await renderPreviewScene(job);
+  expect(presented).toHaveBeenCalledOnce();
+});

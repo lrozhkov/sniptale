@@ -274,8 +274,12 @@ async function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): Promise
     args.renderPasses.overlayFrame,
     ...args.renderPasses.visualPasses.map((pass) => pass.frame),
   ].some((frame) => frame.camera.spatial !== undefined);
-  if (!spatial && !args.watermark && !args.effectRuntimeFrames?.prepareVisualPass)
-    return drawResolvedPreviewSceneContent(args);
+  if (!spatial && !args.watermark && !args.effectRuntimeFrames?.prepareVisualPass) {
+    const drawn = await drawResolvedPreviewSceneContent(args);
+    if (drawn)
+      args.params.canvas.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
+    return drawn;
+  }
   const presented = args.params.canvas;
   const owned = !args.params.stagingCanvas;
   const staging = args.params.stagingCanvas?.() ?? presented.ownerDocument.createElement('canvas');

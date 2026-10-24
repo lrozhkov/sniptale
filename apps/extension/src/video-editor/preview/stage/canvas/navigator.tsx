@@ -156,8 +156,11 @@ function usePreviewNavigatorThumbnail(
   thumbnailRef: RefObject<HTMLCanvasElement | null>,
   geometry: PreviewNavigatorGeometry | null
 ): void {
+  const width = geometry?.width;
+  const height = geometry?.height;
   useEffect(() => {
-    if (!geometry) return;
+    const content = contentRef.current;
+    if (width === undefined || height === undefined || !content) return;
     const draw = () => {
       const source = contentRef.current?.querySelector<HTMLCanvasElement>(
         '[data-preview-stage-canvas]'
@@ -170,9 +173,20 @@ function usePreviewNavigatorThumbnail(
       context.drawImage(source, 0, 0, thumbnail.width, thumbnail.height);
     };
     draw();
-    const interval = window.setInterval(draw, 250);
-    return () => window.clearInterval(interval);
-  }, [contentRef, geometry, thumbnailRef]);
+    let pending: number | undefined;
+    const schedule = () => {
+      if (pending !== undefined) return;
+      pending = window.setTimeout(() => {
+        pending = undefined;
+        draw();
+      }, 250);
+    };
+    content.addEventListener('sniptale-preview-frame', schedule);
+    return () => {
+      content.removeEventListener('sniptale-preview-frame', schedule);
+      window.clearTimeout(pending);
+    };
+  }, [contentRef, width, height, thumbnailRef]);
 }
 
 function usePreviewNavigatorMetrics(
