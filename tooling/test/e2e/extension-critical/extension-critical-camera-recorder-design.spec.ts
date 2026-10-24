@@ -26,6 +26,51 @@ import {
 test.use({ actionTimeout: 10_000 });
 test.setTimeout(150_000);
 
+for (const stopBeforeFloat of [false, true]) {
+  test(`native Camera result confirmation works in the floating window (Stop before Float: ${stopBeforeFloat})`, async ({}, info) => {
+    const c = { locale: 'en', theme: 'dark' } as const;
+    await withBrowser(c, info, async (context, extensionId, origin) => {
+      const page = await launchCamera(context, extensionId, origin, c);
+      if (stopBeforeFloat) {
+        await command(page, c, 'popup.video.stopButton').click();
+        await expect(command(page, c, 'popup.video.postRecordDelete')).toBeEnabled({
+          timeout: 30_000,
+        });
+      }
+      const [pip] = await Promise.all([
+        context.waitForEvent('page'),
+        command(page, c, 'popup.video.teleprompterFloat').click(),
+      ]);
+      await pip.setViewportSize({ width: 480, height: 640 });
+      if (!stopBeforeFloat) await command(pip, c, 'popup.video.stopButton').click();
+      const trigger = command(pip, c, 'popup.video.postRecordDelete');
+      await expect(trigger).toBeEnabled({ timeout: 30_000 });
+      await trigger.click();
+      await expect(pip.getByRole('alertdialog')).toBeVisible();
+      await expect(
+        pip.getByRole('button', { name: tr(c, 'common.actions.cancel'), exact: true })
+      ).toBeFocused();
+      await capture(pip, info, 'result-floating-delete-confirmation');
+      await pip.keyboard.press('Escape');
+      await expect(pip.getByRole('alertdialog')).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+      await capture(pip, info, 'result-floating');
+      await trigger.click();
+      await expect(pip.getByRole('alertdialog')).toBeVisible();
+      await pip.close();
+      await expect(page.getByRole('alertdialog')).toHaveCount(0);
+      const dockedTrigger = command(page, c, 'popup.video.postRecordDelete');
+      await expect(command(page, c, 'popup.video.teleprompterFloat')).toBeFocused();
+      await dockedTrigger.click();
+      await expect(page.getByRole('alertdialog')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('alertdialog')).toHaveCount(0);
+      await expect(dockedTrigger).toBeFocused();
+      await capture(page, info, 'result-restored-after-confirmation');
+    });
+  });
+}
+
 for (const locale of ['ru', 'en'] as const) {
   for (const theme of ['light', 'dark'] as const) {
     const composition = { locale, theme };

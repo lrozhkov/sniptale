@@ -287,8 +287,9 @@ export async function geometry(page: Page) {
     4
   );
   for (const button of await main.locator('button[data-command-press]:visible').all()) {
-    await expect(button).toHaveCSS('height', '32px');
-    await expect(button).toHaveCSS('border-radius', '4px');
+    const isOpenTile = (await button.getAttribute('data-command-tone')) === null;
+    await expect(button).toHaveCSS('height', isOpenTile ? '88px' : '32px');
+    await expect(button).toHaveCSS('border-radius', isOpenTile ? '6px' : '4px');
     await expect(button).toHaveCSS('font-size', '13px');
     await expect(button).toHaveCSS('line-height', '18px');
     await expect(button).toHaveCSS(
@@ -498,6 +499,32 @@ export async function savedResult(page: Page, c: Composition, info: TestInfo) {
     await expect(command(page, c, 'popup.video.postRecordDownload')).toBeEnabled();
     await capture(page, info, `result-${size.width}x${size.height}`);
   }
+  await page.setViewportSize({ width: 320, height: 360 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+  ).toBeLessThanOrEqual(1);
+  const remove = command(page, c, 'popup.video.postRecordDelete');
+  await remove.scrollIntoViewIfNeeded();
+  for (const button of await page.locator('[data-ui="camera-recorder.result"] button').all()) {
+    expect(
+      await button.evaluate((node) => node.scrollWidth - node.clientWidth)
+    ).toBeLessThanOrEqual(1);
+  }
+  await capture(page, info, 'result-compact');
+  await remove.click();
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation).toBeVisible();
+  const cancel = confirmation.getByRole('button', {
+    name: tr(c, 'common.actions.cancel'),
+    exact: true,
+  });
+  await expect(cancel).toBeFocused();
+  await capture(page, info, 'result-delete-confirmation-compact');
+  await page.keyboard.press('Escape');
+  await expect(confirmation).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  await page.setViewportSize(sizes[1]!);
+  await close.scrollIntoViewIfNeeded();
   await close.click();
   await expect.poll(() => page.isClosed()).toBe(true);
 }
