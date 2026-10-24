@@ -144,6 +144,7 @@ function AnnotationMarker(
               'bg-[var(--sniptale-color-surface-panel)] group-hover:inline-flex',
               'group-focus-within:inline-flex cursor-grab active:cursor-grabbing',
             ].join(' ')}
+            data-sniptale-activation-bridge="off"
             data-ui="content.annotation-marker-drag-handle"
             onClick={(event) => {
               event.preventDefault();

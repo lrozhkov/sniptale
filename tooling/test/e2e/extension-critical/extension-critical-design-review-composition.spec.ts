@@ -4,6 +4,49 @@ import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import { evaluateInTarget } from '../support/recording-action';
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`marker drag handle distinguishes pointer and Tab focus ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      const target = (await page.locator('#measurement-target').boundingBox())!;
+      await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+      const popover = page.locator('[data-ui="content.design-review.popover"]');
+      const comment = popover.getByRole('textbox', {
+        name: /Element comment|Комментарий к элементу/u,
+      });
+      await comment.fill('Marker focus check');
+      await comment.press('Enter');
+      await expect(popover).toHaveCount(0);
+      const marker = page.locator('[data-ui="content.annotation-marker-button"]');
+      const handle = page.locator('[data-ui="content.annotation-marker-drag-handle"]');
+      await marker.hover();
+      await handle.click({ position: { x: 10, y: 17 } });
+      await expect(handle).toHaveCSS('outline-style', 'none');
+      const before = (await marker.boundingBox())!;
+      const grip = (await handle.boundingBox())!;
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + 17);
+      await page.mouse.down();
+      await page.mouse.move(grip.x + grip.width / 2 + 12, grip.y + 17 + 20, {
+        steps: 4,
+      });
+      await page.mouse.up();
+      await expect.poll(async () => (await marker.boundingBox())!.x - before.x).toBeCloseTo(12, 0);
+      await expect(handle).toHaveCSS('outline-style', 'none');
+      await page.screenshot({ path: info.outputPath('marker-pointer.png'), fullPage: false });
+      await marker.focus();
+      await page.keyboard.press('Tab');
+      await expect(handle).toBeFocused();
+      await expect(handle).not.toHaveCSS('outline-style', 'none');
+      await page.screenshot({ path: info.outputPath('marker-keyboard.png'), fullPage: false });
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+
   test(`reset icon follows toolbar mode ${name}`, async ({
     context,
     extensionId,
