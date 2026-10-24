@@ -216,3 +216,25 @@ it('preserves audio duration policy through real split and duplicate commands', 
   ).toBe(true);
   expect(duplicated.duration).toBe(2);
 });
+
+it('shows zero volume for a retained muted audio clip', () => {
+  const { project, audio } = fixture();
+  audio.muted = true;
+  act(() =>
+    root.render(
+      renderAudioFields({
+        project,
+        selectedClip: audio,
+        onUpdateClipMuted: vi.fn(),
+        onUpdateClipVolume: vi.fn(),
+        onUpdateClipAudioEnvelope: vi.fn(),
+        onDetachClipGroup: vi.fn(),
+      })
+    )
+  );
+  const input = container.querySelector<HTMLInputElement>(
+    'input[aria-label="videoEditor.sidebar.volumeLabel"]'
+  );
+  expect(input).not.toBeNull();
+  expect(Number(input!.value)).toBe(0);
+});

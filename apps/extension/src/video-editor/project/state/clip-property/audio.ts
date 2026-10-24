@@ -128,10 +128,16 @@ function updateClipVolume(set: VideoEditorStoreSet, clipId: string, volume: numb
 
     return applyProjectUpdate(state, (project) =>
       updateClipWithProjectGuard(project, clipId, (item) =>
-        syncLegacyClipAudioFields(item, {
-          audioGainEnd: clampNumber(normalizedVolume, 0, 2),
-          audioGainStart: clampNumber(normalizedVolume, 0, 2),
-        })
+        syncLegacyClipAudioFields(
+          {
+            ...item,
+            muted: item.type === 'AUDIO' && normalizedVolume > 0 ? false : item.muted,
+          },
+          {
+            audioGainEnd: clampNumber(normalizedVolume, 0, 2),
+            audioGainStart: clampNumber(normalizedVolume, 0, 2),
+          }
+        )
       )
     );
   });

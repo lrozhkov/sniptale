@@ -23,8 +23,9 @@ function renderSharedAudioFields(params: {
   onUpdateClipVolume: WorkspaceSidebarProps['onUpdateClipVolume'];
 }) {
   const gainRange = getClipGainRange(params.clip);
-  const sharedVolumeValue =
-    Math.abs(gainRange.start - gainRange.end) < 0.0001
+  const sharedVolumeValue = params.clip.muted
+    ? 0
+    : Math.abs(gainRange.start - gainRange.end) < 0.0001
       ? gainRange.start
       : Number(((gainRange.start + gainRange.end) / 2).toFixed(2));
 

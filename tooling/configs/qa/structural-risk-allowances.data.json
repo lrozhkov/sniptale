@@ -1755,10 +1755,10 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This operation builds one detached Native candidate. Existing document identities connect audio snapshots to the same admitted graph. Schema selection and final root validation belong to that decision. No new writer, resource lifetime or coordinator applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This operation builds one detached Native candidate. The original-audio clip gain and track visibility map one Gallery policy into that graph. Schema selection and final root validation belong to the same decision. No new writer, resource lifetime, coordinator or recovery applies. Main and independent structural diagnosis inspected this exact body. Final independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "9a5d2f3bd24fb70aed61365570c43d9ddfa5f1a5e0c3b28dcce839bafb7a4a25",
+      "reviewDate": "2026-10-24",
+      "astHash": "0a639c044e029614117fd4223f7633f7f0a5e58a84138df657bef06f87519e9c",
       "signatureHash": "aff1ec32267bff7533ef76c684c337421199883ca7e1fad8d395795e6fc50eb7"
     },
     {

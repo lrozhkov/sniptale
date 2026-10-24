@@ -634,3 +634,226 @@ for (const variant of [
     }
   });
 }
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`muted Gallery audio can be restored in Native ${viewport.size.width}`, async ({
+    page,
+  }, info) => {
+    test.setTimeout(120_000);
+    page.setDefaultTimeout(10000);
+    await page.setViewportSize({ ...viewport.size });
+    await page.addInitScript(() => {
+      const meters: AnalyserNode[] = [];
+      AudioNode.prototype.connect = new Proxy(AudioNode.prototype.connect, {
+        apply(target, receiver, args) {
+          if (receiver instanceof AudioNode && args[0] instanceof AudioDestinationNode) {
+            const meter = receiver.context.createAnalyser();
+            meters.push(meter);
+            Reflect.apply(target, receiver, [meter]);
+            return Reflect.apply(target, meter, args);
+          }
+          return Reflect.apply(target, receiver, args);
+        },
+      });
+      Object.defineProperty(window, '__sniptaleMutedAudioRms', {
+        value: () => {
+          return Math.max(
+            0,
+            ...meters.map((meter) => {
+              const data = new Float32Array(meter.fftSize);
+              meter.getFloatTimeDomainData(data);
+              return Math.sqrt(data.reduce((sum, value) => sum + value * value, 0) / data.length);
+            })
+          );
+        },
+      });
+    });
+    const rms = () =>
+      page.evaluate(() => {
+        const probe: unknown = Reflect.get(window, '__sniptaleMutedAudioRms');
+        if (typeof probe !== 'function') throw new Error('Missing audio meter');
+        const value: unknown = probe();
+        if (typeof value !== 'number') throw new Error('Invalid audio meter result');
+        return value;
+      });
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': 'en',
+          'sniptale-theme-preference': 'dark',
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=dark`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page
+        .getByRole('button', { name: /beta-v1.webm/ })
+        .first()
+        .click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      const master = dialog.getByRole('switch', {
+        name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.audioOriginal')}`,
+      });
+      if (!(await master.isVisible()))
+        await dialog
+          .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
+          .click();
+      await master.click();
+      await expect(master).toHaveAttribute('aria-checked', 'false');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeReviewWorkspace(page, 'recording:beta-v1-recording'))?.advanced.ui
+              .tracks.originalAudio
+        )
+        .toBe(false);
+      const sourceBefore = await readNativeReviewWorkspace(page, 'recording:beta-v1-recording');
+      await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+      await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
+      await expect
+        .poll(() => page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs().length ?? 0))
+        .toBe(1);
+      const tab = (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []))[0]!;
+      const query = new URL(tab.url!).searchParams;
+      query.set('theme', 'dark');
+      const nativeUrl = `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${query}`;
+      await page.goto(nativeUrl);
+      await page.locator('[data-ui="video-editor.timeline.surface"]').waitFor();
+      const project = (await readNativeVideoProject(page))!;
+      const reopenUrl = `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${encodeURIComponent(project.id)}&theme=dark`;
+      const audio = project.clips.find((clip) => clip.type === 'AUDIO')!;
+      expect(project.tracks.find((track) => track.id === audio.trackId)?.visible).toBe(false);
+      expect(audio.muted).toBe(false);
+      expect(await readNativeReviewWorkspace(page, 'recording:beta-v1-recording')).toEqual(
+        sourceBefore
+      );
+      const play = page.getByRole('button', {
+        name: label('videoEditor.timeline.play'),
+        exact: true,
+      });
+      const pause = page.getByRole('button', {
+        name: label('videoEditor.timeline.pause'),
+        exact: true,
+      });
+      await play.click();
+      await pause.waitFor();
+      await expect.poll(rms).toBeLessThan(0.001);
+      await page
+        .getByRole('button', { name: label('videoEditor.timeline.trackAudioMuted'), exact: true })
+        .click();
+      if (await play.isVisible()) await play.click();
+      await expect.poll(rms).toBeGreaterThan(0.01);
+      await pause.click();
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.tracks.find((track) => track.id === audio.trackId)
+              ?.visible
+        )
+        .toBe(true);
+      await page.screenshot({
+        path: info.outputPath('transferred-track-restored.png'),
+        fullPage: false,
+      });
+      // Reopen a project with the exact legacy failure shape, without changing its media bytes.
+      const legacy = (await readNativeVideoProject(page))!;
+      legacy.clips = legacy.clips.map((clip) =>
+        clip.type === 'AUDIO' ? { ...clip, muted: true } : clip
+      );
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=dark`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await page.evaluate(async (project) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('sniptale-db');
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        try {
+          const tx = db.transaction('video_projects', 'readwrite');
+          const done = new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(tx.error);
+          });
+          tx.objectStore('video_projects').put({
+            id: project.id,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+            project,
+          });
+          await done;
+        } finally {
+          db.close();
+        }
+      }, legacy);
+      await page.goto(reopenUrl);
+      await page.locator('[data-ui="video-editor.timeline.surface"]').waitFor();
+      await page.locator(`[data-project-timeline-clip="${audio.id}"]`).click();
+      const group = page.getByRole('button', {
+        name: label('videoEditor.sidebar.inspectorGroupAudio'),
+        exact: true,
+      });
+      await group.click();
+      const volume = page.getByRole('textbox', {
+        name: label('videoEditor.sidebar.volumeLabel'),
+        exact: true,
+      });
+      await expect(volume).toHaveValue('0');
+      await volume.fill('70');
+      await volume.press('Enter');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === audio.id)?.muted
+        )
+        .toBe(false);
+      await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+      await expect(volume).toHaveValue('0');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === audio.id)?.muted
+        )
+        .toBe(true);
+      await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
+      await expect(volume).toHaveValue('70');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === audio.id)?.muted
+        )
+        .toBe(false);
+      await play.click();
+      await expect.poll(rms).toBeGreaterThan(0.01);
+      await pause.click();
+      await page.screenshot({
+        path: info.outputPath('legacy-muted-clip-restored.png'),
+        fullPage: false,
+      });
+      await page.reload();
+      await page.locator('[data-ui="video-editor.timeline.surface"]').waitFor();
+      expect(
+        (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === audio.id)?.muted
+      ).toBe(false);
+      await page
+        .getByRole('button', { name: label('videoEditor.timeline.play'), exact: true })
+        .click();
+      await expect.poll(rms).toBeGreaterThan(0.01);
+      await writeFile(
+        info.outputPath('audio-signal-proof.json'),
+        JSON.stringify({ restoredRms: await rms(), minimumAudibleSignalRms: 0.01 })
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
