@@ -38,7 +38,11 @@ import { createEffectInstanceGroups, EffectAttachmentControls } from '../effect-
 import { TextTemplateUpgradeFields } from '../inputs/text-upgrade';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
-import { CameraLayoutControls, CameraFitControls } from '../inputs/camera-layout';
+import {
+  CameraLayoutControls,
+  CameraFitControls,
+  CameraTimingOffsetControl,
+} from '../inputs/camera-layout';
 
 export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const clip = props.selectedClip;
@@ -390,7 +394,21 @@ function createTimingGroup(
     id: 'timing',
     semantic: 'timing' as const,
     label: translate('videoEditor.sidebar.inspectorGroupTiming'),
-    content: <ClipTimingControls {...props} clip={clip} locked={locked} />,
+    content: (
+      <>
+        {isCameraRoleVideoClip(props.project, clip) ? (
+          <CameraTimingOffsetControl
+            clip={clip}
+            project={props.project}
+            disabled={locked}
+            {...(props.onEditCameraPosition
+              ? { onEditCameraPosition: props.onEditCameraPosition }
+              : {})}
+          />
+        ) : null}
+        <ClipTimingControls {...props} clip={clip} locked={locked} />
+      </>
+    ),
   } as const;
 }
 

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { createSceneSelection } from '../../../project/selection/model';
 import { ProjectTimelineCanvas } from './';
+import { ProjectTimelineHoverPreview } from './hover-preview';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -36,6 +37,7 @@ it('renders hover preview on empty canvas and suppresses it over marked timeline
   movePointer(canvas, 90);
 
   expect(getHoverPreview()?.getAttribute('style')).toContain('left: 90px');
+  expect(getHoverPreview()?.textContent).toContain('0:01.000');
 
   act(() => {
     const marker = document.createElement('div');
@@ -182,3 +184,63 @@ function dispatchPointerEvent(target: Element | null, type: string, clientX: num
 function getHoverPreview() {
   return container?.querySelector('[data-timeline-hover-preview="true"]') ?? null;
 }
+
+it('keeps readout inside the visible viewport and moves it away from the ruler pointer', () => {
+  const viewport = document.createElement('div');
+  Object.defineProperty(viewport, 'clientWidth', { value: 300 });
+  const render = (time: number) =>
+    act(() =>
+      root?.render(
+        <ProjectTimelineHoverPreview
+          height={240}
+          hoverTime={time}
+          pixelsPerSecond={100}
+          timelineRef={{ current: viewport }}
+          pointer={{ clientX: time * 100, clientY: 5 }}
+        />
+      )
+    );
+  render(1.5);
+  expect(
+    container
+      ?.querySelector('[data-ui="video-editor.timeline.time-readout"]')
+      ?.getAttribute('style')
+  ).toContain('translateX(-98px)');
+  render(0);
+  expect(
+    container
+      ?.querySelector('[data-ui="video-editor.timeline.time-readout"]')
+      ?.getAttribute('style')
+  ).toContain('translateX(32px)');
+  render(2.9);
+  expect(
+    container
+      ?.querySelector('[data-ui="video-editor.timeline.time-readout"]')
+      ?.getAttribute('style')
+  ).toContain('translateX(-98px)');
+  render(4);
+  expect(getHoverPreview()).toBeNull();
+});
+
+it('shows accepted resize timing until its disposable draft clears', () => {
+  act(() =>
+    root?.render(
+      <ProjectTimelineHoverPreview
+        height={240}
+        hoverTime={null}
+        pixelsPerSecond={100}
+        timingFeedback={{ time: 2, beforeDuration: 1, duration: 1.5 }}
+      />
+    )
+  );
+  expect(getHoverPreview()?.textContent).toContain('0:02.000');
+  expect(
+    container?.querySelector('[data-ui="video-editor.timeline.duration-readout"]')?.textContent
+  ).toBe('0:01.000 → 0:01.500 (+0:00.500)');
+  act(() =>
+    root?.render(
+      <ProjectTimelineHoverPreview height={240} hoverTime={null} pixelsPerSecond={100} />
+    )
+  );
+  expect(getHoverPreview()).toBeNull();
+});

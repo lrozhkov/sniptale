@@ -422,6 +422,25 @@ describe('workspace-sidebar/selection/inspect-core', () => {
   });
 });
 
+it('groups camera source offset with timing while keeping placement in layout', () => {
+  const props = createVideoProps();
+  props.project.tracks = props.project.tracks.map((track) =>
+    track.id === props.selectedClip?.trackId
+      ? { ...track, role: VideoProjectTrackRole.CAMERA }
+      : track
+  );
+  if (props.selectedClip?.type !== 'VIDEO') throw new Error('Expected a camera video clip');
+  props.selectedClip.cameraTiming = { offsetSeconds: 0.25, transitions: 'bounded' };
+  renderInspectPanel(props);
+  expect(
+    container?.querySelector('[data-ui="video-editor.camera-placement-controls"]')
+  ).not.toBeNull();
+  expect(container?.textContent).not.toContain('gallery.videoReview.webcamOffset');
+  clickGroup('videoEditor.sidebar.inspectorGroupTiming');
+  expect(container?.textContent).toContain('gallery.videoReview.webcamOffset');
+  expect(container?.querySelector('[data-ui="video-editor.camera-placement-controls"]')).toBeNull();
+});
+
 function renderInspectPanel(props: WorkspaceSidebarSelectionPanelProps) {
   act(() => {
     root?.render(<WorkspaceSidebarInspectPanel {...props} />);

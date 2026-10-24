@@ -15,6 +15,13 @@ import {
   type CameraAppearance,
 } from '../../project/camera/appearance';
 import { isBoundedNumber } from '../../project/validation/primitives';
+import {
+  cameraSplitPanels,
+  FULL_CAMERA_PANEL,
+  interpolateCameraPanel,
+  isCameraSplitSide,
+  type CameraSplitSide,
+} from '../../project/camera/split';
 
 /** Normalized against the complete output scene, independently of Focus transforms. */
 export interface QuickEditWebcamPlacement {
@@ -31,6 +38,7 @@ interface QuickEditWebcamPosition {
   /** Original main-video seconds; cuts and speeds never rewrite this anchor. */
   time: number;
   placement: QuickEditWebcamPlacement;
+  split?: CameraSplitSide | null;
   crop?: QuickEditWebcamCrop;
   transition: { type: 'none' | 'ease-in-out' | 'shrink'; duration: number };
 }
@@ -45,6 +53,7 @@ export interface QuickEditWebcam {
   appearance: CameraAppearance;
   shadow?: { intensity: number; color: string };
   placement: QuickEditWebcamPlacement;
+  split?: CameraSplitSide | undefined;
   positions: QuickEditWebcamPosition[];
   hiddenRanges: CameraHiddenRange[];
 }
@@ -88,11 +97,14 @@ function parsePosition(value: unknown): QuickEditWebcamPosition | null {
     return null;
   const crop = value['crop'];
   if (crop !== undefined && !isCameraCrop(crop)) return null;
+  if (value['split'] !== undefined && value['split'] !== null && !isCameraSplitSide(value['split']))
+    return null;
   return {
     ...(crop === undefined ? {} : { crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY } }),
     id: value['id'],
     time: value['time'],
     placement,
+    ...(value['split'] === undefined ? {} : { split: value['split'] }),
     transition: { type: transition['type'], duration: transition['duration'] },
   };
 }
@@ -134,6 +146,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
   if (!placement || !positions || !hiddenRanges) return null;
   const appearance = value['appearance'];
   const shadow = value['shadow'];
+  if (value['split'] !== undefined && !isCameraSplitSide(value['split'])) return null;
   let parsedShadow: QuickEditWebcam['shadow'];
   if (shadow !== undefined) {
     const parsed = parseQuickEditShadow(shadow);
@@ -154,6 +167,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
     },
     ...(parsedShadow ? { shadow: parsedShadow } : {}),
     placement,
+    ...(value['split'] === undefined ? {} : { split: value['split'] }),
     positions,
     hiddenRanges,
   };
@@ -184,8 +198,16 @@ export function createQuickEditWebcam(
 export function quickEditWebcamPlacementAt(webcam: QuickEditWebcam, sourceTime: number) {
   const index = webcam.positions.findLastIndex((position) => position.time <= sourceTime);
   const current = webcam.positions[index];
-  if (!current) return webcam.placement;
-  const previous = webcam.positions[index - 1]?.placement ?? webcam.placement;
+  if (!current) return webcam.split ? cameraSplitPanels(webcam.split).camera : webcam.placement;
+  const previousPosition = webcam.positions[index - 1];
+  const previous = previousPosition
+    ? previousPosition.split
+      ? cameraSplitPanels(previousPosition.split).camera
+      : previousPosition.placement
+    : webcam.split
+      ? cameraSplitPanels(webcam.split).camera
+      : webcam.placement;
+  const destination = current.split ? cameraSplitPanels(current.split).camera : current.placement;
   const duration = Math.min(
     current.transition.duration,
     (webcam.positions[index + 1]?.time ?? Infinity) - current.time
@@ -194,24 +216,43 @@ export function quickEditWebcamPlacementAt(webcam: QuickEditWebcam, sourceTime: 
     current.transition.type === 'none' || duration === 0
       ? 1
       : Math.min(1, Math.max(0, (sourceTime - current.time) / duration));
-  if (progress === 1) return current.placement;
+  if (progress === 1) return destination;
   if (progress === 0) return previous;
   const eased = progress * progress * (3 - 2 * progress);
   const mix = (a: number, b: number) => a + (b - a) * eased;
   const scale =
     current.transition.type === 'shrink' ? 1 - 0.55 * Math.sin(Math.PI * progress) ** 2 : 1;
-  const width = mix(previous.width, current.placement.width) * scale;
-  const height = mix(previous.height, current.placement.height) * scale;
+  const width = mix(previous.width, destination.width) * scale;
+  const height = mix(previous.height, destination.height) * scale;
   return {
-    x:
-      mix(previous.x + previous.width / 2, current.placement.x + current.placement.width / 2) -
-      width / 2,
-    y:
-      mix(previous.y + previous.height / 2, current.placement.y + current.placement.height / 2) -
-      height / 2,
+    x: mix(previous.x + previous.width / 2, destination.x + destination.width / 2) - width / 2,
+    y: mix(previous.y + previous.height / 2, destination.y + destination.height / 2) - height / 2,
     width,
     height,
   };
+}
+
+/** Screen panel follows the same authored transition as the camera pane. */
+export function quickEditWebcamScreenPlacementAt(
+  webcam: QuickEditWebcam,
+  sourceTime: number
+): QuickEditWebcamPlacement {
+  const index = webcam.positions.findLastIndex((position) => position.time <= sourceTime);
+  const current = webcam.positions[index];
+  if (!current) return webcam.split ? cameraSplitPanels(webcam.split).screen : FULL_CAMERA_PANEL;
+  const previousSplit = webcam.positions[index - 1]?.split ?? (index === 0 ? webcam.split : null);
+  const from = previousSplit ? cameraSplitPanels(previousSplit).screen : FULL_CAMERA_PANEL;
+  const to = current.split ? cameraSplitPanels(current.split).screen : FULL_CAMERA_PANEL;
+  const duration = Math.min(
+    current.transition.duration,
+    (webcam.positions[index + 1]?.time ?? Infinity) - current.time
+  );
+  const progress =
+    current.transition.type === 'none' || duration === 0
+      ? 1
+      : Math.min(1, Math.max(0, (sourceTime - current.time) / duration));
+  const eased = progress * progress * (3 - 2 * progress);
+  return interpolateCameraPanel(from, to, eased);
 }
 
 /** One visibility and clock policy consumed by live preview and frame export. */

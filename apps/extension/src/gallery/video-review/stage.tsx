@@ -286,7 +286,7 @@ export function ReviewStage(props: ReviewStageProps) {
             binding={props.webcam}
             main={props.video}
             output={size}
-            manual={manual ? presentation.webcamManual : undefined}
+            manual={presentation.active ? presentation.webcamManual : undefined}
             onPreviewPlacement={presentation.onWebcamPreview}
           />
         ) : null}

@@ -1,6 +1,7 @@
 import { parseReviewSpeechTranscript } from '../../review/speech-validation';
 import { parseMediaSourceCrop } from '../media-crop';
 import { parseCameraHiddenRanges } from '../camera/visibility';
+import { isCameraSplitSide } from '../camera/split';
 import { parseColor } from '@sniptale/foundation/color';
 import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { isCameraAppearance, isCameraCrop } from '../camera/appearance';
@@ -243,6 +244,9 @@ function hasCameraPositions(value: unknown): boolean {
       typeof item['sourceTime'] !== 'number' ||
       item['sourceTime'] <= previous ||
       (item['crop'] !== undefined && !isCameraCrop(item['crop'])) ||
+      (item['cameraSplit'] !== undefined &&
+        item['cameraSplit'] !== null &&
+        !isCameraSplitSide(item['cameraSplit'])) ||
       !isTransform(item['transform']) ||
       !isRecord(item['transform']) ||
       Number(item['transform']['width']) <= 0 ||
@@ -422,6 +426,12 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   if (
     value['cameraMirrored'] !== undefined &&
     (value['type'] !== VideoProjectClipType.VIDEO || typeof value['cameraMirrored'] !== 'boolean')
+  )
+    return false;
+
+  if (
+    value['cameraSplit'] !== undefined &&
+    (value['type'] !== VideoProjectClipType.VIDEO || !isCameraSplitSide(value['cameraSplit']))
   )
     return false;
 

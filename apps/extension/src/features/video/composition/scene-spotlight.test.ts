@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { createQuickEditSpotlight } from '../project/scene/focus-appearance';
+import {
+  createQuickEditSpotlight,
+  parseQuickEditSpotlight,
+} from '../project/scene/focus-appearance';
 import { resolveSceneSpotlightTarget, sampleSceneSpotlight } from './scene-spotlight';
 
 it('samples fade and independent blur at evaluated phase progress', () => {
@@ -64,4 +67,36 @@ it('morphs evaluated compatible endpoints without applying an entrance expansion
   expect(sampleSceneSpotlight({ ...args, progress: 1 })).toEqual(
     resolveSceneSpotlightTarget(spotlight, args.window, 1)
   );
+});
+
+it('admits persisted lens optics and interpolates magnification over an interval', () => {
+  const authored = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify' as const,
+    magnification: 2.5,
+    lensOptics: 'optical' as const,
+  };
+  const spotlight = parseQuickEditSpotlight(authored)!;
+  expect(spotlight).toEqual(authored);
+  expect(parseQuickEditSpotlight({ ...authored, lensOptics: 'fisheye' })).toBeNull();
+  expect(parseQuickEditSpotlight({ ...authored, magnification: 5 })).toBeNull();
+  const args = {
+    spotlight,
+    window: { x: 100, y: 50, width: 400, height: 200 },
+    extent: { x: 0, y: 0, width: 800, height: 600 },
+    scale: 1,
+    phase: 'enter' as const,
+  };
+  expect(sampleSceneSpotlight({ ...args, progress: 0 }).lens).toEqual({
+    scale: 1,
+    optics: 'optical',
+  });
+  expect(sampleSceneSpotlight({ ...args, progress: 0.5 }).lens).toEqual({
+    scale: 1.75,
+    optics: 'optical',
+  });
+  expect(sampleSceneSpotlight({ ...args, progress: 1 }).lens).toEqual({
+    scale: 2.5,
+    optics: 'optical',
+  });
 });

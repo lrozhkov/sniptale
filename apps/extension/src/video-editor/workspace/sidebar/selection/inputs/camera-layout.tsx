@@ -11,6 +11,7 @@ import { NumberInput } from './number';
 import type { CameraPositionEdit } from '../../../../../features/video/project/camera/animation';
 import { InspectorActionButton } from '../shared/actions';
 import { translate } from '../../../../../platform/i18n';
+import { CameraSplitLayoutButtons } from './camera-split-layout-buttons';
 import {
   resolveVideoProjectCameraLayout,
   resolveVideoProjectCameraPlacement,
@@ -64,14 +65,14 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
   const currentTime = props.currentTime ?? props.clip.startTime;
   const position = activeCameraPosition(props.clip, currentTime);
   const clip = position
-    ? { ...props.clip, transform: position.transform, fitMode: position.fitMode }
+    ? {
+        ...props.clip,
+        transform: position.transform,
+        fitMode: position.fitMode,
+        cameraSplit: position.cameraSplit ?? undefined,
+      }
     : props.clip;
   const layout = resolveVideoProjectCameraLayout(props.project, clip);
-  const setOffset = (offsetSeconds: number) =>
-    props.onEditCameraPosition?.(props.clip.id, {
-      kind: 'offset',
-      offsetSeconds: Math.round(offsetSeconds * 1000) / 1000,
-    });
   const disabled = props.disabled || !props.onApplyCameraLayout;
   const [showCustom, setShowCustom] = useState(false);
   const custom =
@@ -86,27 +87,16 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
       data-ui="video-editor.camera-placement-controls"
     >
       <CameraPositionNavigation {...props} />
-      {props.clip.cameraTiming ? (
-        <NumericRow
-          label={translate('gallery.videoReview.webcamOffset')}
-          value={props.clip.cameraTiming.offsetSeconds}
-          min={-86400}
-          max={86400}
-          step={0.01}
-          precision={3}
-          unit="s"
-          disabled={props.disabled || !props.onEditCameraPosition}
-          onCommitValue={setOffset}
-          onPreviewValue={setOffset}
-        />
-      ) : null}
       <div
         className="video-inspector-camera-layout"
         role="group"
         aria-label={translate('videoEditor.sidebar.cameraLayoutLabel')}
       >
         {PLACEMENT_OPTIONS.map((option) => {
-          const active = !custom && matchesCameraPlacement(props.project, clip, option.placement);
+          const active =
+            layout === VideoProjectCameraLayout.OVERLAY &&
+            !custom &&
+            matchesCameraPlacement(props.project, clip, option.placement);
           return (
             <InspectorActionButton
               key={option.placement}
@@ -137,6 +127,14 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
             </InspectorActionButton>
           );
         })}
+        <CameraSplitLayoutButtons
+          layout={layout}
+          disabled={disabled}
+          onChoose={(choice) => {
+            setShowCustom(false);
+            props.onApplyCameraLayout?.(props.clip.id, choice);
+          }}
+        />
         {(
           [
             {
@@ -172,6 +170,29 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
       {custom ? props.customControls : null}
       <CameraTransitionFields {...props} />
     </div>
+  );
+}
+
+export function CameraTimingOffsetControl(props: CameraLayoutControlsProps) {
+  if (!props.clip.cameraTiming) return null;
+  const setOffset = (offsetSeconds: number) =>
+    props.onEditCameraPosition?.(props.clip.id, {
+      kind: 'offset',
+      offsetSeconds: Math.round(offsetSeconds * 1000) / 1000,
+    });
+  return (
+    <NumericRow
+      label={translate('gallery.videoReview.webcamOffset')}
+      value={props.clip.cameraTiming.offsetSeconds}
+      min={-86400}
+      max={86400}
+      step={0.01}
+      precision={3}
+      unit="s"
+      disabled={props.disabled || !props.onEditCameraPosition}
+      onCommitValue={setOffset}
+      onPreviewValue={setOffset}
+    />
   );
 }
 

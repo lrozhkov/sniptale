@@ -31,6 +31,23 @@ it('keeps authored protection while a contracting entrance covers a wider openin
   expect(frame.presence).toBe(0.25);
   expect(frame.openingClipProgress).toBe(0.25);
 });
+
+it('places the Native lens on the sampled cursor without changing its authored dock', () => {
+  const spotlight = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify' as const,
+    area: { x: 0.1, y: 0.2, width: 0.2, height: 0.2 },
+    magnification: 2.5,
+    lensOptics: 'optical' as const,
+  };
+  const frame = sampleCompositionSpotlightLayer({
+    ...geometry,
+    state: { id: 'lens', spotlight, phase: 'hold', progress: 1, lensFocus: { x: 0.75, y: 0.5 } },
+  });
+  expect(frame.opening).toEqual({ x: 260, y: 80, width: 80, height: 40 });
+  expect(frame.lens).toEqual({ scale: 2.5, optics: 'optical' });
+  expect(spotlight.area).toEqual({ x: 0.1, y: 0.2, width: 0.2, height: 0.2 });
+});
 it('uses the moving opening as full-strength protection throughout a linked morph', () => {
   const from = {
     ...createQuickEditSpotlight(),

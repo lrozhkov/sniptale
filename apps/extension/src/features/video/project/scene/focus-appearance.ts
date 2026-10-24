@@ -5,7 +5,10 @@ import { isBoundedNumber } from '../validation/primitives';
 /** An opening normalized over the decorated window; outside effects cover the composed scene. */
 export interface QuickEditSpotlight {
   area: { x: number; y: number; width: number; height: number };
-  effect: 'dim' | 'blur';
+  effect: 'dim' | 'blur' | 'magnify';
+  /** Lens strength and sampling; absent values keep authored spotlight history unchanged. */
+  magnification?: number;
+  lensOptics?: 'flat' | 'optical';
   strength: number;
   blur: number;
   roundness: number;
@@ -39,7 +42,11 @@ export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | nu
     !isBoundedNumber(area['height'], 0.01, 1) ||
     area['x'] + area['width'] > 1.0000001 ||
     area['y'] + area['height'] > 1.0000001 ||
-    (value['effect'] !== 'dim' && value['effect'] !== 'blur') ||
+    (value['effect'] !== 'dim' && value['effect'] !== 'blur' && value['effect'] !== 'magnify') ||
+    (value['magnification'] !== undefined && !isBoundedNumber(value['magnification'], 1, 4)) ||
+    (value['lensOptics'] !== undefined &&
+      value['lensOptics'] !== 'flat' &&
+      value['lensOptics'] !== 'optical') ||
     !isBoundedNumber(value['strength'], 0, 1) ||
     !isBoundedNumber(value['blur'], 0, 40) ||
     !isBoundedNumber(value['roundness'], 0, 0.5) ||
@@ -52,6 +59,8 @@ export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | nu
   return {
     area: { x: area['x'], y: area['y'], width: area['width'], height: area['height'] },
     effect: value['effect'],
+    ...(value['magnification'] === undefined ? {} : { magnification: value['magnification'] }),
+    ...(value['lensOptics'] === undefined ? {} : { lensOptics: value['lensOptics'] }),
     strength: value['strength'],
     blur: value['blur'],
     roundness: value['roundness'],
@@ -84,6 +93,22 @@ export function clampQuickEditSpotlightArea(
     height,
     x: Math.max(0, Math.min(1 - width, area.x)),
     y: Math.max(0, Math.min(1 - height, area.y)),
+  };
+}
+
+/** Move a lens around a normalized cursor point while retaining its authored dock and size. */
+export function placeQuickEditLens(
+  value: QuickEditSpotlight,
+  point: { x: number; y: number } | null
+): QuickEditSpotlight {
+  if (value.effect !== 'magnify' || !point) return value;
+  return {
+    ...value,
+    area: clampQuickEditSpotlightArea({
+      ...value.area,
+      x: point.x - value.area.width / 2,
+      y: point.y - value.area.height / 2,
+    }),
   };
 }
 

@@ -91,13 +91,17 @@ function drawLens(
     context.save();
     try {
       context.clip();
-      source.draw(
-        context,
-        x + (source.rect.x - x) * lens.scale,
-        y + (source.rect.y - y) * lens.scale,
-        source.rect.width * lens.scale,
-        source.rect.height * lens.scale
-      );
+      if (lens.optics === 'optical') {
+        drawOpticalLens(context, source, x, y, radius, lens.scale);
+      } else {
+        source.draw(
+          context,
+          x + (source.rect.x - x) * lens.scale,
+          y + (source.rect.y - y) * lens.scale,
+          source.rect.width * lens.scale,
+          source.rect.height * lens.scale
+        );
+      }
     } finally {
       context.restore();
     }
@@ -109,5 +113,88 @@ function drawLens(
     context.stroke();
   } finally {
     context.restore();
+  }
+}
+
+function drawOpticalLens(
+  context: CanvasRenderingContext2D,
+  source: PointerFeedbackSource,
+  x: number,
+  y: number,
+  radius: number,
+  scale: number
+): void {
+  const diameter = radius * 2;
+  // An optical lens is intentionally soft. Bound the readback and warp work for large radii.
+  const side = Math.max(1, Math.min(160, Math.ceil(diameter)));
+  const samplingScale = side / diameter;
+  const left = x - radius;
+  const top = y - radius;
+  const input = document.createElement('canvas');
+  const output = document.createElement('canvas');
+  input.width = output.width = side;
+  input.height = output.height = side;
+  try {
+    const inputContext = input.getContext('2d', { willReadFrequently: true });
+    const outputContext = output.getContext('2d');
+    if (!inputContext || !outputContext) return;
+    inputContext.scale(samplingScale, samplingScale);
+    source.draw(
+      inputContext,
+      source.rect.x - left,
+      source.rect.y - top,
+      source.rect.width,
+      source.rect.height
+    );
+    const sourcePixels = inputContext.getImageData(0, 0, side, side);
+    const warpedPixels = outputContext.createImageData(side, side);
+    warpOpticalPixels(sourcePixels.data, warpedPixels.data, side, side / 2, scale);
+    outputContext.putImageData(warpedPixels, 0, 0);
+    context.drawImage(output, left, top, diameter, diameter);
+  } finally {
+    input.width = input.height = output.width = output.height = 0;
+  }
+}
+
+/** Continuous inverse sampling prevents visible seams between magnification levels. */
+export function warpOpticalPixels(
+  input: Uint8ClampedArray,
+  output: Uint8ClampedArray,
+  side: number,
+  radius: number,
+  scale: number,
+  profile: 'radial' | 'rect' = 'radial'
+): void {
+  const center = side / 2;
+  for (let row = 0; row < side; row++) {
+    for (let column = 0; column < side; column++) {
+      const dx = column + 0.5 - center;
+      const dy = row + 0.5 - center;
+      const distance =
+        (profile === 'radial' ? Math.hypot(dx, dy) : Math.max(Math.abs(dx), Math.abs(dy))) / radius;
+      if (distance >= 1) continue;
+      const falloff = 1 - distance * distance;
+      const localScale = 1 + (scale - 1) * falloff * falloff;
+      const sampleX = center + dx / localScale - 0.5;
+      const sampleY = center + dy / localScale - 0.5;
+      const x0 = Math.max(0, Math.min(side - 1, Math.floor(sampleX)));
+      const y0 = Math.max(0, Math.min(side - 1, Math.floor(sampleY)));
+      const x1 = Math.min(side - 1, x0 + 1);
+      const y1 = Math.min(side - 1, y0 + 1);
+      const xWeight = sampleX - x0;
+      const yWeight = sampleY - y0;
+      const target = (row * side + column) * 4;
+      const upperLeft = (y0 * side + x0) * 4;
+      const upperRight = (y0 * side + x1) * 4;
+      const lowerLeft = (y1 * side + x0) * 4;
+      const lowerRight = (y1 * side + x1) * 4;
+      for (let channel = 0; channel < 4; channel++) {
+        const upper =
+          input[upperLeft + channel]! * (1 - xWeight) + input[upperRight + channel]! * xWeight;
+        const lower =
+          input[lowerLeft + channel]! * (1 - xWeight) + input[lowerRight + channel]! * xWeight;
+        output[target + channel] = upper * (1 - yWeight) + lower * yWeight;
+      }
+    }
   }
 }

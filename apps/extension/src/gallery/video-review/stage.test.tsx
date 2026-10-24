@@ -397,6 +397,22 @@ it('keeps video layout fixed throughout slow zoom and clips its fitted corners a
 });
 
 it('moves and resizes spotlight on the stage with live preview and one durable commit', async () => {
+  let nextFrame = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+    frames.delete(id);
+  });
+  const flushFrame = () =>
+    act(() => {
+      const callbacks = [...frames.values()];
+      frames.clear();
+      callbacks.forEach((callback) => callback(0));
+    });
+
   const onPreview = vi.fn(),
     onChange = vi.fn(),
     onInteract = vi.fn();
@@ -437,6 +453,7 @@ it('moves and resizes spotlight on the stage with live preview and one durable c
   });
   await stage.event(area, 'pointerdown', 400, 225);
   await stage.event(plane, 'pointermove', 480, 270);
+  flushFrame();
   expect(onPreview).toHaveBeenLastCalledWith({
     spotlight: {
       ...zoom.region.spotlight,

@@ -1,4 +1,9 @@
 import { drawCompositionSceneSpotlights } from '../../../features/video/composition/draw/project-spotlight';
+import {
+  drawDeferredCameraSplitSpotlights,
+  paintCameraSplitScreen,
+  resolveActiveCameraSplit,
+} from '../../../features/video/composition/camera-split';
 import { drawCompositionBorders } from '../../../features/video/composition/draw/border';
 import { drawSpatialCompositionGroup } from '../../../features/video/composition/draw/spatial';
 import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
@@ -62,6 +67,7 @@ function beginExportCameraPass(
 }
 
 async function drawVisualPasses(params: {
+  time: number;
   clipMediaElements: ClipMediaSources;
   context: CanvasRenderingContext2D;
   effectRuntimeFrames?: EffectRuntimeRenderedComposition;
@@ -76,9 +82,14 @@ async function drawVisualPasses(params: {
   logicalSize: { width: number; height: number };
   spatialRenderer?: () => ReviewSpatialRenderer;
 }) {
+  const splitClipId = resolveActiveCameraSplit(
+    params.project,
+    params.time,
+    params.renderPasses.overlayFrame.visualLayers
+  )?.clipId;
   const segments = segmentVisualLayersByViewportLock(
     resolveEffectRuntimeVisualLayers(
-      params.renderPasses.overlayFrame.visualLayers,
+      params.renderPasses.overlayFrame.visualLayers.filter((layer) => layer.clipId !== splitClipId),
       params.effectRuntimeFrames?.overlayFrames
     ),
     params.renderPasses.overlayFrame.camera
@@ -322,6 +333,7 @@ export async function drawProjectFrame(
       width: settings.width,
     });
     await drawVisualPasses({
+      time: currentTime,
       clipMediaElements,
       context,
       ...(options.effectRuntimeFrames ? { effectRuntimeFrames: options.effectRuntimeFrames } : {}),
@@ -365,6 +377,57 @@ export async function drawProjectFrame(
       spatialRenderer: options.spatialRenderer,
     });
     context.restore();
+    const split = resolveActiveCameraSplit(
+      project,
+      currentTime,
+      renderPasses.overlayFrame.visualLayers
+    );
+    if (split) {
+      paintCameraSplitScreen(
+        context,
+        {
+          x: offsetX,
+          y: offsetY,
+          width: project.width * scale,
+          height: project.height * scale,
+        },
+        split.screen
+      );
+      context.save();
+      try {
+        context.translate(offsetX, offsetY);
+        if (
+          !drawEffectRuntimeVisualLayer({
+            context,
+            frames: options.effectRuntimeFrames?.overlayFrames,
+            layer: split.layer,
+            scaleX: scale,
+            scaleY: scale,
+            state: createEffectRuntimeDrawState(),
+          })
+        )
+          drawCompositionLayer(
+            context,
+            split.layer,
+            scale,
+            scale,
+            loadedImages,
+            clipMediaElements,
+            1
+          );
+      } finally {
+        context.restore();
+      }
+      drawDeferredCameraSplitSpotlights({
+        context,
+        split,
+        frame: renderPasses.overlayFrame,
+        project,
+        images: loadedImages,
+        viewport: { x: 0, y: 0, width: settings.width, height: settings.height },
+        composition: { x: offsetX, y: offsetY, scale },
+      });
+    }
   } finally {
     context.restore();
   }

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { VideoEditorTrackHeightMultiplier } from '../../../persistence/track-panel';
 import { useProjectTimelineEffectInteractions } from '../effect-lanes/interactions';
 import type { ProjectTimelineProps } from '../types';
+import { useProjectTimelinePlaybackNavigation } from './playback-follow';
 import { useProjectTimelineDrag } from './drag';
 import { useProjectTimelineRangeSelection } from './range';
 import { useProjectTimelineScrollSync } from './scroll-sync';
@@ -210,6 +211,13 @@ export function useProjectTimelineState(
     trackHeightByTrackId,
     viewState.readTimelineStartTime
   );
+  const playbackNavigation = useProjectTimelinePlaybackNavigation(
+    props,
+    viewState,
+    scroll.timelineRef,
+    viewportWidth,
+    Boolean(interactions.dragGhost || interactions.effectDragDraft || playback.visiblePlaybackRange)
+  );
   useTimelineReveal({
     request: props.revealRequest,
     project,
@@ -241,7 +249,7 @@ export function useProjectTimelineState(
     hoveredClipId,
     ...interactions,
     ...playback,
-    ...viewState,
+    ...playbackNavigation,
     selectedClip,
     timelineWidth,
     setHoveredClipId,

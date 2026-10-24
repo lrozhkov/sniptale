@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import {
   supportedReviewVideoCodecs,
@@ -45,14 +45,17 @@ export function useReviewExportSettings(
       current = false;
     };
   }, [source, enabled, width, height, bitrate, fps, key]);
-  const index =
-    source && enabled
-      ? {
-          ...source,
-          outputCodecs:
-            probe?.source === source && probe.key === key ? probe.codecs : { mp4: [], webm: [] },
-        }
-      : source;
+  const index = useMemo(
+    () =>
+      source && enabled
+        ? {
+            ...source,
+            outputCodecs:
+              probe?.source === source && probe.key === key ? probe.codecs : { mp4: [], webm: [] },
+          }
+        : source,
+    [source, enabled, probe, key]
+  );
   const checkingCodecs = enabled && !(probe?.source === source && probe.key === key);
   return { index, renderSettings, setRenderSettings, checkingCodecs };
 }

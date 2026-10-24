@@ -94,10 +94,10 @@
       "file": "apps/extension/src/platform/i18n/messages/gallery/video-review.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:platform",
-      "reason": "tool-noise: The candidate adds typed RU/EN initial-mode titles, descriptions and a later-switch hint to the existing video-review message catalog. The file remains static locale data with no state, effects, external dependency edges or runtime authority and cohesion1. Splitting these messages only to satisfy the file cap would fragment their existing semantic catalog. Independent mode_structural_prewrite inspection supports Keep. Fresh complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess executable behavior, mutable state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-19",
-      "astHash": "84fdbb648be512db29387a8d5b8c9c9222b7fcd95d3f6c9fe07e0afd08601403",
+      "reason": "tool-noise: This candidate adds two paired RU and EN labels for the timed lens mode and placement. The file remains static locale data with no state, effects, dependency edges, or runtime authority. Its existing catalog is cohesive. Splitting these messages would fragment that catalog. Independent architecture review must check this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess executable behavior, mutable state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Fresh complete-candidate architecture review must check this classification.",
+      "reviewDate": "2026-10-24",
+      "astHash": "a12fbb17ab308f32e5e4fad48faaf849a0cbca1e44f8a8cc426f470cef016a29",
       "signatureHash": "401666a2c5baa7b93761dc388924bab5516dc4c098271f424f4811eccf1344ef"
     },
     {
@@ -380,11 +380,11 @@
       "file": "apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when mounted manual-preview scheduler/publication/disposal test fixture gains independently managed render lifetimes. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "f28b3142fd0757ed6810841d409e575ce73b34dbfd6fd065dc12c9d38aba80c2",
-      "signatureHash": "be757cb3047b9229806d267e986f4b3c24aceb428f1e7a77aa44ec3feae9dea8",
-      "reason": "tool-noise: The existing mounted presentation fixture now checks retained front replacement, background readiness, playback cadence and native/manual handoff. These are states of the same stage or presentation lifetime, with shared setup and teardown. File score remains 2 without an increase and cohesion is 1. Main inspected the complete fixture; it adds no independent persistence, transport or resource owner. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-15"
+      "reason": "tool-noise: This test file checks one presentation hook through a shared browser fixture. The added cases prove semantic identity, resource reuse, and visible frame publication. Fixture variables describe the same disposable session. Splitting these cases would duplicate the fixture without separating a product authority. Independent architecture review must assess this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-23",
+      "astHash": "5fe6f84fd1268ebc0c9cd28259f22280fc21695679e2cb98b569161256d83c25",
+      "signatureHash": "be757cb3047b9229806d267e986f4b3c24aceb428f1e7a77aa44ec3feae9dea8"
     },
     {
       "rule": "structural-function-risk",
@@ -424,11 +424,11 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when prepared-preview budget/admission/disposal test proof introduces another mutable resource receiver. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "6a3213e95612e72ea4791da46237a0c2668f87f5d37c450f75a566a42f601ad2",
-      "signatureHash": "86530e711942f831e057a31412f0ad7d4765551f03cc348f6c0b445b2ffc90e9",
-      "reason": "tool-noise: One resource/IO fixture tests prepared preview ownership, admission and layer ordering. New annotation cases exercise unique-source/output budgets, refusal before sandbox execution and late-abort/dispose/supersede cleanup through the same renderer API. The mock resource leases are recreated and IO reset; variants of prepared scene lifetime do not create a second production receiver. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: This test file checks one renderer through a shared resource fixture. Added cases cover caption refresh, semantic identity, cancellation, allocation, failure, and retry. Resource counters belong to the same preparation and publication lifetime. The line increase adds proof without introducing a production owner or writer. Independent architecture review must assess this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-23",
+      "astHash": "04ff396c4a1701c880477f84442dbe21665e870cd576268a82eb5360a6a3ed43",
+      "signatureHash": "db3098e942fda1cc0f25d863fb49281d664a5781b0becec4106d7d95505aa614"
     },
     {
       "rule": "structural-function-risk",
@@ -765,11 +765,11 @@
       "file": "apps/extension/src/gallery/video-review/stage.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The candidate changes only the dynamic import and local alias of the shared perspective default. Test fixtures, assertions, and lifecycle remain unchanged. The existing file score is 4 with delta 0. Splitting this fixture for a mechanical import change would add unrelated test ownership. Fresh architecture review must check this classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent fixtures, state receivers, gestures, resources, or test behavior. Remove when import-only analysis recognizes this dynamic import projection.",
-      "reviewDate": "2026-10-20",
-      "astHash": "f2dc57463fe306444aac6f18ed64b04eeef7446007e0de539189987ea0ede63b",
-      "signatureHash": "ef5dee3252ee043ec4e129b77f2488d6c9091f0ea6426835716b79e68759d0ab"
+      "reason": "tool-noise: This test file checks the review stage with one shared React fixture. The candidate adds a cancellable animation frame queue to the existing spotlight gesture case. The queue observes the existing deferred preview before assertions. It adds no production authority or independent fixture. Independent architecture review must assess this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-23",
+      "astHash": "0d8dea0023e3b05a0a32178a3947cf2efa197b0490617cf6c42d5c07da4cbed5",
+      "signatureHash": "a8c7dacdb3caebb50c6ffcb765747b29b1a54f45272f1ccbddf661a2854c286f"
     },
     {
       "rule": "structural-function-risk",
@@ -2283,11 +2283,11 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
       "symbol": "createMaterializedJoinPresentation",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: This factory owns one serial frame preparation lifetime. Its163 lines include nested sample and returned frame methods, which analysis also measures separately. The outer body has11 statements and cyclomatic1. Existing injected media state and canvas remain the same receiver. The subordinate cut renderer omits final scene edges. Failure, retry and disposal tests cover the same lifetime. The correction forwards output sampling to final scene fades through the existing input. Independent architecture review must assess this changed body again.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "c19667a07e89fd8e9191ede0711cf80dc059fcb41145b6e94d394185276a042d",
-      "signatureHash": "d124a5c7e4a4a1fcffed5cc4aa1ec6dcadaff12efa7f44644016471279b89945"
+      "reason": "tool-noise: This factory owns one serial composition lifetime. Its outer line count includes nested sampling and frame methods that the analyzer also measures separately. Project updates invalidate endpoint copies while retaining compatible media in the same owner. The outer body contains eleven statements and one cyclomatic path. Independent architecture review must assess this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-23",
+      "astHash": "1232775ab86fc78ecef8bd2357f78b96b439a06bc6c0b098ed7d630fd0b16350",
+      "signatureHash": "cd62735830284b47717064ff7ac4a0eab741447e9bfeb5f4e0b47d37d29ea869"
     },
     {
       "rule": "structural-file-risk",
@@ -2420,6 +2420,50 @@
       "reviewDate": "2026-10-23",
       "astHash": "514016bbd4bd152a0efa63a1e19773e60c96d400e69bd303d0bf0e1f2ea39955",
       "signatureHash": "65db8947592046ea0204fa32f520b703b3644746aa27ccfcaf8aa14c040262e1"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/preview/cache/materializer.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: This test file checks one materializer and its media lifetime. The added cases prove compatible updates, invalidation, cancellation, retry, and disposal. Mock counters represent the resources of that same materializer. The line increase adds proof without adding a product authority. Independent architecture review must assess this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-23",
+      "astHash": "ec4ec0c3b00326e5966318ef1ca8fc1e2774683023232720ce2368b86e438495",
+      "signatureHash": "4c8eeba057dbcff011b043bf63e24861df6871d3c7521ee9d316e8a9aa8aa335"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/render-preview.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This file retains one prepared-scene resource lifetime. Later camera split changes call the existing render-allocation admission and pure panel painters within that same lifetime. Outer fade painting moved to the same scene helper. The complete file has one owner, one effect family and cohesion 0.96; no additional writer or runtime authority was introduced. Independent architecture review must inspect this exact candidate before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-24",
+      "astHash": "278a021f059eab378f8817f81b3c93ea47db5a0f589e93ca5708c3e4ab13ee11",
+      "signatureHash": "d48bf5df3c1bd234a4b93ac5971237130de41b8c1e850273bbe651c66e7d833a"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/render-preview.ts",
+      "symbol": "createReviewPreviewRenderer",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This factory owns the current scene, generation, resource leases, and disposal. Its outer line count includes nested lifecycle methods that the analyzer also measures separately. The outer body contains ten statements and one cyclomatic path. Moving these closures solely to reduce lines would distribute the same state authority. Independent architecture review must assess this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-23",
+      "astHash": "d8db43c5d27d9e9f83ca14ad6a727c91b466d5c6c5d8fb6ce8226f8a9f20494c",
+      "signatureHash": "d7f57fe082b1ba8c068746bfd925235d6703826902782cd2634e5e1b11f20997"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/render-preview.ts",
+      "symbol": "createReviewPreviewRenderer.prepare",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One prepare transaction selects an exact match, retained resources, or replacement resources. The two reported state receivers are mutually exclusive resource branches under one current record. The factory owns cancellation, generation checks, and publication. A named caption operation isolates admission and planning without moving that authority. Tests cover supersession, revert, failure, retry, disposal, and resource limits. Independent architecture review must assess this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-23",
+      "astHash": "4f75b8062c05c46264d17a23216e8603da03db7fa79e17cc9ef49b26c03ac413",
+      "signatureHash": "7f6156d16770269261aac61f2e56e18eb91a74fa4164c7da762118782484b733"
     }
   ]
 }

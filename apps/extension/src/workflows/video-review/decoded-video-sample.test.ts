@@ -405,3 +405,26 @@ it('holds the last bounded video frame after a split even when the caller reques
   source.dispose();
   expect(closeLast).toHaveBeenCalledOnce();
 });
+
+it('samples the explicit project snapshot while retaining the accepted source decoder', async () => {
+  const clip = createVideoClip({
+    id: 'moving',
+    startTime: 0,
+    duration: 2,
+    sourceStart: 0,
+    sourceDuration: 2,
+  });
+  const project = createProject([clip]);
+  const source = createCompositionCutSampleSource({ project, sourceUrl: () => 'blob:stable' });
+  cutDecode.getSample.mockImplementation(async (time: number) => cutFrame(time));
+  const first = await source.sample(0.25, new AbortController().signal, 'first');
+  first.release();
+  const next = { ...project, clips: [{ ...clip, sourceStart: 0.5 }] };
+  const second = await source.sample(0.25, new AbortController().signal, 'first', next);
+  second.release();
+  expect(cutDecode.getSample.mock.calls.map(([time]) => time)).toEqual([0.25, 0.75]);
+  expect(cutDecode.open).toHaveBeenCalledOnce();
+  expect(cutDecode.dispose).not.toHaveBeenCalled();
+  source.dispose();
+  expect(cutDecode.dispose).toHaveBeenCalledOnce();
+});

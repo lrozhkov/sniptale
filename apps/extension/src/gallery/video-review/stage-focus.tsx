@@ -65,7 +65,9 @@ export function ReviewStageFocusControl(props: {
           label={translate(
             focus.region.border
               ? 'gallery.videoReview.focusBorder'
-              : 'gallery.videoReview.focusSpotlight'
+              : focus.region.spotlight?.effect === 'magnify'
+                ? 'gallery.videoReview.focusLens'
+                : 'gallery.videoReview.focusSpotlight'
           )}
           output={output}
           video={computeQuickEditSourceWindowTransform(layout)}
@@ -167,9 +169,11 @@ export function ReviewStageFocusTargets(props: {
           const label = translate(
             region.border
               ? 'gallery.videoReview.focusBorder'
-              : region.spotlight
-                ? 'gallery.videoReview.focusSpotlight'
-                : 'gallery.videoReview.zoomRegionLabel'
+              : region.spotlight?.effect === 'magnify'
+                ? 'gallery.videoReview.focusLens'
+                : region.spotlight
+                  ? 'gallery.videoReview.focusSpotlight'
+                  : 'gallery.videoReview.zoomRegionLabel'
           );
           return (
             <button

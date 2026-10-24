@@ -442,9 +442,11 @@ function reviewZoomBlockPresentation(
   const kindLabel = translate(
     region.border
       ? 'gallery.videoReview.focusBorder'
-      : region.spotlight
-        ? 'gallery.videoReview.focusSpotlight'
-        : 'gallery.videoReview.zoomRegionLabel'
+      : region.spotlight?.effect === 'magnify'
+        ? 'gallery.videoReview.focusLens'
+        : region.spotlight
+          ? 'gallery.videoReview.focusSpotlight'
+          : 'gallery.videoReview.zoomRegionLabel'
   );
   const label =
     `${kindLabel} ` +
@@ -634,9 +636,11 @@ function ReviewZoomRegionBlock(
           name={translate(
             region.border
               ? 'gallery.videoReview.focusBorder'
-              : region.spotlight
-                ? 'gallery.videoReview.focusSpotlight'
-                : 'gallery.videoReview.zoomRegionLabel'
+              : region.spotlight?.effect === 'magnify'
+                ? 'gallery.videoReview.focusLens'
+                : region.spotlight
+                  ? 'gallery.videoReview.focusSpotlight'
+                  : 'gallery.videoReview.zoomRegionLabel'
           )}
           value={region.spotlight || region.border ? undefined : scaleLabel}
         />

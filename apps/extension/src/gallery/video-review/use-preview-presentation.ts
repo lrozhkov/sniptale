@@ -46,6 +46,10 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   // A raw-source dissolve cannot represent two independently decorated camera poses.
   const manual =
     isReviewPreviewManual(input.preferences, input.playing) ||
+    !!(
+      input.scene.webcam?.enabled &&
+      (input.scene.webcam.split || input.scene.webcam.positions.some((position) => position.split))
+    ) ||
     (!!input.scene.annotationEffects?.lane.enabled &&
       input.scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
     !!input.scene.captions?.settings?.enabled ||

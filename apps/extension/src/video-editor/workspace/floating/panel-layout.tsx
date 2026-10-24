@@ -45,7 +45,7 @@ export function useWorkspacePanelSizes(materialsOpen: boolean) {
   const defaults = { materials: Math.min(360, 240 + extraWidth), inspector: 320 + extraWidth };
   const materialsMax = Math.min(360, frameWidth - 40 - 640 - 280);
   const materialsWidth = Math.min(widths.materials ?? defaults.materials, materialsMax);
-  const inspectorMax = Math.min(520, frameWidth - 40 - 640 - (materialsOpen ? materialsWidth : 0));
+  const inspectorMax = Math.min(800, frameWidth - 40 - 640 - (materialsOpen ? materialsWidth : 0));
   const dimension = (side: PanelSide): WorkspacePanelResize => {
     const setWidth = side === 'materials' ? setMaterialsWidth : setInspectorWidth;
     const limits = PANEL_WIDTHS[side];

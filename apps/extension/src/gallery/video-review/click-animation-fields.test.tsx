@@ -100,6 +100,7 @@ it('shows lens controls with fractional magnification and no repeated pulses', (
   expect(field('clickRadius', 'range').max).toBe('160');
   expect(field('clickPulses')).toBeNull();
   expect(field('clickLensShadow').value).toBe('20');
+  expect(host.textContent).toContain('gallery.videoReview.clickLensOptics_optical');
   expect(field('clickStroke')).not.toBeNull();
   act(() => {
     field('clickMagnification').focus();

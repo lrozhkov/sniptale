@@ -33,6 +33,7 @@ import {
 import { drawPreviewTransitionOverlays, resolvePreviewEffectDrawState } from './render-effects';
 import { resolvePreviewPassTarget } from './render-pass-target';
 import type { VideoEditorPreviewRasterSize } from '../sizing/raster';
+import { resolveActiveCameraSplit } from '../../../../features/video/composition/camera-split';
 
 function drawLockedPreviewLayer(
   prepared: PreparedPreviewSceneCanvas,
@@ -180,6 +181,7 @@ export async function drawPreviewVisualPasses(params: {
 
   await drawPreviewOrderedVisualLayers({
     project: params.project,
+    time: params.currentTime ?? 0,
     canvas: params.canvas,
     clipMediaElements: params.clipMediaElements,
     frame: params.overlayFrame,
@@ -200,6 +202,7 @@ export async function drawPreviewVisualPasses(params: {
 
 async function drawPreviewOrderedVisualLayers(params: {
   project: VideoProject;
+  time: number;
   canvas: HTMLCanvasElement;
   clipMediaElements: Map<string, VideoCompositionMediaSource>;
   frame: ReturnType<typeof resolveVideoCompositionRenderPasses>['overlayFrame'];
@@ -209,9 +212,14 @@ async function drawPreviewOrderedVisualLayers(params: {
   prepared: PreparedPreviewSceneCanvas;
   spatialRenderer: (() => ReviewSpatialRenderer) | undefined;
 }) {
+  const splitClipId = resolveActiveCameraSplit(
+    params.project,
+    params.time,
+    params.frame.visualLayers
+  )?.clipId;
   const segments = segmentVisualLayersByViewportLock(
     resolveEffectRuntimeVisualLayers(
-      params.frame.visualLayers,
+      params.frame.visualLayers.filter((layer) => layer.clipId !== splitClipId),
       params.effectRuntimeFrames?.overlayFrames
     ),
     params.frame.camera

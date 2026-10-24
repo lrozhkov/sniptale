@@ -11,6 +11,8 @@ import {
   resolveMotionConnectionVideo,
 } from '../../../project/motion';
 import type { VideoProject, VideoProjectMotionRegion } from '../../../project/types';
+import { VideoMotionFocusMode } from '../../../project/types';
+import { resolveProjectCursorFocus } from '../../../project/cursor-focus-path/projection';
 import { motionConnectionProgress } from '../../motion/math';
 import type { VideoCompositionSpotlightState } from '../../types';
 
@@ -54,17 +56,24 @@ export function resolveVideoCompositionSpotlights(project: VideoProject, time: n
           spotlight: region.spotlight!,
           ...sampleSpotlightPhase(region, time, edges.connectedIn, edges.connectedOut, project),
         };
-    const state = {
-      ...sampled,
-      ...(region.sourceBinding?.coordinateSpace
-        ? { coordinateSpace: region.sourceBinding.coordinateSpace }
-        : {}),
-    };
     const clipId =
       inGap && region.sourceBinding?.coordinateSpace === 'source-window'
         ? resolveMotionConnectionVideo(project, incoming, region, time)?.id
         : region.sourceBinding?.clipId;
     if (region.sourceBinding?.coordinateSpace === 'source-window' && !clipId) continue;
+    const cursor =
+      region.spotlight?.effect === 'magnify' && region.focusMode === VideoMotionFocusMode.CURSOR
+        ? resolveProjectCursorFocus(project, time, undefined, clipId)
+        : null;
+    const state = {
+      ...sampled,
+      ...(region.sourceBinding?.coordinateSpace
+        ? { coordinateSpace: region.sourceBinding.coordinateSpace }
+        : {}),
+      ...(cursor
+        ? { lensFocus: { x: cursor.x / project.width, y: cursor.y / project.height } }
+        : {}),
+    };
     if (region.spotlightTarget === 'window' && clipId) {
       const states = windows.get(clipId) ?? [];
       states.push(state);

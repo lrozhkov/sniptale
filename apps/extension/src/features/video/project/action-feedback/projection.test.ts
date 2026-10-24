@@ -6,7 +6,30 @@ import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../factories/creation';
 import { getVideoProjectUtilityLanes } from '../utility-lanes';
 import { getVideoProjectFeedbackRuns, patchVideoProjectActionFeedback } from './projection';
-import { parseVideoProjectActionFeedback, REVIEW_CLICK_DEFAULT } from './validation';
+import {
+  parseReviewClickAnimations,
+  parseVideoProjectActionFeedback,
+  REVIEW_CLICK_DEFAULT,
+} from './validation';
+
+it('preserves an optical click style through persisted parsing and rejects malformed optics', () => {
+  const style = { id: 'click', ...REVIEW_CLICK_DEFAULT, effect: 'magnify' as const };
+  expect(parseReviewClickAnimations([style])?.[0]).not.toHaveProperty('lensOptics');
+  const optical = { ...style, lensOptics: 'optical' };
+  expect(parseReviewClickAnimations([optical])?.[0]).toMatchObject({ lensOptics: 'optical' });
+  expect(
+    parseVideoProjectActionFeedback([
+      {
+        recordingId: 'recording',
+        sourceInstanceId: 'instance',
+        settings: [],
+        signals: [],
+        gestureStyles: [optical],
+      },
+    ])?.[0]?.gestureStyles?.[0]
+  ).toMatchObject({ lensOptics: 'optical' });
+  expect(parseReviewClickAnimations([{ ...style, lensOptics: 'fisheye' }])).toBeNull();
+});
 
 function fixture() {
   const project = createVideoProjectFromRecording({

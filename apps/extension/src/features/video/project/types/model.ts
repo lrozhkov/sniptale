@@ -6,6 +6,7 @@ import type { VideoProjectTextBinding } from '../text/types';
 import type { ReviewSpeechTranscript } from '../../review/speech-transcript';
 import type { CameraHiddenRange } from '../camera/visibility';
 import type { CameraAppearance, CameraCrop } from '../camera/appearance';
+import type { CameraSplitSide } from '../camera/split';
 import type { VideoProjectVoiceTextSnapshot } from '../text/types';
 import type { VideoMediaFitMode } from './media';
 import type {
@@ -63,6 +64,7 @@ export interface VideoProjectSourceVoiceoverDocument {
 interface CameraPosition {
   /** An absent destination crop inherits the clip-wide source framing. */
   crop?: CameraCrop;
+  cameraSplit?: CameraSplitSide | null;
   id: string;
   /** Source seconds keep the trajectory continuous across trims, splits and rate changes. */
   sourceTime: number;
@@ -259,6 +261,7 @@ export interface VideoProjectUtilityLanes {
 }
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
+  cameraSplit?: CameraSplitSide | undefined;
   /** Camera-native source seconds survive cuts, rates and project moves. */
   cameraHiddenRanges?: CameraHiddenRange[];
   /** Authored camera anchors use main-source seconds; media seconds subtract the offset. */

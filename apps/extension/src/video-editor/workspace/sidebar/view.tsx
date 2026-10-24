@@ -146,9 +146,11 @@ export function getSelectionMeta(
       const region = project?.motionRegions?.find((item) => item.id === selection.motionRegionId);
       return region?.border
         ? createStaticSelectionMeta(Frame, 'gallery.videoReview.focusBorder')
-        : region?.spotlight
-          ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusSpotlight')
-          : createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
+        : region?.spotlight?.effect === 'magnify'
+          ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusLens')
+          : region?.spotlight
+            ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusSpotlight')
+            : createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
     }
     case VideoEditorSelectionKind.MOTION_CONNECTION: {
       const region = project?.motionRegions?.find((item) => item.id === selection.motionRegionId);

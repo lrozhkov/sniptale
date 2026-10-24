@@ -2,6 +2,7 @@ import { createReviewPreviewRenderer } from '../../workflows/video-review/render
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import {
   quickEditWebcamFrameAt,
+  quickEditWebcamScreenPlacementAt,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
 import { createReviewPreviewPresentation } from './preview-presentation';
@@ -408,11 +409,15 @@ function capturePresentationCamera(
   if (state.phase !== 'ready' || !source) throw new PendingPresentation();
   const mapped = quickEditWebcamFrameAt(binding.settings, video.currentTime, state.duration);
   if (!mapped) return undefined;
+  const screen = quickEditWebcamScreenPlacementAt(binding.settings, video.currentTime);
+  const split = screen.width < 1 || screen.height < 1;
   const selected =
     !binding.disabled && ['webcam', 'webcam-position'].includes(binding.editor.selection.kind);
   const result = source.captureAccepted(
     {
-      placement: snapshot.placement ?? (selected ? binding.editor.placement : undefined),
+      placement: split
+        ? undefined
+        : (snapshot.placement ?? (selected ? binding.editor.placement : undefined)),
       crop: selected ? binding.editor.crop : undefined,
     },
     resources

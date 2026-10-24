@@ -313,7 +313,19 @@ export function resolveEffectDisplayDraft(
   target: TimelineEffectDragTarget,
   range: Omit<TimelineEffectDragDraft, 'segmentId'>
 ): TimelineEffectDragDraft {
-  const draft = { segmentId: target.segmentId, ...range };
+  const startTime = range.startTime ?? target.originalStart;
+  const timingFeedback =
+    target.kind === 'motion' && target.mode !== 'move'
+      ? {
+          time:
+            target.mode === 'resize-end'
+              ? startTime + (range.duration ?? target.originalDuration)
+              : startTime,
+          beforeDuration: target.originalDuration,
+          duration: range.duration ?? target.originalDuration,
+        }
+      : { time: startTime };
+  const draft = { segmentId: target.segmentId, ...range, timingFeedback };
   if (target.kind === 'cursor') {
     const startTime = range.startTime ?? target.originalStart;
     return {

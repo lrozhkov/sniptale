@@ -307,9 +307,11 @@ export function MotionOverview(props: { motionRegion: VideoProjectMotionRegion }
           value={
             props.motionRegion.border
               ? translate('gallery.videoReview.focusBorder')
-              : props.motionRegion.spotlight
-                ? translate('gallery.videoReview.focusSpotlight')
-                : getMotionFocusModeLabel(props.motionRegion.focusMode)
+              : props.motionRegion.spotlight?.effect === 'magnify'
+                ? translate('gallery.videoReview.focusLens')
+                : props.motionRegion.spotlight
+                  ? translate('gallery.videoReview.focusSpotlight')
+                  : getMotionFocusModeLabel(props.motionRegion.focusMode)
           }
         />
         <DetailItem

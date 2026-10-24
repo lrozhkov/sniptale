@@ -80,3 +80,9 @@ it('removes cursor source facts with backing media while retaining manual cursor
   expect(removed.cursorTrack?.samples).toEqual(project.cursorTrack!.samples);
   expect(removed.cursorTrack?.skin).toEqual(project.cursorTrack!.skin);
 });
+
+it('does not replace captured source references for an unrelated appearance edit', () => {
+  const { project } = fixture();
+  const edited = { ...project, name: 'Appearance edit' };
+  expect(reconcileVideoProjectInteractionSources(project, edited)).toEqual({});
+});

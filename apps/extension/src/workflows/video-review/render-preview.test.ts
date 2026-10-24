@@ -33,7 +33,18 @@ const io = vi.hoisted(() => ({
   header: vi.fn(),
   spatial: vi.fn(),
   background: vi.fn(),
+  captionPreparation: vi.fn(),
 }));
+vi.mock('./render-captions', async (original) => {
+  const actual = await original<typeof import('./render-captions')>();
+  return {
+    ...actual,
+    prepareReviewCaptions: (...args: Parameters<typeof actual.prepareReviewCaptions>) => {
+      io.captionPreparation(...args);
+      return actual.prepareReviewCaptions(...args);
+    },
+  };
+});
 vi.mock('./scene-frame', () => ({ drawReviewSceneFrame: io.frame }));
 vi.mock('./render-scene-overlays', () => ({ drawReviewSceneOverlays: io.overlays }));
 vi.mock('./render-webcam', () => ({ drawReviewWebcam: io.webcam }));
@@ -752,7 +763,11 @@ it('admits bitmap and retained transition bytes before reservation and refreshes
   prepared.release();
   const count = replaceLimits.mock.calls.length;
   input.publication.previousFront = { width: 20, height: 20 };
-  const next = await renderer.prepare(snapshot, dimensions, new AbortController().signal);
+  const next = await renderer.prepare(
+    { ...snapshot, zoomRegions: [createQuickEditZoomRegion({ id: 'camera-update', at: 0 })] },
+    dimensions,
+    new AbortController().signal
+  );
   expect(replaceLimits).toHaveBeenCalledTimes(count + 1);
   expect(createImageBitmap).toHaveBeenCalledOnce();
   next.release();
@@ -939,5 +954,410 @@ it('admits the full output dissolve scratch and endpoint overlays before acquiri
   expect(resources.canvas).toHaveBeenCalledWith('preview-transition-source', dimensions.backing);
   output.release();
   prepared.release();
+  renderer.dispose();
+});
+
+it('retains camera-independent preparation across paused camera edits and cancels only old leases', async () => {
+  const { resources, reservations } = setup();
+  const bitmap = { width: 100, height: 50, close: vi.fn() };
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async () => bitmap)
+  );
+  const readAsset = vi.fn(async () => new Blob(['image']));
+  const renderer = createReviewPreviewRenderer({ resources, readAsset });
+  const input = captionScene();
+  input.background = {
+    enabled: true,
+    type: 'image',
+    assetId: 'background',
+    imageFit: 'contain',
+    layout: { padding: 0, cornerRadius: 0, blur: 8 },
+  };
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'camera', at: 0, duration: 4 }),
+    perspective: { enabled: true, rotateX: 10, rotateY: 20, rotateZ: 0, strength: 0.5 },
+  };
+  input.zoomRegions = [region];
+  const controller = new AbortController();
+  const first = await renderer.prepare(input, dimensions, controller.signal);
+  (await renderer.render(first, frame())).release();
+  const painter = io.background.mock.results[0]!.value;
+  const spatial = io.spatial.mock.results[0]!.value;
+  const nextScene = {
+    ...input,
+    zoomRegions: [{ ...region, transform: { ...region.transform, scale: 2, centerX: 0.7 } }],
+  };
+  const next = await renderer.prepare(nextScene, dimensions, new AbortController().signal);
+  controller.abort();
+  expect(readAsset).toHaveBeenCalledOnce();
+  expect(createImageBitmap).toHaveBeenCalledOnce();
+  expect(io.spatial).toHaveBeenCalledOnce();
+  expect(io.background).toHaveBeenCalledOnce();
+  expect(painter.dispose).not.toHaveBeenCalled();
+  expect(spatial.dispose).not.toHaveBeenCalled();
+  expect(bitmap.close).not.toHaveBeenCalled();
+  await expect(renderer.render(first, frame())).rejects.toThrow('stale');
+  (await renderer.render(next, frame())).release();
+  expect(io.frame.mock.calls.at(-1)![1].backgroundPainter).toBe(painter);
+  expect(io.frame.mock.calls.at(-1)![1].spatialRenderer).toBe(spatial);
+  expect(io.overlays.mock.calls.at(-1)![0].regions).toEqual(nextScene.zoomRegions);
+  expect(io.frame.mock.calls.at(-1)![1].cameraScale).toBe(2);
+  renderer.dispose();
+  renderer.dispose();
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(painter.dispose).toHaveBeenCalledOnce();
+  expect(spatial.dispose).toHaveBeenCalledOnce();
+  for (const release of reservations) expect(release).toHaveBeenCalledOnce();
+});
+
+it.each(['asset', 'style', 'captions', 'dimensions'] as const)(
+  'invalidates retained preparation when %s inputs change',
+  async (change) => {
+    const { resources } = setup();
+    const bitmaps: { width: number; height: number; close: ReturnType<typeof vi.fn> }[] = [];
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => {
+        const bitmap = { width: 100, height: 50, close: vi.fn() };
+        bitmaps.push(bitmap);
+        return bitmap;
+      })
+    );
+    const renderer = createReviewPreviewRenderer({
+      resources,
+      readAsset: async () => new Blob(['image']),
+    });
+    const input = scene();
+    input.background = {
+      enabled: true,
+      type: 'image',
+      assetId: 'one',
+      imageFit: 'contain',
+      layout: { padding: 0, cornerRadius: 0 },
+    };
+    const first = await renderer.prepare(input, dimensions, new AbortController().signal);
+    const changed = structuredClone(input);
+    if (changed.background.enabled && changed.background.type === 'image') {
+      if (change === 'asset') changed.background.assetId = 'two';
+      if (change === 'style') changed.background.layout.blur = 10;
+    }
+    if (change === 'captions')
+      changed.captions = {
+        document: undefined,
+        settings: createReviewCaptionSettings(),
+        segments: [],
+      };
+    const next = await renderer.prepare(
+      changed,
+      change === 'dimensions'
+        ? { ...dimensions, backing: { width: 320, height: 180 } }
+        : dimensions,
+      new AbortController().signal
+    );
+    expect(createImageBitmap).toHaveBeenCalledTimes(2);
+    expect(bitmaps[0]!.close).toHaveBeenCalledOnce();
+    await expect(renderer.render(first, frame())).rejects.toThrow('stale');
+    (await renderer.render(next, frame())).release();
+    renderer.dispose();
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('refreshes captions without disposing camera-independent resources', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const input = scene();
+  input.captions = {
+    document: undefined,
+    settings: { ...createReviewCaptionSettings(), enabled: true },
+    segments: [],
+  };
+  await renderer.prepare(input, dimensions, new AbortController().signal);
+  const painter = io.background.mock.results[0]!.value;
+  await renderer.prepare(
+    { ...input, zoomRegions: [createQuickEditZoomRegion({ id: 'new-camera', at: 0 })] },
+    dimensions,
+    new AbortController().signal
+  );
+  expect(io.background).toHaveBeenCalledOnce();
+  expect(painter.dispose).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('retains effect resources for camera edits and invalidates changed effect inputs', async () => {
+  const f = await annotationsFixture();
+  const { resources } = setup();
+  const createExecutor = vi.fn(() => f.executor);
+  const renderer = createReviewPreviewRenderer({ resources, annotationExecutor: createExecutor });
+  const first = await renderer.prepare(f.input, dimensions, new AbortController().signal);
+  (await renderer.render(first, frame())).release();
+  const nextScene = {
+    ...f.input,
+    zoomRegions: [createQuickEditZoomRegion({ id: 'new-camera', at: 0 })],
+  };
+  const next = await renderer.prepare(nextScene, dimensions, new AbortController().signal);
+  (await renderer.render(next, frame())).release();
+  expect(createExecutor).toHaveBeenCalledOnce();
+  expect(f.executor.dispose).not.toHaveBeenCalled();
+  const changed = structuredClone(nextScene);
+  changed.annotationEffects!.lane.instances[0]!.transform.x = 0.4;
+  await renderer.prepare(changed, dimensions, new AbortController().signal);
+  expect(f.executor.dispose).toHaveBeenCalledOnce();
+  renderer.dispose();
+  expect(f.executor.dispose).toHaveBeenCalledOnce();
+});
+
+it('readmits retained assets and permits retry after a camera-change admission refusal', async () => {
+  const { resources } = setup();
+  const replaceLimits = vi.fn();
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    allocation: { describe: allocationInput, replaceLimits },
+  });
+  const input = scene();
+  const first = await renderer.prepare(input, dimensions, new AbortController().signal);
+  const painter = io.background.mock.results[0]!.value;
+  const changed = {
+    ...input,
+    zoomRegions: [createQuickEditZoomRegion({ id: 'new-camera', at: 0 })],
+  };
+  replaceLimits.mockImplementationOnce(() => {
+    throw new Error('admission refused');
+  });
+  await expect(renderer.prepare(changed, dimensions, new AbortController().signal)).rejects.toThrow(
+    'admission refused'
+  );
+  expect(painter.dispose).not.toHaveBeenCalled();
+  (await renderer.render(first, frame())).release();
+  const calls = replaceLimits.mock.calls.length;
+  const next = await renderer.prepare(changed, dimensions, new AbortController().signal);
+  expect(replaceLimits).toHaveBeenCalledTimes(calls + 1);
+  (await renderer.render(next, frame())).release();
+  expect(io.background).toHaveBeenCalledOnce();
+  renderer.dispose();
+  expect(painter.dispose).toHaveBeenCalledOnce();
+});
+
+function captionScene() {
+  const input = scene();
+  input.captions = {
+    settings: { ...createReviewCaptionSettings(), enabled: true },
+    segments: buildReviewTimeMap(5, []),
+    document: {
+      version: 1,
+      fragments: [
+        {
+          id: 'caption',
+          text: 'Caption',
+          originalText: 'Caption',
+          start: 0,
+          end: 5,
+          timeDomain: 'result',
+          alignment: 'manual',
+          revision: 0,
+          timingRevision: 0,
+          showInVideo: true,
+        },
+      ],
+    },
+  };
+  return input;
+}
+
+it('refreshes camera-dependent caption reservations to match a newly prepared scene', async () => {
+  const { resources, leases } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const input = captionScene();
+  input.comments = [
+    {
+      ...createCanvasComment({ id: 'comment', position: { x: 0.5, y: 0.7 } }),
+      attachment: 'content',
+      renderToVideo: true,
+      resolvedText: 'Comment',
+    },
+  ];
+  const region = createQuickEditZoomRegion({ id: 'camera', at: 0, duration: 5 });
+  input.zoomRegions = [region];
+  await renderer.prepare(input, dimensions, new AbortController().signal);
+  const firstArguments = io.captionPreparation.mock.calls.at(-1)![0];
+  const changed = {
+    ...input,
+    zoomRegions: [{ ...region, transform: { ...region.transform, scale: 2, centerY: 0.4 } }],
+  };
+  const next = await renderer.prepare(changed, dimensions, new AbortController().signal);
+  const nextArguments = io.captionPreparation.mock.calls.at(-1)![0];
+  const context = leases[0]!.context;
+  expect(nextArguments.reservations(context)).not.toEqual(firstArguments.reservations(context));
+  const fresh = createReviewPreviewRenderer({ resources });
+  const reference = await fresh.prepare(changed, dimensions, new AbortController().signal);
+  expect(next.captionConflicts).toEqual(reference.captionConflicts);
+  expect(nextArguments.reservations(context)).toEqual(
+    io.captionPreparation.mock.calls.at(-1)![0].reservations(context)
+  );
+  (await renderer.render(next, frame())).release();
+  expect(io.order).toContain('captions');
+  renderer.dispose();
+  fresh.dispose();
+});
+
+it.each(['abort', 'newer', 'revert', 'dispose', 'font-failure'] as const)(
+  'does not install or release shared assets after caption refresh %s',
+  async (action) => {
+    const { resources } = setup();
+    const renderer = createReviewPreviewRenderer({ resources });
+    const input = captionScene();
+    const first = await renderer.prepare(input, dimensions, new AbortController().signal);
+    const painter = io.background.mock.results[0]!.value;
+    const faces = await document.fonts.load('font');
+    let finish!: (faces: FontFace[]) => void;
+    vi.mocked(document.fonts.load).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const controller = new AbortController();
+    const changed = {
+      ...input,
+      zoomRegions: [createQuickEditZoomRegion({ id: 'pending', at: 0 })],
+    };
+    const pending = renderer.prepare(changed, dimensions, controller.signal);
+    const rejected = expect(pending).rejects.toThrow();
+    let latest = first;
+    if (action === 'abort') controller.abort();
+    if (action === 'dispose') renderer.dispose();
+    if (action === 'revert')
+      latest = await renderer.prepare(input, dimensions, new AbortController().signal);
+    if (action === 'newer')
+      latest = await renderer.prepare(
+        { ...changed, zoomRegions: [createQuickEditZoomRegion({ id: 'latest', at: 1 })] },
+        dimensions,
+        new AbortController().signal
+      );
+    finish(action === 'font-failure' ? [] : faces);
+    await rejected;
+    if (action !== 'dispose') {
+      expect(painter.dispose).not.toHaveBeenCalled();
+      (await renderer.render(latest, frame())).release();
+      const retry = await renderer.prepare(changed, dimensions, new AbortController().signal);
+      (await renderer.render(retry, frame())).release();
+      expect(io.background).toHaveBeenCalledOnce();
+      renderer.dispose();
+    }
+    expect(painter.dispose).toHaveBeenCalledOnce();
+  }
+);
+
+it('admits caption measurement beside retained render allocations in the real resource ledger', async () => {
+  const { createPreviewRenderResources } = await import('./preview-render-resources');
+  const { calculatePreviewRenderAllocation } = await import('./preview-render-allocation');
+  const context = setup().resources.canvas('context', { width: 1, height: 1 }).context;
+  const resources = createPreviewRenderResources({
+    maximumManagedBytes: 1,
+    maximumCanvases: 1,
+    createCanvas: () =>
+      ({ width: 0, height: 0, getContext: () => context }) as unknown as HTMLCanvasElement,
+  });
+  const graph = allocationInput();
+  graph.scene.spatial = { output: dimensions.backing, plane: dimensions.backing, halfFloat: true };
+  const limits: { maximumManagedBytes: number; maximumCanvases: number }[] = [];
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    allocation: {
+      describe: () => graph,
+      replaceLimits(value) {
+        resources.replaceLimits(value);
+        limits.push(value);
+      },
+    },
+  });
+  const input = captionScene();
+  const first = await renderer.prepare(input, dimensions, new AbortController().signal);
+  const plan = calculatePreviewRenderAllocation({ ...graph, assets: first.allocationAssets });
+  const peak = plan.phases.find((phase) => phase.name === 'scene')!;
+  // Occupy the admitted worst-case phase, including retained GPU storage, before refreshing captions.
+  const retained = peak.allocations.map((allocation) =>
+    allocation.canvases
+      ? resources.canvas(allocation.role, { width: allocation.bytes / 4, height: 1 })
+      : resources.bytes(allocation.role, allocation.bytes)
+  );
+  const changed = { ...input, zoomRegions: [createQuickEditZoomRegion({ id: 'camera', at: 0 })] };
+  const next = await renderer.prepare(changed, dimensions, new AbortController().signal);
+  expect(limits.at(-2)).toEqual({
+    maximumManagedBytes: plan.maximumManagedBytes + 4,
+    maximumCanvases: plan.maximumCanvases + 1,
+  });
+  expect(limits.at(-1)).toEqual({
+    maximumManagedBytes: plan.maximumManagedBytes,
+    maximumCanvases: plan.maximumCanvases,
+  });
+  expect(resources.counters.peakManagedBytes).toBe(peak.bytes + 4);
+  expect(resources.counters.peakCanvasCount).toBe(peak.canvases + 1);
+  expect(next.captionConflicts).toEqual(first.captionConflicts);
+  for (const resource of retained) resource.release();
+  renderer.dispose();
+  resources.dispose();
+  expect(resources.counters.managedBytes).toBe(0);
+});
+
+it('preserves scene and preparation identity across persisted property reordering', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const input = captionScene();
+  input.background = {
+    enabled: true,
+    type: 'solid',
+    color: '#000000',
+    layout: { blur: 8, padding: 40, cornerRadius: 12 },
+  };
+  const first = await renderer.prepare(input, dimensions, new AbortController().signal);
+  const reordered = {
+    ...input,
+    background: {
+      type: 'solid' as const,
+      enabled: true as const,
+      color: '#000000',
+      layout: { padding: 40, cornerRadius: 12, blur: 8 },
+    },
+  };
+  const same = await renderer.prepare(reordered, dimensions, new AbortController().signal);
+  expect(same.generation).toBe(first.generation);
+  expect(io.background).toHaveBeenCalledOnce();
+  expect(io.captionPreparation).toHaveBeenCalledOnce();
+  const region = createQuickEditZoomRegion({ id: 'camera', at: 0 });
+  const changedCamera = await renderer.prepare(
+    { ...reordered, zoomRegions: [region] },
+    dimensions,
+    new AbortController().signal
+  );
+  expect(changedCamera.generation).not.toBe(first.generation);
+  expect(io.background).toHaveBeenCalledOnce();
+  expect(io.captionPreparation).toHaveBeenCalledTimes(2);
+  const changed = {
+    ...reordered,
+    background: {
+      ...reordered.background,
+      layout: { ...reordered.background.layout, padding: 50 },
+    },
+  };
+  await renderer.prepare(changed, dimensions, new AbortController().signal);
+  expect(io.background).toHaveBeenCalledTimes(2);
+  const regions = [region, createQuickEditZoomRegion({ id: 'second', at: 3 })];
+  const ordered = await renderer.prepare(
+    { ...changed, zoomRegions: regions },
+    dimensions,
+    new AbortController().signal
+  );
+  const reversed = await renderer.prepare(
+    { ...changed, zoomRegions: [...regions].reverse() },
+    dimensions,
+    new AbortController().signal
+  );
+  expect(reversed.generation).not.toBe(ordered.generation);
+  (await renderer.render(reversed, frame())).release();
+  expect(
+    io.overlays.mock.calls.at(-1)![0].regions.map((entry: { id: string }) => entry.id)
+  ).toEqual(['second', 'camera']);
   renderer.dispose();
 });

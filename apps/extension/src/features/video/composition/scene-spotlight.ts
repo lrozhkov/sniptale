@@ -8,6 +8,8 @@ export interface SceneSpotlightFrame {
   radius: number;
   dim: number;
   blur: number;
+  /** Original scene pixels inside the opening, magnified without moving the camera. */
+  lens?: { scale: number; optics: 'flat' | 'optical' };
   protectionOpening?: SceneSpotlightRect;
   protectionRadius?: number;
   presence?: number;
@@ -34,6 +36,9 @@ export function resolveSceneSpotlightTarget(
     radius: Math.min(opening.width, opening.height) * value.roundness,
     dim: value.effect === 'dim' ? value.strength : 0,
     blur: value.effect === 'blur' ? value.blur * scale : 0,
+    ...(value.effect === 'magnify'
+      ? { lens: { scale: value.magnification ?? 2, optics: value.lensOptics ?? 'flat' } }
+      : {}),
   };
 }
 
@@ -50,13 +55,14 @@ export function sampleSceneSpotlight(args: {
   const end = resolveSceneSpotlightTarget(args.spotlight, args.window, args.scale);
   const animation = args.phase === 'exit' ? args.spotlight.exitReveal : args.spotlight.reveal;
   const expanded = expandSpotlightOpening(end, args.extent);
-  const start = args.from ?? {
+  const start: SceneSpotlightFrame = args.from ?? {
     opening: animation === 'contract' ? expanded.opening : end.opening,
     radius: animation === 'contract' ? expanded.radius : 0,
     dim: 0,
     blur: 0,
   };
   const t = Math.max(0, Math.min(1, args.progress));
+  const lens = start.lens ?? end.lens;
   return {
     opening: {
       x: mix(start.opening.x, end.opening.x, t),
@@ -67,6 +73,14 @@ export function sampleSceneSpotlight(args: {
     radius: mix(start.radius, end.radius, t),
     dim: mix(start.dim, end.dim, t),
     blur: mix(start.blur, end.blur, t),
+    ...(lens
+      ? {
+          lens: {
+            scale: mix(start.lens?.scale ?? 1, end.lens?.scale ?? 1, t),
+            optics: end.lens?.optics ?? start.lens!.optics,
+          },
+        }
+      : {}),
   };
 }
 

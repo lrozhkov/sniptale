@@ -77,7 +77,7 @@ export function syncProjectTransitions(project: VideoProject): VideoProject {
       transitionByPair.get(buildPairKey(junction.leadingClip.id, junction.trailingClip.id)) ??
       legacyTransitions.get(buildPairKey(junction.leadingClip.id, junction.trailingClip.id));
 
-    return normalizeVideoProjectTransition({
+    const normalized = normalizeVideoProjectTransition({
       duration: junction.duration,
       easing: existing?.easing ?? VideoTransitionEasing.LINEAR,
       id: existing?.id ?? crypto.randomUUID(),
@@ -90,23 +90,37 @@ export function syncProjectTransitions(project: VideoProject): VideoProject {
       ...(existing?.highlightColor ? { highlightColor: existing.highlightColor } : {}),
       ...(existing?.intensity ? { intensity: existing.intensity } : {}),
     });
+    const fields = new Map(Object.entries(normalized));
+    return existing &&
+      Object.keys(existing).length === fields.size &&
+      Object.entries(existing).every(
+        ([key, value]) => fields.has(key) && Object.is(fields.get(key), value)
+      )
+      ? existing
+      : normalized;
   });
 
   const trailingTransitionIds = new Set(transitions.map((transition) => transition.trailingClipId));
   const leadingTransitionIds = new Set(transitions.map((transition) => transition.leadingClipId));
-  const clips = project.clips.map((clip) => ({
-    ...clip,
-    transitionIn: trailingTransitionIds.has(clip.id)
+  const clips = project.clips.map((clip) => {
+    const transitionIn = trailingTransitionIds.has(clip.id)
       ? VideoClipTransitionKind.CROSSFADE
-      : VideoClipTransitionKind.NONE,
-    transitionOut: leadingTransitionIds.has(clip.id)
+      : VideoClipTransitionKind.NONE;
+    const transitionOut = leadingTransitionIds.has(clip.id)
       ? VideoClipTransitionKind.CROSSFADE
-      : VideoClipTransitionKind.NONE,
-  }));
+      : VideoClipTransitionKind.NONE;
+    return clip.transitionIn === transitionIn && clip.transitionOut === transitionOut
+      ? clip
+      : { ...clip, transitionIn, transitionOut };
+  });
 
   return applyVideoProjectMutationPatch(project, {
-    clips,
-    transitions,
+    clips: clips.every((clip, index) => clip === project.clips[index]) ? project.clips : clips,
+    transitions:
+      transitions.length === project.transitions?.length &&
+      transitions.every((transition, index) => transition === project.transitions?.[index])
+        ? project.transitions
+        : transitions,
   });
 }
 

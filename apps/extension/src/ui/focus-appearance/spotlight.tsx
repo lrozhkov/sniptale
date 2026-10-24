@@ -21,18 +21,48 @@ export function SpotlightAppearanceFields(props: {
   const { value, onChange, Details } = props;
   return (
     <div className="sniptale-parameter-stack">
-      <SegmentedRow<QuickEditSpotlight['effect']>
-        columns={2}
-        layout="stacked"
-        label={translate('gallery.videoReview.focusOutside')}
-        ariaLabel={translate('gallery.videoReview.focusOutside')}
-        value={value.effect}
-        options={[
-          { value: 'dim', label: translate('gallery.videoReview.focusDim') },
-          { value: 'blur', label: translate('gallery.videoReview.focusBlur') },
-        ]}
-        onChange={(effect) => onChange({ effect })}
-      />
+      {value.effect === 'magnify' ? (
+        <>
+          <PreviewNumericRow
+            label={translate('gallery.videoReview.clickMagnification')}
+            min={1}
+            max={4}
+            step={0.1}
+            precision={2}
+            unit="x"
+            value={value.magnification ?? 2}
+            onPreview={(magnification) =>
+              props.onPreview?.(magnification === null ? null : { magnification })
+            }
+            onChange={(magnification) => onChange({ magnification })}
+          />
+          <SegmentedRow<'flat' | 'optical'>
+            columns={2}
+            layout="stacked"
+            label={translate('gallery.videoReview.clickLensOptics')}
+            ariaLabel={translate('gallery.videoReview.clickLensOptics')}
+            value={value.lensOptics ?? 'flat'}
+            options={[
+              { value: 'flat', label: translate('gallery.videoReview.clickLensOptics_flat') },
+              { value: 'optical', label: translate('gallery.videoReview.clickLensOptics_optical') },
+            ]}
+            onChange={(lensOptics) => onChange({ lensOptics })}
+          />
+        </>
+      ) : (
+        <SegmentedRow<'dim' | 'blur'>
+          columns={2}
+          layout="stacked"
+          label={translate('gallery.videoReview.focusOutside')}
+          ariaLabel={translate('gallery.videoReview.focusOutside')}
+          value={value.effect}
+          options={[
+            { value: 'dim', label: translate('gallery.videoReview.focusDim') },
+            { value: 'blur', label: translate('gallery.videoReview.focusBlur') },
+          ]}
+          onChange={(effect) => onChange({ effect })}
+        />
+      )}
       {value.effect === 'dim' ? (
         <PreviewNumericRow
           label={translate('gallery.videoReview.focusStrength')}
@@ -47,7 +77,7 @@ export function SpotlightAppearanceFields(props: {
           }
           onChange={(strength) => onChange({ strength: strength / 100 })}
         />
-      ) : (
+      ) : value.effect === 'blur' ? (
         <PreviewNumericRow
           label={translate('gallery.videoReview.focusBlurRadius')}
           min={0}
@@ -59,7 +89,7 @@ export function SpotlightAppearanceFields(props: {
           onPreview={(blur) => props.onPreview?.(blur === null ? null : { blur })}
           onChange={(blur) => onChange({ blur })}
         />
-      )}
+      ) : null}
       <FocusRoundnessField
         value={value.roundness}
         onPreview={(roundness) => props.onPreview?.(roundness === null ? null : { roundness })}

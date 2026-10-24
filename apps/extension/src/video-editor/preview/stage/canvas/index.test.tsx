@@ -149,12 +149,22 @@ it('previews an independent handle gesture and commits once without changing the
   handle.setPointerCapture = vi.fn();
   handle.hasPointerCapture = () => false;
   pointer(handle, 'pointerdown', 100, 80);
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  pointer(window, 'pointermove', 150, 100);
   pointer(window, 'pointermove', 200, 120);
+  expect(props.onPreviewEffectAnchors).not.toHaveBeenCalled();
+  expect(frames).toHaveLength(1);
+  act(() => frames[0]!(0));
   expect(props.onPreviewEffectAnchors).toHaveBeenCalledWith('effect', { tip: { x: 200, y: 120 } });
   expect(props.onUpdateEffectInstance).not.toHaveBeenCalled();
-  pointer(window, 'pointerup', 200, 120);
+  pointer(window, 'pointermove', 220, 140);
+  pointer(window, 'pointerup', 240, 160);
   expect(props.onUpdateEffectInstance).toHaveBeenCalledExactlyOnceWith('effect', {
-    sceneAnchors: { tip: { x: 200, y: 120 } },
+    sceneAnchors: { tip: { x: 240, y: 160 } },
   });
   expect(props.onUpdateClipTransform).not.toHaveBeenCalled();
   expect(props.onPreviewEffectAnchors).toHaveBeenLastCalledWith('effect', null);
@@ -173,4 +183,33 @@ it('cancels a handle gesture with Escape and hides editing handles in a player o
   act(() => root!.render(<PreviewStageCanvas {...props} selectedClipLocked />));
   expect(container!.querySelector('[data-effect-handle]')).toBeNull();
   expect(createPreviewStageSelectionOverlay({ ...props, mode: 'player' })).toBeNull();
+});
+
+it.each(['Escape', 'pointercancel', 'unmount'])('cancels pending handle frames on %s', (reason) => {
+  const props = fixture();
+  render(props);
+  const handle = container!.querySelector<HTMLButtonElement>('[data-effect-handle="tip"]')!;
+  handle.setPointerCapture = vi.fn();
+  handle.hasPointerCapture = () => false;
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+  pointer(handle, 'pointerdown', 100, 80);
+  pointer(window, 'pointermove', 400, 200);
+  if (reason === 'Escape') {
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  } else if (reason === 'unmount') {
+    act(() => root!.unmount());
+    root = undefined;
+  } else {
+    pointer(window, 'pointercancel', 400, 200);
+  }
+  expect(cancel).toHaveBeenCalledWith(1);
+  expect(props.onUpdateEffectInstance).not.toHaveBeenCalled();
+  expect(props.onPreviewEffectAnchors).toHaveBeenCalledExactlyOnceWith('effect', null);
+  act(() => frames[0]!(0));
+  expect(props.onPreviewEffectAnchors).toHaveBeenCalledTimes(1);
 });

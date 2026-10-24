@@ -114,6 +114,58 @@ for (const variant of variants) {
   });
 }
 
+test('expanded inspector keeps every selected clip and track in two bounded columns', async ({
+  page,
+  hostOrigin,
+}, info) => {
+  test.setTimeout(300_000);
+  const variant = variants[3];
+  const fixture = await openAuditProject(page, hostOrigin, variant);
+  await setInspectorWidth(page, 800);
+  const panel = page.locator(INSPECTOR);
+  const checkColumns = async (selection: string) => {
+    if (!(await panel.locator('[data-presentation="all"]').count()))
+      await page.locator(TOGGLE).click();
+    await openAllDetails(panel);
+    const geometry = await panel.evaluate((root) => {
+      const body = root.querySelector('[data-ui="video-editor.inspector.body"]');
+      const groups = root.querySelector('[data-presentation="all"]');
+      const sections = [...(groups?.querySelectorAll(':scope > section') ?? [])];
+      return {
+        columns: groups ? getComputedStyle(groups).gridTemplateColumns : '',
+        sectionBoxes: sections.map((section) => {
+          const box = section.getBoundingClientRect();
+          return { x: box.x, right: box.right, width: box.width };
+        }),
+        overflow: body ? body.scrollWidth - body.clientWidth : -1,
+      };
+    });
+    expect(geometry.overflow, selection).toBeLessThanOrEqual(1);
+    if (geometry.sectionBoxes.length > 1) {
+      expect(geometry.columns.split(' ').length, selection).toBe(2);
+      expect(geometry.sectionBoxes[1]!.x - geometry.sectionBoxes[0]!.x, selection).toBeGreaterThan(
+        100
+      );
+      expect(geometry.sectionBoxes[0]!.right, selection).toBeLessThanOrEqual(
+        geometry.sectionBoxes[1]!.x - 8
+      );
+    }
+  };
+  for (const clip of fixture.project.clips) {
+    await selectAuditClip(page, clip, variant.locale);
+    await checkColumns(`clip ${clip.type} ${clip.id}`);
+  }
+  for (const track of fixture.project.tracks) {
+    await page
+      .locator('[data-ui="video-editor.timeline.track-select"]')
+      .filter({ hasText: track.name })
+      .first()
+      .click();
+    await checkColumns(`track ${track.kind} ${track.name}`);
+  }
+  await page.screenshot({ path: info.outputPath('expanded-inspector.png'), fullPage: false });
+});
+
 async function openAuditProject(page: Page, hostOrigin: string, variant: AuditVariant) {
   page.setDefaultTimeout(10_000);
   const fixture = createInspectorAuditFixture();

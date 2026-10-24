@@ -305,6 +305,11 @@
     gap: 12px;
     align-items: start;
   }
+  [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all']:has(
+      > .review-inspector-section-column:only-child
+    ) {
+    grid-template-columns: minmax(0, 1fr);
+  }
   /* Embedded object settings already occupy their parent section's column. */
   .review-inspector-section-body
     [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all'] {

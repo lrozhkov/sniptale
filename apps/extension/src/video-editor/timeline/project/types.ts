@@ -148,8 +148,16 @@ export interface TimelineEffectSelection {
   segmentId: string;
 }
 
+/** Timing values from the accepted gesture draft, in seconds. */
+interface TimelineTimingFeedback {
+  time: number;
+  beforeDuration?: number;
+  duration?: number;
+}
+
 /** Transient timeline geometry; the project changes only when the gesture commits. */
 export interface TimelineEffectDragDraft {
+  timingFeedback?: TimelineTimingFeedback | undefined;
   segmentId: string;
   cursorSampleTimes?: {
     sampleId: string;
@@ -233,6 +241,7 @@ export interface TimelineClipReorderSlot {
 }
 
 export interface TimelineClipDragGhost extends TimelineClipDragPlacement {
+  timingFeedback?: TimelineTimingFeedback | undefined;
   reorderSlots?: TimelineClipReorderSlot[];
   activeReorder?: 'left' | 'right';
   relatedClips?: TimelineClipDragPlacement[];

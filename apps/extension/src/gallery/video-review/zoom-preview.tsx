@@ -21,6 +21,7 @@ import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { ReviewBorderOverlay } from './border-overlay';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
+import type { SceneSpotlightLayer } from '../../features/video/composition/draw/spotlight';
 import { useReviewWindowHeader } from './use-window-header';
 import { ZoomPreviewCanvas } from './zoom-preview-canvas';
 import { ReviewSpotlightPreview } from './spotlight-preview';
@@ -164,6 +165,18 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
   const spatialInteractive =
     interactive && props.spatialEdit?.enabled !== false && !props.spatialEdit?.region.dormant;
   const background = props.background;
+  const resultOverlays =
+    !overlay && (view === 'result' || playback)
+      ? resolveZoomResultOverlays({
+          region,
+          focus: props.focus,
+          background,
+          output,
+          layout,
+          scale: previewScale * camera.scale,
+          cornerRadius,
+        })
+      : null;
   const authoredCenter = (patch: { centerX: number; centerY: number; scale?: number }) => {
     const mapped = quickEditCropCamera({ ...camera, ...patch }, props, true);
     return { ...patch, centerX: mapped.centerX, centerY: mapped.centerY };
@@ -180,6 +193,7 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
     layout,
     output,
     onPreview: props.onPreview,
+    lensFrames: resultOverlays?.spotlights.filter((frame) => frame.lens),
   };
   return (
     <section
@@ -250,17 +264,7 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
             getFrame={() => playback?.video ?? frame?.image ?? null}
           />
         ) : null}
-        {!overlay && (view === 'result' || playback) ? (
-          <ZoomResultOverlays
-            region={region}
-            focus={props.focus}
-            background={background}
-            output={output}
-            layout={layout}
-            scale={previewScale * camera.scale}
-            cornerRadius={cornerRadius}
-          />
-        ) : null}
+        {resultOverlays ? <ZoomResultOverlays value={resultOverlays} /> : null}
         {!overlay && props.spatialEdit && tool !== 'position' ? (
           <ZoomSpatialEditor
             edit={props.spatialEdit}
@@ -552,7 +556,7 @@ function resolvePreviewCamera(props: ZoomPreviewProps) {
 }
 
 /** Results composite all sampled masks before source-attached strokes in the same window. */
-function ZoomResultOverlays(props: {
+function resolveZoomResultOverlays(props: {
   region: QuickEditZoomRegion;
   focus: ZoomPreviewProps['focus'];
   background: QuickEditBackgroundSettings;
@@ -560,7 +564,13 @@ function ZoomResultOverlays(props: {
   layout: ReturnType<typeof computeQuickEditSceneLayout>;
   scale: number;
   cornerRadius: number;
-}) {
+}): {
+  output: { width: number; height: number };
+  spotlights: SceneSpotlightLayer[];
+  borders: ReturnType<typeof evaluateQuickEditBordersAtTime>;
+  clip: { rect: { x: number; y: number; width: number; height: number }; radius: number };
+  projection: ReturnType<typeof quickEditPlaneProjection> | undefined;
+} {
   const sample = {
     regions: props.focus?.regions ?? [props.region],
     time: props.focus?.time ?? (props.region.start + props.region.end) / 2,
@@ -577,12 +587,27 @@ function ZoomResultOverlays(props: {
   const projection = props.layout.spatial
     ? quickEditPlaneProjection(window, window, props.layout.spatial)
     : undefined;
+  return {
+    output: props.output,
+    spotlights: evaluateQuickEditSpotlightsAtTime(sample).map((frame) => ({
+      ...frame,
+      clip,
+      ...(projection ? { projection } : {}),
+    })),
+    borders: evaluateQuickEditBordersAtTime(sample),
+    clip,
+    projection,
+  };
+}
+
+function ZoomResultOverlays(props: { value: ReturnType<typeof resolveZoomResultOverlays> }) {
+  const { spotlights, borders, clip, projection, output } = props.value;
   return (
     <>
       <ReviewSpotlightOverlay
         projection={projection}
-        output={props.output}
-        frames={evaluateQuickEditSpotlightsAtTime(sample)}
+        output={output}
+        frames={spotlights.filter((frame) => frame.dim > 0 || frame.blur > 0)}
         clip={clip}
       />
       <div
@@ -593,11 +618,7 @@ function ZoomResultOverlays(props: {
             : undefined
         }
       >
-        <ReviewBorderOverlay
-          output={props.output}
-          frames={evaluateQuickEditBordersAtTime(sample)}
-          clip={clip}
-        />
+        <ReviewBorderOverlay output={output} frames={borders} clip={clip} />
       </div>
     </>
   );

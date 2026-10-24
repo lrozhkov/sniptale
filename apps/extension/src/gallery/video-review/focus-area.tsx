@@ -79,10 +79,15 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
   const { frame, hovered, trackPointer, pointerInteraction, keyboardInteraction } =
     useFocusFrameHover();
   const host = useRef<HTMLDivElement>(null);
+  const previewFrame = useRef<number | null>(null);
   const { drag, draft, setDraft, cancel } = useCapturedPreview<
     SpotlightCapture,
     QuickEditSpotlight['area']
-  >(props.disabled, () => onPreview?.(null));
+  >(props.disabled, () => {
+    if (previewFrame.current !== null) cancelAnimationFrame(previewFrame.current);
+    previewFrame.current = null;
+    onPreview?.(null);
+  });
   const areaValue = draft ?? props.area;
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     trackPointer(event);
@@ -104,13 +109,21 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
         : { ...active.area, x: active.area.x + dx, y: active.area.y + dy }
     );
     drag.current!.pending = area;
-    setDraft(area);
-    onPreview?.(area);
+    if (previewFrame.current !== null) return;
+    previewFrame.current = requestAnimationFrame(() => {
+      previewFrame.current = null;
+      if (drag.current !== active || !active.pending) return;
+      setDraft(active.pending);
+      onPreview?.(active.pending);
+    });
   };
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     trackPointer(event);
     if (drag.current?.id !== event.pointerId) return;
-    if (drag.current.pending) props.onChange(drag.current.pending);
+    if (drag.current.pending) {
+      onPointerMove(event);
+      props.onChange(drag.current.pending);
+    }
     cancel();
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {

@@ -43,6 +43,16 @@ export function reconcileVideoProjectInteractionSources(
     !project.cursorTrack?.sourceObservations?.length
   )
     return {};
+  if (
+    previous.source === project.source &&
+    previous.baseRecordingId === project.baseRecordingId &&
+    previous.assets === project.assets &&
+    previous.clips === project.clips &&
+    previous.cursorTrack === project.cursorTrack &&
+    previous.actionFeedback === project.actionFeedback &&
+    previous.cursorFocusPath === project.cursorFocusPath
+  )
+    return {};
   const before = sourceInstances(previous),
     after = sourceInstances(project);
   const retained = (binding: { recordingId: string; sourceInstanceId: string }) =>

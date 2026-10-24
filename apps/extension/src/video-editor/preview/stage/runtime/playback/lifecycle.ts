@@ -152,8 +152,12 @@ function usePreviewRuntimeConfigurationReset(
   params: UsePreviewStagePlaybackPreviewRuntimeParams
 ): void {
   const projectRenderIdentity = useMemo(
-    () => createVideoPreviewRenderIdentity(params.project),
-    [params.project]
+    // Live gestures need conservative invalidation without serializing recorded telemetry.
+    () =>
+      params.previewMode === VideoEditorPreviewMode.CACHE
+        ? createVideoPreviewRenderIdentity(params.project)
+        : params.project,
+    [params.project, params.previewMode]
   );
   useLayoutEffect(() => {
     authority.completedCacheRef.current = null;

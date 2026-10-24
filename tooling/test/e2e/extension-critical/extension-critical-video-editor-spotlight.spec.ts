@@ -239,6 +239,44 @@ for (const [index, size] of [
       await expect
         .poll(async () => (await read()).motionRegions![0]!.spotlightTarget)
         .toBe('window');
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.focusType'),
+        label('gallery.videoReview.focusLens')
+      );
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight?.effect)
+        .toBe('magnify');
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.clickLensOptics'),
+        label('gallery.videoReview.clickLensOptics_optical')
+      );
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight?.lensOptics)
+        .toBe('optical');
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.focusLensPlacement'),
+        label('videoEditor.sidebar.cursorFocusFollow')
+      );
+      await expect.poll(async () => (await read()).motionRegions![0]!.focusMode).toBe('CURSOR');
+      await page.screenshot({ path: info.outputPath('native-optical-lens.png'), fullPage: false });
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.focusLensPlacement'),
+        label('videoEditor.sidebar.cursorFocusFixed')
+      );
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.focusType'),
+        label('gallery.videoReview.focusSpotlight')
+      );
       const targetLabel = label('videoEditor.sidebar.spotlightTarget');
       const targetGroup = inspector.getByRole('group', { name: targetLabel, exact: true });
       if (await targetGroup.count()) {

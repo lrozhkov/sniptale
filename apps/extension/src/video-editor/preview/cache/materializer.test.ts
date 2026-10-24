@@ -19,9 +19,17 @@ type PreviewSceneInput = Parameters<
 const renderPreviewScene = vi.hoisted(() =>
   vi.fn<(args: PreviewSceneInput) => Promise<void | false>>(async () => {})
 );
-const cut = vi.hoisted(() => ({ sample: vi.fn(), release: vi.fn(), dispose: vi.fn() }));
+const cut = vi.hoisted(() => ({
+  create: vi.fn(),
+  sample: vi.fn(),
+  release: vi.fn(),
+  dispose: vi.fn(),
+}));
 vi.mock('../../../workflows/video-review/decoded-video-sample', () => ({
-  createCompositionCutSampleSource: () => ({ sample: cut.sample, dispose: cut.dispose }),
+  createCompositionCutSampleSource: () => {
+    cut.create();
+    return { sample: cut.sample, dispose: cut.dispose };
+  },
 }));
 const spatial = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../../../features/video/composition/canvas/spatial-renderer', () => ({
@@ -34,6 +42,7 @@ import { createVideoPreviewFrameMaterializer } from './materializer';
 
 beforeEach(() => {
   renderPreviewScene.mockClear();
+  cut.create.mockClear();
   cut.sample.mockClear();
   cut.release.mockClear();
   cut.dispose.mockClear();
@@ -747,9 +756,86 @@ it('materializes a windowed video with the bounded decoder outside composition j
     rasterSize: { width: 16, height: 9 },
   });
   await materializer.renderFrame(1.1, new AbortController().signal);
-  expect(cut.sample).toHaveBeenCalledWith(1.1, expect.any(AbortSignal), 'last');
+  expect(cut.sample).toHaveBeenCalledWith(1.1, expect.any(AbortSignal), 'last', project);
   expect(renderPreviewScene.mock.lastCall?.[0].decodedVideoFrames).toBe(decoded);
   expect(cut.release).toHaveBeenCalledOnce();
   materializer.dispose();
   expect(cut.dispose).toHaveBeenCalledOnce();
+});
+
+it('recomposes held join endpoints from the new snapshot without replacing media', async () => {
+  const f = compositionFixture();
+  f.project.compositionJoins![0]!.sampling = 'cut';
+  renderPreviewScene.mockImplementation(async ({ canvas, project }) => {
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = project.backgroundColor;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  });
+  await f.owner.renderFrame(1, new AbortController().signal);
+  const before = f.pixel();
+  const next = { ...f.project, backgroundColor: '#00ff00' };
+  expect(f.owner.updateProject(next)).toBe(true);
+  await f.owner.renderFrame(1, new AbortController().signal);
+  expect(f.pixel()).toEqual([0, 255, 0, 255]);
+  expect(f.pixel()).not.toEqual(before);
+  expect(renderPreviewScene).toHaveBeenCalledTimes(4);
+  expect(renderPreviewScene.mock.calls.slice(2).every(([input]) => input.project === next)).toBe(
+    true
+  );
+  expect(cut.create).toHaveBeenCalledOnce();
+  expect(cut.dispose).not.toHaveBeenCalled();
+  f.owner.dispose();
+  expect(cut.dispose).toHaveBeenCalledOnce();
+});
+
+it('retains windowed media and renderer owners while accepting a new visual snapshot', async () => {
+  mockDelayedSeekVideo();
+  const project = createEmptyVideoProject('Windowed edits');
+  const clip = createVideoClip(project.tracks[0]!.id);
+  clip.playbackWindow = { offset: 0, holdAt: 0.9 };
+  project.clips = [clip];
+  const owner = createVideoPreviewFrameMaterializer({
+    project,
+    assetUrls: { 'asset-1': 'blob:held' },
+    ownerDocument: document,
+    rasterSize: { width: 16, height: 9 },
+  });
+  await owner.renderFrame(0.5, new AbortController().signal);
+  const first = renderPreviewScene.mock.lastCall![0];
+  const video = first.videoRefs.current[clip.id];
+  const next = {
+    ...project,
+    backgroundColor: '#00ff00',
+    clips: [{ ...clip, transform: { ...clip.transform, x: 20 } }],
+  };
+  expect(owner.updateProject(next)).toBe(true);
+  await owner.renderFrame(0.5, new AbortController().signal);
+  const second = renderPreviewScene.mock.lastCall![0];
+  expect(second.project).toBe(next);
+  expect(second.videoRefs.current[clip.id]).toBe(video);
+  expect(second.captionRenderer).toBe(first.captionRenderer);
+  expect(second.watermarkRenderer).toBe(first.watermarkRenderer);
+  expect(cut.sample).toHaveBeenLastCalledWith(0.5, expect.any(AbortSignal), 'last', next);
+  expect(cut.create).toHaveBeenCalledOnce();
+  expect(cut.dispose).not.toHaveBeenCalled();
+  expect(owner.updateProject({ ...next, id: 'different-project' })).toBe(false);
+  expect(owner.updateProject({ ...next, clips: [{ ...clip, sourceStart: 0.2 }] })).toBe(false);
+  expect(owner.updateProject({ ...next, clips: [{ ...clip, assetId: 'different-asset' }] })).toBe(
+    false
+  );
+  owner.dispose();
+  owner.dispose();
+  expect(cut.dispose).toHaveBeenCalledOnce();
+});
+
+it('refuses snapshot replacement until an active frame settles', async () => {
+  const f = compositionFixture();
+  const pending = Promise.withResolvers<void>();
+  renderPreviewScene.mockReturnValueOnce(pending.promise);
+  const rendering = f.owner.renderFrame(1, new AbortController().signal);
+  expect(f.owner.updateProject({ ...f.project, backgroundColor: '#00ff00' })).toBe(false);
+  pending.resolve();
+  await rendering;
+  expect(f.owner.updateProject({ ...f.project, backgroundColor: '#00ff00' })).toBe(true);
+  f.owner.dispose();
 });

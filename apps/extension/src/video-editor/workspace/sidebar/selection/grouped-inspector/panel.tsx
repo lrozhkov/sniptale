@@ -126,7 +126,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
         ref={surface}
         data-ui="video-editor.inspector.sections"
         data-presentation="all"
-        className="divide-y divide-[var(--sniptale-color-border-soft)]"
+        className="video-editor-inspector-all-groups"
       >
         {groups.map((group) => {
           const Icon = SECTION_ICONS[group.semantic];

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import * as revision from '../../../../preview/cache/revision';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -389,3 +390,43 @@ it.each(['resolve', 'reject'] as const)(
     expect(await pending).toBe('live-ready');
   }
 );
+
+it('does not serialize live project replacements and retries stale voice preparation once', async () => {
+  const identity = vi.spyOn(revision, 'createVideoPreviewRenderIdentity');
+  let firstSignal!: AbortSignal;
+  const voice = vi
+    .fn()
+    .mockImplementationOnce((request: VideoEditorPreviewPrepareRequest) => {
+      firstSignal = request.signal;
+      return new Promise<void>((_resolve, reject) => {
+        request.signal.addEventListener('abort', () => reject(request.signal.reason), {
+          once: true,
+        });
+      });
+    })
+    .mockResolvedValue(undefined);
+  try {
+    await act(async () => root.render(<Harness mode="live" prepareSourceVoiceover={voice} />));
+    expect(identity).not.toHaveBeenCalled();
+    const pending = runtime!.prepare({
+      generation: 1,
+      isPlaying: true,
+      playbackRange: null,
+      reason: 'play',
+      signal: new AbortController().signal,
+      time: 0,
+    });
+    await act(async () => Promise.resolve());
+    await act(async () =>
+      root.render(
+        <Harness mode="live" projectOverride={{ ...project }} prepareSourceVoiceover={voice} />
+      )
+    );
+    expect(firstSignal.aborted).toBe(true);
+    await expect(pending).resolves.toBe('live-ready');
+    expect(voice).toHaveBeenCalledTimes(2);
+    expect(identity).not.toHaveBeenCalled();
+  } finally {
+    identity.mockRestore();
+  }
+});

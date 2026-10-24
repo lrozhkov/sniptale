@@ -32,6 +32,7 @@ import {
   type SceneSpotlightClip,
 } from './spotlight';
 import { resolveSceneSpotlightTarget, sampleSceneSpotlight } from '../scene-spotlight';
+import { placeQuickEditLens } from '../../project/scene/focus-appearance';
 
 type Rect = VideoCompositionSpotlightState['spotlight']['area'];
 
@@ -45,15 +46,24 @@ export function sampleCompositionSpotlightLayer(args: {
   clip?: SceneSpotlightClip;
 }): SceneSpotlightLayer {
   const { state, window, scale } = args;
-  const target = resolveSceneSpotlightTarget(state.spotlight, window, scale);
+  const spotlight = placeQuickEditLens(state.spotlight, state.lensFocus ?? null);
+  const target = resolveSceneSpotlightTarget(spotlight, window, scale);
   const sample = sampleSceneSpotlight({
-    spotlight: state.spotlight,
+    spotlight,
     window,
     extent: args.extent,
     scale,
     phase: state.phase,
     progress: state.progress,
-    ...(state.from ? { from: resolveSceneSpotlightTarget(state.from, window, scale) } : {}),
+    ...(state.from
+      ? {
+          from: resolveSceneSpotlightTarget(
+            placeQuickEditLens(state.from, state.lensFocus ?? null),
+            window,
+            scale
+          ),
+        }
+      : {}),
   });
   const reveal = state.phase === 'exit' ? state.spotlight.exitReveal : state.spotlight.reveal;
   const protection = state.from ? sample : target;

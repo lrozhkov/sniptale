@@ -1,7 +1,11 @@
 import { getVideoClipPresentationTime } from '../project/timeline/rate';
 import { REVIEW_CLICK_DEFAULT } from '../project/action-feedback/validation';
 import { getVideoProjectActionPresentation } from '../project/action-presentation';
-import type { VideoProject, RecordingActionEvent } from '../project/types';
+import type {
+  VideoProject,
+  RecordingActionEvent,
+  VideoProjectCursorSample,
+} from '../project/types';
 import type {
   VideoProjectActionFeedback,
   ReviewActionAudioTarget,
@@ -12,6 +16,52 @@ import { buildReviewActionAudioPlan, type ReviewActionAudioPlan } from './action
 import { scheduleReviewClicks, evaluateReviewClicks } from './click-animation';
 import { projectReviewTelemetry } from './telemetry';
 import { getVideoProjectFeedbackRuns } from '../project/action-feedback/projection';
+
+const normalizedGestureSamples = new WeakMap<
+  readonly VideoProjectCursorSample[],
+  Map<string, VideoProjectCursorSample[]>
+>();
+
+function gestureSourceSamples(
+  samples: readonly VideoProjectCursorSample[],
+  captured: boolean,
+  recordingId: string
+): VideoProjectCursorSample[] {
+  const key = JSON.stringify([captured, recordingId]);
+  let variants = normalizedGestureSamples.get(samples);
+  const cached = variants?.get(key);
+  if (cached) return cached;
+  const cursorIdentities = new Set<string>();
+  const normalized = samples.flatMap((sample) => {
+    const anchor = sample.sourceAnchor;
+    const sourceTime = captured ? sample.time : anchor?.sourceTime;
+    if (sourceTime === undefined || (!captured && anchor?.recordingId !== recordingId)) return [];
+    const identity = JSON.stringify([
+      sourceTime,
+      sample.captureSegment,
+      sample.visible,
+      sample.observation,
+      sample.recordingPoint?.x,
+      sample.recordingPoint?.y,
+    ]);
+    if (cursorIdentities.has(identity)) return [];
+    cursorIdentities.add(identity);
+    return [
+      {
+        ...sample,
+        time: sourceTime,
+        x: sample.recordingPoint?.x ?? sample.x,
+        y: sample.recordingPoint?.y ?? sample.y,
+      },
+    ];
+  });
+  if (!variants) {
+    variants = new Map();
+    normalizedGestureSamples.set(samples, variants);
+  }
+  variants.set(key, normalized);
+  return normalized;
+}
 
 /** Projects the original source gesture for presentation editing and rendering. */
 export function projectActionFeedbackMarkers(
@@ -42,7 +92,6 @@ export function projectActionFeedbackMarkers(
       },
     ];
   });
-  const cursorIdentities = new Set<string>();
   const rawTrack = geometry ? project.cursorTrack : null;
   const captured = rawTrack?.sourceObservations?.find(
     (item) =>
@@ -51,30 +100,11 @@ export function projectActionFeedbackMarkers(
   const cursorTrack = rawTrack
     ? {
         ...rawTrack,
-        samples: (captured?.samples ?? rawTrack.samples).flatMap((sample) => {
-          const anchor = sample.sourceAnchor;
-          const sourceTime = captured ? sample.time : anchor?.sourceTime;
-          if (sourceTime === undefined || (!captured && anchor?.recordingId !== group.recordingId))
-            return [];
-          const identity = JSON.stringify([
-            sourceTime,
-            sample.captureSegment,
-            sample.visible,
-            sample.observation,
-            sample.recordingPoint?.x,
-            sample.recordingPoint?.y,
-          ]);
-          if (cursorIdentities.has(identity)) return [];
-          cursorIdentities.add(identity);
-          return [
-            {
-              ...sample,
-              time: sourceTime,
-              x: sample.recordingPoint?.x ?? sample.x,
-              y: sample.recordingPoint?.y ?? sample.y,
-            },
-          ];
-        }),
+        samples: gestureSourceSamples(
+          captured?.samples ?? rawTrack.samples,
+          captured !== undefined,
+          group.recordingId
+        ),
       }
     : null;
   const duration = Math.max(

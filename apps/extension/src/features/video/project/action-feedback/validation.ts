@@ -238,9 +238,11 @@ function parseClick(raw: unknown): ReviewClickAnimation | null {
   const magnification = raw['magnification'];
   const lensShadow = raw['lensShadow'];
   const lensShape = raw['lensShape'];
+  const lensOptics = raw['lensOptics'];
   if (magnification !== undefined && !isBoundedNumber(magnification, 1, 3)) return null;
   if (lensShadow !== undefined && !isBoundedNumber(lensShadow, 0, 100)) return null;
   if (lensShape !== undefined && lensShape !== 'circle' && lensShape !== 'rounded') return null;
+  if (lensOptics !== undefined && lensOptics !== 'flat' && lensOptics !== 'optical') return null;
   return {
     id: raw['id'],
     ...numbers,
@@ -252,6 +254,7 @@ function parseClick(raw: unknown): ReviewClickAnimation | null {
     ...(magnification === undefined ? {} : { magnification }),
     ...(lensShadow === undefined ? {} : { lensShadow }),
     ...(lensShape === undefined ? {} : { lensShape }),
+    ...(lensOptics === undefined ? {} : { lensOptics }),
   };
 }
 

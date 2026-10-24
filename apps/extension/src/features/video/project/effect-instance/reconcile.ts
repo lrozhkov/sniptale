@@ -27,9 +27,26 @@ export function reconcileVideoProjectEffectInstances(project: VideoProject): Vid
   );
   return {
     ...project,
-    clips,
-    ...(project.effectInstances ? { effectInstances } : {}),
-    ...(project.effectSnapshots ? { effectSnapshots } : {}),
+    clips: clips.length === project.clips.length ? project.clips : clips,
+    ...(project.effectInstances
+      ? {
+          effectInstances:
+            effectInstances.length === project.effectInstances.length &&
+            effectInstances.every(
+              (instance, index) => instance === project.effectInstances?.[index]
+            )
+              ? project.effectInstances
+              : effectInstances,
+        }
+      : {}),
+    ...(project.effectSnapshots
+      ? {
+          effectSnapshots:
+            effectSnapshots.length === project.effectSnapshots.length
+              ? project.effectSnapshots
+              : effectSnapshots,
+        }
+      : {}),
   };
 }
 
@@ -55,14 +72,15 @@ function reconcileEffectInstances(
       const startTime = Math.max(instance.startTime, clip.startTime);
       const end = Math.min(instance.startTime + instance.duration, clip.startTime + clip.duration);
       if (end <= startTime) return [];
+      const duration = end - startTime;
+      const sourceStart =
+        (instance.sourceStart ?? 0) + (startTime - instance.startTime) * instance.playbackRate;
       return [
-        {
-          ...instance,
-          startTime,
-          duration: end - startTime,
-          sourceStart:
-            (instance.sourceStart ?? 0) + (startTime - instance.startTime) * instance.playbackRate,
-        },
+        instance.startTime === startTime &&
+        instance.duration === duration &&
+        instance.sourceStart === sourceStart
+          ? instance
+          : { ...instance, startTime, duration, sourceStart },
       ];
     }
     if (instance.target.kind === 'scene') {

@@ -93,6 +93,7 @@ export function planReviewProjectCamera(args: {
       transitionOut: 'NONE',
       fitMode: 'COVER',
       transform: transform(webcam.placement),
+      ...(webcam.split ? { cameraSplit: webcam.split } : {}),
       cameraTiming: { offsetSeconds: webcam.offsetSeconds, transitions: 'bounded' },
       cameraAppearance: structuredClone(webcam.appearance),
       cameraMirrored: webcam.mirrored,
@@ -101,6 +102,7 @@ export function planReviewProjectCamera(args: {
         id: position.id,
         sourceTime: position.time,
         transform: transform(position.placement),
+        ...(position.split !== undefined ? { cameraSplit: position.split } : {}),
         fitMode: 'COVER',
         ...(position.crop ? { crop: structuredClone(position.crop) } : {}),
         transition: {

@@ -41,7 +41,19 @@ for (const variant of [
       await button('gallery.videoReview.advancedEditing').click();
       await addReviewFocus(page);
       const type = dialog.locator('[data-ui="gallery.videoReview.focusType"]');
-      await expect(type.getByRole('button')).toHaveCount(3);
+      await expect(type.getByRole('button')).toHaveCount(4);
+      await type
+        .getByRole('button', { name: label('gallery.videoReview.focusLens'), exact: true })
+        .click();
+      await expect
+        .poll(async () => (await persistedFocus(page))?.spotlight?.effect)
+        .toBe('magnify');
+      await expect(
+        dialog.getByRole('group', { name: label('gallery.videoReview.clickLensOptics') })
+      ).toBeVisible();
+      await type
+        .getByRole('button', { name: label('gallery.videoReview.zoomRegionLabel'), exact: true })
+        .click();
       const preview = dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await expect(preview).toHaveAttribute('data-status', 'ready');
       const frame = preview.locator('[data-focus-frame]');
@@ -507,9 +519,54 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .getByRole('option', { name: label('videoEditor.sidebar.cursorFocusFixed'), exact: true })
         .click();
       await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(false);
+      await dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first()
+        .click();
+      const focusSelect = inspector.getByRole('button', {
+        name: label('gallery.videoReview.focusType'),
+        exact: true,
+      });
+      if (await focusSelect.count()) {
+        await focusSelect.click();
+        await page
+          .getByRole('option', { name: label('gallery.videoReview.focusLens'), exact: true })
+          .click();
+      } else
+        await inspector
+          .getByRole('button', { name: label('gallery.videoReview.focusLens'), exact: true })
+          .click();
+      await expect
+        .poll(async () => (await persistedFocus(page))?.spotlight?.effect)
+        .toBe('magnify');
+      const optics = inspector.getByRole('group', {
+        name: label('gallery.videoReview.clickLensOptics'),
+      });
+      await optics
+        .getByRole('button', { name: label('gallery.videoReview.clickLensOptics_optical') })
+        .click();
+      await expect
+        .poll(async () => (await persistedFocus(page))?.spotlight?.lensOptics)
+        .toBe('optical');
+      const placement = inspector.getByRole('button', {
+        name: label('gallery.videoReview.focusLensPlacement'),
+      });
+      await placement.click();
+      await page
+        .getByRole('option', { name: label('videoEditor.sidebar.cursorFocusFollow'), exact: true })
+        .click();
+      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(true);
+      await placement.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('following-optical-lens.png'),
+        fullPage: false,
+      });
       await page.reload();
       await expect(dialog).toBeVisible();
-      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(false);
+      await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(true);
+      await expect
+        .poll(async () => (await persistedFocus(page))?.spotlight?.lensOptics)
+        .toBe('optical');
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

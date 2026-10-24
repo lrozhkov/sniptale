@@ -3,7 +3,10 @@ import {
   createQuickEditSpotlight,
 } from '../../features/video/project/scene/focus-appearance';
 
-import { quickEditFocusConflicts } from '../../features/video/review/advanced/focus-layout';
+import {
+  quickEditFocusConflicts,
+  quickEditFocusType,
+} from '../../features/video/review/advanced/focus-layout';
 
 import { useEffect, useState } from 'react';
 import type {
@@ -56,23 +59,30 @@ function fitsActiveWindow(
   );
 }
 
-export type ReviewFocusType = 'zoom' | 'spotlight' | 'border';
+export type ReviewFocusType = 'zoom' | 'spotlight' | 'border' | 'lens';
 
 /** Disposable insertion choice does not alter the stored camera. */
 export function withReviewFocusType(
   region: QuickEditZoomRegion,
   type: ReviewFocusType
 ): QuickEditZoomRegion {
-  if (type === 'border' && region.border) return region;
+  if (
+    (type === 'border' && region.border) ||
+    (type === 'lens' && region.spotlight?.effect === 'magnify')
+  )
+    return region;
   const { spotlight, border, ...camera } = region;
   const area = spotlight ?? border;
   return type === 'zoom'
     ? camera
-    : type === 'spotlight'
+    : type === 'spotlight' || type === 'lens'
       ? {
           ...camera,
           spotlight: {
             ...createQuickEditSpotlight(),
+            ...(type === 'lens'
+              ? { effect: 'magnify' as const, magnification: 2, lensOptics: 'flat' as const }
+              : {}),
             ...(area ? { area: area.area, roundness: area.roundness } : {}),
           },
         }
@@ -167,7 +177,7 @@ function resetFocusSettings(zoom: ZoomState, id: string): ZoomState {
       endMax: selected.end,
       ...(selected.sourceAnchor ? { sourceAnchor: selected.sourceAnchor } : {}),
     }),
-    selected.border ? 'border' : selected.spotlight ? 'spotlight' : 'zoom'
+    quickEditFocusType(selected)
   );
   const reset = fitQuickEditZoomTransitions({
     ...defaults,

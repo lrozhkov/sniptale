@@ -150,6 +150,7 @@ it('snaps the nearest moving edge and clears its guide in one history transactio
 
   expect(onMoveClip).not.toHaveBeenCalled();
   expect(harness.ghosts.at(-1)?.startTime).toBe(7);
+  expect(harness.ghosts.at(-1)).toHaveProperty('timingFeedback', { time: 7 });
   expect(harness.guides.at(-1)).toBe(10);
   act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenCalledOnce();
@@ -292,6 +293,11 @@ it('hides a trim guide when the mutation owner clamps away from the snap target'
 
   expect(onTrimClipStart).not.toHaveBeenCalled();
   expect(harness.ghosts.at(-1)?.startTime).toBeCloseTo(3 - 1 / project.fps);
+  expect(harness.ghosts.at(-1)).toHaveProperty('timingFeedback', {
+    time: harness.ghosts.at(-1)?.startTime,
+    beforeDuration: 3,
+    duration: harness.ghosts.at(-1)?.duration,
+  });
   expect(harness.guides.at(-1)).toBeNull();
   act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onTrimClipStart).toHaveBeenLastCalledWith(clip.id, 3);
@@ -418,8 +424,14 @@ it.each(['trim-start', 'trim-end'] as const)(
       pointerMove(target);
     });
     expect(harness.ghosts.at(-1)?.duration).toBe(2);
+    expect(harness.ghosts.at(-1)).toHaveProperty('timingFeedback', {
+      time: mode === 'trim-start' ? 6 : 7,
+      beforeDuration: 3,
+      duration: 2,
+    });
     expect(useVideoEditorStore.getState().project).toBe(before);
     act(() => window.dispatchEvent(new Event('pointercancel')));
+    expect(harness.ghosts.at(-1)).toBeNull();
     expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
     expect(useVideoEditorStore.getState().projectHistory.future).toHaveLength(1);
     act(() => {

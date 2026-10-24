@@ -3,6 +3,8 @@ import {
   sampleSceneSpotlight,
   type SceneSpotlightFrame,
 } from '../../composition/scene-spotlight';
+import { placeQuickEditLens } from '../../project/scene/focus-appearance';
+import { evaluateReviewCursorFocus } from './cursor-focus-path';
 import { resolveQuickEditFocusLink } from './focus-layout';
 import { sampleQuickEditFocusAtTime, type QuickEditRect } from './scene';
 import type { QuickEditZoomRegion } from './types';
@@ -22,7 +24,7 @@ export function evaluateQuickEditSpotlightAtTime(args: {
   );
   if (!sample?.to.spotlight) return null;
   return sampleSceneSpotlight({
-    spotlight: sample.to.spotlight,
+    spotlight: reviewLensAtTime(sample.to, args.time),
     window: args.video,
     extent: { x: 0, y: 0, ...args.output },
     scale: args.scale,
@@ -30,7 +32,11 @@ export function evaluateQuickEditSpotlightAtTime(args: {
     phase: sample.phase === 'exit' ? 'exit' : 'enter',
     ...(sample.from?.spotlight
       ? {
-          from: resolveSceneSpotlightTarget(sample.from.spotlight, args.video, args.scale),
+          from: resolveSceneSpotlightTarget(
+            reviewLensAtTime(sample.from, args.time),
+            args.video,
+            args.scale
+          ),
         }
       : {}),
   });
@@ -64,7 +70,11 @@ export function evaluateQuickEditSpotlightsAtTime(
     const sample = sampleQuickEditFocusAtTime(connected, args.time);
     const frame = evaluateQuickEditSpotlightAtTime({ ...args, regions: connected });
     if (!frame || !sample) continue;
-    const target = resolveSceneSpotlightTarget(region.spotlight!, args.video, args.scale);
+    const target = resolveSceneSpotlightTarget(
+      reviewLensAtTime(region, args.time),
+      args.video,
+      args.scale
+    );
     const reveal =
       sample.phase === 'exit' ? region.spotlight!.exitReveal : region.spotlight!.reveal;
     frames.push({
@@ -76,4 +86,21 @@ export function evaluateQuickEditSpotlightsAtTime(
     });
   }
   return frames;
+}
+
+function reviewLensAtTime(region: QuickEditZoomRegion, time: number) {
+  const spotlight = region.spotlight!;
+  const context = region.cursorFocus;
+  if (
+    spotlight.effect !== 'magnify' ||
+    !(region.followCursor ?? context?.path.mode === 'follow') ||
+    !context
+  )
+    return spotlight;
+  const run = context.timeMap?.find(
+    (part) => part.kind !== 'cut' && time >= part.resultStart && time < part.resultEnd
+  );
+  if (context.timeMap && !run) return spotlight;
+  const sourceTime = run ? run.sourceStart + (time - run.resultStart) * run.rate : time;
+  return placeQuickEditLens(spotlight, evaluateReviewCursorFocus(context.path, sourceTime));
 }

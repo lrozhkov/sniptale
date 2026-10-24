@@ -604,3 +604,26 @@ it('rebuilds trimmed, rated and moved cursor observations while retaining manual
   ).toBe(true);
   expect(restored.cursorTrack?.sourceObservations).toEqual(facts);
 });
+
+it.each(['motion', 'background'])('preserves captured cursor identity after a %s edit', (kind) => {
+  const project = createAnchoredInteractionProject();
+  const track = project.cursorTrack!;
+  track.sourceObservations = [
+    {
+      recordingId: 'recording-1',
+      sourceInstanceId: 'instance-anchor-clip',
+      samples: [{ id: 'raw', time: 1, x: 10, y: 20, visible: true }],
+    },
+  ];
+  const nextProject =
+    kind === 'motion'
+      ? {
+          ...project,
+          motionRegions: project.motionRegions!.map((region) => ({ ...region, scale: 2 })),
+        }
+      : { ...project, sceneBackground: { kind: 'solid' as const, color: '#112233' } };
+  const next = reconcileRecordingInteractionAnchors(project, nextProject);
+  expect(next.cursorTrack).toBe(track);
+  expect(next.cursorTrack?.samples).toBe(track.samples);
+  expect(next.cursorTrack?.sourceObservations).toBe(track.sourceObservations);
+});

@@ -259,6 +259,11 @@ it('magnifies once around the click, returns to identity, and ignores decorative
   expect(evaluateReviewClicks(cues, 0.9)).toEqual([]);
   expect(evaluateReviewClicks(cues, 1)[0]!.lens!.scale).toBe(1);
   expect(evaluateReviewClicks(cues, 2)[0]).toMatchObject({ radius: 160, lens: { scale: 2 } });
+  expect(evaluateReviewClicks(cues, 2)[0]!.lens!.optics).toBe('flat');
+  expect(
+    evaluateReviewClicks([{ ...cues[0]!, settings: { ...settings, lensOptics: 'optical' } }], 2)[0]!
+      .lens!.optics
+  ).toBe('optical');
   expect(evaluateReviewClicks(cues, 2.5)[0]!.lens!.scale).toBeGreaterThan(1);
   expect(evaluateReviewClicks(cues, 2.999)[0]!.lens!.scale).toBeCloseTo(1, 2);
   expect(evaluateReviewClicks(cues, 3)).toEqual([]);
@@ -266,6 +271,43 @@ it('magnifies once around the click, returns to identity, and ignores decorative
   expect(
     evaluateReviewClicks([{ ...cues[0]!, start: 1.5, end: 2.5 }], 2.4999)[0]!.lens!.scale
   ).toBeCloseTo(1, 2);
+});
+
+it('keeps an optical click style from turning a recorded drag into a lens', () => {
+  const style = {
+    ...REVIEW_CLICK_DEFAULT,
+    id: 'drag',
+    effect: 'magnify' as const,
+    lensOptics: 'optical' as const,
+    gestureAppearance: 'path' as const,
+  };
+  const gesture: ReviewTelemetryMarker = {
+    ...marker,
+    ref: { kind: 'action', id: 'drag' },
+    start: 1,
+    end: 2,
+    gesture: {
+      id: 'drag',
+      type: 'selection',
+      button: 0,
+      downTime: 1,
+      upTime: 2,
+      completion: 'released',
+      path: [
+        { time: 1, x: 0.2, y: 0.3 },
+        { time: 2, x: 0.8, y: 0.7 },
+      ],
+      gaps: [{ start: 1.7, end: 1.8 }],
+    },
+  };
+  const cues = scheduleReviewClicks([gesture], [style], buildReviewTimeMap(4, []));
+  expect(cues).toHaveLength(1);
+  expect(evaluateReviewClicks(cues, 1.7)).toEqual([]);
+  expect(evaluateReviewClicks(cues, 1.5)[0]).toMatchObject({
+    effect: 'press',
+    point: { x: 0.5, y: 0.5 },
+  });
+  expect(evaluateReviewClicks(cues, 1.5)[0]).not.toHaveProperty('lens');
 });
 
 it('creates an area on explicit selection and preserves existing batch rectangles', () => {

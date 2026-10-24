@@ -64,6 +64,7 @@ export function PointerFeedbackFields(props: PointerFeedbackFieldsProps) {
           magnify={magnify}
           color={color}
           lensShape={common('lensShape')}
+          lensOptics={common('lensOptics')}
           stroke={
             props.gesture
               ? common('gestureAppearance') === 'path' || common('gestureAppearance') === 'area'
@@ -213,6 +214,7 @@ function clickFieldValues(styles: readonly ReviewClickStyle[]) {
     magnification: 1.6,
     lensShadow: 20,
     lensShape: 'circle' as const,
+    lensOptics: 'flat' as const,
     ...value,
   }));
   const magnify = values.every((value) => value.effect === 'magnify');
@@ -235,6 +237,7 @@ function ClickAppearance({
   magnify,
   color,
   lensShape,
+  lensOptics,
   stroke,
   number,
   onChange,
@@ -242,6 +245,7 @@ function ClickAppearance({
   magnify: boolean;
   color: string | undefined;
   lensShape: ReviewClickStyle['lensShape'] | null;
+  lensOptics: ReviewClickStyle['lensOptics'] | null;
   stroke: boolean;
   onChange: PointerFeedbackFieldsProps['onChange'];
   number(
@@ -256,6 +260,15 @@ function ClickAppearance({
       {magnify ? (
         <>
           {number('magnification', 'gallery.videoReview.clickMagnification', 1, 'x')}
+          <PointerChoice
+            label={translate('gallery.videoReview.clickLensOptics')}
+            value={lensOptics ?? ''}
+            options={(['flat', 'optical'] as const).map((value) => ({
+              value,
+              label: translate(`gallery.videoReview.clickLensOptics_${value}`),
+            }))}
+            onChange={(lensOptics: 'flat' | 'optical') => onChange({ lensOptics })}
+          />
           <PointerChoice
             label={translate('gallery.videoReview.clickLensShape')}
             value={lensShape ?? ''}

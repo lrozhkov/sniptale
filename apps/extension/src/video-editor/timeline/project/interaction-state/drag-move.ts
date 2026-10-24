@@ -164,7 +164,16 @@ export function applyTimelineDragMove({
       time: interaction.originalStart + deltaSeconds,
     });
     const applied = onTrimClipStart(interaction.clip.id, result.time);
-    if (applied) setDragGhost({ ...applied, name: interaction.clip.name });
+    if (applied)
+      setDragGhost({
+        ...applied,
+        name: interaction.clip.name,
+        timingFeedback: {
+          time: applied.startTime,
+          beforeDuration: interaction.clip.duration,
+          duration: applied.duration,
+        },
+      });
     setSnapGuideTime(resolveAppliedSnapGuide(result.targetTime, applied?.startTime ?? result.time));
     return;
   }
@@ -179,7 +188,16 @@ export function applyTimelineDragMove({
     time: interaction.originalEnd + deltaSeconds,
   });
   const applied = onTrimClipEnd(interaction.clip.id, result.time);
-  if (applied) setDragGhost({ ...applied, name: interaction.clip.name });
+  if (applied)
+    setDragGhost({
+      ...applied,
+      name: interaction.clip.name,
+      timingFeedback: {
+        time: applied.endTime,
+        beforeDuration: interaction.clip.duration,
+        duration: applied.duration,
+      },
+    });
   setSnapGuideTime(resolveAppliedSnapGuide(result.targetTime, applied?.endTime ?? result.time));
 }
 
@@ -255,6 +273,7 @@ function applyTimelineClipMove({
         name: clip.name,
         reorderSlots,
         activeReorder: slot.direction,
+        timingFeedback: { time: applied.startTime },
       });
       return;
     }
@@ -279,6 +298,7 @@ function applyTimelineClipMove({
   );
   setDragGhost({
     clipId: clip.id,
+    timingFeedback: applied ? { time: applied.startTime } : undefined,
     reorderSlots,
     duration,
     name: clip.name,

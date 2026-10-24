@@ -52,6 +52,7 @@ beforeEach(() => {
   HTMLElement.prototype.hasPointerCapture = vi.fn(() => true);
   HTMLElement.prototype.releasePointerCapture = vi.fn();
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: vi.fn(),
     clearRect: vi.fn(),
     save: vi.fn(),
     translate: vi.fn(),
@@ -80,6 +81,37 @@ afterEach(async () => {
 });
 const output = { width: 200, height: 100 };
 const rect = { x: 0, y: 0, ...output };
+it('reuses the paused source frame while the lens opening moves', () => {
+  const initial = createQuickEditSpotlight();
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'lens', at: 0 }),
+    spotlight: { ...initial, effect: 'magnify' as const, magnification: 2 },
+  };
+  const frame = { image: document.createElement('canvas'), ...output };
+  const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
+  const renderLens = (area: typeof initial.area) =>
+    act(() =>
+      root.render(
+        <ReviewSpotlightPreview
+          region={{ ...region, spotlight: { ...region.spotlight, area } }}
+          camera={{ scale: 1, centerX: 0.5, centerY: 0.5 }}
+          view="area"
+          frame={frame}
+          output={output}
+          layout={layout}
+          cornerRadius={4}
+          scale={1}
+          disabled={false}
+          onChange={vi.fn()}
+        />
+      )
+    );
+  renderLens(initial.area);
+  expect(paint).toHaveBeenCalledOnce();
+  renderLens({ ...initial.area, x: 0.3 });
+  expect(paint).toHaveBeenCalledOnce();
+});
+
 function render(disabled = false) {
   const onChange = vi.fn();
   const onPreview = vi.fn();
@@ -123,11 +155,28 @@ async function key(target: Element, key: string, shiftKey = false) {
   );
 }
 it('commits one bounded move or resize and discards cancelled drafts', async () => {
+  let nextFrame = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+    frames.delete(id);
+  });
+  const flushFrame = () =>
+    act(() => {
+      const callbacks = [...frames.values()];
+      frames.clear();
+      callbacks.forEach((callback) => callback(0));
+    });
+
   const view = render();
   expect(paint).toHaveBeenCalled();
   await pointer(view.plane, 'pointermove', 60);
   await pointer(view.group, 'pointerdown', 50);
   await pointer(view.plane, 'pointermove', 70);
+  flushFrame();
   expect(view.onChange).not.toHaveBeenCalled();
   expect(view.onPreview).toHaveBeenLastCalledWith(
     expect.objectContaining({

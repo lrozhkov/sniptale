@@ -95,6 +95,8 @@ export interface VideoCompositionSpotlightState {
   /** Split appearances of one authored focus share a single Native transition mask pass. */
   sourceTransition?: { id: string; leadingClipId: string; trailingClipId: string; blend?: true };
   coordinateSpace?: 'source-window';
+  /** Normalized cursor focus sampled at this frame; absent samples keep the authored dock. */
+  lensFocus?: { x: number; y: number };
   id: string;
   spotlight: QuickEditSpotlight;
   phase: 'enter' | 'hold' | 'exit';

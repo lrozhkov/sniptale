@@ -9,6 +9,21 @@ import { createVideoClipFromAsset } from '../../../../features/video/project/fac
 import { VideoProjectAssetType } from '../../../../features/video/project/types';
 import { drawPreviewVisualPasses } from './render-visual';
 import { renderPreviewScene } from './render-preview';
+const splitProof = vi.hoisted(() => ({
+  resolve: vi.fn(() => null),
+  paint: vi.fn(),
+  spotlight: vi.fn(),
+  camera: vi.fn(),
+}));
+vi.mock('../../../../features/video/composition/camera-split', () => ({
+  resolveActiveCameraSplit: splitProof.resolve,
+  paintCameraSplitScreen: splitProof.paint,
+  drawDeferredCameraSplitSpotlights: splitProof.spotlight,
+}));
+vi.mock('../../../../features/video/composition/draw', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../features/video/composition/draw')>()),
+  drawCompositionVisualLayer: splitProof.camera,
+}));
 vi.mock('./render-visual', () => ({ drawPreviewVisualPasses: vi.fn(() => null) }));
 beforeEach(() => vi.clearAllMocks());
 function setup() {
@@ -44,6 +59,29 @@ function setup() {
     },
   };
 }
+
+it('applies deferred camera spotlight masks after painting the split camera in preview', async () => {
+  const { job } = setup();
+  const context = job.canvas.getContext('2d')!;
+  const split = {
+    clipId: 'camera',
+    layer: { kind: 'video', clipId: 'camera' },
+    screen: { x: 0.51, y: 0, width: 0.49, height: 1 },
+    camera: { x: 0, y: 0, width: 0.49, height: 1 },
+  };
+  splitProof.resolve.mockReturnValueOnce(split as never);
+  vi.mocked(drawPreviewVisualPasses).mockResolvedValueOnce({
+    context,
+    dpr: 1,
+    viewport: { offsetX: 0, offsetY: 0, width: 1280, height: 720, scale: 1 },
+  } as Awaited<ReturnType<typeof drawPreviewVisualPasses>>);
+  await renderPreviewScene(job);
+  expect(splitProof.paint).toHaveBeenCalledOnce();
+  expect(splitProof.spotlight).toHaveBeenCalledWith(expect.objectContaining({ context, split }));
+  expect(splitProof.camera.mock.invocationCallOrder[0]!).toBeLessThan(
+    splitProof.spotlight.mock.invocationCallOrder[0]!
+  );
+});
 it('retains the presented canvas when a seek loses video readiness between enqueue and drawing', async () => {
   const { video, job } = setup();
   const pending = renderPreviewScene(job);

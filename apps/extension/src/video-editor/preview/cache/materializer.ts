@@ -37,6 +37,8 @@ const MEDIA_READY_FOR_CURRENT_FRAME = 2;
 
 export interface VideoPreviewFrameMaterializer {
   readonly canvas: HTMLCanvasElement;
+  /** Replaces composition only between frames; false requires a new resource owner. */
+  updateProject(project: VideoProject): boolean;
   dispose(): void;
   renderFrame(
     time: number,
@@ -200,6 +202,25 @@ function createMaterializerSurface(
   return { canvas, stage };
 }
 
+function materializerMediaIdentity(project: VideoProject): string {
+  return JSON.stringify({
+    id: project.id,
+    assets: project.assets.map(({ id, type }) => ({ id, type })),
+    videos: project.clips.filter(isVideoClip).map((clip) => ({
+      id: clip.id,
+      assetId: clip.assetId,
+      startTime: clip.startTime,
+      duration: clip.duration,
+      sourceStart: clip.sourceStart,
+      sourceDuration: clip.sourceDuration,
+      playbackRate: clip.playbackRate,
+      playbackWindow: clip.playbackWindow,
+      cameraTiming: clip.cameraTiming,
+    })),
+    headers: projectWindowHeaderImages(project),
+  });
+}
+
 export function createVideoPreviewFrameMaterializer(params: {
   assetUrls: Record<string, string>;
   sampleFps?: number;
@@ -207,23 +228,47 @@ export function createVideoPreviewFrameMaterializer(params: {
   project: VideoProject;
   rasterSize: VideoEditorPreviewRasterSize;
 }): VideoPreviewFrameMaterializer {
+  const mediaIdentity = materializerMediaIdentity(params.project);
+  let busy = false;
   const joinPlans = resolveVideoProjectCompositionJoinPlans(params.project);
   const { canvas, stage } = createMaterializerSurface(params.ownerDocument, params.rasterSize);
   const state = createMaterializerMediaState(params, stage);
-  const presentation = joinPlans.length
+  let presentation = joinPlans.length
     ? createMaterializedJoinPresentation(params, state, canvas, stage, joinPlans)
     : null;
 
   return {
     canvas,
+    updateProject(project) {
+      if (busy || state.disposed) return false;
+      if (project === params.project) return true;
+      if (materializerMediaIdentity(project) !== mediaIdentity) return false;
+      params = { ...params, project };
+      const plans = resolveVideoProjectCompositionJoinPlans(project);
+      if (presentation && plans.length) presentation.updateProject(project, plans);
+      else {
+        presentation?.dispose();
+        presentation = plans.length
+          ? createMaterializedJoinPresentation(params, state, canvas, stage, plans)
+          : null;
+      }
+      return true;
+    },
     dispose: () => {
       presentation?.dispose();
       disposeMaterializer(state, stage);
     },
-    renderFrame: (time, signal, cameraOverride) =>
-      presentation
-        ? presentation.renderFrame(time, signal, cameraOverride)
-        : renderMaterializedFrame(params, state, canvas, stage, time, signal, cameraOverride),
+    async renderFrame(time, signal, cameraOverride) {
+      if (busy) throw new Error('Composition frame is already being materialized.');
+      busy = true;
+      try {
+        return await (presentation
+          ? presentation.renderFrame(time, signal, cameraOverride)
+          : renderMaterializedFrame(params, state, canvas, stage, time, signal, cameraOverride));
+      } finally {
+        busy = false;
+      }
+    },
   };
 }
 
@@ -234,7 +279,12 @@ function createMaterializedJoinPresentation(
   stage: HTMLDivElement,
   plans: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>,
   sceneEdges: 'include' | 'omit' = 'include'
-): Pick<VideoPreviewFrameMaterializer, 'dispose' | 'renderFrame'> {
+): Pick<VideoPreviewFrameMaterializer, 'dispose' | 'renderFrame'> & {
+  updateProject(
+    project: VideoProject,
+    plans: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>
+  ): void;
+} {
   const resources = createPreviewRenderResources({
     maximumCanvases: 2,
     maximumManagedBytes: params.rasterSize.width * params.rasterSize.height * 8,
@@ -242,7 +292,7 @@ function createMaterializedJoinPresentation(
   });
   let cutSampler: ReturnType<typeof createCompositionCutSampleSource> | undefined;
   let cutPlan: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>[number] | undefined;
-  const cutPlans = plans.filter(({ boundary }) => boundary.sampling === 'cut');
+  let cutPlans = plans.filter(({ boundary }) => boundary.sampling === 'cut');
   let nestedCuts: ReturnType<typeof createMaterializedJoinPresentation> | undefined;
   let disposed = false;
   let cameraOverride: VideoCompositionCameraState | undefined;
@@ -277,7 +327,12 @@ function createMaterializedJoinPresentation(
     });
     const source = cutSampler;
     try {
-      const frames = await source.sample(time, signal, time < cutPlan.seam ? 'last' : 'first');
+      const frames = await source.sample(
+        time,
+        signal,
+        time < cutPlan.seam ? 'last' : 'first',
+        params.project
+      );
       try {
         return await renderMaterializedFrame(
           params,
@@ -308,6 +363,14 @@ function createMaterializedJoinPresentation(
     }),
   });
   return {
+    updateProject(project, nextPlans) {
+      params = { ...params, project };
+      plans = nextPlans;
+      cutPlans = plans.filter(({ boundary }) => boundary.sampling === 'cut');
+      endpoints.clear();
+      nestedCuts?.dispose();
+      nestedCuts = undefined;
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -499,7 +562,7 @@ async function renderMaterializedFrame(
         project: params.project,
         sourceUrl: (clip) => params.assetUrls[clip.assetId],
       });
-      sampled = await state.playbackSampler.sample(time, signal, 'last');
+      sampled = await state.playbackSampler.sample(time, signal, 'last', params.project);
       decodedVideoFrames = sampled.media;
     }
     assertActive();

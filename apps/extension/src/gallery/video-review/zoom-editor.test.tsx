@@ -522,6 +522,16 @@ it('inserts overlapping borders and retains camera and area through type convers
   border.border!.roundness = 0.23;
   const spotlight = withReviewFocusType(border, 'spotlight');
   expect(spotlight.spotlight).toMatchObject({ area: border.border!.area, roundness: 0.23 });
+  const lens = withReviewFocusType(spotlight, 'lens');
+  expect(lens.spotlight).toMatchObject({
+    effect: 'magnify',
+    magnification: 2,
+    lensOptics: 'flat',
+    area: border.border!.area,
+    roundness: 0.23,
+  });
+  expect(withReviewFocusType(lens, 'lens')).toBe(lens);
+  expect(withReviewFocusType(lens, 'zoom').transform).toEqual(camera.transform);
   expect(withReviewFocusType(spotlight, 'zoom').transform).toEqual(camera.transform);
   const setZoom = vi.fn();
   const zoom = { enabled: true, regions: [camera] };
@@ -623,7 +633,7 @@ it('defaults new Borders to a one-second entrance and fits short source interval
   expect(withReviewFocusType(border, 'border')).toBe(border);
 });
 
-it.each(['spotlight', 'border'] as const)(
+it.each(['spotlight', 'border', 'lens'] as const)(
   'duplicates %s independently on its retained source interval',
   (type) => {
     const original = {
@@ -653,8 +663,9 @@ it.each(['spotlight', 'border'] as const)(
     expect(copy).toMatchObject({ start: 1, end: 3, sourceAnchor: { start: 4, end: 8 } });
     expect(copy.linkTo).toBeUndefined();
     expect(copy.linkEasing).toBeUndefined();
-    expect(copy[type]).toEqual(original[type]);
-    expect(copy[type]).not.toBe(original[type]);
+    const appearance = type === 'lens' ? 'spotlight' : type;
+    expect(copy[appearance]).toEqual(original[appearance]);
+    expect(copy[appearance]).not.toBe(original[appearance]);
     expect(state.regions.find((item) => item.id === original.id)).toEqual(original);
     const rows = packQuickEditFocusRows(state.regions);
     expect(rows.get(copy.id)).not.toBe(rows.get(original.id));
@@ -695,7 +706,7 @@ it('does not duplicate a camera, unresolved placement, or missing selection', ()
   expect(editor.selection).toBeNull();
 });
 
-it.each(['zoom', 'spotlight', 'border'] as const)(
+it.each(['zoom', 'spotlight', 'border', 'lens'] as const)(
   'resets all %s parameters without changing its interval or link target',
   (type) => {
     const initial = withReviewFocusType(region('selected', 2, 5), 'zoom');

@@ -6,6 +6,7 @@ import {
 import type { RenderCanvasLease, RenderResources } from '../canvas/render-resources';
 import { projectQuickEditPoint, type QuickEditHomography } from '../motion/spatial-geometry';
 import { drawEdgePaddedBlur } from '../canvas/edge-padded-blur';
+import { drawSceneLens } from './scene-lens';
 type SceneSpotlightRect = SceneSpotlightFrame['opening'];
 
 /** Visible video-window clip in output pixels. */
@@ -33,6 +34,8 @@ export function drawSceneSpotlight(
   resources?: RenderResources
 ) {
   if (!frame) return;
+  if (frame.lens) drawSpotlightLenses(context, canvas, [frame]);
+  if (frame.dim <= 0 && frame.blur <= 0) return;
   context.save();
   try {
     context.clip(new Path2D(sceneSpotlightPath(canvas, frame)), 'evenodd');
@@ -343,7 +346,10 @@ export function drawSceneSpotlights(
     return;
   }
   if (!frames.length) return;
-  const masks = createSceneSpotlightMasks(canvas, frames, resources);
+  drawSpotlightLenses(context, canvas, frames, resources);
+  const maskFrames = frames.filter((frame) => frame.dim > 0 || frame.blur > 0);
+  if (!maskFrames.length) return;
+  const masks = createSceneSpotlightMasks(canvas, maskFrames, resources);
   try {
     if (masks.radius > 0) {
       const layer = maskCanvas(canvas, 'spotlight.layer', resources);
@@ -360,6 +366,71 @@ export function drawSceneSpotlights(
   } finally {
     masks.dispose();
   }
+}
+
+function drawSpotlightLenses(
+  context: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  frames: readonly SceneSpotlightLayer[],
+  resources?: RenderResources
+) {
+  const lenses = frames.filter((frame) => frame.lens && frame.lens.scale > 1);
+  if (!lenses.length) return;
+  const snapshot =
+    lenses.length > 1 ? maskCanvas(canvas, 'spotlight.lens-source', resources) : null;
+  try {
+    if (snapshot) snapshot.context.drawImage(canvas, 0, 0);
+    const source = snapshot?.canvas ?? canvas;
+    for (const frame of lenses) {
+      const opening = frame.projection
+        ? projectedOpening(frame.opening, frame.radius, frame.projection)
+        : new Path2D(sceneSpotlightOpeningPath(frame));
+      const bounds = frame.projection
+        ? projectedLensBounds(frame.opening, frame.projection)
+        : frame.opening;
+      if (!bounds) continue;
+      context.save();
+      try {
+        if (frame.clip) {
+          const clip = frame.clip.outline
+            ? spotlightOutlinePath(frame.clip, frame.projection)
+            : frame.projection
+              ? projectedOpening(frame.clip.rect, frame.clip.radius, frame.projection)
+              : new Path2D(
+                  sceneSpotlightOpeningPath({
+                    opening: frame.clip.rect,
+                    radius: frame.clip.radius,
+                  })
+                );
+          context.clip(clip);
+        }
+        context.clip(opening);
+        drawSceneLens(context, source, bounds, frame.lens!);
+      } finally {
+        context.restore();
+      }
+    }
+  } finally {
+    snapshot?.release();
+  }
+}
+
+function projectedLensBounds(rect: SceneSpotlightRect, projection: QuickEditHomography) {
+  const points = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y },
+    { x: rect.x, y: rect.y + rect.height },
+    { x: rect.x + rect.width, y: rect.y + rect.height },
+  ].map((point) => projectQuickEditPoint(projection, point));
+  if (points.some((point) => !point)) return null;
+  const x = points.map((point) => point!.x);
+  const y = points.map((point) => point!.y);
+  return {
+    x: Math.min(...x),
+    y: Math.min(...y),
+    width: Math.max(...x) - Math.min(...x),
+    height: Math.max(...y) - Math.min(...y),
+  };
 }
 
 /** Rounded openings become a bounded polygon in the same projected space as the window. */

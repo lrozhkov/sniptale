@@ -201,7 +201,7 @@ for (const variant of [
             .getByRole('button', { name: label('gallery.videoReview.canvas'), exact: true })
             .click();
           const canvas = inspector.locator('[data-section="canvas"] .review-inspector-columns');
-          for (const size of [515, 516, 517]) {
+          for (const size of [523, 524, 525]) {
             await resizeContent(canvas, size);
             await expect
               .poll(() =>
@@ -209,7 +209,7 @@ for (const variant of [
                   (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length
                 )
               )
-              .toBe(size < 516 ? 1 : 2);
+              .toBe(size < 524 ? 1 : 2);
           }
           await button('scenario.editor.inspectorShowAll').click();
           await expect(sections.locator('.review-inspector-section')).toHaveCount(8);

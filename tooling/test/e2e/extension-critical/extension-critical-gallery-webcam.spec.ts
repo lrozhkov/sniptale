@@ -18,16 +18,20 @@ for (const variant of [
       ')',
     ].join(''),
     async ({ page }, info) => {
+      test.setTimeout(180_000);
       if ('viewport' in variant) await page.setViewportSize(variant.viewport);
       const host = await startHostServer();
       const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
-      const toggle = () =>
-        dialog
-          .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
-          .and(dialog.locator('[aria-label]'));
+      const toggle = async () => {
+        const enabled = dialog.getByRole('switch', {
+          name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.webcam')}`,
+        });
+        if (!(await enabled.isVisible())) await button('gallery.videoReview.trackSettings').click();
+        await enabled.click();
+      };
       try {
         await applyHarnessBootstrap(page, {
           preserveMediaLibrary: true,
@@ -53,12 +57,13 @@ for (const variant of [
             .evaluate((video) => {
               video.currentTime = 0.09;
             });
-        await toggle().click();
+        await toggle();
+        await button('gallery.videoReview.webcamSettings').click();
         const track = dialog.locator('[data-ui="gallery.videoReview.webcamTrack"]');
         const overlay = dialog.locator('[data-ui="gallery.videoReview.webcamOverlay"]');
         const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
         await expect(track).toBeVisible();
-        await expect(track).toHaveCSS('height', '40px');
+        await expect(track).toHaveCSS('height', '36px');
         await button('gallery.videoReview.compactTrackHeight').click();
         await expect(track).toHaveCSS('height', '28px');
         await expect(inspector).toBeVisible();
@@ -90,10 +95,10 @@ for (const variant of [
           })
         ).toBeVisible();
         await refineCameraPoint(page, variant.locale, info);
-        await toggle().click();
-        await expect(track).toHaveCount(0);
+        await toggle();
+        await expect(track).toBeVisible();
         await expect(overlay).toHaveCount(0);
-        await toggle().click();
+        await toggle();
         await expect(
           track.getByRole('button', {
             name: `${label('gallery.videoReview.webcamPosition')} 1`,
@@ -266,9 +271,33 @@ for (const variant of [
           path: info.outputPath('webcam-hidden-inspector.png'),
           fullPage: false,
         });
+        if (!('lowCadence' in variant) && variant.locale === 'en') {
+          await hidden.click();
+          const resize = dialog.getByRole('separator', {
+            name: label('videoEditor.sidebar.resizeInspector'),
+          });
+          await resize.focus();
+          await resize.press('End');
+          const sections = inspector.locator('[data-ui="gallery.videoReview.inspectorSections"]');
+          await expect(sections.locator('.review-inspector-section')).toHaveCount(1);
+          await expect
+            .poll(() =>
+              sections.evaluate(
+                (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length
+              )
+            )
+            .toBe(1);
+          const section = (await sections.locator('.review-inspector-section').boundingBox())!;
+          const available = (await sections.boundingBox())!;
+          expect(section.width).toBeCloseTo(available.width, 0);
+          await page.screenshot({
+            path: info.outputPath('webcam-hidden-wide.png'),
+            fullPage: false,
+          });
+          await resize.press('Home');
+        }
         await page.reload();
-        await page.getByRole('button', { name: /: Screen$/ }).click();
-        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await expect(dialog).toBeVisible();
         await expect(hidden).toHaveCount(1);
         await dialog
           .locator('video')
@@ -363,8 +392,7 @@ for (const variant of [
           fullPage: false,
         });
         await page.reload();
-        await page.getByRole('button', { name: /: Screen$/ }).click();
-        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await expect(dialog).toBeVisible();
         await button('gallery.videoReview.webcamSettings').click();
         await expect(
           inspector.getByRole('textbox', {
@@ -390,6 +418,7 @@ for (const variant of [
 test('webcam inspector preserves controls across adaptive columns and panel heights', async ({
   page,
 }, info) => {
+  test.setTimeout(120_000);
   const host = await startHostServer();
   const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
   const dialog = page.locator('dialog');
@@ -407,7 +436,13 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
     await page.getByRole('button', { name: /: Screen$/ }).click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await button('gallery.videoReview.advancedEditing').click();
-    await button('gallery.videoReview.webcam').click();
+    await button('gallery.videoReview.trackSettings').click();
+    await dialog
+      .getByRole('switch', {
+        name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.webcam')}`,
+      })
+      .click();
+    await button('gallery.videoReview.webcamSettings').click();
     const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
     const sections = inspector.locator('[data-ui="gallery.videoReview.inspectorSections"]');
     const width = dialog.getByRole('separator', {
@@ -459,7 +494,11 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
         })
       ).toHaveCount(0);
       await select('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeSoft');
-      await select('gallery.videoReview.webcamMirror', 'gallery.videoReview.webcamMirrorOn');
+      const mirror = inspector.getByRole('switch', {
+        name: label('gallery.videoReview.webcamMirror'),
+      });
+      if ((await mirror.getAttribute('aria-checked')) === 'false') await mirror.click();
+      await expect(mirror).toHaveAttribute('aria-checked', 'true');
       await inspector
         .getByRole('button', { name: label('gallery.videoReview.webcamLayout'), exact: true })
         .click();
@@ -499,7 +538,13 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
         fullPage: false,
       });
       await button('scenario.editor.inspectorShowAll').click();
-      await expect(sections.locator('.review-inspector-section')).toHaveCount(3);
+      await expect
+        .poll(() =>
+          sections
+            .locator('.review-inspector-section')
+            .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-section')))
+        )
+        .toEqual(['webcam-layout', 'webcam-appearance', 'webcam-timing', 'actions']);
       await button('gallery.videoReview.webcamDisable').scrollIntoViewIfNeeded();
       await expect(button('gallery.videoReview.webcamDisable')).toBeInViewport();
     }

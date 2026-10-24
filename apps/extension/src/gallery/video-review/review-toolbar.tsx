@@ -379,10 +379,11 @@ function ReviewFocusToolControl({
           options={[
             { value: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
             { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+            { value: 'lens', label: translate('gallery.videoReview.focusLens') },
             { value: 'border', label: translate('gallery.videoReview.focusBorder') },
           ]}
           onChange={(value) => {
-            if (value === 'zoom' || value === 'spotlight' || value === 'border')
+            if (value === 'zoom' || value === 'spotlight' || value === 'border' || value === 'lens')
               admit(() => tool.onType?.(value));
           }}
         />

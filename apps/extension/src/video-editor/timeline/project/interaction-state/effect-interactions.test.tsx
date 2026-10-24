@@ -86,9 +86,9 @@ it('wraps all effect pointer moves in one history transaction', () => {
   };
   act(() => beginEffectInteraction?.(createPointerEvent(100), target));
   act(() => dispatchPointerMove(120));
-  expect(draft).toEqual({ segmentId: 'action-1', startTime: 4 });
+  expect(draft).toEqual({ segmentId: 'action-1', startTime: 4, timingFeedback: { time: 4 } });
   act(() => dispatchPointerMove(140));
-  expect(draft).toEqual({ segmentId: 'action-1', startTime: 6 });
+  expect(draft).toEqual({ segmentId: 'action-1', startTime: 6, timingFeedback: { time: 6 } });
   expect(onMoveMotionRegion).not.toHaveBeenCalled();
   act(() => window.dispatchEvent(new Event('pointerup')));
   expect(draft).toBeNull();
@@ -346,11 +346,11 @@ it('includes viewport scrolling in effect movement within one transaction', () =
   startTime += 3;
   act(() => root.render(<Harness />));
   act(() => dispatchPointerMove(120));
-  expect(draft).toEqual({ segmentId: 'action-1', startTime: 7 });
+  expect(draft).toEqual({ segmentId: 'action-1', startTime: 7, timingFeedback: { time: 7 } });
   expect(onMoveMotionRegion).not.toHaveBeenCalled();
   startTime -= 3;
   act(() => root.render(<Harness />));
-  expect(draft).toEqual({ segmentId: 'action-1', startTime: 4 });
+  expect(draft).toEqual({ segmentId: 'action-1', startTime: 4, timingFeedback: { time: 4 } });
   act(() => {
     dispatchPointerMove(140);
     window.dispatchEvent(new Event('pointerup'));
@@ -468,3 +468,52 @@ it.each(['click', 'drag', 'trim', 'cancel'] as const)(
     }
   }
 );
+
+it('reports constrained motion resize timing and removes it on cancellation', () => {
+  const clip = createVideoClip({ startTime: 2, duration: 8, sourceDuration: 8 });
+  const project = createProject([clip]);
+  project.duration = 20;
+  const region = bindMotionRegionToClip(
+    { ...createVideoProjectMotionRegion(project, 3), duration: 2 },
+    clip
+  );
+  project.motionRegions = [region];
+  let interaction: ReturnType<typeof useProjectTimelineEffectInteractions>;
+  const onMoveMotionRegion = vi.fn();
+  const onResizeMotionRegion = vi.fn();
+  function Harness() {
+    interaction = useProjectTimelineEffectInteractions({
+      historyTransaction: createHistoryTransactionMocks(),
+      magnetEnabled: false,
+      pixelsPerSecond: 10,
+      project,
+      onMoveMotionRegion,
+      onMoveCursorSegment: vi.fn(),
+      onMoveTransitionSegment: vi.fn(),
+      onResizeMotionRegion,
+      onUpdateEffectInstance: vi.fn(),
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() =>
+    interaction.beginEffectInteraction(createPointerEvent(100), {
+      kind: 'motion',
+      mode: 'resize-end',
+      motionRegionId: region.id,
+      segmentId: region.id,
+      originalDuration: 2,
+      originalStart: 3,
+    })
+  );
+  act(() => dispatchPointerMove(300));
+  expect(interaction!.effectDragDraft?.timingFeedback).toEqual({
+    time: 10,
+    beforeDuration: 2,
+    duration: 7,
+  });
+  expect(onResizeMotionRegion).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointercancel')));
+  expect(interaction!.effectDragDraft).toBeNull();
+  expect(onResizeMotionRegion).not.toHaveBeenCalled();
+});
