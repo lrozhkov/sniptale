@@ -1,10 +1,10 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
+import { ChevronRight } from 'lucide-react';
 
 export type ReadingPreferences = {
   fontSize: number | null;
   columnWidth: number | null;
-  fadeEdges: boolean;
   focusGuide: boolean;
 };
 const READER_CLASS = [
@@ -12,6 +12,31 @@ const READER_CLASS = [
   'bg-[var(--sniptale-color-surface-panel)] [font-family:var(--sniptale-font-document-sans)]',
   'text-start leading-[1.5] whitespace-pre-wrap [overflow-wrap:anywhere]',
 ].join(' ');
+const MANUAL_SCROLL_KEYS = new Set([
+  'ArrowUp',
+  'ArrowDown',
+  'PageUp',
+  'PageDown',
+  'Home',
+  'End',
+  ' ',
+]);
+
+function getReadingMetrics(
+  preferences: ReadingPreferences,
+  size: { width: number; height: number }
+) {
+  const fontSize =
+    preferences.fontSize ?? Math.max(24, Math.min(32, Math.round(24 + (size.width - 360) / 70)));
+  const guidePosition = Math.max(fontSize * 0.75, size.height * 0.35);
+  const paddingTop = preferences.focusGuide
+    ? Math.max(0, guidePosition - fontSize * 0.75)
+    : fontSize * 0.5;
+  const paddingBottom = preferences.focusGuide
+    ? Math.max(0, size.height - guidePosition - fontSize * 0.75)
+    : fontSize * 0.5;
+  return { fontSize, guidePosition, paddingTop, paddingBottom };
+}
 
 /** Keeps reader effects outside the scroll owner and leaves the scrollbar unobscured. */
 export function TeleprompterReader(props: {
@@ -30,10 +55,10 @@ export function TeleprompterReader(props: {
     end: number;
     fontSize: number;
     columnWidth: number | null;
+    focusGuide: boolean;
   } | null>(null);
-  const fontSize =
-    props.preferences.fontSize ??
-    Math.max(24, Math.min(32, Math.round(24 + (size.width - 360) / 70)));
+  const metrics = getReadingMetrics(props.preferences, size);
+  const { fontSize, guidePosition, paddingTop, paddingBottom } = metrics;
   const updateEdges = useCallback(() => {
     const reader = readerRef.current;
     if (!reader) return;
@@ -90,7 +115,8 @@ export function TeleprompterReader(props: {
       previous.width > 0 &&
       (previous.width !== size.width ||
         previous.fontSize !== fontSize ||
-        previous.columnWidth !== props.preferences.columnWidth);
+        previous.columnWidth !== props.preferences.columnWidth ||
+        previous.focusGuide !== props.preferences.focusGuide);
     if (reflow) {
       onPause();
       // Reflow preserves approximate progress. Pixel offsets cannot identify the same words after wrapping.
@@ -101,12 +127,14 @@ export function TeleprompterReader(props: {
       end,
       fontSize,
       columnWidth: props.preferences.columnWidth,
+      focusGuide: props.preferences.focusGuide,
     };
     onFontSize(fontSize);
     updateEdges();
   }, [
     fontSize,
     props.preferences.columnWidth,
+    props.preferences.focusGuide,
     size.width,
     size.height,
     readerRef,
@@ -125,7 +153,8 @@ export function TeleprompterReader(props: {
         className={READER_CLASS}
         style={{
           fontSize,
-          paddingBlock: '0.5em',
+          paddingTop,
+          paddingBottom,
           paddingInline: 'clamp(12px, 4%, 48px)',
           overflowAnchor: 'none',
         }}
@@ -134,10 +163,7 @@ export function TeleprompterReader(props: {
         onTouchStart={props.onPause}
         onPointerDown={props.onPause}
         onKeyDown={(event) => {
-          if (
-            ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)
-          )
-            onPause();
+          if (MANUAL_SCROLL_KEYS.has(event.key)) onPause();
         }}
       >
         <div
@@ -154,6 +180,7 @@ export function TeleprompterReader(props: {
       <ReaderEffects
         preferences={props.preferences}
         fontSize={fontSize}
+        guidePosition={guidePosition}
         height={size.height}
         edges={edges}
         selecting={selecting}
@@ -165,12 +192,13 @@ export function TeleprompterReader(props: {
 function ReaderEffects(props: {
   preferences: ReadingPreferences;
   fontSize: number;
+  guidePosition: number;
   height: number;
   edges: { top: boolean; bottom: boolean; scrollbar: number };
   selecting: boolean;
 }) {
   const { fontSize, edges } = props;
-  const fadeHeight = Math.min(fontSize * 0.8, Math.max(0, props.height * 0.1));
+  const fadeHeight = Math.min(fontSize * 1.5, Math.max(0, props.height * 0.18));
   const effects = !props.selecting;
   return (
     <>
@@ -178,11 +206,22 @@ function ReaderEffects(props: {
         <div
           aria-hidden="true"
           data-teleprompter-guide=""
-          className="pointer-events-none absolute start-0 border-y border-[var(--sniptale-color-border-soft)]"
-          style={{ top: '35%', height: `${fontSize * 1.5}px`, insetInlineEnd: edges.scrollbar }}
-        />
+          className="pointer-events-none absolute start-0"
+          style={{
+            top: props.guidePosition,
+            paddingInline: 'clamp(12px, 4%, 48px)',
+            insetInlineEnd: edges.scrollbar,
+          }}
+        >
+          <div
+            className="relative mx-auto w-full [font-family:var(--sniptale-font-document-sans)]"
+            style={{ maxWidth: `${props.preferences.columnWidth ?? 40}ch`, fontSize }}
+          >
+            <ChevronRight className="absolute -start-3 size-3 -translate-y-1/2 text-[var(--sniptale-color-accent)]" />
+          </div>
+        </div>
       ) : null}
-      {effects && props.preferences.fadeEdges ? (
+      {effects ? (
         <>
           {edges.top ? (
             <ReaderFade edge="top" height={fadeHeight} scrollbar={edges.scrollbar} />
@@ -208,7 +247,13 @@ function ReaderFade(props: { edge: 'top' | 'bottom'; height: number; scrollbar: 
         [props.edge]: 0,
         height: props.height,
         insetInlineEnd: props.scrollbar,
-        background: `linear-gradient(to ${direction}, ${surface}, transparent)`,
+        background: [
+          `linear-gradient(to ${direction}`,
+          `${surface} 0%`,
+          `color-mix(in srgb, ${surface} 85%, transparent) 25%`,
+          `color-mix(in srgb, ${surface} 30%, transparent) 65%`,
+          'transparent 100%)',
+        ].join(', '),
       }}
     />
   );

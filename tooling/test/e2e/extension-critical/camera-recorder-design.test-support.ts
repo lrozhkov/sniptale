@@ -232,9 +232,19 @@ export async function launchCamera(
 }
 
 export async function playbackLabel(page: Page, c: Composition, key: TranslationKey) {
-  const label = command(page, c, key).locator('.sniptale-command-content > span');
-  await expect(label).toBeVisible();
-  expect(await label.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  const button = command(page, c, key);
+  const label = button.locator('.sniptale-command-content > span');
+  const headerWidth = await page
+    .locator('.camera-teleprompter-header')
+    .evaluate((node) => node.clientWidth);
+  if (headerWidth <= 499) {
+    await expect(label).toBeHidden();
+    await expect(button).toHaveCSS('width', '32px');
+    await expect(button).toHaveAttribute('title', tr(c, key));
+  } else {
+    await expect(label).toBeVisible();
+    expect(await label.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  }
 }
 
 export async function nativeWindow(context: BrowserContext, page: Page, info: TestInfo) {

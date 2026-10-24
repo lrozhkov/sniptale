@@ -36,13 +36,33 @@
   animation: none;
 }
 
-@container (max-width: 449px) {
-  .camera-teleprompter-header .camera-recording-command {
+@container (max-width: 649px) {
+  .camera-teleprompter-reset .camera-recording-command {
     width: 32px;
     padding-inline: 0;
   }
 
-  .camera-teleprompter-header .camera-recording-command-label {
+  .camera-teleprompter-reset .camera-recording-command-label {
+    display: none;
+  }
+}
+
+@container (max-width: 499px) {
+  .camera-teleprompter-play .camera-recording-command {
+    width: 32px;
+    padding-inline: 0;
+  }
+  .camera-teleprompter-play .camera-recording-command-label {
+    display: none;
+  }
+}
+
+@container (max-width: 399px) {
+  .camera-teleprompter-mode .camera-recording-command {
+    width: 32px;
+    padding-inline: 0;
+  }
+  .camera-teleprompter-mode .camera-recording-command-label {
     display: none;
   }
 }

@@ -128,12 +128,6 @@ export function TeleprompterSettings(props: {
             onChange={(columnWidth) => props.onPreferencesChange({ columnWidth })}
           />
           <ReadingToggle
-            id={`${props.id}-fade`}
-            label={translate('popup.video.teleprompterFadeEdges')}
-            checked={props.preferences.fadeEdges}
-            onChange={(fadeEdges) => props.onPreferencesChange({ fadeEdges })}
-          />
-          <ReadingToggle
             id={`${props.id}-guide`}
             label={translate('popup.video.teleprompterFocusGuide')}
             checked={props.preferences.focusGuide}

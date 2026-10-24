@@ -27,10 +27,6 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'знаков',
     en: 'characters',
   },
-  teleprompterFadeEdges: {
-    ru: 'Мягкие края',
-    en: 'Fade edges',
-  },
   teleprompterFocusGuide: {
     ru: 'Ориентир чтения',
     en: 'Reading guide',

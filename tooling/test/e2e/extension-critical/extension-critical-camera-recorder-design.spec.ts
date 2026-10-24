@@ -214,6 +214,29 @@ for (const locale of ['en', 'ru'] as const) {
       await editor.fill(`${script}\nFinal line added after reading.`);
       await command(page, c, 'popup.video.teleprompterRead').click();
       await expect(reader).toContainText('Final line added after reading.');
+      await command(page, c, 'popup.video.teleprompterSettings').click();
+      await page.getByRole('switch', { name: tr(c, 'popup.video.teleprompterFocusGuide') }).click();
+      await page.keyboard.press('Escape');
+      const guide = reader.locator('..').locator('[data-teleprompter-guide]');
+      await expect(guide.locator('svg')).toBeVisible();
+      await command(page, c, 'popup.video.teleprompterReset').click();
+      await expect(reader.locator('..').locator('[data-teleprompter-fade=top]')).toHaveCount(0);
+      await expect(reader.locator('..').locator('[data-teleprompter-fade=bottom]')).toHaveCount(1);
+      await reader.evaluate((node) => {
+        const range = node.ownerDocument.createRange();
+        range.selectNodeContents(node);
+        const selection = node.ownerDocument.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        node.ownerDocument.dispatchEvent(new Event('selectionchange'));
+      });
+      await expect(guide).toHaveCount(0);
+      await expect(reader.locator('..').locator('[data-teleprompter-fade]')).toHaveCount(0);
+      await reader.evaluate((node) => {
+        node.ownerDocument.getSelection()?.removeAllRanges();
+        node.ownerDocument.dispatchEvent(new Event('selectionchange'));
+      });
+      await expect(guide.locator('svg')).toBeVisible();
 
       const controlInset = await page
         .locator('[data-ui="camera-recorder.controls"]')
@@ -228,7 +251,7 @@ for (const locale of ['en', 'ru'] as const) {
       const headerInset = await page
         .locator('.camera-teleprompter-header')
         .evaluate((node) => innerWidth - node.clientWidth);
-      const headerBreakpoint = Math.round(headerInset) + 450;
+      const headerBreakpoints = [400, 500, 650].map((width) => Math.round(headerInset) + width);
       const captureSizes = [
         { width: 1280, height: 560 },
         { width: 1920, height: 900 },
@@ -238,9 +261,7 @@ for (const locale of ['en', 'ru'] as const) {
           controlBreakpoint - 1,
           controlBreakpoint,
           controlBreakpoint + 1,
-          headerBreakpoint - 1,
-          headerBreakpoint,
-          headerBreakpoint + 1,
+          ...headerBreakpoints.flatMap((width) => [width - 1, width, width + 1]),
         ].map((width) => ({
           width,
           height: 560,
@@ -286,10 +307,31 @@ for (const locale of ['en', 'ru'] as const) {
           expect(box!.x + box!.width).toBeLessThanOrEqual(size.width + 1);
           expect(box!.y + box!.height).toBeLessThanOrEqual(size.height + 1);
         }
-        const scriptPanel = page
-          .getByRole('heading', { name: tr(c, 'popup.video.teleprompterTitle'), exact: true })
-          .locator('..')
-          .locator('..');
+        const scriptPanel = page.getByRole('region', {
+          name: tr(c, 'popup.video.teleprompterTitle'),
+          exact: true,
+        });
+        await expect(scriptPanel.getByRole('heading')).toHaveCount(0);
+        const header = scriptPanel.locator('.camera-teleprompter-header');
+        for (const key of [
+          'popup.video.teleprompterPlay',
+          'popup.video.teleprompterReset',
+          'popup.video.teleprompterEdit',
+          'popup.video.teleprompterSettings',
+        ] as const) {
+          await expect(header.getByRole('button', { name: tr(c, key), exact: true })).toBeVisible();
+        }
+        const headerWidth = await header.evaluate((node) => node.clientWidth);
+        const resetLabel = command(page, c, 'popup.video.teleprompterReset').locator(
+          '.camera-recording-command-label'
+        );
+        if (headerWidth <= 649) await expect(resetLabel).toBeHidden();
+        else await expect(resetLabel).toBeVisible();
+        const editLabel = command(page, c, 'popup.video.teleprompterEdit').locator(
+          '.camera-recording-command-label'
+        );
+        if (headerWidth <= 399) await expect(editLabel).toBeHidden();
+        else await expect(editLabel).toBeVisible();
         const scriptBox = await scriptPanel.boundingBox();
         const detailsBox = await page.locator('[data-ui="camera-recorder.controls"]').boundingBox();
         expect(scriptBox).not.toBeNull();
@@ -438,10 +480,9 @@ test(
       await page
         .getByRole('slider', { name: tr(c, 'popup.video.teleprompterColumnWidth') })
         .press('Home');
-      await page.getByRole('switch', { name: tr(c, 'popup.video.teleprompterFadeEdges') }).click();
       await page.getByRole('switch', { name: tr(c, 'popup.video.teleprompterFocusGuide') }).click();
       await page.keyboard.press('Escape');
-      await expect(reader.locator('..').locator('[data-teleprompter-fade]')).toHaveCount(0);
+      await expect(reader.locator('..').locator('[data-teleprompter-fade=bottom]')).toHaveCount(1);
       await expect(reader.locator('..').locator('[data-teleprompter-guide]')).toHaveCount(1);
       await capture(page, info, 'manual-column-and-guide');
       await command(page, c, 'popup.video.teleprompterSettings').click();

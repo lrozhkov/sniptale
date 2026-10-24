@@ -75,6 +75,23 @@ function read(script = 'Script\n'.repeat(100)) {
   setColumnHeight(reader, 1200);
   return reader;
 }
+
+it('puts playback in the header and keeps editing before settings without a visible title', () => {
+  read();
+  const header = container.querySelector('.camera-teleprompter-header')!;
+  expect(header.querySelector('h2')).toBeNull();
+  const names = [...header.querySelectorAll('button')].map((node) =>
+    node.getAttribute('aria-label')
+  );
+  expect(names).toEqual([
+    'popup.video.teleprompterPlay',
+    'popup.video.teleprompterReset',
+    'popup.video.teleprompterEdit',
+    'popup.video.teleprompterSettings',
+  ]);
+  click('teleprompterSettings');
+  expect(container.querySelectorAll('[role=switch]')).toHaveLength(1);
+});
 function setColumnHeight(reader: HTMLElement, height: number) {
   const column = reader.querySelector<HTMLElement>('[data-teleprompter-column]');
   if (!column) throw new Error('Missing reading column');
@@ -388,11 +405,19 @@ it('leaves the start/end readable and disables optional effects while text is se
   expect(container.querySelector('[data-teleprompter-fade=bottom]')).not.toBeNull();
   expect(container.querySelector('[data-teleprompter-guide]')).toBeNull();
   click('teleprompterSettings');
-  const guide = container.querySelectorAll<HTMLButtonElement>('[role=switch]')[1];
+  const guide = container.querySelector<HTMLButtonElement>('[role=switch]');
   act(() => guide?.click());
   expect(container.querySelector('[data-teleprompter-guide]')).not.toBeNull();
+  expect(container.querySelector('[data-teleprompter-guide] svg')).not.toBeNull();
+  expect(reader.style.paddingTop).toBe('46px');
+  expect(reader.style.paddingBottom).toBe('106px');
+  input(container.querySelectorAll<HTMLInputElement>('input[type=range]')[1], '72');
+  Object.defineProperty(reader, 'clientHeight', { configurable: true, value: 120 });
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(reader.style.paddingTop).toBe('0px');
+  expect(container.querySelector<HTMLElement>('[data-teleprompter-guide]')?.style.top).toBe('54px');
   click('teleprompterSettings');
-  reader.scrollTop = 800;
+  reader.scrollTop = reader.scrollHeight - reader.clientHeight;
   act(() => reader.dispatchEvent(new Event('scroll', { bubbles: true })));
   expect(container.querySelector('[data-teleprompter-fade=bottom]')).toBeNull();
   const selection = document.getSelection();

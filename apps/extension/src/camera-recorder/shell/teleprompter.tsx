@@ -35,7 +35,6 @@ export function Teleprompter({
   const [preferences, setPreferences] = useState<ReadingPreferences>({
     fontSize: null,
     columnWidth: null,
-    fadeEdges: true,
     focusGuide: false,
   });
   const [effectiveFontSize, setEffectiveFontSize] = useState(24);
@@ -52,12 +51,36 @@ export function Teleprompter({
     onRead: () => setEditing(false),
   });
   return (
-    <section ref={section} aria-labelledby={`${id}-title`} className={SECTION_CLASS}>
+    <section
+      ref={section}
+      aria-label={translate('popup.video.teleprompterTitle')}
+      className={SECTION_CLASS}
+    >
       <div className="camera-teleprompter-header flex shrink-0 items-center justify-between gap-2">
-        <h2 id={`${id}-title`} className="m-0 text-[14px] leading-5 font-medium">
-          {translate('popup.video.teleprompterTitle')}
-        </h2>
-        <div className="flex min-w-0 items-center gap-2">
+        {!editing ? (
+          <PlaybackControls
+            running={scroll.running}
+            manuallyPaused={scroll.manuallyPaused}
+            paused={paused}
+            onToggle={scroll.toggle}
+            onReset={scroll.reset}
+          />
+        ) : null}
+        <div className="ms-auto flex min-w-0 items-center gap-2">
+          <div className={!editing ? 'camera-teleprompter-mode' : undefined}>
+            <CameraWindowButton
+              responsiveLabel
+              icon={SquarePen}
+              label={translate(
+                editing ? 'popup.video.teleprompterRead' : 'popup.video.teleprompterEdit'
+              )}
+              disabled={editing && !text.trim()}
+              onClick={() => {
+                if (!editing) scroll.pause();
+                setEditing(!editing);
+              }}
+            />
+          </div>
           <TeleprompterSettings
             id={id}
             visible={visible}
@@ -72,18 +95,6 @@ export function Teleprompter({
               setPreferences((previous) => ({ ...previous, ...change }));
             }}
             onSpeedChange={setSpeed}
-          />
-          <CameraWindowButton
-            responsiveLabel
-            icon={SquarePen}
-            label={translate(
-              editing ? 'popup.video.teleprompterRead' : 'popup.video.teleprompterEdit'
-            )}
-            disabled={editing && !text.trim()}
-            onClick={() => {
-              if (!editing) scroll.pause();
-              setEditing(!editing);
-            }}
           />
           {onHide ? (
             <CameraWindowButton
@@ -123,20 +134,9 @@ export function Teleprompter({
           onFontSize={setEffectiveFontSize}
         />
       )}
-      <div className="grid shrink-0 gap-3">
-        {!editing ? (
-          <PlaybackControls
-            running={scroll.running}
-            manuallyPaused={scroll.manuallyPaused}
-            paused={paused}
-            onToggle={scroll.toggle}
-            onReset={scroll.reset}
-          />
-        ) : null}
-        {paused ? (
-          <p className="sr-only">{translate('popup.video.teleprompterRecordingPaused')}</p>
-        ) : null}
-      </div>
+      {paused ? (
+        <p className="sr-only">{translate('popup.video.teleprompterRecordingPaused')}</p>
+      ) : null}
     </section>
   );
 }
@@ -154,18 +154,24 @@ function PlaybackControls(props: {
       ? 'popup.video.teleprompterResume'
       : 'popup.video.teleprompterPlay';
   return (
-    <div className="mx-auto grid w-full min-w-0 max-w-[360px] grid-cols-2 gap-2">
-      <CameraWindowButton
-        icon={props.running ? Pause : Play}
-        label={translate(label)}
-        disabled={props.paused}
-        onClick={props.onToggle}
-      />
-      <CameraWindowButton
-        icon={RotateCcw}
-        label={translate('popup.video.teleprompterReset')}
-        onClick={props.onReset}
-      />
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="camera-teleprompter-play">
+        <CameraWindowButton
+          responsiveLabel
+          icon={props.running ? Pause : Play}
+          label={translate(label)}
+          disabled={props.paused}
+          onClick={props.onToggle}
+        />
+      </div>
+      <div className="camera-teleprompter-reset">
+        <CameraWindowButton
+          responsiveLabel
+          icon={RotateCcw}
+          label={translate('popup.video.teleprompterReset')}
+          onClick={props.onReset}
+        />
+      </div>
     </div>
   );
 }
