@@ -47,6 +47,7 @@ export interface ToolbarVideoRecordingProps {
   onCameraOffer: (sdp: string) => Promise<string>;
   onCameraPeerClose: () => Promise<void> | void;
   onDeactivate: () => Promise<boolean> | boolean;
+  onHide?: () => Promise<void>;
   onAutoHideDelayChange?: (delay: RecordingDrawingAutoHideDelay) => Promise<void> | void;
   onInteractionChange: (interaction: VideoRecordingToolbarInteraction) => void;
   onMicrophoneEnabledChange: (enabled: boolean) => Promise<void> | void;

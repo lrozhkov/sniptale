@@ -169,8 +169,20 @@ export function resolveToolbarDrawingMenuStyle(params: {
     placement: params.displayMode === 'vertical' ? 'side' : params.placement,
     surfaceInset: params.surfaceInset ?? 0,
   });
-  const above = params.displayMode !== 'vertical' && params.placement === 'up';
   const toLeft = params.displayMode === 'vertical' && position.left < toolbarRect.x;
+  if (params.displayMode === 'vertical' && toolbar.dataset['videoRecording'] === 'true') {
+    return {
+      ...position,
+      position: 'fixed',
+      left: toLeft ? 'auto' : position.left,
+      right: toLeft
+        ? viewport.width - position.left - Math.min(params.menuWidth, position.maxWidth)
+        : 'auto',
+      bottom: 'auto',
+      overflowY: 'auto',
+    };
+  }
+  const above = params.displayMode !== 'vertical' && params.placement === 'up';
   return {
     ...position,
     left: toLeft ? 'auto' : position.left - anchorRect.x,

@@ -642,6 +642,7 @@ function useSurfaceControllerProjection(args: SurfaceControllerProjectionArgs) {
         args.startAttemptRef.current += 1;
       },
       onDeactivate: args.deactivate,
+      onHide: () => args.command({ kind: 'set-toolbar-requested', enabled: false }, false),
       onPause: () => args.command({ kind: 'pause' }),
       onResume: () => args.command({ kind: 'resume' }),
       onStart: args.start,

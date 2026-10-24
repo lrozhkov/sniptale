@@ -796,3 +796,37 @@ it.each([
     });
   }
 );
+
+it('hides the toolbar without releasing its camera or recording surface', async () => {
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.RECORDING });
+  mocks.command.mockResolvedValueOnce({
+    snapshot: {
+      ...snapshot,
+      recordingId: 'recording-1',
+      status: VideoRecordingStatus.RECORDING,
+      toolbarRequested: false,
+    },
+  });
+  onToolbarRequested.mockClear();
+  await act(async () => controller.onHide());
+  expect(mocks.command).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1', surfaceSessionId: 'surface-1' }),
+    { kind: 'set-toolbar-requested', enabled: false }
+  );
+  expect(mocks.release).not.toHaveBeenCalled();
+  expect(controller.state.cameraEnabled).toBe(true);
+  expect(controller.state.phase).toBe('recording');
+  expect(onToolbarRequested).not.toHaveBeenCalled();
+});
+
+it('propagates a hide refusal without duplicating the shell error or interrupting recording', async () => {
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.RECORDING });
+  mocks.command.mockRejectedValueOnce(new Error('Hide refused'));
+  await act(async () => {
+    await expect(controller.onHide()).rejects.toThrow('Hide refused');
+  });
+  expect(controller.state.phase).toBe('recording');
+  expect(controller.state.error).toBeNull();
+  expect(controller.state.cameraEnabled).toBe(true);
+  expect(mocks.release).not.toHaveBeenCalled();
+});

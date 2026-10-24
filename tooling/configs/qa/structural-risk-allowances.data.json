@@ -2464,6 +2464,17 @@
       "reviewDate": "2026-10-23",
       "astHash": "4f75b8062c05c46264d17a23216e8603da03db7fa79e17cc9ef49b26c03ac413",
       "signatureHash": "7f6156d16770269261aac61f2e56e18eb91a74fa4164c7da762118782484b733"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/content/overlay/video-recording/session/controller.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:content:overlay",
+      "reason": "tool-noise: This file tests one mounted recording surface controller with one Probe, transport mock receiver and reset/unmount lifecycle. The hide success and refusal cases use that same fixture and preserve recording and camera state. The score is 2, delta is 0, cohesion is 1.00, and there are no effectful clusters. No authority was added; only the 800-line limit is crossed. Splitting these cases would duplicate the fixture or add a fixture-only forwarding boundary. Independent read-only diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent fixture, state authority, resource lifetime or recovery owner. Remove when the analyzer models this cohesive test shape.",
+      "reviewDate": "2026-10-24",
+      "astHash": "057301f67e379ce8699fd1c2c5d132df0b077b8d9f45878fe41b249c54932f8c",
+      "signatureHash": "99464e722cafa745f7bada7105ee114e588e55ae5ee41eabe9397b75579040b4"
     }
   ]
 }

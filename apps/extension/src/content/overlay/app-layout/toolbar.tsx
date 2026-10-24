@@ -281,10 +281,16 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
       )?.focus();
     }
   }, [toolbar.isToolbarVisible, toolbar.isCompletelyHidden]);
-  const handleHideToolbar = (restoreFocus = false) => {
-    focusRestorePending.current = restoreFocus;
-    useFrameUIStore.getState().dismissFrameUi();
-    toolbar.setPinnedToolbarVisible(false);
+  const handleHideToolbar = async (restoreFocus = false) => {
+    try {
+      if (toolbar.modes.videoRecordingMode) await toolbar.videoRecording?.onHide?.();
+      focusRestorePending.current = restoreFocus;
+      useFrameUIStore.getState().dismissFrameUi();
+      toolbar.setPinnedToolbarVisible(false);
+    } catch (error) {
+      logger.error('Failed to hide video recording toolbar', error);
+      showToast(translate('content.toolbar.videoRecordingActionFailed'), 'error');
+    }
   };
   const subscribeAvailability = useCallback(
     (listener: () => void) => subscribeResetAvailability(listener, toolbar.drawingController),

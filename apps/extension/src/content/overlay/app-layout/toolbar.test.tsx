@@ -304,6 +304,59 @@ async function verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface() {
 
 describe('ContentToolbarShell', () => {
   useContentToolbarShellTestScope();
+  it('clears the recording surface request before hiding and allows retry after refusal', async () => {
+    const props = createProps();
+    props.toolbar.modes.videoRecordingMode = true;
+    const drawingOwner = createRecordingDrawingOwner();
+    let resolveHide!: () => void;
+    const onHide = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error('Surface command refused'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveHide = resolve;
+          })
+      );
+    const emptyAction = vi.fn();
+    props.toolbar.videoRecording = {
+      drawingOwner,
+      state: INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
+      onActivate: () => true,
+      onCancelStart: emptyAction,
+      onCameraEnabledChange: emptyAction,
+      onCameraGeometryChange: emptyAction,
+      onCameraOffer: async () => 'answer',
+      onCameraPeerClose: emptyAction,
+      onDeactivate: () => true,
+      onHide,
+      onInteractionChange: emptyAction,
+      onMicrophoneEnabledChange: emptyAction,
+      onPause: emptyAction,
+      onResume: emptyAction,
+      onSpotlightEnabledChange: emptyAction,
+      onStart: emptyAction,
+      onStop: emptyAction,
+    };
+    await renderShell(props);
+    const toolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as { onHide: () => void };
+    await act(async () => {
+      toolbarProps.onHide();
+    });
+    expect(onHide).toHaveBeenCalledOnce();
+    expect(props.toolbar.setPinnedToolbarVisible).not.toHaveBeenCalled();
+    expect(showToastMock).toHaveBeenCalledOnce();
+    await act(async () => {
+      toolbarProps.onHide();
+    });
+    expect(onHide).toHaveBeenCalledTimes(2);
+    expect(props.toolbar.setPinnedToolbarVisible).not.toHaveBeenCalled();
+    await act(async () => resolveHide());
+    expect(props.toolbar.setPinnedToolbarVisible).toHaveBeenCalledWith(false);
+    expect(props.toolbar.videoRecording.onStop).not.toHaveBeenCalled();
+    expect(props.toolbar.videoRecording.onCameraEnabledChange).not.toHaveBeenCalled();
+    drawingOwner.dispose();
+  });
   it.each([true, false])(
     'restores collapsed toolbar focus only for keyboard activation: %s',
     verifiesCollapseFocus
