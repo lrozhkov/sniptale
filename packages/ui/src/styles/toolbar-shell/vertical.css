@@ -233,3 +233,21 @@
   --sniptale-toolbar-indicator-rotation: 0deg;
   --sniptale-toolbar-chevron-rotation: -90deg;
 }
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-video-recording='true'] {
+  inline-size: calc(2 * var(--sniptale-toolbar-button-size) + var(--sniptale-toolbar-gap) + 16px);
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-video-recording='true']
+  :is(
+    [data-ui='content.toolbar.drawing-tools-group'],
+    [data-ui='content.toolbar.drawing-actions-group'],
+    [data-ui='content.toolbar.video-recording.setup-group'],
+    [data-ui='content.toolbar.video-recording.media-group']
+  ) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  justify-items: center;
+  gap: min(4px, var(--sniptale-toolbar-gap));
+}

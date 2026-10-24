@@ -1,12 +1,16 @@
 import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { PageToolbarControlsContext } from '../state/page-controls';
 import { PageProtectedControls } from '../controls/control-visibility';
 import { Redo2, Undo2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { normalizeHotkeyKey } from '../../../../features/keyboard-shortcuts/hotkeys';
-import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import {
+  pagePreparationHistory,
+  getPagePreparationHistoryDomain,
+  type PagePreparationHistoryDomain,
+} from '../../../parser/page-preparation/history';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import type { ToolbarMenuState } from '../state/menu';
 import { ToolbarResetConfirmControl } from './reset-confirm';
@@ -37,23 +41,15 @@ function matchesHotkey(event: KeyboardEvent, code: 'KeyY' | 'KeyZ', key: 'y' | '
   return event.code === '' && normalizeHotkeyKey(event.key).toLowerCase() === key;
 }
 
-function readPagePreparationHistoryState() {
+function usePagePreparationHistoryState(domain?: PagePreparationHistoryDomain) {
+  useSyncExternalStore(
+    pagePreparationHistory.subscribe,
+    () => pagePreparationHistory.getState().revision
+  );
   return {
-    ...pagePreparationHistory.getState(),
+    ...pagePreparationHistory.getState(domain),
     hasOpenTransactions: pagePreparationHistory.hasOpenTransactions(),
   };
-}
-
-function usePagePreparationHistoryState() {
-  const [historyState, setHistoryState] = useState(readPagePreparationHistoryState);
-
-  useEffect(() => {
-    return pagePreparationHistory.subscribe(() => {
-      setHistoryState(readPagePreparationHistoryState());
-    });
-  }, []);
-
-  return historyState;
 }
 
 function useFrameEditingState(): boolean {
@@ -68,22 +64,27 @@ function useFrameEditingState(): boolean {
   return active;
 }
 
-function handleHistoryHotkey(args: { canRedo: boolean; canUndo: boolean; event: KeyboardEvent }) {
+function handleHistoryHotkey(args: {
+  canRedo: boolean;
+  canUndo: boolean;
+  event: KeyboardEvent;
+  domain: PagePreparationHistoryDomain | undefined;
+}) {
   if (matchesHotkey(args.event, 'KeyZ', 'z') && args.event.shiftKey && args.canRedo) {
     args.event.preventDefault();
-    pagePreparationHistory.redo();
+    pagePreparationHistory.redo(args.domain);
     return;
   }
 
-  if (matchesHotkey(args.event, 'KeyZ', 'z') && args.canUndo) {
+  if (matchesHotkey(args.event, 'KeyZ', 'z') && !args.event.shiftKey && args.canUndo) {
     args.event.preventDefault();
-    pagePreparationHistory.undo();
+    pagePreparationHistory.undo(args.domain);
     return;
   }
 
   if (matchesHotkey(args.event, 'KeyY', 'y') && args.event.ctrlKey && args.canRedo) {
     args.event.preventDefault();
-    pagePreparationHistory.redo();
+    pagePreparationHistory.redo(args.domain);
   }
 }
 
@@ -91,6 +92,7 @@ function usePagePreparationHistoryHotkeys(args: {
   canRedo: boolean;
   canUndo: boolean;
   screenshotMode: boolean;
+  domain: PagePreparationHistoryDomain | undefined;
 }) {
   useEffect(() => {
     if (!args.screenshotMode) {
@@ -102,7 +104,11 @@ function usePagePreparationHistoryHotkeys(args: {
         return;
       }
 
-      if (isEditableTarget(event.target) || hasActiveInlineEditing()) {
+      if (
+        event.composedPath().some(isEditableTarget) ||
+        isEditableTarget(event.target) ||
+        hasActiveInlineEditing()
+      ) {
         return;
       }
 
@@ -110,6 +116,7 @@ function usePagePreparationHistoryHotkeys(args: {
         canRedo: args.canRedo,
         canUndo: args.canUndo,
         event,
+        domain: args.domain,
       });
     };
 
@@ -117,14 +124,27 @@ function usePagePreparationHistoryHotkeys(args: {
     return () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
-  }, [args.canRedo, args.canUndo, args.screenshotMode]);
+  }, [args.canRedo, args.canUndo, args.screenshotMode, args.domain]);
 }
 
-function HistoryButton(props: { action: 'undo' | 'redo'; canRun: boolean }) {
-  const copyKey = props.action === 'undo' ? 'editor.toolbar.undo' : 'editor.toolbar.redo';
+const HISTORY_COPY = {
+  annotation: { undo: 'content.toolbar.undoAnnotation', redo: 'content.toolbar.redoAnnotation' },
+  drawing: { undo: 'content.toolbar.undoDrawing', redo: 'content.toolbar.redoDrawing' },
+  'page-editing': { undo: 'content.toolbar.undoPageEdit', redo: 'content.toolbar.redoPageEdit' },
+} as const;
+
+function HistoryButton(props: {
+  action: 'undo' | 'redo';
+  canRun: boolean;
+  domain: PagePreparationHistoryDomain | undefined;
+}) {
+  const copyKey = props.domain
+    ? HISTORY_COPY[props.domain][props.action]
+    : props.action === 'undo'
+      ? 'editor.toolbar.undo'
+      : 'editor.toolbar.redo';
   const Icon = props.action === 'undo' ? Undo2 : Redo2;
-  const handleClick =
-    props.action === 'undo' ? pagePreparationHistory.undo : pagePreparationHistory.redo;
+  const handleClick = () => pagePreparationHistory[props.action](props.domain);
 
   return (
     <ContentToolbarButton
@@ -150,7 +170,11 @@ export function ToolbarHistoryControls(props: {
   resetScope?: PagePreparationResetScope;
   onClearPagePreparation?: () => void;
 }) {
-  const historyState = usePagePreparationHistoryState();
+  const domain =
+    props.resetScope && props.resetScope !== 'all'
+      ? getPagePreparationHistoryDomain(props.resetScope)
+      : undefined;
+  const historyState = usePagePreparationHistoryState(domain);
   const visibility = useContext(PageToolbarControlsContext);
   const frameEditing = useFrameEditingState();
   const canUndo =
@@ -167,14 +191,19 @@ export function ToolbarHistoryControls(props: {
   usePagePreparationHistoryHotkeys({
     canRedo,
     canUndo,
-    screenshotMode: props.screenshotMode,
+    screenshotMode: props.screenshotMode && !props.isNavigationMode,
+    domain,
   });
 
   return (
     <>
       <PageProtectedControls>
-        {props.isNavigationMode ? null : <HistoryButton action="undo" canRun={canUndo} />}
-        {props.isNavigationMode ? null : <HistoryButton action="redo" canRun={canRedo} />}
+        {props.isNavigationMode ? null : (
+          <HistoryButton action="undo" canRun={canUndo} domain={domain} />
+        )}
+        {props.isNavigationMode ? null : (
+          <HistoryButton action="redo" canRun={canRedo} domain={domain} />
+        )}
         <ToolbarResetConfirmControl
           displayMode={props.displayMode}
           toolbarMenuState={props.toolbarMenuState}

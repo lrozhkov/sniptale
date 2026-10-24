@@ -20,11 +20,17 @@ import type {
   RecordingDrawingOwner,
 } from './video-recording/drawing-session';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import type { VideoOutputProfile } from '@sniptale/runtime-contracts/video/types/types';
 import type { WebcamPresentationPatch } from '../../../features/video/recording/webcam-presentation';
 
 export interface ToolbarVideoRecordingProps {
   drawingOwner: RecordingDrawingOwner;
   state: VideoRecordingToolbarState;
+  setupPending?: boolean;
+  captureMode?: 'TAB' | 'TAB_CROP';
+  onCaptureModeChange?: (mode: 'TAB' | 'TAB_CROP') => void;
+  onQualityProfileChange?: (profileId: string) => Promise<void>;
+  onOutputProfileChange?: (outputProfile: VideoOutputProfile) => Promise<void>;
   onActivate: (activationEvent?: Event) => Promise<boolean> | boolean;
   onCancelStart: () => Promise<void> | void;
   onCameraEnabledChange: (enabled: boolean) => Promise<void> | void;

@@ -308,3 +308,34 @@ it.each([
     })
   ).toMatchObject({ top: expectedTop });
 });
+
+it.each([8, 860])('keeps recording menus outside both vertical columns at x=%s', (x) => {
+  vi.stubGlobal('innerWidth', 1000);
+  vi.stubGlobal('innerHeight', 560);
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar';
+  toolbar.dataset['videoRecording'] = 'true';
+  const anchor = document.createElement('button');
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(new DOMRect(x, 8, 92, 520));
+  const trigger = vi.spyOn(anchor, 'getBoundingClientRect');
+  for (const columnOffset of [8, 48]) {
+    trigger.mockReturnValue(new DOMRect(x + columnOffset, 350, 32, 32));
+    const style = resolveToolbarFloatingMenuStyle({
+      anchorEl: anchor,
+      displayMode: 'vertical',
+      placement: 'down',
+      menuWidth: 320,
+      menuHeight: 360,
+    });
+    expect(style).not.toBeNull();
+    if (x === 8) {
+      expect(x + columnOffset + Number(style?.left)).toBeGreaterThanOrEqual(x + 92 + 1);
+    } else {
+      expect(x + columnOffset + 32 - Number(style?.right)).toBeLessThanOrEqual(x - 1);
+    }
+    expect(Number(style?.top) + 350).toBeGreaterThanOrEqual(8);
+    expect(Number(style?.top) + 350 + 360).toBeLessThanOrEqual(552);
+  }
+});

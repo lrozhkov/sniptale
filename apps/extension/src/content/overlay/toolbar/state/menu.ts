@@ -13,6 +13,8 @@ export type ToolbarPopoverMenu =
   | 'recording-auto-hide'
   | 'recording-camera'
   | 'recording-microphone'
+  | 'recording-quality'
+  | 'recording-target'
   | 'recording-spotlight'
   | 'reset-confirm'
   | 'settings'

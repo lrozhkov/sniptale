@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   pagePreparationHistory,
+  type PagePreparationHistoryDomain,
   type PagePreparationResetScope,
 } from '../../../parser/page-preparation/history';
 import { ToolbarHistoryControls } from './history';
@@ -35,6 +36,7 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let historyState = { canRedo: false, canUndo: false, revision: 0 };
+let domainStates: Partial<Record<PagePreparationHistoryDomain, typeof historyState>> = {};
 let openTransactions = false;
 let listener: (() => void) | null = null;
 
@@ -74,7 +76,9 @@ function emitHistoryState(nextState: typeof historyState) {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.spyOn(pagePreparationHistory, 'getState').mockImplementation(() => historyState);
+  vi.spyOn(pagePreparationHistory, 'getState').mockImplementation((domain) =>
+    domain ? (domainStates[domain] ?? historyState) : historyState
+  );
   vi.spyOn(pagePreparationHistory, 'hasOpenTransactions').mockImplementation(
     () => openTransactions
   );
@@ -98,6 +102,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   historyState = { canRedo: false, canUndo: false, revision: 0 };
+  domainStates = {};
   openTransactions = false;
   listener = null;
   vi.restoreAllMocks();
@@ -267,6 +272,149 @@ function verifyFrameEditingBlocksHistoryControls() {
 }
 
 describe('ToolbarHistoryControls', () => {
+  it.each([
+    {
+      scope: 'drawing',
+      domain: 'drawing',
+      undo: 'content.toolbar.undoDrawing',
+      redo: 'content.toolbar.redoDrawing',
+    },
+    {
+      scope: 'annotation',
+      domain: 'annotation',
+      undo: 'content.toolbar.undoAnnotation',
+      redo: 'content.toolbar.redoAnnotation',
+    },
+    {
+      scope: 'content-editing',
+      domain: 'page-editing',
+      undo: 'content.toolbar.undoPageEdit',
+      redo: 'content.toolbar.redoPageEdit',
+    },
+    {
+      scope: 'design-review',
+      domain: 'page-editing',
+      undo: 'content.toolbar.undoPageEdit',
+      redo: 'content.toolbar.redoPageEdit',
+    },
+    { scope: 'all', domain: undefined, undo: 'editor.toolbar.undo', redo: 'editor.toolbar.redo' },
+  ] as const)('routes buttons and shortcuts to $scope with translated action names', (entry) => {
+    historyState = { canRedo: true, canUndo: true, revision: 1 };
+    renderComponent(true, {
+      canClearPagePreparation: false,
+      onClearPagePreparation: vi.fn(),
+      resetScope: entry.scope,
+    });
+    const undo = container?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.history-undo-button"]'
+    );
+    const redo = container?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.history-redo-button"]'
+    );
+    expect(undo?.getAttribute('aria-label')).toBe(entry.undo);
+    expect(undo?.getAttribute('title')).toBe(entry.undo);
+    expect(redo?.getAttribute('aria-label')).toBe(entry.redo);
+    expect(redo?.getAttribute('title')).toBe(entry.redo);
+    act(() => undo?.click());
+    act(() => redo?.click());
+
+    for (const shortcut of [
+      { code: 'KeyZ', key: 'z', ctrlKey: true },
+      { code: 'KeyZ', key: 'z', metaKey: true },
+      { code: 'KeyZ', key: 'z', ctrlKey: true, shiftKey: true },
+      { code: 'KeyZ', key: 'z', metaKey: true, shiftKey: true },
+      { code: 'KeyY', key: 'y', ctrlKey: true },
+    ]) {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...shortcut });
+      document.body.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+    }
+    expect(pagePreparationHistory.undo).toHaveBeenCalledTimes(3);
+    expect(pagePreparationHistory.redo).toHaveBeenCalledTimes(4);
+    for (const call of vi.mocked(pagePreparationHistory.undo).mock.calls)
+      expect(call).toEqual([entry.domain]);
+    for (const call of vi.mocked(pagePreparationHistory.redo).mock.calls)
+      expect(call).toEqual([entry.domain]);
+  });
+  it('refreshes selected-domain availability on a scope change without a history revision', () => {
+    historyState = { canRedo: true, canUndo: true, revision: 5 };
+    domainStates = {
+      drawing: { canRedo: true, canUndo: false, revision: 5 },
+      annotation: { canRedo: false, canUndo: false, revision: 5 },
+      'page-editing': { canRedo: false, canUndo: true, revision: 5 },
+    };
+    const renderScope = (resetScope: PagePreparationResetScope) =>
+      renderComponent(true, {
+        canClearPagePreparation: false,
+        onClearPagePreparation: vi.fn(),
+        resetScope,
+      });
+    const disabled = (action: 'undo' | 'redo') =>
+      container?.querySelector<HTMLButtonElement>(
+        `[data-ui="content.toolbar.history-${action}-button"]`
+      )?.disabled;
+    renderScope('drawing');
+    expect(disabled('undo')).toBe(true);
+    expect(disabled('redo')).toBe(false);
+    renderScope('annotation');
+    expect(disabled('undo')).toBe(true);
+    expect(disabled('redo')).toBe(true);
+    const unavailableUndo = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyZ',
+      ctrlKey: true,
+      key: 'z',
+    });
+    document.body.dispatchEvent(unavailableUndo);
+    expect(unavailableUndo.defaultPrevented).toBe(false);
+    expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+    renderScope('content-editing');
+    expect(disabled('undo')).toBe(false);
+    expect(disabled('redo')).toBe(true);
+    renderScope('design-review');
+    expect(disabled('undo')).toBe(false);
+    expect(disabled('redo')).toBe(true);
+    renderScope('drawing');
+    expect(disabled('undo')).toBe(true);
+    expect(disabled('redo')).toBe(false);
+  });
+  it.each([true, false])(
+    'does not intercept navigation hotkeys with screenshotMode=%s',
+    (screenshotMode) => {
+      historyState = { canRedo: true, canUndo: true, revision: 1 };
+      renderComponent(
+        screenshotMode,
+        {
+          canClearPagePreparation: true,
+          onClearPagePreparation: vi.fn(),
+          resetScope: 'drawing',
+        },
+        true
+      );
+      for (const shortcut of [
+        { code: 'KeyZ', key: 'z', ctrlKey: true },
+        { code: 'KeyZ', key: 'z', metaKey: true, shiftKey: true },
+        { code: 'KeyY', key: 'y', ctrlKey: true },
+      ]) {
+        const event = new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          ...shortcut,
+        });
+        document.body.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(false);
+      }
+      expect(
+        container?.querySelector('[data-ui="content.toolbar.history-undo-button"]')
+      ).toBeNull();
+      expect(
+        container?.querySelector('[data-ui="content.toolbar.history-redo-button"]')
+      ).toBeNull();
+      expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+      expect(pagePreparationHistory.redo).not.toHaveBeenCalled();
+    }
+  );
   it(
     'renders undo and redo controls with disabled state from the history store',
     verifyDisabledStateRendering
@@ -374,3 +522,48 @@ it.each(resetScopes)(
     }
   }
 );
+
+it('leaves history keys inside a Shadow DOM text editor to native text history', () => {
+  historyState = { canRedo: true, canUndo: true, revision: 1 };
+  renderComponent(true, {
+    canClearPagePreparation: false,
+    onClearPagePreparation: vi.fn(),
+    resetScope: 'drawing',
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const input = document.createElement('textarea');
+  host.attachShadow({ mode: 'open' }).append(input);
+  const event = new KeyboardEvent('keydown', {
+    key: 'z',
+    code: 'KeyZ',
+    ctrlKey: true,
+    bubbles: true,
+    composed: true,
+    cancelable: true,
+  });
+  act(() => input.dispatchEvent(event));
+  expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+  expect(event.defaultPrevented).toBe(false);
+});
+
+it('does not turn an unavailable Redo shortcut into Undo', () => {
+  historyState = { canRedo: false, canUndo: true, revision: 1 };
+  renderComponent(true, {
+    canClearPagePreparation: false,
+    onClearPagePreparation: vi.fn(),
+    resetScope: 'drawing',
+  });
+  const event = new KeyboardEvent('keydown', {
+    key: 'z',
+    code: 'KeyZ',
+    ctrlKey: true,
+    shiftKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => document.body.dispatchEvent(event));
+  expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+  expect(pagePreparationHistory.redo).not.toHaveBeenCalled();
+  expect(event.defaultPrevented).toBe(false);
+});

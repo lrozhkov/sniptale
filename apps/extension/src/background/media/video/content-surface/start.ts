@@ -11,6 +11,7 @@ import { loadSettings } from '../../../../composition/persistence/settings';
 import { ensureMediaHubStorageHeadroom } from '../../../../features/media-hub/storage-capacity';
 import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { startRecording } from '../manager';
+import { runSerializedVideoRecordingMediaMutation } from './mutation-queue';
 import { resolveVideoRecordingViewportPreset } from './preset';
 import { createVideoRecordingSurfaceSnapshot } from './snapshot';
 import { resolveRecordingMediaAccess } from './media-access';
@@ -100,7 +101,7 @@ export async function startSavedTabVideoRecording(
   ownerDocumentId: string | undefined,
   confirmation: Pick<
     StartSavedTabVideoRecordingMessage,
-    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone' | 'captureMode'
   > = {}
 ) {
   if (pendingSavedStarts.has(tabId)) {
@@ -109,13 +110,12 @@ export async function startSavedTabVideoRecording(
   const attempt = { cancelled: false };
   pendingSavedStarts.set(tabId, attempt);
   try {
-    return await runSavedTabVideoRecordingStart(
-      tabId,
-      ownerSenderUrl,
-      ownerDocumentId,
-      confirmation,
-      attempt
-    );
+    const runStart = () =>
+      runSavedTabVideoRecordingStart(tabId, ownerSenderUrl, ownerDocumentId, confirmation, attempt);
+    const lease = await ensureVideoRecordingSurfaceLeaseHydrated();
+    return await (lease?.tabId === tabId
+      ? runSerializedVideoRecordingMediaMutation(lease.surfaceSessionId, runStart)
+      : runStart());
   } finally {
     if (pendingSavedStarts.get(tabId) === attempt) pendingSavedStarts.delete(tabId);
   }
@@ -127,7 +127,7 @@ async function runSavedTabVideoRecordingStart(
   ownerDocumentId: string | undefined,
   confirmation: Pick<
     StartSavedTabVideoRecordingMessage,
-    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone' | 'captureMode'
   >,
   attempt: { cancelled: boolean }
 ) {
@@ -144,7 +144,7 @@ async function runSavedTabVideoRecordingStart(
   const result = await startRecording(
     tabId,
     settings,
-    CaptureMode.TAB,
+    confirmation.captureMode ?? CaptureMode.TAB,
     viewportPresetId,
     ownerSenderUrl,
     ownerDocumentId
@@ -155,7 +155,7 @@ async function runSavedTabVideoRecordingStart(
 async function loadConfirmedRecordingSettings(
   confirmation: Pick<
     StartSavedTabVideoRecordingMessage,
-    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone' | 'captureMode'
   >
 ): Promise<VideoRecordingSettings | null> {
   const settings = await resolveRecordingMediaAccess(await loadVideoSettings());

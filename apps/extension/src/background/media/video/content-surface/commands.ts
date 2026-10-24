@@ -32,9 +32,12 @@ import {
 import { runSerializedVideoRecordingMediaMutation } from './mutation-queue';
 import { cancelSavedTabVideoRecordingStart, isSavedTabVideoRecordingStartPending } from './start';
 import { hasRecordingMediaAccess, resolveRecordingMediaAccess } from './media-access';
+import { updateVideoRecordingOutputSettings } from './quality-settings';
 import { resolveMicrophoneGain } from '@sniptale/runtime-contracts/video/types/microphone-processing';
 
 const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
+  'select-quality-profile',
+  'set-output-profile',
   'set-microphone-gain',
   'set-microphone-enabled',
   'set-webcam-enabled',
@@ -49,6 +52,8 @@ const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['comm
 ]);
 
 const SERIALIZED_MEDIA_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
+  'select-quality-profile',
+  'set-output-profile',
   'set-microphone-gain',
   'set-microphone-enabled',
   'set-webcam-enabled',
@@ -100,6 +105,13 @@ export async function runVideoRecordingSurfaceCommand(
     throw new Error('Recording lifecycle commands require an active recording');
   }
 
+  if (
+    message.command.kind === 'select-quality-profile' ||
+    message.command.kind === 'set-output-profile'
+  ) {
+    requireIdleOutputSettings(tabId, message);
+  }
+
   const execute = async (authorizedLease: typeof lease) => {
     const result = await applySurfaceCommand(tabId, message);
     const [settings, currentLease] = await Promise.all([
@@ -126,11 +138,40 @@ export async function runVideoRecordingSurfaceCommand(
   return execute(lease);
 }
 
+function requireIdleOutputSettings(
+  tabId: number,
+  message: VideoRecordingSurfaceCommandMessage
+): void {
+  if (
+    !validateVideoRecordingSurfaceCapability({
+      capabilityEpoch: message.capabilityEpoch,
+      documentGeneration: message.documentGeneration,
+      recordingId: message.recordingId,
+      surfaceToken: message.surfaceToken,
+      tabId,
+    })
+  )
+    throw new Error('Unauthorized or stale video recording surface command');
+  if (
+    message.recordingId ||
+    isSavedTabVideoRecordingStartPending(tabId) ||
+    getVideoRecordingRuntimeState().status !== VideoRecordingStatus.IDLE
+  ) {
+    throw new Error('Output settings cannot change during recording');
+  }
+}
+
 async function applySurfaceCommand(
   tabId: number,
   message: VideoRecordingSurfaceCommandMessage
 ): Promise<unknown> {
   switch (message.command.kind) {
+    case 'select-quality-profile':
+    case 'set-output-profile':
+      await updateVideoRecordingOutputSettings(message.command, () =>
+        requireIdleOutputSettings(tabId, message)
+      );
+      return { result: 'updated' };
     case 'list-media-devices': {
       if (!(await hasRecordingMediaAccess(message.command.deviceKind))) {
         return { mediaDevices: [], permissionRequired: true };

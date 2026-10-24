@@ -95,6 +95,19 @@ export function resolveToolbarFloatingMenuStyle(params: {
     return null;
   }
 
+  if (
+    displayMode === 'vertical' &&
+    anchorEl.closest('.sniptale-toolbar[data-video-recording="true"]')
+  ) {
+    return resolveToolbarDrawingMenuStyle({
+      anchorEl,
+      displayMode,
+      menuHeight,
+      menuWidth,
+      placement,
+    });
+  }
+
   const uiScale = readContentUiScaleCompensation(anchorEl);
   const clientRect = anchorEl.getBoundingClientRect();
   const anchorRect = projectClientRectToContentUi(

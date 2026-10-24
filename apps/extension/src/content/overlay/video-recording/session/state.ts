@@ -1,4 +1,6 @@
 import type {
+  CaptureMode,
+  SelectedArea,
   VideoCursorEffectSettings,
   WebcamPresentationSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -7,7 +9,10 @@ import {
   VideoRecordingStatus,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import type { VideoRecordingSurfaceSnapshot } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import type {
+  VideoRecordingSurfaceSnapshot,
+  VideoRecordingSurfaceOutputSettings,
+} from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 type VideoRecordingToolbarPhase =
   | 'idle'
@@ -20,6 +25,9 @@ type VideoRecordingToolbarPhase =
 export type VideoRecordingToolbarInteraction = 'navigation' | 'drawing';
 
 export type VideoRecordingToolbarState = {
+  outputSettings: VideoRecordingSurfaceOutputSettings | null;
+  captureMode: CaptureMode | null;
+  cropRegion: SelectedArea | null;
   cameraEnabled: boolean;
   cameraPreviewSuppressed: boolean;
   durationSeconds: number;
@@ -42,6 +50,9 @@ export type VideoRecordingToolbarState = {
 };
 
 export const INITIAL_VIDEO_RECORDING_TOOLBAR_STATE: VideoRecordingToolbarState = {
+  outputSettings: null,
+  captureMode: null,
+  cropRegion: null,
   cameraEnabled: false,
   cameraPreviewSuppressed: false,
   durationSeconds: 0,
@@ -115,6 +126,9 @@ function projectSurfaceSnapshot(
   const sameSession = state.surfaceSessionId === snapshot.surfaceSessionId;
   const next = {
     ...state,
+    outputSettings: snapshot.outputSettings ?? (sameSession ? state.outputSettings : null),
+    captureMode: snapshot.captureMode ?? null,
+    cropRegion: snapshot.cropRegion ?? null,
     cameraEnabled: snapshot.webcamEnabled,
     cameraPreviewSuppressed: sameSession ? state.cameraPreviewSuppressed : false,
     durationSeconds: Math.max(0, snapshot.duration),

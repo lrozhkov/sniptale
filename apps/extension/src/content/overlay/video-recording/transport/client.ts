@@ -76,7 +76,7 @@ export async function startSavedTabVideoRecording(
   event: Event,
   confirmation: Pick<
     StartSavedTabVideoRecordingMessage,
-    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone' | 'captureMode'
   > = {}
 ) {
   const message = await attachContentActionIntent(

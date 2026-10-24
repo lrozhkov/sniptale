@@ -327,7 +327,7 @@ it('returns authoritative confirmation without reporting a recording failure', a
   await act(async () => expect(await controller.onStart(startEvent)).toBe('confirmation-required'));
   expect(controller.state.phase).toBe('idle');
   expect(controller.state.error).toBeNull();
-  expect(mocks.start).toHaveBeenCalledWith(startEvent, {});
+  expect(mocks.start).toHaveBeenCalledWith(startEvent, { captureMode: 'TAB' });
 });
 
 it('uses the new Continue activation and explicit remembered choice on retry', async () => {
@@ -342,6 +342,7 @@ it('uses the new Continue activation and explicit remembered choice on retry', a
     ).toBe('started')
   );
   expect(mocks.start).toHaveBeenCalledWith(continueEvent, {
+    captureMode: 'TAB',
     confirmedWithoutMicrophone: true,
     rememberWithoutMicrophone: true,
   });

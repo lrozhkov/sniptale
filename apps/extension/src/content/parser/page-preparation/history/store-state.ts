@@ -10,6 +10,7 @@ import type {
   PagePreparationHistoryEntry,
   PagePreparationSessionSnapshot,
   PagePreparationHistoryState,
+  PagePreparationHistoryDomain,
 } from './types';
 
 const logger = createLogger({ namespace: 'ContentPagePreparationHistoryApply' });
@@ -57,17 +58,24 @@ export function createHistoryStoreState(): HistoryStoreRuntimeState {
   };
 }
 
-function buildHistoryState(
-  past: PagePreparationHistoryEntry[],
-  future: PagePreparationHistoryEntry[],
-  revision: number
-): PagePreparationHistoryState {
-  const recoveryPending = past[past.length - 1]?.domEffect?.recoveryOnly === true;
-  return {
-    canRedo: future.length > 0 && !recoveryPending,
-    canUndo: past.length > 0,
-    revision,
-  };
+/** Maps producer ownership to navigation without splitting the canonical history store. */
+export function getPagePreparationHistoryDomain(
+  scope: PagePreparationChangeScope
+): PagePreparationHistoryDomain {
+  return scope === 'drawing' || scope === 'annotation' ? scope : 'page-editing';
+}
+
+/** Scoped Undo cannot cross a pending factual recovery, even after later commits. */
+export function isHistoryDomainBlocked(
+  state: HistoryStoreRuntimeState,
+  domain: PagePreparationHistoryDomain
+): boolean {
+  const recoveryIndex = state.past.findLastIndex((entry) => entry.domEffect?.recoveryOnly === true);
+  return (
+    recoveryIndex >= 0 &&
+    state.past.findLastIndex((entry) => getPagePreparationHistoryDomain(entry.scope) === domain) <
+      recoveryIndex
+  );
 }
 
 function dispatchHistoryApplied(historyAppliedEvent: string): void {
@@ -193,8 +201,26 @@ export function publishHistoryState(state: HistoryStoreRuntimeState): void {
   notifyListeners(state);
 }
 
-export function readHistoryState(state: HistoryStoreRuntimeState): PagePreparationHistoryState {
-  return buildHistoryState(state.past, state.future, state.revision);
+export function readHistoryState(
+  state: HistoryStoreRuntimeState,
+  domain?: PagePreparationHistoryDomain
+): PagePreparationHistoryState {
+  const matches = (entry: PagePreparationHistoryEntry) =>
+    domain === undefined || getPagePreparationHistoryDomain(entry.scope) === domain;
+  const recoveryPending =
+    domain === undefined
+      ? state.past.at(-1)?.domEffect?.recoveryOnly === true
+      : state.past.some((entry) => entry.domEffect?.recoveryOnly === true);
+  const blocked =
+    domain !== undefined &&
+    (isHistoryDomainBlocked(state, domain) ||
+      state.transactions.size > 0 ||
+      state.deferredCommits.size > 0);
+  return {
+    canRedo: !blocked && state.future.some(matches) && !recoveryPending,
+    canUndo: !blocked && state.past.some(matches),
+    revision: state.revision,
+  };
 }
 
 export function captureHistorySnapshot(
@@ -250,7 +276,11 @@ export function pushHistoryEntry(
   }
 
   state.past = [...state.past, { ...entry, domBatch, domEffect }];
-  state.future = [];
+  state.future = state.future.filter(
+    (candidate) =>
+      getPagePreparationHistoryDomain(candidate.scope) !==
+      getPagePreparationHistoryDomain(entry.scope)
+  );
   notifyHistoryReachabilityChanged(state);
   publishHistoryState(state);
   return true;

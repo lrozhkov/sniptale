@@ -1,5 +1,6 @@
 import {
   applyHistoryEntry,
+  getPagePreparationHistoryDomain,
   notifyHistoryReachabilityChanged,
   publishHistoryState,
   type HistoryStoreRuntimeState,
@@ -42,7 +43,8 @@ function retainRecovery(
 function restoreSuccessfulUndos(
   state: HistoryStoreRuntimeState,
   appliedEvent: string,
-  undone: readonly PagePreparationHistoryEntry[]
+  undone: readonly PagePreparationHistoryEntry[],
+  scope: PagePreparationChangeScope
 ): void {
   const restore = [...undone].reverse();
   for (const [index, entry] of restore.entries()) {
@@ -52,7 +54,10 @@ function restoreSuccessfulUndos(
       // Later entries can depend on this restoration; retain only factual successful progress.
       const notRestored = new Set(restore.slice(index));
       state.past = state.past.filter((candidate) => !notRestored.has(candidate));
-      state.future = [];
+      state.future = state.future.filter(
+        (entry) =>
+          getPagePreparationHistoryDomain(entry.scope) !== getPagePreparationHistoryDomain(scope)
+      );
       return;
     }
   }
@@ -73,14 +78,17 @@ export function resetHistoryScope(
     const outcome = applyHistoryEntry('undo', appliedEvent, entry, state);
     if (outcome.status !== 'applied') {
       retainRecovery(state, outcome);
-      restoreSuccessfulUndos(state, appliedEvent, undone);
+      restoreSuccessfulUndos(state, appliedEvent, undone, scope);
       publishReset(state);
       return false;
     }
     undone.push(entry);
   }
   state.past = retained;
-  state.future = [];
+  state.future = state.future.filter(
+    (entry) =>
+      getPagePreparationHistoryDomain(entry.scope) !== getPagePreparationHistoryDomain(scope)
+  );
   publishReset(state);
   return true;
 }

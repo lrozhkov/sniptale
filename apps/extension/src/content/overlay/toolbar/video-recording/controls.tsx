@@ -29,6 +29,7 @@ import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { RecordingDrawingControls, type RecordingDrawingInteractionMode } from './drawing-controls';
 import { RecordingMediaSplitControl } from './media-menu';
+import { RecordingSetupControls } from './setup-menu';
 import { applyWebcamPresentationPatch } from '../../../../features/video/recording/webcam-presentation';
 import { RecordingSpotlightMenu } from './spotlight-menu';
 import { ToolbarSettingsMenu } from '../capture/settings';
@@ -190,7 +191,7 @@ function RecordingLifecycleControl(props: {
     <>
       <ContentToolbarButton
         ref={triggerRef}
-        disabled={visibility?.editing || visibility?.pending}
+        disabled={visibility?.editing || visibility?.pending || props.recording.setupPending}
         dataUi="content.toolbar.video-recording.start"
         tone="default"
         title={translate('content.toolbar.videoRecordingStartHint')}
@@ -238,7 +239,10 @@ function MediaControls(props: {
   )
     return null;
   return (
-    <ContentToolbarGroup aria-label={translate('content.toolbar.videoRecordingMedia')}>
+    <ContentToolbarGroup
+      dataUi="content.toolbar.video-recording.media-group"
+      aria-label={translate('content.toolbar.videoRecordingMedia')}
+    >
       <RecordingControlVisibility
         control="microphone"
         icon={Mic}
@@ -509,6 +513,13 @@ export function ToolbarVideoRecordingControls(props: {
         onInteractionModeChange={setMode}
       />
       <ContentToolbarDivider />
+      {props.recording.state.phase === 'idle' || props.recording.state.phase === 'error' ? (
+        <RecordingSetupControls
+          displayMode={props.displayMode}
+          recording={props.recording}
+          toolbarMenuState={props.toolbarMenuState}
+        />
+      ) : null}
       <MediaControls
         displayMode={props.displayMode}
         recording={props.recording}

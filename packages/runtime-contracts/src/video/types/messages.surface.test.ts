@@ -353,6 +353,48 @@ it('validates release, snapshot, and command authority fields narrowly', () => {
       snapshot,
     })
   ).toBe(true);
+  const outputSettings = {
+    outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
+    qualityProfileId: 'builtin:optimal',
+    qualityProfiles: [
+      { id: 'custom:one', name: 'One', configuration: DEFAULT_VIDEO_SETTINGS.outputProfile },
+    ],
+  };
+  const configured = {
+    ...snapshot,
+    outputSettings,
+    captureMode: 'TAB_CROP',
+    cropRegion: { x: 0, y: 0, width: 400, height: 240 },
+  };
+  expect(
+    isVideoRecordingSurfaceSnapshotMessage({
+      type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+      snapshot: configured,
+    })
+  ).toBe(true);
+  for (const change of [
+    { outputSettings: { outputProfile: outputSettings.outputProfile } },
+    { outputSettings: { ...outputSettings, qualityProfiles: undefined } },
+    { outputSettings: { ...outputSettings, qualityProfileId: undefined } },
+    { outputSettings: { ...outputSettings, unexpected: true } },
+    { outputSettings: { ...outputSettings, qualityProfiles: [{}] } },
+    {
+      outputSettings: {
+        ...outputSettings,
+        outputProfile: { ...outputSettings.outputProfile, extra: true },
+      },
+    },
+    { captureMode: 'PAGE' },
+    { cropRegion: { x: -1, y: 0, width: 400, height: 240 } },
+    { cropRegion: { x: 0, y: 0, width: 0, height: 240 } },
+    { cropRegion: { x: 0, y: 0, width: 400, height: Infinity } },
+  ])
+    expect(
+      isVideoRecordingSurfaceSnapshotMessage({
+        type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+        snapshot: { ...configured, ...change },
+      })
+    ).toBe(false);
   for (const freePlacement of [true, false, 'true', null]) {
     expect(
       isVideoRecordingSurfaceSnapshotMessage({
@@ -474,4 +516,53 @@ it('binds camera signaling messages to the surface and peer generations', () => 
       sdp: 'offer-sdp',
     })
   ).toBe(false);
+});
+
+it('admits only page capture targets in trusted saved start options', () => {
+  const message = { type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING, contentIntent };
+  for (const captureMode of ['TAB', 'TAB_CROP'])
+    expect(isStartSavedTabVideoRecordingMessage({ ...message, captureMode })).toBe(true);
+  for (const captureMode of ['SCREEN', 'CAMERA', '', null, 1])
+    expect(isStartSavedTabVideoRecordingMessage({ ...message, captureMode })).toBe(false);
+});
+
+it('admits bounded profile selection and exact canonical output payloads', () => {
+  const message = {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    surfaceSessionId: identity.surfaceSessionId,
+    surfaceToken: identity.surfaceToken,
+    documentGeneration: 2,
+    capabilityEpoch: 4,
+    recordingId: null,
+  };
+  expect(
+    isVideoRecordingSurfaceCommandMessage({
+      ...message,
+      command: { kind: 'select-quality-profile', profileId: 'builtin:compact' },
+    })
+  ).toBe(true);
+  for (const profileId of ['', 'x'.repeat(129), null, 1])
+    expect(
+      isVideoRecordingSurfaceCommandMessage({
+        ...message,
+        command: { kind: 'select-quality-profile', profileId },
+      })
+    ).toBe(false);
+  const command = {
+    kind: 'set-output-profile',
+    outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
+  };
+  expect(isVideoRecordingSurfaceCommandMessage({ ...message, command })).toBe(true);
+  expect(
+    isVideoRecordingSurfaceCommandMessage({ ...message, command: { ...command, extra: true } })
+  ).toBe(false);
+  for (const outputProfile of [
+    { ...command.outputProfile, extra: true },
+    { ...command.outputProfile, frameRate: NaN },
+    { ...command.outputProfile, codec: 'H264', container: 'WEBM' },
+    null,
+  ])
+    expect(
+      isVideoRecordingSurfaceCommandMessage({ ...message, command: { ...command, outputProfile } })
+    ).toBe(false);
 });
