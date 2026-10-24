@@ -26,8 +26,7 @@ import {
 } from './agent-tooling.mjs';
 import { createTempRoot } from '../qa/test-support/test-helpers';
 
-function createKit() {
-  const root = createTempRoot('agent-tooling-');
+function createKit(root = createTempRoot('agent-tooling-')) {
   const files = new Map(
     AGENT_TOOLING_PAYLOAD_PATHS.map((relativePath) => [relativePath, `# ${relativePath}\n`])
   );
@@ -201,6 +200,64 @@ describe('optional agent tooling archive', () => {
     await expect(
       packAgentTooling({ archivePath: kit.archivePath, repositoryRoot: kit.root })
     ).rejects.toThrow('Markdown link is unresolved');
+  });
+
+  it('packs design routing to existing repository files without bundling those files or local skills', async () => {
+    const kit = createKit();
+    for (const target of ['docs/design/index.md', 'tooling/design-reference/index.html']) {
+      mkdirSync(path.dirname(path.join(kit.root, target)), { recursive: true });
+      writeFileSync(path.join(kit.root, target), 'Repository reference\n');
+    }
+    const design =
+      '[Rules](docs/design/index.md)\n[Reference](tooling/design-reference/index.html)\n';
+    writeFileSync(path.join(kit.root, 'DESIGN.md'), design);
+    for (const skill of ['impeccable', 'devin-review']) {
+      const target = path.join(kit.root, '.agents/skills', skill, 'SKILL.md');
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, 'Local skill\n');
+    }
+
+    await packAgentTooling({ archivePath: kit.archivePath, repositoryRoot: kit.root });
+
+    const archive = loadAgentToolingArchive(kit.archivePath);
+    expect([...archive.keys()]).toEqual(AGENT_TOOLING_PAYLOAD_PATHS);
+    expect(archive.get('DESIGN.md')?.contents.toString()).toBe(design);
+    expect([...archive.keys()].some((entry) => /impeccable|devin-review/.test(entry))).toBe(false);
+  });
+
+  it.each(['docs/missing.md', '../outside.md', '.agents/skills/local/SKILL.md'])(
+    'rejects unresolved or unpackaged agent link %s',
+    async (target) => {
+      const kit = createKit(path.join(createTempRoot('agent-tooling-reference-'), 'repository'));
+      if (target !== 'docs/missing.md') {
+        mkdirSync(path.dirname(path.join(kit.root, target)), { recursive: true });
+        writeFileSync(path.join(kit.root, target), 'Outside the kit\n');
+      }
+      writeFileSync(path.join(kit.root, 'DESIGN.md'), `[Invalid](${target})\n`);
+
+      await expect(
+        packAgentTooling({ archivePath: kit.archivePath, repositoryRoot: kit.root })
+      ).rejects.toThrow('Markdown link is unresolved');
+    }
+  );
+
+  it.each(['file', 'parent'])('rejects symlinked repository reference %s', async (kind) => {
+    const kit = createKit();
+    const external = createTempRoot('agent-tooling-reference-');
+    writeFileSync(path.join(external, 'reference.md'), 'External reference\n');
+    mkdirSync(path.join(kit.root, 'docs'), { recursive: true });
+    const target = kind === 'file' ? 'docs/reference.md' : 'docs/linked/reference.md';
+    symlinkSync(
+      kind === 'file' ? path.join(external, 'reference.md') : external,
+      path.join(kit.root, kind === 'file' ? target : 'docs/linked'),
+      kind === 'file' ? 'file' : 'dir'
+    );
+    writeFileSync(path.join(kit.root, 'DESIGN.md'), `[Invalid](${target})\n`);
+
+    await expect(
+      packAgentTooling({ archivePath: kit.archivePath, repositoryRoot: kit.root })
+    ).rejects.toThrow(/unsafe/);
+    expect(existsSync(kit.archivePath)).toBe(false);
   });
 
   it('restores the prior archive and legacy files when publication fails', async () => {
