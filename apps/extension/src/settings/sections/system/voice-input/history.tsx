@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { Copy, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { Copy, Download, MoreHorizontal, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
 import type { VoiceHistoryEntry } from '@sniptale/runtime-contracts/voice-input';
 import {
   formatDateTime,
@@ -65,16 +66,6 @@ export function VoiceInputHistoryPanel({
             {translate('settings.voiceInput.historyDescription')}
           </p>
         </div>
-        <ProductActionButton
-          compact
-          tone="secondary"
-          data-ui="settings.voice.history-refresh"
-          disabled={history.loading}
-          onClick={() => void history.refresh()}
-        >
-          <RefreshCw aria-hidden="true" className="h-4 w-4" />
-          {translate('settings.voiceInput.historyRefresh')}
-        </ProductActionButton>
       </div>
       {history.error ? (
         <p role="alert" className="text-sm text-[var(--sniptale-color-text-secondary)]">
@@ -146,57 +137,116 @@ function HistoryEntryActions({
   const playing = history.playback?.entryId === entry.entryId;
   const text = entry.transcript ?? entry.rawTranscript;
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      <ProductActionButton
-        compact
-        tone="secondary"
-        data-ui="settings.voice.history-play"
+    <div className="flex flex-wrap items-center gap-1" data-ui="settings.voice.history-actions">
+      <ContentToolbarButton
+        size="compact"
+        tone="utility"
+        dataUi="settings.voice.history-play"
+        title={translate(
+          playing ? 'settings.voiceInput.historyStop' : 'settings.voiceInput.historyPlay'
+        )}
         disabled={busy}
         onClick={() => (playing ? history.stop() : void history.play(entry))}
       >
-        {playing ? (
-          <Square aria-hidden="true" className="h-4 w-4" />
-        ) : (
-          <Play aria-hidden="true" className="h-4 w-4" />
-        )}
-        {translate(playing ? 'settings.voiceInput.historyStop' : 'settings.voiceInput.historyPlay')}
-      </ProductActionButton>
-      <ProductActionButton
-        compact
-        tone="secondary"
-        data-ui="settings.voice.history-copy"
+        {playing ? <Square aria-hidden="true" size={16} /> : <Play aria-hidden="true" size={16} />}
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        size="compact"
+        tone="utility"
+        dataUi="settings.voice.history-copy"
+        title={translate('settings.voiceInput.historyCopy')}
         disabled={!text}
         onClick={() => void history.copy(entry)}
       >
-        <Copy aria-hidden="true" className="h-4 w-4" />
-        {translate(
-          history.copiedId === entry.entryId
-            ? 'settings.voiceInput.historyCopied'
-            : 'settings.voiceInput.historyCopy'
-        )}
-      </ProductActionButton>
+        <Copy aria-hidden="true" size={16} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        size="compact"
+        tone="utility"
+        dataUi="settings.voice.history-download"
+        title={translate('settings.voiceInput.historyDownload')}
+        disabled={busy}
+        onClick={() => void history.download(entry)}
+      >
+        <Download aria-hidden="true" size={16} />
+      </ContentToolbarButton>
       {showRetry ? (
-        <ProductActionButton
-          compact
-          tone="secondary"
-          data-ui="settings.voice.history-retry"
+        <ContentToolbarButton
+          size="compact"
+          tone="utility"
+          dataUi="settings.voice.history-retry"
+          title={translate('settings.voiceInput.historyRetry')}
           disabled={busy || !canRetry}
           onClick={() => void history.retry(entry)}
         >
-          <RefreshCw aria-hidden="true" className="h-4 w-4" />
-          {translate('settings.voiceInput.historyRetry')}
-        </ProductActionButton>
+          <RefreshCw aria-hidden="true" size={16} />
+        </ContentToolbarButton>
       ) : null}
-      <ProductActionButton
-        compact
-        tone="secondary"
-        data-ui="settings.voice.history-delete"
+      <ContentToolbarButton
+        size="compact"
+        tone="utility"
+        dataUi="settings.voice.history-delete"
+        title={translate('settings.voiceInput.historyDelete')}
         disabled={deleting}
         onClick={onDelete}
       >
-        <Trash2 aria-hidden="true" className="h-4 w-4" />
-        {translate('settings.voiceInput.historyDelete')}
-      </ProductActionButton>
+        <Trash2 aria-hidden="true" size={16} />
+      </ContentToolbarButton>
+      <span role="status" className="sr-only">
+        {history.copiedId === entry.entryId ? translate('settings.voiceInput.historyCopied') : ''}
+      </span>
+    </div>
+  );
+}
+
+/** CSS clips the preview without changing the saved or copied transcript. */
+function HistoryTranscript({ text }: { text: string }) {
+  const id = useId();
+  const paragraph = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflow, setOverflow] = useState(false);
+  useLayoutEffect(() => {
+    const node = paragraph.current;
+    if (!node || expanded) return;
+    const measure = () => setOverflow(node.scrollHeight > node.clientHeight + 1);
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(node);
+    return () => observer?.disconnect();
+  }, [text, expanded]);
+  return (
+    <div className="relative">
+      <p
+        id={id}
+        ref={paragraph}
+        tabIndex={-1}
+        data-ui="settings.voice.history-text"
+        className={[
+          expanded ? '' : 'line-clamp-3',
+          'whitespace-pre-wrap break-words text-[13px] leading-5',
+          'text-[var(--sniptale-color-text-primary)]',
+        ].join(' ')}
+        style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
+      >
+        {text}
+      </p>
+      {overflow && !expanded ? (
+        <ContentToolbarButton
+          size="compact"
+          tone="utility"
+          className="!absolute bottom-0 right-0 !h-6 !min-h-6 !w-6 !bg-[var(--sniptale-color-surface-panel)]"
+          title={translate('settings.voiceInput.historyExpand')}
+          aria-expanded={expanded}
+          aria-controls={id}
+          dataUi="settings.voice.history-expand"
+          onClick={() => {
+            setExpanded(true);
+            paragraph.current?.focus({ preventScroll: true });
+          }}
+        >
+          <MoreHorizontal aria-hidden="true" size={16} />
+        </ContentToolbarButton>
+      ) : null}
     </div>
   );
 }
@@ -283,15 +333,12 @@ function HistoryEntryRow({
         </span>
       </div>
       {text ? (
-        <p
-          className={[
-            'line-clamp-3 whitespace-pre-wrap break-words text-[13px] leading-5',
-            'text-[var(--sniptale-color-text-primary)]',
-          ].join(' ')}
-        >
-          {text}
+        <HistoryTranscript text={text} />
+      ) : (
+        <p className="text-[13px] leading-5 text-[var(--sniptale-color-text-secondary)]">
+          {translate('settings.voiceInput.historyNoTranscript')}
         </p>
-      ) : null}
+      )}
       {entry.correctionStatus === 'failed' ? (
         <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('settings.voiceInput.historyCorrectionFailed')}

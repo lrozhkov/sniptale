@@ -74,6 +74,7 @@ function correctionPayload(body: Buffer): unknown {
 
 /** Real HTTP replies reach the service worker without replacing extension runtime or fetch APIs. */
 export async function startVoiceProvider() {
+  let transcript = RAW_TRANSCRIPT;
   const modes: Record<Stage, ResponseMode> = { asr: 'ok', correction: 'ok' };
   const pending: Record<Stage, Set<ServerResponse>> = { asr: new Set(), correction: new Set() };
   const uploads: Array<ReturnType<typeof wavDescriptor>> = [];
@@ -92,7 +93,7 @@ export async function startVoiceProvider() {
         modes[stage] === 'error'
           ? { error: { message: 'Synthetic provider failure' } }
           : stage === 'asr'
-            ? { text: RAW_TRANSCRIPT }
+            ? { text: transcript }
             : {
                 choices: [
                   {
@@ -136,6 +137,9 @@ export async function startVoiceProvider() {
     origin: `http://127.0.0.1:${address.port}`,
     uploads,
     corrections,
+    setTranscript(text: string) {
+      transcript = text;
+    },
     hold(stage: Stage) {
       modes[stage] = 'hold';
     },

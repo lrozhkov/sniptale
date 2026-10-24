@@ -275,3 +275,61 @@ describe('voice history lifecycle', () => {
     expect(result.entries).toHaveLength(2);
   });
 });
+
+it('downloads the scoped original audio and preserves the row after read failure', async () => {
+  const f = fixture();
+  f.deps.download = vi.fn();
+  await f.mount();
+  await act(async () => result.download(loadedEntry()));
+  expect(f.deps.readAudio).toHaveBeenCalledWith(
+    expect.objectContaining({ entryId: 'one', incarnation: 'one', epoch: 'epoch', revision: 1 }),
+    expect.any(AbortSignal)
+  );
+  expect(f.deps.download).toHaveBeenCalledWith(expect.any(File), 'dictation-1.wav');
+  vi.mocked(f.deps.readAudio).mockRejectedValueOnce(new Error('unavailable'));
+  await act(async () => result.download(loadedEntry()));
+  expect(result.error).toBe(true);
+  expect(result.entries).toHaveLength(2);
+  expect(f.deps.download).toHaveBeenCalledOnce();
+});
+
+it.each(['delete', 'unmount'] as const)('does not download late audio after %s', async (action) => {
+  const f = fixture();
+  const audio = deferred<File>();
+  f.deps.download = vi.fn();
+  vi.mocked(f.deps.readAudio).mockReturnValue(audio.promise);
+  await f.mount();
+  let pending!: Promise<void>;
+  act(() => {
+    pending = result.download(loadedEntry());
+  });
+  if (action === 'delete') await act(async () => result.remove(loadedEntry()));
+  else {
+    act(() => root.unmount());
+    root = createRoot(container);
+  }
+  await act(async () => {
+    audio.resolve(new File(['private audio'], 'audio.wav'));
+    await pending;
+  });
+  expect(f.deps.download).not.toHaveBeenCalled();
+});
+
+it('keeps an explicit audio download pending when playback ends', async () => {
+  const f = fixture();
+  const audio = deferred<File>();
+  f.deps.download = vi.fn();
+  await f.mount();
+  await act(async () => result.play(loadedEntry()));
+  vi.mocked(f.deps.readAudio).mockReturnValueOnce(audio.promise);
+  let pending!: Promise<void>;
+  act(() => {
+    pending = result.download(loadedEntry());
+  });
+  act(() => result.stop());
+  await act(async () => {
+    audio.resolve(new File(['original audio'], 'audio.wav'));
+    await pending;
+  });
+  expect(f.deps.download).toHaveBeenCalledOnce();
+});

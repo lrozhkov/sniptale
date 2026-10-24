@@ -636,9 +636,9 @@ async function voiceTestField(page: Page, locale: Locale, info: TestInfo) {
   await field.scrollIntoViewIfNeeded();
   await expect.soft(heading).toHaveCSS('font-size', '14px', { timeout: 100 });
   await expect.soft(heading).toHaveCSS('font-weight', '500', { timeout: 100 });
-  const label = page.getByText(t('settings.voiceInput.textareaLabel'), { exact: true });
-  await expect.soft(label).toHaveCSS('font-size', '13px', { timeout: 100 });
-  await expect.soft(label).toHaveCSS('font-weight', '400', { timeout: 100 });
+  await expect(page.getByText(t('settings.voiceInput.textareaLabel'), { exact: true })).toHaveCount(
+    0
+  );
   await expect.soft(field).toHaveCSS('border-radius', '4px', { timeout: 100 });
   await expect.soft(field).toHaveCSS('line-height', '20px', { timeout: 100 });
   await expect.soft(field).toHaveCSS('font-weight', '400', { timeout: 100 });

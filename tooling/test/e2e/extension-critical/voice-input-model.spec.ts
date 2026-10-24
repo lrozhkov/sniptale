@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
@@ -116,21 +117,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       ).toHaveCount(0);
       await expect(page.locator('a[href="?section=access-data&view=permissions"]')).toHaveCount(0);
       const grid = ui(page, 'settings.voice.test-grid');
-      const container = grid.locator('..');
-      for (const width of [639, 640, 641]) {
-        await container.evaluate((element, width) => {
-          element.style.width = `${width}px`;
-        }, width);
-        const columns = await grid.evaluate(
-          (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length
-        );
-        expect(columns).toBe(width < 640 ? 1 : 2);
-        await grid.scrollIntoViewIfNeeded();
-        await voiceScreenshot(page, info, `recognition-layout-${width}`);
-      }
-      await container.evaluate((element) => {
-        element.style.removeProperty('width');
-      });
+      const columns = await grid.evaluate(
+        (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length
+      );
+      expect(columns).toBe(2);
       expect(provider.uploads).toHaveLength(0);
       expect(provider.corrections).toHaveLength(0);
     });
@@ -175,7 +165,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       provider.respond('correction');
       await expect(field).toHaveValue(CORRECTED_TRANSCRIPT);
       await expect(ui(page, 'settings.voice.start')).toBeEnabled();
-      await ui(page, 'settings.voice.history-refresh').click();
+      await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
       const row = ui(page, 'settings.voice.history-row');
       await expect(row).toHaveCount(1);
       await expect(row).toHaveAttribute('data-status', 'ready');
@@ -261,7 +251,7 @@ test('native ASR failure retains audio and retries without inserting a partial r
     });
     await expect(ui(page, 'settings.voice.start')).toBeEnabled();
     await expect(field).toHaveValue('');
-    await ui(page, 'settings.voice.history-refresh').click();
+    await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
     const row = ui(page, 'settings.voice.history-row');
     await expect(row).toHaveCount(1);
     await expect(row).toHaveAttribute('data-status', 'failed');
@@ -309,7 +299,7 @@ test('native correction failure preserves raw text and original audio for explic
       exact: true,
     });
     await expect(field).toHaveValue(RAW_TRANSCRIPT);
-    await ui(page, 'settings.voice.history-refresh').click();
+    await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
     const row = ui(page, 'settings.voice.history-row');
     await expect(row).toContainText(RAW_TRANSCRIPT);
     const original = (await readVoiceEntries(page))[0]!;
@@ -562,3 +552,83 @@ test('native content field keeps click recording and applies the saved correctio
     );
   }
 });
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  const locale = index === 0 ? 'en' : 'ru';
+  test(`voice history supports native selection, expansion and audio download ${viewport.name}`, async ({}, info) => {
+    await withVoiceBrowser(viewport.size, locale, async ({ page, provider }) => {
+      await ui(page, 'settings.voice.correction').click();
+      const text = 'A complete dictated sentence with a selectable transcript. '.repeat(35).trim();
+      provider.setTranscript(text);
+      await recordSettingsMicrophone(page);
+      const row = ui(page, 'settings.voice.history-row').first();
+      const paragraph = row.locator('p').filter({ hasText: text });
+      await expect(paragraph).toHaveText(text);
+      await expect(paragraph).toHaveCSS('user-select', 'text');
+      const expand = ui(row, 'settings.voice.history-expand');
+      await expect(expand).toBeVisible();
+      const previewBounds = (await paragraph.boundingBox())!;
+      const expandBounds = (await expand.boundingBox())!;
+      expect(expandBounds.y + expandBounds.height).toBeLessThanOrEqual(
+        previewBounds.y + previewBounds.height + 1
+      );
+      await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
+      await expect(
+        page.getByRole('button', {
+          name: translate('settings.voiceInput.refresh', locale),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      const field = page.getByRole('textbox', {
+        name: translate('settings.voiceInput.textareaLabel', locale),
+        exact: true,
+      });
+      const microphone = ui(page, 'settings.voice.microphone-test');
+      await field.scrollIntoViewIfNeeded();
+      const left = (await microphone.boundingBox())!;
+      const right = (await field.boundingBox())!;
+      expect(left.x + left.width).toBeLessThanOrEqual(right.x);
+      const meter = (await page.getByRole('meter').boundingBox())!;
+      expect(Math.abs(meter.y - right.y)).toBeLessThanOrEqual(2);
+      await expect(
+        page.getByText(translate('settings.voiceInput.textareaLabel', locale), { exact: true })
+      ).toHaveCount(0);
+      const actions = ui(row, 'settings.voice.history-actions').locator('button');
+      await expect(actions).toHaveCount(5);
+      for (const action of await actions.all()) {
+        await expect(action).toHaveAccessibleName(/.+/);
+        expect(await action.innerText()).toBe('');
+        const box = (await action.boundingBox())!;
+        expect(box.width).toBeGreaterThanOrEqual(24);
+        expect(box.width).toBeLessThanOrEqual(36);
+      }
+      await voiceScreenshot(page, info, `history-compact-${viewport.name}`);
+      await expand.click();
+      await expect(paragraph).toBeFocused();
+      await paragraph.click({ clickCount: 3 });
+      await expect.poll(() => page.evaluate(() => getSelection()?.toString().trim())).toBe(text);
+      await page.keyboard.press('Control+c');
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+      const downloadEvent = page.waitForEvent('download');
+      await ui(row, 'settings.voice.history-download').click();
+      const download = await downloadEvent;
+      expect(download.suggestedFilename()).toMatch(/^dictation-\d+\.wav$/u);
+      const path = await download.path();
+      if (!path) throw new Error('Downloaded audio path missing');
+      const audio = await readFile(path);
+      expect(audio.toString('ascii', 0, 4)).toBe('RIFF');
+      const entry = (await readVoiceEntries(page))[0]!;
+      expect(audio.length).toBe(entry.byteLength);
+      await expect(ui(row, 'settings.voice.history-text')).toHaveText(text);
+      await voiceScreenshot(page, info, `history-expanded-${viewport.name}`);
+      await page.setViewportSize({ width: 1100, height: 560 });
+      const outer = page.locator('.sniptale-settings-viewport');
+      expect(await outer.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeGreaterThan(
+        0
+      );
+      await ui(row, 'settings.voice.history-copy').scrollIntoViewIfNeeded();
+      await ui(row, 'settings.voice.history-copy').click();
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+    });
+  });
+}

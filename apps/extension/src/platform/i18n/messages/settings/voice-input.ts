@@ -61,6 +61,9 @@ export const settingsVoiceInputMessages = defineMessageSource({
     ru: 'Провайдер не завершил обработку. Аудио доступно в истории для повтора.',
     en: 'The provider could not finish processing. Retry the saved audio from history.',
   },
+  historyDownload: { ru: 'Скачать аудиозапись', en: 'Download audio recording' },
+  historyExpand: { ru: 'Показать полный текст', en: 'Show full transcript' },
+  historyNoTranscript: { ru: 'Текст пока не распознан', en: 'No transcript yet' },
   historyTitle: { ru: 'История голосового ввода', en: 'Voice history' },
   historyDescription: {
     ru: 'Последние 20 аудиозаписей хранятся только в этом браузере.',
@@ -249,8 +252,8 @@ export const settingsVoiceInputMessages = defineMessageSource({
     en: 'The dictation package could not be installed. Chrome-managed mode will be used.',
   },
   runtimeError: {
-    ru: 'Распознавание завершилось с ошибкой. Обновите статус и попробуйте снова.',
-    en: 'Recognition failed. Refresh the status and try again.',
+    ru: 'Распознавание завершилось с ошибкой. Попробуйте снова.',
+    en: 'Recognition failed. Try again.',
   },
   busyVideo: { ru: 'Сначала завершите запись видео.', en: 'Finish video recording first.' },
   busySpeech: { ru: 'Голосовой ввод уже используется.', en: 'Voice input is already in use.' },
