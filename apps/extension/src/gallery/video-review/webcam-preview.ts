@@ -7,7 +7,7 @@ import type {
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import {
   drawReviewWebcam,
-  inspectReviewWebcamFrameDuration,
+  inspectReviewWebcamMetadata,
 } from '../../workflows/video-review/render-webcam';
 import { createReviewWebcamPlayback, type ReviewWebcamAdmission } from './webcam-playback';
 
@@ -84,7 +84,7 @@ function createWebcamSource(
 ) {
   let disposed = false;
   const abort = new AbortController();
-  let frameDuration = 1 / 30;
+  let metadata = { duration: 0, frameDuration: 1 / 30 };
   let url: string | null = null;
   let stop: (() => void) | undefined;
   const listeners = new Set<(frame: ReviewWebcamAdmission | null) => void>();
@@ -106,24 +106,24 @@ function createWebcamSource(
       events.failed();
     }
   };
-  const capture = createWebcamCapture(main, video, settings, fail);
+  const capture = createWebcamCapture(main, video, settings, () => metadata.duration, fail);
   const loaded = () => {
     if (disposed) return;
     if (
-      ![video.duration, video.videoWidth, video.videoHeight].every(
+      ![metadata.duration, video.videoWidth, video.videoHeight].every(
         (value) => Number.isFinite(value) && value > 0
       )
     ) {
       fail();
       return;
     }
-    events.loaded(video.duration);
+    events.loaded(metadata.duration);
     stop?.();
     if (capture.current()) publish(null);
     stop = createReviewWebcamPlayback({
       main,
       camera: video,
-      frameDuration,
+      ...metadata,
       settings,
       failed: fail,
       paint: publish,
@@ -138,7 +138,7 @@ function createWebcamSource(
         fail();
         return;
       }
-      frameDuration = await inspectReviewWebcamFrameDuration(blob, abort.signal);
+      metadata = await inspectReviewWebcamMetadata(blob, abort.signal);
       if (disposed) return;
       url = URL.createObjectURL(blob);
       video.src = url;
@@ -178,6 +178,7 @@ function createWebcamCapture(
   main: HTMLVideoElement,
   video: HTMLVideoElement,
   settings: () => QuickEditWebcam,
+  duration: () => number,
   fail: () => void
 ) {
   let disposed = false;
@@ -191,7 +192,7 @@ function createWebcamCapture(
   const captureAccepted = (request: CaptureRequest, resources: RenderResources): CaptureResult => {
     const accepted = admission;
     const currentSettings = settings();
-    const mapped = quickEditWebcamFrameAt(currentSettings, main.currentTime, video.duration);
+    const mapped = quickEditWebcamFrameAt(currentSettings, main.currentTime, duration());
     if (
       disposed ||
       !accepted ||

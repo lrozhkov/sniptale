@@ -25,11 +25,11 @@ type WebcamDrawable = {
   ): void;
 };
 
-/** Inspect a bounded packet prefix before the first native seek; no frames are decoded. */
-export async function inspectReviewWebcamFrameDuration(
+/** Inspect track duration and a bounded cadence prefix without decoding frames. */
+export async function inspectReviewWebcamMetadata(
   blob: Blob,
   signal: AbortSignal
-): Promise<number> {
+): Promise<{ duration: number; frameDuration: number }> {
   signal.throwIfAborted();
   const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
   const releaseInput = bindReviewMediaInput(input, signal);
@@ -40,7 +40,12 @@ export async function inspectReviewWebcamFrameDuration(
     signal.throwIfAborted();
     if (!Number.isFinite(stats.averagePacketRate) || stats.averagePacketRate <= 0)
       throw new Error('Camera frame cadence is invalid.');
-    return Math.max(1 / 120, 1 / stats.averagePacketRate);
+    // MediaRecorder WebM can omit duration; native metadata then reports Infinity.
+    const duration = await track.computeDuration();
+    signal.throwIfAborted();
+    if (!Number.isFinite(duration) || duration <= 0)
+      throw new Error('Camera track duration is invalid.');
+    return { duration, frameDuration: Math.max(1 / 120, 1 / stats.averagePacketRate) };
   } finally {
     releaseInput();
   }

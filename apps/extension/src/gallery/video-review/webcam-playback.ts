@@ -16,6 +16,7 @@ export type ReviewWebcamAdmission = Frame & {
 type PlaybackArgs = {
   main: HTMLVideoElement;
   camera: HTMLVideoElement;
+  duration: number;
   frameDuration?: number;
   settings(): QuickEditWebcam;
   paint(frame: ReviewWebcamAdmission | null): void;
@@ -115,11 +116,7 @@ class ReviewWebcamPlayback {
     if (this.disposed) return;
     const now = performance.now();
     const settings = this.args.settings();
-    const frame = quickEditWebcamFrameAt(
-      settings,
-      this.args.main.currentTime,
-      this.args.camera.duration
-    );
+    const frame = quickEditWebcamFrameAt(settings, this.args.main.currentTime, this.args.duration);
     const running = this.clock.running(now);
     const tolerance = this.frameDuration * 2;
     this.updateAlignment(frame, settings, tolerance);

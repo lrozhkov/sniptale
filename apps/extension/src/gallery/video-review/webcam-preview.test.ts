@@ -8,7 +8,10 @@ type Playback = Parameters<typeof createReviewWebcamPlayback>[0];
 const mocks = vi.hoisted(() => ({
   recover: vi.fn(),
   read: vi.fn<(id: string) => Promise<Blob | null>>(),
-  cadence: vi.fn<(blob: Blob, signal: AbortSignal) => Promise<number>>(),
+  cadence:
+    vi.fn<
+      (blob: Blob, signal: AbortSignal) => Promise<{ duration: number; frameDuration: number }>
+    >(),
   playback: vi.fn<(args: Playback) => () => void>(),
   draw: vi.fn(),
   stop: vi.fn(),
@@ -23,7 +26,7 @@ vi.mock('../../workflows/video-review/asset-bytes', () => ({
 }));
 vi.mock('../../workflows/video-review/render-webcam', () => ({
   drawReviewWebcam: mocks.draw,
-  inspectReviewWebcamFrameDuration: mocks.cadence,
+  inspectReviewWebcamMetadata: mocks.cadence,
 }));
 vi.mock('./webcam-playback', () => ({ createReviewWebcamPlayback: mocks.playback }));
 let loaded: HTMLMediaElement[];
@@ -33,7 +36,7 @@ beforeEach(() => {
   loaded = [];
   cleanups = new Set();
   mocks.read.mockResolvedValue(new Blob(['camera']));
-  mocks.cadence.mockResolvedValue(0.1);
+  mocks.cadence.mockResolvedValue({ duration: 10, frameDuration: 0.1 });
   mocks.playback.mockReturnValue(mocks.stop);
   mocks.createUrl.mockReturnValue('blob:camera');
   vi.stubGlobal(
@@ -83,12 +86,12 @@ function setup() {
     },
   };
 }
-async function camera() {
+async function camera(duration = 10) {
   await vi.waitFor(() => expect(loaded.length).toBeGreaterThan(0));
   const node = loaded[0];
   if (!(node instanceof HTMLVideoElement)) throw new Error('Expected camera decoder');
   Object.defineProperties(node, {
-    duration: { value: 10 },
+    duration: { value: duration },
     videoWidth: { value: 100 },
     videoHeight: { value: 100 },
   });
@@ -220,8 +223,8 @@ function fakeFrames() {
     },
   };
 }
-async function admitManual(state: ReturnType<typeof manualSetup>) {
-  const node = await camera();
+async function admitManual(state: ReturnType<typeof manualSetup>, duration = 10) {
+  const node = await camera(duration);
   Object.defineProperty(node, 'readyState', { configurable: true, value: 2 });
   node.dispatchEvent(new Event('loadedmetadata'));
   const playback = mocks.playback.mock.calls[0]![0];
@@ -236,34 +239,37 @@ async function admitManual(state: ReturnType<typeof manualSetup>) {
   return { node, playback };
 }
 
-it('captures admitted timestamps and releases retained and active leases', async () => {
-  const frames = fakeFrames();
-  const state = manualSetup();
-  const { playback } = await admitManual(state);
-  expect(loaded).toHaveLength(1);
-  expect(mocks.draw).not.toHaveBeenCalled();
-  expect(frames.instances).toHaveLength(0);
-  frames.timestamp(10000);
-  const capture = state.source.captureAccepted({ generation: 2 }, state.resources);
-  expect(capture.status).toBe('ready');
-  if (capture.status !== 'ready') throw new Error('Expected admitted frame');
-  expect(capture.frame.representedMediaTime).toBe(0.01);
-  const drawImage = vi.fn();
-  const context = { drawImage } as unknown as CanvasRenderingContext2D;
-  frames.timestamp(900000);
-  capture.frame.drawable.draw(context, 0, 0, 100, 100);
-  expect(drawImage.mock.calls[0]![0].timestamp).toBe(10000);
-  expect(state.reservations.map(({ role, bytes }) => ({ role, bytes }))).toEqual([
-    { role: 'webcam.retained', bytes: 60000 },
-    { role: 'webcam.active', bytes: 60000 },
-  ]);
-  capture.frame.release();
-  capture.frame.release();
-  expect(frames.instances[1]!.close).toHaveBeenCalledOnce();
-  playback.paint(null);
-  expect(frames.instances[0]!.close).toHaveBeenCalledOnce();
-  expect(state.reservations.every((entry) => entry.release.mock.calls.length === 1)).toBe(true);
-});
+it.each([10, Infinity])(
+  'captures admitted timestamps and releases leases with native duration %s',
+  async (duration) => {
+    const frames = fakeFrames();
+    const state = manualSetup();
+    const { playback } = await admitManual(state, duration);
+    expect(loaded).toHaveLength(1);
+    expect(mocks.draw).not.toHaveBeenCalled();
+    expect(frames.instances).toHaveLength(0);
+    frames.timestamp(10000);
+    const capture = state.source.captureAccepted({ generation: 2 }, state.resources);
+    expect(capture.status).toBe('ready');
+    if (capture.status !== 'ready') throw new Error('Expected admitted frame');
+    expect(capture.frame.representedMediaTime).toBe(0.01);
+    const drawImage = vi.fn();
+    const context = { drawImage } as unknown as CanvasRenderingContext2D;
+    frames.timestamp(900000);
+    capture.frame.drawable.draw(context, 0, 0, 100, 100);
+    expect(drawImage.mock.calls[0]![0].timestamp).toBe(10000);
+    expect(state.reservations.map(({ role, bytes }) => ({ role, bytes }))).toEqual([
+      { role: 'webcam.retained', bytes: 60000 },
+      { role: 'webcam.active', bytes: 60000 },
+    ]);
+    capture.frame.release();
+    capture.frame.release();
+    expect(frames.instances[1]!.close).toHaveBeenCalledOnce();
+    playback.paint(null);
+    expect(frames.instances[0]!.close).toHaveBeenCalledOnce();
+    expect(state.reservations.every((entry) => entry.release.mock.calls.length === 1)).toBe(true);
+  }
+);
 
 it('retains immutable camera pixels through brief underflow and clears them on seek or expiry', async () => {
   const frames = fakeFrames();
@@ -358,4 +364,13 @@ it('releases retained pixels when active-clone reservation fails', async () => {
   expect(state.events.failed).toHaveBeenCalledOnce();
   expect(frames.instances[0]!.close).toHaveBeenCalledOnce();
   expect(state.reservations[0]!.release).toHaveBeenCalledOnce();
+});
+
+it('loads a recorded WebM whose native duration is Infinity from inspected track metadata', async () => {
+  const { events } = setup();
+  const node = await camera(Infinity);
+  node.dispatchEvent(new Event('loadedmetadata'));
+  expect(events.failed).not.toHaveBeenCalled();
+  expect(events.loaded).toHaveBeenCalledWith(10);
+  expect(mocks.playback.mock.lastCall?.[0]).toMatchObject({ duration: 10 });
 });

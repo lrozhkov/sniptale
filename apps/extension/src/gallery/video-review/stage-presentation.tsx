@@ -179,6 +179,8 @@ export function ReviewStagePresentationFeedback({
   onCaptionSelect?: PresentationProps['onCaptionSelect'];
 }) {
   const manual = presentation.active;
+  const cameraFailed = manual && presentation.webcamManual.phase === 'failed';
+  const failed = cameraFailed || presentation.status.phase === 'failed';
   const replacing =
     manual && presentation.status.phase === 'pending' && presentation.status.actualRaster !== null;
   return (
@@ -223,13 +225,13 @@ export function ReviewStagePresentationFeedback({
               })}
           </div>
         )}
-      {manual && presentation.status.phase !== 'ready' ? (
+      {manual && (cameraFailed || presentation.status.phase !== 'ready') ? (
         <DelayedLoadingFallback
-          key={presentation.status.phase}
-          delayMs={presentation.status.phase === 'failed' ? 0 : 1000}
+          key={failed ? 'failed' : presentation.status.phase}
+          delayMs={failed ? 0 : 1000}
           fallback={
             <div
-              role={presentation.status.phase === 'failed' ? 'alert' : 'status'}
+              role={failed ? 'alert' : 'status'}
               className={[
                 'absolute inset-x-0 top-0 z-40 flex items-center gap-2',
                 'bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs',
@@ -237,14 +239,16 @@ export function ReviewStagePresentationFeedback({
             >
               <span>
                 {translate(
-                  presentation.status.phase === 'failed'
-                    ? 'gallery.videoReview.previewFailed'
-                    : replacing
-                      ? 'gallery.videoReview.previewUpdating'
-                      : 'gallery.videoReview.previewLoading'
+                  cameraFailed
+                    ? 'gallery.videoReview.webcamFailed'
+                    : presentation.status.phase === 'failed'
+                      ? 'gallery.videoReview.previewFailed'
+                      : replacing
+                        ? 'gallery.videoReview.previewUpdating'
+                        : 'gallery.videoReview.previewLoading'
                 )}
               </span>
-              {presentation.status.phase === 'failed' ? (
+              {failed ? (
                 <ReviewButton
                   label={translate('gallery.videoReview.retry')}
                   onClick={presentation.retry}
