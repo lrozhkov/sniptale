@@ -1,6 +1,5 @@
 import { createRecordingTerminal, finalizeRecordingArtifact } from './artifact-terminal';
 import {
-  AppendOnlyStreamTarget,
   MediaStreamAudioTrackSource,
   Mp4OutputFormat,
   Output,
@@ -34,6 +33,7 @@ import {
 import { LiveNativeVideoEncoderSource } from './live-native-video-encoder-source';
 import { createLiveAudioTimestampTransform } from './live-audio-timeline';
 import { LiveVideoSessionDiagnostics } from './live-video-session-diagnostics';
+import { createLiveOutputTarget } from './live-output-target';
 import type { RecordingFrameClockAnchor } from '../../../contracts/video/recording-frame-clock';
 import type { RecordingFrameClockObserver } from './recording-frame-clock';
 
@@ -173,14 +173,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       : null;
     this.expectedVideoEncoderConfig = nativeEncoderConfig ?? explicitEncoderConfig;
 
-    const target = new AppendOnlyStreamTarget(
-      new WritableStream<Uint8Array>({
-        write: (chunk) =>
-          input.writer.append(
-            new Blob([new Uint8Array(chunk).buffer], { type: 'application/octet-stream' })
-          ),
-      })
-    );
+    const target = createLiveOutputTarget(input.writer);
     this.output = new Output({ format: createOutputFormat(input.encoding.container), target });
     this.videoProcessor = new MediaStreamTrackProcessor({
       maxBufferSize: LIVE_VIDEO_PROCESSOR_BUFFER_SIZE,

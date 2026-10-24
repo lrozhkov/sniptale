@@ -31,6 +31,11 @@ async function readState(page: Page) {
 }
 
 async function installControlledRecordingSensors() {
+  if (
+    (!location.pathname.includes('/offscreen/') && !location.pathname.includes('/popup/')) ||
+    Reflect.has(globalThis, '__tabCameraSensors')
+  )
+    return;
   const native = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   const audio = new AudioContext({ sampleRate: 48000 });
   const oscillator = audio.createOscillator();
@@ -42,8 +47,8 @@ async function installControlledRecordingSensors() {
   oscillator.start();
   await audio.resume();
   const canvas = document.createElement('canvas');
-  canvas.width = 640;
-  canvas.height = 480;
+  canvas.width = 1920;
+  canvas.height = 1080;
   const drawing = canvas.getContext('2d');
   if (!drawing) throw new Error('Native camera canvas is unavailable');
   const draw = () => {
@@ -234,13 +239,13 @@ async function inspectSavedArtifacts(page: Page, primaryId: string) {
 test('TAB popup repeats recording after closing the camera teleprompter companion', async ({}, info) => {
   test.setTimeout(120_000);
   const host = await startHostServer();
-  const launched = await launchExtensionBrowser({ viewport: { width: 1280, height: 560 } });
+  const launched = await launchExtensionBrowser({ viewport: { width: 1904, height: 985 } });
   const startupProof: unknown[] = [];
   try {
     const { context, extensionId } = launched;
     const { page, popup } = await openDesignReview(context, extensionId, host.origin, {
-      width: 1280,
-      height: 560,
+      width: 1904,
+      height: 985,
     });
     await context.grantPermissions(['camera', 'microphone']);
     const offscreenId = await installRecordingSensors(context, true);
@@ -291,10 +296,12 @@ test('TAB popup repeats recording after closing the camera teleprompter companio
         sniptale_video_settings: {
           ...defaults,
           microphoneEnabled: true,
+          microphoneDeviceId: 'controlled-microphone',
           webcamEnabled: true,
+          webcamDeviceId: 'controlled-camera',
           webcamPresentation: { ...defaults.webcamPresentation, mode: 'separate-track' },
           systemAudioEnabled: false,
-          countdownSeconds: 0,
+          countdownSeconds: 3,
           warnWithoutMicrophone: false,
           qualityProfileId: null,
           teleprompterEnabled: false,
@@ -317,6 +324,7 @@ test('TAB popup repeats recording after closing the camera teleprompter companio
       .find((candidate) => new URL(candidate.url()).pathname === cameraPath);
     if (!companion) throw new Error('Prepared teleprompter window is unavailable');
     await expect(companion.getByRole('button', { name: 'Stop', exact: true })).toBeDisabled();
+    const savedIds: string[] = [];
     for (let run = 0; run < 2; run += 1) {
       await page.bringToFront();
       const action = await triggerExtensionAction(context, extensionId, page);
@@ -343,11 +351,42 @@ test('TAB popup repeats recording after closing the camera teleprompter companio
           timeout: 20_000,
         });
         await expect(companion.getByRole('alert')).toHaveCount(0);
+        const audioStartedAt = await evaluateInTarget(
+          context,
+          offscreenId,
+          'globalThis.__tabCameraSensors.audio.currentTime'
+        );
+        if (typeof audioStartedAt !== 'number') throw new Error('Audio clock is unavailable');
         const registration = await companion.evaluate(() =>
           Reflect.get(globalThis, '__repeatCompanionProof')
         );
         startupProof.push({ run: run + 1, registration });
         if (run === 1) expect(registration).toMatchObject({ queryLaunch: true });
+        await expect
+          .poll(
+            () =>
+              companion!
+                .locator('video')
+                .evaluateAll((videos) =>
+                  videos.some((video) => video.videoWidth > 0 && video.currentTime > 0.1)
+                ),
+            { timeout: 20_000 }
+          )
+          .toBe(true);
+        await expect
+          .poll(
+            async () => {
+              const current = await evaluateInTarget(
+                context,
+                offscreenId,
+                'globalThis.__tabCameraSensors.audio.currentTime'
+              );
+              if (typeof current !== 'number') throw new Error('Audio clock is unavailable');
+              return current - audioStartedAt;
+            },
+            { timeout: 20_000 }
+          )
+          .toBeGreaterThan(4);
         await expect
           .poll(
             async () => {
@@ -366,19 +405,18 @@ test('TAB popup repeats recording after closing the camera teleprompter companio
           .poll(async () => (await readState(popup)).postRecordResult, { timeout: 30_000 })
           .toBeTruthy();
         const saved = (await readState(popup)).postRecordResult!;
-        const artifacts = await inspectSavedArtifacts(popup, saved.primaryRecordingId);
-        startupProof.push({ run: run + 1, artifacts });
-        expect(artifacts.map((artifact) => artifact.role).sort()).toEqual(['display', 'webcam']);
-        const primary = artifacts.find((artifact) => artifact.id === saved.primaryRecordingId);
-        expect(primary?.audio?.duration).toBeGreaterThan(3);
-        expect(primary?.audio?.rms).toBeGreaterThan(0.001);
+        savedIds.push(saved.primaryRecordingId);
         await expect(companion.locator('[data-ui="camera-recorder.result"]')).toBeVisible();
         await companion.getByRole('button', { name: 'Close', exact: true }).click();
         await expect.poll(() => companion?.isClosed()).toBe(true);
       } catch (error) {
         startupProof.push({
           run: run + 1,
-          state: (await readState(popup)).state,
+          state: await readState(popup).then(({ state }) => ({
+            status: state.status,
+            duration: state.duration,
+            error: state.error,
+          })),
           registration: await companion.evaluate(() =>
             Reflect.get(globalThis, '__repeatCompanionProof')
           ),
@@ -394,6 +432,15 @@ test('TAB popup repeats recording after closing the camera teleprompter companio
         });
         throw error;
       }
+    }
+    for (const [run, primaryId] of savedIds.entries()) {
+      const artifacts = await inspectSavedArtifacts(popup, primaryId);
+      startupProof.push({ run: run + 1, artifacts });
+      expect(artifacts.map((artifact) => artifact.role).sort()).toEqual(['display', 'webcam']);
+      const primary = artifacts.find((artifact) => artifact.id === primaryId);
+      expect(primary).toMatchObject({ width: 1904, height: 984 });
+      expect(primary?.audio?.duration).toBeGreaterThan(3);
+      expect(primary?.audio?.rms).toBeGreaterThan(0.001);
     }
     const sensors = await evaluateInTarget(
       context,

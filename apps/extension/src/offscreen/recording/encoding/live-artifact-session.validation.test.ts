@@ -6,7 +6,7 @@ const mediabunny = vi.hoisted(() => ({
 }));
 
 vi.mock('mediabunny', () => ({
-  AppendOnlyStreamTarget: class {},
+  StreamTarget: class {},
   MediaStreamAudioTrackSource: class {},
   Mp4OutputFormat: class {},
   Output: class {},
