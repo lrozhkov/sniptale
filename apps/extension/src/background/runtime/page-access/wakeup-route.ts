@@ -297,7 +297,6 @@ async function restoreForcedScenarioSurface(args: {
 
   await args.runtimeState.scenarioSessionService.updateSurfaceState(args.tabId, {
     ...args.scenarioState.surface,
-    captureAction: 'scenario',
     screenshotMode: true,
     toolbarVisible: args.scenarioState.surface.toolbarVisible,
   });

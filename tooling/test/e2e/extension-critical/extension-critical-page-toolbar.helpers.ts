@@ -71,34 +71,8 @@ export async function openDesignReview(
   return { page, popup };
 }
 
-export async function restoreScenarioRecorderFixture(page: Page, popup: Page): Promise<void> {
-  const results = await popup.evaluate(async (targetUrl) => {
-    const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === targetUrl);
-    if (tab?.id === undefined) throw new Error('Scenario fixture host tab missing');
-    const [injection] = await chrome.scripting.executeScript({
-      target: { frameIds: [0], tabId: tab.id },
-      func: async () => {
-        const send = (message: Record<string, unknown>) =>
-          chrome.runtime.sendMessage({
-            ...message,
-            __sniptaleRuntimeFreshness: {
-              issuedAtEpochMs: Date.now(),
-              nonce: crypto.randomUUID(),
-            },
-          });
-        const surface = await send({
-          type: 'SCENARIO_UPDATE_SURFACE_STATE',
-          surface: { screenshotMode: true, toolbarVisible: true, captureAction: 'scenario' },
-        });
-        const session = await send({ type: 'SCENARIO_SET_ENABLED', enabled: true });
-        // Navigation clears unpinned state; use the existing snapshot restore listener.
-        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-        return { surface, session };
-      },
-    });
-    return injection?.result;
-  }, page.url());
-  expect(results).toMatchObject({ surface: { success: true }, session: { success: true } });
+export async function restoreScenarioRecorderFixture(page: Page, _popup: Page): Promise<void> {
   await page.bringToFront();
+  await page.locator('[data-ui="content.toolbar.scenario-panel-button"]').click();
   await expect(page.locator('[data-ui="content.scenario.sidebar"]')).toBeVisible();
 }

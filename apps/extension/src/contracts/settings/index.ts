@@ -94,6 +94,7 @@ export const PAGE_TOOLBAR_CONTROLS = [
   'after-capture',
   'capture-delay',
   'capture-size',
+  'scenario-panel',
   'drawing-pencil',
   'drawing-marker',
   'drawing-text',

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import type { CaptureActionType } from '../../../../contracts/settings';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installContentRuntimeMessagingMock } from '../../../application/runtime-services/services.test-support';
@@ -26,7 +27,7 @@ import { useScenarioControllerState, useScenarioSessionRefresh } from './state';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
-const captureActionRef = { current: 'download_default' as const };
+const captureActionRef: { current: CaptureActionType } = { current: 'download_default' };
 const setCaptureActionMock = vi.fn();
 const setIsToolbarVisibleMock = vi.fn();
 const setScreenshotModeMock = vi.fn();
@@ -224,7 +225,8 @@ function registerScenarioBfcacheRefreshTests() {
     });
 
     expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(2);
-    expect(setCaptureActionMock).toHaveBeenLastCalledWith('scenario');
+    expect(setCaptureActionMock).not.toHaveBeenCalled();
+    expect(captureActionRef.current).toBe('download_default');
     expect(setScreenshotModeMock).toHaveBeenLastCalledWith(true);
     expect(setIsToolbarVisibleMock).toHaveBeenLastCalledWith(true);
   });
@@ -252,8 +254,24 @@ function registerScenarioBfcacheRefreshTests() {
     });
 
     expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(2);
-    expect(setCaptureActionMock).toHaveBeenLastCalledWith('scenario');
+    expect(setCaptureActionMock).not.toHaveBeenCalled();
+    expect(captureActionRef.current).toBe('download_default');
     expect(setScreenshotModeMock).toHaveBeenLastCalledWith(true);
     expect(setIsToolbarVisibleMock).toHaveBeenLastCalledWith(true);
   });
 }
+
+it('does not let a delayed legacy scenario snapshot replace a newer ordinary capture action', async () => {
+  const pending = createDeferred<unknown>();
+  sendRuntimeMessageMock.mockReturnValueOnce(pending.promise);
+  await renderScenarioState();
+  captureActionRef.current = 'copy';
+  await act(async () => {
+    pending.resolve({ success: true, ...createForcedScenarioSnapshotResponse() });
+    await flushEffects();
+  });
+  expect(lastControllerState?.effectiveSession.enabled).toBe(true);
+  expect(captureActionRef.current).toBe('copy');
+  expect(setCaptureActionMock).not.toHaveBeenCalled();
+  captureActionRef.current = 'download_default';
+});

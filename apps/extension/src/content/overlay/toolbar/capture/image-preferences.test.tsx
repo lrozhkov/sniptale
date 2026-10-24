@@ -187,22 +187,18 @@ it('restores the displayed quality draft after a failed toolbar save and retains
       )
       ?.click()
   );
-  const range = container.querySelector<HTMLInputElement>('input[type="range"]');
   const quality = container.querySelector<HTMLInputElement>('input[type="text"]');
-  expect(range).not.toBeNull();
+  expect(container.querySelector('input[type="range"]')).toBeNull();
   expect(quality?.value).toBe('73');
-  act(() =>
-    range?.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        key: 'ArrowRight',
-        bubbles: true,
-      })
-    )
-  );
+  act(() => {
+    quality?.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(quality, '74');
+    quality?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   expect(quality?.value).toBe('74');
   expect(mocks.patch).not.toHaveBeenCalled();
   await act(async () => {
-    range?.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }));
+    quality?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   });
   expect(mocks.patch).toHaveBeenCalledExactlyOnceWith({ imageQuality: 74 });
   expect(quality?.value).toBe('74');
@@ -210,7 +206,7 @@ it('restores the displayed quality draft after a failed toolbar save and retains
     refuse(new Error('write refused'));
   });
   expect(quality?.value).toBe('73');
-  expect(range?.value).toBe('73');
+  expect(container.querySelector('input[type="range"]')).toBeNull();
   expect(container.querySelector('.sniptale-screenshot-menu')).not.toBeNull();
   expect(mocks.toast).toHaveBeenCalledExactlyOnceWith(
     'content.toolbar.fullPageSettingsSaveError',

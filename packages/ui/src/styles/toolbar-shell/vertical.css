@@ -99,7 +99,8 @@
   border-radius: 0 0 var(--sniptale-radius-md) var(--sniptale-radius-md);
 }
 
-.sniptale-toolbar[data-display-mode='vertical'] .sniptale-toolbar-split-control {
+.sniptale-toolbar[data-display-mode='vertical']
+  .sniptale-toolbar-split-control:not(.sniptale-screenshot-split-control) {
   display: grid;
   grid-template-columns: 10px var(--sniptale-toolbar-button-size) 10px;
   width: calc(var(--sniptale-toolbar-button-size) + 20px);
@@ -107,13 +108,13 @@
   gap: 0;
 }
 .sniptale-toolbar[data-display-mode='vertical']
-  .sniptale-toolbar-split-control
+  .sniptale-toolbar-split-control:not(.sniptale-screenshot-split-control)
   > .sniptale-full-page-primary {
   grid-column: 2;
   border-radius: var(--sniptale-radius-sm, 4px);
 }
 .sniptale-toolbar[data-display-mode='vertical']
-  .sniptale-toolbar-split-control
+  .sniptale-toolbar-split-control:not(.sniptale-screenshot-split-control)
   > .sniptale-full-page-chevron {
   grid-column: 3;
   width: 10px;

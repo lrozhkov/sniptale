@@ -4,6 +4,20 @@ import {
   type ScreenshotCaptureConfig,
 } from '@sniptale/runtime-contracts/capture/action';
 
+const CONFIGURABLE_CAPTURE_ACTIONS = new Set<CaptureActionType>([
+  'download_default',
+  'ask_preset',
+  'ask_system',
+  'edit',
+  'copy',
+  'save_to_library',
+]);
+
+/** Replace deprecated configurable scenario sinks while retaining internal scenario capture. */
+export function normalizeConfigurableCaptureAction(action: CaptureActionType): CaptureActionType {
+  return action === 'scenario' ? 'download_default' : action;
+}
+
 // policyStateId: quick-action-capability-policy - canonical field and sink constraints shared by
 // Settings canonicalization, popup availability, storage normalization, and runtime validation.
 const DESKTOP_AFTER_CAPTURE_ACTIONS = new Set<CaptureActionType>([
@@ -19,8 +33,10 @@ export function isDesktopQuickAction(action: Pick<QuickAction, 'screenshotMode'>
 
 export function getAllowedQuickActionAfterCaptureActions(
   action: Pick<QuickAction, 'screenshotMode'>
-): ReadonlySet<CaptureActionType> | null {
-  return isDesktopQuickAction(action) ? DESKTOP_AFTER_CAPTURE_ACTIONS : null;
+): ReadonlySet<CaptureActionType> {
+  return isDesktopQuickAction(action)
+    ? DESKTOP_AFTER_CAPTURE_ACTIONS
+    : CONFIGURABLE_CAPTURE_ACTIONS;
 }
 
 function isQuickActionAfterCaptureAllowed(
@@ -31,7 +47,9 @@ function isQuickActionAfterCaptureAllowed(
 }
 
 export function normalizeQuickActionPolicy(action: QuickAction): QuickAction {
-  const requestedAfterCapture = action.afterCapture ?? 'download_default';
+  const requestedAfterCapture = normalizeConfigurableCaptureAction(
+    action.afterCapture ?? 'download_default'
+  );
   const afterCapture =
     isDesktopQuickAction(action) && !DESKTOP_AFTER_CAPTURE_ACTIONS.has(requestedAfterCapture)
       ? 'download_default'
@@ -51,6 +69,7 @@ export function normalizeScreenshotCaptureConfigPolicy(
 ): ScreenshotCaptureConfig {
   return normalizeScreenshotCaptureConfig({
     ...config,
+    afterCapture: normalizeConfigurableCaptureAction(config.afterCapture),
     ...(config.screenshotMode === 'desktop' && !isQuickActionAfterCaptureAllowed(config)
       ? { afterCapture: 'download_default' }
       : {}),
@@ -72,6 +91,10 @@ export function assertQuickActionPolicy(
   action: Pick<QuickAction, 'afterCapture' | 'screenshotMode'>
 ): void {
   if (!isQuickActionAfterCaptureAllowed(action)) {
-    throw new Error('Selected action is unavailable for window or screen capture');
+    throw new Error(
+      isDesktopQuickAction(action)
+        ? 'Selected action is unavailable for window or screen capture'
+        : 'Selected action is unavailable for tab capture'
+    );
   }
 }

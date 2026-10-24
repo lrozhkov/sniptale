@@ -18,6 +18,7 @@ const NAVIGATION_CONTROLS: readonly PageToolbarControl[] = [
   'after-capture',
   'capture-delay',
   'capture-size',
+  'scenario-panel',
 ];
 const MODE_CONTROL_PREFIX: Record<PageToolbarMode, string | null> = {
   cursor: null,

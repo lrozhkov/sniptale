@@ -18,7 +18,6 @@ const captureActions: CaptureActionType[] = [
   'ask_system',
   'edit',
   'copy',
-  'scenario',
   'save_to_library',
 ];
 

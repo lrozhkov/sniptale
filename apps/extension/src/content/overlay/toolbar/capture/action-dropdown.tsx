@@ -1,9 +1,18 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React from 'react';
-import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
+import {
+  ProductToolbarMenu,
+  ProductToolbarMenuItem,
+  ProductToolbarMenuItemCopy,
+} from '@sniptale/ui/product-menus/toolbar';
 import { translate } from '../../../../platform/i18n';
-import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
-import { CaptureActionIcons } from './action-icons';
+import {
+  createToolbarMenuItemClickHandler,
+  preventToolbarMenuClick,
+  resolveToolbarDropdownState,
+  ToolbarMenuDropdown,
+} from '../menu/dropdown';
+import { renderMenuCheck } from './options';
 
 type CaptureActionDropdownProps = {
   captureDropdownMenuRef: React.RefObject<HTMLDivElement | null>;
@@ -25,18 +34,43 @@ type CaptureActionDropdownProps = {
   viewportRightInset?: number;
 };
 
+function CaptureActionDropdownItems(props: {
+  captureAction: string;
+  captureActionOptions: CaptureActionDropdownProps['captureActionOptions'];
+  onSelect: (value: string) => void;
+}) {
+  return props.captureActionOptions.map((option) => {
+    const isSelected = props.captureAction === option.value;
+
+    return (
+      <ProductToolbarMenuItem
+        key={option.value}
+        dataUi={`content.toolbar.capture-action-option.${option.value}`}
+        onMouseDown={preventToolbarMenuClick}
+        onClick={createToolbarMenuItemClickHandler(() => props.onSelect(option.value))}
+        selected={isSelected}
+      >
+        {option.icon}
+        <ProductToolbarMenuItemCopy label={option.label} hint={option.hint} />
+        {isSelected && renderMenuCheck()}
+      </ProductToolbarMenuItem>
+    );
+  });
+}
+
 export function resolveCaptureActionMenuLayout(
   props: Pick<
     CaptureActionDropdownProps,
     'captureButtonRef' | 'displayMode' | 'getMenuPosition' | 'viewportRightInset'
-  >
+  >,
+  menuHeight = 340
 ) {
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.captureButtonRef,
     displayMode: props.displayMode,
     getMenuPosition: props.getMenuPosition,
-    menuHeight: 100,
-    menuWidth: 260,
+    menuHeight,
+    menuWidth: 280,
     ...(props.viewportRightInset === undefined
       ? {}
       : { viewportRightInset: props.viewportRightInset }),
@@ -47,7 +81,19 @@ export function resolveCaptureActionMenuLayout(
 
 export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
   const adopted = React.useContext(CommandPressScope);
-  const { placement: menuPlacement, style } = resolveCaptureActionMenuLayout(props);
+  const [menuHeight, setMenuHeight] = React.useState(340);
+  React.useLayoutEffect(() => {
+    const surface = props.captureDropdownMenuRef.current?.firstElementChild;
+    if (!(surface instanceof HTMLElement)) return;
+    const measure = () => {
+      if (surface.offsetHeight) setMenuHeight(surface.offsetHeight);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(surface);
+    return () => observer?.disconnect();
+  }, [props.captureDropdownMenuRef, props.compactMenus]);
+  const { placement: menuPlacement, style } = resolveCaptureActionMenuLayout(props, menuHeight);
 
   if (!style) {
     return null;
@@ -64,13 +110,11 @@ export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
         title={translate('content.toolbar.afterCaptureTitle')}
         variant="capture"
         placement={menuPlacement}
-        style={style}
+        style={{ ...style, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}
       >
-        <CaptureActionIcons
-          label={translate('content.toolbar.afterCaptureTitle')}
-          dataUiPrefix="content.toolbar.capture-action-option"
-          selected={props.captureAction}
-          options={props.captureActionOptions}
+        <CaptureActionDropdownItems
+          captureAction={props.captureAction}
+          captureActionOptions={props.captureActionOptions}
           onSelect={props.onSelect}
         />
       </ProductToolbarMenu>

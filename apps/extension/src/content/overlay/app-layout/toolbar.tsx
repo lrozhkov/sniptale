@@ -15,7 +15,6 @@ import type {
   ContentAppLayoutToolbarProps,
   ContentAppScenarioState,
 } from './types';
-import type { CaptureActionType } from '../../../contracts/settings';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../platform/i18n';
 import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
@@ -82,12 +81,6 @@ function buildScenarioToolbarProps(args: {
     byClickDisabled: args.blocked,
     captureMode: args.state.scenarioCaptureMode,
     enabled: args.state.scenarioEnabled,
-    onCaptureActionSelected: (action: CaptureActionType) => {
-      if (action === 'scenario') {
-        warmScenarioRecorderSidebar();
-      }
-      return args.actions.applyCaptureAction(action);
-    },
     onCreateProject: (name: string) => args.actions.createProject(name),
     onFinishScenario: args.onFinishScenario,
     onOpenEditor: (stepId?: string | null) => void args.actions.openEditor(stepId),
@@ -95,19 +88,18 @@ function buildScenarioToolbarProps(args: {
     onSetCaptureMode: (captureMode: 'manual' | 'by-click') =>
       void args.actions.setCaptureMode(captureMode),
     onToggleSidebar: () => {
-      if (!args.state.sidebarVisible) {
+      if (!args.state.scenarioEnabled || !args.state.sidebarVisible) {
         warmScenarioRecorderSidebar();
       }
-      return args.actions.setSidebarVisible(!args.state.sidebarVisible);
+      return args.actions.setRecorderPanelVisible(
+        !args.state.scenarioEnabled || !args.state.sidebarVisible
+      );
     },
     projectId: args.state.scenarioProjectId,
     projectName: args.state.scenarioProjectName,
     projects: args.state.projects,
     pendingProjectSelection: args.state.pendingProjectSelection,
-    sidebarVisible:
-      args.state.captureAction === 'scenario' &&
-      args.state.scenarioEnabled &&
-      args.state.sidebarVisible,
+    sidebarVisible: args.state.scenarioEnabled && args.state.sidebarVisible,
   };
 }
 

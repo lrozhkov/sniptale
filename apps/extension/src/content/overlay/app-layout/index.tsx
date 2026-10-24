@@ -21,7 +21,7 @@ function ContentScenarioRecorderSidebarSlot(props: {
   setPinToTab: ContentAppLayoutProps['toolbar']['setPinToTab'];
   keepPinnedForAutoBlur: boolean;
 }) {
-  if (props.scenario.state.captureAction !== 'scenario' || !props.scenario.state.scenarioEnabled) {
+  if (!props.scenario.state.scenarioEnabled) {
     return null;
   }
 

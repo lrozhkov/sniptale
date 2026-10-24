@@ -55,15 +55,6 @@ function resolveEffectiveInteractionMode(
   return 'cursor';
 }
 
-function resolveScenarioCaptureProps(
-  toolbarProps: ToolbarProps,
-  viewModel: ToolbarViewModel
-): ToolbarProps['scenario'] | undefined {
-  return viewModel.screenshotMode && viewModel.capture.action === 'scenario'
-    ? toolbarProps.scenario
-    : undefined;
-}
-
 function createUtilityButtonsProps(args: {
   interactionMode: ReturnType<typeof resolveEffectiveInteractionMode>;
   toolbarProps: ToolbarProps;
@@ -147,9 +138,6 @@ function createCaptureActionProps(args: {
     onViewportChange: args.onViewportChange,
     toolbarMenuState: args.viewModel.toolbarMenuState,
     onTakeScreenshot: args.toolbarProps.onTakeScreenshot,
-    ...(args.toolbarProps.scenario?.onCaptureActionSelected === undefined
-      ? {}
-      : { onCaptureActionCommitted: args.toolbarProps.scenario.onCaptureActionSelected }),
     ...(args.scenarioCaptureProps === undefined ? {} : { scenario: args.scenarioCaptureProps }),
   };
 }
@@ -160,14 +148,13 @@ function createSecondaryControlsRenderState(props: {
   onViewportChange: (viewport: { width: number; height: number } | null) => void;
 }) {
   const interactionMode = resolveEffectiveInteractionMode(props.toolbarProps, props.viewModel);
-  const scenarioCaptureProps = resolveScenarioCaptureProps(props.toolbarProps, props.viewModel);
 
   return {
     interactionMode,
     captureActionProps: createCaptureActionProps({
       interactionMode,
       onViewportChange: props.onViewportChange,
-      scenarioCaptureProps,
+      scenarioCaptureProps: props.toolbarProps.scenario,
       toolbarProps: props.toolbarProps,
       viewModel: props.viewModel,
     }),
@@ -201,7 +188,7 @@ export function ToolbarSecondaryControls(props: {
 
   return (
     <>
-      {viewModel.designReviewMode ? (
+      {!viewModel.pendingInteractionMode && viewModel.designReviewMode ? (
         <ToolbarDesignReviewControls
           compactMenus={viewModel.derivedState.compactMenus}
           displayMode={viewModel.derivedState.displayMode}
@@ -210,7 +197,9 @@ export function ToolbarSecondaryControls(props: {
           onTogglePanel={toolbarProps.onToggleDesignReviewPanel ?? (() => undefined)}
         />
       ) : null}
-      {toolbarProps.drawingMode && toolbarProps.drawingController ? (
+      {!viewModel.pendingInteractionMode &&
+      toolbarProps.drawingMode &&
+      toolbarProps.drawingController ? (
         <ToolbarDrawingControls
           controller={toolbarProps.drawingController}
           displayMode={viewModel.derivedState.displayMode}

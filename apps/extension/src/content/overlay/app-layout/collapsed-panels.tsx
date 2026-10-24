@@ -38,7 +38,6 @@ export function CollapsedPanels(props: CollapsedPanelsProps) {
     (props.toolbar.modes.screenshotMode || props.toolbar.modes.videoRecordingMode === true);
   const showScenario =
     props.toolbar.modes.videoRecordingMode !== true &&
-    props.scenario.state.captureAction === 'scenario' &&
     props.scenario.state.scenarioEnabled &&
     !props.scenario.state.sidebarVisible;
   const visible = !hidden && (showToolbar || showScenario);

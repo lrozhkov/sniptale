@@ -3,9 +3,9 @@ import { projectPreparationScenario, type PreparationSurfaceControllers } from '
 
 function createScenarioController(): PreparationSurfaceControllers['scenarioController'] {
   return {
-    applyCaptureAction: vi.fn(),
+    setRecorderPanelVisible: vi.fn(),
     buildManualCapturePayload: vi.fn(),
-    captureAction: 'scenario',
+    captureAction: 'copy',
     createProject: vi.fn(),
     deleteRecentStep: vi.fn(),
     ensureCaptureReady: vi.fn(),
@@ -47,13 +47,13 @@ it('projects real scenario layout props for the viewer sidebar gate', () => {
 
   expect(scenario.state).toEqual(
     expect.objectContaining({
-      captureAction: 'scenario',
+      captureAction: 'copy',
       scenarioEnabled: true,
       scenarioProjectId: 'project-1',
       sidebarVisible: true,
     })
   );
   expect(scenario.actions.finishRecording).toBe(controller.finishRecording);
-  expect(scenario.actions.applyCaptureAction).toBe(controller.applyCaptureAction);
+  expect(scenario.actions.setRecorderPanelVisible).toBe(controller.setRecorderPanelVisible);
   expect(scenario.actions.setSidebarVisible).toBe(controller.setSidebarVisible);
 });

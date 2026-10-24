@@ -76,7 +76,9 @@ export function ToolbarCaptureActionGroup(
     (['capture-visible', 'capture-selection', 'capture-full'] as const).some(visibility.isVisible);
   const optionsVisible =
     !visibility ||
-    (['after-capture', 'capture-delay', 'capture-size'] as const).some(visibility.isVisible);
+    (['after-capture', 'capture-delay', 'capture-size', 'scenario-panel'] as const).some(
+      visibility.isVisible
+    );
 
   return (
     <>

@@ -28,7 +28,7 @@ function createScenarioLayoutSection(
 ): ContentAppLayoutScenarioProps {
   return {
     actions: {
-      applyCaptureAction: viewModel.scenarioController.applyCaptureAction,
+      setRecorderPanelVisible: viewModel.scenarioController.setRecorderPanelVisible,
       createProject: viewModel.scenarioController.createProject,
       deleteRecentStep: viewModel.scenarioController.deleteRecentStep,
       finishRecording: viewModel.scenarioController.finishRecording,

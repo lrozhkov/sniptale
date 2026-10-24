@@ -61,7 +61,7 @@ export function projectPreparationScenario(
 ): ContentAppLayoutScenarioProps {
   return {
     actions: {
-      applyCaptureAction: scenarioController.applyCaptureAction,
+      setRecorderPanelVisible: scenarioController.setRecorderPanelVisible,
       createProject: scenarioController.createProject,
       deleteRecentStep: scenarioController.deleteRecentStep,
       finishRecording: scenarioController.finishRecording,

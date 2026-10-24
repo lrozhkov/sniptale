@@ -39,7 +39,7 @@ function resolveCaptureMenuLayout(
     placement: menuPlacement,
     style: style
       ? resolveToolbarDrawingMenuStyle({
-          anchorEl: triggerRef.current,
+          anchorEl: triggerRef.current?.parentElement ?? null,
           displayMode,
           menuHeight: full ? 600 : 300,
           menuWidth: 300,

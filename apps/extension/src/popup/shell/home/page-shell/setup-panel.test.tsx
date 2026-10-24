@@ -135,7 +135,7 @@ it('hides format and quality whenever clipboard delivery is selected', async () 
   expect(getContainer()?.textContent).not.toContain('popup.home.captureQualityLabel');
 });
 
-it('uses popup folder wording and offers scenario recording for tab captures', async () => {
+it('uses popup folder wording and offers six ordinary actions for tab captures', async () => {
   await renderNode(
     <ScreenshotSetupPanel
       config={DEFAULT_SCREENSHOT_SETUP_STATE.tab}
@@ -154,16 +154,16 @@ it('uses popup folder wording and offers scenario recording for tab captures', a
     label: 'popup.home.captureChooseFolderLabel',
     value: 'ask_preset',
   });
-  expect(values).toContainEqual({
-    label: 'settings.quickActions.afterCaptureScenario',
-    value: 'scenario',
-  });
+  expect(values.map((option) => option.value)).not.toContain('scenario');
+  const afterCapture = getContainer()
+    ?.querySelector('[data-testid="settings.quickActions.afterCaptureLabel.icons"]')
+    ?.closest('label')
+    ?.querySelector('select');
+  expect(afterCapture?.options).toHaveLength(6);
   expect(
     getContainer()?.querySelector('[data-option-icon="edit"] svg')?.getAttribute('data-ui')
   ).toBe('popup.image-editor-icon');
-  expect(
-    getContainer()?.querySelector('[data-option-icon="scenario"] svg')?.getAttribute('class')
-  ).toContain('lucide-book-open');
+  expect(getContainer()?.querySelector('[data-option-icon="scenario"]')).toBeNull();
 });
 
 it('renders tab settings, applies field changes, and disables a pending capture', async () => {

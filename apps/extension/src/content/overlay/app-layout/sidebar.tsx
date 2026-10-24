@@ -37,7 +37,7 @@ function useSidebarCapture(args: ContentScenarioRecorderSidebarArgs) {
     pending.current = true;
     setBusy(true);
     try {
-      await args.handleTakeScreenshot('visible', source);
+      await args.handleTakeScreenshot('visible', source, { captureAction: 'scenario' });
     } catch (error) {
       showScreenshotError(error);
     } finally {

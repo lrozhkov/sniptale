@@ -1,3 +1,4 @@
+import { normalizeConfigurableCaptureAction } from '../../../features/quick-actions-presets/policy';
 import {
   CONTENT_TOOLBAR_DOCK_EDGES,
   RECORDING_TOOLBAR_CONTROLS,
@@ -84,7 +85,9 @@ function parseOptionalCaptureAction(value: unknown): ParsedFieldValue<CaptureAct
     return 'download_default';
   }
 
-  return isCaptureActionTypeValue(value) ? value : INVALID_FIELD;
+  return isCaptureActionTypeValue(value)
+    ? normalizeConfigurableCaptureAction(value)
+    : INVALID_FIELD;
 }
 
 function parseOptionalToolbarDisplayMode(

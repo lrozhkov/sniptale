@@ -5,7 +5,7 @@ import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defau
 
 function createScenarioController() {
   return {
-    applyCaptureAction: vi.fn(async () => undefined),
+    setRecorderPanelVisible: vi.fn(async () => true),
     captureAction: 'download_default' as const,
     createProject: vi.fn(async () => undefined),
     deleteRecentStep: vi.fn(async () => undefined),
@@ -38,7 +38,7 @@ function createScenarioProps(): ContentAppLayoutScenarioProps {
 
   return {
     actions: {
-      applyCaptureAction: controller.applyCaptureAction,
+      setRecorderPanelVisible: controller.setRecorderPanelVisible,
       createProject: controller.createProject,
       deleteRecentStep: controller.deleteRecentStep,
       finishRecording: controller.finishRecording,

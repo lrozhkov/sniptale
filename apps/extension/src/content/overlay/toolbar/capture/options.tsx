@@ -11,7 +11,7 @@ import { getCaptureActionDescriptors } from '../../../../features/quick-actions-
 import { FullPageCaptureSplitButton } from './full-page-menu';
 import { CaptureActionIcons } from './action-icons';
 import { ScreenshotCaptureSplitButton } from './screenshot-menu';
-import { NumericRow, SegmentedRow } from '../../../../ui/compact-inspector-controls';
+import { NumericValueField, SegmentedRow } from '../../../../ui/compact-inspector-controls';
 import { useToolbarImagePreferences } from './image-preferences';
 import { useFullPageCapturePreferences } from './full-page-preferences';
 import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
@@ -219,36 +219,41 @@ function CaptureImageParameters({
   }, [image.imageQuality, image.saving]);
   return (
     <div className="sniptale-capture-image-parameters">
-      <span className="sniptale-capture-parameter-label">
-        {translate('imageSettings.section.formatLabel')}
-      </span>
-      <SegmentedRow
-        ariaLabel={translate('imageSettings.section.formatLabel')}
-        value={image.imageFormat}
-        options={[
-          { value: 'png', label: translate('imageSettings.section.formatPngLabel') },
-          { value: 'jpeg', label: translate('imageSettings.section.formatJpegLabel') },
-          { value: 'webp', label: translate('imageSettings.section.formatWebpLabel') },
-        ]}
-        onChange={(imageFormat) => void image.updatePreferences({ imageFormat })}
-      />
-      {image.imageFormat !== 'png' ? (
-        <NumericRow
-          appearance="plain"
-          label={translate('imageSettings.section.qualityLabel')}
-          value={quality}
-          min={1}
-          max={100}
-          step={1}
-          unit="%"
-          revealScrub
-          scrub={{ min: 1, max: 100, step: 1 }}
-          onPreviewValue={setQuality}
-          onCommitValue={(imageQuality) => {
-            setQuality(imageQuality);
-            void image.updatePreferences({ imageQuality });
-          }}
+      <div className="sniptale-capture-parameter-field">
+        <span className="sniptale-capture-parameter-label">
+          {translate('imageSettings.section.formatLabel')}
+        </span>
+        <SegmentedRow
+          ariaLabel={translate('imageSettings.section.formatLabel')}
+          value={image.imageFormat}
+          options={[
+            { value: 'png', label: translate('imageSettings.section.formatPngLabel') },
+            { value: 'jpeg', label: translate('imageSettings.section.formatJpegLabel') },
+            { value: 'webp', label: translate('imageSettings.section.formatWebpLabel') },
+          ]}
+          onChange={(imageFormat) => void image.updatePreferences({ imageFormat })}
         />
+      </div>
+      {image.imageFormat !== 'png' ? (
+        <div className="sniptale-capture-parameter-field">
+          <span className="sniptale-capture-parameter-label">
+            {translate('imageSettings.section.qualityLabel')}
+          </span>
+          <NumericValueField
+            className="sniptale-capture-quality-input"
+            label={translate('imageSettings.section.qualityLabel')}
+            value={quality}
+            min={1}
+            max={100}
+            step={1}
+            unit="%"
+            onPreviewValue={setQuality}
+            onCommitValue={(imageQuality) => {
+              setQuality(imageQuality);
+              void image.updatePreferences({ imageQuality });
+            }}
+          />
+        </div>
       ) : null}
     </div>
   );

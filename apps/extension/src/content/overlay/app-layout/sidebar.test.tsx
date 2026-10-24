@@ -58,8 +58,8 @@ const SCENARIO_SIDEBAR_TEST_NAME =
 
 function createScenarioController() {
   return {
-    applyCaptureAction: vi.fn(async () => undefined),
-    captureAction: 'scenario' as const,
+    setRecorderPanelVisible: vi.fn(async () => true),
+    captureAction: 'copy' as const,
     createProject: vi.fn(async () => undefined),
     deleteRecentStep: vi.fn(async () => undefined),
     finishRecording: vi.fn(async () => undefined),
@@ -91,7 +91,7 @@ function createScenarioProps() {
 
   return {
     actions: {
-      applyCaptureAction: controller.applyCaptureAction,
+      setRecorderPanelVisible: controller.setRecorderPanelVisible,
       createProject: controller.createProject,
       deleteRecentStep: controller.deleteRecentStep,
       finishRecording: controller.finishRecording,
@@ -373,9 +373,13 @@ it('keeps pending capture ownership through hidden panel remounts and allows fai
     click();
     click();
   });
-  expect(props.handleTakeScreenshot).toHaveBeenCalledExactlyOnceWith('visible', {
-    kind: 'trusted-content-event',
-  });
+  expect(props.handleTakeScreenshot).toHaveBeenCalledExactlyOnceWith(
+    'visible',
+    {
+      kind: 'trusted-content-event',
+    },
+    { captureAction: 'scenario' }
+  );
   expect(captureMocks.source.mock.calls[0]?.[0]).toBeInstanceOf(Event);
   props.isCompletelyHidden = true;
   await renderSidebar(props);

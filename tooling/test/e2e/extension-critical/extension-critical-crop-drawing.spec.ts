@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Page, TestInfo } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
@@ -127,7 +127,104 @@ async function checkCropUndoRedo(page: Page) {
   await page.locator('[data-ui="content.crop.mode.drawing"]').click();
 }
 
+async function checkCropCaptureActionMenu(page: Page, info: TestInfo) {
+  const captureTrigger = page.locator('.sniptale-selection-capture-menu-trigger');
+  const captureMenu = page.locator('[data-ui="content.selection.capture-action-menu"]');
+  await captureTrigger.click();
+  const captureIcons = captureMenu.locator('.sniptale-capture-action-icons [role="menuitem"]');
+  const captureLabels = [
+    'Download',
+    'Copy image',
+    'Open in editor',
+    'Save as…',
+    'Choose a folder',
+    'Save to library',
+  ];
+  await expect(captureIcons).toHaveCount(captureLabels.length);
+  for (const [index, label] of captureLabels.entries()) {
+    await expect(captureIcons.nth(index)).toBeVisible();
+    await expect(captureIcons.nth(index)).toHaveAttribute('aria-label', label);
+    await expect(captureIcons.nth(index)).toHaveAttribute('title', label);
+    await expect(captureIcons.nth(index)).toHaveText('');
+    await expect(captureIcons.nth(index).locator('svg')).toHaveCount(1);
+  }
+  const iconBounds = await captureIcons.evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const bounds = button.getBoundingClientRect();
+      return { x: bounds.x, y: bounds.y, width: bounds.width };
+    })
+  );
+  expect(
+    Math.max(...iconBounds.map((bounds) => bounds.y)) -
+      Math.min(...iconBounds.map((bounds) => bounds.y))
+  ).toBeLessThanOrEqual(1);
+  for (let index = 1; index < iconBounds.length; index++) {
+    expect(iconBounds[index]!.x).toBeGreaterThanOrEqual(
+      iconBounds[index - 1]!.x + iconBounds[index - 1]!.width
+    );
+  }
+  await expect(captureIcons.first()).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(captureIcons.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(captureIcons.first()).toBeFocused();
+  await page.screenshot({
+    path: info.outputPath('crop-capture-action-icons.png'),
+    fullPage: false,
+  });
+  await page.keyboard.press('Escape');
+  await expect(captureMenu).toHaveCount(0);
+  await expect(captureTrigger).toBeFocused();
+  await expect(page.locator('.sniptale-selection-toolbar')).toBeVisible();
+}
+
 for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Crop capture icon menu executes the selected action at ${viewport.width}`, async ({
+    hostOrigin,
+  }, info) => {
+    const launched = await launchExtensionBrowser({ viewport });
+    try {
+      const { context, extensionId } = launched;
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+      try {
+        await popup.evaluate(() => {
+          const grant = document.createElement('button');
+          grant.textContent = 'Grant crop capture proof';
+          grant.onclick = async () => {
+            grant.dataset['granted'] = String(
+              await chrome.permissions.request({ origins: ['<all_urls>'] })
+            );
+          };
+          document.body.append(grant);
+        });
+        const grant = popup.getByRole('button', { name: 'Grant crop capture proof', exact: true });
+        await grant.click();
+        await expect(grant).toHaveAttribute('data-granted', 'true');
+        await page.bringToFront();
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+        await openImmediateCrop(page);
+        const frame = page.locator('.sniptale-selection-final-frame');
+        const before = await frame.boundingBox();
+        await checkCropCaptureActionMenu(page, info);
+        expect(await frame.boundingBox()).toEqual(before);
+        await page.locator('.sniptale-selection-capture-menu-trigger').click();
+        const editorOpened = context.waitForEvent('page');
+        await page.locator('[data-ui="content.selection.capture-action-option.edit"]').click();
+        const editor = await editorOpened;
+        await expect(editor.locator('[data-ui="editor.page.root"]')).toBeVisible();
+        await expect(editor.locator('[data-ui="editor.page.open-loading"]')).toBeHidden();
+        await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
+        await editor.close();
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    } finally {
+      await closeExtensionBrowser(launched, { removeUserDataDir: true });
+    }
+  });
+
   test(`Crop drawing preserves the independent main mode at ${viewport.width}`, async ({
     context,
     extensionId,
@@ -415,6 +512,7 @@ for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
             'Crop text'
           );
         }
+        await checkCropCaptureActionMenu(page, info);
         await captureTrigger.click();
         const editorOpened = context.waitForEvent('page');
         await page.locator('[data-ui="content.selection.capture-action-option.edit"]').click();

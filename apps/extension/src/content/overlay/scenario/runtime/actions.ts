@@ -1,12 +1,11 @@
 import { finishScenarioRecording } from '../mutation/finish';
-import type { CaptureActionType } from '../../../../contracts/settings';
 import type { ScenarioCaptureMode } from '@sniptale/runtime-contracts/scenario/types/base';
 import type {
   ScenarioRecorderSurfaceState,
   ScenarioSessionState,
 } from '@sniptale/runtime-contracts/scenario/types/session';
 import {
-  applyScenarioCaptureAction,
+  applyScenarioRecorderPanelVisibility,
   applyScenarioCaptureMode,
   applyScenarioEnabledState,
   applyScenarioRememberSelection,
@@ -27,12 +26,6 @@ function createScenarioControllerModeActions(args: {
   setOptimisticCaptureMode: (captureMode: ScenarioCaptureMode | null) => void;
 }) {
   return {
-    applyCaptureAction: (actionType: CaptureActionType) =>
-      applyScenarioCaptureAction({
-        actionType,
-        applyScenarioResponse: args.applyScenarioResponse,
-        currentSurface: args.currentSurfaceRef.current,
-      }),
     handleScreenshotModeDisabled: () =>
       applyScenarioScreenshotModeDisabled({
         applyScenarioResponse: args.applyScenarioResponse,
@@ -129,7 +122,11 @@ async function applyRecentStepMutation(args: {
   await args.action();
 }
 
+/** Retains one recorder-panel request across controller rerenders. */
+export type ScenarioPanelPendingOperation = { visible: boolean; promise: Promise<boolean> };
+
 export function createScenarioControllerActions(args: {
+  panelPendingRef: { current: ScenarioPanelPendingOperation | null };
   finishPendingRef: { current: Promise<void> | null };
   applyScenarioResponse: (response: ScenarioControllerResponse) => void;
   currentSurfaceRef: { current: ScenarioRecorderSurfaceState };
@@ -141,6 +138,23 @@ export function createScenarioControllerActions(args: {
   setOptimisticCaptureMode: (captureMode: ScenarioCaptureMode | null) => void;
 }) {
   return {
+    /** Activates the recorder on first open and otherwise changes only panel visibility. */
+    setRecorderPanelVisible: (visible: boolean): Promise<boolean> => {
+      const pending = args.panelPendingRef.current;
+      if (pending) return pending.visible === visible ? pending.promise : Promise.resolve(false);
+      const promise = applyScenarioRecorderPanelVisibility({
+        applyScenarioResponse: args.applyScenarioResponse,
+        currentSession: { ...args.sessionRef.current },
+        currentSurface: { ...args.currentSurfaceRef.current },
+        refreshSession: args.refreshSession,
+        screenshotMode: args.screenshotMode,
+        visible,
+      }).finally(() => {
+        if (args.panelPendingRef.current?.promise === promise) args.panelPendingRef.current = null;
+      });
+      args.panelPendingRef.current = { visible, promise };
+      return promise;
+    },
     finishRecording: () => {
       if (!args.finishPendingRef.current) {
         args.finishPendingRef.current = finishScenarioRecording({

@@ -78,4 +78,21 @@ describe('settings read-path purity', () => {
     expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
     expect(browserStorageSyncRemoveMock).not.toHaveBeenCalled();
   });
+
+  it('normalizes a legacy scenario default without writes and preserves other preferences', async () => {
+    browserStorageSyncGetMock.mockResolvedValue({
+      sniptale_settings: {
+        captureAction: 'scenario',
+        imageFormat: 'webp',
+        imageQuality: 71,
+        captureDelay: 5,
+      },
+    });
+    await expect(loadSettings()).resolves.toMatchObject({
+      captureAction: 'download_default',
+      imageFormat: 'webp',
+      imageQuality: 71,
+    });
+    expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+  });
 });

@@ -6,7 +6,6 @@ import {
 } from '@sniptale/ui/floating-interactions/placement';
 import {
   createProductToolbarMenuDom,
-  createProductToolbarMenuItemCopyDom,
   createProductToolbarMenuItemDom,
 } from '@sniptale/ui/product-menus/toolbar/dom';
 import { translate } from '../../../../../platform/i18n';
@@ -53,7 +52,7 @@ export function syncSelectionCaptureMenuDirection(root: ParentNode): void {
   if (!trigger) return;
   const below = canOpenCaptureMenuBelow(
     getCaptureMenuShellRect(trigger),
-    captureMenuHeights.get(trigger) ?? 284
+    captureMenuHeights.get(trigger) ?? 84
   );
   applyCaptureMenuDirection(trigger, below);
 }
@@ -64,15 +63,15 @@ function positionCaptureMenu(menu: HTMLElement, anchor: HTMLElement): void {
   menu.style.maxHeight = '';
   menu.classList.remove('sniptale-toolbar-menu--compact');
   let menuRect = menu.getBoundingClientRect();
-  let height = menuRect.height || 284;
+  let height = menuRect.height || 84;
   const availableAbove = shellRect.top - MENU_GAP - VIEWPORT_MARGIN;
   const availableBelow = window.innerHeight - VIEWPORT_MARGIN - shellRect.bottom - MENU_GAP;
   if (height > Math.max(availableAbove, availableBelow)) {
     menu.classList.add('sniptale-toolbar-menu--compact');
     menuRect = menu.getBoundingClientRect();
-    height = menuRect.height || 284;
+    height = menuRect.height || 84;
   }
-  const width = menuRect.width || 280;
+  const width = menuRect.width || 260;
   captureMenuHeights.set(anchor, height);
   const canOpenBelow = canOpenCaptureMenuBelow(shellRect, height);
   applyCaptureMenuDirection(anchor, canOpenBelow);
@@ -121,12 +120,12 @@ function createCaptureMenuItem(
   const button = createProductToolbarMenuItemDom({
     dataUi: `content.selection.capture-action-option.${descriptor.value}`,
   });
+  button.classList.add('sniptale-capture-action-icon');
   button.setAttribute('role', 'menuitem');
+  button.setAttribute('aria-label', descriptor.label);
+  button.title = descriptor.label;
   button.tabIndex = tabIndex;
-  button.append(
-    createSelectionCaptureActionIcon(descriptor.value, 18),
-    createProductToolbarMenuItemCopyDom(descriptor.label, descriptor.hint)
-  );
+  button.append(createSelectionCaptureActionIcon(descriptor.value, 18));
   button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -141,9 +140,12 @@ function appendCaptureMenuActions(list: HTMLElement, options: SelectionCaptureAc
   const descriptors = getCaptureActionDescriptors().filter(
     (descriptor) => descriptor.value !== 'scenario'
   );
+  const row = document.createElement('div');
+  row.className = 'sniptale-capture-action-icons';
   descriptors.forEach((descriptor, index) => {
-    list.appendChild(createCaptureMenuItem(descriptor, index === 0 ? 0 : -1, options));
+    row.appendChild(createCaptureMenuItem(descriptor, index === 0 ? 0 : -1, options));
   });
+  list.appendChild(row);
 }
 
 function installCaptureMenuKeyboardNavigation(
@@ -162,8 +164,10 @@ function installCaptureMenuKeyboardNavigation(
     if (currentIndex < 0) return;
 
     let nextIndex: number | null = null;
-    if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length;
-    if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight')
+      nextIndex = (currentIndex + 1) % items.length;
+    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft')
+      nextIndex = (currentIndex - 1 + items.length) % items.length;
     if (event.key === 'Home') nextIndex = 0;
     if (event.key === 'End') nextIndex = items.length - 1;
     if (event.key === 'Tab') {

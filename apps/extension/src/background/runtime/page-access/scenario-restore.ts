@@ -24,8 +24,7 @@ export async function readScenarioRestoreState(
   return {
     shouldEnablePreparation: session.enabled || shouldScenarioSurfaceRestore(surface),
     shouldRestore,
-    shouldWriteForcedScenarioSurface:
-      session.enabled && (surface.captureAction !== 'scenario' || !surface.screenshotMode),
+    shouldWriteForcedScenarioSurface: session.enabled && !surface.screenshotMode,
     surface,
   };
 }

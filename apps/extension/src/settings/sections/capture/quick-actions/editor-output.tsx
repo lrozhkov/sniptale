@@ -114,7 +114,9 @@ function QuickActionsAfterCaptureField(props: { state: QuickActionsEditorOutputS
           props.state.updateFormField('afterCapture', value as CaptureActionType)
         }
         options={(Object.entries(afterCaptureLabels) as [CaptureActionType, string][])
-          .filter(([value]) => !allowedActions || allowedActions.has(value))
+          .filter(
+            ([value]) => value !== 'scenario' && (!allowedActions || allowedActions.has(value))
+          )
           .map(([value, label]) => ({ value, label }))}
       />
     </SettingsControlRow>

@@ -233,14 +233,13 @@ export interface ToolbarProps {
     byClickDisabled: boolean;
     captureMode: 'manual' | 'by-click';
     enabled: boolean;
-    onCaptureActionSelected: (action: CaptureActionType) => Promise<void> | void;
     onCreateProject: (name: string) => Promise<void> | void;
     onFinishScenario: () => Promise<void> | void;
     onOpenEditor: (stepId?: string | null) => void;
     onProjectSelect: (projectId: string) => Promise<void> | void;
     onRememberProjectSelectionChange?: (value: boolean) => Promise<void> | void;
     onSetCaptureMode: (captureMode: 'manual' | 'by-click') => void;
-    onToggleSidebar: () => void;
+    onToggleSidebar: () => Promise<boolean> | boolean | void;
     projectId: string | null;
     projectName: string | null;
     projects: Array<{ id: string; name: string }>;

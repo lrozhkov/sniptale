@@ -19,6 +19,7 @@ async function configureToolbar(
         imageQuality: 83,
         contentToolbar: {
           ...current?.contentToolbar,
+          pageControls: { ...current?.contentToolbar?.pageControls, 'scenario-panel': true },
           displayMode,
           freePlacement: false,
           position: null,
@@ -90,6 +91,20 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             await expect(surface).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
           }
 
+          if (orientation === 'vertical') {
+            for (const mode of ['visible', 'full'] as const) {
+              const primary = await page
+                .locator(`[data-ui="content.toolbar.capture-${mode}-button"]`)
+                .boundingBox();
+              const arrow = await page
+                .locator(`[data-ui="content.toolbar.capture-${mode}-settings-button"]`)
+                .boundingBox();
+              expect(arrow!.y).toBeGreaterThanOrEqual(primary!.y + primary!.height - 1);
+              expect(
+                Math.abs(arrow!.x + arrow!.width / 2 - primary!.x - primary!.width / 2)
+              ).toBeLessThanOrEqual(1);
+            }
+          }
           for (const mode of ['visible', 'full'] as const) {
             const trigger = page.locator(
               `[data-ui="content.toolbar.capture-${mode}-settings-button"]`
@@ -121,7 +136,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
               )
               .toBe('webp');
             await menu.getByRole('button', { name: 'JPEG', exact: true }).click();
-            await expect(menu.getByRole('slider')).toBeVisible();
+            await expect(menu.getByRole('slider')).toHaveCount(0);
             await expect
               .poll(() =>
                 popup.evaluate(
@@ -134,6 +149,18 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             const input = menu.getByRole('textbox', {
               name: /Image quality|Качество изображения/u,
             });
+            const labels = await menu
+              .locator('.sniptale-capture-parameter-label')
+              .evaluateAll((nodes) =>
+                nodes.map((node) => {
+                  const css = getComputedStyle(node);
+                  return { font: css.font, color: css.color, lineHeight: css.lineHeight };
+                })
+              );
+            expect(labels).toHaveLength(2);
+            expect(labels[0]).toEqual(labels[1]);
+            const field = menu.locator('.sniptale-capture-quality-input');
+            await expect(field).toHaveCSS('height', '32px');
             await input.fill('76');
             await input.press('Enter');
             await expect
@@ -145,6 +172,10 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
                 )
               )
               .toBe(76);
+            await page.screenshot({
+              path: info.outputPath(`${orientation}-${mode}-quality.png`),
+              fullPage: false,
+            });
             await menu.getByRole('button', { name: 'PNG', exact: true }).click();
             await expect(menu.getByRole('slider')).toHaveCount(0);
             const box = (await menu.locator('.sniptale-toolbar-menu').boundingBox())!;
@@ -173,7 +204,25 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           }
           await page.locator('[data-ui="content.toolbar.capture-action-button"]').click();
           const defaults = page.locator('[data-ui="content.toolbar.capture-action-menu"]');
-          await expect(defaults.locator('.sniptale-capture-action-icons button')).toHaveCount(6);
+          await expect(defaults.locator('.sniptale-capture-action-icons')).toHaveCount(0);
+          await expect(defaults.locator('.sniptale-toolbar-menu-item')).toHaveCount(6);
+          await expect(defaults.locator('.sniptale-toolbar-menu-item-label')).toHaveCount(6);
+          await expect(defaults.locator('.sniptale-toolbar-menu-item-hint')).toHaveCount(6);
+          await expect(defaults.locator('[data-ui$=".scenario"]')).toHaveCount(0);
+          await expect
+            .poll(async () =>
+              defaults.locator('.sniptale-popover-menu').evaluate((element) => {
+                const bounds = element.getBoundingClientRect();
+                return bounds.top >= 7 && bounds.bottom <= innerHeight - 7;
+              })
+            )
+            .toBe(true);
+          await defaults.locator('.sniptale-toolbar-menu-item').last().scrollIntoViewIfNeeded();
+          await expect(defaults.locator('.sniptale-toolbar-menu-item').last()).toBeInViewport();
+          await page.screenshot({
+            path: info.outputPath(`${orientation}-after-capture-list.png`),
+            fullPage: false,
+          });
           await defaults.locator('[data-ui="content.toolbar.capture-action-option.copy"]').click();
           await expect(defaults).toHaveCount(0);
           await expect
@@ -265,3 +314,62 @@ test('quick capture overrides the default once for visible and full screenshots'
     await popup.close();
   }
 });
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`independent scenario panel and ordinary captures ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await configureToolbar(popup, page, hostOrigin, 'horizontal');
+      const toggle = page.locator('[data-ui="content.toolbar.scenario-panel-button"]');
+      const sidebar = page.locator('[data-ui="content.scenario.sidebar"]');
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await toggle.click();
+      await expect(sidebar).toBeVisible();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      await page.screenshot({
+        path: info.outputPath('scenario-panel-toggle.png'),
+        fullPage: false,
+      });
+      const editorPromise = context.waitForEvent('page');
+      await page.locator('[data-ui="content.toolbar.capture-visible-button"]').click();
+      const editor = await editorPromise;
+      await expect(editor).toHaveURL(/\/editor\/index\.html/u);
+      await editor.close();
+      await page.bringToFront();
+      await expect(sidebar.locator('[data-ui="content.scenario.sidebar.step"]')).toHaveCount(0);
+      expect(
+        await popup.evaluate(
+          async () =>
+            (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'].captureAction
+        )
+      ).toBe('edit');
+      await toggle.click();
+      await expect(sidebar).toBeHidden();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await toggle.click();
+      await expect(sidebar).toBeVisible();
+      await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+      await page.locator('[data-ui="content.toolbar.settings.customize-buttons"]').click();
+      const visibility = page.locator('[data-ui="content.toolbar.visibility.scenario-panel"]');
+      await visibility.click();
+      await expect(visibility).toHaveAttribute('aria-pressed', 'false');
+      await expect(sidebar).toBeVisible();
+      await page.locator('[data-ui="content.toolbar.customize-done"]').click();
+      await expect(toggle).toHaveCount(0);
+      expect(
+        await popup.evaluate(
+          async () =>
+            (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'].contentToolbar
+              .pageControls['scenario-panel']
+        )
+      ).toBe(false);
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}

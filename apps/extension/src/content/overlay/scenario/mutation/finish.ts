@@ -27,7 +27,6 @@ export async function finishScenarioRecording(args: {
     const surfaceResponse = await requireScenarioResponse(
       updateScenarioSurfaceState({
         ...args.currentSurface,
-        captureAction: 'download_default',
         screenshotMode: false,
         toolbarVisible: false,
       })

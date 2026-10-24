@@ -1,3 +1,4 @@
+import { normalizeConfigurableCaptureAction } from '../../features/quick-actions-presets/policy';
 import { getAIModelOperation } from '../../contracts/settings/model-operation';
 import { z } from 'zod';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
@@ -124,7 +125,13 @@ function parseCoreDomain(
       const parsed = parseStoredQuickActions(value['items']);
       if (parsed.hasInvalidRoot || parsed.invalidEntryCount > 0)
         failSettingsTransferDomain(domainId);
-      return json({ items: parsed.actions ?? [] });
+      return json({
+        items: (parsed.actions ?? []).map((action) =>
+          action.afterCapture === 'scenario'
+            ? { ...action, afterCapture: normalizeConfigurableCaptureAction(action.afterCapture) }
+            : action
+        ),
+      });
     }
     case 'capture.viewport-presets': {
       if (Object.keys(value).some((key) => key !== 'items' && key !== 'defaultId'))

@@ -125,3 +125,29 @@ it('retains bounded optional voice correction prompts and rejects oversized valu
     })
   ).toThrow();
 });
+
+it('normalizes imported legacy scenario sinks and preserves quick-action identity and metadata', () => {
+  const action = {
+    id: 'legacy-scenario',
+    status: true,
+    name: 'My capture',
+    icon: 'Camera',
+    screenshotMode: 'full',
+    afterCapture: 'scenario',
+    viewportPresetId: 'wide',
+    delay: 5,
+    imageFormat: 'webp',
+    imageQuality: 71,
+    exitAfterCapture: true,
+    origin: 'user',
+    hotkey: { key: 'K', ctrlKey: true, altKey: false, shiftKey: false, metaKey: false },
+  };
+  const result = parseSettingsTransferDomains({
+    'capture.after-capture': { schemaVersion: 1, data: { action: 'scenario' } },
+    'capture.quick-actions': { schemaVersion: 1, data: { items: [action] } },
+  });
+  expect(result['capture.after-capture']?.data).toEqual({ action: 'download_default' });
+  expect(result['capture.quick-actions']?.data).toEqual({
+    items: [{ ...action, afterCapture: 'download_default' }],
+  });
+});

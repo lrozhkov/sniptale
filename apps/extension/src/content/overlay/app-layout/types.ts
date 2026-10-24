@@ -42,7 +42,7 @@ type ContentAppModes = {
 };
 
 export type ContentAppScenarioActions = {
-  applyCaptureAction: (actionType: CaptureActionType) => Promise<void>;
+  setRecorderPanelVisible: (visible: boolean) => Promise<boolean>;
   createProject: (name: string) => Promise<void>;
   deleteRecentStep: (stepId: string) => Promise<void>;
   finishRecording: () => Promise<void>;

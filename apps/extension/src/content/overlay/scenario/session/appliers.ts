@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import type { CaptureActionType } from '../../../../contracts/settings';
 import type { ScenarioCaptureMode } from '@sniptale/runtime-contracts/scenario/types/base';
 import type {
   ScenarioRecorderSurfaceState,
@@ -24,41 +23,23 @@ export function buildEffectiveScenarioSession(
 }
 
 export function useScenarioSurfaceStateApplier(args: {
-  captureActionRef: { current: CaptureActionType };
-  setCaptureAction: (action: CaptureActionType) => void;
   setIsToolbarVisible: (visible: boolean) => void;
   setScreenshotMode: (enabled: boolean) => void;
   setSurface: React.Dispatch<React.SetStateAction<ScenarioRecorderSurfaceState>>;
   surfaceRef: { current: ScenarioRecorderSurfaceState };
 }) {
-  const {
-    captureActionRef,
-    setCaptureAction,
-    setIsToolbarVisible,
-    setScreenshotMode,
-    setSurface,
-    surfaceRef,
-  } = args;
+  const { setIsToolbarVisible, setScreenshotMode, setSurface, surfaceRef } = args;
 
   return useCallback(
     (nextSurface: ScenarioRecorderSurfaceState, options?: { syncModeState?: boolean }) => {
       setSurface(nextSurface);
       surfaceRef.current = nextSurface;
-      captureActionRef.current = nextSurface.captureAction;
-      setCaptureAction(nextSurface.captureAction);
       if (options?.syncModeState ?? true) {
         setScreenshotMode(nextSurface.screenshotMode);
         setIsToolbarVisible(nextSurface.toolbarVisible);
       }
     },
-    [
-      captureActionRef,
-      setCaptureAction,
-      setIsToolbarVisible,
-      setScreenshotMode,
-      setSurface,
-      surfaceRef,
-    ]
+    [setIsToolbarVisible, setScreenshotMode, setSurface, surfaceRef]
   );
 }
 
