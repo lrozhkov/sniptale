@@ -60,7 +60,14 @@ export type RuntimeVideoSessionRequestByType = {
     sdp: string;
     source:
       | { kind: 'surface'; settings: VideoRecordingSettings }
-      | { kind: 'countdown'; recordingId: string; generation: number; streamInstanceId: string };
+      | { kind: 'countdown'; recordingId: string; generation: number; streamInstanceId: string }
+      | {
+          kind: 'recording-preview';
+          recordingId: string;
+          generation: number;
+          streamInstanceId: string;
+          cameraOnly: boolean;
+        };
   };
   [VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE]: {
     type: typeof VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE;

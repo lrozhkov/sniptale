@@ -38,7 +38,8 @@ export function useRecordingState(
   const [postRecordResult, setPostRecordResult] = useState<VideoPostRecordResult | null>(null);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const refreshGenerationRef = useRef(0);
-  const authorizedRecordingIdRef = useRef<string | null>(routeState.recordingId);
+  const authorizedRecordingIdRef = useRef<string | null>(null);
+  const registeredRouteRef = useRef<CameraRecorderRouteState | null>(null);
 
   const refreshState = useCallback(async () => {
     const generation = ++refreshGenerationRef.current;
@@ -55,7 +56,9 @@ export function useRecordingState(
       setState(response.state);
     }
     setCapability(
-      typeof response?.controlToken === 'string' && typeof response.recordingId === 'string'
+      authorizedRecordingIdRef.current !== null &&
+        response?.recordingId === authorizedRecordingIdRef.current &&
+        typeof response.controlToken === 'string'
         ? { controlToken: response.controlToken, recordingId: response.recordingId }
         : null
     );
@@ -72,7 +75,7 @@ export function useRecordingState(
     if (!postRecordResult) {
       return;
     }
-    refreshGenerationRef.current += 1;
+    const generation = ++refreshGenerationRef.current;
     const response = await messaging.sendRuntimeMessage({
       type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
       recordingId: postRecordResult.recordingId,
@@ -83,23 +86,32 @@ export function useRecordingState(
     if (response.result !== 'acknowledged' && response.result !== 'stale') {
       throw new Error(translate('common.states.error'));
     }
-    setPostRecordResult(null);
+    if (generation === refreshGenerationRef.current) setPostRecordResult(null);
   }, [messaging, postRecordResult]);
 
-  useEffect(
-    () =>
-      registerCameraRecorder(
-        routeState,
-        messaging,
-        setCapability,
-        setRegistrationError,
-        (recordingId) => {
-          authorizedRecordingIdRef.current = recordingId;
-        },
-        refreshState
-      ),
-    [messaging, refreshState, routeState]
-  );
+  useEffect(() => {
+    refreshGenerationRef.current += 1;
+    authorizedRecordingIdRef.current = null;
+    registeredRouteRef.current = null;
+    setCapability(null);
+    setPostRecordResult(null);
+    setRegistrationError(null);
+    const dispose = registerCameraRecorder(
+      routeState,
+      messaging,
+      setCapability,
+      setRegistrationError,
+      (recordingId) => {
+        authorizedRecordingIdRef.current = recordingId;
+        registeredRouteRef.current = routeState;
+      },
+      refreshState
+    );
+    return () => {
+      dispose();
+      refreshGenerationRef.current += 1;
+    };
+  }, [messaging, refreshState, routeState]);
   useEffect(
     () => subscribeToRecordingUpdates(setState, refreshState, setRegistrationError),
     [refreshState]
@@ -107,8 +119,8 @@ export function useRecordingState(
 
   return {
     acknowledgePostRecord,
-    capability,
-    postRecordResult,
+    capability: registeredRouteRef.current === routeState ? capability : null,
+    postRecordResult: registeredRouteRef.current === routeState ? postRecordResult : null,
     refreshState,
     registrationError,
     state,
@@ -137,6 +149,10 @@ function registerCameraRecorder(
 
   async function registerAndLoadState(): Promise<void> {
     try {
+      if (routeState.draft && !routeState.registrationToken) {
+        await refreshState();
+        return;
+      }
       const registration = await messaging.sendRuntimeMessage(
         createCameraRegistrationMessage(routeState)
       );

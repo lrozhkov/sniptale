@@ -25,6 +25,18 @@ function parseCurrentVideoSettings(value: Record<string, unknown>) {
 }
 
 describe('video guards roots', () => {
+  it.each([false, true])('admits the persisted teleprompter preference %s', (value) => {
+    const result = parseCurrentVideoSettings({ teleprompterEnabled: value });
+    expect(result.value.teleprompterEnabled).toBe(value);
+    expect(result.invalidFieldCount).toBe(0);
+  });
+
+  it.each(['true', 1, null])('refuses the malformed teleprompter preference %s', (value) => {
+    const result = parseCurrentVideoSettings({ teleprompterEnabled: value });
+    expect(result.value.teleprompterEnabled).toBeUndefined();
+    expect(result.invalidFieldCount).toBe(1);
+  });
+
   it.each(['circle', 'rectangle', 'soft', 'ellipse', 'square'])(
     'round-trips %s page camera appearance',
     (shape) => {

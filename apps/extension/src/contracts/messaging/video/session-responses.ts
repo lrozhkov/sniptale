@@ -12,6 +12,8 @@ type RuntimeRecordingCommandResult = { result?: string };
 type RuntimeRequiredAckResponse = Exclude<RuntimeAckResponse, undefined>;
 type RuntimeRecordingStartResult = RuntimeRecordingCommandResult & {
   cameraLaunchToken?: string;
+  /** True after the background completes canonical companion delivery. */
+  cameraRecorderOpened?: boolean;
   controlToken?: string;
   recordingId?: string;
 };

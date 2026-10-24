@@ -243,6 +243,35 @@ async function verifyVideoSettingsErasure() {
 describe('video', () => {
   beforeEach(resetVideoStorageMocks);
 
+  it('retains the teleprompter preference through reload and a parallel microphone patch', async () => {
+    let stored = { ...DEFAULT_VIDEO_SETTINGS };
+    const started = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    browserStorageLocalGetMock.mockImplementation(async () => ({
+      sniptale_video_settings: stored,
+    }));
+    browserStorageLocalSetMock.mockImplementation(async (items) => {
+      started.resolve();
+      await released.promise;
+      stored = items.sniptale_video_settings;
+    });
+    const teleprompter = patchVideoSettings({ teleprompterEnabled: true });
+    await started.promise;
+    const microphone = patchVideoSettings({ microphoneEnabled: true });
+    expect(browserStorageLocalSetMock).toHaveBeenCalledOnce();
+    released.resolve();
+    await Promise.all([teleprompter, microphone]);
+    await expect(loadVideoSettings()).resolves.toMatchObject({
+      teleprompterEnabled: true,
+      microphoneEnabled: true,
+    });
+    await patchVideoSettings({ teleprompterEnabled: false });
+    await expect(loadVideoSettings()).resolves.toMatchObject({
+      teleprompterEnabled: false,
+      microphoneEnabled: true,
+    });
+  });
+
   it(
     'patches video settings and drops invalid persisted fields on load',
     verifyVideoSettingsContracts

@@ -84,6 +84,11 @@ function CameraPostRecordActions(props: {
   return (
     <>
       <CameraWindowButton
+        disabled={props.isBusy}
+        label={translate('popup.video.postRecordNext')}
+        onClick={() => props.decide(() => Promise.resolve())}
+      />
+      <CameraWindowButton
         icon={Film}
         disabled={props.isBusy}
         label={translate('popup.video.postRecordOpenEditor')}

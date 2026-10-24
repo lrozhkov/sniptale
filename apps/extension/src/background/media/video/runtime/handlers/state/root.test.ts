@@ -234,6 +234,7 @@ async function verifyRecordingStartStopLifecycle(
   expect(markVideoRecordingPreparationSettledMock).toHaveBeenCalledTimes(1);
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
     status: VideoRecordingStatus.RECORDING,
+    displaySurface: null,
     countdownEndsAt: null,
     error: null,
   });

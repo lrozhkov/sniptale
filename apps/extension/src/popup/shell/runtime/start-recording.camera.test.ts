@@ -104,3 +104,109 @@ describe('startRecordingHandler camera mode', () => {
     });
   });
 });
+
+describe('teleprompter companion launch', () => {
+  it.each([CaptureMode.TAB, CaptureMode.TAB_CROP, CaptureMode.SCREEN])(
+    'opens a script-only companion for %s capture',
+    async (captureMode) => {
+      tabsQuery.mockResolvedValue([{ id: 7 }]);
+      await startRecordingHandler({
+        captureMode,
+        microphoneDevices: [],
+        webcamDevices: [],
+        setIsStartPending,
+        setRecordingControlCapability,
+        setStartError,
+        videoSettings: { ...defaultSettings, teleprompterEnabled: true },
+        viewportPresetId: null,
+      });
+      expect(requestWebcamPermission).not.toHaveBeenCalled();
+      expect(openCameraRecorderPage).toHaveBeenCalledWith({
+        launchToken: 'launch-token-1',
+        recordingId: 'recording-1',
+        teleprompter: true,
+      });
+      expect(runtimeSendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({ teleprompterEnabled: true, webcamEnabled: false }),
+        })
+      );
+    }
+  );
+  it('reports companion failure while preserving accepted recording control', async () => {
+    tabsQuery.mockResolvedValue([{ id: 7 }]);
+    openCameraRecorderPage.mockRejectedValueOnce(new Error('window unavailable'));
+    await startRecordingHandler({
+      captureMode: CaptureMode.TAB,
+      microphoneDevices: [],
+      webcamDevices: [],
+      setIsStartPending,
+      setRecordingControlCapability,
+      setStartError,
+      videoSettings: { ...defaultSettings, teleprompterEnabled: true },
+      viewportPresetId: null,
+    });
+    expect(setRecordingControlCapability).toHaveBeenLastCalledWith({
+      controlToken: 'control-token-1',
+      recordingId: 'recording-1',
+    });
+    expect(setStartError).toHaveBeenCalled();
+  });
+});
+
+it.each([CaptureMode.CAMERA, CaptureMode.TAB])(
+  'does not open a duplicate companion after background delivery for %s',
+  async (captureMode) => {
+    tabsQuery.mockResolvedValue([{ id: 7 }]);
+    runtimeSendMessage.mockResolvedValueOnce({
+      success: true,
+      result: 'accepted',
+      cameraRecorderOpened: true,
+      cameraLaunchToken: 'launch-token-1',
+      controlToken: 'control-token-1',
+      recordingId: 'recording-1',
+    });
+    await startRecordingHandler({
+      captureMode,
+      microphoneDevices: [],
+      webcamDevices: [],
+      setIsStartPending,
+      setRecordingControlCapability,
+      setStartError,
+      videoSettings: { ...defaultSettings, teleprompterEnabled: true },
+      viewportPresetId: null,
+    });
+    expect(openCameraRecorderPage).not.toHaveBeenCalled();
+    expect(setRecordingControlCapability).toHaveBeenLastCalledWith({
+      controlToken: 'control-token-1',
+      recordingId: 'recording-1',
+    });
+    expect(setStartError).not.toHaveBeenCalled();
+  }
+);
+it('retries companion delivery when the background reports opening failure', async () => {
+  tabsQuery.mockResolvedValue([{ id: 7 }]);
+  runtimeSendMessage.mockResolvedValueOnce({
+    success: true,
+    result: 'accepted',
+    cameraRecorderOpened: false,
+    cameraLaunchToken: 'launch-token-1',
+    controlToken: 'control-token-1',
+    recordingId: 'recording-1',
+  });
+  await startRecordingHandler({
+    captureMode: CaptureMode.TAB,
+    microphoneDevices: [],
+    webcamDevices: [],
+    setIsStartPending,
+    setRecordingControlCapability,
+    setStartError,
+    videoSettings: { ...defaultSettings, teleprompterEnabled: true },
+    viewportPresetId: null,
+  });
+  expect(openCameraRecorderPage).toHaveBeenCalledWith({
+    launchToken: 'launch-token-1',
+    recordingId: 'recording-1',
+    teleprompter: true,
+  });
+});

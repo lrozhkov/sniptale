@@ -342,6 +342,24 @@ it('validates optional admitted recording quality without rejecting older snapsh
   }
 });
 
+it('validates reported display surfaces and permits unknown or older runtime snapshots', () => {
+  const state = {
+    captureMode: CaptureMode.SCREEN,
+    captureSource: null,
+    countdownEndsAt: null,
+    duration: 0,
+    error: null,
+    status: 'recording',
+    viewportPresetId: null,
+  };
+  for (const displaySurface of [undefined, null, 'monitor', 'window', 'browser']) {
+    expect(isVideoRecordingRuntimeState({ ...state, displaySurface })).toBe(true);
+  }
+  for (const displaySurface of ['screen', 'tab', '', 1, {}]) {
+    expect(isVideoRecordingRuntimeState({ ...state, displaySurface })).toBe(false);
+  }
+});
+
 it('validates runtime state capture source variants', () => {
   const state = {
     captureMode: CaptureMode.TAB,
@@ -424,3 +442,18 @@ it('validates the completion projection without accepting malformed cleanup auth
     expect(isVideoRecordingRuntimeState({ ...state, completion })).toBe(false);
   }
 });
+
+it.each([undefined, false, true])(
+  'accepts the optional teleprompter setting %s',
+  (teleprompterEnabled) => {
+    expect(isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, teleprompterEnabled })).toBe(true);
+  }
+);
+it.each([null, 'true', 1, {}])(
+  'rejects malformed teleprompter setting %j',
+  (teleprompterEnabled) => {
+    expect(isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, teleprompterEnabled })).toBe(
+      false
+    );
+  }
+);

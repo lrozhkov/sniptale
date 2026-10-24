@@ -1,4 +1,5 @@
 import { offscreenDataReadiness, prepareOffscreenRecordingData } from './data-readiness';
+import { answerRecordingCameraOffer, closeRecordingCameraPeer } from '../recording/camera-preview';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -199,6 +200,33 @@ function buildStartRecordingArgs(
   };
 }
 
+function answerVideoRecordingCameraOffer(
+  message: Extract<
+    HandledMessage,
+    { type: typeof VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER }
+  >
+): Promise<CameraSourcePeerAnswer> {
+  if (message.source.kind === 'recording-preview') {
+    return answerRecordingCameraOffer({
+      source: message.source,
+      peerId: message.peerId,
+      sdp: message.sdp,
+    });
+  }
+  if (message.source.kind === 'countdown') {
+    return answerCountdownCameraOffer({
+      binding: message.source,
+      peerId: message.peerId,
+      sdp: message.sdp,
+    });
+  }
+  return answerCameraSourceOffer({
+    peerId: message.peerId,
+    offer: { type: 'offer', sdp: message.sdp },
+    settings: message.source.settings,
+  });
+}
+
 export async function handleOffscreenRuntimeMessage(
   message: HandledMessage,
   sendResponse?: ResponseSender
@@ -231,20 +259,10 @@ export async function handleOffscreenRuntimeMessage(
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
       return probeOffscreenRuntimeReadiness(message);
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER:
-      if (message.source.kind === 'countdown') {
-        return answerCountdownCameraOffer({
-          binding: message.source,
-          peerId: message.peerId,
-          sdp: message.sdp,
-        });
-      }
-      return answerCameraSourceOffer({
-        peerId: message.peerId,
-        offer: { type: 'offer', sdp: message.sdp },
-        settings: message.source.settings,
-      });
+      return answerVideoRecordingCameraOffer(message);
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE:
       closeCountdownCameraPeer(message.peerId);
+      closeRecordingCameraPeer(message.peerId);
       closeCameraSourcePeer(message.peerId);
       return;
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH:

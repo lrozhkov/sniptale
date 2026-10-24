@@ -5,11 +5,23 @@ const mocks = vi.hoisted(() => ({
   beginPreparedRecording: vi.fn(),
   scheduleWatchdog: vi.fn(),
   enableHistory: vi.fn(),
+  issueLaunchToken: vi.fn(),
+  openCompanion: vi.fn(),
 }));
 
 vi.mock('../runtime/manager/controlled-cursor/messages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../runtime/manager/controlled-cursor/messages')>()),
   enableControlledCursorCapture: mocks.enableHistory,
+}));
+
+vi.mock('../runtime/camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/camera-recorder-control')>()),
+  issueCameraRecorderLaunchToken: mocks.issueLaunchToken,
+}));
+
+vi.mock('../../../../platform/navigation/extension-pages', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/navigation/extension-pages')>()),
+  openCameraRecorderPage: mocks.openCompanion,
 }));
 
 vi.mock('../recording-control-lease', async (importOriginal) => ({
@@ -33,6 +45,8 @@ beforeEach(() => {
   mocks.beginPreparedRecording.mockResolvedValue(undefined);
   mocks.activateLease.mockResolvedValue({ controlToken: 'active-token' });
   mocks.enableHistory.mockResolvedValue(undefined);
+  mocks.issueLaunchToken.mockResolvedValue('launch-token');
+  mocks.openCompanion.mockResolvedValue(undefined);
 });
 
 it('activates the recorder without a helper capability or receipt-time history reset', async () => {
@@ -165,4 +179,104 @@ it('never publishes active authority after a failed BEGIN delivery', async () =>
     streamInstanceId: 'stream-1',
   });
   expect(mocks.activateLease).not.toHaveBeenCalled();
+});
+
+it.each(Object.values(CaptureMode))(
+  'issues a companion launch token for teleprompter in %s capture',
+  async (captureMode) => {
+    await expect(
+      finalizeAcceptedRecordingStart(
+        'recording-1',
+        {
+          captureMode,
+          generation: 3,
+          settings: { teleprompterEnabled: true },
+          viewportPresetId: null,
+        },
+        'stream-1'
+      )
+    ).resolves.toMatchObject({ cameraLaunchToken: 'launch-token', result: 'accepted' });
+    expect(mocks.issueLaunchToken).toHaveBeenCalledWith('recording-1');
+    expect(mocks.openCompanion).toHaveBeenCalledWith({
+      launchToken: 'launch-token',
+      recordingId: 'recording-1',
+      teleprompter: true,
+    });
+  }
+);
+it('keeps the companion closed for ordinary tab recording', async () => {
+  const result = await finalizeAcceptedRecordingStart(
+    'recording-1',
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 3,
+      settings: {},
+      viewportPresetId: null,
+    },
+    'stream-1'
+  );
+  expect(result).not.toHaveProperty('cameraLaunchToken');
+  expect(mocks.issueLaunchToken).not.toHaveBeenCalled();
+  expect(mocks.openCompanion).not.toHaveBeenCalled();
+});
+it('keeps the camera companion available without teleprompter', async () => {
+  await expect(
+    finalizeAcceptedRecordingStart(
+      'recording-1',
+      {
+        captureMode: CaptureMode.CAMERA,
+        generation: 3,
+        settings: {},
+        viewportPresetId: null,
+      },
+      'stream-1'
+    )
+  ).resolves.toMatchObject({ cameraLaunchToken: 'launch-token' });
+});
+
+it('delivers the companion before returning acceptance to a disposable popup', async () => {
+  const entered = Promise.withResolvers<void>();
+  const opening = Promise.withResolvers<void>();
+  mocks.openCompanion.mockImplementationOnce(() => {
+    entered.resolve();
+    return opening.promise;
+  });
+  const delivery = finalizeAcceptedRecordingStart(
+    'recording-1',
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 3,
+      settings: { teleprompterEnabled: true },
+      viewportPresetId: null,
+    },
+    'stream-1'
+  );
+  expect(
+    await Promise.race([entered.promise.then(() => 'opening'), delivery.then(() => 'returned')])
+  ).toBe('opening');
+  opening.resolve();
+  await expect(delivery).resolves.toMatchObject({ cameraRecorderOpened: true, result: 'accepted' });
+  expect(mocks.issueLaunchToken.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.openCompanion.mock.invocationCallOrder[0]!
+  );
+});
+it('preserves an accepted recording and fallback token when background delivery fails', async () => {
+  mocks.openCompanion.mockRejectedValueOnce(new Error('window unavailable'));
+  await expect(
+    finalizeAcceptedRecordingStart(
+      'recording-1',
+      {
+        captureMode: CaptureMode.TAB,
+        generation: 3,
+        settings: { teleprompterEnabled: true },
+        viewportPresetId: null,
+      },
+      'stream-1'
+    )
+  ).resolves.toMatchObject({
+    cameraRecorderOpened: false,
+    cameraLaunchToken: 'launch-token',
+    controlToken: 'active-token',
+    result: 'accepted',
+  });
 });

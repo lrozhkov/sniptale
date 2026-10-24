@@ -1,3 +1,7 @@
+import { Text } from 'lucide-react';
+import { openTeleprompterPage } from '../../../../../../platform/navigation/extension-pages';
+import { translate } from '../../../../../../platform/i18n/popup';
+import { PopupIconStateButton } from '../../../../../../ui/popup-shell/icon-state-button';
 import {
   CaptureMode,
   type VideoRecordingSettings,
@@ -36,7 +40,7 @@ export function VideoToggleGrid({
   const toolbarAvailable = captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP;
 
   return (
-    <div className={`${VIDEO_TOGGLE_GRID_CLASS_NAME} grid-cols-5`}>
+    <div className={`${VIDEO_TOGGLE_GRID_CLASS_NAME} grid-cols-6`}>
       <VideoMicrophoneToggle
         active={settings.microphoneEnabled}
         onToggleMicrophone={onToggleMicrophone}
@@ -62,6 +66,21 @@ export function VideoToggleGrid({
         disabled={controlledCursorDisabled}
         disabledReason={controlledCursorDisabledReason}
         onSettingsChange={onSettingsChange}
+      />
+      <PopupIconStateButton
+        icon={Text}
+        label={translate('popup.video.teleprompterLabel')}
+        description={translate('popup.video.teleprompterDescription')}
+        active={settings.teleprompterEnabled === true}
+        onClick={() => {
+          const enabled = settings.teleprompterEnabled !== true;
+          onSettingsChange({ teleprompterEnabled: enabled });
+          if (enabled) void openTeleprompterPage().catch(() => undefined);
+        }}
+        accentClassName="text-[var(--sniptale-color-accent)]"
+        dataUi="popup.video.teleprompter-toggle"
+        geometry="square"
+        inactiveDecoration="slash"
       />
     </div>
   );

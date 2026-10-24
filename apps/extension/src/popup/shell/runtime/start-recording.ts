@@ -193,7 +193,8 @@ async function resolveActiveTabId(
 function applyStartRecordingResponse(
   response: StartRecordingResponse,
   actions: StartRecordingResponseActions,
-  captureMode: CaptureMode
+  captureMode: CaptureMode,
+  teleprompterEnabled: boolean
 ): void {
   if (response?.success === false) {
     throw response.error ?? response;
@@ -211,14 +212,16 @@ function applyStartRecordingResponse(
       controlToken: response.controlToken,
       recordingId: response.recordingId,
     });
-    if (captureMode === CaptureMode.CAMERA && typeof response.cameraLaunchToken === 'string') {
+    if (response.cameraRecorderOpened === true) return;
+    if (typeof response.cameraLaunchToken === 'string') {
       void openCameraRecorderPage({
+        ...(teleprompterEnabled ? { teleprompter: true } : {}),
         launchToken: response.cameraLaunchToken,
         recordingId: response.recordingId,
       }).catch(() => {
         actions.setStartError(translate('popup.video.openCameraWindowError'));
       });
-    } else if (captureMode === CaptureMode.CAMERA) {
+    } else if (captureMode === CaptureMode.CAMERA || teleprompterEnabled) {
       actions.setStartError(translate('popup.video.openCameraWindowError'));
     }
   }
@@ -267,7 +270,8 @@ export async function startRecordingHandler(args: StartRecordingArgs): Promise<v
         setRecordingControlCapability,
         setStartError,
       },
-      recordingCaptureMode
+      recordingCaptureMode,
+      sanitizedSettings.teleprompterEnabled === true
     );
   } catch (error) {
     setIsStartPending(false);

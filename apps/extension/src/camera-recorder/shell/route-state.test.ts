@@ -55,3 +55,35 @@ it('rejects a partial launch identity after URL scrubbing', () => {
   expect(window.location.search).toBe('');
   expect(window.sessionStorage.length).toBe(0);
 });
+
+it('consumes a new recording fragment before the previous query and scrubs both', () => {
+  window.history.replaceState(
+    {},
+    '',
+    '/apps/extension/src/camera-recorder/index.html?draft=1#recordingId=rec-2&launchToken=launch-2&teleprompter=1'
+  );
+  expect(consumeCameraRecorderRouteState()).toEqual({
+    recordingId: 'rec-2',
+    registrationToken: 'launch-2',
+    routeError: null,
+    teleprompter: true,
+  });
+  expect(window.location.search).toBe('');
+  expect(window.location.hash).toBe('');
+});
+
+it('consumes a draft without recording identity or registration authority', () => {
+  window.history.replaceState(
+    {},
+    '',
+    '/apps/extension/src/camera-recorder/index.html?draft=1&teleprompter=1'
+  );
+  expect(consumeCameraRecorderRouteState()).toEqual({
+    recordingId: null,
+    registrationToken: null,
+    routeError: null,
+    teleprompter: true,
+    draft: true,
+  });
+  expect(window.location.search).toBe('');
+});

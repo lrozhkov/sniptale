@@ -569,6 +569,7 @@ it('handles recording start and stop lifecycle mutations through the recording o
   expect(setControlledCursorDisplaySurfaceMock).toHaveBeenCalledWith('window');
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
     countdownEndsAt: null,
+    displaySurface: 'window',
     error: null,
     status: VideoRecordingStatus.RECORDING,
   });
@@ -576,6 +577,20 @@ it('handles recording start and stop lifecycle mutations through the recording o
   expectAsyncRoute(handleOffscreenRecordingStopped({ recordingId: 'rec-1' }, sendResponse));
   await flushAsyncRoute();
   expect(completionMock).toHaveBeenCalledWith('rec-1');
+  expectAcceptedLifecycleResponse(sendResponse);
+});
+
+it('publishes a reported monitor surface to recording observers', async () => {
+  const sendResponse = createSendResponse();
+  handleOffscreenRecordingStarted(
+    { recordingId: 'rec-1', displaySurface: 'monitor' },
+    sendResponse
+  );
+  await flushAsyncRoute();
+
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith(
+    expect.objectContaining({ displaySurface: 'monitor' })
+  );
   expectAcceptedLifecycleResponse(sendResponse);
 });
 
@@ -647,6 +662,9 @@ it('clears the stored display surface when recording starts without metadata', a
 
   expect(setControlledCursorVerifiedModeMock).not.toHaveBeenCalled();
   expect(setControlledCursorDisplaySurfaceMock).toHaveBeenCalledWith(null);
+  expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith(
+    expect.objectContaining({ displaySurface: null })
+  );
   expectAcceptedLifecycleResponse(sendResponse);
 });
 

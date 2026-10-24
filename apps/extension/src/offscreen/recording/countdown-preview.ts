@@ -8,6 +8,7 @@ import {
 } from '../../contracts/video/recording-frame-clock';
 import { acquireCameraSource, type CameraSourceLease } from './camera-source/session';
 import { createCameraSourcePeerOwner } from './camera-source/peer';
+import { cleanupRecordingCameraPreview } from './camera-preview';
 
 type PreparedPreview = {
   binding: RecordingFrameClockBinding;
@@ -21,6 +22,7 @@ type PreparedPreview = {
 export function createCountdownPreviewOwner(deps: {
   acquireCamera: typeof acquireCameraSource;
   createConnection: Parameters<typeof createCameraSourcePeerOwner>[0]['createConnection'];
+  cleanupRecordingPreview?: () => void;
 }) {
   let current: PreparedPreview | null = null;
   const peers = createCameraSourcePeerOwner({
@@ -34,6 +36,7 @@ export function createCountdownPreviewOwner(deps: {
     if (previous) previous.retired = true;
     previous?.cancelPreparation?.();
     peers.closeAll();
+    deps.cleanupRecordingPreview?.();
     previous?.preparation?.release();
   };
 
@@ -149,6 +152,7 @@ export function createCountdownPreviewOwner(deps: {
 
 const owner = createCountdownPreviewOwner({
   acquireCamera: acquireCameraSource,
+  cleanupRecordingPreview: cleanupRecordingCameraPreview,
   createConnection: () => new RTCPeerConnection(),
 });
 

@@ -5,13 +5,20 @@ import type {
   CountdownCameraOfferMessage,
   CountdownCameraCloseMessage,
 } from '@sniptale/runtime-contracts/video/types/messages.control';
-import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getBackgroundRuntimeMessaging } from '../../../../routing-contracts/runtime-messaging/services';
-import { getActiveVideoRecordingLeaseSnapshot } from '../../recording-control-lease';
+import {
+  ensureVideoRecordingLeaseCache,
+  getActiveVideoRecordingLeaseSnapshot,
+} from '../../recording-control-lease';
 import { ensureActiveVideoRecordingLeaseHydrated } from '../recording-completion';
 import { getVideoRecordingRuntimeState } from '../session-state';
-import { resolveTrustedPopupRuntimeSenderUrl } from '../sender-policy';
+import {
+  resolveTrustedPopupRuntimeSenderUrl,
+  resolveTrustedCameraRecorderRuntimeSenderUrl,
+} from '../sender-policy';
+import { isAuthorizedCameraRecorderDocument } from '../camera-recorder-control';
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
 
 type CameraCommand = CountdownCameraOfferMessage | CountdownCameraCloseMessage;
@@ -20,13 +27,22 @@ const generations = new Map<string, { generation: number; closed: boolean }>();
 
 function requireCapability(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
   const senderUrl = resolveTrustedPopupRuntimeSenderUrl(sender);
+  const cameraSenderUrl = resolveTrustedCameraRecorderRuntimeSenderUrl(sender);
+  const recorder =
+    !!cameraSenderUrl &&
+    isAuthorizedCameraRecorderDocument({
+      documentId: sender?.documentId,
+      recordingId: message.recordingId,
+      senderUrl: cameraSenderUrl,
+      tabId: sender?.tab?.id,
+    });
   const lease = getActiveVideoRecordingLeaseSnapshot();
   if (
-    !senderUrl ||
+    (!senderUrl && !recorder) ||
     !lease ||
     lease.phase === 'terminal' ||
     lease.expiresAt <= Date.now() ||
-    lease.ownerSenderUrl !== senderUrl ||
+    (!recorder && lease.ownerSenderUrl !== senderUrl) ||
     lease.recordingId !== message.recordingId ||
     lease.controlToken !== message.controlToken ||
     !lease.surfaceBinding
@@ -34,6 +50,7 @@ function requireCapability(message: CameraCommand, sender?: chrome.runtime.Messa
     throw new Error('Unauthorized countdown camera capability');
   return {
     lease,
+    recorder,
     binding: { recordingId: lease.recordingId, ...lease.surfaceBinding },
   };
 }
@@ -53,6 +70,18 @@ async function resolvePopupDocumentId(sender?: chrome.runtime.MessageSender): Pr
 
 function requireCountdown(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
   const authority = requireCapability(message, sender);
+  if (authority.recorder) {
+    const state = getVideoRecordingRuntimeState();
+    if (
+      authority.lease.phase !== 'active' ||
+      (state.status !== VideoRecordingStatus.RECORDING &&
+        state.status !== VideoRecordingStatus.PAUSED) ||
+      (state.captureMode !== CaptureMode.CAMERA && state.liveMedia?.webcamEnabled !== true)
+    ) {
+      throw new Error('Recording camera is unavailable');
+    }
+    return authority;
+  }
   if (
     authority.lease.phase !== 'prepared' ||
     getVideoRecordingRuntimeState().status !== VideoRecordingStatus.COUNTDOWN
@@ -71,17 +100,27 @@ function closePeer(peerId: string): Promise<unknown> {
   );
 }
 
-async function runCameraCommand(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
+async function prepareCameraCommandLease(message: CameraCommand): Promise<void> {
+  if (message.type === VideoMessageType.COUNTDOWN_CAMERA_CLOSE) {
+    // Cleanup must not restore runtime state while a failed recording still retains its lease.
+    await ensureVideoRecordingLeaseCache();
+    return;
+  }
   await ensureActiveVideoRecordingLeaseHydrated();
+}
+
+async function runCameraCommand(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
+  await prepareCameraCommandLease(message);
   const initial = requireCapability(message, sender);
   const documentId = await resolvePopupDocumentId(sender);
-  const { lease, binding } = requireCapability(message, sender);
+  const { lease, binding, recorder } = requireCapability(message, sender);
   if (
     binding.generation !== initial.binding.generation ||
     binding.streamInstanceId !== initial.binding.streamInstanceId
   )
     throw new Error('Stale countdown camera source');
-  const peerId = `countdown:${JSON.stringify([lease.recordingId, documentId, message.peerGeneration])}`;
+  const peerPrefix = recorder ? 'recording-preview' : 'countdown';
+  const peerId = `${peerPrefix}:${JSON.stringify([lease.recordingId, documentId, message.peerGeneration])}`;
   if (recordingId !== lease.recordingId) {
     generations.clear();
     recordingId = lease.recordingId;
@@ -106,7 +145,7 @@ async function runCameraCommand(message: CameraCommand, sender?: chrome.runtime.
   generations.set(documentId, negotiation);
   if (previous !== undefined) {
     await closePeer(
-      `countdown:${JSON.stringify([lease.recordingId, documentId, previous.generation])}`
+      `${peerPrefix}:${JSON.stringify([lease.recordingId, documentId, previous.generation])}`
     );
     requireCountdown(message, sender);
     if (generations.get(documentId) !== negotiation || negotiation.closed)
@@ -118,7 +157,14 @@ async function runCameraCommand(message: CameraCommand, sender?: chrome.runtime.
         type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
         peerId,
         sdp: message.sdp,
-        source: { kind: 'countdown', ...binding },
+        // Keep the popup countdown transport compatible; recorder previews have a separate source lifecycle.
+        source: recorder
+          ? {
+              kind: 'recording-preview',
+              ...binding,
+              cameraOnly: getVideoRecordingRuntimeState().captureMode === CaptureMode.CAMERA,
+            }
+          : { kind: 'countdown', ...binding },
       })
     );
     const current = requireCountdown(message, sender);

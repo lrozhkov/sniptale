@@ -1,4 +1,5 @@
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { openCameraRecorderPage } from '../../../../platform/navigation/extension-pages';
 
 import { issueCameraRecorderLaunchToken } from '../runtime/camera-recorder-control';
 import { activateVideoRecordingLease } from '../recording-control-lease';
@@ -7,7 +8,13 @@ import { scheduleRecordingStartActivationWatchdog } from './start-activation-wat
 import type { VideoRecordingStartFailureCode } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 export type RecordingStartResult =
-  | { cameraLaunchToken?: string; controlToken: string; recordingId: string; result: 'accepted' }
+  | {
+      cameraLaunchToken?: string;
+      cameraRecorderOpened?: boolean;
+      controlToken: string;
+      recordingId: string;
+      result: 'accepted';
+    }
   | { result: 'already-active' | 'cancelled' | 'duplicate-preparing' }
   | { error: string; failureCode?: VideoRecordingStartFailureCode; result: 'failed' };
 
@@ -17,7 +24,7 @@ export async function finalizeAcceptedRecordingStart(
     captureMode: CaptureMode;
     generation: number;
     tabId?: number | null;
-    settings: { sourceCount?: number };
+    settings: { sourceCount?: number; teleprompterEnabled?: boolean };
     viewportPresetId: string | null;
   },
   streamInstanceId: string
@@ -31,11 +38,26 @@ export async function finalizeAcceptedRecordingStart(
   });
   scheduleRecordingStartActivationWatchdog(recordingId);
   const cameraLaunchToken =
-    context.captureMode === CaptureMode.CAMERA
+    context.captureMode === CaptureMode.CAMERA || context.settings.teleprompterEnabled === true
       ? await issueCameraRecorderLaunchToken(recordingId)
       : null;
+  let cameraRecorderOpened = false;
+  if (cameraLaunchToken !== null) {
+    try {
+      // Delivery belongs to the accepted start, because native popup documents can close during tab preparation.
+      await openCameraRecorderPage({
+        launchToken: cameraLaunchToken,
+        recordingId,
+        ...(context.settings.teleprompterEnabled === true ? { teleprompter: true } : {}),
+      });
+      cameraRecorderOpened = true;
+    } catch {
+      // A live popup can retry the same grant without rolling back the accepted recording.
+      cameraRecorderOpened = false;
+    }
+  }
   return {
-    ...(cameraLaunchToken === null ? {} : { cameraLaunchToken }),
+    ...(cameraLaunchToken === null ? {} : { cameraLaunchToken, cameraRecorderOpened }),
     controlToken: activeLease.controlToken,
     recordingId,
     result: 'accepted',

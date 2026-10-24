@@ -90,6 +90,7 @@ it('stores actual webcam settings from current recording started events', async 
   expect(clearRecordingStartActivationWatchdogMock).toHaveBeenCalledWith('rec-1');
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
     countdownEndsAt: null,
+    displaySurface: null,
     error: null,
     liveMedia: expect.objectContaining({
       webcamSettings: { frameRate: 30, height: 720, width: 1280 },

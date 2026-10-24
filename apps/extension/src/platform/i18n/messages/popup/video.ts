@@ -3,6 +3,156 @@ import { popupVideoMediaMessages } from './video-media';
 import { popupVideoRecordingControlMessages } from './video-recording-controls';
 
 export const popupVideoMessages = defineMessageSource({
+  postRecordNext: {
+    ru: 'Подготовить следующую запись',
+    en: 'Prepare next recording',
+  },
+  teleprompterPlaybackMode: {
+    ru: 'Запуск прокрутки',
+    en: 'Playback',
+  },
+  teleprompterManual: {
+    ru: 'Вручную',
+    en: 'Manual',
+  },
+  teleprompterWithRecording: {
+    ru: 'Вместе с записью',
+    en: 'With recording',
+  },
+  teleprompterColumnWidth: {
+    ru: 'Ширина области чтения',
+    en: 'Reading width',
+  },
+  teleprompterColumnWidthUnit: {
+    ru: 'знаков',
+    en: 'characters',
+  },
+  teleprompterFadeEdges: {
+    ru: 'Мягкие края',
+    en: 'Fade edges',
+  },
+  teleprompterFocusGuide: {
+    ru: 'Ориентир чтения',
+    en: 'Reading guide',
+  },
+  teleprompterResetLayout: {
+    ru: 'Автоматическая компоновка',
+    en: 'Automatic layout',
+  },
+  teleprompterAuto: {
+    ru: 'Авто',
+    en: 'Auto',
+  },
+
+  teleprompterSettings: {
+    ru: 'Настройки текста',
+    en: 'Text settings',
+  },
+  teleprompterLabel: {
+    ru: 'Телесуфлёр',
+    en: 'Teleprompter',
+  },
+  teleprompterDescription: {
+    ru: 'Текст для чтения в отдельном окне',
+    en: 'Read your script in a separate window',
+  },
+  teleprompterTitle: {
+    ru: 'Телесуфлёр',
+    en: 'Teleprompter',
+  },
+  teleprompterScript: {
+    ru: 'Текст выступления',
+    en: 'Script',
+  },
+  teleprompterPlaceholder: {
+    ru: 'Вставьте или введите текст выступления',
+    en: 'Paste or type your script',
+  },
+  teleprompterRead: {
+    ru: 'Читать текст',
+    en: 'Read script',
+  },
+  teleprompterEdit: {
+    ru: 'Редактировать текст',
+    en: 'Edit script',
+  },
+  teleprompterPlay: {
+    ru: 'Начать прокрутку',
+    en: 'Start scrolling',
+  },
+  teleprompterResizeCamera: {
+    ru: 'Изменить высоту камеры',
+    en: 'Resize camera preview',
+  },
+  teleprompterResetCamera: {
+    ru: 'Двойной щелчок или Enter — автоматическая высота',
+    en: 'Double-click or Enter for automatic height',
+  },
+  teleprompterResume: {
+    ru: 'Продолжить',
+    en: 'Resume scrolling',
+  },
+  teleprompterPause: {
+    ru: 'Приостановить',
+    en: 'Pause scrolling',
+  },
+  teleprompterReset: {
+    ru: 'В начало',
+    en: 'Back to start',
+  },
+  teleprompterSpeed: {
+    ru: 'Темп чтения (примерный)',
+    en: 'Reading pace (approx.)',
+  },
+  teleprompterSpeedUnit: {
+    ru: 'слов/мин',
+    en: 'words/min',
+  },
+  teleprompterFontSize: {
+    ru: 'Размер текста',
+    en: 'Text size',
+  },
+  teleprompterFontSizeUnit: {
+    ru: 'пикс',
+    en: 'px',
+  },
+  teleprompterRecordingPaused: {
+    ru: 'Прокрутка приостановлена вместе с записью',
+    en: 'Scrolling is paused with the recording',
+  },
+  teleprompterFloat: {
+    ru: 'Поверх всех окон',
+    en: 'Keep on top',
+  },
+  teleprompterDock: {
+    ru: 'Вернуть в окно записи',
+    en: 'Return to recording window',
+  },
+  teleprompterFloatingHint: {
+    ru: 'Камера и телесуфлёр открыты поверх остальных окон. Не закрывайте это окно до конца записи.',
+    en: 'Camera and teleprompter are floating above other windows. Keep this window open until recording ends.',
+  },
+  teleprompterUnsupported: {
+    ru: 'Этот браузер не поддерживает окно поверх остальных окон. Телесуфлёр доступен здесь.',
+    en: 'This browser does not support an always-on-top window. You can read your script here.',
+  },
+  teleprompterFloatError: {
+    ru: 'Не удалось открыть плавающее окно. Текст сохранён здесь. Повторите попытку.',
+    en: 'Could not open the floating window. Your script is still here. Try again.',
+  },
+  teleprompterMonitorHint: {
+    ru: 'Телесуфлёр может попасть в запись экрана.',
+    en: 'The teleprompter may appear in the screen recording.',
+  },
+  teleprompterShow: {
+    ru: 'Показать телесуфлёр',
+    en: 'Show teleprompter',
+  },
+  teleprompterHide: {
+    ru: 'Скрыть телесуфлёр',
+    en: 'Hide teleprompter',
+  },
+
   withoutMicrophoneTitle: {
     ru: 'Начать запись без микрофона?',
     en: 'Start recording without a microphone?',

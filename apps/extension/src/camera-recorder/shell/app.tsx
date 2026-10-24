@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import type { RuntimeMessagingTransport } from '../../platform/runtime-messaging';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -7,6 +7,7 @@ import { CameraControlBar } from './control-bar';
 import { getResponseError } from './format';
 import { createUserFacingErrorMessage } from '../../platform/i18n/user-facing-error';
 import { CameraLivePanel } from './live-panel';
+import { FloatingRecordingWindow } from './floating-window';
 import { CameraPostRecordPanel } from './post-record-panel';
 import { consumeCameraRecorderRouteState } from './route-state';
 import type { RuntimeControlMessage } from './types';
@@ -14,7 +15,13 @@ import { useDeviceLabels } from './use-device-labels';
 import { useRecordingState } from './use-recording-state';
 
 export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTransport }) {
-  const routeState = useMemo(consumeCameraRecorderRouteState, []);
+  const [routeState, setRouteState] = useState(consumeCameraRecorderRouteState);
+  useEffect(() => {
+    const consumeRoute = () => setRouteState(consumeCameraRecorderRouteState());
+    window.addEventListener('hashchange', consumeRoute);
+    if (window.location.hash) consumeRoute();
+    return () => window.removeEventListener('hashchange', consumeRoute);
+  }, []);
   const {
     acknowledgePostRecord,
     capability,
@@ -25,6 +32,10 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
   } = useRecordingState(routeState, messaging);
   const [error, setError] = useState<string | null>(routeState.routeError);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  useEffect(() => {
+    setError(routeState.routeError);
+    setCancelConfirmOpen(false);
+  }, [routeState]);
 
   const runControl = useCallback(
     async (message: RuntimeControlMessage, onAccepted?: () => void) => {
@@ -50,32 +61,37 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
     [messaging, refreshState]
   );
 
-  if (postRecordResult) {
-    return (
-      <CommandPressScope value={true}>
-        <CameraPostRecordPanel result={postRecordResult} onAcknowledge={acknowledgePostRecord} />
-      </CommandPressScope>
-    );
-  }
-
   return (
     <CommandPressScope value={true}>
-      <CameraRecorderLiveScreen
-        capability={capability}
-        cancelConfirmOpen={cancelConfirmOpen}
-        error={error}
-        onCancel={() => setCancelConfirmOpen(true)}
-        onContinue={() => setCancelConfirmOpen(false)}
-        onControl={runControl}
-        recordingId={routeState.recordingId ?? ''}
-        registrationError={registrationError}
-        state={state}
-      />
+      <FloatingRecordingWindow>
+        {postRecordResult ? (
+          <CameraPostRecordPanel result={postRecordResult} onAcknowledge={acknowledgePostRecord} />
+        ) : null}
+        <div hidden={postRecordResult !== null} className="h-full">
+          <CameraRecorderLiveScreen
+            visible={postRecordResult === null}
+            messaging={messaging}
+            teleprompterEnabled={routeState.teleprompter === true}
+            capability={capability}
+            cancelConfirmOpen={cancelConfirmOpen}
+            error={error}
+            onCancel={() => setCancelConfirmOpen(true)}
+            onContinue={() => setCancelConfirmOpen(false)}
+            onControl={runControl}
+            recordingId={routeState.recordingId ?? ''}
+            registrationError={registrationError}
+            state={state}
+          />
+        </div>
+      </FloatingRecordingWindow>
     </CommandPressScope>
   );
 }
 
 function CameraRecorderLiveScreen(props: {
+  visible: boolean;
+  messaging: RuntimeMessagingTransport;
+  teleprompterEnabled: boolean;
   capability: ReturnType<typeof useRecordingState>['capability'];
   cancelConfirmOpen: boolean;
   error: string | null;
@@ -93,19 +109,23 @@ function CameraRecorderLiveScreen(props: {
       data-ui="camera-recorder.live"
       className={[
         'sniptale-compact-workspace overflow-y-auto',
-        'flex h-screen flex-col bg-[var(--sniptale-color-surface-canvas)]',
+        'flex h-full flex-col bg-[var(--sniptale-color-surface-canvas)]',
         'p-3 text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
     >
       <CameraLivePanel
+        visible={props.visible}
+        messaging={props.messaging}
+        initialTeleprompterEnabled={props.teleprompterEnabled}
         capability={props.capability}
         deviceLabels={deviceLabels}
         error={props.error}
-        onControl={(message) => void props.onControl(message)}
         registrationError={props.registrationError}
         state={props.state}
       />
       <CameraControlBar
+        state={props.state}
+        onControl={(message) => void props.onControl(message)}
         capability={props.capability}
         cancelConfirmOpen={props.cancelConfirmOpen}
         isPaused={props.state.status === VideoRecordingStatus.PAUSED}
