@@ -183,7 +183,7 @@
 +	private _restartNativeCapture: (() => void) | null = null;
 @@ -2789,0 +2857 @@
 +		this._acceptingAudio = true;
-@@ -2794,0 +2863,8 @@
+@@ -2794,0 +2863,12 @@
 +		let restarted = false;
 +		const fail = (error: unknown) => {
 +			if (errored || this._forceClosed) return;
@@ -192,29 +192,34 @@
 +			this._promiseWithResolvers.reject(error);
 +			void this._audioContext?.suspend();
 +		};
-@@ -2797 +2873 @@
++
++		const nativeBufferSize = 128;
++		// A full native backlog can arrive while one earlier sample awaits encoder or writer progress.
++		const nativeBurstCapacity = typeof MediaStreamTrackProcessor !== 'undefined' ? nativeBufferSize + 1 : 0;
+@@ -2797 +2877 @@
 -			if (errored) {
 +			if (errored || !this._acceptingAudio) {
-@@ -2804 +2880 @@
+@@ -2804 +2884 @@
 -			if (this._paused) {
 +			if (this._paused || this._resumeRequested) {
-@@ -2820,0 +2897,5 @@
+@@ -2820,0 +2901,5 @@
 +			if (restarted && lastSampleTimestamp !== null && this._options.timestampBase !== 'unix') {
 +				timestampOffset -= currentTimestamp - lastSampleTimestamp - audioSample.duration;
 +			}
 +			restarted = false;
 +
-@@ -2845,2 +2926,5 @@
+@@ -2845,2 +2930,6 @@
 -			if (this._encoder.getQueueSize() >= 8) {
 -				// Drop data if the encoder is overloaded
 +			// Native packet quanta vary. Bound retained PCM, not the number of packet objects.
 +			const duration = audioSample.duration;
 +			const bytes = audioSample.allocationSize({ format: 'f32', planeIndex: 0 });
-+			if (this._admittedAudioDuration + duration > 1 + 1e-9
++			if ((this._admittedAudioDuration + duration > 1 + 1e-9
++				&& this._admittedAudio.size >= nativeBurstCapacity)
 +				|| this._admittedAudioBytes + bytes > 4 * 1024 * 1024) {
-@@ -2847,0 +2932 @@
+@@ -2847,0 +2937 @@
 +				fail(new Error('Live audio buffer exceeded its bounded capacity.'));
-@@ -2853,7 +2938,8 @@
+@@ -2853,7 +2943,8 @@
 -			void this._encoder.add(audioSample, true)
 -				.catch((error) => {
 -					errored = true;
@@ -230,9 +235,9 @@
 +					if (!this._admittedAudio.delete(audioSample)) return;
 +					this._admittedAudioDuration = Math.max(0, this._admittedAudioDuration - duration);
 +					this._admittedAudioBytes -= bytes;
-@@ -2860,0 +2947 @@
+@@ -2860,0 +2952 @@
 +			void this._audioDrain.catch(fail);
-@@ -2864,14 +2951,36 @@
+@@ -2864,14 +2956,36 @@
 -			// Great, MediaStreamTrackProcessor is supported, this is the preferred way of doing things
 -			const processor = new MediaStreamTrackProcessor({ track: this._track });
 -			const consumer = new WritableStream<AudioData>({
@@ -258,7 +263,7 @@
 +					while (!signal.aborted && this._acceptingAudio) {
 +						const generation = this._nativeGeneration;
 +						// A fresh subscription excludes native frames buffered during the pause.
-+						const processor = new MediaStreamTrackProcessor({ track: this._track, maxBufferSize: 128 });
++						const processor = new MediaStreamTrackProcessor({ track: this._track, maxBufferSize: nativeBufferSize });
 +						const reader = processor.readable.getReader();
 +						this._nativeReader = reader;
 +						restarted = this._resumeRequested;
@@ -283,13 +288,13 @@
 +					if (!signal.aborted) fail(error);
 +				}
 +			})();
-@@ -2917,0 +3027 @@
+@@ -2917,0 +3032 @@
 +		this._resumeRequested = false;
-@@ -2921,0 +3032 @@
+@@ -2921,0 +3037 @@
 +		if (!this._paused) return;
-@@ -2922,0 +3034 @@
+@@ -2922,0 +3039 @@
 +		this._restartNativeCapture?.();
-@@ -2926,0 +3039,10 @@
+@@ -2926,0 +3044,10 @@
 +		this._acceptingAudio = false;
 +		this._resumeRequested = false;
 +		this._forceClosed = forceClose;
@@ -300,7 +305,7 @@
 +			this._admittedAudioDuration = 0;
 +			this._admittedAudioBytes = 0;
 +		}
-@@ -2931,0 +3054,3 @@
+@@ -2931,0 +3059,3 @@
 +
 +			await this._nativePump;
 +			if (!forceClose) await this._audioDrain;

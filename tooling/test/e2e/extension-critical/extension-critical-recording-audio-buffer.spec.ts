@@ -4,12 +4,20 @@ import http from 'node:http';
 import { resolve } from 'node:path';
 import type * as AudioProbe from '../support/recording-audio-buffer-probe';
 
-for (const { packetFrames, channels, overload } of [
+for (const {
+  packetFrames,
+  channels,
+  overload,
+  nativeEncoder = false,
+  packets = nativeEncoder ? 128 : 130,
+} of [
   { packetFrames: 128, channels: 1, overload: false },
   { packetFrames: 480, channels: 1, overload: true },
   { packetFrames: 256, channels: 32, overload: true },
+  { packetFrames: 480, channels: 1, overload: false, nativeEncoder: true },
+  { packetFrames: 480, channels: 1, overload: false, packets: 129 },
 ])
-  test(`native audio burst preserves bounded PCM frames=${packetFrames} channels=${channels}`, async ({
+  test(`native audio burst preserves bounded PCM frames=${packetFrames} channels=${channels} encoder=${nativeEncoder} packets=${packets}`, async ({
     page,
   }) => {
     const bundled = await build({
@@ -32,18 +40,26 @@ for (const { packetFrames, channels, overload } of [
       await page.goto(`http://127.0.0.1:${address.port}/`);
       await page.addScriptTag({ content: bundled.outputFiles[0]!.text });
       const result = await page.evaluate(
-        async ({ frames, channels }) => {
+        async ({ frames, channels, nativeEncoder, packets }) => {
           const host = window as typeof window & { recordingAudioProbe: typeof AudioProbe };
-          return host.recordingAudioProbe.recordNativeAudioBurst(frames, channels);
+          return host.recordingAudioProbe.recordNativeAudioBurst(
+            frames,
+            channels,
+            nativeEncoder ? 'native-opus' : 'held-pcm',
+            packets
+          );
         },
-        { frames: packetFrames, channels }
+        { frames: packetFrames, channels, nativeEncoder, packets }
       );
       expect(result.error).toBe(
         overload ? 'Live audio buffer exceeded its bounded capacity.' : null
       );
       expect(result.borrowedTrackState).toBe('live');
-      if (!overload) {
-        expect(result.frames).toBe(130 * packetFrames);
+      if (nativeEncoder) {
+        expect(Math.abs(result.frames - packets * packetFrames)).toBeLessThanOrEqual(960);
+        expect(result.rms).toBeGreaterThan(0.03);
+      } else if (!overload) {
+        expect(result.frames).toBe(packets * packetFrames);
         expect(result.changed).toBe(0);
       }
     } finally {
