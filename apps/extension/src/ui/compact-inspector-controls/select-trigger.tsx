@@ -53,7 +53,7 @@ export function CompactSelectTrigger<T extends string>({
         'transition hover:border-[color:var(--sniptale-color-border-strong)]',
         'focus-visible:outline-none focus-visible:border-[color:var(--sniptale-color-border-accent-strong)]',
         open && 'border-[color:var(--sniptale-color-border-accent-strong)]',
-        disabled && 'cursor-not-allowed opacity-55',
+        disabled ? 'cursor-not-allowed opacity-55' : 'cursor-pointer',
         className
       )}
     >

@@ -526,6 +526,19 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect
         .poll(() => direction.evaluate((element) => getComputedStyle(element).cursor))
         .not.toBe('none');
+      await paint.getByRole('button', { name: 'Дополнительно', exact: true }).click();
+      const gradientChoices = paint.locator('button[aria-haspopup="listbox"]');
+      await expect(gradientChoices).toHaveCount(3);
+      for (const trigger of await gradientChoices.all()) {
+        await trigger.hover();
+        await expect.soft(trigger).toHaveCSS('cursor', 'pointer', { timeout: 100 });
+        await trigger.click();
+        const option = page.getByRole('option').first();
+        await option.hover();
+        await expect(option).toHaveCSS('cursor', 'pointer');
+        await option.press('Escape');
+      }
+      await paint.getByRole('button', { name: 'Дополнительно', exact: true }).click();
       await paint.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('picker-gradient-full.png'), fullPage: false });
       const footerBefore = (await paint.boundingBox())!.height;
@@ -542,6 +555,52 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(
         templates.getByRole('button', { name: 'Проверка миграции', exact: true })
       ).toBeVisible();
+      const templateSelection = templates.getByRole('button', {
+        name: 'Проверка миграции',
+        exact: true,
+      });
+      await templateSelection.hover();
+      await expect(templateSelection).toHaveCSS('cursor', 'pointer');
+      const filter = templates.getByRole('button', { name: 'Тип шаблона', exact: true });
+      await filter.hover();
+      await expect.soft(filter).toHaveCSS('cursor', 'pointer', { timeout: 100 });
+      await filter.click();
+      await page.getByRole('option').first().hover();
+      await expect(page.getByRole('option').first()).toHaveCSS('cursor', 'pointer');
+      await page.getByRole('option').first().press('Escape');
+      await templates.getByRole('button', { name: 'Сетка', exact: true }).click();
+      await templateSelection.hover({ position: { x: 8, y: 32 } });
+      await expect(templateSelection).toHaveCSS('cursor', 'pointer');
+      const templateRow = templates.locator('[data-preset-id]').filter({
+        has: page.getByRole('button', { name: 'Проверка миграции', exact: true }),
+      });
+      for (const label of ['Настроить шаблон', 'Действия с шаблоном']) {
+        const command = templateRow.getByRole('button', {
+          name: `${label}: Проверка миграции`,
+          exact: true,
+        });
+        await templateRow.hover();
+        for (const state of ['hover', 'focus']) {
+          if (state === 'hover') await command.hover();
+          else {
+            await command.press('Tab');
+            await page.keyboard.press('Shift+Tab');
+            await page.mouse.move(0, 0);
+            await expect(command).toBeFocused();
+            await expect(command).toHaveCSS('outline-style', 'solid');
+          }
+          await expect
+            .poll(() =>
+              command.evaluate((node) => {
+                const context = document.createElement('canvas').getContext('2d')!;
+                context.fillStyle = getComputedStyle(node).backgroundColor;
+                context.fillRect(0, 0, 1, 1);
+                return context.getImageData(0, 0, 1, 1).data[3];
+              })
+            )
+            .toBe(255);
+        }
+      }
       await paint.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('picker-templates.png'), fullPage: false });
       await paint.getByRole('button', { name: 'Градиент', exact: true }).first().click();

@@ -138,6 +138,8 @@ export function PickerManualColorField(props: {
 
 export function PickerFooter(props: {
   variant?: 'color' | 'paint';
+  applyLabel?: string | undefined;
+  applyDisabled?: boolean | undefined;
   onApply: () => void;
   onCancel: () => void;
   utilities?: ReactNode;
@@ -179,8 +181,13 @@ export function PickerFooter(props: {
       <button type="button" onClick={props.onCancel} className={CANCEL_ACTION_CLASS}>
         {translate('shared.ui.colorSelectorCancel')}
       </button>
-      <button type="button" onClick={props.onApply} className={APPLY_ACTION_CLASS}>
-        {translate('shared.ui.colorSelectorApply')}
+      <button
+        type="button"
+        disabled={props.applyDisabled}
+        onClick={props.onApply}
+        className={`${APPLY_ACTION_CLASS} disabled:cursor-default disabled:opacity-40`}
+      >
+        {props.applyLabel ?? translate('shared.ui.colorSelectorApply')}
       </button>
     </div>
   );

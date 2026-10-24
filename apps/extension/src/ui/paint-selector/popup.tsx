@@ -45,6 +45,9 @@ const utilityClass = [
 type PaintSelectorPopupProps = {
   resources: GradientTemplateResources;
   nameField?: ReactNode;
+  applyLabel?: string;
+  applyDisabled?: boolean;
+  showSaveTemplate?: boolean;
   allowedModes?: readonly ('solid' | GradientType)[];
   apply: () => void;
   cancel: () => void;
@@ -191,6 +194,8 @@ function PaintPopupFooter(props: {
       <div className="shrink-0" data-picker-footer="true">
         <PickerFooter
           variant="paint"
+          applyLabel={props.popup.applyLabel}
+          applyDisabled={props.popup.applyDisabled}
           onApply={() => applyValidPaint(props.popup.apply, props.root.current)}
           onCancel={props.popup.cancel}
           compact={props.popup.compact}
@@ -208,17 +213,19 @@ function PaintPopupFooter(props: {
                 >
                   <Undo2 size={16} strokeWidth={1.75} />
                 </button>
-                <button
-                  ref={saveAnchor}
-                  type="button"
-                  className={utilityClass}
-                  aria-expanded={saving}
-                  aria-label={translate('highlighter.paintPicker.saveTemplate')}
-                  title={translate('highlighter.paintPicker.saveTemplate')}
-                  onClick={() => setSaving(!saving)}
-                >
-                  <BookmarkPlus size={16} strokeWidth={1.75} />
-                </button>
+                {props.popup.showSaveTemplate !== false && (
+                  <button
+                    ref={saveAnchor}
+                    type="button"
+                    className={utilityClass}
+                    aria-expanded={saving}
+                    aria-label={translate('highlighter.paintPicker.saveTemplate')}
+                    title={translate('highlighter.paintPicker.saveTemplate')}
+                    onClick={() => setSaving(!saving)}
+                  >
+                    <BookmarkPlus size={16} strokeWidth={1.75} />
+                  </button>
+                )}
               </>
             ) : undefined
           }

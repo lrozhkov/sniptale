@@ -33,7 +33,7 @@ const CHECKERBOARD = 'conic-gradient(#c4c4c4 25%, #eee 0 50%, #c4c4c4 0 75%, #ee
 const ROW_STYLES = {
   grid: {
     select: [
-      'absolute inset-0 rounded-[3px] outline-none focus-visible:outline focus-visible:outline-1',
+      'absolute inset-0 cursor-pointer rounded-[3px] outline-none focus-visible:outline focus-visible:outline-1',
       'focus-visible:outline-[var(--sniptale-color-text-primary)]',
     ].join(' '),
     check: [
@@ -47,7 +47,8 @@ const ROW_STYLES = {
       '[@media(hover:none)]:opacity-100',
     ].join(' '),
     command: [
-      '!h-5 !w-5 bg-[var(--sniptale-color-surface-panel)] [@media(pointer:coarse)]:!h-6',
+      '!h-5 !w-5 !bg-[color:rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]',
+      '[@media(pointer:coarse)]:!h-6',
       '[@media(pointer:coarse)]:!w-6',
     ].join(' '),
     row: 'h-11',
@@ -56,7 +57,7 @@ const ROW_STYLES = {
   },
   list: {
     select: [
-      'flex h-[30px] min-w-0 flex-1 items-center gap-2 rounded-[4px] p-0.5 text-left outline-none',
+      'flex h-[30px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-[4px] p-0.5 text-left outline-none',
       'focus-visible:outline focus-visible:outline-1',
       'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
     ].join(' '),
