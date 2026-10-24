@@ -13,6 +13,16 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   },
 }));
 
+vi.mock('../../../ui/color-selector/picker.css?inline', async () => {
+  const { readFileSync } = await import('node:fs');
+  return {
+    default: readFileSync(
+      new URL('../../../ui/color-selector/picker.css', import.meta.url),
+      'utf8'
+    ),
+  };
+});
+
 import {
   createContentEntrypointStyles,
   normalizeContentEntrypointRemUnits,
@@ -37,6 +47,15 @@ afterEach(() => {
 });
 
 describe('content entrypoint styles', () => {
+  it('includes custom color picker controls in the injected shadow stylesheet', () => {
+    const styles = createContentEntrypointStyles();
+    expect(styles).toContain('.sniptale-picker-range::-webkit-slider-thumb');
+    expect(styles).toContain('.sniptale-color-plane-ring');
+    expect(styles).toContain('.sniptale-picker-number');
+    expect(styles).toContain('.sniptale-picker-steppers');
+    expect(styles).toContain('.sniptale-picker-checker');
+  });
+
   it('loads the shared style bundle once for the shadow runtime', () => {
     const styles = createContentEntrypointStyles();
     const source = readFileSync(STYLES_SOURCE_PATH, 'utf8');

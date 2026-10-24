@@ -732,6 +732,85 @@ const compositions: Composition[] = [
   { locale: 'en', theme: 'light', viewport: { width: 1920, height: 900 } },
   { locale: 'ru', theme: 'dark', viewport: { width: 1920, height: 900 } },
 ];
+for (const width of [1280, 1920]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`drawing picker shadow styles ${width} ${theme}`, async ({
+      context,
+      extensionId,
+    }, info) => {
+      const origin = 'https://sniptale-picker-shadow.test';
+      const composition: Composition = {
+        locale: 'ru',
+        theme,
+        viewport: { width, height: width === 1280 ? 560 : 900 },
+      };
+      await context.route(`${origin}/**`, (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body: '<!doctype html><html><body><p>Drawing picker style boundary</p></body></html>',
+        })
+      );
+      const { page, popup } = await activateHost(context, extensionId, origin, composition);
+      try {
+        await ui(page, 'content.toolbar.mode-selector-button').click();
+        await ui(page, 'content.toolbar.mode-option.drawing').click();
+        const pencil = ui(page, 'content.toolbar.drawing.pencil');
+        if ((await pencil.getAttribute('aria-expanded')) !== 'true') await pencil.click();
+        await ui(page, 'content.toolbar.drawing-options.pencil')
+          .locator('[data-ui="shared.ui.color-selector.picker-trigger"]')
+          .click();
+        const picker = ui(page, 'shared.ui.color-selector.picker');
+        await expect(picker).toBeVisible();
+        await expect(picker.locator('.sniptale-color-plane-ring')).toHaveCSS('width', '18px');
+        await expect(picker.locator('.sniptale-color-plane-ring')).toHaveCSS(
+          'border-top-width',
+          '2px'
+        );
+        await expect(picker.locator('.sniptale-color-plane-ring')).toHaveCSS(
+          'border-top-color',
+          'rgb(255, 255, 255)'
+        );
+        const range = picker.locator('.sniptale-picker-range').first();
+        await expect(range).toHaveCSS('appearance', 'none');
+        await expect(range).toHaveCSS('height', '32px');
+        const alpha = picker.locator(
+          '[data-ui="shared.ui.color-selector.opacity"] .sniptale-picker-number'
+        );
+        await expect(alpha).toHaveCSS('display', 'flex');
+        await expect(alpha).toHaveCSS('height', '32px');
+        const checker = picker.locator('.sniptale-picker-checker').first();
+        await expect(checker).toHaveCSS('background-image', /conic-gradient/);
+        for (const mode of ['compact', 'full']) {
+          const toggle = picker.getByRole('button', {
+            name: mode === 'compact' ? 'Компактный режим' : 'Полный режим',
+            exact: true,
+          });
+          if (await toggle.count()) await toggle.click();
+          await withinViewport(ui(page, 'shared.ui.color-selector.picker-layer'));
+          await alpha.hover();
+          const steppers = alpha.locator('.sniptale-picker-steppers');
+          await expect(steppers).toHaveCSS('opacity', '1');
+          const bounds = (await alpha.boundingBox())!;
+          for (const button of await steppers.locator('button').all()) {
+            const box = (await button.boundingBox())!;
+            expect(box.width).toBeCloseTo(24, 0);
+            expect(box.height).toBeCloseTo(16, 0);
+            expect(box.y).toBeGreaterThanOrEqual(bounds.y - 1);
+            expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height + 1);
+          }
+          await capture(page, info, `drawing-picker-${mode}`);
+        }
+        await picker.getByRole('button', { name: 'Отмена', exact: true }).click();
+        await expect(picker).toHaveCount(0);
+      } finally {
+        await page.close();
+        await popup.close();
+        await context.unroute(`${origin}/**`);
+      }
+    });
+  }
+}
+
 for (const composition of compositions) {
   test(`native content controls ${composition.locale} ${composition.theme} ${composition.viewport.width}`, async ({
     context,
