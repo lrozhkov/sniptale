@@ -23,6 +23,7 @@ function canvasContexts(options: { readbackFails?: boolean; missingOutput?: bool
     if (options.missingOutput && calls === 2) return null;
     return {
       drawImage: sampled,
+      scale: vi.fn(),
       getImageData: () => {
         if (options.readbackFails) throw new DOMException('Unavailable', 'SecurityError');
         return { data: pixels };
@@ -41,9 +42,10 @@ it('magnifies original pixels with a bounded optical readback', () => {
   expect(sampled).toHaveBeenCalledWith(source, 20, 10, 16, 16, 0, 0, 16, 16);
   expect(published).toHaveBeenCalledOnce();
   const warped = published.mock.calls[0]![0].data as Uint8ClampedArray;
-  expect(warped[(8 * 16 + 11) * 4]).toBeLessThan(pixels[(8 * 16 + 11) * 4]!);
-  expect(warped[(8 * 16 + 11) * 4 + 3]).toBe(255);
-  expect(target.drawImage).toHaveBeenCalledOnce();
+  expect(warped[(8 * 16 + 11) * 4 + 3]).toBe(0);
+  expect(pixels[(8 * 16 + 11) * 4 + 3]).toBe(255);
+  expect(sampled).toHaveBeenCalledWith(source, 24, 14, 8, 8, 0, 0, 16, 16);
+  expect(target.drawImage).toHaveBeenCalledTimes(2);
 });
 
 it('flat sampling uses the centered inner crop without pixel readback', () => {

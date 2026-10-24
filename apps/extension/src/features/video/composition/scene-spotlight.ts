@@ -9,7 +9,7 @@ export interface SceneSpotlightFrame {
   dim: number;
   blur: number;
   /** Original scene pixels inside the opening, magnified without moving the camera. */
-  lens?: { scale: number; optics: 'flat' | 'optical' };
+  lens?: { scale: number; optics: 'flat' | 'optical'; edgeWidth?: number };
   protectionOpening?: SceneSpotlightRect;
   protectionRadius?: number;
   presence?: number;
@@ -37,7 +37,13 @@ export function resolveSceneSpotlightTarget(
     dim: value.effect === 'dim' ? value.strength : 0,
     blur: value.effect === 'blur' ? value.blur * scale : 0,
     ...(value.effect === 'magnify'
-      ? { lens: { scale: value.magnification ?? 2, optics: value.lensOptics ?? 'flat' } }
+      ? {
+          lens: {
+            scale: value.magnification ?? 2,
+            optics: value.lensOptics ?? 'flat',
+            ...(value.lensEdgeWidth === undefined ? {} : { edgeWidth: value.lensEdgeWidth }),
+          },
+        }
       : {}),
   };
 }
@@ -78,6 +84,11 @@ export function sampleSceneSpotlight(args: {
           lens: {
             scale: mix(start.lens?.scale ?? 1, end.lens?.scale ?? 1, t),
             optics: end.lens?.optics ?? start.lens!.optics,
+            ...(start.lens?.edgeWidth === undefined && end.lens?.edgeWidth === undefined
+              ? {}
+              : {
+                  edgeWidth: mix(start.lens?.edgeWidth ?? 8, end.lens?.edgeWidth ?? 8, t),
+                }),
           },
         }
       : {}),

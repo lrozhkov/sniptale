@@ -58,12 +58,13 @@ it('switches a Native focus to an optical lens and validates subsequent scale ed
   const lens = editMotionFocus(project, initial, {
     kind: 'spotlight',
     enabled: true,
-    settings: { effect: 'magnify', magnification: 2.5, lensOptics: 'optical' },
+    settings: { effect: 'magnify', magnification: 2.5, lensOptics: 'optical', lensEdgeWidth: 4 },
   })!;
   expect(lens.spotlight).toMatchObject({
     effect: 'magnify',
     magnification: 2.5,
     lensOptics: 'optical',
+    lensEdgeWidth: 4,
   });
   expect(
     editMotionFocus(project, lens, { kind: 'spotlight', settings: { magnification: 3 } })?.spotlight
@@ -114,4 +115,17 @@ it('refuses unbound window and scene edits and disables only the requested activ
   ).toBeNull();
   expect(editMotionFocus(project, active, { kind: 'border', enabled: false })).toBe(active);
   expect(editMotionFocus(project, active, { kind: 'spotlight', enabled: false })).toEqual(region);
+});
+
+it.each([0, 31, NaN, Infinity])('refuses invalid lens rim width %s', (lensEdgeWidth) => {
+  const project = createEmptyVideoProject('Rim');
+  const region = createVideoProjectMotionRegion(project, 0);
+  expect(
+    editMotionFocus(project, region, {
+      kind: 'spotlight',
+      enabled: true,
+      settings: { effect: 'magnify', lensEdgeWidth },
+    })
+  ).toBeNull();
+  expect(region.spotlight).toBeUndefined();
 });

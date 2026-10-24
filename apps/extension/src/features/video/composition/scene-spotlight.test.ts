@@ -100,3 +100,24 @@ it('admits persisted lens optics and interpolates magnification over an interval
     optics: 'optical',
   });
 });
+
+it('keeps legacy rim width absent, admits bounded widths and projects the authored shoulder', () => {
+  const legacy = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify' as const,
+    lensOptics: 'optical' as const,
+  };
+  expect(parseQuickEditSpotlight(legacy)).not.toHaveProperty('lensEdgeWidth');
+  for (const lensEdgeWidth of [1, 8, 30]) {
+    const spotlight = parseQuickEditSpotlight({ ...legacy, lensEdgeWidth })!;
+    expect(spotlight.lensEdgeWidth).toBe(lensEdgeWidth);
+    const frame = resolveSceneSpotlightTarget(
+      spotlight,
+      { x: 0, y: 0, width: 640, height: 360 },
+      1
+    );
+    expect(frame.lens).toMatchObject({ optics: 'optical', edgeWidth: lensEdgeWidth });
+  }
+  for (const lensEdgeWidth of [0, 31, NaN, Infinity, '8', null])
+    expect(parseQuickEditSpotlight({ ...legacy, lensEdgeWidth })).toBeNull();
+});

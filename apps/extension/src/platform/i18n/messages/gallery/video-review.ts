@@ -48,6 +48,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   clickLensOptics: { ru: 'Оптика', en: 'Optics' },
   clickLensOptics_flat: { ru: 'Плоская', en: 'Flat' },
   clickLensOptics_optical: { ru: 'Оптическая', en: 'Optical' },
+  clickLensEdgeWidth: { ru: 'Ширина края', en: 'Rim width' },
   clickLens_circle: { ru: 'Круг', en: 'Circle' },
   clickLens_rounded: { ru: 'Скруглённый квадрат', en: 'Rounded square' },
   clickLensShadow: { ru: 'Тень', en: 'Shadow' },

@@ -305,3 +305,14 @@ it('retains a Gallery gesture phase across split windows without repeating its s
   expect(buildProjectActionAudioPlan(heldOnly).descriptors).toEqual([]);
   expect(candidate).toEqual(before);
 });
+
+it('admits bounded lens edge width without injecting it into legacy click styles', () => {
+  const legacy = { id: 'edge', ...REVIEW_CLICK_DEFAULT, effect: 'magnify' };
+  expect(parseReviewClickAnimations([legacy])?.[0]).not.toHaveProperty('lensEdgeWidth');
+  for (const lensEdgeWidth of [1, 8, 30])
+    expect(parseReviewClickAnimations([{ ...legacy, lensEdgeWidth }])?.[0]).toMatchObject({
+      lensEdgeWidth,
+    });
+  for (const lensEdgeWidth of [0, 31, NaN, Infinity, '8', null])
+    expect(parseReviewClickAnimations([{ ...legacy, lensEdgeWidth }])).toBeNull();
+});

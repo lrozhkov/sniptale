@@ -1,4 +1,4 @@
-import { warpOpticalPixels } from './pointer-feedback';
+import { drawOpticalGlass } from './optical-lens';
 import type { SceneSpotlightFrame } from '../scene-spotlight';
 
 type Rect = SceneSpotlightFrame['opening'];
@@ -8,19 +8,34 @@ export function drawSceneLens(
   context: CanvasRenderingContext2D,
   source: HTMLCanvasElement | OffscreenCanvas,
   bounds: Rect,
-  lens: NonNullable<SceneSpotlightFrame['lens']>
+  lens: NonNullable<SceneSpotlightFrame['lens']>,
+  radius = 0
 ): void {
   if (lens.scale <= 1 || bounds.width <= 0 || bounds.height <= 0) return;
   if (lens.optics === 'flat') {
     drawFlatLens(context, source, bounds, lens.scale);
     return;
   }
-  try {
-    if (drawOpticalLens(context, source, bounds, lens.scale)) return;
-  } catch {
-    // A tainted or unavailable readback affects only this lens frame.
-  }
-  drawFlatLens(context, source, bounds, lens.scale);
+  drawOpticalGlass(
+    context,
+    bounds,
+    lens.scale,
+    Math.min(1, radius / (Math.min(bounds.width, bounds.height) / 2)),
+    (sample) =>
+      sample.drawImage(
+        source,
+        bounds.x,
+        bounds.y,
+        bounds.width,
+        bounds.height,
+        0,
+        0,
+        bounds.width,
+        bounds.height
+      ),
+    () => drawFlatLens(context, source, bounds, lens.scale),
+    lens.edgeWidth
+  );
 }
 
 function drawFlatLens(
@@ -51,32 +66,5 @@ function drawFlatLens(
     context.drawImage(input, bounds.x, bounds.y, bounds.width, bounds.height);
   } finally {
     input.width = input.height = 0;
-  }
-}
-
-/** Pixel work is capped independently of export resolution. */
-function drawOpticalLens(
-  context: CanvasRenderingContext2D,
-  source: HTMLCanvasElement | OffscreenCanvas,
-  bounds: Rect,
-  scale: number
-): boolean {
-  const side = Math.max(1, Math.min(160, Math.ceil(Math.max(bounds.width, bounds.height))));
-  const input = document.createElement('canvas');
-  const output = document.createElement('canvas');
-  input.width = input.height = output.width = output.height = side;
-  try {
-    const sample = input.getContext('2d', { willReadFrequently: true });
-    const result = output.getContext('2d');
-    if (!sample || !result) return false;
-    sample.drawImage(source, bounds.x, bounds.y, bounds.width, bounds.height, 0, 0, side, side);
-    const pixels = sample.getImageData(0, 0, side, side);
-    const warped = result.createImageData(side, side);
-    warpOpticalPixels(pixels.data, warped.data, side, side / 2, scale, 'rect');
-    result.putImageData(warped, 0, 0);
-    context.drawImage(output, bounds.x, bounds.y, bounds.width, bounds.height);
-    return true;
-  } finally {
-    input.width = input.height = output.width = output.height = 0;
   }
 }

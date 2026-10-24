@@ -138,10 +138,12 @@ const CLICK_BOUNDS = {
   ...REVIEW_CLICK_BOUNDS,
   magnification: [1, 3],
   lensShadow: [0, 100],
+  lensEdgeWidth: [1, 30],
 } as const;
 const CLICK_SCRUB = {
   magnification: [1, 2.5, 0.1],
   lensShadow: [0, 50, 1],
+  lensEdgeWidth: [1, 30, 1],
   radius: [2, 80, 1],
   stroke: [0.5, 8, 0.5],
   opacity: [0, 1, 0.01],
@@ -213,6 +215,7 @@ function clickFieldValues(styles: readonly ReviewClickStyle[]) {
   const values = styles.map((value) => ({
     magnification: 1.6,
     lensShadow: 20,
+    lensEdgeWidth: 8,
     lensShape: 'circle' as const,
     lensOptics: 'flat' as const,
     ...value,
@@ -269,6 +272,9 @@ function ClickAppearance({
             }))}
             onChange={(lensOptics: 'flat' | 'optical') => onChange({ lensOptics })}
           />
+          {lensOptics === 'optical'
+            ? number('lensEdgeWidth', 'gallery.videoReview.clickLensEdgeWidth', 1, '%')
+            : null}
           <PointerChoice
             label={translate('gallery.videoReview.clickLensShape')}
             value={lensShape ?? ''}

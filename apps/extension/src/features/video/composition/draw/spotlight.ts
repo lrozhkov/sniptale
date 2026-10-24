@@ -405,7 +405,7 @@ function drawSpotlightLenses(
           context.clip(clip);
         }
         context.clip(opening);
-        drawSceneLens(context, source, bounds, frame.lens!);
+        drawSceneLens(context, source, bounds, frame.lens!, frame.radius);
       } finally {
         context.restore();
       }

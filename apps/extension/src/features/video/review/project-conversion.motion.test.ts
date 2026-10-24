@@ -113,6 +113,7 @@ it('carries a following optical lens from Gallery into a reopened Native project
     effect: 'magnify',
     magnification: 2.5,
     lensOptics: 'optical',
+    lensEdgeWidth: 4,
   };
   const before = structuredClone(input);
   const plan = planReviewProjectConversion(input);
@@ -124,6 +125,7 @@ it('carries a following optical lens from Gallery into a reopened Native project
       (region) =>
         region.spotlight?.effect === 'magnify' &&
         region.spotlight.lensOptics === 'optical' &&
+        region.spotlight.lensEdgeWidth === 4 &&
         region.focusMode === VideoMotionFocusMode.CURSOR
     )
   ).toBe(true);

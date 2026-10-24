@@ -239,6 +239,8 @@ function parseClick(raw: unknown): ReviewClickAnimation | null {
   const lensShadow = raw['lensShadow'];
   const lensShape = raw['lensShape'];
   const lensOptics = raw['lensOptics'];
+  const lensEdgeWidth = raw['lensEdgeWidth'];
+  if (lensEdgeWidth !== undefined && !isBoundedNumber(lensEdgeWidth, 1, 30)) return null;
   if (magnification !== undefined && !isBoundedNumber(magnification, 1, 3)) return null;
   if (lensShadow !== undefined && !isBoundedNumber(lensShadow, 0, 100)) return null;
   if (lensShape !== undefined && lensShape !== 'circle' && lensShape !== 'rounded') return null;
@@ -255,6 +257,7 @@ function parseClick(raw: unknown): ReviewClickAnimation | null {
     ...(lensShadow === undefined ? {} : { lensShadow }),
     ...(lensShape === undefined ? {} : { lensShape }),
     ...(lensOptics === undefined ? {} : { lensOptics }),
+    ...(lensEdgeWidth === undefined ? {} : { lensEdgeWidth }),
   };
 }
 

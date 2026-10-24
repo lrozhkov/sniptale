@@ -9,6 +9,8 @@ export interface QuickEditSpotlight {
   /** Lens strength and sampling; absent values keep authored spotlight history unchanged. */
   magnification?: number;
   lensOptics?: 'flat' | 'optical';
+  /** Glass shoulder width as a percentage of the opening's shorter half-axis. */
+  lensEdgeWidth?: number;
   strength: number;
   blur: number;
   roundness: number;
@@ -47,6 +49,7 @@ export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | nu
     (value['lensOptics'] !== undefined &&
       value['lensOptics'] !== 'flat' &&
       value['lensOptics'] !== 'optical') ||
+    (value['lensEdgeWidth'] !== undefined && !isBoundedNumber(value['lensEdgeWidth'], 1, 30)) ||
     !isBoundedNumber(value['strength'], 0, 1) ||
     !isBoundedNumber(value['blur'], 0, 40) ||
     !isBoundedNumber(value['roundness'], 0, 0.5) ||
@@ -61,6 +64,7 @@ export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | nu
     effect: value['effect'],
     ...(value['magnification'] === undefined ? {} : { magnification: value['magnification'] }),
     ...(value['lensOptics'] === undefined ? {} : { lensOptics: value['lensOptics'] }),
+    ...(value['lensEdgeWidth'] === undefined ? {} : { lensEdgeWidth: value['lensEdgeWidth'] }),
     strength: value['strength'],
     blur: value['blur'],
     roundness: value['roundness'],

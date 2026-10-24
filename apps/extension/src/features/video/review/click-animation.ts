@@ -36,6 +36,7 @@ export interface ReviewClickFrame {
     shape: 'circle' | 'rounded';
     shadow: number;
     optics?: 'flat' | 'optical';
+    edgeWidth?: number;
   };
 }
 
@@ -208,6 +209,7 @@ export function evaluateReviewClicks(
             shape: s.lensShape ?? 'circle',
             shadow: (s.lensShadow ?? 20) * strength,
             optics: s.lensOptics ?? 'flat',
+            ...(s.lensEdgeWidth === undefined ? {} : { edgeWidth: s.lensEdgeWidth }),
           },
         },
       ];

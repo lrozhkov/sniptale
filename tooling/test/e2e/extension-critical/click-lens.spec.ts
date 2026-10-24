@@ -152,7 +152,7 @@ test('opaque lens live pixels match export, with identity endpoints and moving s
         "th=400;source.height=240;\n const s=source.getContext('2d');s.fillStyle='#246" +
         "';s.fillRect(0,0,400,240);s.fillStyle='#ff0000';s.fillRect(190,110,20,20);\n " +
         'const rect={x:0,y:0,width:400,height:240};\n const settings={...REVIEW_CLICK_' +
-        "DEFAULT,effect:'magnify',radius:60,magnification:2,before:1,after:1,lensShad" +
+        "DEFAULT,effect:'magnify',lensOptics:'optical',radius:60,magnification:2,before:1,after:1,lensShad" +
         "ow:0,color:'#00000000'};\n const cue={settings,point:{x:.5,y:.5},anchor:1,sta" +
         "rt:0,end:2};\n const host=document.createElement('div');document.body.append(" +
         "host);host.style='position:relative;width:400px;height:240px';const root=cre" +
@@ -253,7 +253,11 @@ for (const [width, height, locale, theme] of [
         db.close();
       }, betaV1Fixture);
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator(`[data-gallery-keyboard-id="${betaV1Fixture.records.media_library[0].id}"]`)
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const button = (key: Parameters<typeof translate>[0]) =>
         page.locator('dialog').getByRole('button', { name: label(key), exact: true });
@@ -264,10 +268,18 @@ for (const [width, height, locale, theme] of [
         )
         .first();
       await marker.click();
-      await button('gallery.videoReview.clickEffect').click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.click_magnify'), exact: true })
-        .click();
+      const effectSelect = button('gallery.videoReview.clickEffect');
+      if (await effectSelect.count()) {
+        await effectSelect.click();
+        await page
+          .getByRole('option', { name: label('gallery.videoReview.click_magnify'), exact: true })
+          .click();
+      } else {
+        await page
+          .getByRole('group', { name: label('gallery.videoReview.clickEffect'), exact: true })
+          .getByRole('button', { name: label('gallery.videoReview.click_magnify'), exact: true })
+          .click();
+      }
       const appearance = page
         .locator('[data-ui="gallery.videoReview.clickFields"] details')
         .filter({
@@ -286,19 +298,68 @@ for (const [width, height, locale, theme] of [
       await amount.fill('2');
       await amount.press('Enter');
       await expect(page.locator('[data-ui="gallery.videoReview.clickAnimation"]')).toBeVisible();
+      await page
+        .getByRole('group', { name: label('gallery.videoReview.clickLensOptics') })
+        .getByRole('button', { name: label('gallery.videoReview.clickLensOptics_optical') })
+        .click();
+      const edge = page.getByRole('textbox', {
+        name: label('gallery.videoReview.clickLensEdgeWidth'),
+        exact: true,
+      });
+      await expect(edge).toHaveValue('8');
+      await edge.fill('4');
+      await edge.press('Enter');
+      await expect(edge).toHaveValue('4');
       await amount.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('lens-inspector.png'), fullPage: false });
       await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.videoReview.enter"]')).toBeVisible();
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator(`[data-gallery-keyboard-id="${betaV1Fixture.records.media_library[0].id}"]`)
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await marker.click();
       if (!(await appearance.evaluate((node) => (node as HTMLDetailsElement).open)))
         await appearance.locator('summary').click();
       await expect(amount).toHaveValue('2');
+      await expect(edge).toHaveValue('4');
     } finally {
       await new Promise<void>((r) => host.server.close(() => r()));
     }
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`optical glass keeps central text sharp and confines dispersion to its rim ${viewport.width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize(viewport);
+    const bundle = await build({
+      entryPoints: ['tooling/test/e2e/support/optical-lens-render-probe.ts'],
+      bundle: true,
+      format: 'esm',
+      platform: 'browser',
+      write: false,
+    });
+    const results = await page.evaluate(async (text) => {
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+      try {
+        return (await import(url)).opticalLensProbe();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }, bundle.outputFiles[0]!.text);
+    await writeFile(info.outputPath('optical-glass-proof.json'), JSON.stringify(results, null, 2));
+    for (const row of results) {
+      expect(row.centralMaximum, row.shape).toBeLessThanOrEqual(1);
+      expect(row.fringePixels, row.shape).toBeGreaterThan(100);
+    }
+    await page.screenshot({ path: info.outputPath('optical-glass.png'), fullPage: false });
   });
 }

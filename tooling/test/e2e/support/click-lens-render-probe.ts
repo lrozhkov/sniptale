@@ -216,6 +216,7 @@ export async function probe() {
             settings: {
               ...REVIEW_CLICK_DEFAULT,
               effect: 'magnify',
+              lensOptics: mode === 'spatial' || mode === 'fragment-dissolve' ? 'optical' : 'flat',
               magnification: 2,
               radius: 120,
               color: '#00000000',

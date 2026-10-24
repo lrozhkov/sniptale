@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { drawPointerFeedbackFrame, warpOpticalPixels } from './pointer-feedback';
+import { drawPointerFeedbackFrame } from './pointer-feedback';
 import type { ReviewClickFrame } from '../../review/click-animation';
 
 function surface() {
@@ -118,7 +118,7 @@ it('inherits layer opacity for original lens pixels and applies cue opacity only
   expect(frame).toEqual(before);
 });
 
-it('samples an optical lens once and restores state', () => {
+it('samples only the glass rim and retains the native sharp draw and state', () => {
   const { inputContext, outputContext } = mockOpticalCanvases();
   const { canvas, context, stack } = surface();
   const source = {
@@ -130,13 +130,14 @@ it('samples an optical lens once and restores state', () => {
         _y: number,
         _width: number,
         _height: number
-      ) => expect(_context).toBe(inputContext)
+      ) => expect([inputContext, context]).toContain(_context)
     ),
   };
   const frame = lens();
   frame.lens!.optics = 'optical';
   drawPointerFeedbackFrame(canvas, frame, source);
-  expect(source.draw).toHaveBeenCalledExactlyOnceWith(inputContext, -20, -30, 100, 100);
+  expect(source.draw).toHaveBeenNthCalledWith(1, inputContext, -20, -30, 100, 100);
+  expect(source.draw).toHaveBeenNthCalledWith(2, context, -40, -50, 200, 200);
   expect(outputContext.putImageData).toHaveBeenCalledTimes(1);
   expect(context.drawImage).toHaveBeenCalledTimes(1);
   expect(stack).toHaveLength(0);
@@ -147,13 +148,13 @@ it('bounds the optical sampling surface at the largest authored lens size', () =
   const { inputContext } = mockOpticalCanvases();
   const { canvas, context } = surface();
   const frame = lens();
-  frame.radius = 200;
+  frame.radius = 400;
   frame.lens!.optics = 'optical';
   const source = { rect: { x: 0, y: 0, width: 640, height: 480 }, draw: vi.fn() };
   drawPointerFeedbackFrame(canvas, frame, source);
-  expect(inputContext.scale).toHaveBeenCalledExactlyOnceWith(0.4, 0.4);
-  expect(source.draw).toHaveBeenCalledTimes(1);
-  expect(context.drawImage).toHaveBeenCalledWith(expect.anything(), -160, -150, 400, 400);
+  expect(inputContext.scale).toHaveBeenCalledExactlyOnceWith(0.32, 0.32);
+  expect(source.draw).toHaveBeenCalledTimes(2);
+  expect(context.drawImage).toHaveBeenCalledWith(expect.anything(), -360, -350, 800, 800);
 });
 
 it('samples a rounded optical lens and restores nested state after a failed source draw', () => {
@@ -185,27 +186,9 @@ it('renders a rounded optical lens from the original source once', () => {
   frame.lens!.optics = 'optical';
   frame.lens!.shape = 'rounded';
   drawPointerFeedbackFrame(canvas, frame, source);
-  expect(source.draw).toHaveBeenCalledTimes(1);
+  expect(source.draw).toHaveBeenCalledTimes(2);
   expect(context.roundRect.mock.calls.length).toBeGreaterThanOrEqual(2);
   expect(stack).toHaveLength(0);
-});
-
-it('warps an optical lens continuously and keeps its rim aligned with the original pixels', () => {
-  const side = 40;
-  const input = new Uint8ClampedArray(side * side * 4);
-  const output = new Uint8ClampedArray(input.length);
-  for (let row = 0; row < side; row++)
-    for (let column = 0; column < side; column++) {
-      const offset = (row * side + column) * 4;
-      input[offset] = column * 6;
-      input[offset + 3] = 255;
-    }
-  warpOpticalPixels(input, output, side, 20, 2);
-  const red = (column: number) => output[(20 * side + column) * 4]!;
-  expect(red(10)).toBeGreaterThan(input[(20 * side + 10) * 4]!);
-  expect(red(19)).toBeGreaterThan(red(10));
-  expect(Math.abs(red(1) - input[(20 * side + 1) * 4]!)).toBeLessThanOrEqual(2);
-  expect(Math.abs(red(2) - red(1))).toBeLessThan(12);
 });
 
 it('restores every nested drawing state when the original source fails', () => {

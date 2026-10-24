@@ -46,7 +46,7 @@ afterEach(() => {
 it('paints a single timed lens inside its opening without building a dim mask', () => {
   const target = context();
   drawSceneSpotlights(target, source, null, [frame]);
-  expect(drawLens).toHaveBeenCalledWith(target, source, opening, frame.lens);
+  expect(drawLens).toHaveBeenCalledWith(target, source, opening, frame.lens, frame.radius);
   expect(target.clip).toHaveBeenCalledOnce();
   expect(target.save).toHaveBeenCalledOnce();
   expect(target.restore).toHaveBeenCalledOnce();

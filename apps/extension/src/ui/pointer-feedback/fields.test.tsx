@@ -121,3 +121,40 @@ it('retains the runtime disclosure and excludes synthetic gesture timing and pos
   expect(host.querySelector('input')).toBeNull();
   expect(props.onChange).not.toHaveBeenCalled();
 });
+
+it('shows a narrow default rim only for optical lenses and preserves the authored width', () => {
+  const change = vi.fn();
+  const render = (lensOptics: 'flat' | 'optical', lensEdgeWidth?: number) =>
+    act(() =>
+      root.render(
+        <PointerFeedbackFields
+          part="appearance"
+          Details={Details}
+          onChange={change}
+          values={[
+            {
+              ...REVIEW_CLICK_DEFAULT,
+              effect: 'magnify',
+              lensOptics,
+              ...(lensEdgeWidth === undefined ? {} : { lensEdgeWidth }),
+            },
+          ]}
+        />
+      )
+    );
+  render('flat');
+  expect(host.querySelector('[aria-label="gallery.videoReview.clickLensEdgeWidth"]')).toBeNull();
+  render('optical');
+  expect(
+    host.querySelector<HTMLInputElement>(
+      'input[aria-label="gallery.videoReview.clickLensEdgeWidth"]'
+    )?.value
+  ).toBe('8');
+  render('optical', 4);
+  expect(
+    host.querySelector<HTMLInputElement>(
+      'input[aria-label="gallery.videoReview.clickLensEdgeWidth"]'
+    )?.value
+  ).toBe('4');
+  expect(change).not.toHaveBeenCalled();
+});

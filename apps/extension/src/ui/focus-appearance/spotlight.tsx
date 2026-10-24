@@ -48,6 +48,21 @@ export function SpotlightAppearanceFields(props: {
             ]}
             onChange={(lensOptics) => onChange({ lensOptics })}
           />
+          {value.lensOptics === 'optical' ? (
+            <PreviewNumericRow
+              label={translate('gallery.videoReview.clickLensEdgeWidth')}
+              min={1}
+              max={30}
+              step={1}
+              precision={0}
+              unit="%"
+              value={value.lensEdgeWidth ?? 8}
+              onPreview={(lensEdgeWidth) =>
+                props.onPreview?.(lensEdgeWidth === null ? null : { lensEdgeWidth })
+              }
+              onChange={(lensEdgeWidth) => onChange({ lensEdgeWidth })}
+            />
+          ) : null}
         </>
       ) : (
         <SegmentedRow<'dim' | 'blur'>

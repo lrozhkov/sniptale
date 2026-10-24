@@ -548,6 +548,14 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect
         .poll(async () => (await persistedFocus(page))?.spotlight?.lensOptics)
         .toBe('optical');
+      const edge = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.clickLensEdgeWidth'),
+        exact: true,
+      });
+      await expect(edge).toHaveValue('8');
+      await edge.fill('5');
+      await edge.press('Enter');
+      await expect.poll(async () => (await persistedFocus(page))?.spotlight?.lensEdgeWidth).toBe(5);
       const placement = inspector.getByRole('button', {
         name: label('gallery.videoReview.focusLensPlacement'),
       });
@@ -564,6 +572,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.reload();
       await expect(dialog).toBeVisible();
       await expect.poll(async () => (await persistedFocus(page))?.followCursor).toBe(true);
+      await expect.poll(async () => (await persistedFocus(page))?.spotlight?.lensEdgeWidth).toBe(5);
       await expect
         .poll(async () => (await persistedFocus(page))?.spotlight?.lensOptics)
         .toBe('optical');

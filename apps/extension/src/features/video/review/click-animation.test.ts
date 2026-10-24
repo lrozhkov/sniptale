@@ -264,6 +264,12 @@ it('magnifies once around the click, returns to identity, and ignores decorative
     evaluateReviewClicks([{ ...cues[0]!, settings: { ...settings, lensOptics: 'optical' } }], 2)[0]!
       .lens!.optics
   ).toBe('optical');
+  expect(
+    evaluateReviewClicks(
+      [{ ...cues[0]!, settings: { ...settings, lensOptics: 'optical', lensEdgeWidth: 4 } }],
+      2
+    )[0]!.lens
+  ).toMatchObject({ optics: 'optical', edgeWidth: 4 });
   expect(evaluateReviewClicks(cues, 2.5)[0]!.lens!.scale).toBeGreaterThan(1);
   expect(evaluateReviewClicks(cues, 2.999)[0]!.lens!.scale).toBeCloseTo(1, 2);
   expect(evaluateReviewClicks(cues, 3)).toEqual([]);
