@@ -7,6 +7,38 @@ import { betaV1Fixture } from '../../../../apps/extension/src/composition/persis
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { writeFile } from 'node:fs/promises';
 
+test('scene lenses stay centered and clip naturally at every frame edge', async ({
+  page,
+}, info) => {
+  const bundle = await build({
+    entryPoints: ['tooling/test/e2e/support/optical-lens-render-probe.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+  });
+  const results = await page.evaluate(async (text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    try {
+      return (await import(url)).lensEdgeProbe();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, bundle.outputFiles[0]!.text);
+  await writeFile(info.outputPath('lens-edge-pixels.json'), JSON.stringify(results, null, 2));
+  expect(results).toHaveLength(36);
+  for (const row of results) {
+    expect(row.maximum, JSON.stringify(row)).toBe(0);
+    expect(row.outsideChanged, JSON.stringify(row)).toBe(0);
+    expect(row.insideChanged, JSON.stringify(row)).toBeGreaterThan(0);
+    if (row.shape === 'circle') {
+      expect(row.opening.width).toBe(row.opening.height);
+      expect(row.radius).toBe(row.opening.width / 2);
+    }
+  }
+  await page.screenshot({ path: info.outputPath('lens-edge-clipping.png'), fullPage: false });
+});
+
 test('managed magnify matches shared export composition through spatial and fragment dissolve', async ({
   page,
 }, info) => {
@@ -363,3 +395,226 @@ for (const viewport of [
     await page.screenshot({ path: info.outputPath('optical-glass.png'), fullPage: false });
   });
 }
+
+for (const size of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`Gallery circular lens draft matches commit at the edge ${size.width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize(size);
+    const host = await startHostServer();
+    try {
+      await applyHarnessBootstrap(page, {});
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      const bundle = await build({
+        stdin: {
+          contents: `
+            import React from 'react';
+            import {createRoot} from 'react-dom/client';
+            import {flushSync} from 'react-dom';
+            import {ReviewSpotlightPreview} from './apps/extension/src/gallery/video-review/spotlight-preview';
+            import {ReviewStageFocusControl} from './apps/extension/src/gallery/video-review/stage-focus';
+            import {createQuickEditSpotlight} from './apps/extension/src/features/video/project/scene/focus-appearance';
+            import {createQuickEditZoomRegion} from './apps/extension/src/features/video/review/advanced/zoom';
+            export function mount() {
+              const host=document.createElement('div');host.id='circle-draft-proof';
+              host.style='position:fixed;left:40px;top:40px;width:400px;height:200px;z-index:999999;background:white';
+              document.body.append(host);const root=createRoot(host);
+              const source=document.createElement('canvas');source.width=400;source.height=200;
+              const c=source.getContext('2d');c.fillStyle='#252628';c.fillRect(0,0,400,200);
+              c.fillStyle='white';c.font='18px Arial';for(let y=25;y<200;y+=25)c.fillText('Readable text · lens preview · 0123456789',10,y);
+              let region={...createQuickEditZoomRegion({id:'circle',at:0}),spotlight:{...createQuickEditSpotlight(),effect:'magnify',lensShape:'circle'}};
+              const rect={x:0,y:0,width:400,height:200};
+              let stage=false;
+              const accept=patch=>{region={...region,...patch};host.dataset.saved=JSON.stringify(region.spotlight);render();};
+              const layout={contentRect:rect,windowRect:rect,videoRect:rect,videoTransform:rect};
+              function render(){flushSync(()=>{
+                const preview=React.createElement(ReviewSpotlightPreview,{
+                  region,camera:{scale:1,centerX:.5,centerY:.5},view:stage?'result':'area',frame:{image:source,width:400,height:200},
+                  output:rect,layout,cornerRadius:0,scale:1,disabled:false,onChange:accept
+                });
+                root.render(stage?React.createElement(React.Fragment,null,preview,React.createElement(ReviewStageFocusControl,{
+                  focus:{region,onChange:accept,onPreview:()=>{},onInteract:()=>{}},layout,output:rect
+                })):preview);
+              });}
+              host.addEventListener('circle-proof-stage',()=>{stage=true;host.dispatchEvent(new CustomEvent('circle-proof-size',{detail:50}));});
+              host.addEventListener('circle-proof-size',event=>{
+                const d=event.detail/100;
+                region={...region,spotlight:{...region.spotlight,area:{x:.5-d/2,y:.5-d/2,width:d,height:d}}};
+                delete host.dataset.saved;render();
+              });render();
+            }
+          `,
+          resolveDir: process.cwd(),
+          loader: 'tsx',
+        },
+        bundle: true,
+        format: 'esm',
+        platform: 'browser',
+        write: false,
+        loader: { '.woff2': 'dataurl', '.css': 'empty' },
+        define: { 'process.env.NODE_ENV': '"production"' },
+      });
+      await page.evaluate(async (text) => {
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+        try {
+          (await import(url)).mount();
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }, bundle.outputFiles[0]!.text);
+      const surface = page.locator('#circle-draft-proof');
+      const frame = surface.locator('[data-focus-frame]');
+      await expect(frame).toHaveCSS('left', '150px');
+      await page.mouse.move(240, 140);
+      await page.mouse.down();
+      await page.mouse.move(360, 140);
+      await expect(frame).toHaveCSS('left', '250px');
+      const before = await surface
+        .locator('canvas')
+        .first()
+        .evaluate((node) => node.toDataURL());
+      await page.screenshot({
+        path: info.outputPath('gallery-circle-edge-draft.png'),
+        fullPage: false,
+      });
+      await page.mouse.up();
+      await expect(frame).toHaveCSS('left', '250px');
+      await expect
+        .poll(async () => JSON.parse((await surface.getAttribute('data-saved'))!).area.x)
+        .toBe(0.5);
+      expect(
+        await surface
+          .locator('canvas')
+          .first()
+          .evaluate((node) => node.toDataURL())
+      ).toBe(before);
+      await page.screenshot({
+        path: info.outputPath('gallery-circle-edge-committed.png'),
+        fullPage: false,
+      });
+      await surface.evaluate((node) =>
+        node.dispatchEvent(new CustomEvent('circle-proof-size', { detail: 1 }))
+      );
+      await expect(frame).toHaveCSS('width', '2px');
+      await page.mouse.move(240, 140);
+      await page.mouse.down();
+      await page.mouse.move(241, 141);
+      await page.mouse.move(240, 140);
+      await page.mouse.up();
+      expect(await surface.getAttribute('data-saved')).toBeNull();
+      await frame.press('ArrowRight');
+      await expect
+        .poll(async () => JSON.parse((await surface.getAttribute('data-saved'))!).area.x)
+        .toBeCloseTo(0.505, 10);
+      const minimum = JSON.parse((await surface.getAttribute('data-saved'))!).area;
+      expect(minimum.width).toBeCloseTo(0.01, 12);
+      expect(minimum.height).toBeCloseTo(0.01, 12);
+      await expect(frame).toHaveCSS('width', '2px');
+      await page.screenshot({
+        path: info.outputPath('gallery-circle-minimum.png'),
+        fullPage: false,
+      });
+      await surface.evaluate((node) => node.dispatchEvent(new Event('circle-proof-stage')));
+      await expect(frame).toHaveCSS('width', '100px');
+      await expect(frame).toHaveCSS('height', '100px');
+      await page.mouse.move(240, 140);
+      await page.mouse.down();
+      await page.mouse.move(300, 140);
+      await page.mouse.up();
+      await expect
+        .poll(async () => JSON.parse((await surface.getAttribute('data-saved'))!).area.x)
+        .toBeCloseTo(0.4, 10);
+      await expect(frame).toHaveCSS('left', '210px');
+      await surface.evaluate((node) =>
+        node.dispatchEvent(new CustomEvent('circle-proof-size', { detail: 1 }))
+      );
+      await expect(frame).toHaveCSS('width', '2px');
+      await page.mouse.move(240, 140);
+      await page.mouse.down();
+      await page.mouse.move(241, 141);
+      await page.mouse.move(240, 140);
+      await page.mouse.up();
+      expect(await surface.getAttribute('data-saved')).toBeNull();
+      await frame.press('ArrowRight');
+      await expect
+        .poll(async () => JSON.parse((await surface.getAttribute('data-saved'))!).area.x)
+        .toBeCloseTo(0.505, 10);
+      await expect(frame).toHaveCSS('width', '2px');
+      await expect(frame).toHaveCSS('height', '2px');
+      await page.screenshot({
+        path: info.outputPath('gallery-main-stage-circle.png'),
+        fullPage: false,
+      });
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+test('scene circular lens keeps a circular clip throughout enter and exit fade', async ({
+  page,
+}, info) => {
+  const bundle = await build({
+    entryPoints: ['tooling/test/e2e/support/optical-lens-render-probe.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+  });
+  const results = await page.evaluate(async (text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    try {
+      return (await import(url)).lensFadeProbe();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, bundle.outputFiles[0]!.text);
+  expect(results).toHaveLength(20);
+  for (const row of results) {
+    expect(row.radius, JSON.stringify(row)).toBe(row.diameter / 2);
+    expect(row.maximum, JSON.stringify(row)).toBe(0);
+  }
+  await writeFile(info.outputPath('lens-fade-pixels.json'), JSON.stringify(results, null, 2));
+  await page.screenshot({ path: info.outputPath('lens-fade-circles.png'), fullPage: false });
+});
+
+test('mixed legacy and circle lens links preserve endpoint pixels and continuous contours', async ({
+  page,
+}, info) => {
+  const bundle = await build({
+    entryPoints: ['tooling/test/e2e/support/optical-lens-render-probe.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+  });
+  const results = await page.evaluate(async (text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    try {
+      return (await import(url)).lensLinkProbe();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, bundle.outputFiles[0]!.text);
+  await writeFile(info.outputPath('lens-link-pixels.json'), JSON.stringify(results, null, 2));
+  expect(results).toHaveLength(20);
+  for (const row of results) {
+    if (row.time === 2) expect(row.start.maximum, JSON.stringify(row)).toBe(0);
+    else if (row.time === 4) expect(row.end.maximum, JSON.stringify(row)).toBe(0);
+    else if (row.time < 3)
+      expect(row.start.interiorMaximum, JSON.stringify(row)).toBeLessThanOrEqual(2);
+    else if (row.time > 3)
+      expect(row.end.interiorMaximum, JSON.stringify(row)).toBeLessThanOrEqual(2);
+    else {
+      expect(row.arcMix).toBeGreaterThan(0);
+      expect(row.arcMix).toBeLessThan(1);
+      expect(row.start.changed).toBeGreaterThan(0);
+      expect(row.end.changed).toBeGreaterThan(0);
+    }
+  }
+  await page.screenshot({ path: info.outputPath('lens-link-mixed-contours.png'), fullPage: false });
+});

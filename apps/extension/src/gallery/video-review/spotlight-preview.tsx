@@ -1,6 +1,6 @@
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { useEffect, useRef, useState } from 'react';
-import { ReviewFocusArea } from './focus-area';
+import { ReviewRegionFocusArea } from './region-focus-area';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import {
@@ -20,7 +20,6 @@ import {
 import type { ZoomPreviewFrame } from './use-zoom-preview-source';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { ReviewBorderOverlay } from './border-overlay';
-import { translate } from '../../platform/i18n';
 import {
   drawSceneSpotlights,
   type SceneSpotlightLayer,
@@ -71,10 +70,6 @@ export function ReviewSpotlightPreview(props: {
   const motion = computeQuickEditSceneCamera(props.layout, props.background ?? { enabled: false });
   const spotlights = evaluateQuickEditSpotlightsAtTime(args);
   const clip = { rect: motion.windowClip, radius: props.cornerRadius * motion.scale };
-  const patchArea = (area: NonNullable<typeof overlay>['area']): QuickEditZoomRegionPatch =>
-    region.border
-      ? { border: { ...region.border, area } }
-      : { spotlight: { ...region.spotlight!, area } };
   return (
     <div className="relative">
       <div
@@ -122,23 +117,15 @@ export function ReviewSpotlightPreview(props: {
         clip={{ rect: motion.windowClip, radius: props.cornerRadius * motion.scale }}
       />
       {overlay && framing ? (
-        <ReviewFocusArea
+        <ReviewRegionFocusArea
           alwaysVisible
-          area={overlay.area}
-          label={translate(
-            region.border
-              ? 'gallery.videoReview.focusBorder'
-              : region.spotlight?.effect === 'magnify'
-                ? 'gallery.videoReview.focusLens'
-                : 'gallery.videoReview.focusSpotlight'
-          )}
+          region={props.region}
           output={props.output}
-          video={computeQuickEditSourceWindowTransform(props.layout)}
+          video={args.video}
           disabled={props.disabled}
-          onChange={(area) => props.onChange(patchArea(area))}
-          onPreview={(area) => {
-            const patch = area ? patchArea(area) : null;
-            setDraft(area);
+          onChange={props.onChange}
+          onPreview={(patch) => {
+            setDraft(patch?.spotlight?.area ?? patch?.border?.area ?? null);
             props.onPreview?.(patch);
           }}
         />

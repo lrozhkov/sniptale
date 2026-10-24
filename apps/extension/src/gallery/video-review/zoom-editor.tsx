@@ -81,7 +81,12 @@ export function withReviewFocusType(
           spotlight: {
             ...createQuickEditSpotlight(),
             ...(type === 'lens'
-              ? { effect: 'magnify' as const, magnification: 2, lensOptics: 'flat' as const }
+              ? {
+                  effect: 'magnify' as const,
+                  magnification: 2,
+                  lensOptics: 'flat' as const,
+                  lensShape: 'circle' as const,
+                }
               : {}),
             ...(area ? { area: area.area, roundness: area.roundness } : {}),
           },

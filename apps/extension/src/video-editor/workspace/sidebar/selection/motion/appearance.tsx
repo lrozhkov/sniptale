@@ -78,6 +78,7 @@ export function MotionEffectModeField({ motionRegion, panel }: FocusProps) {
         { value: 'lens', label: translate('gallery.videoReview.focusLens') },
       ]}
       onChange={(mode) => {
+        if (mode === kind) return;
         const focusEdit: MotionFocusEdit =
           mode === 'camera'
             ? {
@@ -95,6 +96,7 @@ export function MotionEffectModeField({ motionRegion, panel }: FocusProps) {
                           effect: 'magnify',
                           magnification: motionRegion.spotlight?.magnification ?? 2,
                           lensOptics: motionRegion.spotlight?.lensOptics ?? 'flat',
+                          lensShape: motionRegion.spotlight?.lensShape ?? 'circle',
                           ...(motionRegion.border
                             ? {
                                 area: motionRegion.border.area,

@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { QuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
+import { authorQuickEditLensArea } from '../../features/video/project/scene/focus-appearance';
 import { FocusRoundnessField, FocusAreaFields } from './geometry';
 import { translate } from '../../platform/i18n';
 import { SegmentedRow } from '../compact-inspector-controls';
@@ -23,6 +24,7 @@ export function SpotlightAppearanceFields(props: {
     <div className="sniptale-parameter-stack">
       {value.effect === 'magnify' ? (
         <>
+          <LensShapeFields value={value} onChange={onChange} onPreview={props.onPreview} />
           <PreviewNumericRow
             label={translate('gallery.videoReview.clickMagnification')}
             min={1}
@@ -105,22 +107,85 @@ export function SpotlightAppearanceFields(props: {
           onChange={(blur) => onChange({ blur })}
         />
       ) : null}
-      <FocusRoundnessField
-        value={value.roundness}
-        onPreview={(roundness) => props.onPreview?.(roundness === null ? null : { roundness })}
-        onChange={(roundness) => onChange({ roundness })}
-      />
-      <Details
-        preferenceId={props.preferenceId}
-        label={translate('gallery.videoReview.preciseArea')}
-      >
-        <FocusAreaFields
-          area={value.area}
-          onPreview={(area) => props.onPreview?.(area === null ? null : { area })}
-          onChange={(area) => onChange({ area })}
-        />
-      </Details>
+      {value.effect !== 'magnify' || value.lensShape !== 'circle' ? (
+        <>
+          <FocusRoundnessField
+            value={value.roundness}
+            onPreview={(roundness) => props.onPreview?.(roundness === null ? null : { roundness })}
+            onChange={(roundness) => onChange({ roundness })}
+          />
+          <Details
+            preferenceId={props.preferenceId}
+            label={translate('gallery.videoReview.preciseArea')}
+          >
+            <FocusAreaFields
+              area={value.area}
+              onPreview={(area) => props.onPreview?.(area === null ? null : { area })}
+              onChange={(area) => onChange({ area })}
+            />
+          </Details>
+        </>
+      ) : null}
     </div>
+  );
+}
+
+function LensShapeFields(props: {
+  value: QuickEditSpotlight;
+  onChange(patch: SpotlightAppearancePatch): void;
+  onPreview?: ((patch: SpotlightAppearancePatch | null) => void) | undefined;
+}) {
+  const { value } = props;
+  const sizePatch = (diameter: number) => {
+    const center = {
+      x: value.area.x + value.area.width / 2,
+      y: value.area.y + value.area.height / 2,
+    };
+    const size = diameter / 100;
+    return {
+      area: authorQuickEditLensArea(value, {
+        x: center.x - size / 2,
+        y: center.y - size / 2,
+        width: size,
+        height: size,
+      }),
+    };
+  };
+  return (
+    <>
+      <SegmentedRow<'circle' | 'rounded'>
+        columns={2}
+        layout="stacked"
+        label={translate('gallery.videoReview.clickLensShape')}
+        ariaLabel={translate('gallery.videoReview.clickLensShape')}
+        value={value.lensShape ?? 'rounded'}
+        options={[
+          { value: 'circle', label: translate('gallery.videoReview.clickLens_circle') },
+          { value: 'rounded', label: translate('gallery.videoReview.focusLensRounded') },
+        ]}
+        onChange={(lensShape) => {
+          if (lensShape !== (value.lensShape ?? 'rounded')) props.onChange({ lensShape });
+        }}
+      />
+      {value.lensShape === 'circle' ? (
+        <div className="grid gap-1">
+          <PreviewNumericRow
+            label={translate('gallery.videoReview.focusLensDiameter')}
+            min={1}
+            max={100}
+            step={1}
+            precision={1}
+            unit="%"
+            value={Math.max(value.area.width, value.area.height) * 100}
+            onPreview={(size) => props.onPreview?.(size === null ? null : sizePatch(size))}
+            onChange={(size) => props.onChange(sizePatch(size))}
+          />
+          <p className="m-0 text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+            {translate('gallery.videoReview.focusLensDiameterHint')}
+          </p>
+        </div>
+      ) : null}
+    </>
   );
 }
 

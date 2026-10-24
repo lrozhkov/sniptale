@@ -599,16 +599,21 @@ export function mapVisualLayerPointToSourceNormalized(
   };
 }
 
+/** Coordinate-domain window before rotation and scale, shared by pointers and focus geometry. */
+export function getVisualLayerMappingWindow(params: VisualLayerSourcePointMapping): MediaFrame {
+  return params.cameraAppearance
+    ? cameraWindowFrame(params.frame, params.cameraAppearance.shape)
+    : params.coordinateSpace === 'source-window'
+      ? getFittedMediaOriginalWindowFrame(params)
+      : getFittedMediaWindowFrame(params);
+}
+
 /** Window coordinates include decoration and do not inherit source crop or mirroring. */
 export function mapWindowNormalizedPointToVisualLayer(
   params: VisualLayerSourcePointMapping
 ): SourcePoint | null {
   if (!isValidPointMapping(params)) return null;
-  const window = params.cameraAppearance
-    ? cameraWindowFrame(params.frame, params.cameraAppearance.shape)
-    : params.coordinateSpace === 'source-window'
-      ? getFittedMediaOriginalWindowFrame(params)
-      : getFittedMediaWindowFrame(params);
+  const window = getVisualLayerMappingWindow(params);
   const { center, angle } = visualLayerRotation(params.frame);
   const x = window.x + params.point.x * window.width - center.x;
   const y = window.y + params.point.y * window.height - center.y;
@@ -629,11 +634,7 @@ export function mapVisualLayerPointToWindowNormalized(
   params: VisualLayerSourcePointMapping
 ): SourcePoint | null {
   if (!isValidPointMapping(params)) return null;
-  const window = params.cameraAppearance
-    ? cameraWindowFrame(params.frame, params.cameraAppearance.shape)
-    : params.coordinateSpace === 'source-window'
-      ? getFittedMediaOriginalWindowFrame(params)
-      : getFittedMediaWindowFrame(params);
+  const window = getVisualLayerMappingWindow(params);
   if (window.width <= 0 || window.height <= 0) return null;
   const { center, angle } = visualLayerRotation(params.frame);
   const x = (params.point.x - center.x - params.renderState.translateX) / params.renderState.scaleX;

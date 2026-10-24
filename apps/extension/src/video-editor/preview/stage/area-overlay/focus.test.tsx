@@ -300,3 +300,88 @@ function useSpotlight(target: 'viewport' | 'window' | 'scene' | 'source-scene' =
   region.spotlight = createQuickEditSpotlight();
   region.spotlightTarget = target;
 }
+
+it('matches a physical circle, locks resize aspect, and cancels without authoring a draft', () => {
+  useSpotlight();
+  params.selectedMotionRegion!.spotlight = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify',
+    lensShape: 'circle',
+  };
+  render();
+  expect(handle().style.left).toBe('62.5%');
+  expect(handle().style.top).toBe('75%');
+  pointer(body(), 'pointerdown', 100, 50);
+  pointer(window, 'pointerup', 100, 50);
+  expect(commit).not.toHaveBeenCalled();
+  pointer(handle(), 'pointerdown', 125, 75);
+  pointer(window, 'pointermove', 135, 76);
+  const area = preview.mock.lastCall?.[0].edit.settings.area;
+  expect(area.width).toBeCloseTo(0.6);
+  expect(area.height).toBeCloseTo(0.6);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  pointer(window, 'pointerup', 135, 76);
+  expect(commit).not.toHaveBeenCalled();
+  expect(preview).toHaveBeenLastCalledWith(null);
+  pointer(handle(), 'pointerdown', 125, 75);
+  pointer(window, 'pointerup', 135, 76);
+  expect(commit.mock.lastCall?.[1].focusEdit.settings.area).toEqual(area);
+});
+
+it.each([
+  { width: 1920, height: 1080 },
+  { width: 1080, height: 1920 },
+])(
+  'keeps minimum circle size and authors nothing for no-op gestures in $width×$height',
+  ({ width, height }) => {
+    useSpotlight();
+    params.project.width = width;
+    params.project.height = height;
+    params.camera = {
+      ...params.camera,
+      scale: 1,
+      focusPoint: { x: width / 2, y: height / 2 },
+      viewportX: 0,
+      viewportY: 0,
+      viewportWidth: width,
+      viewportHeight: height,
+    };
+    params.selectedMotionRegion!.spotlight = {
+      ...createQuickEditSpotlight(),
+      effect: 'magnify',
+      lensShape: 'circle',
+      area: { x: 0.495, y: 0.495, width: 0.01, height: 0.01 },
+    };
+    render();
+    for (const target of [body(), handle()]) {
+      pointer(target, 'pointerdown', 100, 50);
+      pointer(window, 'pointerup', 100, 50);
+      expect(commit).not.toHaveBeenCalled();
+      pointer(target, 'pointerdown', 100, 50);
+      pointer(window, 'pointermove', 101, 51);
+      pointer(window, 'pointermove', 100, 50);
+      pointer(window, 'pointerup', 100, 50);
+      expect(commit).not.toHaveBeenCalled();
+    }
+    pointer(body(), 'pointerdown', 100, 50);
+    pointer(window, 'pointerup', 101, 50);
+    const area = commit.mock.lastCall?.[1].focusEdit.settings.area;
+    expect(area.width).toBeCloseTo(0.01, 12);
+    expect(area.height).toBeCloseTo(0.01, 12);
+    expect(area.x).toBeGreaterThan(0.495);
+  }
+);
+
+it('does not normalize a rectangular authored circle during a no-op click', () => {
+  useSpotlight();
+  params.selectedMotionRegion!.spotlight = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify',
+    lensShape: 'circle',
+    area: { x: 0.2, y: 0.3, width: 0.6, height: 0.4 },
+  };
+  render();
+  pointer(body(), 'pointerdown', 100, 50);
+  pointer(window, 'pointerup', 100, 50);
+  expect(commit).not.toHaveBeenCalled();
+});

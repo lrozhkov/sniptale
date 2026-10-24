@@ -1,4 +1,8 @@
 import {
+  resolveSceneSpotlightTarget,
+  sceneSpotlightOpeningPath,
+} from '../../composition/scene-spotlight';
+import {
   type QuickEditSpotlight,
   createQuickEditSpotlight,
   parseQuickEditSpotlight,
@@ -203,3 +207,30 @@ it('defaults a saved single animation at ingress and rejects malformed exit anim
   const value = { ...createQuickEditSpotlight(), exitReveal: 'contract' as const };
   expect(parseQuickEditSpotlight(value)).toEqual(value);
 });
+
+it.each([false, true])(
+  'preserves mixed lens contour endpoints through Gallery links (reverse=%s)',
+  (reverse) => {
+    const legacy = { ...createQuickEditSpotlight(), effect: 'magnify' as const, roundness: 0.5 };
+    const circle = { ...legacy, lensShape: 'circle' as const };
+    const a = {
+      ...createQuickEditZoomRegion({ id: 'a', at: 0, duration: 2 }),
+      linkTo: 'b',
+      spotlight: reverse ? circle : legacy,
+    };
+    const b = {
+      ...createQuickEditZoomRegion({ id: 'b', at: 4, duration: 2 }),
+      spotlight: reverse ? legacy : circle,
+    };
+    const video = { x: 0, y: 0, width: 400, height: 400 };
+    const sample = (time: number) =>
+      evaluateQuickEditSpotlightAtTime({ regions: [a, b], time, video, output: video, scale: 1 })!;
+    expect(sceneSpotlightOpeningPath(sample(2))).toBe(
+      sceneSpotlightOpeningPath(resolveSceneSpotlightTarget(a.spotlight, video, 1))
+    );
+    expect(sceneSpotlightOpeningPath(sample(3))).toContain('C');
+    expect(sceneSpotlightOpeningPath(sample(4))).toBe(
+      sceneSpotlightOpeningPath(resolveSceneSpotlightTarget(b.spotlight, video, 1))
+    );
+  }
+);

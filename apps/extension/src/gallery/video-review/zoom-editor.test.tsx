@@ -527,6 +527,7 @@ it('inserts overlapping borders and retains camera and area through type convers
     effect: 'magnify',
     magnification: 2,
     lensOptics: 'flat',
+    lensShape: 'circle',
     area: border.border!.area,
     roundness: 0.23,
   });

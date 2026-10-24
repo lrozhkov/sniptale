@@ -1,3 +1,4 @@
+import { resolveSceneSpotlightTarget, sceneSpotlightOpeningPath } from '../scene-spotlight';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createQuickEditSpotlight } from '../../project/scene/focus-appearance';
 import { sampleCompositionSpotlightLayer } from './project-spotlight';
@@ -322,5 +323,27 @@ it.each(['dim', 'blur'] as const)(
       expect(layers.map((layer) => layer.blur)).toEqual([48, 48]);
     }
     expect(args.frame).toEqual(before);
+  }
+);
+
+it.each([false, true])(
+  'preserves mixed lens contour endpoints through the Native consumer (reverse=%s)',
+  (reverse) => {
+    const legacy = { ...createQuickEditSpotlight(), effect: 'magnify' as const, roundness: 0.5 };
+    const circle = { ...legacy, lensShape: 'circle' as const };
+    const from = reverse ? circle : legacy,
+      spotlight = reverse ? legacy : circle;
+    for (const progress of [0, 1]) {
+      const frame = sampleCompositionSpotlightLayer({
+        ...geometry,
+        state: { id: 'link', spotlight, from, phase: 'enter', progress },
+      });
+      const target = resolveSceneSpotlightTarget(
+        progress ? spotlight : from,
+        geometry.window,
+        geometry.scale
+      );
+      expect(sceneSpotlightOpeningPath(frame)).toBe(sceneSpotlightOpeningPath(target));
+    }
   }
 );

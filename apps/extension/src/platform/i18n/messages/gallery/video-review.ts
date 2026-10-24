@@ -45,6 +45,12 @@ export const galleryVideoReviewMessages = defineMessageSource({
   clickLensBorder: { ru: 'Цвет контура', en: 'Outline color' },
   clickMagnification: { ru: 'Увеличение', en: 'Magnification' },
   clickLensShape: { ru: 'Форма линзы', en: 'Lens shape' },
+  focusLensRounded: { ru: 'Прямоугольник', en: 'Rectangle' },
+  focusLensDiameter: { ru: 'Диаметр', en: 'Diameter' },
+  focusLensDiameterHint: {
+    ru: 'От меньшей стороны кадра',
+    en: 'Relative to the shorter frame side',
+  },
   clickLensOptics: { ru: 'Оптика', en: 'Optics' },
   clickLensOptics_flat: { ru: 'Плоская', en: 'Flat' },
   clickLensOptics_optical: { ru: 'Оптическая', en: 'Optical' },

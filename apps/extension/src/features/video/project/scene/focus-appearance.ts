@@ -9,6 +9,8 @@ export interface QuickEditSpotlight {
   /** Lens strength and sampling; absent values keep authored spotlight history unchanged. */
   magnification?: number;
   lensOptics?: 'flat' | 'optical';
+  /** Circle diameter is the larger authored area axis as a fraction of the window's shorter side. */
+  lensShape?: 'circle' | 'rounded';
   /** Glass shoulder width as a percentage of the opening's shorter half-axis. */
   lensEdgeWidth?: number;
   strength: number;
@@ -50,6 +52,9 @@ export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | nu
       value['lensOptics'] !== 'flat' &&
       value['lensOptics'] !== 'optical') ||
     (value['lensEdgeWidth'] !== undefined && !isBoundedNumber(value['lensEdgeWidth'], 1, 30)) ||
+    (value['lensShape'] !== undefined &&
+      value['lensShape'] !== 'circle' &&
+      value['lensShape'] !== 'rounded') ||
     !isBoundedNumber(value['strength'], 0, 1) ||
     !isBoundedNumber(value['blur'], 0, 40) ||
     !isBoundedNumber(value['roundness'], 0, 0.5) ||
@@ -64,6 +69,7 @@ export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | nu
     effect: value['effect'],
     ...(value['magnification'] === undefined ? {} : { magnification: value['magnification'] }),
     ...(value['lensOptics'] === undefined ? {} : { lensOptics: value['lensOptics'] }),
+    ...(value['lensShape'] === undefined ? {} : { lensShape: value['lensShape'] }),
     ...(value['lensEdgeWidth'] === undefined ? {} : { lensEdgeWidth: value['lensEdgeWidth'] }),
     strength: value['strength'],
     blur: value['blur'],
@@ -108,12 +114,52 @@ export function placeQuickEditLens(
   if (value.effect !== 'magnify' || !point) return value;
   return {
     ...value,
-    area: clampQuickEditSpotlightArea({
+    area: {
       ...value.area,
       x: point.x - value.area.width / 2,
       y: point.y - value.area.height / 2,
-    }),
+    },
   };
+}
+
+/** Resolve a circle's normalized pixel-square bounds without changing the authored center. */
+export function resolveQuickEditLensArea(
+  value: QuickEditSpotlight,
+  window: { width: number; height: number }
+): QuickEditSpotlight['area'] {
+  const area = value.area;
+  if (
+    value.effect !== 'magnify' ||
+    value.lensShape !== 'circle' ||
+    window.width <= 0 ||
+    window.height <= 0
+  )
+    return area;
+  const diameter = Math.max(area.width, area.height) * Math.min(window.width, window.height);
+  const width = diameter / window.width,
+    height = diameter / window.height;
+  return {
+    x: area.x + (area.width - width) / 2,
+    y: area.y + (area.height - height) / 2,
+    width,
+    height,
+  };
+}
+
+/** Store a resized circular box as one bounded diameter, keeping existing area admission intact. */
+export function authorQuickEditLensArea(
+  value: QuickEditSpotlight,
+  area: QuickEditSpotlight['area']
+): QuickEditSpotlight['area'] {
+  if (value.effect !== 'magnify' || value.lensShape !== 'circle')
+    return clampQuickEditSpotlightArea(area);
+  const diameter = Math.max(area.width, area.height);
+  return clampQuickEditSpotlightArea({
+    x: area.x + (area.width - diameter) / 2,
+    y: area.y + (area.height - diameter) / 2,
+    width: diameter,
+    height: diameter,
+  });
 }
 
 /** Stable annotation defaults in authored scene pixels. */
@@ -181,4 +227,25 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
     reveal: value['reveal'],
     exitReveal: value['exitReveal'],
   };
+}
+
+/** Ignore floating-point round-trip noise below 1e-10 in normalized geometry. */
+export function areQuickEditSpotlightAreasEqual(
+  a: QuickEditSpotlight['area'],
+  b: QuickEditSpotlight['area']
+): boolean {
+  return (['x', 'y', 'width', 'height'] as const).every(
+    (key) => Math.abs(a[key] - b[key]) <= 1e-10
+  );
+}
+
+/** Constrain derived lens edits while preserving an unchanged admitted source geometry. */
+export function constrainQuickEditLensArea(
+  value: QuickEditSpotlight,
+  area: QuickEditSpotlight['area'],
+  window: { width: number; height: number }
+): QuickEditSpotlight['area'] {
+  const origin = resolveQuickEditLensArea(value, window);
+  if (areQuickEditSpotlightAreasEqual(area, origin)) return origin;
+  return resolveQuickEditLensArea({ ...value, area: authorQuickEditLensArea(value, area) }, window);
 }

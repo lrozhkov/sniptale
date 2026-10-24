@@ -58,13 +58,20 @@ it('switches a Native focus to an optical lens and validates subsequent scale ed
   const lens = editMotionFocus(project, initial, {
     kind: 'spotlight',
     enabled: true,
-    settings: { effect: 'magnify', magnification: 2.5, lensOptics: 'optical', lensEdgeWidth: 4 },
+    settings: {
+      effect: 'magnify',
+      magnification: 2.5,
+      lensOptics: 'optical',
+      lensEdgeWidth: 4,
+      lensShape: 'circle',
+    },
   })!;
   expect(lens.spotlight).toMatchObject({
     effect: 'magnify',
     magnification: 2.5,
     lensOptics: 'optical',
     lensEdgeWidth: 4,
+    lensShape: 'circle',
   });
   expect(
     editMotionFocus(project, lens, { kind: 'spotlight', settings: { magnification: 3 } })?.spotlight
