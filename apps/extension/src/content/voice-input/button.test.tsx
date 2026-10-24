@@ -266,3 +266,67 @@ it('resets an unfinished pointer press when dictation is disabled and enabled ag
   );
   expect(control.onStart).toHaveBeenCalledTimes(2);
 });
+
+it('stops a click recording exactly once when the content activation bridge is installed', async () => {
+  const { useState } = await import('react');
+  const { installContentUiActivationBridge } = await import('../runtime/ui-activation-bridge');
+  const { isTrustedMouseEvent } = await import('../../composition/voice-input/trusted-events');
+  vi.mocked(isTrustedMouseEvent).mockReturnValue(false);
+  const onStart = vi.fn();
+  const onStop = vi.fn();
+  const onCancel = vi.fn();
+  function Field() {
+    const [phase, setPhase] = useState<'idle' | 'listening' | 'processing-asr'>('idle');
+    return (
+      <ContentVoiceInputButton
+        dataUi="bridged-field"
+        disabled={false}
+        labels={{ error: 'Error', start: 'Start', stop: 'Stop' }}
+        onStart={() => {
+          onStart();
+          setPhase('listening');
+        }}
+        onStop={() => {
+          onStop();
+          setPhase('processing-asr');
+        }}
+        onCancel={onCancel}
+        state={{
+          active: phase === 'listening',
+          pending: phase === 'processing-asr',
+          audioLevel: 0,
+          errorCode: null,
+          phase,
+        }}
+      />
+    );
+  }
+  container = document.createElement('div');
+  document.body.append(container);
+  const dispose = installContentUiActivationBridge(container);
+  root = createRoot(container);
+  await act(async () => root?.render(<Field />));
+  const button = container.querySelector('button')!;
+  const press = () => {
+    for (const type of ['pointerdown', 'pointerup']) {
+      const event = new MouseEvent(type, { bubbles: true, button: 0 });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      act(() => button.dispatchEvent(event));
+    }
+    act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+  };
+  try {
+    press();
+    expect(onStart).toHaveBeenCalledOnce();
+    expect(onStop).not.toHaveBeenCalled();
+    press();
+    expect(onStop).toHaveBeenCalledOnce();
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(button.getAttribute('aria-label')).toBe(
+      (await import('../../platform/i18n')).translate('settings.voiceInput.cancel')
+    );
+  } finally {
+    dispose();
+    vi.mocked(isTrustedMouseEvent).mockReturnValue(true);
+  }
+});

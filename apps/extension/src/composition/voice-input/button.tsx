@@ -119,6 +119,7 @@ function EnabledVoiceInputButton(props: VoiceInputButtonProps) {
       aria-pressed={props.state.active}
       className={getVoiceButtonClassName(props)}
       data-ui={props.dataUi}
+      data-sniptale-activation-bridge="off"
       disabled={props.disabled || (stopping && !props.onCancel)}
       style={props.style}
       title={label}

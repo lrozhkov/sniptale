@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { startHostServer } from '../support/host-server';
+import { openRealPopup, sendRuntimeMessage } from '../support/recording-action';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import {
   ASR_MODEL_NAME,
@@ -450,4 +452,113 @@ test('native scenario global model and Cancel prevent late insertion', async ({}
       await settings.close();
     }
   );
+});
+
+test('native content field keeps click recording and applies the saved correction prompt', async ({}, info) => {
+  const host = await startHostServer();
+  try {
+    await withVoiceBrowser(
+      PRIMARY_BROWSER_VIEWPORTS[0].size,
+      'en',
+      async ({ page: settings, extensionId, provider, context }) => {
+        const page = await context.newPage();
+        await page.goto(host.origin);
+        const popup = await openRealPopup(context, extensionId);
+        await popup.evaluate((origin) => {
+          const grant = document.createElement('button');
+          grant.textContent = 'Grant voice test site';
+          grant.onclick = async () => {
+            grant.dataset['granted'] = String(
+              await chrome.permissions.request({ origins: [`${origin}/*`] })
+            );
+          };
+          document.body.append(grant);
+        }, host.origin);
+        const grant = popup.getByRole('button', { name: 'Grant voice test site', exact: true });
+        await grant.click();
+        await expect(grant).toHaveAttribute('data-granted', 'true');
+        const tabId = await popup.evaluate(async (url) => {
+          const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+          if (tab?.id === undefined) throw new Error('Voice source tab missing');
+          return tab.id;
+        }, page.url());
+        await page.reload();
+        expect(
+          await sendRuntimeMessage(popup, {
+            type: 'PAGE_ACCESS',
+            operation: 'register-granted-site',
+            tabId,
+          })
+        ).toMatchObject({ success: true });
+        await popup.evaluate(
+          (id) =>
+            chrome.tabs.sendMessage(id, {
+              type: 'ENABLE_SCREENSHOT_MODE',
+              workingMode: 'highlighter',
+            }),
+          tabId
+        );
+        await page.bringToFront();
+        await ui(page, 'content.toolbar.mode-selector-button').click();
+        await ui(page, 'content.toolbar.mode-option.quick-edit').click();
+        await ui(page, 'content.toolbar.page-editing-mode.ai').click();
+        await page.locator('h1').first().click();
+        const field = page.locator('#ai-prompt');
+        const microphone = ui(page, 'content.ai-modal.prompt-voice-input');
+        await expect(field).toBeVisible();
+        await field.fill('');
+        await microphone.click();
+        await expect(microphone).toHaveAttribute('aria-pressed', 'true');
+        await page.waitForTimeout(800);
+        await expect(microphone).toHaveAttribute('aria-pressed', 'true');
+        await microphone.click();
+        await expect(field).toHaveValue(CORRECTED_TRANSCRIPT);
+        expect(provider.corrections).toEqual([
+          {
+            model: 'synthetic-text',
+            messages: [
+              { role: 'system', content: CORRECTION_PROMPT },
+              { role: 'user', content: RAW_TRANSCRIPT },
+            ],
+          },
+        ]);
+        await voiceScreenshot(page, info, 'content-click-corrected');
+        await settings.bringToFront();
+        const prompt = ui(settings, 'settings.voice.correction-prompt');
+        await prompt.fill('Return only the dictated sentence in uppercase.');
+        await ui(settings, 'settings.voice.prompt-save').click();
+        await expect(ui(settings, 'settings.voice.prompt-save')).toBeDisabled();
+        await page.bringToFront();
+        await field.fill('');
+        await microphone.hover();
+        await page.mouse.down();
+        await page.waitForTimeout(800);
+        await page.mouse.up();
+        await expect(field).toHaveValue(CORRECTED_TRANSCRIPT);
+        expect(provider.corrections).toHaveLength(2);
+        expect(provider.corrections[1]).toMatchObject({
+          messages: [
+            { role: 'system', content: 'Return only the dictated sentence in uppercase.' },
+            { role: 'user', content: RAW_TRANSCRIPT },
+          ],
+        });
+        await settings.bringToFront();
+        await ui(settings, 'settings.voice.correction').click();
+        await page.bringToFront();
+        await field.fill('');
+        await microphone.click();
+        await page.waitForTimeout(800);
+        await microphone.click();
+        await expect(field).toHaveValue(RAW_TRANSCRIPT);
+        expect(provider.corrections).toHaveLength(2);
+        expect(provider.uploads).toHaveLength(3);
+        await popup.close();
+      }
+    );
+  } finally {
+    host.server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      host.server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
 });
