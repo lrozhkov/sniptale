@@ -73,7 +73,7 @@ function getButton(label: string) {
 
 function getModeCycleButton() {
   return container?.querySelector(
-    '[data-ui="shared.ui.color-selector.mode-cycle"]'
+    '[data-ui="shared.ui.color-selector.mode-cycle"][aria-pressed="true"]'
   ) as HTMLButtonElement | null;
 }
 
@@ -175,7 +175,9 @@ async function changeInput(label: string, value: string) {
 async function cycleMode(times = 1) {
   for (let index = 0; index < times; index += 1) {
     await act(async () => {
-      getModeCycleButton()?.click();
+      const active = getModeCycleButton();
+      const buttons = Array.from(active?.parentElement?.querySelectorAll('button') ?? []);
+      buttons[(buttons.indexOf(active!) + 1) % buttons.length]?.click();
     });
   }
 }
@@ -190,13 +192,13 @@ it('routes hue, manual color, footer, and plane interactions through the picker 
   await triggerPlaneInteractions(preparePlane());
   await triggerFormInteractions();
   await act(async () => {
-    getButton('shared.ui.colorSelectorTransparent')?.click();
+    getButton('shared.ui.colorSelectorOriginal')?.click();
   });
 
   expect(onColorChange).toHaveBeenCalled();
   expect(onCancel).toHaveBeenCalledOnce();
   expect(onApply).toHaveBeenCalledOnce();
-  expect(onSelectTransparent).toHaveBeenCalledOnce();
+  expect(onColorChange).toHaveBeenCalledWith('#123456');
 });
 
 it('routes HSL field edits through the same draft update seam', async () => {
@@ -226,7 +228,7 @@ it('renders the eyedropper as an icon-only square action', () => {
   renderPopover();
 
   expect(getButton('shared.ui.colorSelectorEyedropper')?.textContent).toBe('');
-  expect(getButton('shared.ui.colorSelectorEyedropper')?.className).toContain('h-7 w-7');
+  expect(getButton('shared.ui.colorSelectorEyedropper')?.className).toContain('h-8 w-full');
 });
 
 it('keeps invalid and transparent manual input local to the field', async () => {
@@ -309,4 +311,17 @@ it('renders the picker panel inline without floating-ui markers', () => {
     container?.querySelector('[data-ui="shared.ui.color-selector.picker"]')?.className
   ).not.toContain('absolute');
   expect(container?.querySelector('[data-floating-ui-root]')).toBeNull();
+});
+
+it('blocks Apply while the manual color draft is invalid', async () => {
+  const onApply = vi.fn();
+  renderPopover({ onApply });
+  await changeInput('shared.ui.colorSelectorHex', 'broken');
+  await act(async () => getButton('shared.ui.colorSelectorApply')?.click());
+  expect(onApply).not.toHaveBeenCalled();
+  expect(getInput('shared.ui.colorSelectorHex')?.getAttribute('aria-invalid')).toBe('true');
+  expect(document.activeElement).toBe(getInput('shared.ui.colorSelectorHex'));
+  await changeInput('shared.ui.colorSelectorHex', '#abcdef');
+  await act(async () => getButton('shared.ui.colorSelectorApply')?.click());
+  expect(onApply).toHaveBeenCalledOnce();
 });

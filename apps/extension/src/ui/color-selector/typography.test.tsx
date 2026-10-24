@@ -28,6 +28,6 @@ it('uses compact inspector label typography in color selector sections', () => {
     </>
   );
 
-  expect(markup).toContain('text-[12px] font-semibold uppercase');
+  expect(markup).toContain('text-xs');
   expect(markup).not.toContain('tracking-[0.08em]');
 });

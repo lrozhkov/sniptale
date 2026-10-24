@@ -1,3 +1,4 @@
+import { TYPECHECK_PROJECTS } from '../../proof/typecheck/typecheck-project-definitions.mjs';
 import { TARGET_ONLY_PATH_POLICY } from './target-only-path-policy.mjs';
 
 const SOURCE_REFERENCES = [
@@ -35,6 +36,16 @@ function isQualifiedSourceReference(line, index) {
   return /(?:apps\/extension|packages\/[^/]+)\/$/u.test(prefix);
 }
 
+function isQualifiedConfigReference(line, index, reference) {
+  return TYPECHECK_PROJECTS.some((project) =>
+    project.files?.some(
+      (file) =>
+        file.endsWith('/' + reference) &&
+        line.slice(0, index).endsWith(file.slice(0, -reference.length))
+    )
+  );
+}
+
 function lineReferences(line) {
   if (!REFERENCE_HINT.test(line)) return [];
   const matches = [];
@@ -47,7 +58,7 @@ function lineReferences(line) {
         continue;
       if (
         ROOT_CONFIG_REFERENCES.includes(pattern) &&
-        /apps\/extension\/$/u.test(line.slice(0, index))
+        isQualifiedConfigReference(line, index, match[0])
       ) {
         continue;
       }

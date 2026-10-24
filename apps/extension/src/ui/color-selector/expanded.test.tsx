@@ -36,6 +36,6 @@ it('renders manual picker mode labels without legacy letter spacing', () => {
     </>
   );
 
-  expect(markup).toContain('text-[12px] font-semibold uppercase');
+  expect(markup).toContain('text-xs');
   expect(markup).not.toContain('tracking-[0.08em]');
 });

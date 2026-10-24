@@ -205,3 +205,29 @@ it('separates typecheck-control proof triggers from unrelated QA TypeScript test
   ).toBe(true);
   expect(requiresFullTypecheckControlProof(['tooling/qa/wrappers/checkpoint.test.ts'])).toBe(false);
 });
+
+it('checks the canonical reference browser entry with the existing design-system owner', () => {
+  expect(
+    PRODUCTION_TYPECHECK_PROJECTS.find((project) => project.id === 'design-system')?.include
+  ).toContain('tooling/design-reference/pickers/entry.tsx');
+  expect(
+    resolveAffectedTypecheckProjects(['tooling/design-reference/pickers/entry.tsx'], {
+      fileExists: () => true,
+    })
+  ).toMatchObject({
+    mode: 'affected',
+    projectIds: expect.arrayContaining(['design-system', 'design-system-tests']),
+  });
+});
+
+it('routes reference build configuration to the Node owner before its browser owner prefix', () => {
+  for (const file of [
+    'tooling/design-reference/pickers/vite.config.ts',
+    'tooling/design-reference/pickers/shadow-properties.ts',
+  ]) {
+    expect(resolveAffectedTypecheckProjects([file], { fileExists: () => true })).toMatchObject({
+      mode: 'affected',
+      projectIds: ['design-reference-node'],
+    });
+  }
+});

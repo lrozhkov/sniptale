@@ -1,10 +1,29 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
-import { createRoot } from 'react-dom/client';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { createRoot as createReactRoot } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createSolidPaint } from '@sniptale/foundation/paint';
 import { CompactPaintSelector } from '.';
+
+const mountedRoots = new Set<ReturnType<typeof createReactRoot>>();
+function createRoot(container: Element) {
+  const root = createReactRoot(container);
+  mountedRoots.add(root);
+  const unmount = root.unmount.bind(root);
+  root.unmount = () => {
+    mountedRoots.delete(root);
+    unmount();
+  };
+  return root;
+}
+afterEach(() => {
+  act(() => {
+    for (const root of mountedRoots) root.unmount();
+  });
+  document.body.replaceChildren();
+  vi.unstubAllGlobals();
+});
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -45,7 +64,17 @@ beforeEach(() => {
 });
 
 function selectPaintMode(popup: Element, mode: 'solid' | 'linear' | 'radial' | 'conic') {
-  popup.querySelector<HTMLButtonElement>(`[aria-label="highlighter.paintPicker.${mode}"]`)!.click();
+  const label = mode === 'linear' ? 'gradient' : mode;
+  popup
+    .querySelector<HTMLButtonElement>(`button[aria-label="highlighter.paintPicker.${label}"]`)!
+    .click();
+}
+function showAdvanced(popup: Element) {
+  act(() =>
+    popup
+      .querySelector<HTMLButtonElement>('button[aria-label="highlighter.paintPicker.advanced"]')!
+      .click()
+  );
 }
 
 function changeInput(input: HTMLInputElement, value: string) {
@@ -126,31 +155,32 @@ it.each(['default', 'swatch'] as const)(
       popup.querySelectorAll('[data-ui="shared.ui.color-selector.editor-panel"]')
     ).toHaveLength(1);
     expect(popup.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
+    const modeGroup = popup.querySelector(
+      '[role="group"][aria-label="highlighter.paintPicker.mode"]'
+    )!;
     expect(
-      popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.solid"]')
-        ?.textContent
-    ).toBe('');
-    expect(popup.firstElementChild?.firstElementChild?.tagName).toBe('STRONG');
-    expect(popup.firstElementChild?.lastElementChild?.getAttribute('role')).toBe('toolbar');
-    expect(
-      popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.solid"]')
-        ?.className
-    ).toContain('sniptale-glass-icon-button');
-    expect(
-      Array.from(popup.querySelectorAll<HTMLElement>('[role="toolbar"] > button')).map((button) =>
+      Array.from(modeGroup.querySelectorAll('button')).map((button) =>
         button.getAttribute('aria-label')
       )
     ).toEqual([
       'highlighter.paintPicker.solid',
+      'highlighter.paintPicker.gradient',
       'highlighter.paintPicker.presets',
-      'highlighter.paintPicker.linear',
-      'highlighter.paintPicker.radial',
-      'highlighter.paintPicker.conic',
     ]);
-    act(() => selectPaintMode(popup, 'linear'));
-    expect(popup.querySelector('strong')?.textContent).toBe('highlighter.paintPicker.linear');
     expect(
-      popup.querySelectorAll('[aria-label^="highlighter.paintPicker.gradientStop"]')
+      modeGroup
+        .querySelector('[aria-label="highlighter.paintPicker.solid"]')
+        ?.getAttribute('aria-pressed')
+    ).toBe('true');
+    expect(popup.querySelector('[aria-label="highlighter.paintPicker.radial"]')).toBeNull();
+    act(() => selectPaintMode(popup, 'linear'));
+    expect(
+      popup.querySelector('[data-ui="shared.ui.paint-selector.gradient-editor"]')
+    ).not.toBeNull();
+    expect(
+      popup.querySelectorAll(
+        '[data-ui="shared.ui.paint-selector.rail"] button[aria-label^="highlighter.paintPicker.gradientStop"]'
+      )
     ).toHaveLength(2);
     const buttons = Array.from(popup.querySelectorAll<HTMLButtonElement>('button'));
     act(() =>
@@ -193,11 +223,13 @@ it('copies a gradient template into the matching editable mode', () => {
   act(() =>
     popup
       .querySelector<HTMLButtonElement>(
-        '[aria-label="highlighter.paintPicker.copyPreset: Sunset"]'
+        '[aria-label="highlighter.paintPicker.configureTemplate: Sunset"]'
       )!
       .click()
   );
-  expect(popup.querySelector('strong')?.textContent).toBe('highlighter.paintPicker.linear');
+  expect(
+    popup.querySelector('[data-ui="shared.ui.paint-selector.gradient-editor"]')
+  ).not.toBeNull();
   expect(popup.querySelector('[data-ui="shared.ui.paint-selector.templates"]')).toBeNull();
   act(() =>
     Array.from(popup.querySelectorAll<HTMLButtonElement>('button'))
@@ -240,7 +272,7 @@ it('selects a template in place without switching to the editor', () => {
 
   expect(popup.querySelector('[data-ui="shared.ui.paint-selector.templates"]')).not.toBeNull();
   expect(popup.querySelector<HTMLButtonElement>('[aria-label="Sunset"]')?.ariaPressed).toBe('true');
-  expect(layer.style.width).toBe('328px');
+  expect(layer.style.width).toBe('620px');
 
   act(() => root.unmount());
   host.remove();
@@ -267,7 +299,7 @@ it('limits modes and advanced gradient controls for legacy-backed consumers', ()
   expect(popup.querySelector('[aria-label="highlighter.paintPicker.radial"]')).toBeNull();
   expect(popup.querySelector('[aria-label="highlighter.paintPicker.conic"]')).toBeNull();
   act(() => selectPaintMode(popup, 'linear'));
-  expect(popup.querySelector('summary')).toBeNull();
+  expect(popup.querySelector('[aria-label="highlighter.paintPicker.advanced"]')).toBeNull();
   act(() => root.unmount());
   host.remove();
 });
@@ -289,16 +321,18 @@ it('uses compact design-system selects and steppers for gradient controls', () =
   act(() => host.querySelector<HTMLButtonElement>('button')!.click());
   const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
   act(() => selectPaintMode(popup, 'linear'));
+  showAdvanced(popup);
 
   expect(popup.querySelector('select')).toBeNull();
-  expect(popup.querySelectorAll('[data-ui="shared.ui.compact-select"]')).toHaveLength(2);
+  expect(popup.querySelectorAll('[data-ui="shared.ui.compact-select"]')).toHaveLength(3);
   expect(
-    popup.querySelector('[aria-label="highlighter.paintPicker.position increase"]')
+    popup.querySelector('button[aria-label="highlighter.paintPicker.position +"]')
   ).not.toBeNull();
   expect(
-    popup.querySelector<HTMLInputElement>('[aria-label="highlighter.paintPicker.angle"]')
-      ?.parentElement?.className
-  ).toContain('!w-[6.25rem]');
+    popup
+      .querySelector<HTMLInputElement>('input[aria-label="highlighter.paintPicker.angle"]')
+      ?.closest('.sniptale-picker-number')
+  ).not.toBeNull();
 
   act(() => root.unmount());
   host.remove();
@@ -321,6 +355,7 @@ it('keeps the paint popup open when selecting interpolation and repeat options',
   act(() => host.querySelector<HTMLButtonElement>('button')!.click());
   const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
   act(() => selectPaintMode(popup, 'linear'));
+  showAdvanced(popup);
 
   const chooseOption = (triggerLabel: string, optionLabel: string) => {
     act(() => popup.querySelector<HTMLButtonElement>(`[aria-label="${triggerLabel}"]`)!.click());
@@ -363,6 +398,7 @@ it('lets an owned compact listbox close itself on Escape before the paint popup'
   act(() => host.querySelector<HTMLButtonElement>('button')!.click());
   const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
   act(() => selectPaintMode(popup, 'linear'));
+  showAdvanced(popup);
   const trigger = popup.querySelector<HTMLButtonElement>(
     '[aria-label="highlighter.paintPicker.interpolation"]'
   )!;
@@ -382,7 +418,7 @@ it('lets an owned compact listbox close itself on Escape before the paint popup'
   host.remove();
 });
 
-it('keeps gradient templates compact and reveals the borderless copy action on row interaction', () => {
+it('keeps gradient templates in a bounded scroll region with compact configure controls', () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -406,13 +442,21 @@ it('keeps gradient templates compact and reveals the borderless copy action on r
   const templates = popup.querySelector<HTMLElement>(
     '[data-ui="shared.ui.paint-selector.templates"]'
   )!;
+  act(() =>
+    templates
+      .querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.templateGrid"]')!
+      .click()
+  );
   const copy = templates.querySelector<HTMLButtonElement>(
-    '[aria-label="highlighter.paintPicker.copyPreset: Sunset"]'
+    '[aria-label="highlighter.paintPicker.configureTemplate: Sunset"]'
   )!;
-  expect(templates.className).toContain('max-h-[11.25rem]');
-  expect(copy.className).toContain('opacity-0');
-  expect(copy.className).toContain('group-hover:opacity-100');
-  expect(copy.className).toContain('!border-0');
+  const scroll = templates.querySelector<HTMLElement>(
+    '[data-ui="shared.ui.paint-selector.template-scroll"]'
+  )!;
+  expect(scroll.className).toContain('overflow-y-auto');
+  expect(copy.querySelector('.lucide-settings-2')).not.toBeNull();
+  expect(copy.closest('.group')?.className).toContain('h-11');
+  expect(templates.querySelector('.lucide-copy')).toBeNull();
   act(() => root.unmount());
   host.remove();
 });
@@ -466,6 +510,7 @@ it('does not expose pointer-opened select options as keyboard-focused controls',
   const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
   expect(document.activeElement).toBe(popup);
   act(() => selectPaintMode(popup, 'linear'));
+  showAdvanced(popup);
   const trigger = popup.querySelector<HTMLButtonElement>(
     '[aria-label="highlighter.paintPicker.interpolation"]'
   )!;
@@ -534,7 +579,7 @@ it('uses a compact solid-color layout and shows the palette in the same dialog',
   act(() => host.querySelector<HTMLButtonElement>('button')!.click());
   const layer = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.layer"]')!;
   const popup = layer.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
-  expect(layer.style.width).toBe('328px');
+  expect(layer.style.width).toBe('300px');
   expect(popup.querySelector('[data-ui="shared.ui.paint-selector.presets"]')).toBeNull();
   const paletteColor = popup.querySelector<HTMLButtonElement>('[aria-label="Fill: #123456"]')!;
   act(() => paletteColor.click());
@@ -603,7 +648,7 @@ it('keeps dismissal and focus traversal inside a Shadow DOM paint popup', async 
     '[data-ui="shared.ui.paint-selector.popup"]'
   )!;
   const mode = popup.querySelector<HTMLButtonElement>(
-    '[aria-label="highlighter.paintPicker.linear"]'
+    'button[aria-label="highlighter.paintPicker.gradient"]'
   )!;
   act(() => {
     mode.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));

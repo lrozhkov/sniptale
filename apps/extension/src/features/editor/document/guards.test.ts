@@ -334,3 +334,30 @@ it('retains image provenance strings even when they exceed window header display
     })
   ).toBe(true);
 });
+
+it('accepts additive complete linear frame gradients and rejects invalid imported gradient contracts', () => {
+  const source = createEditorDocumentFixture();
+  const backgroundGradient = {
+    type: 'linear',
+    angle: 45,
+    interpolation: 'oklab',
+    repeat: { enabled: true, span: 0.5 },
+    stops: [
+      { id: 'a', color: '#ff000080', position: 0, midpoint: 0.2 },
+      { id: 'b', color: '#0000ffff', position: 1, midpoint: 0.5 },
+    ],
+  };
+  expect(isEditorDocument({ ...source, frame: { ...source.frame, backgroundGradient } })).toBe(
+    true
+  );
+  for (const invalid of [
+    null,
+    {},
+    { ...backgroundGradient, interpolation: 'other' },
+    { ...backgroundGradient, stops: [{ id: 'only', color: '#fff', position: 0 }] },
+  ]) {
+    expect(
+      isEditorDocument({ ...source, frame: { ...source.frame, backgroundGradient: invalid } })
+    ).toBe(false);
+  }
+});

@@ -187,7 +187,7 @@ describe('shared/ui/color-selector eyedropper', () => {
     await flushPromises();
 
     expect(receivedSignal?.aborted).toBe(false);
-    expect(getButton('shared.ui.colorSelectorEyedropper')?.disabled).toBe(true);
+    expect(getButton('shared.ui.colorSelectorEyedropper')?.getAttribute('aria-busy')).toBe('true');
     await act(async () => resolvePick?.({ sRGBHex: '#14b8a6' }));
     expect(onPreviewChange).toHaveBeenCalledWith('#14b8a6');
   });

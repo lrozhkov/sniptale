@@ -41,4 +41,4 @@ Use [Font families](fonts.md) for replacement and installation, [Field accessori
 
 The [catalog](../../tooling/design-reference/index.html) is the only example index. Each group has one page and one rule entry. Entries route focused subtopics without copying rules. The [tool guide](../../tooling/design-reference/README.md) explains local serving and the runtime boundary. [Verification](verification.md) defines the acceptance checks and unproven integration boundaries. [Coverage](coverage.md) maps inspected product surfaces to this reference.
 
-The existing product color selector remains authoritative for its complete picker UI. Circular checkbox geometry, glass tuning, and the thin slider track remain proposed visual decisions pending user acceptance. Do not claim full accessibility compliance from prototype checks.
+The layers sandbox demonstrates the complete color and gradient pickers. [Layers](layers.md#color-and-gradient-editors) defines their accepted behavior. Circular checkbox geometry and unrelated glass tuning remain proposed decisions. Do not claim full accessibility compliance from prototype checks.

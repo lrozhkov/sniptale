@@ -65,9 +65,11 @@ vi.mock('../../../../ui/paint-selector', () => ({
                   gradient: {
                     type: 'linear',
                     angle: 45,
+                    interpolation: 'oklab',
+                    repeat: { enabled: true, span: 0.3 },
                     stops: [
-                      { color: '#123123ff', position: 0 },
-                      { color: '#ffffffff', position: 1 },
+                      { id: 'first', color: '#123123ff', position: 0, midpoint: 0.2 },
+                      { id: 'last', color: '#ffffffff', position: 1, midpoint: 0.5 },
                     ],
                   },
                 }
@@ -241,7 +243,13 @@ it('renders the gradient branch and forwards gradient actions', async () => {
       )
       ?.click();
   });
-  expect(applyGradientPreset).toHaveBeenCalledOnce();
+  expect(applyGradientPreset).not.toHaveBeenCalled();
+  expect(applyFramePatch).toHaveBeenCalledWith(
+    expect.objectContaining({
+      backgroundGradient: expect.objectContaining({ type: 'linear' }),
+      backgroundMode: 'gradient',
+    })
+  );
 
   await act(async () => {
     (
@@ -249,10 +257,21 @@ it('renders the gradient branch and forwards gradient actions', async () => {
     )?.click();
   });
 
-  expect(applyGradientPreset).toHaveBeenCalledOnce();
+  expect(applyGradientPreset).not.toHaveBeenCalled();
+  expect(applyFramePatch).toHaveBeenCalledWith(
+    expect.objectContaining({
+      backgroundGradient: expect.objectContaining({ type: 'linear' }),
+      backgroundMode: 'gradient',
+    })
+  );
   expect(previewFramePatch).not.toHaveBeenCalled();
   expect(applyFramePatch).toHaveBeenCalledWith(
     expect.objectContaining({
+      backgroundGradient: expect.objectContaining({
+        interpolation: 'oklab',
+        repeat: { enabled: true, span: 0.3 },
+        stops: expect.arrayContaining([expect.objectContaining({ id: 'first', midpoint: 0.2 })]),
+      }),
       backgroundGradientAngle: 45,
       backgroundGradientFrom: '#123123ff',
       backgroundGradientTo: '#ffffffff',

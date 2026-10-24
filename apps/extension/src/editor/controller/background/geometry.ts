@@ -22,7 +22,11 @@ export function createBackgroundGradient(
   size: BackgroundCanvasSize,
   frame: EditorFrameSettings
 ): Gradient<'linear'> {
-  const angleRad = ((normalizeGradientAngle(frame.backgroundGradientAngle) - 90) * Math.PI) / 180;
+  const angleRad =
+    ((normalizeGradientAngle(frame.backgroundGradient?.angle ?? frame.backgroundGradientAngle) -
+      90) *
+      Math.PI) /
+    180;
   const centerX = size.width / 2;
   const centerY = size.height / 2;
   const radius =
@@ -39,10 +43,12 @@ export function createBackgroundGradient(
       x2: centerX + deltaX,
       y2: centerY + deltaY,
     },
-    colorStops: normalizeEditorFrameGradientColorStops(frame).map((stop) => ({
-      offset: stop.offset,
-      color: createEditorGradientColorStopColor(stop),
-    })),
+    colorStops: frame.backgroundGradient
+      ? frame.backgroundGradient.stops.map((stop) => ({ offset: stop.position, color: stop.color }))
+      : normalizeEditorFrameGradientColorStops(frame).map((stop) => ({
+          offset: stop.offset,
+          color: createEditorGradientColorStopColor(stop),
+        })),
   });
 }
 

@@ -261,6 +261,7 @@ function createPresetHeaderArgs(
       localState.setFrameDraft((state) => ({
         ...state,
         ...settings,
+        backgroundGradient: settings.backgroundGradient,
         sourceImage: normalizeEditorImageSettings(settings.sourceImage ?? state.sourceImage),
       }));
     },

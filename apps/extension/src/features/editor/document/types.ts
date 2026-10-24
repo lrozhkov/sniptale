@@ -1,3 +1,4 @@
+import type { LinearGradient } from '@sniptale/foundation/paint';
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { BorderPreset } from '../../highlighter/contracts';
 import type { EditorRasterEffect } from './effects';
@@ -75,6 +76,8 @@ export interface EditorFrameSettings {
   backgroundGradientStops?: string[] | undefined;
   backgroundGradientColorStops?: EditorGradientColorStop[] | undefined;
   backgroundGradientAngle: number;
+  /** Complete gradient; omitted for legacy documents. */
+  backgroundGradient?: LinearGradient | undefined;
   backgroundImageData: string | null;
   backgroundImageFit: EditorBackgroundImageFit;
   sourceImage?: EditorImageSettings;

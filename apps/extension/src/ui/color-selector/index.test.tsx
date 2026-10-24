@@ -341,21 +341,21 @@ it('renders the translated transparent value in the picker trigger', () => {
   expect(container?.textContent).toContain('shared.ui.colorSelectorTransparent');
 });
 
-it('previews transparent from the picker toolbar and commits it only on apply', async () => {
+it('previews zero alpha and commits it only on apply', async () => {
   const onChange = vi.fn();
   const onPreviewChange = vi.fn();
   renderSelector({ onChange, onPreviewChange });
 
   await openPicker();
-  await clickButton('shared.ui.colorSelectorTransparent');
+  await changeInput('shared.ui.colorSelectorAlpha', '0');
 
-  expect(onPreviewChange).toHaveBeenCalledWith('transparent');
+  expect(onPreviewChange).toHaveBeenCalledWith('#12345600');
   expect(onChange).not.toHaveBeenCalled();
   expect(getButton('shared.ui.colorSelectorApply')).toBeDefined();
 
   await clickButton('shared.ui.colorSelectorApply');
 
-  expect(onChange).toHaveBeenCalledWith('transparent');
+  expect(onChange).toHaveBeenCalledWith('#12345600');
 });
 
 it('reopens the picker with its palette after cancellation', async () => {

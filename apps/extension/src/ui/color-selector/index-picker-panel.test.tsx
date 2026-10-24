@@ -50,7 +50,7 @@ function getTextInput(label: string) {
 
 function getModeCycleButton() {
   return document.body.querySelector(
-    '[data-ui="shared.ui.color-selector.mode-cycle"]'
+    '[data-ui="shared.ui.color-selector.mode-cycle"][aria-pressed="true"]'
   ) as HTMLButtonElement | null;
 }
 
@@ -69,7 +69,9 @@ async function clickButton(label: string) {
 async function cycleMode(times = 1) {
   for (let index = 0; index < times; index += 1) {
     await act(async () => {
-      getModeCycleButton()?.click();
+      const active = getModeCycleButton();
+      const buttons = Array.from(active?.parentElement?.querySelectorAll('button') ?? []);
+      buttons[(buttons.indexOf(active!) + 1) % buttons.length]?.click();
     });
   }
 }
@@ -135,27 +137,19 @@ it('cycles the visible field group through HEX, RGB, and HSL from the label-row 
   expect(getTextInput('shared.ui.colorSelectorHue')).toBeUndefined();
 });
 
-it('places the compact opacity control after the active color-format fields', async () => {
+it('places stacked opacity before format fields and preserves the footer', async () => {
   renderSelector();
   await clickButton('shared.ui.colorSelectorChooseColor');
-
-  const formatFields = document.body.querySelector(
+  const formats = document.body.querySelector(
     '[data-ui="shared.ui.color-selector.mode-label-row"]'
-  )?.parentElement;
+  );
   const opacity = document.body.querySelector('[data-ui="shared.ui.color-selector.opacity"]');
-  const opacityField = opacity?.querySelector<HTMLInputElement>('input[type="text"]');
-  const footer = getButton('shared.ui.colorSelectorApply')?.parentElement;
-
-  expect(formatFields?.compareDocumentPosition(opacity!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(opacityField?.type).toBe('text');
-  expect(opacity?.querySelector('[data-appearance="plain"]')).not.toBeNull();
-  expect(opacityField?.parentElement?.className).toContain('group/compact-numeric');
-  expect(
-    opacity?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
-  ).not.toBeNull();
-  expect(opacity?.querySelector('.sniptale-color-selector-alpha-range')).toBeNull();
-  expect(opacity?.compareDocumentPosition(footer!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(footer?.className).not.toContain('sticky');
+  expect(opacity?.compareDocumentPosition(formats!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(opacity?.querySelector('input[type="number"]')).not.toBeNull();
+  expect(opacity?.querySelector('input[type="range"]')).not.toBeNull();
+  expect(opacity?.compareDocumentPosition(getButton('shared.ui.colorSelectorApply')!)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING
+  );
 });
 
 it('labels the compact format switch and retains its hover and keyboard target', async () => {
@@ -168,7 +162,7 @@ it('labels the compact format switch and retains its hover and keyboard target',
   );
 
   expect(modeCycleButton?.textContent).toBe('shared.ui.colorSelectorHex');
-  expect(modeCycleButton?.className).toContain('hover:bg-');
+  expect(modeCycleButton?.className).toContain('focus-visible:outline-1');
   expect(labelRow?.textContent).toContain('shared.ui.colorSelectorHex');
 });
 

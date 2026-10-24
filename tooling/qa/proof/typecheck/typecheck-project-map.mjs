@@ -5,6 +5,7 @@ import { fromRelativePath } from '../../analysis/repository/shared-paths.mjs';
 import {
   FULL_TYPECHECK_PROJECT_IDS,
   OWNER_TEST_TYPECHECK_PROJECTS,
+  REFERENCE_NODE_TYPECHECK_PROJECT,
   PRODUCTION_TYPECHECK_PROJECTS,
   TEST_HARNESS_TYPECHECK_PROJECT,
   TYPECHECK_PROJECT_DEFINITIONS_PATH,
@@ -112,6 +113,9 @@ function collectReverseDependents(projectIds) {
 }
 
 function resolveDirectProjectId(file) {
+  if (REFERENCE_NODE_TYPECHECK_PROJECT.files.includes(file))
+    return REFERENCE_NODE_TYPECHECK_PROJECT.id;
+
   if (file === 'apps/extension/src/vite-env.d.ts') {
     return null;
   }

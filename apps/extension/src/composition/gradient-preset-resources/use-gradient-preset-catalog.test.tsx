@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   reorder: vi.fn(),
   reset: vi.fn(),
   update: vi.fn(),
+  rename: vi.fn(),
   toast: vi.fn(),
   locale: 'en',
 }));
@@ -32,6 +33,7 @@ vi.mock('../persistence/gradient-presets', async (importOriginal) => ({
   toggleGradientPresetFavoriteForSurface: mocks.favorite,
   toggleGradientPresetEnabled: mocks.enabled,
   updateGradientPreset: mocks.update,
+  renameGradientPreset: mocks.rename,
 }));
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.toast }));
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -61,6 +63,7 @@ beforeEach(() => {
   mocks.reorder.mockResolvedValue('applied');
   mocks.reset.mockResolvedValue('applied');
   mocks.update.mockResolvedValue('applied');
+  mocks.rename.mockResolvedValue('applied');
   vi.clearAllMocks();
   mocks.load.mockResolvedValue(catalog);
   mocks.subscribe.mockReturnValue(vi.fn());
@@ -72,6 +75,7 @@ beforeEach(() => {
   mocks.reorder.mockResolvedValue('applied');
   mocks.reset.mockResolvedValue('applied');
   mocks.update.mockResolvedValue('applied');
+  mocks.rename.mockResolvedValue('applied');
 });
 
 afterEach(() => {
@@ -217,4 +221,40 @@ it('does not publish an older post-mutation refresh over a newer result', async 
   await act(async () => resolveOlder(olderCatalog));
   await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
   expect(resources.presets.find((preset) => preset.id === 'user-race')?.name).toBe('Newer');
+});
+
+it('renames through the locked owner without resubmitting a stale gradient', async () => {
+  let resources!: ReturnType<typeof useGradientPresetCatalog>;
+  function View() {
+    resources = useGradientPresetCatalog('highlighter-frame-fill');
+    return null;
+  }
+  await act(async () => root?.render(<View />));
+  await act(async () => {
+    await resources.actions.onRename('user-concurrent', 'Renamed');
+  });
+  expect(mocks.rename).toHaveBeenCalledWith('user-concurrent', 'Renamed');
+  expect(mocks.update).not.toHaveBeenCalled();
+});
+
+it('keeps accepted saves accepted if the subsequent refresh fails', async () => {
+  let resources!: ReturnType<typeof useGradientPresetCatalog>;
+  function View() {
+    resources = useGradientPresetCatalog('highlighter-frame-fill');
+    return null;
+  }
+  await act(async () => root?.render(<View />));
+  mocks.load.mockRejectedValueOnce(new Error('read unavailable'));
+  let accepted: boolean | undefined;
+  await act(async () => {
+    accepted = await resources.actions.onSave(
+      'Mine',
+      createDefaultGradientPresetCatalog().presets[0]!.gradient,
+      'fixed-save-id'
+    );
+  });
+  expect(accepted).toBe(true);
+  expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({ id: 'fixed-save-id' }));
+  expect(mocks.toast).toHaveBeenCalledWith('en:highlighter.paintPicker.loadError', 'error');
+  expect(mocks.toast).not.toHaveBeenCalledWith('en:highlighter.paintPicker.saveError', 'error');
 });

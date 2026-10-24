@@ -38,3 +38,29 @@ it('defaults legacy blur and rejects explicitly invalid blur values', () => {
     expect(parseSceneBackgroundSettings({ ...base, backgroundBlurAmount })).toBeNull();
   }
 });
+
+it('retains complete scene gradients and rejects malformed canonical gradients', () => {
+  const backgroundGradient = {
+    type: 'linear',
+    angle: 37,
+    interpolation: 'srgb-linear',
+    repeat: { enabled: true, span: 0.25 },
+    stops: [
+      { id: 'a', color: '#ff000080', position: 0, midpoint: 0.2 },
+      { id: 'b', color: '#0000ffff', position: 1, midpoint: 0.5 },
+    ],
+  };
+  const base = createDefaultEditorPresetStorageState().sceneBackground.presets[0]!.settings;
+  expect(parseSceneBackgroundSettings({ ...base, backgroundGradient })?.backgroundGradient).toEqual(
+    backgroundGradient
+  );
+  expect(
+    parseSceneBackgroundSettings({
+      ...base,
+      backgroundGradient: {
+        ...backgroundGradient,
+        stops: [{ id: 'a', color: 'bad', position: 0 }],
+      },
+    })
+  ).toBeNull();
+});

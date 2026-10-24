@@ -14,7 +14,9 @@ Open [the reference catalog](http://127.0.0.1:8780/tooling/design-reference/). U
 
 ## Boundaries
 
-The examples establish visual and interaction references. They do not replace product state owners or specialized engines. The existing application component catalog demonstrates actual product components as migration proceeds. The external scene exercise and historical trials remain outside this tool. Agent-tooling packaging is a separate task.
+The examples establish visual and interaction references. They do not replace product state owners or specialized engines. This tool is the active sandbox. Do not add migration examples to the historical `apps/extension/src/design-system` catalog. The external scene exercise and historical trials remain outside this tool. Agent-tooling packaging is a separate task.
+
+The Layers page contains the complete product color and gradient panels. Starting this server builds their reference adapter into the ignored `.generated` folder. Each panel uses an open Shadow DOM to isolate its product styles from the sandbox shell. The adapter retains canonical tokens, geometry, and interactions. Reference templates stay in memory. They do not change the extension's template catalog. The reference density preference uses a separate local key.
 
 Use the group catalog and its Rules tab. [Verification](../../docs/design/verification.md) defines visual and interaction proof.
 

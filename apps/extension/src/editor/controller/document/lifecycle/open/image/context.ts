@@ -31,6 +31,7 @@ function resolveOpenedImageFrame(frame: EditorStoreState['frame']): EditorFrameS
     backgroundGradientStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientStops,
     backgroundGradientColorStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientColorStops,
     backgroundGradientTo: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientTo,
+    backgroundGradient: undefined,
     backgroundGradientAngle: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientAngle,
     backgroundImageData: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundImageData,
     backgroundImageFit: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundImageFit,

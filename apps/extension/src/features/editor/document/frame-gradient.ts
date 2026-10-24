@@ -1,6 +1,8 @@
+import { parsePaint, serializePaintToCss, type LinearGradient } from '@sniptale/foundation/paint';
 import type { EditorFrameSettings } from './types';
 import {
   createEditorGradientCssStops,
+  createEditorGradientColorStopColor,
   createEditorGradientFallbackStops,
   normalizeEditorGradientColorList,
   normalizeEditorGradientStops,
@@ -34,11 +36,13 @@ export function createEditorFrameGradientPatch(
   | 'backgroundGradientFrom'
   | 'backgroundGradientTo'
   | 'backgroundGradientStops'
+  | 'backgroundGradient'
 > {
   const normalizedColorStops = normalizeEditorFrameGradientPatchStops(frame, stops);
   const normalizedStops = normalizedColorStops.map((stop) => stop.color);
 
   return {
+    backgroundGradient: undefined,
     backgroundGradientFrom: normalizedStops[0] ?? frame.backgroundGradientFrom,
     backgroundGradientTo: normalizedStops.at(-1) ?? frame.backgroundGradientTo,
     backgroundGradientStops: normalizedStops,
@@ -62,8 +66,12 @@ export function normalizeEditorFrameGradientColorStops(
 export function createEditorFrameGradientCss(
   frame: FrameGradientSource & {
     backgroundGradientAngle: number;
+    backgroundGradient?: LinearGradient | undefined;
   }
 ): string {
+  if (frame.backgroundGradient) {
+    return serializePaintToCss({ kind: 'gradient', gradient: frame.backgroundGradient });
+  }
   return `linear-gradient(${frame.backgroundGradientAngle}deg, ${createEditorGradientCssStops(
     normalizeEditorFrameGradientColorStops(frame)
   )})`;
@@ -91,4 +99,46 @@ function isEditorGradientColorStopList(
   stops: readonly string[] | readonly EditorGradientColorStop[]
 ): stops is readonly EditorGradientColorStop[] {
   return stops.some((stop) => typeof stop !== 'string');
+}
+
+/** Parse the optional complete frame gradient at document and preset boundaries. */
+export function parseEditorFrameGradient(value: unknown): LinearGradient | null | undefined {
+  if (value === undefined) return undefined;
+  const paint = parsePaint({ kind: 'gradient', gradient: value });
+  return paint?.kind === 'gradient' && paint.gradient.type === 'linear' ? paint.gradient : null;
+}
+
+/** Resolve complete gradients while retaining the legacy visual interpretation. */
+export function resolveEditorFrameGradient(
+  frame: FrameGradientSource & {
+    backgroundGradientAngle: number;
+    backgroundGradient?: LinearGradient | undefined;
+  }
+): LinearGradient {
+  if (frame.backgroundGradient) return structuredClone(frame.backgroundGradient);
+  return {
+    type: 'linear',
+    angle: frame.backgroundGradientAngle,
+    interpolation: 'srgb',
+    repeat: { enabled: false, span: 1 },
+    stops: normalizeEditorFrameGradientColorStops(frame).map((stop, index) => ({
+      id: `editor-background-stop-${index}`,
+      color: createEditorGradientColorStopColor(stop),
+      position: stop.offset,
+      midpoint: 0.5,
+    })),
+  };
+}
+
+/** Preserve the canonical gradient and maintain legacy read compatibility. */
+export function createEditorFramePaintGradientPatch(gradient: LinearGradient) {
+  return {
+    ...createEditorFrameGradientPatch(
+      { backgroundGradientFrom: '#00000000', backgroundGradientTo: '#00000000' },
+      gradient.stops.map((stop) => ({ color: stop.color, offset: stop.position }))
+    ),
+    backgroundGradientAngle: gradient.angle,
+    backgroundGradient: structuredClone(gradient),
+    backgroundMode: 'gradient' as const,
+  };
 }

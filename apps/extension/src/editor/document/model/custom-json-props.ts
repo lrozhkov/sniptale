@@ -16,6 +16,7 @@ export const CUSTOM_JSON_PROPS = [
   'sniptaleBackgroundGradientStops',
   'sniptaleBackgroundGradientColorStops',
   'sniptaleBackgroundGradientAngle',
+  'sniptaleBackgroundGradient',
   'sniptaleDrawingJson',
   'sniptaleScenarioBlurJson',
   'sniptaleImageOpacity',

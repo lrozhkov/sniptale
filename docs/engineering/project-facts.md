@@ -77,6 +77,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/library-lifecycle`
 - `apps/extension/src/composition/persistence/managed-preset-order`
 - `apps/extension/src/composition/persistence/media-library`
+- `apps/extension/src/composition/persistence/picker-preferences`
 - `apps/extension/src/composition/persistence/popup-export-preferences`
 - `apps/extension/src/composition/persistence/privacy-erasure`
 - `apps/extension/src/composition/persistence/project-export-inputs`
@@ -96,6 +97,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/video-preview-cache`
 - `apps/extension/src/composition/persistence/voice-input-history`
 - `apps/extension/src/composition/persistence/web-snapshots`
+- `apps/extension/src/composition/picker-preferences`
 - `apps/extension/src/composition/surface-style-preset-resources`
 - `apps/extension/src/composition/voice-input`
 - `apps/extension/src/contracts/aggregate-promotion.ts`

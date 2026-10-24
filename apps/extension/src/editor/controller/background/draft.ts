@@ -5,6 +5,7 @@ export function resetFrameBackgroundDraft(): Pick<
   EditorFrameSettings,
   | 'backgroundColor'
   | 'backgroundBlurAmount'
+  | 'backgroundGradient'
   | 'backgroundGradientAngle'
   | 'backgroundGradientColorStops'
   | 'backgroundGradientFrom'
@@ -17,6 +18,7 @@ export function resetFrameBackgroundDraft(): Pick<
   return {
     backgroundBlurAmount: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundBlurAmount,
     backgroundColor: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundColor,
+    backgroundGradient: undefined,
     backgroundGradientAngle: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientAngle,
     backgroundGradientColorStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientColorStops,
     backgroundGradientFrom: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientFrom,

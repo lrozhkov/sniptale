@@ -2,6 +2,7 @@ import {
   DEFAULT_WINDOW_HEADER,
   parseWindowHeader,
 } from '@sniptale/runtime-contracts/window-header';
+import { parseEditorFrameGradient } from './frame-gradient';
 import type { EditorDocument } from './types';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import {
@@ -90,6 +91,7 @@ function isEditorFrameSettings(value: unknown): boolean {
     isOptionalStringArray(value['backgroundGradientStops']) &&
     isOptionalGradientColorStopArray(value['backgroundGradientColorStops']) &&
     isNumber(value['backgroundGradientAngle']) &&
+    parseEditorFrameGradient(value['backgroundGradient']) !== null &&
     isNullableString(value['backgroundImageData']) &&
     isString(value['backgroundImageFit']) &&
     BACKGROUND_IMAGE_FITS.has(value['backgroundImageFit']) &&

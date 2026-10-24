@@ -16,6 +16,7 @@ export function assignBackgroundMetadata(object: FabricObject, frame: EditorFram
   object.sniptaleBackgroundGradientTo = frame.backgroundGradientTo;
   object.sniptaleBackgroundGradientStops = frame.backgroundGradientStops;
   object.sniptaleBackgroundGradientColorStops = frame.backgroundGradientColorStops;
+  object.sniptaleBackgroundGradient = frame.backgroundGradient;
   object.sniptaleBackgroundGradientAngle = frame.backgroundGradientAngle;
 }
 
@@ -46,4 +47,5 @@ export function convertBackgroundDuplicateToAnnotation(object: FabricObject): vo
   Reflect.deleteProperty(object, 'sniptaleBackgroundGradientStops');
   Reflect.deleteProperty(object, 'sniptaleBackgroundGradientColorStops');
   Reflect.deleteProperty(object, 'sniptaleBackgroundGradientAngle');
+  Reflect.deleteProperty(object, 'sniptaleBackgroundGradient');
 }

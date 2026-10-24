@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { build } from 'vite';
+import { resolve } from 'node:path';
 import type { Server } from 'node:http';
 import { writeFile } from 'node:fs/promises';
 import { createDesignReferenceServer } from '../../../design-reference/server.mjs';
@@ -10,6 +12,10 @@ let origin: string;
 test.use({ actionTimeout: 10_000 });
 
 test.beforeAll(async () => {
+  await build({
+    configFile: resolve('tooling/design-reference/pickers/vite.config.ts'),
+    logLevel: 'error',
+  });
   server = createDesignReferenceServer();
   await new Promise<void>((resolve, reject) => {
     server!.once('error', reject);
@@ -427,6 +433,141 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         path: info.outputPath('composition-module-closure.png'),
         fullPage: false,
       });
+    });
+  }
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`reference picker geometry and editing ${viewport.name} ${theme}`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await page.goto(`${origin}examples/layers/?view=${theme}&mode=examples&lang=ru`);
+      const color = page.locator(
+        '[data-picker-reference="color"] [data-ui="shared.ui.color-selector.picker"]'
+      );
+      await expect(color).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect(color).toHaveCSS('width', '304px');
+      const plane = color.locator('.sniptale-color-plane');
+      const short = viewport.size.height <= 650;
+      await expect(plane).toHaveCSS('height', short ? '106px' : '154px');
+      const swatch = color
+        .locator('[data-ui="shared.ui.color-selector.picker-palette"] button')
+        .first()
+        .locator('span')
+        .first();
+      await expect(swatch).toHaveCSS('width', '18px');
+      await expect(swatch).toHaveCSS('height', '18px');
+      expect(
+        await swatch.evaluate((element) => parseFloat(getComputedStyle(element).borderRadius))
+      ).toBeGreaterThanOrEqual(9);
+      await expect(color.locator('.sniptale-color-plane-ring')).toHaveCSS(
+        'border-top-color',
+        'rgb(255, 255, 255)'
+      );
+      const initialHeight = (await color.boundingBox())!.height;
+      expect(Math.abs(initialHeight - (short ? 418 : 466))).toBeLessThanOrEqual(1);
+      const hex = color.getByRole('textbox', { name: 'HEX', exact: true });
+      await expect(hex).toHaveValue('#FA7116');
+      await expect(hex).toHaveCSS('border-top-width', '1px');
+      await hex.fill('#33669980');
+      await hex.press('Enter');
+      await expect(
+        color.getByRole('spinbutton', { name: 'Прозрачность', exact: true })
+      ).toHaveValue('50');
+      await color.getByRole('button', { name: 'Исходный', exact: true }).click();
+      await expect(hex).toHaveValue('#FA7116');
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+      const copy = color.getByRole('button', { name: 'Копировать цвет', exact: true });
+      await copy.click();
+      await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toBe('#FA7116A6');
+      await expect(copy).toBeEnabled();
+      await expect(copy).toHaveCSS('cursor', 'pointer');
+      await color.getByRole('button', { name: 'RGB', exact: true }).click();
+      await expect(color.locator('.sniptale-picker-number')).toHaveCount(4);
+      await color.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('picker-color-full.png'), fullPage: false });
+      await color.getByRole('button', { name: 'Компактный режим', exact: true }).click();
+      await expect(color.getByRole('textbox', { name: 'HEX', exact: true })).toHaveCount(0);
+      expect(
+        Math.abs((await color.boundingBox())!.height - (short ? 290 : 338))
+      ).toBeLessThanOrEqual(1);
+      await color.getByRole('button', { name: 'Полный режим', exact: true }).click();
+      const paint = page.locator(
+        '[data-picker-reference="paint"] [data-ui="shared.ui.paint-selector.popup"]'
+      );
+      await paint.scrollIntoViewIfNeeded();
+      await expect(paint).toHaveCSS('width', '620px');
+      await expect(paint.locator('[data-ui="shared.ui.paint-selector.canvas"]')).toHaveCSS(
+        'height',
+        '106px'
+      );
+      const direction = paint.locator('[data-gradient-handle="direction"]');
+      const before = Number(await direction.getAttribute('aria-valuenow'));
+      await direction.focus();
+      await direction.press('ArrowRight');
+      await expect(direction).toHaveAttribute('aria-valuenow', String((before + 1) % 360));
+      await direction.press('Control+z');
+      await expect(direction).toHaveAttribute('aria-valuenow', String(before));
+      await direction.press('Control+Shift+z');
+      await expect(direction).toHaveAttribute('aria-valuenow', String((before + 1) % 360));
+      const handle = (await direction.boundingBox())!;
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+      await page.mouse.down();
+      await expect
+        .poll(() => direction.evaluate((element) => getComputedStyle(element).cursor))
+        .toBe('none');
+      await page.mouse.move(handle.x + 20, handle.y + 25);
+      await page.mouse.up();
+      await expect
+        .poll(() => direction.evaluate((element) => getComputedStyle(element).cursor))
+        .not.toBe('none');
+      await paint.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('picker-gradient-full.png'), fullPage: false });
+      const footerBefore = (await paint.boundingBox())!.height;
+      await paint.getByRole('button', { name: 'Сохранить в шаблоны', exact: true }).click();
+      const save = page.locator(
+        '[data-picker-reference="paint"] [data-ui="shared.ui.paint-selector.template-save"]'
+      );
+      await expect(save).toBeVisible();
+      await expect(save).toHaveCSS('height', '82px');
+      expect(Math.abs((await paint.boundingBox())!.height - footerBefore)).toBeLessThanOrEqual(1);
+      await save.getByRole('textbox').fill('Проверка миграции');
+      await save.getByRole('button', { name: 'Сохранить', exact: true }).click();
+      const templates = paint.locator('[data-ui="shared.ui.paint-selector.templates"]');
+      await expect(
+        templates.getByRole('button', { name: 'Проверка миграции', exact: true })
+      ).toBeVisible();
+      await paint.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('picker-templates.png'), fullPage: false });
+      await paint.getByRole('button', { name: 'Градиент', exact: true }).first().click();
+      await paint.getByRole('button', { name: 'Компактный режим', exact: true }).click();
+      await expect(paint.locator('[data-ui="shared.ui.paint-selector.canvas"]')).toHaveCSS(
+        'height',
+        '80px'
+      );
+      await page.screenshot({
+        path: info.outputPath('picker-gradient-compact.png'),
+        fullPage: false,
+      });
+      await page
+        .locator('[data-picker-reference="paint"]')
+        .getByRole('button', { name: 'Редактор шаблона', exact: true })
+        .click();
+      const toolbar = paint.locator('[data-ui="shared.ui.paint-selector.stop-toolbar"]');
+      const name = toolbar.getByRole('textbox', { name: 'Название шаблона', exact: true });
+      await name.fill('Мой градиент');
+      await expect(name).toHaveValue('Мой градиент');
+      await expect(name).toHaveCSS('height', '28px');
+      const nameBox = (await name.boundingBox())!;
+      const toolbarBox = (await toolbar.boundingBox())!;
+      expect(Math.abs(nameBox.y - toolbarBox.y)).toBeLessThanOrEqual(0.5);
+      expect(nameBox.x).toBeCloseTo(toolbarBox.x, 0);
+      await page.screenshot({ path: info.outputPath('picker-template-name.png'), fullPage: false });
     });
   }
 }

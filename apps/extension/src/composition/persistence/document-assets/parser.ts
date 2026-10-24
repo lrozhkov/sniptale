@@ -1,3 +1,4 @@
+import { parseEditorFrameGradient } from '../../../features/editor/document/frame-gradient';
 // policyStateIds: [] - canvas binary field names are an immutable persisted-data validation
 // allowlist; per-document sets are operation-local indexes and grant no authority.
 import {
@@ -109,6 +110,7 @@ function parseFrame(value: unknown): PersistedEditorDocumentV3['frame'] | null {
   if (!isRecord(value)) return null;
   const backgroundImage =
     value['backgroundImage'] === null ? null : parsePointer(value['backgroundImage']);
+  const backgroundGradient = parseEditorFrameGradient(value['backgroundGradient']);
   const gradientStops = parseOptionalStringArray(value['backgroundGradientStops']);
   const gradientColorStops = parseGradientColorStops(value['backgroundGradientColorStops']);
   const sourceImage = parseEditorImageSettings(value['sourceImage']);
@@ -122,6 +124,7 @@ function parseFrame(value: unknown): PersistedEditorDocumentV3['frame'] | null {
         : null;
   if (
     (backgroundImage === null && value['backgroundImage'] !== null) ||
+    backgroundGradient === null ||
     gradientStops === null ||
     gradientColorStops === null ||
     sourceImage === null ||
@@ -170,6 +173,7 @@ function parseFrame(value: unknown): PersistedEditorDocumentV3['frame'] | null {
       ? {}
       : { backgroundGradientColorStops: gradientColorStops }),
     backgroundGradientAngle: value['backgroundGradientAngle'],
+    ...(backgroundGradient ? { backgroundGradient } : {}),
     backgroundImage,
     backgroundImageFit: value['backgroundImageFit'],
     ...(sourceImage === undefined ? {} : { sourceImage }),

@@ -31,7 +31,9 @@ Opening an editor creates a draft from the accepted value. Preview can update th
 
 Use [color row geometry](parameter-layout.md#color-row-geometry) for inline HEX and swatch construction.
 
-The simplified palette/HEX/alpha popup proves transactions only. Preserve the existing CompactColorSelector and CompactPaintSelector for complete color-plane and gradient behavior.
+## Color and gradient editors
+
+Use the [picker rules](color-and-gradient-editors.md) and the complete examples in the layers sandbox.
 
 ## Popup-specific curtains
 

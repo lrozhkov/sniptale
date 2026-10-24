@@ -4,13 +4,9 @@ import { useState, type ReactElement } from 'react';
 import { createSolidPaint, serializePaintToCss, type Paint } from '@sniptale/foundation/paint';
 
 import {
-  createEditorFrameGradientPatch,
-  normalizeEditorFrameGradientColorStops,
+  createEditorFramePaintGradientPatch,
+  resolveEditorFrameGradient,
 } from '../../../../features/editor/document/frame-gradient';
-import {
-  createEditorGradientColorStopColor,
-  createEditorGradientCssStops,
-} from '../../../../features/editor/document/gradient';
 import { translate } from '../../../../platform/i18n';
 import { CompactPaintSelector } from '../../../../ui/paint-selector';
 import { EditorInspectorFrameBackgroundImageEditor } from './image';
@@ -20,21 +16,7 @@ function frameToPaint(frame: EditorInspectorFrameBackgroundEditorProps['frameDra
   if (frame.backgroundMode !== 'gradient') {
     return createSolidPaint(frame.backgroundColor);
   }
-  return {
-    kind: 'gradient',
-    gradient: {
-      type: 'linear',
-      angle: frame.backgroundGradientAngle,
-      interpolation: 'srgb',
-      repeat: { enabled: false, span: 1 },
-      stops: normalizeEditorFrameGradientColorStops(frame).map((stop, index) => ({
-        id: `editor-background-stop-${index}`,
-        color: createEditorGradientColorStopColor(stop),
-        midpoint: 0.5,
-        position: stop.offset,
-      })),
-    },
-  };
+  return { kind: 'gradient', gradient: resolveEditorFrameGradient(frame) };
 }
 
 function paintToFramePatch(paint: Paint) {
@@ -44,19 +26,7 @@ function paintToFramePatch(paint: Paint) {
   if (paint.gradient.type !== 'linear') {
     return {};
   }
-  return {
-    backgroundGradientAngle: paint.gradient.angle,
-    backgroundMode: 'gradient' as const,
-    ...createEditorFrameGradientPatch(
-      {
-        backgroundGradientColorStops: undefined,
-        backgroundGradientFrom: paint.gradient.stops[0]?.color ?? '#00000000',
-        backgroundGradientStops: undefined,
-        backgroundGradientTo: paint.gradient.stops.at(-1)?.color ?? '#00000000',
-      },
-      paint.gradient.stops.map((stop) => ({ color: stop.color, offset: stop.position }))
-    ),
-  };
+  return createEditorFramePaintGradientPatch(paint.gradient);
 }
 
 function FrameBackgroundPresetChoices(props: EditorInspectorFrameBackgroundEditorProps) {
@@ -75,24 +45,16 @@ function FrameBackgroundPresetChoices(props: EditorInspectorFrameBackgroundEdito
     style: { backgroundColor: color },
   }));
   const gradientChoices = gradients.map((preset, index) => {
-    const angle = preset.gradient.type === 'linear' ? preset.gradient.angle : 0;
-    const stops = preset.gradient.stops.map((stop) => ({
-      color: stop.color,
-      offset: stop.position,
-    }));
     return {
       id: `gradient:${preset.id}`,
       name: preset.name,
       groupLabel: index === 0 ? translate('editor.compact.frameBackgroundModeGradient') : undefined,
       active:
         props.frameDraft.backgroundMode === 'gradient' &&
-        preset.gradient.type === 'linear' &&
-        preset.gradient.angle === props.frameDraft.backgroundGradientAngle &&
-        JSON.stringify(
-          preset.gradient.stops.map((stop) => ({ color: stop.color, offset: stop.position }))
-        ) === JSON.stringify(normalizeEditorFrameGradientColorStops(props.frameDraft)),
+        serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }) ===
+          serializePaintToCss(frameToPaint(props.frameDraft)),
       style: {
-        backgroundImage: `linear-gradient(${angle}deg, ${createEditorGradientCssStops(stops)})`,
+        backgroundImage: serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
       },
     };
   });
@@ -109,18 +71,7 @@ function FrameBackgroundPresetChoices(props: EditorInspectorFrameBackgroundEdito
         }
         const preset = gradients.find((item) => `gradient:${item.id}` === id);
         if (!preset || preset.gradient.type !== 'linear') return;
-        const stops = preset.gradient.stops.map((stop) => ({
-          color: stop.color,
-          offset: stop.position,
-        }));
-        props.applyGradientPreset({
-          id: preset.id,
-          label: preset.name,
-          angle: preset.gradient.angle,
-          from: stops[0]!.color,
-          to: stops.at(-1)!.color,
-          stops,
-        });
+        props.applyFramePatch(createEditorFramePaintGradientPatch(preset.gradient));
       }}
     />
   );
@@ -139,7 +90,7 @@ export function EditorInspectorFrameBackgroundFillEditor(
       <CompactPaintSelector
         triggerVariant="swatch"
         allowedModes={['solid', 'linear']}
-        showGradientAdvancedControls={false}
+        showGradientAdvancedControls
         title={translate('editor.scene.sceneBackgroundTitle')}
         label={translate('editor.scene.sceneBackgroundLabel')}
         value={transactionValue ?? frameToPaint(props.frameDraft)}

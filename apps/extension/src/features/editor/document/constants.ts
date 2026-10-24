@@ -13,6 +13,7 @@ import { DEFAULT_COLOR_GRID, DEFAULT_COLOR_WORKSPACE } from '@sniptale/ui/defaul
 import {
   normalizeEditorFrameGradientColorStops,
   normalizeEditorFrameGradientStops,
+  parseEditorFrameGradient,
 } from './frame-gradient';
 import { DEFAULT_EDITOR_IMAGE_SETTINGS, normalizeEditorImageSettings } from './image-types';
 export { DEFAULT_EDITOR_TOOL_SETTINGS } from './tool-defaults';
@@ -114,6 +115,8 @@ export function normalizeEditorFrameSettings(
   const backgroundGradientTo =
     frame?.backgroundGradientTo ?? DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientTo;
 
+  const backgroundGradient = parseEditorFrameGradient(frame?.backgroundGradient);
+
   return {
     browserMode: frame?.browserMode ?? DEFAULT_EDITOR_FRAME_SETTINGS.browserMode,
     paddingTop: frame?.paddingTop ?? DEFAULT_EDITOR_FRAME_SETTINGS.paddingTop,
@@ -137,6 +140,7 @@ export function normalizeEditorFrameSettings(
       backgroundGradientStops: frame?.backgroundGradientStops,
       backgroundGradientTo,
     }),
+    ...(backgroundGradient ? { backgroundGradient } : {}),
     backgroundGradientAngle:
       frame?.backgroundGradientAngle ?? DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientAngle,
     backgroundImageData:

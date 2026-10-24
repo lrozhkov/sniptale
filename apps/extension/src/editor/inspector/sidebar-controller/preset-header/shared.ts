@@ -156,6 +156,7 @@ export function pickSceneBackgroundSettings(frameDraft: {
   backgroundGradientColorStops?:
     | EditorSceneBackgroundSettings['backgroundGradientColorStops']
     | undefined;
+  backgroundGradient?: EditorSceneBackgroundSettings['backgroundGradient'] | undefined;
   backgroundGradientAngle: number;
   backgroundImageData: string | null;
   backgroundImageFit: string;
@@ -175,6 +176,9 @@ export function pickSceneBackgroundSettings(frameDraft: {
     backgroundGradientStops: frameDraft.backgroundGradientStops,
     backgroundGradientColorStops: frameDraft.backgroundGradientColorStops,
     backgroundGradientAngle: frameDraft.backgroundGradientAngle,
+    ...(frameDraft.backgroundGradient
+      ? { backgroundGradient: structuredClone(frameDraft.backgroundGradient) }
+      : {}),
     backgroundImageData: frameDraft.backgroundImageData,
     backgroundImageFit:
       frameDraft.backgroundImageFit as EditorSceneBackgroundSettings['backgroundImageFit'],

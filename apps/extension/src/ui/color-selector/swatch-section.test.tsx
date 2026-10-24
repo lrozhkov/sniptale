@@ -49,5 +49,5 @@ it('makes picker palette colors pointer targets with a visible hover scale', () 
   );
 
   expect(markup).toContain('cursor-pointer');
-  expect(markup).toContain('hover:scale-110');
+  expect(markup).toContain('outline-offset-2');
 });

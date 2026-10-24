@@ -12,6 +12,8 @@ export interface CompactPaintSelectorProps extends Omit<
   PaintSelectorTransactionOptions,
   'createId'
 > {
+  /** Override the remembered picker density for a controlled presentation. */
+  density?: 'full' | 'compact';
   className?: string;
   triggerVariant?: 'default' | 'swatch';
   disabled?: boolean;

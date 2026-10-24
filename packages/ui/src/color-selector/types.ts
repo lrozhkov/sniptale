@@ -12,6 +12,8 @@ export function getNextColorSelectorFormatMode(
 }
 
 export interface CompactColorSelectorProps {
+  /** Override the remembered picker density for a controlled presentation. */
+  density?: 'full' | 'compact';
   allowAlpha?: boolean;
   allowTransparent?: boolean;
   className?: string;

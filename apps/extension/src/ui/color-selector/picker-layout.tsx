@@ -4,7 +4,8 @@ import {
   PickerRgbFields,
   PickerToolbar,
 } from './picker-sections';
-import { NumericRow } from '../compact-inspector-controls/numeric';
+import { PickerNumberField } from './picker-number-field';
+import { PickerRange } from './picker-toolbar';
 import { translate } from '../../platform/i18n';
 import type {
   useEyedropper,
@@ -16,10 +17,18 @@ import type {
 } from '@sniptale/ui/color-selector/popover-state';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 
+function alphaGradient(rgb: { red: number; green: number; blue: number }) {
+  const channels = [rgb.red, rgb.green, rgb.blue].join(',');
+  return `linear-gradient(to right,rgba(${channels},0),rgb(${channels}))`;
+}
+
 function PickerFields(props: {
   formatMode: ColorSelectorFormatMode;
   hslInputs: ReturnType<typeof useHslInputs>;
-  manualColorInput: ReturnType<typeof useManualColorInput>;
+  manualColorInput: ReturnType<typeof useManualColorInput> & {
+    handleFocus?: (() => void) | undefined;
+    handleBlur?: () => void;
+  };
   onCycleFormatMode: () => void;
   rgbInputs: ReturnType<typeof useRgbInputs>;
 }) {
@@ -30,6 +39,8 @@ function PickerFields(props: {
           mode={props.formatMode}
           onCycle={props.onCycleFormatMode}
           value={props.manualColorInput.manualColor}
+          onFocus={props.manualColorInput.handleFocus}
+          onBlur={props.manualColorInput.handleBlur}
           onChange={props.manualColorInput.handleManualColorChange}
         />
       );
@@ -63,13 +74,17 @@ function PickerFields(props: {
 }
 
 export function PickerControls(props: {
-  allowAlpha?: boolean;
-  allowTransparent?: boolean;
+  compact?: boolean | undefined;
+  allowAlpha?: boolean | undefined;
+  allowTransparent?: boolean | undefined;
   color: ReturnType<typeof usePickerColorState>;
   eyedropper: ReturnType<typeof useEyedropper>;
   formatMode: ReturnType<typeof useFormatMode>['formatMode'];
   hslInputs: ReturnType<typeof useHslInputs>;
-  manualColorInput: ReturnType<typeof useManualColorInput>;
+  manualColorInput: ReturnType<typeof useManualColorInput> & {
+    handleFocus?: (() => void) | undefined;
+    handleBlur?: () => void;
+  };
   onAlphaChange: (nextAlpha: string) => void;
   onCycleFormatMode: () => void;
   onHueChange: (nextHue: string) => void;
@@ -77,8 +92,9 @@ export function PickerControls(props: {
   rgbInputs: ReturnType<typeof useRgbInputs>;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <PickerToolbar
+        showTransparentAction={props.allowAlpha === false && props.allowTransparent !== false}
         allowTransparent={props.allowTransparent !== false}
         eyedropperAvailable={props.eyedropper.eyedropperAvailable}
         eyedropperPressed={props.eyedropper.eyedropperPressed}
@@ -88,26 +104,38 @@ export function PickerControls(props: {
         onSelectTransparent={props.onSelectTransparent}
         resolvedColor={props.color.resolvedColor}
       />
-      <PickerFields
-        formatMode={props.formatMode}
-        hslInputs={props.hslInputs}
-        manualColorInput={props.manualColorInput}
-        onCycleFormatMode={props.onCycleFormatMode}
-        rgbInputs={props.rgbInputs}
-      />
       {props.allowAlpha !== false ? (
-        <div data-ui="shared.ui.color-selector.opacity">
-          <NumericRow
-            appearance="plain"
-            className="min-h-7! grid-cols-[minmax(0,1fr)_auto]! py-0!"
+        <div
+          className="grid grid-cols-[minmax(0,1fr)_72px] items-center gap-3"
+          data-ui="shared.ui.color-selector.opacity"
+        >
+          <PickerRange
             label={translate('shared.ui.colorSelectorAlpha')}
+            min={0}
+            max={100}
+            value={props.color.alphaPercent}
+            onChange={props.onAlphaChange}
+            checker
+            background={alphaGradient(props.color.rgbColor)}
+          />
+          <PickerNumberField
+            ariaLabel={translate('shared.ui.colorSelectorAlpha')}
             min={0}
             max={100}
             unit="%"
             value={props.color.alphaPercent}
-            scrub={{ min: 0, max: 100, step: 1 }}
-            onPreviewValue={(value) => props.onAlphaChange(String(value))}
-            onCommitValue={(value) => props.onAlphaChange(String(value))}
+            onChange={props.onAlphaChange}
+          />
+        </div>
+      ) : null}
+      {!props.compact ? (
+        <div className="pt-2">
+          <PickerFields
+            formatMode={props.formatMode}
+            hslInputs={props.hslInputs}
+            manualColorInput={props.manualColorInput}
+            onCycleFormatMode={props.onCycleFormatMode}
+            rgbInputs={props.rgbInputs}
           />
         </div>
       ) : null}

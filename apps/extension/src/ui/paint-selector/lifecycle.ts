@@ -67,6 +67,7 @@ export function usePaintSelectorLifecycle(options: {
     };
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (layerRef.current?.querySelector('[data-picker-local-layer]')) return;
         if (getOwnedLayers(layerRef.current).length > 0) return;
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -129,9 +130,9 @@ export function usePaintSelectorLifecycle(options: {
 
 export function resolvePaintSelectorLayerStyle(
   baseStyle: CSSProperties,
-  anchor: HTMLElement | null
+  anchor: HTMLElement | null,
+  preferredWidth = 620
 ): CSSProperties {
-  const preferredWidth = 328;
   const layerWidth =
     typeof window === 'undefined'
       ? preferredWidth
@@ -144,12 +145,14 @@ export function resolvePaintSelectorLayerStyle(
       : baseStyle.transform === 'translateY(-100%)'
         ? top - 8
         : window.innerHeight - top - 8;
+  const expand = typeof window !== 'undefined' && availableHeight < 360;
   return {
     ...baseStyle,
     ...(rect && typeof window !== 'undefined'
       ? { left: Math.min(Math.max(8, rect.right - layerWidth), window.innerWidth - layerWidth - 8) }
       : {}),
     width: layerWidth,
-    maxHeight: Math.max(0, Math.min(680, availableHeight)),
+    ...(expand ? { top: 8, transform: undefined } : {}),
+    maxHeight: Math.max(0, Math.min(680, expand ? window.innerHeight - 16 : availableHeight)),
   };
 }
