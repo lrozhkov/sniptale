@@ -23,32 +23,32 @@
     {
       "path": "dist/bundles/mediabunny.cjs",
       "beforeSha256": "4b5fbceaf3f2edf261f2663998068132f9af6f2be22c272f7c186a42d02ffa99",
-      "afterSha256": "30ad8d21e899f241391276acdf919171d8ad0e93b0bf670166969fb0feae4d07",
-      "bytes": 1524948
+      "afterSha256": "cd8b7935d09449e06a4b4b72a4b127848ff12b3da45ef264661096a99d41508a",
+      "bytes": 1523641
     },
     {
       "path": "dist/bundles/mediabunny.min.cjs",
       "beforeSha256": "d17c404d9e1742f7c5f2cd5c3786c6b185741714f78e120153dd6f8b0992e1b3",
-      "afterSha256": "19f676b9d57918c4fd63ce4571cb8af9652049691b1ef774b38dc80340d2e4b8",
-      "bytes": 727637
+      "afterSha256": "25b1ba03407684dce58f14e78b791bddf6e44e875daac47a1af65fe391404622",
+      "bytes": 728015
     },
     {
       "path": "dist/bundles/mediabunny.min.mjs",
       "beforeSha256": "d7b3a90e82158a7022729cbd4f861daf73cbb4f69d23349d2aefc9c8281cf70c",
-      "afterSha256": "4e3d0a6424f67d20795ee4fd77e58c6dfc62d29c759e22c531555330ce1f0129",
-      "bytes": 727347
+      "afterSha256": "2f5bde5522f7800341ae092fb562216e544704fa05e951670a4a849d5bc34d18",
+      "bytes": 727725
     },
     {
       "path": "dist/bundles/mediabunny.mjs",
       "beforeSha256": "ef4af783346b35fb85a32fc17b7cbeba7549129ef5105ae644a9041d414a99a5",
-      "afterSha256": "780408fda30076065953488dc6898f05841ed4a158d954481be3bb28665a2800",
-      "bytes": 1521287
+      "afterSha256": "16b5511cada60949a50430ab6703d9a6439bdc0ac9c48441257e4dd7edb0fa34",
+      "bytes": 1520007
     },
     {
       "path": "dist/bundles/mediabunny.node.cjs",
       "beforeSha256": "90005d62e0633bb2c0f622bbe08b5ed4b7527504c85222588fbbf2cd74f9e9c5",
-      "afterSha256": "46dec0a7b8b8e639f25cf02b2e71b33177c381b51955cb1ce0f1133201cc30d5",
-      "bytes": 1527661
+      "afterSha256": "d0b711ccb7c047954764d1eee49a857110f783a6417e224c7849c96621ea96c1",
+      "bytes": 1526381
     },
     {
       "path": "dist/mediabunny.d.ts",
@@ -101,20 +101,20 @@
     {
       "path": "dist/modules/src/media-source.d.ts",
       "beforeSha256": "8942405de79c2f70d784b3fe6a78b86b50b4ef606c34153c5f08360bcea11dd8",
-      "afterSha256": "1bb4d7f5abb09aacc1eceeee13b2dd3631f39e7b09aaa0886fd7d03998cdeb75",
-      "bytes": 18266
+      "afterSha256": "b6a77a4fe0f8cab0234399d6d56454e013ebdc2a64668127cf94680db5a31c31",
+      "bytes": 18377
     },
     {
       "path": "dist/modules/src/media-source.d.ts.map",
       "beforeSha256": "4b7cab7c5a57bd8662e41feda51055a8cd8705404542500603552d1fb38804c9",
-      "afterSha256": "0e1cfc6fe8646a2971b555bce95f353b4931906637fe797aa0b8e2b1f05a04af",
-      "bytes": 5772
+      "afterSha256": "62de02ced8500179f938f199a6f0b8a54f038578c45bd8e28b871e2c66d370e2",
+      "bytes": 5854
     },
     {
       "path": "dist/modules/src/media-source.js",
       "beforeSha256": "1c60a60034eff049d8ee1a973de7ef665bb8e648ee14854227150556e25f9088",
-      "afterSha256": "98cd24b5394bd7e88275eff9704bb02b92c357fa01e047e42b8b3111b4873f6d",
-      "bytes": 125229
+      "afterSha256": "7effa68c29b53fc1e9b7d1f175c5021dbabc2d63eee76ca83410b41a70b5f43e",
+      "bytes": 126058
     },
     {
       "path": "dist/modules/src/output.d.ts",
@@ -155,8 +155,8 @@
     {
       "path": "src/media-source.ts",
       "beforeSha256": "a7b80dc7f1cf41e25bfe5d1b3b8d00b8d71b4ed4869e4a9de776aebeeca6d6a3",
-      "afterSha256": "77ae7e002c154aa917aea64b8904c1f9cd376f5e6a76381918be28e68e1ade8c",
-      "bytes": 107257
+      "afterSha256": "d73648087011e0e22d70ecba09191ba5f7c663d822a4ad7c7acc3bc09cdbcef4",
+      "bytes": 107954
     },
     {
       "path": "src/output.ts",
@@ -168,10 +168,10 @@
   "schemaVersion": 1,
   "payload": {
     "path": "patch-payload.json.gz",
-    "sha256": "7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980",
-    "expandedBytes": 7112530,
-    "compressedBytes": 1422978
+    "sha256": "bb588a6e18ac893864be955eb4fea0720545c437c8bdbd6cafa546df4d87de2f",
+    "expandedBytes": 7111278,
+    "compressedBytes": 1423238
   },
   "packageJsonSha256": "f8cf1d42f0f505230f146a8af0d5097655636a149d5496d128a23d9d23a98f43",
-  "sourcePatchSha256": "9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00"
+  "sourcePatchSha256": "b50b4891045ba16cc68b797e53342bf16b9dc69cbd63d5729f460f99ff5ad711"
 }

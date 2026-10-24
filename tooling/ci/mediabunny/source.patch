@@ -158,7 +158,7 @@
 +				if (this.closed) return;
 +				this.checkForEncoderError();
 +			}
-@@ -2734,0 +2780,18 @@
+@@ -2734,0 +2780,22 @@
 +	/** @internal */
 +	private _resumeRequested = false;
 +	/** @internal */
@@ -170,6 +170,10 @@
 +	/** @internal */
 +	private _admittedAudio = new Set<AudioSample>();
 +	/** @internal */
++	private _admittedAudioDuration = 0;
++	/** @internal */
++	private _admittedAudioBytes = 0;
++	/** @internal */
 +	private _nativeReader: ReadableStreamDefaultReader<AudioData> | null = null;
 +	/** @internal */
 +	private _nativePump: Promise<void> | null = null;
@@ -177,9 +181,9 @@
 +	private _nativeGeneration = 0;
 +	/** @internal */
 +	private _restartNativeCapture: (() => void) | null = null;
-@@ -2789,0 +2853 @@
+@@ -2789,0 +2857 @@
 +		this._acceptingAudio = true;
-@@ -2794,0 +2859,8 @@
+@@ -2794,0 +2863,8 @@
 +		let restarted = false;
 +		const fail = (error: unknown) => {
 +			if (errored || this._forceClosed) return;
@@ -188,25 +192,29 @@
 +			this._promiseWithResolvers.reject(error);
 +			void this._audioContext?.suspend();
 +		};
-@@ -2797 +2869 @@
+@@ -2797 +2873 @@
 -			if (errored) {
 +			if (errored || !this._acceptingAudio) {
-@@ -2804 +2876 @@
+@@ -2804 +2880 @@
 -			if (this._paused) {
 +			if (this._paused || this._resumeRequested) {
-@@ -2819,0 +2892,5 @@
-+
+@@ -2820,0 +2897,5 @@
 +			if (restarted && lastSampleTimestamp !== null && this._options.timestampBase !== 'unix') {
 +				timestampOffset -= currentTimestamp - lastSampleTimestamp - audioSample.duration;
 +			}
 +			restarted = false;
-@@ -2845,2 +2922 @@
++
+@@ -2845,2 +2926,5 @@
 -			if (this._encoder.getQueueSize() >= 8) {
 -				// Drop data if the encoder is overloaded
-+			if (this._admittedAudio.size >= 128) {
-@@ -2847,0 +2924 @@
++			// Native packet quanta vary. Bound retained PCM, not the number of packet objects.
++			const duration = audioSample.duration;
++			const bytes = audioSample.allocationSize({ format: 'f32', planeIndex: 0 });
++			if (this._admittedAudioDuration + duration > 1 + 1e-9
++				|| this._admittedAudioBytes + bytes > 4 * 1024 * 1024) {
+@@ -2847,0 +2932 @@
 +				fail(new Error('Live audio buffer exceeded its bounded capacity.'));
-@@ -2853,8 +2930,4 @@
+@@ -2853,7 +2938,8 @@
 -			void this._encoder.add(audioSample, true)
 -				.catch((error) => {
 -					errored = true;
@@ -214,12 +222,17 @@
 -					this._abortController?.abort();
 -					this._promiseWithResolvers.reject(error);
 -					void this._audioContext?.suspend();
--				});
 +			this._admittedAudio.add(audioSample);
++			this._admittedAudioDuration += duration;
++			this._admittedAudioBytes += bytes;
 +			this._audioDrain = this._encoder.add(audioSample, true, this._audioDrain)
-+				.finally(() => this._admittedAudio.delete(audioSample));
++				.finally(() => {
++					if (!this._admittedAudio.delete(audioSample)) return;
++					this._admittedAudioDuration = Math.max(0, this._admittedAudioDuration - duration);
++					this._admittedAudioBytes -= bytes;
+@@ -2860,0 +2947 @@
 +			void this._audioDrain.catch(fail);
-@@ -2864,14 +2937,36 @@
+@@ -2864,14 +2951,36 @@
 -			// Great, MediaStreamTrackProcessor is supported, this is the preferred way of doing things
 -			const processor = new MediaStreamTrackProcessor({ track: this._track });
 -			const consumer = new WritableStream<AudioData>({
@@ -270,13 +283,13 @@
 +					if (!signal.aborted) fail(error);
 +				}
 +			})();
-@@ -2917,0 +3013 @@
+@@ -2917,0 +3027 @@
 +		this._resumeRequested = false;
-@@ -2921,0 +3018 @@
+@@ -2921,0 +3032 @@
 +		if (!this._paused) return;
-@@ -2922,0 +3020 @@
+@@ -2922,0 +3034 @@
 +		this._restartNativeCapture?.();
-@@ -2926,0 +3025,8 @@
+@@ -2926,0 +3039,10 @@
 +		this._acceptingAudio = false;
 +		this._resumeRequested = false;
 +		this._forceClosed = forceClose;
@@ -284,8 +297,10 @@
 +		if (forceClose) {
 +			for (const sample of this._admittedAudio) sample.close();
 +			this._admittedAudio.clear();
++			this._admittedAudioDuration = 0;
++			this._admittedAudioBytes = 0;
 +		}
-@@ -2931,0 +3038,3 @@
+@@ -2931,0 +3054,3 @@
 +
 +			await this._nativePump;
 +			if (!forceClose) await this._audioDrain;

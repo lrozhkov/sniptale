@@ -4,6 +4,56 @@ import http from 'node:http';
 import { resolve } from 'node:path';
 import type * as AudioProbe from '../support/recording-audio-buffer-probe';
 
+for (const { packetFrames, channels, overload } of [
+  { packetFrames: 128, channels: 1, overload: false },
+  { packetFrames: 480, channels: 1, overload: true },
+  { packetFrames: 256, channels: 32, overload: true },
+])
+  test(`native audio burst preserves bounded PCM frames=${packetFrames} channels=${channels}`, async ({
+    page,
+  }) => {
+    const bundled = await build({
+      entryPoints: [resolve('tooling/test/e2e/support/recording-audio-buffer-probe.ts')],
+      bundle: true,
+      format: 'iife',
+      globalName: 'recordingAudioProbe',
+      write: false,
+      platform: 'browser',
+    });
+    const server = http.createServer((_request, response) => {
+      response.setHeader('Content-Type', 'text/html');
+      response.end('<!doctype html><title>Native audio admission burst</title>');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string')
+        throw new Error('Audio burst server has no port');
+      await page.goto(`http://127.0.0.1:${address.port}/`);
+      await page.addScriptTag({ content: bundled.outputFiles[0]!.text });
+      const result = await page.evaluate(
+        async ({ frames, channels }) => {
+          const host = window as typeof window & { recordingAudioProbe: typeof AudioProbe };
+          return host.recordingAudioProbe.recordNativeAudioBurst(frames, channels);
+        },
+        { frames: packetFrames, channels }
+      );
+      expect(result.error).toBe(
+        overload ? 'Live audio buffer exceeded its bounded capacity.' : null
+      );
+      expect(result.borrowedTrackState).toBe('live');
+      if (!overload) {
+        expect(result.frames).toBe(130 * packetFrames);
+        expect(result.changed).toBe(0);
+      }
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
 for (const capture of ['live', 'microphone-track'] as const)
   for (const load of [false, true])
     for (const pause of capture === 'live' && load ? [false, true] : [false]) {

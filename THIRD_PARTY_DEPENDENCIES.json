@@ -266,15 +266,15 @@
         "files": [
           {
             "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz",
-            "sha256": "7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980"
+            "sha256": "bb588a6e18ac893864be955eb4fea0720545c437c8bdbd6cafa546df4d87de2f"
           },
           {
             "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json",
-            "sha256": "f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856"
+            "sha256": "fdd1c4e0ec67596da6cdac34ba1549d1ac3882e27b114c24ff4f39705fefdb55"
           },
           {
             "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch",
-            "sha256": "9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00"
+            "sha256": "b50b4891045ba16cc68b797e53342bf16b9dc69cbd63d5729f460f99ff5ad711"
           },
           {
             "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE",
