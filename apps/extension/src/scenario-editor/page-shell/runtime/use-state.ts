@@ -378,9 +378,13 @@ function createGuideProjectCommands({
 /** Owns image and attached audio URLs; the existing images map is the player media input. */
 function useGuideMedia(project: GuideProject | null) {
   const [media, setMedia] = useState<{
-    identity: string | null;
+    projectId: string | null;
     images: Record<string, string | null>;
-  }>({ identity: null, images: {} });
+  }>({ projectId: null, images: {} });
+  const retained = useRef<{ projectId: string | null; urls: Map<string, string | null> }>({
+    projectId: null,
+    urls: new Map(),
+  });
   const projectId = project?.id ?? null;
   const assetKey = JSON.stringify([
     ...new Set([
@@ -398,40 +402,57 @@ function useGuideMedia(project: GuideProject | null) {
       ) ?? []),
     ]),
   ]);
-  const identity = JSON.stringify([projectId, assetKey]);
+  useEffect(
+    () => () => {
+      for (const url of retained.current.urls.values()) if (url) URL.revokeObjectURL(url);
+      retained.current.urls.clear();
+    },
+    []
+  );
   useEffect(() => {
     let active = true;
-    const urls: string[] = [];
-    setMedia({ identity, images: {} });
-    const publish = (id: string, url: string | null) =>
-      setMedia((current) =>
-        current.identity === identity
-          ? { identity, images: { ...current.images, [id]: url } }
-          : current
-      );
+    const owner = retained.current;
+    if (owner.projectId !== projectId) {
+      for (const url of owner.urls.values()) if (url) URL.revokeObjectURL(url);
+      owner.urls.clear();
+      owner.projectId = projectId;
+    }
     const parsedIds: unknown = JSON.parse(assetKey);
     const ids = Array.isArray(parsedIds)
       ? parsedIds.filter((id): id is string => typeof id === 'string')
       : [];
+    const wanted = new Set(ids);
+    for (const [id, url] of owner.urls) {
+      if (wanted.has(id)) continue;
+      if (url) URL.revokeObjectURL(url);
+      owner.urls.delete(id);
+    }
+    const publish = () => {
+      const images = Object.fromEntries(owner.urls);
+      setMedia((current) =>
+        current.projectId === projectId &&
+        Object.keys(current.images).length === owner.urls.size &&
+        Object.entries(images).every(([id, url]) => current.images[id] === url)
+          ? current
+          : { projectId, images }
+      );
+    };
+    publish();
     void Promise.all(
-      [...ids].map(async (id) => {
-        const blob = await getScenarioAssetBlob(id).catch(() => undefined);
-        if (!active) return;
-        if (!blob) {
-          publish(id, null);
-          return;
-        }
-        const url = URL.createObjectURL(blob);
-        urls.push(url);
-        publish(id, url);
-      })
+      ids
+        .filter((id) => !owner.urls.has(id))
+        .map(async (id) => {
+          const blob = await getScenarioAssetBlob(id).catch(() => undefined);
+          if (!active) return;
+          owner.urls.set(id, blob ? URL.createObjectURL(blob) : null);
+          publish();
+        })
     );
     return () => {
       active = false;
-      urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [assetKey, identity]);
-  return media.identity === identity ? media.images : {};
+  }, [assetKey, projectId]);
+  return media.projectId === projectId ? media.images : {};
 }
 
 /** Keeps item selection addressable when structural edits or undo remove the focused item. */

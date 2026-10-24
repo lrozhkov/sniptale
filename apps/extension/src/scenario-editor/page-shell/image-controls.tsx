@@ -97,10 +97,33 @@ function GuideImageControlsView({
     change: Parameters<typeof changeGuideImageGeometry>[1],
     group: string | null = null
   ) => onChange(constrain(changeGuideImageGeometry(block, change)), group);
+  const geometryControls = (
+    <div className="guide-image-reset-actions">
+      {framing && (
+        <ContentToolbarButton
+          title={t('scenario.editor.guideImageCenter')}
+          disabled={geometryDisabled}
+          onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
+        >
+          <Focus size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      )}
+      <ContentToolbarButton
+        title={t('scenario.editor.guideImageReset')}
+        disabled={geometryDisabled || !dimensions}
+        onClick={() => {
+          if (dimensions) geometry({ kind: 'reset', ...dimensions });
+        }}
+      >
+        <RotateCcw size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+    </div>
+  );
   const [activeSection, setActiveSection] = useState('placement');
   const sections = guideImageSections(
     { block, framing, layout, htmlDefaults, disabled, onChange, t },
     <GuideImageGeometryFields
+      controls={geometryControls}
       framing={framing}
       onStartFraming={onStartFraming}
       startDisabled={disabled || !url}
@@ -118,7 +141,6 @@ function GuideImageControlsView({
       }
       block={block}
       geometryDisabled={geometryDisabled}
-      dimensions={dimensions}
       geometry={geometry}
       t={t}
     />
@@ -144,6 +166,7 @@ function GuideImageControlsView({
             onSectionChange={setActiveSection}
             sections={sections}
             showSectionHeading
+            renderSectionHeadingControl={(id) => (id === 'framing' ? geometryControls : null)}
             renderSection={(id) => (
               <InspectorCategorizedContent>
                 {sections.find((section) => section.id === id)?.content}
@@ -253,29 +276,30 @@ function guideImageSections(
 
 /** Geometry settings work against either the active draft or the selected saved image. */
 function GuideImageGeometryFields({
+  controls,
   framing,
   onStartFraming,
   startDisabled,
   overview,
   block,
   geometryDisabled,
-  dimensions,
   geometry,
   t,
 }: {
+  controls: ReactNode;
   framing: boolean;
   onStartFraming: (() => void) | undefined;
   startDisabled: boolean;
   overview: ReactNode;
   block: GuideImageBlock;
   geometryDisabled: boolean;
-  dimensions: { width: number; height: number } | null;
   geometry: (change: Parameters<typeof changeGuideImageGeometry>[1], group?: string | null) => void;
   t: Translate;
 }) {
   return (
     <GuideInspectorGroup
       id="framing"
+      action={controls}
       icon={ScanLine}
       title={t('scenario.editor.guideFramingGroup')}
     >
@@ -284,7 +308,6 @@ function GuideImageGeometryFields({
           disabled={startDisabled || !onStartFraming}
           onClick={onStartFraming}
         >
-          <ScanLine size={16} aria-hidden="true" />
           {t('scenario.editor.guideEditImageFrame')}
         </ScenarioInspectorActionButton>
       )}
@@ -316,15 +339,6 @@ function GuideImageGeometryFields({
               geometry({ kind: 'zoom', scale: value / 100 }, `image-zoom:${block.id}`)
             }
           />
-          <div className="guide-image-reset-actions">
-            <ContentToolbarButton
-              title={t('scenario.editor.guideImageCenter')}
-              disabled={geometryDisabled}
-              onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
-            >
-              <Focus size={16} aria-hidden="true" />
-            </ContentToolbarButton>
-          </div>
         </>
       )}
       {(['width', 'height'] as const).map((dimension) => (
@@ -349,17 +363,6 @@ function GuideImageGeometryFields({
           }
         />
       ))}
-      <div className="guide-image-reset-actions">
-        <ContentToolbarButton
-          title={t('scenario.editor.guideImageReset')}
-          disabled={geometryDisabled || !dimensions}
-          onClick={() => {
-            if (dimensions) geometry({ kind: 'reset', ...dimensions });
-          }}
-        >
-          <RotateCcw size={16} aria-hidden="true" />
-        </ContentToolbarButton>
-      </div>
     </GuideInspectorGroup>
   );
 }

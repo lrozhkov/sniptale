@@ -28,19 +28,15 @@ async function expectWindow(player: Locator) {
       )
     )
     .toBe(true);
-  const geometry = await scene.locator('.tour-image-viewport').evaluate((node) => {
-    const outer = node.getBoundingClientRect();
+  const geometry = await scene.locator('.tour-image').evaluate((node) => {
+    const image = node.getBoundingClientRect();
     const header = node
       .parentElement!.querySelector('.tour-window-header')!
       .getBoundingClientRect();
-    const values = getComputedStyle(node).clipPath.slice(6, -1).split(/\s+/).map(parseFloat);
-    const top = values[0]!;
-    const right = values[1] ?? top;
-    const left = values[3] ?? right;
     return {
-      gap: outer.top + top - header.bottom,
-      left: outer.left + left - header.left,
-      width: outer.width - left - right - header.width,
+      gap: image.top - header.bottom,
+      left: image.left - header.left,
+      width: image.width - header.width,
     };
   });
   expect(Math.abs(geometry.gap)).toBeLessThanOrEqual(1);
@@ -110,6 +106,10 @@ async function exerciseStageBackground(
     name: t('settings.editor.backgrounds.library'),
     exact: true,
   });
+  await expect(page.locator('[data-ui="autosave-control"] > button')).toHaveAttribute(
+    'aria-label',
+    new RegExp(t('scenario.editor.guideSaved') + '$')
+  );
   await library.click();
   const drawer = page.locator('[data-ui="background.library.drawer"]');
   await expect(drawer).toBeVisible();
@@ -206,6 +206,7 @@ for (const [locale, theme, size] of [
     await appearance.click();
     await exerciseStageBackground(page, panel, player, t);
     await exerciseWindowHeader(page, panel, player, t);
+    await page.screenshot({ path: info.outputPath('window-fitted.png'), fullPage: false });
     await page.locator('.tour-slide-select').first().click();
     await category(t('scenario.editor.tourObjects')).click();
     await panel
@@ -230,6 +231,10 @@ for (const [locale, theme, size] of [
       name: t('scenario.editor.guideReplaceImage'),
       exact: true,
     });
+    await expect(page.locator('[data-ui="autosave-control"] > button')).toHaveAttribute(
+      'aria-label',
+      new RegExp(t('scenario.editor.guideSaved') + '$')
+    );
     await replace.click();
     await expect(page.locator('#guide-resource-drawer')).toBeVisible();
     await page.keyboard.press('Escape');
@@ -293,7 +298,9 @@ for (const [locale, theme, size] of [
     await position.press('Enter');
     await expectWindow(player);
     expect(
-      Math.abs((await player.locator('.tour-window-header').boundingBox())!.width - headerWidth)
+      Math.abs(
+        (await player.locator('.tour-window-header').boundingBox())!.width - headerWidth * 1.5
+      )
     ).toBeLessThanOrEqual(1);
     const projection = await player.locator('.tour-image').evaluate((node) => {
       const image = node.getBoundingClientRect();
@@ -335,6 +342,9 @@ for (const [locale, theme, size] of [
       .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
       .click();
     await expectWindow(player);
+    await page
+      .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true })
+      .click();
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
     await page
       .locator('.guide-export-stage')
@@ -376,3 +386,101 @@ for (const [locale, theme, size] of [
     issues.assertClean();
   });
 }
+
+for (const large of [false, true])
+  test(`measures scenario edits and preserves existing media when the stage background changes (${large ? '100 slides' : '2 slides'})`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(180_000);
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      'light',
+      'en',
+      { width: 1920, height: 900 },
+      'compare',
+      { tourFixture: '1', performanceFixture: large ? '1' : '0' }
+    );
+    await page.getByRole('button', { name: 'Interactive tour', exact: true }).click();
+    await page.evaluate(() => {
+      const samples: Array<{
+        input: number;
+        paintMs?: number;
+        saveMs?: number;
+        settledMs?: number;
+      }> = [];
+      let saving: number | undefined;
+      document.addEventListener(
+        'input',
+        (event) => {
+          if (
+            !(event.target instanceof HTMLInputElement) ||
+            !event.target.closest('.guide-project-name')
+          )
+            return;
+          const sample = { input: performance.now() };
+          samples.push(sample);
+          saving = undefined;
+          requestAnimationFrame(() =>
+            Object.assign(sample, { paintMs: performance.now() - sample.input })
+          );
+        },
+        true
+      );
+      const button = document.querySelector('[data-ui="autosave-control"] > button')!;
+      new MutationObserver(() => {
+        const sample = samples.at(-1);
+        if (!sample) return;
+        const label = button.getAttribute('aria-label') ?? '';
+        if (label.includes('Saving') && saving === undefined) saving = performance.now();
+        if (label.endsWith('Saved')) {
+          sample.settledMs = performance.now() - sample.input;
+          if (saving !== undefined) sample.saveMs = performance.now() - saving;
+        }
+      }).observe(button, { attributes: true, attributeFilter: ['aria-label'] });
+      Object.defineProperty(window, 'scenarioPerformanceSamples', {
+        configurable: true,
+        get: () => samples,
+      });
+    });
+    const client = await page.context().newCDPSession(page);
+    await client.send('Profiler.enable');
+    await client.send('Profiler.start');
+    const totals: number[] = [];
+    const field = page.locator('.guide-project-name input');
+    for (let index = 0; index < 12; index++) {
+      const start = performance.now();
+      await field.fill(`Performance edit ${index}`);
+      await field.press('Tab');
+      await expect(page.locator('[data-ui="autosave-control"] > button')).toHaveAttribute(
+        'aria-label',
+        /Saved$/
+      );
+      totals.push(performance.now() - start);
+    }
+    const browser = await page.evaluate(() => Reflect.get(window, 'scenarioPerformanceSamples'));
+    const result = await client.send('Profiler.stop');
+    await client.detach();
+    await writeFile(info.outputPath('editing-profile.json'), JSON.stringify(result));
+    await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+    const image = page.locator('.tour-canvas .tour-image');
+    const source = await image.getAttribute('src');
+    const background = page.locator('[data-ui="background.image.picker"]');
+    const started = performance.now();
+    await background.locator('[role="group"] > button').first().click();
+    await expect
+      .poll(() =>
+        page
+          .locator('.tour-canvas [data-tour-stage]')
+          .evaluate((node) => getComputedStyle(node).backgroundImage)
+      )
+      .toContain('url(');
+    const backgroundMs = performance.now() - started;
+    await writeFile(
+      info.outputPath('editing-timings.json'),
+      JSON.stringify({ saveMs: totals, backgroundMs, browser }, null, 2)
+    );
+    console.log(JSON.stringify({ saveMs: totals, backgroundMs, browser }));
+    await expect(image).toHaveAttribute('src', source!);
+  });

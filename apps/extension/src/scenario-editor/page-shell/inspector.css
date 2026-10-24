@@ -170,10 +170,6 @@
 .guide-inspector-panel .guide-style-fields {
   gap: 0;
 }
-.guide-inspector-panel .guide-image-reset-actions {
-  padding-block: 8px;
-  justify-content: flex-start;
-}
 .guide-template-controls,
 .guide-template-controls form {
   display: grid;
@@ -749,4 +745,13 @@
   > [data-ui='shared.information-disclosure']
   + :is(.guide-inspector-group, .guide-inspector-categorized) {
   margin-top: 8px;
+}
+
+.guide-inspector-group[data-level='group'] > .guide-inspector-group-heading h4 {
+  font-size: 13px;
+  line-height: 18px;
+}
+.tour-heading-text-field {
+  min-width: 0;
+  padding-inline: 8px;
 }

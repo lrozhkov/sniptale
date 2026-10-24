@@ -1,4 +1,4 @@
-import { useCallback, useReducer } from 'react';
+import { useCallback, useMemo, useReducer } from 'react';
 import {
   applyGuideStructureOperation,
   type GuideStructureOperation,
@@ -46,10 +46,13 @@ function guideActionIdentity(state: GuideHistory, actionId?: string): GuideHisto
   return { ...rest, ...(actionId ? { actionId } : {}) };
 }
 
-function retainGuideHistory(state: GuideHistory): GuideHistory {
+function retainGuideHistory(
+  state: GuideHistory,
+  measure?: (project: GuideProject) => number
+): GuideHistory {
   if (!state.present) return state;
   const snapshots = [...state.past, state.present, ...state.future];
-  const window = selectEditorSnapshotWindow(snapshots, state.past.length);
+  const window = selectEditorSnapshotWindow(snapshots, state.past.length, measure);
   const past = window.start === 0 ? state.past : snapshots.slice(window.start, state.past.length);
   const future =
     window.end === snapshots.length - 1
@@ -89,9 +92,14 @@ function reusePublishedGuideItems(project: GuideProject, source: GuideProject): 
 }
 
 /** One reducer owns the current buffer and both directions of reversible edits. */
-export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): GuideHistory {
+export function reduceGuideHistory(
+  state: GuideHistory,
+  action: HistoryAction,
+  measure?: (project: GuideProject) => number
+): GuideHistory {
+  const retain = (next: GuideHistory) => retainGuideHistory(next, measure);
   if (action.kind === 'reset')
-    return retainGuideHistory({
+    return retain({
       present: action.project,
       past: (action.past ?? [])
         .filter((project) => project.id === action.project?.id)
@@ -104,7 +112,7 @@ export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): 
   if (action.kind === 'undo') {
     const previous = state.past.at(-1);
     return previous
-      ? retainGuideHistory({
+      ? retain({
           ...guideActionIdentity(
             {
               ...closeGuideCapture(state),
@@ -122,7 +130,7 @@ export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): 
   if (action.kind === 'redo') {
     const next = state.future[0];
     return next
-      ? retainGuideHistory({
+      ? retain({
           ...guideActionIdentity(
             {
               ...closeGuideCapture(state),
@@ -148,10 +156,10 @@ export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): 
         capture.project !== action.source ||
         (action.actionId !== undefined && capture.actionId !== action.actionId)
     );
-    return retainGuideHistory({ ...state, present, ...(closedCaptures ? { closedCaptures } : {}) });
+    return retain({ ...state, present, ...(closedCaptures ? { closedCaptures } : {}) });
   }
   if (action.kind === 'commit')
-    return retainGuideHistory(
+    return retain(
       guideActionIdentity({
         ...state,
         present: action.project,
@@ -166,7 +174,7 @@ export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): 
     action.group === state.group &&
     state.past.length > 0 &&
     state.future.length === 0;
-  return retainGuideHistory(
+  return retain(
     guideActionIdentity(
       {
         ...(grouped ? state : closeGuideCapture(state)),
@@ -180,6 +188,20 @@ export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): 
   );
 }
 
+/** Page-local advisory sizes are valid for the immutable snapshots accepted by the reducer. */
+export function createGuideHistoryReducer() {
+  const sizes = new WeakMap<GuideProject, number>();
+  const encoder = new TextEncoder();
+  const measure = (project: GuideProject) => {
+    const retained = sizes.get(project);
+    if (retained !== undefined) return retained;
+    const bytes = encoder.encode(JSON.stringify(project)).byteLength;
+    sizes.set(project, bytes);
+    return bytes;
+  };
+  return (state: GuideHistory, action: HistoryAction) => reduceGuideHistory(state, action, measure);
+}
+
 /** React adapter for this page's single disposable guide buffer. */
 export function useGuideHistory({
   canEdit,
@@ -190,7 +212,8 @@ export function useGuideHistory({
   onEdit: () => void;
   onFailure: () => void;
 }) {
-  const [state, dispatch] = useReducer(reduceGuideHistory, {
+  const reduce = useMemo(createGuideHistoryReducer, []);
+  const [state, dispatch] = useReducer(reduce, {
     present: null,
     past: [],
     future: [],

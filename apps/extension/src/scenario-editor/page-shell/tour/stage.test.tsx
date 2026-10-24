@@ -406,12 +406,17 @@ it('projects window chrome and source targets into the stage content box inside 
     const header = shadow().querySelector<HTMLElement>('.tour-window-header')!;
     const image = shadow().querySelector<HTMLElement>('.tour-image')!;
     const point = shadow().querySelector<HTMLElement>('.tour-hotspot')!;
-    expect(parseFloat(header.style.width)).toBe(parseFloat(stage.style.width) - 2);
-    expect(parseFloat(image.style.top)).toBeCloseTo(parseFloat(header.style.height));
-    expect(parseFloat(point.style.left)).toBeCloseTo(stage.clientWidth / 2);
-    expect(parseFloat(point.style.top)).toBeCloseTo(
-      (stage.clientHeight + parseFloat(header.style.height)) / 2
+    expect(parseFloat(header.style.width)).toBeCloseTo(parseFloat(image.style.width));
+    expect(parseFloat(image.style.top)).toBeCloseTo(
+      parseFloat(header.style.top) + parseFloat(header.style.height)
     );
+    expect(parseFloat(point.style.left)).toBeCloseTo(
+      parseFloat(image.style.left) + parseFloat(image.style.width) / 2
+    );
+    expect(parseFloat(point.style.top)).toBeCloseTo(
+      parseFloat(image.style.top) + parseFloat(image.style.height) / 2
+    );
+    expect(parseFloat(header.style.width)).toBeLessThan(stage.clientWidth);
   } finally {
     width.mockRestore();
     height.mockRestore();

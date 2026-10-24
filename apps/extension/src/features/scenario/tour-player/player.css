@@ -64,7 +64,8 @@ a:focus-visible {
   padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--tour-text) 16%, transparent);
   border-radius: 10px;
-  background: var(--tour-surface);
+  background: color-mix(in srgb, var(--tour-surface) 78%, transparent);
+  backdrop-filter: blur(8px);
   box-shadow: 0 4px 20px #0003;
   transition: opacity 0.25s ease;
 }

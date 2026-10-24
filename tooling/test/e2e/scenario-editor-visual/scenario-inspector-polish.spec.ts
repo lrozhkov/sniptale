@@ -3,9 +3,18 @@ import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness } from './scenario-editor-visual.helpers';
 
+const largeReview = process.env['SNIPTALE_UI_REVIEW_LARGE'] === '1';
 const contexts = [
-  { locale: 'ru', theme: 'light', size: { width: 1280, height: 560 } },
-  { locale: 'en', theme: 'dark', size: { width: 1920, height: 900 } },
+  {
+    locale: 'ru',
+    theme: 'light',
+    size: largeReview ? { width: 1920, height: 1080 } : { width: 1280, height: 560 },
+  },
+  {
+    locale: 'en',
+    theme: 'dark',
+    size: largeReview ? { width: 2560, height: 1440 } : { width: 1920, height: 900 },
+  },
 ] as const;
 type Translate = ReturnType<typeof createTranslator>;
 
@@ -63,6 +72,12 @@ async function capture(page: Page, panel: Locator, info: TestInfo, name: string)
       )
       .map((element) => ({
         tag: element.tagName.toLowerCase(),
+        font: getComputedStyle(element).fontFamily,
+        fontRole: element.matches(
+          'textarea,input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"])'
+        )
+          ? 'Sniptale Text'
+          : 'Sniptale Interface',
         role: element.getAttribute('role'),
         name:
           element.getAttribute('aria-label') ??
@@ -79,6 +94,12 @@ async function capture(page: Page, panel: Locator, info: TestInfo, name: string)
       }))
   );
   expect(inventory.length, `${name}: visible parameters`).toBeGreaterThan(0);
+  expect
+    .soft(
+      inventory.filter((element) => !element.font.includes(element.fontRole)),
+      `${name}: font roles`
+    )
+    .toEqual([]);
   await info.attach(`${name}-parameters`, {
     body: JSON.stringify(inventory, null, 2),
     contentType: 'application/json',

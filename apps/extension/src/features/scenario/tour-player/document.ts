@@ -17,14 +17,13 @@ export function prepareTourWindowHeaders(tour: TourDocument): Record<string, str
   const header = tour.stage.windowHeader;
   const result: Record<string, string> = {};
   if (!header) return result;
-  const [aspectWidth, aspectHeight] = tour.stage.aspect.split(':').map(Number);
-  const window = { width: (aspectWidth! / aspectHeight!) * 900, height: 900 };
-  const artwork = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeWindowHeaderSvg(header, window))}`;
   for (const slide of tour.slides) {
     if (slide.kind !== 'image' || !slide.image) continue;
     const source = slide.image;
     const key = `${source.width}x${source.height}`;
-    if (!result[key]) result[key] = artwork;
+    if (!result[key])
+      result[key] =
+        `data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeWindowHeaderSvg(header, source))}`;
   }
   return result;
 }

@@ -9,9 +9,9 @@ import {
   CategorizedInspector,
   type CategorizedInspectorSection,
 } from '@sniptale/ui/categorized-inspector';
-import { InspectorCategorizedContent } from '../inspector';
+import { InspectorCategorizedContent, InspectorSectionHeading } from '../inspector';
 import type { Translate } from '../../../platform/i18n';
-import { Mic } from 'lucide-react';
+import { AudioLines } from 'lucide-react';
 
 type SettingsSection = CategorizedInspectorSection<string> & {
   content: ReactNode;
@@ -33,16 +33,18 @@ export function useTourInspectorSections(
         ...sections,
         {
           id: 'narration',
-          icon: Mic,
+          icon: AudioLines,
           label: t('scenario.editor.tourNarration'),
           categorized: true,
           content: narration,
         },
       ];
-    if (presentation === 'all')
-      return sections.map(({ id, content }) => (
+    if (presentation === 'all' || sections.length === 1)
+      return sections.map(({ id, content, icon, label }) => (
         <div key={id} className="guide-inspector-section">
-          {content}
+          <InspectorSectionHeading title={label} icon={icon}>
+            {content}
+          </InspectorSectionHeading>
         </div>
       ));
     return (

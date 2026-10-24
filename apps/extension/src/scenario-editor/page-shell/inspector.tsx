@@ -1,5 +1,13 @@
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
-import { createContext, useContext, useEffect, useId, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useState,
+  type ReactNode,
+  type ComponentType,
+} from 'react';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { NumericRow } from '../../ui/compact-inspector-controls/numeric';
 import type {
@@ -10,6 +18,20 @@ import '../../ui/compact-inspector-controls/disclosure.css';
 import './inspector.css';
 
 const InspectorCategorizedContentContext = createContext(false);
+type InspectorHeading = { title: string; icon: ComponentType<{ size?: number }> };
+const InspectorSectionHeadingContext = createContext<InspectorHeading | null>(null);
+
+/** Section metadata supplies the same heading in grouped and categorized presentations. */
+export function InspectorSectionHeading({
+  children,
+  ...heading
+}: InspectorHeading & { children: ReactNode }) {
+  return (
+    <InspectorSectionHeadingContext.Provider value={heading}>
+      {children}
+    </InspectorSectionHeadingContext.Provider>
+  );
+}
 
 /**
  * Marks inspector content that renders inside one shared category heading:
@@ -48,16 +70,21 @@ export function GuideInspectorGroup({
   level?: 'section' | 'group';
   children: ReactNode;
 }) {
-  const categorized = useContext(InspectorCategorizedContentContext);
+  const categorized = useContext(InspectorCategorizedContentContext) && level !== 'group';
+  const definition = useContext(InspectorSectionHeadingContext);
+  const heading = level === 'section' ? definition : null;
+  const HeadingIcon = heading?.icon ?? Icon;
+  const headingTitle = heading?.title ?? title;
+  const canCollapse = Boolean(heading) || collapsible;
   const Heading = level === 'group' ? 'h4' : 'h3';
   const [expanded, setExpanded] = useInspectorDisclosure(id, true);
   const bodyId = useId();
   return (
-    <section className="guide-inspector-group" data-level={level} aria-label={title}>
+    <section className="guide-inspector-group" data-level={level} aria-label={headingTitle}>
       {!categorized && (
         <div className="guide-inspector-group-heading">
           <Heading>
-            {collapsible ? (
+            {canCollapse ? (
               <button
                 type="button"
                 className="guide-inspector-disclosure sniptale-disclosure-trigger"
@@ -65,14 +92,14 @@ export function GuideInspectorGroup({
                 aria-controls={bodyId}
                 onClick={() => setExpanded(!expanded)}
               >
-                <Icon size={16} aria-hidden="true" />
-                <span>{title}</span>
+                <HeadingIcon size={level === 'group' ? 14 : 16} aria-hidden="true" />
+                <span>{headingTitle}</span>
                 <ChevronDown size={level === 'group' ? 14 : 16} aria-hidden="true" />
               </button>
             ) : (
               <span className="guide-inspector-static-heading">
-                <Icon size={16} aria-hidden="true" />
-                <span>{title}</span>
+                <HeadingIcon size={level === 'group' ? 14 : 16} aria-hidden="true" />
+                <span>{headingTitle}</span>
               </span>
             )}
           </Heading>
@@ -83,9 +110,11 @@ export function GuideInspectorGroup({
         id={bodyId}
         className="guide-inspector-group-body sniptale-parameter-stack"
         data-compact-select-menu-bounds=""
-        hidden={collapsible && !categorized && !expanded}
+        hidden={canCollapse && !categorized && !expanded}
       >
-        {children}
+        <InspectorSectionHeadingContext.Provider value={null}>
+          {children}
+        </InspectorSectionHeadingContext.Provider>
       </div>
     </section>
   );

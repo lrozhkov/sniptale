@@ -186,13 +186,7 @@ for (const [locale, theme, viewport] of [
       .locator('.guide-page-header')
       .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
       .click();
-    await panel
-      .getByRole('navigation')
-      .getByRole('button', { name: t('scenario.editor.tourMusic'), exact: true })
-      .click();
-    await panel
-      .locator('.tour-audio-acquisition input[type="file"]')
-      .setInputFiles({ name: 'Music.wav', mimeType: 'audio/wav', buffer: narrationWav(60) });
+    await importTourMusic(panel, t('scenario.editor.tourMusic'));
     await expect(panel.locator('.tour-audio-binding')).toContainText('Music.wav');
     await expect(
       panel.getByRole('switch', { name: t('scenario.editor.tourMusicLoop'), exact: true })
@@ -402,6 +396,9 @@ for (const [locale, theme, viewport] of [
         },
       });
     });
+    await page
+      .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true })
+      .click();
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
     await page
       .locator('.guide-export-stage')
@@ -469,4 +466,11 @@ for (const [locale, theme, viewport] of [
     }
     issues.assertClean();
   });
+}
+
+async function importTourMusic(panel: Locator, label: string) {
+  await panel.getByRole('navigation').getByRole('button', { name: label, exact: true }).click();
+  const input = panel.locator('.tour-audio-acquisition input[type="file"]');
+  await expect(input).toBeEnabled();
+  await input.setInputFiles({ name: 'Music.wav', mimeType: 'audio/wav', buffer: narrationWav(60) });
 }

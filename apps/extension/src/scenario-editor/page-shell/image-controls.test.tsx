@@ -92,6 +92,8 @@ it('changes fit and resets the frame from the decoded image dimensions', async (
   await click('Fill');
   expect(change.mock.calls[0]?.[0].fit).toBe('cover');
   await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
+  const reset = host.querySelector('[aria-label="Reset frame and position"]')!;
+  expect(reset.closest('.guide-inspector-group-heading')).not.toBeNull();
   await click('Reset frame and position');
   expect(change.mock.calls[1]?.[0].frame).toEqual({ width: 1200, height: 900 });
   await click('Center image');
@@ -329,6 +331,10 @@ it('offers framing entry without exposing draft-only geometry outside the sessio
   expect(host.querySelector('[aria-label="Center image"]')).toBeNull();
   expect(host.querySelector('[aria-label="Image fit"]')).toBeNull();
   expect(host.textContent).not.toContain('Ctrl');
+  const entry = [...host.querySelectorAll('button')].find(
+    (button) => button.textContent?.trim() === 'Frame and image'
+  )!;
+  expect(entry.querySelector('svg')).toBeNull();
   await click('Frame and image');
   expect(startFraming).toHaveBeenCalledOnce();
   await render(null);

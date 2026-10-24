@@ -11,7 +11,7 @@ import {
   resolveTourMarkerAppearance,
   type TourDocument,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { Palette, MessageSquare, Trash2 } from 'lucide-react';
+import { Palette, MessageSquare, Crosshair, PanelsTopLeft, Trash2 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { GuideInspectorGroup } from '../inspector';
 import { TourMarkerFields } from './object-settings';
@@ -41,7 +41,7 @@ export function TourDocumentSettings({
   return (
     <GuideInspectorGroup
       id={`document:${section}`}
-      icon={section === 'appearance' ? Palette : MessageSquare}
+      icon={section === 'appearance' ? Palette : section === 'hotspots' ? Crosshair : MessageSquare}
       title={t(
         section === 'appearance'
           ? 'scenario.editor.appearance'
@@ -73,15 +73,24 @@ export function TourDocumentSettings({
             onChange={(stage) => onChange({ ...tour, stage })}
             t={t}
           />
-          <WindowHeaderSettings
-            header={tour.stage.windowHeader}
-            disabled={disabled}
-            onChange={(windowHeader) => {
-              const { windowHeader: _previousHeader, ...stage } = tour.stage;
-              if (!onChange({ ...tour, stage: windowHeader ? { ...stage, windowHeader } : stage }))
-                throw new Error('Window header edit refused');
-            }}
-          />
+          <GuideInspectorGroup
+            id="window-header"
+            level="group"
+            icon={PanelsTopLeft}
+            title={t('windowHeader.enabled')}
+          >
+            <WindowHeaderSettings
+              header={tour.stage.windowHeader}
+              disabled={disabled}
+              onChange={(windowHeader) => {
+                const { windowHeader: _previousHeader, ...stage } = tour.stage;
+                if (
+                  !onChange({ ...tour, stage: windowHeader ? { ...stage, windowHeader } : stage })
+                )
+                  throw new Error('Window header edit refused');
+              }}
+            />
+          </GuideInspectorGroup>
           {(
             [
               { key: 'accent', label: t('scenario.editor.tourInteractionAccent') },

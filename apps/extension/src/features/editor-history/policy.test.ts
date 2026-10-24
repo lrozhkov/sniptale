@@ -52,3 +52,11 @@ it('preserves eager UTF8 retention decisions for mixed sizes, Unicode and both d
     }
   }
 });
+
+it('combines custom Scenario byte measurement with lazy video retention', () => {
+  const snapshots = [{ bytes: 2 }, { bytes: EDITOR_HISTORY_LIMITS.maxBytes + 1 }, { bytes: 3 }];
+  const measure = vi.fn((snapshot: { bytes: number }) => snapshot.bytes);
+  expect(selectEditorSnapshotWindow(snapshots, 1, measure)).toMatchObject({ start: 1, end: 1 });
+  expect(measure).toHaveBeenCalledTimes(1);
+  expect(measure).toHaveBeenCalledWith(snapshots[1]);
+});

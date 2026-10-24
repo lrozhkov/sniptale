@@ -1,3 +1,4 @@
+import { TourPreview } from './preview';
 import type { ComponentProps } from 'react';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -5,13 +6,11 @@ import { Image } from 'lucide-react';
 import { GuideImageUpload } from '../image-upload';
 import { TourStage } from './stage';
 import { TourGeneration } from './generation';
-import type { TourView } from './view-controls';
+import type { TourViewMode } from './view-controls';
 import type { SelectedTourProps } from './workspace-contracts';
 
 type TourCanvasProps = SelectedTourProps & {
-  view: TourView;
-  previewKey: number;
-  previewOrigin: 'selection' | 'beginning';
+  mode: TourViewMode;
   generating: boolean;
   onGenerationChange: (value: boolean) => void;
   onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
@@ -34,7 +33,6 @@ export function TourCanvas(props: TourCanvasProps) {
     <div
       className="tour-canvas"
       data-tour-drop-slide={state.slide?.id}
-      tabIndex={0}
       aria-label={t('scenario.editor.tourMode')}
     >
       {generating ? (
@@ -46,7 +44,14 @@ export function TourCanvas(props: TourCanvasProps) {
           t={t}
         />
       ) : project.tour && state.selection ? (
-        <TourSelectedCanvas {...props} />
+        <TourPreview
+          active={props.mode.view === 'preview'}
+          onClose={props.mode.edit}
+          onReplay={props.mode.replayPreview}
+          t={t}
+        >
+          <TourSelectedCanvas {...props} />
+        </TourPreview>
       ) : (
         <TourEmptyCanvas
           disabled={importDisabled}
@@ -71,9 +76,7 @@ function TourSelectedCanvas({
   onImport,
   state,
   onSelectObject: selectObject,
-  view,
-  previewKey,
-  previewOrigin,
+  mode,
 }: Pick<
   TourCanvasProps,
   | 'project'
@@ -85,9 +88,7 @@ function TourSelectedCanvas({
   | 'onImport'
   | 'state'
   | 'onSelectObject'
-  | 'view'
-  | 'previewKey'
-  | 'previewOrigin'
+  | 'mode'
 >) {
   if (!project.tour || !state.selection) return null;
   return (
@@ -100,9 +101,9 @@ function TourSelectedCanvas({
           images={images}
           selection={state.selection}
           t={t}
-          view={view}
-          previewKey={previewKey}
-          previewOrigin={previewOrigin}
+          view={mode.view}
+          previewKey={mode.replay}
+          previewOrigin={mode.previewOrigin}
           onSelectObject={selectObject}
           onNavigateSelection={(selection) => {
             state.select(selection);

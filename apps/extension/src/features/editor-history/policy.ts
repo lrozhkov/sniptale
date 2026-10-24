@@ -10,16 +10,21 @@ export const SCENARIO_SAVED_VERSION_LIMITS = Object.freeze({
 });
 
 /** Measure the current snapshot and both navigation directions under the common product budget. */
-export function selectEditorSnapshotWindow(snapshots: readonly unknown[], cursor: number) {
+export function selectEditorSnapshotWindow<Snapshot>(
+  snapshots: readonly Snapshot[],
+  cursor: number,
+  measureSnapshot: (snapshot: Snapshot) => number = (snapshot) => {
+    const serialized = JSON.stringify(snapshot);
+    return serialized !== undefined && serialized.length > EDITOR_HISTORY_LIMITS.maxBytes
+      ? EDITOR_HISTORY_LIMITS.maxBytes + 1
+      : new TextEncoder().encode(serialized).byteLength;
+  }
+) {
   const sizes = new Map<number, number>();
   const measure = (index: number) => {
     const cached = sizes.get(index);
     if (cached !== undefined) return cached;
-    const serialized = JSON.stringify(snapshots[index]);
-    const size =
-      serialized !== undefined && serialized.length > EDITOR_HISTORY_LIMITS.maxBytes
-        ? EDITOR_HISTORY_LIMITS.maxBytes + 1
-        : new TextEncoder().encode(serialized).byteLength;
+    const size = measureSnapshot(snapshots[index]!);
     sizes.set(index, size);
     return size;
   };

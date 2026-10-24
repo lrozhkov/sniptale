@@ -269,3 +269,41 @@ it.each(['all', 'sections'] as const)(
     }
   }
 );
+
+it.each(['heading', 'note'] as const)(
+  'honors Sections for a %s with note tone beside typography',
+  async (kind) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    try {
+      await act(async () =>
+        root.render(
+          <GuideBlockInspector
+            item={createGuideStep('Step')}
+            block={
+              kind === 'note'
+                ? { kind, id: 'block', paragraphs: [], tone: 'info' }
+                : { kind, id: 'block', text: '' }
+            }
+            presentation="sections"
+            disabled={false}
+            onChange={vi.fn()}
+            onClose={vi.fn()}
+            t={createTranslator('en')}
+          />
+        )
+      );
+      const buttons = [...host.querySelectorAll<HTMLButtonElement>('nav button')];
+      expect(buttons.length).toBe(2);
+      const text = buttons.find((button) => button.getAttribute('aria-label') === 'Text')!;
+      await act(async () => text.click());
+      expect(host.querySelector('[role="group"][aria-label="Text size"]')).not.toBeNull();
+      if (kind === 'note')
+        expect(host.querySelector('button[aria-label="Note type"]')).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      vi.unstubAllGlobals();
+    }
+  }
+);

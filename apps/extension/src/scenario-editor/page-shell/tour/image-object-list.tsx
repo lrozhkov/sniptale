@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, Crosshair, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Crosshair,
+  MessageSquare,
+  MousePointer2,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   getTourHotspots,
@@ -51,7 +59,7 @@ export function TourImageObjects({
   return (
     <GuideInspectorGroup
       id="objects"
-      icon={Crosshair}
+      icon={MousePointer2}
       title={t('scenario.editor.tourObjects')}
       action={
         slide.actions.length ? (
