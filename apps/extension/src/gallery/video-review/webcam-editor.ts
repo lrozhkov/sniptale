@@ -226,14 +226,22 @@ function useReviewWebcamAcquisition(
   const [pending, setPending] = useState(false);
   const [attempt, retry] = useState(0);
   const acquisition = useRef<AbortController | null>(null);
+  const discoveredSession = useRef<WebcamEditorArgs['session'] | null>(null);
+  const automatic = useRef({ session: args.session, attempted: false });
+  if (automatic.current.session !== args.session)
+    automatic.current = { session: args.session, attempted: false };
   const aggregateId = args.session.getSnapshot().snapshot.workspace.aggregateId;
   useEffect(() => {
     const abort = new AbortController();
     setFailed(false);
+    setCandidate(null);
     if (!assetId) {
       void findReviewWebcam(aggregateId, abort.signal).then(
         (value) => {
-          if (!abort.signal.aborted) setCandidate(value);
+          if (!abort.signal.aborted) {
+            discoveredSession.current = args.session;
+            setCandidate(value);
+          }
         },
         () => {
           if (!abort.signal.aborted) setFailed(true);
@@ -241,12 +249,19 @@ function useReviewWebcamAcquisition(
       );
     }
     return () => abort.abort();
-  }, [aggregateId, assetId, attempt]);
-  useEffect(() => () => acquisition.current?.abort(), []);
+  }, [args.session, aggregateId, assetId, attempt]);
+  useEffect(() => {
+    setPending(false);
+    return () => {
+      acquisition.current?.abort();
+      acquisition.current = null;
+    };
+  }, [args.session, aggregateId]);
 
-  const attach = async (recoverAssetId?: string) => {
+  const attach = async (recoverAssetId?: string, automatically = false) => {
     if (!latest.current.allowed() || acquisition.current) return;
-    if (!candidate && !recoverAssetId) return;
+    if ((!candidate || discoveredSession.current !== args.session) && !recoverAssetId) return;
+    automatic.current.attempted = true;
     const abort = new AbortController();
     acquisition.current = abort;
     setPending(true);
@@ -254,7 +269,12 @@ function useReviewWebcamAcquisition(
     latest.current.pause();
     const assertCurrentTarget = () => {
       abort.signal.throwIfAborted();
-      if (!latest.current.allowed() || latest.current.session !== args.session)
+      if (
+        !latest.current.allowed() ||
+        latest.current.session !== args.session ||
+        latest.current.session.getSnapshot().snapshot.workspace.aggregateId !== aggregateId ||
+        (automatically && !canAutomaticallyAttachWebcam(latest.current))
+      )
         throw new Error('Camera attachment target changed.');
     };
     try {
@@ -284,7 +304,7 @@ function useReviewWebcamAcquisition(
             });
           },
         });
-      if (!abort.signal.aborted && !recoverAssetId) {
+      if (!abort.signal.aborted && !recoverAssetId && !automatically) {
         if (latest.current.advanced.advanced.ui.tracks.webcam === false)
           await latest.current.advanced.setTrackVisibility('webcam', true);
         latest.current.select({ kind: 'webcam' });
@@ -292,10 +312,19 @@ function useReviewWebcamAcquisition(
     } catch {
       if (!abort.signal.aborted) setFailed(true);
     } finally {
-      acquisition.current = null;
+      if (acquisition.current === abort) acquisition.current = null;
       if (!abort.signal.aborted) setPending(false);
     }
   };
+  useEffect(() => {
+    if (
+      candidate &&
+      discoveredSession.current === args.session &&
+      !automatic.current.attempted &&
+      canAutomaticallyAttachWebcam(args)
+    )
+      void attach(undefined, true);
+  });
   return {
     candidate,
     failed,
@@ -305,10 +334,32 @@ function useReviewWebcamAcquisition(
     attach: () => attach(),
     retry: () => {
       if (assetId) return attach(assetId);
+      if (candidate) return attach();
+      automatic.current.attempted = false;
       setFailed(false);
       retry((value) => value + 1);
     },
   };
+}
+
+function canAutomaticallyAttachWebcam(
+  args: Pick<WebcamEditorArgs, 'session' | 'advanced' | 'allowed'>
+) {
+  const { webcam, ui } = args.advanced.advanced;
+  return (
+    args.allowed() &&
+    ui.mode === 'advanced' &&
+    !ui.modeSelectionPending &&
+    ui.tracks.webcam !== false &&
+    !webcam &&
+    !args.session
+      .getSnapshot()
+      .snapshot.workspace.history.some(
+        (operation) =>
+          operation.target === 'advancedContent' &&
+          (!!operation.before.webcam || !!operation.after.webcam)
+      )
+  );
 }
 
 /** Framing updates target one anchor or the base without rewriting timing or the other frame properties. */

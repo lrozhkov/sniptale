@@ -6,8 +6,8 @@ import { readWebcamWorkspace } from '../support/quick-editor-webcam-proof';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
-  { locale: 'en', theme: 'light' },
-  { locale: 'ru', theme: 'dark' },
+  { locale: 'en', theme: 'light', viewport: { width: 1280, height: 560 } },
+  { locale: 'ru', theme: 'dark', viewport: { width: 1920, height: 900 } },
   { locale: 'en', theme: 'light', lowCadence: true, viewport: { width: 1200, height: 560 } },
 ] as const) {
   test(
@@ -57,9 +57,12 @@ for (const variant of [
             .evaluate((video) => {
               video.currentTime = 0.09;
             });
-        await toggle();
-        await button('gallery.videoReview.webcamSettings').click();
         const track = dialog.locator('[data-ui="gallery.videoReview.webcamTrack"]');
+        await expect(track).toBeVisible();
+        await dialog
+          .locator('[data-review-header-track="webcam"] [data-review-track-select]')
+          .click();
+        await button('gallery.videoReview.webcamSettings').click();
         const overlay = dialog.locator('[data-ui="gallery.videoReview.webcamOverlay"]');
         const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
         await expect(track).toBeVisible();
@@ -227,6 +230,10 @@ for (const variant of [
           .locator('video')
           .first()
           .evaluate((video) => video.currentTime);
+        const beforeHideDuration = await dialog
+          .locator('video')
+          .first()
+          .evaluate((video) => video.duration);
         await page.mouse.move(
           lane.x + (lane.width * 2.5) / sourceDuration,
           lane.y + lane.height / 2
@@ -246,6 +253,12 @@ for (const variant of [
           await dialog
             .locator('video')
             .first()
+            .evaluate((video) => video.duration)
+        ).toBe(beforeHideDuration);
+        expect(
+          await dialog
+            .locator('video')
+            .first()
             .evaluate((video) => video.currentTime)
         ).toBeCloseTo(beforeHideTime, 1);
         await expect.poll(async () => (await painted())[3]).toBe(0);
@@ -253,6 +266,25 @@ for (const variant of [
         await expect(hidden).toHaveCount(0);
         await button('gallery.videoReview.redo').click();
         await expect(hidden).toHaveCount(1);
+        await hidden.click();
+        for (const [key, value] of [
+          ['rangeStart', '2.4'],
+          ['rangeEnd', '3.6'],
+        ] as const) {
+          const input = inspector.getByRole('textbox', {
+            name: label(`gallery.videoReview.${key}`),
+            exact: true,
+          });
+          await input.fill(value);
+          await input.press('Enter');
+          await expect(input).toHaveValue(value);
+        }
+        expect(
+          await dialog
+            .locator('video')
+            .first()
+            .evaluate((video) => video.duration)
+        ).toBe(beforeHideDuration);
         await expect
           .poll(async () => {
             const workspace = await readWebcamWorkspace(page);
@@ -436,12 +468,7 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
     await page.getByRole('button', { name: /: Screen$/ }).click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await button('gallery.videoReview.advancedEditing').click();
-    await button('gallery.videoReview.trackSettings').click();
-    await dialog
-      .getByRole('switch', {
-        name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.webcam')}`,
-      })
-      .click();
+    await expect(dialog.locator('[data-ui="gallery.videoReview.webcamTrack"]')).toBeVisible();
     await button('gallery.videoReview.webcamSettings').click();
     const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
     const sections = inspector.locator('[data-ui="gallery.videoReview.inspectorSections"]');
@@ -692,16 +719,6 @@ for (const viewport of [
         await page.getByRole('button', { name: /: Screen$/ }).click();
         const dialog = page.locator('dialog');
         await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-        await dialog
-          .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
-          .click();
-        const enabled = dialog.getByRole('switch', {
-          name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.webcam')}`,
-        });
-        if (!(await enabled.isVisible()))
-          await dialog
-            .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
-            .click();
         const cameras = await page.evaluateHandle(() => {
           const videos: HTMLVideoElement[] = [];
           document.createElement = new Proxy(document.createElement, {
@@ -713,7 +730,9 @@ for (const viewport of [
           });
           return videos;
         });
-        await enabled.click();
+        await dialog
+          .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+          .click();
         await expect
           .poll(() =>
             cameras.evaluate((videos) =>

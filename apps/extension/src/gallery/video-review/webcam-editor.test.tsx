@@ -33,22 +33,42 @@ let root: Root | null;
 let editor: ReturnType<typeof useReviewWebcamEditor>;
 let allowed: boolean;
 
-function setup(webcam?: QuickEditWebcam, trackVisible?: boolean) {
+function setup(
+  webcam?: QuickEditWebcam,
+  trackVisible?: boolean,
+  automatic = false,
+  pending = false,
+  mount = true,
+  priorCamera = false,
+  aggregateId = 'recording:main'
+) {
   const advanced = createQuickEditAdvancedState();
-  advanced.ui.mode = 'advanced';
+  advanced.ui.mode = automatic ? 'advanced' : 'basic';
+  advanced.ui.modeSelectionPending = pending;
   if (trackVisible !== undefined) advanced.ui.tracks.webcam = trackVisible;
   if (webcam) advanced.webcam = webcam;
-  const history: ReviewOperation[] = [];
+  const history: ReviewOperation[] = priorCamera
+    ? [
+        {
+          id: 'prior-camera',
+          at: 1,
+          target: 'advancedContent',
+          before: advanced,
+          after: { ...advanced, webcam: createQuickEditWebcam('saved', source, source) },
+        },
+      ]
+    : [];
+  let cursor = 0;
   const events: string[] = [];
   let commitGate = Promise.resolve();
   const snapshot = (): VideoWorkspaceSnapshot => ({
     workspace: {
-      aggregateId: 'recording:main',
+      aggregateId,
       sourceAssetId: 'main',
       formatVersion: 1,
       source,
       revision: history.length + 1,
-      cursor: history.length,
+      cursor,
       advanced,
       history: [...history],
       createdAt: 1,
@@ -61,7 +81,8 @@ function setup(webcam?: QuickEditWebcam, trackVisible?: boolean) {
     await commitGate;
     const operation = parseReviewOperation(args.operation, 12);
     if (!operation) throw new Error('Invalid operation');
-    history.push(operation);
+    history.splice(cursor, history.length - cursor, operation);
+    cursor += 1;
     return snapshot();
   });
   const saveAdvanced = vi.fn(async () => snapshot());
@@ -78,15 +99,18 @@ function setup(webcam?: QuickEditWebcam, trackVisible?: boolean) {
     },
     saveVideoWorkspaceDraft: async () => snapshot(),
     readVideoWorkspace: async () => snapshot(),
-    moveVideoWorkspaceHistory: async () => snapshot(),
+    moveVideoWorkspaceHistory: async ({ direction }) => {
+      cursor += direction === 'undo' ? -1 : 1;
+      return snapshot();
+    },
     saveVideoWorkspaceAdvanced: saveAdvanced,
   });
-  function Harness() {
-    const advanced = useReviewAdvanced(session);
-    const [selection, select] = useState<ReviewSelection>({ kind: 'none' });
+  function Harness({ activeSession = session }: { activeSession?: typeof session }) {
+    const advanced = useReviewAdvanced(activeSession);
+    const [selection, select] = useState<ReviewSelection>({ kind: 'annotation', id: 'note' });
     const [time, seek] = useState(3);
     editor = useReviewWebcamEditor({
-      session,
+      session: activeSession,
       advanced: {
         ...advanced,
         flush: async () => {
@@ -105,13 +129,15 @@ function setup(webcam?: QuickEditWebcam, trackVisible?: boolean) {
     });
     return null;
   }
-  act(() => root!.render(<Harness />));
+  if (mount) act(() => root!.render(<Harness />));
   return {
     session,
     saveAdvanced,
     commit,
     history,
     events,
+    render: (activeSession = session) => root!.render(<Harness activeSession={activeSession} />),
+    advanced,
     gate: (value: Promise<void>) => {
       commitGate = value;
     },
@@ -180,9 +206,6 @@ it('preserves the project and exposes retry after a rejected attachment', async 
   await act(async () => {
     editor.retry();
   });
-  await act(async () => {
-    await editor.toggle();
-  });
   expect(editor.camera?.enabled).toBe(true);
 });
 
@@ -243,28 +266,22 @@ it('aborts an in-flight acquisition when the editor unmounts', async () => {
   expect(io.published).not.toHaveBeenCalled();
 });
 
-it('durably attaches camera bytes even with autosave disabled', async () => {
-  const fixture = setup();
+it('durably attaches automatic camera bytes before user edits with autosave disabled', async () => {
+  const fixture = setup(undefined, undefined, true);
   act(() => fixture.session.setAutosaveEnabled(false));
   await act(async () => {});
-  await act(async () => {
-    await editor.toggle();
-  });
   expect(fixture.commit).toHaveBeenCalledOnce();
   expect(fixture.history).toHaveLength(1);
   expect(fixture.session.getSnapshot().dirty).toBe(false);
 });
 
-it('retries resources after committed attachment publication failure without another attachment', async () => {
-  const fixture = setup();
+it('retries resources after automatic committed publication failure without another attachment', async () => {
+  const fixture = setup(undefined, undefined, true);
   io.attach.mockImplementation(async (args: Parameters<typeof attachReviewWebcam>[0]) => {
     await args.attach('project-asset:camera', source);
     throw new Error('Publication failed');
   });
   await act(async () => {});
-  await act(async () => {
-    await editor.toggle();
-  });
   expect(editor.failed).toBe(true);
   expect(editor.camera?.assetId).toBe('project-asset:camera');
   const attempt = editor.resourceAttempt;
@@ -382,3 +399,121 @@ it.each([null, undefined])(
     expect(editor.camera?.positions[0]).toEqual(camera.positions[0]);
   }
 );
+
+it('automatically admits a linked webcam in Advanced without changing object selection', async () => {
+  const fixture = setup(undefined, undefined, true);
+  await act(async () => {});
+  expect(editor.camera?.enabled).toBe(true);
+  expect(io.attach).toHaveBeenCalledOnce();
+  expect(fixture.commit).toHaveBeenCalledOnce();
+  expect(editor.selection).toEqual({ kind: 'annotation', id: 'note' });
+});
+
+it('shares automatic and manual admission and preserves Undo after the first attachment', async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  io.attach.mockImplementation(async (args: Parameters<typeof attachReviewWebcam>[0]) => {
+    await gate;
+    args.assertCurrentTarget();
+    await args.attach('project-asset:camera', source);
+  });
+  const fixture = setup(undefined, undefined, true);
+  await act(async () => {});
+  expect(editor.pending).toBe(true);
+  await act(async () => editor.toggle());
+  expect(io.attach).toHaveBeenCalledOnce();
+  await act(async () => release());
+  expect(editor.camera?.enabled).toBe(true);
+  await act(async () => fixture.session.history('undo'));
+  expect(editor.camera).toBeUndefined();
+  act(() => fixture.render());
+  await act(async () => {});
+  expect(io.attach).toHaveBeenCalledOnce();
+});
+
+it('does not repeat a failed automatic admission until explicit Retry', async () => {
+  io.attach.mockRejectedValueOnce(new Error('save'));
+  const fixture = setup(undefined, undefined, true);
+  await act(async () => {});
+  expect(editor.failed).toBe(true);
+  act(() => fixture.render());
+  await act(async () => {});
+  expect(io.attach).toHaveBeenCalledOnce();
+  await act(async () => editor.retry());
+  expect(editor.camera?.enabled).toBe(true);
+  expect(fixture.history).toHaveLength(1);
+  expect(io.attach).toHaveBeenCalledTimes(2);
+});
+
+it.each(['basic', 'pending', 'hidden', 'disabled', 'locked'])(
+  'preserves the %s camera choice during automatic discovery',
+  async (choice) => {
+    if (choice === 'locked') allowed = false;
+    const camera =
+      choice === 'disabled'
+        ? { ...createQuickEditWebcam('project-asset:saved', source, source), enabled: false }
+        : undefined;
+    setup(
+      camera,
+      choice === 'hidden' ? false : undefined,
+      choice !== 'basic',
+      choice === 'pending'
+    );
+    await act(async () => {});
+    expect(io.attach).not.toHaveBeenCalled();
+    expect(editor.camera).toEqual(camera);
+  }
+);
+
+it.each(['recording:main', 'recording:replacement'])(
+  'rejects a delayed old session attachment when opening %s',
+  async (aggregateId) => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const signals: AbortSignal[] = [];
+    io.attach.mockImplementation(async (args: Parameters<typeof attachReviewWebcam>[0]) => {
+      signals.push(args.signal);
+      await gate;
+      args.assertCurrentTarget();
+      await args.attach('project-asset:camera', source);
+    });
+    const old = setup(undefined, undefined, true);
+    await act(async () => {});
+    const replacement = setup(undefined, undefined, true, false, false, false, aggregateId);
+    act(() => old.render(replacement.session));
+    await act(async () => {});
+    expect(signals[0].aborted).toBe(true);
+    await act(async () => release());
+    expect(old.commit).not.toHaveBeenCalled();
+    expect(replacement.commit).toHaveBeenCalledOnce();
+  }
+);
+
+it('preserves an undone camera choice when reopening its authored history', async () => {
+  const fixture = setup(undefined, undefined, true, false, true, true);
+  await act(async () => {});
+  expect(editor.camera).toBeUndefined();
+  expect(io.attach).not.toHaveBeenCalled();
+  expect(fixture.commit).not.toHaveBeenCalled();
+});
+
+it('ignores discovery that completes after the target session changed', async () => {
+  let release!: (candidate: { id: string; filename: string }) => void;
+  io.find.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      })
+  );
+  const old = setup(undefined, undefined, true);
+  const replacement = setup(undefined, undefined, true, false, false);
+  await act(async () => old.render(replacement.session));
+  expect(replacement.commit).toHaveBeenCalledOnce();
+  await act(async () => release({ id: 'old-camera', filename: 'old.webm' }));
+  expect(old.commit).not.toHaveBeenCalled();
+  expect(io.attach).toHaveBeenCalledOnce();
+});
