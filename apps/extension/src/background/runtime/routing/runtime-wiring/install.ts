@@ -1,3 +1,4 @@
+import { presentWelcomeOnce } from '../../../storage/onboarding';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import { initializeLocalePreference } from '../../../../platform/i18n';
 import { rebuildBackgroundContextMenus } from '../../context-menu/service';
@@ -27,6 +28,10 @@ export function registerInstallListener(logger: RuntimeWiringLogger): void {
 
     if (installDetails.reason === 'install') {
       logger.log('First installation');
+      // Admit welcome immediately; a locale continuation must not outlive privacy erasure.
+      void presentWelcomeOnce().catch(() => {
+        logger.warn('Failed to open first-install welcome');
+      });
       void initializeFirstInstallLocale(logger).then(() => {
         rebuildContextMenus(logger);
       });

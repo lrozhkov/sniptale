@@ -146,3 +146,14 @@ it('erases quick preview preferences only when preferences are not preserved', (
   expect(erased.sync).not.toContain(key);
   expect(erased.session).not.toContain(key);
 });
+
+it('preserves the first-show marker with preferences and removes it during a full reset', () => {
+  expect(
+    buildBrowserStorageErasurePlan({ includeAiProviderSecrets: false, preservePreferences: true })
+      .local
+  ).not.toContain('sniptale_welcome_shown');
+  expect(
+    buildBrowserStorageErasurePlan({ includeAiProviderSecrets: false, preservePreferences: false })
+      .local
+  ).toContain('sniptale_welcome_shown');
+});

@@ -1,3 +1,4 @@
+import { WelcomePage } from './welcome';
 import { NativeHints } from '../../../ui/native-hints';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
@@ -163,6 +164,7 @@ function SettingsPageMain() {
 }
 
 export function SettingsPage() {
+  const isWelcomePage = new URL(globalThis.location.href).searchParams.get('welcome') === '1';
   const isAIUnlockPage = new URL(globalThis.location.href).searchParams.get('aiUnlock') === '1';
   return (
     <CommandPressScope value={true}>
@@ -171,6 +173,8 @@ export function SettingsPage() {
         <div className="sniptale-settings-viewport">
           {isAIUnlockPage ? (
             <AISecretUnlockPage />
+          ) : isWelcomePage ? (
+            <WelcomePage />
           ) : (
             <SettingsSectionHeaderActionsProvider>
               <SettingsNavigationLockProvider>
