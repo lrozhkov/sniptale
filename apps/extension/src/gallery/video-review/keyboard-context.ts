@@ -43,6 +43,7 @@ export function reviewOwnsPlaybackKeys(target: HTMLElement): boolean {
     target.closest(
       [
         '[data-review-track-select]',
+        '[data-local-space-activation="true"]',
         '[aria-haspopup][aria-expanded="true"]',
         '[role="checkbox"],[role="radio"],[role="switch"]',
       ].join(',')

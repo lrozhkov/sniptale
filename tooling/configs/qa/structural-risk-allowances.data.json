@@ -600,11 +600,11 @@
       "file": "apps/extension/src/gallery/video-review/inspector-binding.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The candidate removes a forwarding scene binding and passes identical callbacks through the existing scene properties binding. Existing session, audio, and navigation receivers retain their responsibilities. State and effect counts are unchanged. No writer or recovery authority moves. Independent read-only scene_structural_blocker investigation confirmed this classification. Final architecture review must validate the complete candidate.",
-      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery, dependency authority, or fixture lifetime. Remove when the analyzer models this cohesive shape.",
-      "reviewDate": "2026-10-14",
-      "astHash": "9d7389ea5942d9c54a977cb28f10738a9c54cc2257867d725aaf6aec9e5a311b",
-      "signatureHash": "5e72e5fe4c4cdb9486008e262b9117573e1a2fc972045dde2e706196d968db41"
+      "reason": "tool-noise: The existing Gallery inspector adapter delegates Play and Cut through beforeAction to existing transport/edit commands. Canonical-index and clock checks are pure; no new writer, queue or montage authority. Main and independent read-only diagnosis inspected this exact boundary and classified Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess selection reconciliation, keyed receivers, command admission, resource, transport, writer or recovery lifetimes. Remove when analyzer support recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "a205a4648c8307bf25fcae64e48cec6e498bbf173e115ab6808c3778d66a7ce4",
+      "signatureHash": "06cb0212dccd2c37073f4d934e4a33f6717cd8e84711cd10d1cdb3ee18a0bd12"
     },
     {
       "rule": "structural-file-risk",
@@ -1799,10 +1799,10 @@
       "file": "apps/extension/src/gallery/video-review/inspector-binding.test.tsx",
       "symbol": "it callback",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This ordered integration test uses one mounted inspector and one session fixture. Its sceneProbe is disposable test data, not another runtime authority. The candidate checks buffer flush, selected source identity, refusal, and retry through that same fixture. The function has one branch and no nested control flow. Only the test line budget triggers this finding. Splitting it would obscure the ordered interaction proof.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
-      "reviewDate": "2026-10-21",
-      "astHash": "0d1b2810b86c59da857ff32f8159b8e69ddea09a7b4621c9402a60241e6be2fe",
+      "reason": "tool-noise: One mounted inspector fixture proves ordered buffer joins and guarded commands. The added temporal-action helper reuses that root and restores its probe in finally; no second fixture lifetime. Main and independent read-only diagnosis inspected this exact boundary and classified Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess selection reconciliation, keyed receivers, command admission, resource, transport, writer or recovery lifetimes. Remove when analyzer support recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "27d755690134256cb1e3e13c9cb9f0da7de08e63beccc45386b96fb3afff877a",
       "signatureHash": "4bd833e688236b8c036afdb49f63adf0e750f7446aac250c82600d04b76483fb"
     },
     {
@@ -2595,6 +2595,83 @@
       "removalCondition": "Remove when this exact AST or signature changes. Reassess independent projects, pages, fixtures, resource lifetimes or journeys without authored-state continuity. Remove when the analyzer recognizes this cohesive browser proof boundary.",
       "reviewDate": "2026-10-25",
       "astHash": "047089e2c315e3c686ae51812017afcb9a68dcaf5e225f0296647c686d679fcf",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/speech-phrase.tsx",
+      "symbol": "ReviewTextPhrase",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One keyed Gallery phrase receiver retains caret, focus and injected edits. Document mode hides only its summary; focus revision targets the same textarea. No separate draft or command lifetime. Main and independent read-only diagnosis inspected this exact boundary and classified Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess selection reconciliation, keyed receivers, command admission, resource, transport, writer or recovery lifetimes. Remove when analyzer support recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "ba0e369d3da92d6f10392600d7431403ef780ea3947f6e2ae0ee5deadad17be7",
+      "signatureHash": "3cd23a73aa2c0c5a14dcd0f6abcef2b679b34074d8049fe329bab657ace75497"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/text-panel.tsx",
+      "symbol": "ReviewTextDocumentPanel",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One Gallery document panel retains filters, selection, open phrase and exclusive forms. The same keyed map survives both views; shared display owns DOM selection only, while runtime commands stay injected. Main and independent read-only diagnosis inspected this exact boundary and classified Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess selection reconciliation, keyed receivers, command admission, resource, transport, writer or recovery lifetimes. Remove when analyzer support recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "df91188e6ccffa562efadf3dd18f0a65fed30ef6f28a13e64347e784e51a0591",
+      "signatureHash": "cf5f9f496c5dc6ffd7102838b1e8c846b3958514ef1efc5a3841e2c6765ea7ca"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-phrase.tsx",
+      "symbol": "ProjectTextPhrase",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: One keyed Native phrase receiver retains accepted text, invalid draft and caret. Views preserve its React identity; focus targets its textarea and writes use ProjectTextEditor. Splitting would distribute one refused-draft lifetime. Main and independent read-only diagnosis inspected this exact boundary and classified Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess selection reconciliation, keyed receivers, command admission, resource, transport, writer or recovery lifetimes. Remove when analyzer support recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "53b4f1a76579fd42ce8fd5914a60f0f8443b63b713939a4ce978763fa6ddb2de",
+      "signatureHash": "d85565f2f5bd5f5be7005b13cf3999d12bf225f32360c4594e0f572caf73d1fc"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.tsx",
+      "symbol": "InspectProjectTextPanel",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: One Native text inspector owns document choice, selected IDs, keyed edit receivers and operation triggers. UI owns only local scheduling before handoff; existing runtime owns accepted preparation and subsequent playback. Voice/rewrite retain controllers; no durable writer or independent resource authority. Main and independent read-only diagnosis inspected the final handoff correction and classify Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess local cancellation of accepted runtime work, duplicate playback state, new transport contracts, keyed receivers, resource or writer lifetime. Remove when analyzer support recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "4eaf304e1daa822fafd7f05df53eb4951197c2c117908412c273ccef9c9f1d80",
+      "signatureHash": "d85a8e534e372df5a8d404fd783e1512c4213663c92a7e7dab1359613ec64152"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-review-text.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: Existing search and text journeys share private helpers but retain per-test page/host and media cleanup. The only change selects Cards for incumbent proof; no new fixture authority. Main and independent read-only diagnosis inspected this exact boundary and classified Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess selection reconciliation, keyed receivers, command admission, resource, transport, writer or recovery lifetimes. Remove when analyzer support recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "b7ea7469bf52c9c5d9cb26ed6603637cf963922d6fd84c80eb477dc0fd42b35d",
+      "signatureHash": "8ccffda9d02a6376af94d6a40b31ff5cc2352a9b897aadccfc8c9310e1586e72"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-review-text.spec.ts",
+      "symbol": "test callback#2",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One authored document continues through existing edits, voice/rewrite/subtitles, history and reload. Cards selections restore the intended surface; one page, fixture-port and host cleanup lifetime. Main and independent read-only diagnosis inspected this exact boundary and classified Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess selection reconciliation, keyed receivers, command admission, resource, transport, writer or recovery lifetimes. Remove when analyzer support recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "ea6dde316cb463697cd8c96b69bf80874471d15d54c37a2dad7347e2f63aa76c",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-text-document.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One authored 56-phrase document journey proves Gallery native Copy, temporal Cut and history, real transfer, Native projected navigation, refused draft repair and reopen. One test page and host retain finally cleanup; Clipboard is the actual browser object restored after the harness stub. Main and independent read-only diagnosis classify the cohesive acceptance journey Keep. Final architecture review must assess it.",
+      "removalCondition": "Remove on exact AST or signature change. Reassess fixture authority, page and host cleanup, Clipboard isolation, cross-runtime transfer and acceptance scope. Remove when analyzer support recognizes this cohesive test workflow.",
+      "reviewDate": "2026-10-25",
+      "astHash": "7dff1f5c4c5fd0f013ff71112dd634237e5762e3605929daeefeb30b938b09a4",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     }
   ]

@@ -182,6 +182,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/recording-icon.test.tsx`
 - `apps/extension/src/ui/recording-icon.tsx`
 - `apps/extension/src/ui/surface-style-selector`
+- `apps/extension/src/ui/text-document.test.tsx`
+- `apps/extension/src/ui/text-document.tsx`
 - `apps/extension/src/ui/theme`
 - `apps/extension/src/ui/video-export`
 - `apps/extension/src/ui/video-text`

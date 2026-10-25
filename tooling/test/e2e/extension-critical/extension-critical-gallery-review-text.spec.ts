@@ -667,6 +667,9 @@ for (const variant of [
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.textTrackOpen'), exact: true })
         .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+        .click();
       await inspectTextSearch(
         dialog.locator('[data-ui="gallery.videoReview.textDocument"]'),
         page,
@@ -780,6 +783,7 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.textTrackOpen').click();
+      await button('gallery.videoReview.textViewCards').click();
       const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
       const track = dialog.locator('[data-ui="gallery.videoReview.textTrack"]');
       await expect(document).toBeVisible();
@@ -975,6 +979,7 @@ for (const variant of [
         variant.height
       );
       await button('gallery.videoReview.textTrackOpen').click();
+      await button('gallery.videoReview.textViewCards').click();
       await expect(document).toBeVisible();
       await expect(
         dialog.getByRole('textbox', { name: label('gallery.videoReview.speechText'), exact: true })
@@ -1052,6 +1057,7 @@ for (const variant of [
       // The retained route restores review directly; do not click the gallery behind its dialog.
       await expect(dialog).toBeVisible();
       await button('gallery.videoReview.textTrackOpen').click();
+      await button('gallery.videoReview.textViewCards').click();
       await expect(cards).toHaveCount(2);
       await expect(cards.nth(0)).toContainText('Первая фраза');
       await expect(cards.nth(1)).toContainText('Вторая фраза');

@@ -1,6 +1,13 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  textView: { ru: 'Вид текста', en: 'Text view' },
+  textViewDocument: { ru: 'Документ', en: 'Document' },
+  textViewCards: { ru: 'Карточки', en: 'Cards' },
+  textPhraseEdit: { ru: 'Изменить фразу', en: 'Edit phrase' },
+  textPlayFromHere: { ru: 'Воспроизвести отсюда', en: 'Play from here' },
+  textCut: { ru: 'Вырезать участок видео', en: 'Cut video interval' },
+
   subtitlesWebVtt: { ru: 'WebVTT', en: 'WebVTT' },
   subtitlesSrt: { ru: 'SRT', en: 'SRT' },
   subtitlesSimultaneous: {

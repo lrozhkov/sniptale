@@ -109,3 +109,35 @@ it('captures all Gallery targets once, keeps focus and releases ownership on dea
     host.remove();
   }
 });
+
+it.each(['native-controls', 'all-targets'] as const)(
+  'respects explicit local Space only under %s policy',
+  (policy) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host),
+      toggle = vi.fn(),
+      local = vi.fn();
+    function Content() {
+      usePlaybackSpaceShortcut(toggle, true, policy);
+      return (
+        <span role="button" tabIndex={0} data-local-space-activation="true" onKeyDown={local}>
+          Phrase
+        </span>
+      );
+    }
+    try {
+      act(() => root.render(<Content />));
+      act(() =>
+        host.firstElementChild!.dispatchEvent(
+          new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true })
+        )
+      );
+      expect(toggle).toHaveBeenCalledTimes(policy === 'all-targets' ? 1 : 0);
+      expect(local).toHaveBeenCalledTimes(policy === 'native-controls' ? 1 : 0);
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  }
+);

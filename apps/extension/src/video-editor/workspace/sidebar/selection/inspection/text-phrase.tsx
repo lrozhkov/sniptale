@@ -33,8 +33,11 @@ export function ProjectTextPhrase(props: {
   fragment: ReviewTextFragment;
   next?: ReviewTextFragment | undefined;
   editor: ProjectTextEditor;
+  documentView?: boolean;
+  visible?: boolean;
   expanded: boolean;
   focus: boolean;
+  focusRevision?: number;
   onToggle(): void;
   onRewrite?(): void;
   onVoice?(): void;
@@ -44,6 +47,7 @@ export function ProjectTextPhrase(props: {
 }) {
   const { entry, fragment, editor } = props;
   const locale = useAppLocale();
+  const textarea = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState(fragment.text);
   const [invalid, setInvalid] = useState(false);
   const errorId = useId();
@@ -56,8 +60,15 @@ export function ProjectTextPhrase(props: {
       setInvalid(false);
     }
   }, [fragment.text]);
+  useEffect(() => {
+    if (props.expanded && props.focus) {
+      textarea.current?.focus({ preventScroll: true });
+      textarea.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [props.expanded, props.focus, props.focusRevision]);
   const change = (patch: Parameters<typeof editReviewTextFragment>[2], typing = false) =>
     editor.edit(entry, editReviewTextFragment(entry.document, fragment.id, patch), typing);
+  if (props.visible === false && !props.expanded) return null;
   return (
     <article
       className={[
@@ -66,54 +77,61 @@ export function ProjectTextPhrase(props: {
       ].join(' ')}
       data-text-id={fragment.id}
     >
-      {props.batch ? (
-        <label className="flex h-8 shrink-0 items-center justify-center">
-          <input
-            type="checkbox"
-            className="sniptale-parameter-check"
-            aria-label={translate('gallery.videoReview.speechSelectPhrase')}
-            checked={props.selected ?? false}
-            onChange={props.onSelect}
+      {!props.documentView && (
+        <>
+          {props.batch ? (
+            <label className="flex h-8 shrink-0 items-center justify-center">
+              <input
+                type="checkbox"
+                className="sniptale-parameter-check"
+                aria-label={translate('gallery.videoReview.speechSelectPhrase')}
+                checked={props.selected ?? false}
+                onChange={props.onSelect}
+              />
+            </label>
+          ) : null}
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs"
+            aria-expanded={props.expanded}
+            title={fragment.text || translate('gallery.videoReview.textFragment')}
+            onClick={props.onToggle}
+          >
+            <ChevronDown
+              size={14}
+              className={props.expanded ? 'shrink-0' : '-rotate-90 shrink-0'}
+            />
+            <span className="min-w-0 flex-1 truncate">
+              {fragment.text || translate('gallery.videoReview.textFragment')}
+            </span>
+            <span className="shrink-0 tabular-nums">
+              {formatNumber(
+                fragment.start,
+                { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+                locale
+              )}
+              –
+              {formatNumber(
+                fragment.end,
+                { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+                locale
+              )}
+            </span>
+          </button>
+          <ProjectTextPhraseCommands
+            fragmentId={fragment.id}
+            text={fragment.text}
+            {...(props.onRewrite ? { onRewrite: props.onRewrite } : {})}
+            {...(props.onVoice ? { onVoice: props.onVoice } : {})}
           />
-        </label>
-      ) : null}
-      <button
-        type="button"
-        className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs"
-        aria-expanded={props.expanded}
-        title={fragment.text || translate('gallery.videoReview.textFragment')}
-        onClick={props.onToggle}
-      >
-        <ChevronDown size={14} className={props.expanded ? 'shrink-0' : '-rotate-90 shrink-0'} />
-        <span className="min-w-0 flex-1 truncate">
-          {fragment.text || translate('gallery.videoReview.textFragment')}
-        </span>
-        <span className="shrink-0 tabular-nums">
-          {formatNumber(
-            fragment.start,
-            { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-            locale
-          )}
-          –
-          {formatNumber(
-            fragment.end,
-            { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-            locale
-          )}
-        </span>
-      </button>
-      <ProjectTextPhraseCommands
-        fragmentId={fragment.id}
-        text={fragment.text}
-        {...(props.onRewrite ? { onRewrite: props.onRewrite } : {})}
-        {...(props.onVoice ? { onVoice: props.onVoice } : {})}
-      />
+        </>
+      )}
       {props.expanded && (
         <div className="w-full min-w-0 space-y-2">
           <TextareaField
+            ref={textarea}
             label={translate('gallery.videoReview.speechText')}
             value={draft}
-            autoFocus={props.focus}
             aria-invalid={invalid}
             aria-describedby={editor.error ? errorId : undefined}
             onFocus={editor.beginTyping}

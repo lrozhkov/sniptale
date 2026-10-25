@@ -65,6 +65,7 @@ type InspectorState = Pick<
   | 'video'
   | 'time'
   | 'playing'
+  | 'play'
   | 'features'
   | 'selected'
   | 'setHovered'
@@ -305,6 +306,8 @@ function reviewInspectorTextDocument(
     | 'beforeAction'
     | 'setVoiceoverSilent'
     | 'editing'
+    | 'seek'
+    | 'play'
   >,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
@@ -312,6 +315,23 @@ function reviewInspectorTextDocument(
     <ReviewTextDocumentPanel
       editor={state.text}
       snapshots={state.text.snapshots}
+      onPlay={(fragment) =>
+        state.beforeAction(() => {
+          state.video.current?.pause();
+          state.seek(state.text.sourceInterval(fragment).start, false);
+          void state.play();
+        })
+      }
+      canCut={(ids) => {
+        const range = reviewTextCutRange(state.text, ids);
+        return !!range && state.editing.canApply('cut', range);
+      }}
+      onCut={(ids) =>
+        state.beforeAction(() => {
+          const range = reviewTextCutRange(state.text, ids);
+          if (range && state.editing.canApply('cut', range)) void state.editing.apply('cut', range);
+        })
+      }
       busy={state.busy || state.editing.exporter.phase !== 'idle'}
       voice={reviewTextVoiceAccess(state, canvasComments)}
       subtitleMainOffset={reviewSubtitleMainOffset(
@@ -794,4 +814,25 @@ function hasSelectionSections(state: InspectorState): boolean {
         'annotation-effect',
       ].includes(state.activeSelection.kind))
   );
+}
+
+/** Only consecutive canonical phrases on one clock can name an existing temporal Cut. */
+function reviewTextCutRange(editor: InspectorState['text'], ids: readonly string[]) {
+  const wanted = new Set(ids);
+  const fragments = editor.document.fragments;
+  const indexes = fragments.flatMap((fragment, index) => (wanted.has(fragment.id) ? [index] : []));
+  if (
+    !indexes.length ||
+    indexes.length !== wanted.size ||
+    indexes.some((index, i) => i > 0 && index !== indexes[i - 1]! + 1)
+  )
+    return null;
+  const selected = indexes.map((index) => fragments[index]!);
+  if (selected.some((fragment) => fragment.timeDomain !== selected[0]!.timeDomain)) return null;
+  const intervals = selected.map(editor.sourceInterval);
+  return {
+    kind: 'range' as const,
+    start: Math.min(...intervals.map((range) => range.start)),
+    end: Math.max(...intervals.map((range) => range.end)),
+  };
 }

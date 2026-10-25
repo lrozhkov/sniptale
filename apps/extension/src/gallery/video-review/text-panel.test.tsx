@@ -1,3 +1,4 @@
+import type { ReviewSelection } from '../../features/video/review/types';
 // @vitest-environment jsdom
 
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
@@ -101,6 +102,8 @@ function Fixture({
     })),
   });
   const [, refresh] = useState(0);
+  const [selection, setSelection] = useState<ReviewSelection>({ kind: 'none' });
+  const inspectedId = selectedId ?? (selection.kind === 'text' ? selection.id : undefined);
   current = document.current;
   const editor = useReviewText({
     document: document.current,
@@ -111,19 +114,26 @@ function Fixture({
       document.current = update(document.current) ?? { version: 1, fragments: [] };
       refresh((version) => version + 1);
     },
-    select: vi.fn(),
+    selection,
+    select: setSelection,
     seek,
     pause: vi.fn(),
   });
   return (
     <InspectorLayout>
-      {selectedId ? (
-        <ReviewSelectedTextProperties editor={editor} id={selectedId} busy={false} voice={voice} />
+      {inspectedId ? (
+        <ReviewSelectedTextProperties editor={editor} id={inspectedId} busy={false} voice={voice} />
       ) : (
         <ReviewTextDocumentPanel editor={editor} snapshots={[]} busy={false} voice={voice} />
       )}
     </InspectorLayout>
   );
+}
+function cards() {
+  const control = host.querySelector<HTMLButtonElement>(
+    '[title="gallery.videoReview.textViewCards"]'
+  );
+  if (control) act(() => control.click());
 }
 function voiceAccess(): ReviewTextVoiceAccess {
   return {
@@ -173,6 +183,7 @@ const button = (label: string) =>
 
 it('keeps document commands beside search', () => {
   act(() => root.render(<Fixture count={3} voice={voiceAccess()} />));
+  cards();
   const searchRow = host.querySelector('input[type="search"]')!.parentElement!.parentElement!;
   expect(searchRow.contains(button('subtitlesTitle'))).toBe(true);
   expect(searchRow.contains(button('textRewriteAll'))).toBe(true);
@@ -181,6 +192,7 @@ it('keeps document commands beside search', () => {
 
 it('keeps jump metadata independent from expansion', () => {
   act(() => root.render(<Fixture count={3} />));
+  cards();
   const card = host.querySelector('[data-text-id="text-1"]')!;
   const jump = card.querySelector<HTMLButtonElement>(
     '[aria-label="gallery.videoReview.speechJump"]'
@@ -196,6 +208,7 @@ it('keeps jump metadata independent from expansion', () => {
 
 it('opens exclusive local subtitles without configured voice access and returns focus to scope trigger', () => {
   act(() => root.render(<Fixture count={3} />));
+  cards();
   act(() => button('subtitlesTitle').click());
   expect(host.querySelector('[data-form]')?.getAttribute('data-ids')).toBe('text-0,text-1,text-2');
   expect(host.querySelector('[data-form]')?.getAttribute('data-whole')).toBe('true');
@@ -213,6 +226,7 @@ it('opens exclusive local subtitles without configured voice access and returns 
 
 it('opens all-text rewriting independently of search and filtered batch scope, returning focus to its trigger', () => {
   act(() => root.render(<Fixture count={3} voice={voiceAccess()} />));
+  cards();
   const search = host.querySelector<HTMLInputElement>('input[type="search"]')!;
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
@@ -251,6 +265,7 @@ it('keeps a selected fragment form exclusive and drops it on selection change or
   const voice = voiceAccess();
   const render = (selectedId: string) =>
     act(() => root.render(<Fixture count={2} voice={voice} selectedId={selectedId} />));
+  cards();
   render('text-0');
   act(() =>
     host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="rewrite:selected"]')!.click()
@@ -268,6 +283,7 @@ it('keeps a selected fragment form exclusive and drops it on selection change or
 
 it('edits, hides and removes canonical text without changing timing or mounting an audio controller', () => {
   act(() => root.render(<Fixture count={1} />));
+  cards();
   act(() => host.querySelector<HTMLButtonElement>('[data-text-id] button[aria-expanded]')!.click());
   const textarea = host.querySelector('textarea')!;
   act(() => {
@@ -298,6 +314,7 @@ it('edits, hides and removes canonical text without changing timing or mounting 
 
 it('opens exactly one card under rapid clicks, allows all closed and keeps seek separate', () => {
   act(() => root.render(<Fixture count={3} />));
+  cards();
   const summaries = () =>
     host.querySelectorAll<HTMLButtonElement>('[data-text-id] button[aria-expanded]');
   act(() => {
@@ -318,6 +335,7 @@ it('opens exactly one card under rapid clicks, allows all closed and keeps seek 
 
 it('selects all matching phrases beyond the first fifty rendered rows and removes text in one action', () => {
   act(() => root.render(<Fixture />));
+  cards();
   expect(host.querySelectorAll('[data-ui="gallery.videoReview.textPhrase"]')).toHaveLength(50);
   act(() => button('speechBatch').click());
   act(() => button('textFragmentSelectFound').click());
@@ -329,6 +347,7 @@ it('selects all matching phrases beyond the first fifty rendered rows and remove
 
 it('creates an empty manual fragment without mounting speech API and focuses its editor', () => {
   act(() => root.render(<Fixture count={1} />));
+  cards();
   act(() => button('textFragmentAdd').click());
   expect(current.fragments).toHaveLength(2);
   const created = current.fragments[1]!;
@@ -338,6 +357,7 @@ it('creates an empty manual fragment without mounting speech API and focuses its
 
 it('keeps large documents paged when a new fragment opens beyond the rendered page', () => {
   act(() => root.render(<Fixture />));
+  cards();
   act(() => button('textFragmentAdd').click());
   expect(current.fragments).toHaveLength(121);
   expect(host.querySelectorAll('[data-ui="gallery.videoReview.textPhrase"]')).toHaveLength(51);
@@ -348,6 +368,7 @@ it('keeps large documents paged when a new fragment opens beyond the rendered pa
 
 it('limits batch deletion to matching selection and resets an empty search without losing other text', () => {
   act(() => root.render(<Fixture />));
+  cards();
   act(() => button('speechBatch').click());
   act(() => button('textFragmentSelectFound').click());
   act(() => button('textFragmentFilters').click());
@@ -374,6 +395,7 @@ it('limits batch deletion to matching selection and resets an empty search witho
 
 it('keeps a selected text detail distinct from an expandable numbered list row', () => {
   act(() => root.render(<Fixture count={1} selectedId="text-0" />));
+  cards();
   const article = host.querySelector('[data-ui="gallery.videoReview.textPhrase"]')!;
   expect(article.querySelector(':scope > div:first-child button[aria-expanded]')).toBeNull();
   expect(article.querySelector('textarea')?.rows).toBe(6);
@@ -390,6 +412,7 @@ it('keeps a selected text detail distinct from an expandable numbered list row',
 it('passes the current source-clock fragment cap into the selected voice form without joining the session', () => {
   const voice = voiceAccess();
   act(() => root.render(<Fixture count={2} voice={voice} selectedId="text-1" sourceClock />));
+  cards();
   act(() => host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="selected"]')!.click());
   expect(host.querySelector('[data-form="voice"]')?.getAttribute('data-maximum')).toBe('596');
   expect(voice.beforeRequest).not.toHaveBeenCalled();
@@ -399,13 +422,76 @@ it('passes the current source-clock fragment cap into the selected voice form wi
 it('keeps voice unavailable for a newly created blank fragment until the user enters text', () => {
   const voice = voiceAccess();
   act(() => root.render(<Fixture count={1} voice={voice} />));
+  cards();
   act(() => button('textFragmentAdd').click());
   const id = current.fragments[1]!.id;
   act(() => root.render(<Fixture count={1} voice={voice} selectedId={id} />));
+  cards();
   const start = host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="selected"]')!;
   expect(start.disabled).toBe(true);
   act(() => start.click());
   expect(host.querySelector('[data-form="voice"]')).toBeNull();
   expect(voice.beforeRequest).not.toHaveBeenCalled();
   expect(document.activeElement).toBe(host.querySelector('textarea'));
+});
+
+it('defaults to connected full text and keeps filtering and the keyed editor through view changes', () => {
+  act(() => root.render(<Fixture />));
+  expect(host.querySelectorAll('[data-text-phrase-id]')).toHaveLength(120);
+  expect(host.querySelector('[aria-label="gallery.videoReview.textFragmentMore"]')).toBeNull();
+  const last = host.querySelector<HTMLElement>('[data-text-phrase-id="text-119"]')!;
+  act(() => last.click());
+  expect(seek).toHaveBeenLastCalledWith(476, false);
+  act(() => button('textPhraseEdit').click());
+  const field = host.querySelector('textarea')!;
+  expect(field.value).toBe('Phrase 119');
+  expect(document.activeElement).toBe(field);
+  cards();
+  expect(host.querySelector('textarea')).toBe(field);
+  act(() => button('textViewDocument').click());
+  expect(host.querySelector('textarea')).toBe(field);
+  const search = host.querySelector<HTMLInputElement>('input[type="search"]')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      search,
+      'Phrase 119'
+    );
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(host.querySelectorAll('[data-text-phrase-id]')).toHaveLength(1);
+  cards();
+  expect(host.querySelectorAll('[data-text-id]')).toHaveLength(1);
+  act(() => button('textViewDocument').click());
+  expect(host.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('Phrase 119');
+});
+
+it('retains active phrase commands when an open Card switches to Document without batch selection', () => {
+  act(() => root.render(<Fixture count={2} voice={voiceAccess()} />));
+  cards();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-text-id="text-0"] button[aria-expanded]')!.click()
+  );
+  act(() => button('textViewDocument').click());
+  expect(
+    host.querySelector('[data-ui="text-document.actions"]')?.getAttribute('data-selected-count')
+  ).toBe('1');
+  act(() => button('textRewriteSelected').click());
+  expect(host.querySelector('[data-form="rewrite"]')?.getAttribute('data-ids')).toBe('text-0');
+});
+
+it('keeps Document mounted through real phrase navigation instead of routing to the fragment inspector', () => {
+  act(() => root.render(<Fixture count={56} />));
+  const documentRoot = host.querySelector('[data-ui="gallery.videoReview.textDocument"]');
+  const last = host.querySelector<HTMLElement>('[data-text-phrase-id="text-55"]')!;
+  act(() => last.click());
+  expect(seek).toHaveBeenLastCalledWith(220, false);
+  expect(host.querySelector('[data-ui="gallery.videoReview.textDocument"]')).toBe(documentRoot);
+  expect(last.getAttribute('aria-pressed')).toBe('true');
+  expect(host.querySelector('[data-ui="text-document.actions"]')).not.toBeNull();
+  const first = host.querySelector<HTMLElement>('[data-text-phrase-id="text-0"]')!;
+  act(() => first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(seek).toHaveBeenLastCalledWith(0, false);
+  expect(host.querySelector('[data-ui="gallery.videoReview.textDocument"]')).toBe(documentRoot);
+  expect(first.getAttribute('aria-pressed')).toBe('true');
+  expect(host.querySelectorAll('[data-text-phrase-id]')).toHaveLength(56);
 });

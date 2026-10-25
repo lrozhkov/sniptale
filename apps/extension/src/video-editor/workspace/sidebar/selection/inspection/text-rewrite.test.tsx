@@ -204,6 +204,7 @@ async function mount(source = false) {
   useVideoEditorStore.getState().setProject(fixture(source));
   durable = structuredClone(useVideoEditorStore.getState().project!);
   await act(async () => root.render(<Harness />));
+  await click('textViewCards');
   await act(async () =>
     host.querySelector<HTMLButtonElement>('[data-project-text-rewrite="all"]')!.click()
   );
