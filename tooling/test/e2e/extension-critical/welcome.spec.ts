@@ -238,6 +238,19 @@ test('welcome permits skipping denied devices and retains Russian light appearan
       fullPage: false,
       animations: 'disabled',
     });
+    await ui(page, 'welcome.back').click();
+    await choose(page, 'theme', 'Тёмная').click();
+    await ui(page, 'welcome.next').click();
+    await expect(ui(page, 'welcome.microphone').getByRole('status')).toContainText('Доступ закрыт');
+    await expect(ui(page, 'welcome.camera').getByRole('status')).toContainText('Доступ закрыт');
+    await page.screenshot({
+      path: info.outputPath('welcome-denied-dark.png'),
+      fullPage: false,
+      animations: 'disabled',
+    });
+    await ui(page, 'welcome.back').click();
+    await choose(page, 'theme', 'Светлая').click();
+    await ui(page, 'welcome.next').click();
     await ui(page, 'welcome.next').click();
     await expect(ui(page, 'welcome.pin-illustration')).toHaveJSProperty('naturalWidth', 768);
     await page.screenshot({

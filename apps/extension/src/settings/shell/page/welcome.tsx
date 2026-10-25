@@ -3,7 +3,11 @@ import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
 import {
   ArrowLeft,
   ArrowRight,
-  Camera,
+  Video,
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  LockKeyhole,
   Check,
   Globe2,
   Mic,
@@ -115,22 +119,31 @@ function PermissionSetup({
   const sites = kind === 'origins';
   const access = setup.access[kind];
   const granted = access === 'granted';
-  const Icon = sites ? Globe2 : kind === 'microphone' ? Mic : Camera;
+  const Icon = sites ? Globe2 : kind === 'microphone' ? Mic : Video;
   const name = translate(sites ? 'settings.welcome.pageTools' : deviceCopy[kind].name);
+  const StatusIcon = granted
+    ? CircleCheck
+    : access === 'denied'
+      ? LockKeyhole
+      : access === 'prompt' || access === 'unknown'
+        ? CircleDashed
+        : CircleAlert;
   return (
     <section aria-label={name} data-ui={`welcome.${kind}`} className="welcome-device-row">
       <span className="welcome-device-icon" aria-hidden="true">
         <Icon size={22} />
       </span>
       <div className="welcome-device-copy">
-        <h2>{name}</h2>
+        <div className="welcome-device-heading">
+          <h2>{name}</h2>
+          <span role="status" data-access={access} className="welcome-device-status">
+            <StatusIcon size={13} aria-hidden="true" />
+            {sites && access === 'error'
+              ? translate('settings.welcome.pageAccessError')
+              : deviceStatus(access)}
+          </span>
+        </div>
         <p>{translate(sites ? 'settings.welcome.pageToolsPurpose' : deviceCopy[kind].purpose)}</p>
-        <p role="status" className="welcome-device-status">
-          {granted ? <Check size={13} aria-hidden="true" /> : null}
-          {sites && access === 'error'
-            ? translate('settings.welcome.pageAccessError')
-            : deviceStatus(access)}
-        </p>
       </div>
       <div className="welcome-device-action">
         {!granted ? (
