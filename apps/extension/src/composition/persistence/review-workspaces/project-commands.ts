@@ -32,7 +32,9 @@ export async function readStoredVideoWorkspaceProject(
   const storage = await readWorkspaceStorage(tx, id);
   const workspace = parseVideoWorkspace(storage.logical);
   if (!workspace || workspace.aggregateId !== id) throw new VideoWorkspaceError('invalid');
-  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(id));
+  const media = parseMediaLibraryEntry(
+    await tx.objectStore(MEDIA_LIBRARY_STORE).get(workspace.sourceMediaId ?? id)
+  );
   return { storage, workspace: materializeVideoWorkspaceProject(workspace, media?.filename ?? id) };
 }
 

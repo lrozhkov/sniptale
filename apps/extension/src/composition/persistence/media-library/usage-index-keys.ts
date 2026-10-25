@@ -37,7 +37,7 @@ export function withReviewWorkspaceUsage<T extends object>(
   const workspace = parseVideoWorkspace(value);
   const keys = new Set([USAGE_INDEX_MARKER]);
   if (workspace) {
-    keys.add(usageReferenceKey('library-asset', workspace.aggregateId));
+    keys.add(usageReferenceKey('library-asset', workspace.sourceMediaId ?? workspace.aggregateId));
     for (const ref of collectReviewAssetReferences(workspace)) {
       if (ref.startsWith('project-asset:'))
         keys.add(usageReferenceKey('project-asset', ref.slice('project-asset:'.length)));

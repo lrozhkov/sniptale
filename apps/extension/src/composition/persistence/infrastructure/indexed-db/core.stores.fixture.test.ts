@@ -284,9 +284,28 @@ it('adds private voice history without rewriting released rows media or indexes'
   expect(target.opfsObjects).toEqual(source.opfsObjects);
   expect(target.stores.filter((name) => name !== 'voice_input_history')).toEqual(source.stores);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, voiceInputHistory: 1 });
-  expect(DATABASE_MIGRATIONS.at(-1)).toMatchObject({
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 35)).toMatchObject({
     backupCoverage: 'none',
     risk: 'additive',
     domainVersions: [{ domainId: 'voiceInputHistory', from: 0, to: 1 }],
+  });
+});
+
+it('admits independent quick projects without rewriting released sources or workspace rows', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 35
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 36
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 28 });
+  expect(DATABASE_MIGRATIONS.at(-1)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 27, to: 28 }],
   });
 });

@@ -142,9 +142,11 @@ async function projectUsageFromMatches(args: {
   }
   for (const workspace of reviews.map(parseVideoWorkspace)) {
     if (!workspace) continue;
-    const primary = workspace.aggregateId === root.id;
+    const primary = (workspace.sourceMediaId ?? workspace.aggregateId) === root.id;
     if (!primary && !reviewWorkspaceUsesMedia(workspace, media)) continue;
-    const owner = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, workspace.aggregateId));
+    const owner = parseMediaLibraryEntry(
+      await db.get(MEDIA_LIBRARY_STORE, workspace.sourceMediaId ?? workspace.aggregateId)
+    );
     result.set(`review:${workspace.aggregateId}`, {
       id: workspace.aggregateId,
       kind: 'review',

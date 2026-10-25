@@ -1,3 +1,4 @@
+import { ReviewProjectTitle } from './project-controls';
 import type { ReviewInspectorNavigation } from './inspector-navigation';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -82,6 +83,8 @@ export function ReviewInspector(props: {
   recording?: ReactNode;
   beforeAction?: ReviewBeforeAction | undefined;
   filename: string;
+  onRenameProject?(name: string): Promise<void>;
+  onNewProject?: (() => void) | undefined;
   annotations: readonly ReviewAnnotation[];
   selectedId: string | null;
   busy: boolean;
@@ -464,8 +467,29 @@ function ReviewInspectorHeader(
   return (
     <header className="flex shrink-0 items-center gap-1">
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={props.filename}>
-        {props.filename}
+        {props.onRenameProject ? (
+          <ReviewProjectTitle
+            name={props.filename}
+            busy={props.busy}
+            onRename={props.onRenameProject}
+          />
+        ) : (
+          props.filename
+        )}
       </h2>
+      {props.onNewProject ? (
+        <ContentToolbarButton
+          type="button"
+          tone="utility"
+          size="compact"
+          title={translate('videoEditor.app.newProjectAction')}
+          disabled={props.busy}
+          onClick={props.onNewProject}
+          dataUi="gallery.videoReview.newProject"
+        >
+          <Plus size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      ) : null}
       {props.section === 'scene' ||
       props.section === 'speech' ||
       (props.section === 'selected' && props.selectionHasSections === true) ? (

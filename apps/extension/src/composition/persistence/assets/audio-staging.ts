@@ -109,7 +109,10 @@ async function assertScopeExists(scope: AudioJobScope): Promise<void> {
   if (target.kind === 'original') {
     if (workspace.aggregateId !== scope.workspaceId || workspace.sourceAssetId !== scope.assetId)
       throw new Error('Missing audio staging scope.');
-    const source = await readLibrarySceneSource(workspace.aggregateId, 'video');
+    const source = await readLibrarySceneSource(
+      workspace.sourceMediaId ?? workspace.aggregateId,
+      'video'
+    );
     if (!sameReviewSourceIdentity(source.ref, workspace.sourceAssetId, workspace.source))
       throw new Error('Missing audio staging scope.');
     return;

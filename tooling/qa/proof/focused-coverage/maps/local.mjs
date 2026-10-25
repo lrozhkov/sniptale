@@ -695,6 +695,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/ai/audio/authorization.test.ts',
       'apps/extension/src/background/ai/audio/authorization.source.test.ts',
+      'apps/extension/src/background/ai/audio/authorization.project.test.ts',
+      'apps/extension/src/background/ai/audio/authorization.project-text.test.ts',
       'apps/extension/src/background/ai/audio/chat-transcription.test.ts',
       'apps/extension/src/background/ai/audio/model-config.test.ts',
     ],

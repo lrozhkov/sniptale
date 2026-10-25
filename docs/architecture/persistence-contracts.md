@@ -46,6 +46,12 @@ Explicit media backup v6 excludes pending recordings and retained safety copies.
 
 ## Admission and migration
 
+Quick-edit projects can share one source video. The source media ID identifies its default workspace. An archived workspace retains its own aggregate ID and an explicit `sourceMediaId`. Source lookup, usage, retention, authorization, and transfer resolve that reference. History and draft writes retain the workspace aggregate ID.
+
+Creating a project copies the complete previous default into an independent archive. One transaction creates the archive and replaces the default. The default revision increases, so delayed writes cannot replace the new project. A stable archive ID identifies a repeated command. Failure preserves the previous default.
+
+Database version 36 changes the mediaLibrary contract to 28. The migration preserves existing rows, history, recovery, stores, and indexes. Earlier writers cannot admit this database. Portable backup gives each archived project an independent media root. Restore binds that project to its restored source.
+
 Quick-edit logical formats 3 and 4 require project names and permanent lifecycles, including independent Trash admission times. Format 3 uses the legacy advanced baseline. Format 4 retains the complete document baseline. Physical formats 4 and 5 store these logical formats.
 
 Formats 1 and 2 remain readable without project metadata. Their physical formats remain 2 and 3. Reading does not materialize project metadata.

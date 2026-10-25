@@ -67,6 +67,7 @@ type ReviewEditorProps = {
   resource: LoadedReview;
   onBack(): void;
   onClose(): void;
+  onProjectCreated(aggregateId: string): void;
 };
 
 /** One immutable editor projection drives the disposable seam preview workflow. */
@@ -109,7 +110,13 @@ function useEditorPresentationPreview(
 }
 
 /** Localize prepared window choices without adding scene/export policy to the workspace shell. */
-function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditorProps) {
+function ReviewEditor({
+  resource,
+  onBack,
+  onClose,
+  onJoinPreview,
+  onProjectCreated,
+}: ReviewEditorProps) {
   const state = useReviewEditorState(resource);
   const editorReady = !state.advanced.ui.modeSelectionPending;
   const previewPreferences = useReviewPreviewPreferences();
@@ -172,6 +179,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
             />
           </div>
           <ReviewInspectorBinding
+            onProjectCreated={onProjectCreated}
             recording={
               voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
             }
@@ -306,16 +314,23 @@ export function VideoReview({
   onClose?(): void;
 }) {
   useAppLocale();
-  const { resource, failed, retry } = useLoadedReview(aggregateId);
+  const [activeId, setActiveId] = useState(aggregateId);
+  useEffect(() => setActiveId(aggregateId), [aggregateId]);
+  const { resource, failed, retry } = useLoadedReview(activeId);
   useEffect(() => {
-    setGalleryQuickEditUrl(aggregateId);
-    return () => clearGalleryQuickEditUrl(aggregateId);
-  }, [aggregateId]);
+    setGalleryQuickEditUrl(activeId);
+    return () => clearGalleryQuickEditUrl(activeId);
+  }, [activeId]);
   return (
     <ReviewDialog>
       {resource ? (
         <ReviewEditor
+          key={`${resource.snapshot.workspace.aggregateId}:${resource.snapshot.workspace.createdAt}`}
           resource={resource}
+          onProjectCreated={(id) => {
+            setActiveId(id);
+            retry();
+          }}
           onBack={onBack}
           onClose={onClose}
           onJoinPreview={onJoinPreview}

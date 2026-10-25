@@ -107,7 +107,7 @@ function projectUsageFromSnapshot(
   }
 
   for (const workspace of reviewWorkspaces) {
-    const primary = workspace.aggregateId === mediaId;
+    const primary = (workspace.sourceMediaId ?? workspace.aggregateId) === mediaId;
     const attached = reviewWorkspaceUsesMedia(workspace, media);
     if (primary || attached) {
       usage.push({
@@ -115,7 +115,7 @@ function projectUsageFromSnapshot(
         kind: 'review',
         name:
           workspace.project?.name ??
-          mediaById.get(workspace.aggregateId)?.filename ??
+          mediaById.get(workspace.sourceMediaId ?? workspace.aggregateId)?.filename ??
           root.filename,
         primary,
       });

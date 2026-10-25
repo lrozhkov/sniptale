@@ -1,3 +1,4 @@
+import type { QuickEditAdvancedContent } from '../../../features/video/review/advanced/types';
 import { readWorkspaceStorage, type WorkspaceStorageReadTransaction } from './storage';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -16,7 +17,7 @@ import {
 
 /** Portable review includes all history and field recovery, but no local OPFS identity. */
 export interface PortableVideoReview {
-  workspace: Omit<VideoWorkspace, 'sourceAssetId' | 'typing'>;
+  workspace: Omit<VideoWorkspace, 'sourceAssetId' | 'typing' | 'sourceMediaId'>;
   draft: VideoWorkspaceDraft | null;
 }
 
@@ -34,7 +35,8 @@ function parsePortableVideoReviewShape(
     !isRecord(value) ||
     !isRecord(value['workspace']) ||
     'sourceAssetId' in value['workspace'] ||
-    'typing' in value['workspace']
+    'typing' in value['workspace'] ||
+    'sourceMediaId' in value['workspace']
   ) {
     throw new Error('Portable video review is invalid.');
   }
@@ -87,7 +89,12 @@ export async function readVideoReviewForBackup(args: {
   if (!workspace || workspace.sourceAssetId !== args.sourceAssetId) {
     throw new Error('Video review source is missing or changed.');
   }
-  const { sourceAssetId: _localId, typing: _typing, ...portable } = workspace;
+  const {
+    sourceAssetId: _localId,
+    typing: _typing,
+    sourceMediaId: _sourceMediaId,
+    ...portable
+  } = workspace;
   const result = parsePortableVideoReviewShape(
     { workspace: portable, draft: rawDraft === undefined ? null : rawDraft },
     args.aggregateId,
@@ -97,6 +104,7 @@ export async function readVideoReviewForBackup(args: {
     const {
       sourceAssetId,
       typing: _expectedTyping,
+      sourceMediaId: _expectedMediaId,
       ...expectedWorkspace
     } = args.expectedSnapshot.workspace;
     const expected = parsePortableVideoReviewShape(
@@ -110,6 +118,52 @@ export async function readVideoReviewForBackup(args: {
   return result;
 }
 
+/** Recording aliases change only source bindings; history identities and authored values remain intact. */
+export function remapVideoReviewRecordingSource(
+  review: PortableVideoReview,
+  sourceRecordingId: string,
+  targetRecordingId: string
+): PortableVideoReview {
+  const content = <T extends QuickEditAdvancedContent>(value: T): T => {
+    if (!value.cursorFocusPath) return value;
+    return {
+      ...value,
+      cursorFocusPath: {
+        ...value.cursorFocusPath,
+        segments: value.cursorFocusPath.segments.map((segment) => ({
+          ...segment,
+          binding:
+            segment.binding.kind === 'recording-source' &&
+            segment.binding.recordingId === sourceRecordingId
+              ? { ...segment.binding, recordingId: targetRecordingId }
+              : segment.binding,
+        })),
+      },
+    };
+  };
+  const workspace = review.workspace;
+  return {
+    ...review,
+    workspace: {
+      ...workspace,
+      advanced: content(workspace.advanced),
+      ...(workspace.baseline
+        ? {
+            baseline: {
+              ...workspace.baseline,
+              advancedContent: content(workspace.baseline.advancedContent),
+            },
+          }
+        : {}),
+      history: workspace.history.map((operation) =>
+        operation.target === 'advancedContent'
+          ? { ...operation, before: content(operation.before), after: content(operation.after) }
+          : operation
+      ),
+    },
+  };
+}
+
 /** Rebinds a verified portable review to the restored video and its new local byte object. */
 export function prepareVideoReviewRestore(args: {
   review: PortableVideoReview;
@@ -118,8 +172,11 @@ export function prepareVideoReviewRestore(args: {
   sourceAssetId: string;
   /** Restored project-asset id map for review audio and image references. */
   assetIdMap?: ReadonlyMap<string, string>;
+  recordingIdMap?: ReadonlyMap<string, string>;
 }): VideoWorkspaceSnapshot {
-  const review = parsePortableVideoReviewShape(args.review, args.sourceAggregateId, true);
+  let review = parsePortableVideoReviewShape(args.review, args.sourceAggregateId, true);
+  for (const [sourceId, targetId] of args.recordingIdMap ?? [])
+    review = remapVideoReviewRecordingSource(review, sourceId, targetId);
   const workspace = parseVideoWorkspace({
     ...review.workspace,
     aggregateId: args.targetAggregateId,

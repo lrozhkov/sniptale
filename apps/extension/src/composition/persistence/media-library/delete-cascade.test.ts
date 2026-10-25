@@ -336,23 +336,41 @@ it('ignores invalid metadata on a scenario child with disjoint dependency locato
   expect(rows.get('scenario_assets')?.has('other')).toBe(true);
 });
 
-it('retains a source when its own quick-edit project evidence is invalid', async () => {
-  rows.get('video_projects')!.clear();
-  rows.set('video_workspaces', new Map([[mediaId, { aggregateId: mediaId, invalid: true }]]));
-  const before = structuredClone(rows);
-  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toThrow();
-  expect(rows).toEqual(before);
-});
+it.each([mediaId, null, 42, '', 'x'.repeat(257), undefined])(
+  'retains a source when quick-edit primary-source evidence is invalid (%s)',
+  async (sourceMediaId) => {
+    rows.get('video_projects')!.clear();
+    rows
+      .get('media_library')!
+      .set(mediaId, { ...mediaEntry(), source: { kind: 'recording', recordingId: 'recording-1' } });
+    const aggregateId = sourceMediaId === mediaId ? mediaId : 'recording:quick-project:uncertain';
+    const evidence = {
+      aggregateId: sourceMediaId === undefined ? undefined : aggregateId,
+      sourceMediaId,
+      invalid: true,
+    };
+    rows.set('video_workspaces', new Map([['uncertain-archive', evidence]]));
+    const before = structuredClone(rows);
+    await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+      reason: 'invalid-graph',
+      graphDomain: 'quick-edit',
+    });
+    expect(rows).toEqual(before);
+    expect(harness.complete).not.toHaveBeenCalled();
+  }
+);
 
-it('does not validate unrelated quick-edit rows for a stored image source', async () => {
+it.each([
+  { aggregateId: 'other', invalid: true },
+  { aggregateId: 'other', sourceMediaId: 'disjoint-source', invalid: true },
+])('does not validate disjoint quick-edit primary-source rows (%j)', async (evidence) => {
   rows.get('video_projects')!.clear();
-  rows.set('video_workspaces', new Map([['other', { aggregateId: 'other', invalid: true }]]));
-  const media = {
+  rows.set('video_workspaces', new Map([['other', evidence]]));
+  rows.get('media_library')!.set(mediaId, {
     ...mediaEntry(),
     kind: 'image',
     source: { kind: 'stored-asset', assetId: physicalId },
-  };
-  rows.get('media_library')!.set(mediaId, media);
+  });
   await deleteMediaAssetWithProjectCascade(mediaId, []);
   expect(rows.get('video_workspaces')?.has('other')).toBe(true);
 });

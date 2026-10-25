@@ -104,7 +104,7 @@ export function reviewWorkspaceUsesMedia(
   workspace: VideoWorkspace,
   media: MediaDependencyTarget
 ): boolean {
-  if (workspace.aggregateId === media.id) return true;
+  if ((workspace.sourceMediaId ?? workspace.aggregateId) === media.id) return true;
   const refs = collectReviewAssetReferences(workspace);
   return [...reviewReferencesForMedia(media)].some((ref) => refs.has(ref));
 }

@@ -2,7 +2,7 @@ import { releaseUnpublishedProjectAssets } from './delete-cascade.sources';
 import { buildPhysicalDeleteOperation } from '../assets';
 import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
 import { withVideoProjectUsage } from './usage-index-keys';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { mediaId, physicalId, mediaEntry, rows, harness } from './delete-cascade.test-support';
 import {
   deleteMediaAssetWithProjectCascade,
@@ -11,6 +11,19 @@ import {
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import type { MediaAssetSource } from './contracts';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import { deleteRecording } from '../recordings';
+import { deleteProjectExport } from '../projects/index.exports';
+
+vi.mock('../infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: async () => harness.db(),
+}));
+
+vi.mock('../assets/opfs-store', async (original) => ({
+  ...(await original<typeof import('../assets/opfs-store')>()),
+  listReadyJournals: async () => [],
+}));
 
 const sources = [
   { kind: 'screenshot' },
@@ -729,3 +742,57 @@ it('keeps the original canonical recording when deleting its restored copy and s
   expect(rows.get('recording_recovery_sessions')?.size).toBe(0);
   expect(rows.get('recording_recovery_blocks')?.size).toBe(0);
 });
+
+it.each(['recording', 'project-export'] as const)(
+  'refuses the lower %s deletion when an archived quick project is the only source consumer',
+  async (kind) => {
+    const source =
+      kind === 'recording'
+        ? { kind, recordingId: 'recording-1' }
+        : { kind, exportId: 'export-1', projectId: 'origin-project' };
+    installSource(source);
+    rows.get('video_projects')!.clear();
+    const sourceMediaId = kind === 'recording' ? 'recording:recording-1' : 'export:export-1';
+    rows.get('media_library')!.delete(mediaId);
+    rows.get('media_library')!.set(sourceMediaId, { ...mediaEntry(), id: sourceMediaId, source });
+    const archiveId = `${kind === 'recording' ? 'recording' : 'export'}:quick-project:retained`;
+    rows.set(
+      'video_workspaces',
+      new Map([
+        [
+          archiveId,
+          {
+            aggregateId: archiveId,
+            sourceMediaId,
+            formatVersion: 3,
+            sourceAssetId: physicalId,
+            source: { duration: 2, width: 100, height: 100, size: 5, mimeType: 'video/webm' },
+            revision: 1,
+            cursor: 0,
+            history: [],
+            advanced: createQuickEditAdvancedState(),
+            project: {
+              name: 'Previous edit',
+              lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+            },
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      ])
+    );
+    expect(rows.get('video_workspaces')?.has(sourceMediaId)).toBe(false);
+    const db = await harness.db();
+    harness.db.mockResolvedValue({
+      ...db,
+      get: async (store: string, key: string) => rows.get(store)?.get(key),
+    });
+    const before = structuredClone(rows);
+    const deletion =
+      kind === 'recording' ? deleteRecording('recording-1') : deleteProjectExport('export-1');
+    await expect(deletion).rejects.toThrow('primary source');
+    expect(rows).toEqual(before);
+    expect(rows.get('asset_refs')?.has(physicalId)).toBe(true);
+    expect(harness.complete).not.toHaveBeenCalled();
+  }
+);

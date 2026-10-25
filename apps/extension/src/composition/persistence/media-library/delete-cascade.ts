@@ -193,9 +193,15 @@ async function loadCascadeGraph(
   );
   const externalReferences = reviewReferencesForMedia(target).size > 0;
   const reviews = requireVerifiedGraphEntries(
-    rawReview.filter(
-      (value) => externalReferences || (isRecord(value) && value['aggregateId'] === media.id)
-    ),
+    rawReview.filter((value) => {
+      if (externalReferences || !isRecord(value)) return true;
+      const sourceId =
+        value['sourceMediaId'] === undefined ? value['aggregateId'] : value['sourceMediaId'];
+      // Exclude only a proven disjoint primary identity; uncertain source evidence must be admitted below.
+      return (
+        typeof sourceId !== 'string' || !sourceId || sourceId.length > 256 || sourceId === media.id
+      );
+    }),
     parseVideoWorkspace,
     'quick-edit',
     () => false
@@ -267,7 +273,8 @@ async function detachReviewWorkspaces(
 ): Promise<MediaAssetProjectUsage[]> {
   const affected: MediaAssetProjectUsage[] = [];
   for (const workspace of graph.reviews) {
-    if (workspace.aggregateId === graph.media.id) throw new PrimaryMediaAssetDeleteError();
+    if ((workspace.sourceMediaId ?? workspace.aggregateId) === graph.media.id)
+      throw new PrimaryMediaAssetDeleteError();
     const attached = reviewWorkspaceUsesMedia(workspace, graph.media);
     if (!attached) continue;
     affected.push({

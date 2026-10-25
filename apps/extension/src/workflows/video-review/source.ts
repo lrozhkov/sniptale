@@ -9,6 +9,7 @@ import { getProjectExport } from '../../composition/persistence/projects/index.e
 import type { VideoWorkspaceDiagnostic } from '../../composition/persistence/review-workspaces/parser';
 import {
   openVideoWorkspace,
+  readVideoWorkspace,
   VideoWorkspaceError,
 } from '../../composition/persistence/review-workspaces/store';
 import { parseReviewSource } from '../../features/video/review/validation';
@@ -113,7 +114,9 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
   let stage: ReviewLoadStage = 'library';
   try {
     signal.throwIfAborted();
-    const media = await getMediaLibraryEntry(aggregateId);
+    const existing = await readVideoWorkspace(aggregateId);
+    const sourceMediaId = existing?.workspace.sourceMediaId ?? aggregateId;
+    const media = await getMediaLibraryEntry(sourceMediaId);
     if (!media?.mimeType.startsWith('video/'))
       throw new VideoReviewLoadError('library', 'unavailable');
     stage = 'source';
@@ -133,7 +136,7 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
     signal.throwIfAborted();
     return {
       file: original.file,
-      filename: media.filename,
+      filename: snapshot.workspace.project?.name ?? media.filename,
       source,
       ...(provenance ? { provenance } : {}),
       snapshot,

@@ -1,3 +1,4 @@
+import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import {
   addReviewFocus,
   seedReviewVideo,
@@ -4373,6 +4374,103 @@ for (const variant of [
         path: info.outputPath('scene-camera-segments.png'),
         fullPage: false,
       });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const locale of ['en', 'ru'] as const) {
+  test(`quick projects rename and preserve previous project (${locale})`, async ({
+    page,
+  }, info) => {
+    const host = await startHostServer();
+    const theme = locale === 'en' ? 'dark' : 'light';
+    const sourceId = betaV1Fixture.records.media_library[0].id;
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(sourceId)}&mode=edit&theme=${theme}`
+      );
+      const title = page.locator('header h2 button').filter({ hasText: 'beta-v1.webm' });
+      await expect(title).toHaveAccessibleName('beta-v1.webm');
+      await title.click();
+      const name = page.getByRole('textbox', {
+        name: label('videoEditor.app.projectNameLabel'),
+        exact: true,
+      });
+      await expect(name).toBeFocused();
+      await name.fill('First project');
+      await name.press('Enter');
+      await expect(page.locator('header h2')).toHaveText('First project');
+      await expect
+        .poll(async () => (await readNativeReviewWorkspace(page, sourceId))?.project?.name)
+        .toBe('First project');
+      await page.screenshot({ path: info.outputPath('renamed-project.png'), fullPage: false });
+      await page.locator('[data-ui="gallery.videoReview.newProject"]').click();
+      await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
+      const archiveId = await page.evaluate(
+        async ({ dbName, sourceId }) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(dbName);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          const result = await new Promise<unknown[]>((resolve, reject) => {
+            const request = db
+              .transaction('video_workspaces')
+              .objectStore('video_workspaces')
+              .getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          db.close();
+          const archived = result.find(
+            (value) =>
+              value &&
+              typeof value === 'object' &&
+              'sourceMediaId' in value &&
+              value.sourceMediaId === sourceId
+          );
+          if (
+            !archived ||
+            typeof archived !== 'object' ||
+            !('aggregateId' in archived) ||
+            typeof archived.aggregateId !== 'string'
+          )
+            throw new Error('Previous project missing');
+          return archived.aggregateId;
+        },
+        { dbName: betaV1Fixture.databaseName, sourceId }
+      );
+      expect((await readNativeReviewWorkspace(page, archiveId))?.project?.name).toBe(
+        'First project'
+      );
+      await page.reload();
+      await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(archiveId)}&mode=edit&theme=${theme}`
+      );
+      await expect(page.locator('header h2')).toHaveText('First project');
+      await page.locator('header h2 button').click();
+      await name.fill('Discard this');
+      await name.press('Escape');
+      await expect(page.locator('header h2')).toHaveText('First project');
+      await page.screenshot({ path: info.outputPath('archived-project.png'), fullPage: false });
+      await page.setViewportSize({ width: 1200, height: 560 });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      ).toBe(true);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

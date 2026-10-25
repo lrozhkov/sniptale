@@ -77,6 +77,10 @@ function isSummaryEnvelope(
     timestamp(raw['createdAt']) &&
     timestamp(raw['updatedAt']) &&
     raw['updatedAt'] >= raw['createdAt'] &&
+    (raw['sourceMediaId'] === undefined ||
+      (typeof raw['sourceMediaId'] === 'string' &&
+        raw['sourceMediaId'].length > 0 &&
+        raw['sourceMediaId'].length <= 256)) &&
     typeof raw['sourceAssetId'] === 'string' &&
     raw['sourceAssetId'].length > 0 &&
     raw['sourceAssetId'].length <= 256
@@ -114,7 +118,11 @@ async function summarizeHead(tx: Transaction, raw: unknown): Promise<VideoWorksp
   )
     return null;
   const aggregateId = raw['aggregateId'];
-  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(aggregateId));
+  const media = parseMediaLibraryEntry(
+    await tx
+      .objectStore(MEDIA_LIBRARY_STORE)
+      .get(typeof raw['sourceMediaId'] === 'string' ? raw['sourceMediaId'] : aggregateId)
+  );
   const project = parseWorkspaceProject(raw['project']);
   const source = parseReviewSource(raw['source']);
   const createdAt = timestamp(raw['createdAt']) ? raw['createdAt'] : 0;

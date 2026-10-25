@@ -61,11 +61,11 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This editor composes existing preview, inspector and timeline owners. Initial mode selection reads the existing advanced UI state and calls the existing setMode command. Readiness enables existing panel and color DOM owners. All hooks retain their order. The merged inspector retains the recorder binding and inert controls. This function has no direct persistence or transport effect. A JSX forwarding component would distribute the same composition. Independent diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource lifetime, transport or recovery policy. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-23",
-      "astHash": "480e44f7addc45222c9cd501c252e60aa85a08d3d98e2fc22c909ee531aa598b",
-      "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e"
+      "reason": "tool-noise: This component composes one review session with existing preview, inspector, and timeline owners. The new callback forwards successful project creation. VideoReview retains session replacement authority. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
+      "astHash": "951c32d89c1b9cd38a106a3955c7a0e9dd227823074056b37e856e713c42180b",
+      "signatureHash": "e03bd8f2bf77d46621b01aca0b5dc15281cedc8bf0ee59bb978065ea1a00acab"
     },
     {
       "rule": "structural-file-risk",
@@ -192,12 +192,12 @@
       "rule": "structural-file-risk",
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.test.ts",
       "symbol": "<file>",
-      "owner": "extension:composition:persistence",
-      "reason": "tool-noise: The durable Undo/Redo/start case shares the existing transactional fixture and failure switch. Refusal, retry, retained locks and reopen exercise the same workspace mutation protocol. No separate fixture lifecycle or production authority is introduced. Independent track_controls_structural_diagnosis inspected this correction. Fresh corrected-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess if this owner acquires another state authority or independent operation. Remove when the analyzer recognizes this cohesive boundary.",
-      "reviewDate": "2026-10-15",
-      "astHash": "03673157f2e057914d6bafafe3a566af7bac7327605264f883614632f1c560f9",
-      "signatureHash": "b327e93b8e7ed0284582f4dfb3249f64ac9b0107b37a2552656a373c887b99f2"
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: These tests exercise one workspace transaction protocol through its existing fixture. Archive, rollback, retry, and source retention share that fixture. Test-local receivers do not introduce product state authorities. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
+      "astHash": "53971a65442059b62a42acae4d54eb8ed9b01e940dae940dea22d8519e5f6903",
+      "signatureHash": "9dfc00c5a9420d6c1e1dceed91000dcf61bc920fa208beb8063006bbbb9a1e0b"
     },
     {
       "rule": "structural-file-risk",
@@ -511,12 +511,12 @@
       "rule": "structural-file-risk",
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
       "symbol": "<file>",
-      "owner": "extension:composition:persistence:review-workspaces",
-      "reason": "tool-noise: This store owns one workspace transaction protocol: source admission, revision checks, history publication, retention and rollback. The merged code retains the consuming-transaction read assertion and initializes modeSelectionPending only in the existing new-workspace branch. It adds no writer, resource lifetime or recovery authority. The structural score remains two with two owner groups, one effect family and no effect cluster. Splitting would distribute this transaction protocol. Independent diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource lifetime, transport or recovery policy. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-23",
-      "astHash": "8eed7b959e51dc95863a66023cc3a6144a6f42f11597ac570c7975cc044049a8",
-      "signatureHash": "f94b148614a83a2e7581a3bb44111aba8600dc78c5eabec39ecd663f1a740528"
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: This owner admits and serializes workspace transactions. Archive creation and default replacement commit through its existing transaction. Source admission, history storage, and cleanup retain their existing authorities. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
+      "astHash": "c7ce4edb8f43bd362b821c70afffc3b556d52046113d26b935c02ca03483e2ee",
+      "signatureHash": "41725b8212b986d8b22b5c85154fe5285b54e6f88e63b35a9e89730622ae56f9"
     },
     {
       "rule": "structural-file-risk",
@@ -742,12 +742,12 @@
       "rule": "structural-file-risk",
       "file": "apps/extension/src/workflows/video-review/session.ts",
       "symbol": "<file>",
-      "owner": "extension:workflows:video-review",
-      "reason": "tool-noise: One session owns the ordered mutation queue, buffer, authoritative snapshot/document, receipt recovery and disposal. Track admission uses that authority. Pure lane classification and annotation resource retention remain separate. Analyzer signals include repeated this receivers, bound methods and attempt/receipt records of this session, not independent writers. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-15",
-      "astHash": "78d094280a565097c22da64467e3da50530386cc305394738828ca9aac669026",
-      "signatureHash": "87143ee24131e5cbf70420ce35f93fb72b737b02cfa2b4277707e314038213b4",
-      "removalCondition": "Remove on exact AST or signature change. Reassess another mutation queue, snapshot authority, resource owner or receipt/recovery authority. Remove when the analyzer distinguishes these single-session receivers."
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This session owns one queue, buffer, autosave coordinator, and resource lifetime. Metadata commands serialize with content through that coordinator. Their retry state remains disposable session state. Persistence adapters retain durable authority. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
+      "astHash": "e1f4da3be95d55bbf5ddc0cac9451301079edd0ca72a3afc14aafdf7e3dabb02",
+      "signatureHash": "87143ee24131e5cbf70420ce35f93fb72b737b02cfa2b4277707e314038213b4"
     },
     {
       "rule": "structural-function-risk",
@@ -820,11 +820,11 @@
       "file": "apps/extension/src/gallery/video-review/inspector.tsx",
       "symbol": "ReviewInspector",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This existing inspector owns one header, navigation rail, and content scroll receiver. The candidate forwards one project action to its existing footer. It adds no capture, resource, persistence, or recovery authority. Its state and complexity do not increase. Extra forwarding components would distribute the same placement and visibility decisions. Existing interaction and primary viewport proof cover this body.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
-      "reviewDate": "2026-10-21",
+      "reason": "tool-noise: This component retains inspector navigation, visibility, and scroll ownership. New metadata props forward to the header. The project controls own the rename draft and focus. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
       "astHash": "1520020310b8d7d670c39ce21a63af1fea5fb90e0dbd84ed0dd03f28c61accdf",
-      "signatureHash": "cfb7a2b0618132a9bb3b4b580dcc722d2854f5e745f9abee642a7c15d5099b97"
+      "signatureHash": "ba9702290f13bccadbabaafcda44ffd5d54861d12a50c8b4969b12e30cc26998"
     },
     {
       "rule": "structural-file-risk",
@@ -1205,11 +1205,11 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "astHash": "3924e9caf45019b39dd37cc5ce3e00d711d50c541411599ddda9052d7266096d",
-      "signatureHash": "c7716f7a7ff44a1af3c19d6ee726708b749b039cf46ae886e47c25035aa87391",
-      "reviewDate": "2026-10-18",
-      "reason": "tool-noise: One review integration fixture; flagged callback preserves recording/pause/cap/accept/download/resources/reopen continuity. Independently inspected by pr_structural_wrapper_diagnosis. This correction leaves the existing fixture sequence and cleanup unchanged; no product authority moves. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
+      "reason": "tool-noise: These Gallery review scenarios use the existing host, bootstrap, and media fixture. Each test owns and closes its host and page lifecycle. Project continuity and its accessible name use the same supported editor flow. Test-local receivers do not introduce product authorities. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any executable selection policy or independent fixture, runtime, state, writer, resource, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
+      "astHash": "8db3c68c4a2884d0375147f41166b2ce05f9efda103603e4f3408699547d53fc",
+      "signatureHash": "d15476fb38ca97d1f58054d63d4cff17a7ff6ef96e34bba43a95262d492462c9"
     },
     {
       "rule": "structural-function-risk",
@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: This file remains one ordered registry of contiguous released database migrations. Version 35 adds the empty private voice history table and its 0-to-1 domain contract. The registry retains one versionchange adapter authority; it adds no independent runtime state receiver or recovery lifetime. Current metrics show owners 0, effects 0, state 0 and cohesion 1.00. The additive migration and released fixtures prove earlier rows and media remain unchanged. Splitting the chronological registry only at 800 lines would add navigation without separating a change reason. Main compared the complete registry with its prior locked body and inspected the added descriptor. Fresh complete-candidate architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive registry boundary.",
+      "reason": "tool-noise: This chronological migration registry adds one additive admission descriptor. It introduces no independent writer, state authority, resource lifetime, or recovery owner. Splitting the registry would add indirection without separating behavior. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-10-24",
-      "astHash": "94e2686a9e8fce469bc72da26a8058701dbb702a72347f561218e8f22642901f",
+      "astHash": "1660495eeaf8771fa3a87716dfa207dc2d716c0f38d7105dfe510f0111ae46ad",
       "signatureHash": "e475b1fb64e96c97e8e5f06c50cd59834a250f161221c716acf6b3c21840b0ee"
     },
     {
@@ -1832,10 +1832,10 @@
       "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
       "symbol": "<file>",
       "owner": "tooling:qa",
-      "reason": "tool-noise: This declarative map selects existing owner tests. Three paths add save, restore and passive playback proof to the existing conversion entry. The map has no runtime state, effects or recovery. A split would only distribute the same registry. Main inspected this exact body. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "4b2b65592eee6ac98163c67d00ad7fcdaa0ef763b7ef0a5725e21bac5f49e01b",
+      "reason": "tool-noise: This declarative registry selects existing owner tests. The two added suites exercise the same audio authorization owner. The registry introduces no executable policy, state, effects, or recovery. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any executable selection policy or independent fixture, runtime, state, writer, resource, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
+      "astHash": "5c8fa4c0511f92fe1093399b8a0438eb313d4e804ae71b577682702c5390f938",
       "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
     },
     {
@@ -2475,6 +2475,28 @@
       "reviewDate": "2026-10-24",
       "astHash": "057301f67e379ce8699fd1c2c5d132df0b077b8d9f45878fe41b249c54932f8c",
       "signatureHash": "99464e722cafa745f7bada7105ee114e588e55ae5ee41eabe9397b75579040b4"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/inspector-binding.tsx",
+      "symbol": "ReviewInspectorBinding",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This binding composes one inspector from its existing state receiver. Project commands delegate to the dedicated metadata controls hook and serialized session. The binding introduces no persistence writer or recovery queue. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
+      "astHash": "6c0f9cad3e209b856b704f98a640f85c8ca92c6148983fce661e2a3f470ae309",
+      "signatureHash": "fbd42bed5e63c10e612eb430c07473537ce05cfa591ff8687d25698cb34e046a"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/session.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: These tests exercise one serialized session writer through explicit persistence adapters. Metadata command cases share the existing buffer and refusal contract. Each test retains an independent local fixture. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-10-24",
+      "astHash": "cef065755ac77a658a6727c23d15c864f04c8d5f47bcd85c556472d37991f541",
+      "signatureHash": "6d23a277aceac252acea99a9af1c5c7f1c28d91726fa538014e7e764cf4ae596"
     }
   ]
 }

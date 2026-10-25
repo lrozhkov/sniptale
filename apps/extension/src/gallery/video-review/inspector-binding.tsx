@@ -1,3 +1,4 @@
+import { useReviewProjectCommands } from './project-controls';
 import {
   exportMediaHubBackup,
   createMediaHubBackupExportOptions,
@@ -131,6 +132,7 @@ function ReviewInspectorFragment({ state }: { state: InspectorState }) {
 }
 
 export function ReviewInspectorBinding({
+  onProjectCreated,
   resource,
   state,
   canvasComments,
@@ -158,9 +160,15 @@ export function ReviewInspectorBinding({
   audio: ReturnType<typeof useReviewAudio>;
   onBack(): void;
   onClose(): void;
+  onProjectCreated?(aggregateId: string): void;
 }) {
   const { editing, snapshot, composer, busy, run } = state;
   const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
+  const projectCommands = useReviewProjectCommands(
+    state,
+    () => flushReviewTextVoiceBuffers(state, canvasComments),
+    onProjectCreated
+  );
   const leave = (done: () => void) => leaveReviewInspector(state, canvasComments, done);
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
@@ -181,7 +189,9 @@ export function ReviewInspectorBinding({
         resizeHandle={resizeHandle}
         navigation={navigation}
         onToggleHeight={onToggleHeight}
-        filename={resource.filename}
+        filename={snapshot.snapshot.workspace.project?.name ?? resource.filename}
+        onNewProject={projectCommands.newProject}
+        onRenameProject={projectCommands.rename}
         annotations={snapshot.document.annotations}
         selectedId={state.selected?.id ?? null}
         busy={busy || editing.exporter.phase !== 'idle'}

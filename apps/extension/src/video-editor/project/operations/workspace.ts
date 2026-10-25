@@ -463,7 +463,11 @@ async function createProjectFromReview(
     snapshot.workspace.source.height
   );
   const libraryBindings: LibraryProjectBinding[] = [];
-  const assets = await ensureLibraryMediaAssets(empty, aggregateId, libraryBindings);
+  const assets = await ensureLibraryMediaAssets(
+    empty,
+    snapshot.workspace.sourceMediaId ?? aggregateId,
+    libraryBindings
+  );
   const primary = assets[0];
   if (!primary || (primary.type !== 'VIDEO' && primary.type !== 'RECORDING'))
     throw new Error('Review video source is unavailable.');

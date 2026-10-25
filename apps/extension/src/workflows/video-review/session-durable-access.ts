@@ -1,4 +1,7 @@
+import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
+import { renameVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/project-commands';
 import {
+  createVideoWorkspaceProject,
   saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
   commitVideoWorkspaceWithProjection,
@@ -32,6 +35,19 @@ import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 
 /** Default persistence adapter; the session factory still accepts an explicit injected adapter. */
 export const reviewSessionPersistence = {
+  async renameVideoWorkspaceProject(...args: Parameters<typeof renameVideoWorkspaceProject>) {
+    await renameVideoWorkspaceProject(...args);
+    publishMediaHubLibraryChanged('update', [args[0]]);
+  },
+  async createVideoWorkspaceProject(args: Parameters<typeof createVideoWorkspaceProject>[0]) {
+    const created = await createVideoWorkspaceProject(args);
+    publishMediaHubLibraryChanged('update', [
+      args.aggregateId,
+      args.archiveId,
+      created.workspace.aggregateId,
+    ]);
+    return created;
+  },
   saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
   commitVideoWorkspaceWithProjection,

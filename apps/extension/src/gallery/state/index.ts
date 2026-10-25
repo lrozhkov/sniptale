@@ -250,7 +250,10 @@ function useInitialRecordingPreview({
 
     const item = mediaId
       ? (allItems.find(
-          (entry) => isGalleryMediaItem(entry) && (entry.entityId ?? entry.id) === mediaId
+          (entry) =>
+            (isGalleryMediaItem(entry) ||
+              (quickEditRef.current && entry.type === 'quick-edit-project')) &&
+            (entry.entityId ?? entry.id) === mediaId
         ) ?? null)
       : findRecordingPreviewItem(allItems, recordingId!);
     if (!item) {

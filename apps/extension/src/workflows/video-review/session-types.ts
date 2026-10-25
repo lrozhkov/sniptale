@@ -7,6 +7,8 @@ import type { ReviewAnnotation, ReviewOperation } from '../../features/video/rev
 import type { replayReviewHistory } from '../../features/video/review/document';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type { VideoWorkspaceTypingChange } from '../../composition/persistence/review-workspaces/typing';
+import type { createVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/store';
+import type { renameVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/project-commands';
 import type * as persistence from '../../composition/persistence/review-workspaces/store';
 import type {
   ReviewSpeechPublicationChange,
@@ -43,8 +45,10 @@ export type ReviewSessionPersistence = Pick<
   | 'readVideoWorkspace'
   | 'saveVideoWorkspaceAdvanced'
   | 'saveVideoWorkspaceDraft'
-> &
-  Partial<
+> & {
+  renameVideoWorkspaceProject?: typeof renameVideoWorkspaceProject;
+  createVideoWorkspaceProject?: typeof createVideoWorkspaceProject;
+} & Partial<
     Pick<typeof persistence, 'saveVideoWorkspaceTyping' | 'commitVideoWorkspaceWithProjection'>
   >;
 
