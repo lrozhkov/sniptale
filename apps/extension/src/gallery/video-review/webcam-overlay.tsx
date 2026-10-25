@@ -102,7 +102,7 @@ export function ReviewWebcamOverlay(props: {
   };
   const frame = quickEditWebcamFrameAt(settings, editor.time, shownResource.duration);
   const screen = quickEditWebcamScreenPlacementAt(settings, editor.time);
-  const split = screen.width < 1 || screen.height < 1;
+  const split = screen.width < 1 || screen.height < 1 || !!screen.clip || !!screen.cameraOverlay;
   return (
     <div
       className={[

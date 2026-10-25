@@ -1,3 +1,4 @@
+import { isCameraScreenBehavior } from './split';
 import { isCameraHiddenRange, MAX_CAMERA_HIDDEN_RANGES } from './visibility';
 import {
   isCameraAppearance,
@@ -32,6 +33,25 @@ export function editCameraPosition(
     )
   )
     return project;
+  if (edit.kind === 'screen-behavior') {
+    if (!isCameraScreenBehavior(edit.behavior)) return project;
+    const position = activeCameraPosition(clip, time);
+    if ((position ? position.cameraScreenBehavior : clip.cameraScreenBehavior) === edit.behavior)
+      return project;
+    const changed = position
+      ? {
+          ...clip,
+          cameraPositions:
+            clip.cameraPositions?.map((item) =>
+              item.id === position.id ? { ...item, cameraScreenBehavior: edit.behavior } : item
+            ) ?? [],
+        }
+      : { ...clip, cameraScreenBehavior: edit.behavior };
+    return applyVideoProjectClipsPatch(
+      project,
+      project.clips.map((item) => (item.id === clipId ? changed : item))
+    );
+  }
   if (edit.kind === 'offset') {
     const timing = clip.cameraTiming;
     if (
@@ -103,6 +123,13 @@ export function editCameraPosition(
           : clip.cameraSplit
             ? { cameraSplit: clip.cameraSplit }
             : {}),
+        ...((activeLayout ? activeLayout.cameraScreenBehavior : clip.cameraScreenBehavior)
+          ? {
+              cameraScreenBehavior: activeLayout
+                ? activeLayout.cameraScreenBehavior
+                : clip.cameraScreenBehavior,
+            }
+          : {}),
         transform: { ...visual.transform },
         fitMode: visual.fitMode,
         transition: {

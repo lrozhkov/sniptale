@@ -265,39 +265,45 @@ export function planReviewProjectConversion(args: {
     audioGainEnd: original.volume,
     muted: clip.muted || (clip.type === 'VIDEO' && !originalAudioEnabled),
   });
-  const minimumVersion = externalAudio.clips.some((clip) => clip.transcript !== undefined)
-    ? 44
-    : compositionJoins.length
-      ? 40
-      : annotations.clips.length
-        ? 38
-        : scene.scene.sceneBackground?.zoomBehavior !== undefined
-          ? 37
-          : scene.video.rememberedWindowLayout ||
-              scene.scene.watermarkEnabled === false ||
-              scene.scene.sceneBackground?.enabled !== undefined ||
-              scene.scene.sceneBackground?.rememberedBlur !== undefined
-            ? 36
-            : scene.video.rememberedWindowHeader ||
-                scene.video.rememberedSourceCrop ||
-                scene.scene.rememberedCanvas
-              ? 35
-              : cursor?.sourceObservations
-                ? 33
-                : camera.clips.length
-                  ? 32
-                  : externalAudio.sourceVoiceoverDocuments.length ||
-                      externalAudio.originalSpeech !== undefined
-                    ? 31
-                    : externalAudio.clips.length
-                      ? 30
-                      : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
-                        ? 29
-                        : original.ranges?.length || sourceMutes.length
-                          ? 28
-                          : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
-                            ? 27
-                            : 26;
+  const minimumVersion = camera.clips.some(
+    (clip) =>
+      clip.cameraScreenBehavior !== undefined ||
+      clip.cameraPositions?.some((position) => position.cameraScreenBehavior !== undefined)
+  )
+    ? 46
+    : externalAudio.clips.some((clip) => clip.transcript !== undefined)
+      ? 44
+      : compositionJoins.length
+        ? 40
+        : annotations.clips.length
+          ? 38
+          : scene.scene.sceneBackground?.zoomBehavior !== undefined
+            ? 37
+            : scene.video.rememberedWindowLayout ||
+                scene.scene.watermarkEnabled === false ||
+                scene.scene.sceneBackground?.enabled !== undefined ||
+                scene.scene.sceneBackground?.rememberedBlur !== undefined
+              ? 36
+              : scene.video.rememberedWindowHeader ||
+                  scene.video.rememberedSourceCrop ||
+                  scene.scene.rememberedCanvas
+                ? 35
+                : cursor?.sourceObservations
+                  ? 33
+                  : camera.clips.length
+                    ? 32
+                    : externalAudio.sourceVoiceoverDocuments.length ||
+                        externalAudio.originalSpeech !== undefined
+                      ? 31
+                      : externalAudio.clips.length
+                        ? 30
+                        : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
+                          ? 29
+                          : original.ranges?.length || sourceMutes.length
+                            ? 28
+                            : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+                              ? 27
+                              : 26;
   let project: VideoProject = {
     ...structuredClone(args.seed),
     version: args.seed.version > minimumVersion ? args.seed.version : minimumVersion,

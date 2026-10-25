@@ -846,4 +846,28 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 28, to: 29 },
+      { domainId: 'videoProjects', from: 5, to: 6 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 36,
+    toDatabaseVersion: 37,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE].every(
+          (name) => db.objectStoreNames.contains(name)
+        )
+      )
+        throw new Error('Camera project stores are unavailable.');
+      return undefined;
+    },
+  },
 ];

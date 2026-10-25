@@ -1,3 +1,4 @@
+import { cameraSplitPanels } from '../../../../../features/video/project/camera/split';
 import { getMediaClipSourceTime } from '../../../../../features/video/project/timeline/rate';
 import { useContext } from 'react';
 import { Scan, RotateCcw } from 'lucide-react';
@@ -127,6 +128,7 @@ export function CameraAppearanceControls(props: {
       ) : null}
       {renderCameraCropControls({
         clip: props.clip,
+        project: props.project,
         currentTime: props.currentTime,
         disabled,
         onEdit: props.onEdit,
@@ -137,6 +139,7 @@ export function CameraAppearanceControls(props: {
 }
 
 function renderCameraCropControls(props: {
+  project: WorkspaceSidebarSelectionPanelProps['project'];
   clip: VideoProjectVideoClip;
   currentTime: number;
   disabled: boolean;
@@ -147,7 +150,11 @@ function renderCameraCropControls(props: {
   const position = activeCameraPosition(props.clip, props.currentTime);
   const crop = position?.crop ?? base;
   const value = { ...base, zoom: crop.zoom, panX: crop.panX, panY: crop.panY };
-  const transform = position?.transform ?? props.clip.transform;
+  const split = position ? position.cameraSplit : props.clip.cameraSplit;
+  const panel = split ? cameraSplitPanels(split).camera : undefined;
+  const transform = panel
+    ? { width: panel.width * props.project.width, height: panel.height * props.project.height }
+    : (position?.transform ?? props.clip.transform);
   const disabled = props.disabled;
   const changeCrop = (crop: CameraCrop) =>
     props.onEdit?.(props.clip.id, {
@@ -165,9 +172,9 @@ function renderCameraCropControls(props: {
         sourceTime={Math.max(0, getMediaClipSourceTime(props.clip, props.currentTime))}
         width={transform.width}
         height={transform.height}
-        appearance={value}
+        appearance={split ? { ...value, shape: 'rounded', roundness: 0 } : value}
         mirrored={props.clip.cameraMirrored ?? false}
-        fitMode={position?.fitMode ?? props.clip.fitMode}
+        fitMode={split ? 'COVER' : (position?.fitMode ?? props.clip.fitMode)}
         disabled={disabled}
         onChange={changeCrop}
       />

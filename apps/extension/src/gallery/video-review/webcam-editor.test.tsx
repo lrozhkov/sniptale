@@ -486,7 +486,7 @@ it.each(['recording:main', 'recording:replacement'])(
     const replacement = setup(undefined, undefined, true, false, false, false, aggregateId);
     act(() => old.render(replacement.session));
     await act(async () => {});
-    expect(signals[0].aborted).toBe(true);
+    expect(signals[0]?.aborted).toBe(true);
     await act(async () => release());
     expect(old.commit).not.toHaveBeenCalled();
     expect(replacement.commit).toHaveBeenCalledOnce();
@@ -516,4 +516,37 @@ it('ignores discovery that completes after the target session changed', async ()
   await act(async () => release({ id: 'old-camera', filename: 'old.webm' }));
   expect(old.commit).not.toHaveBeenCalled();
   expect(io.attach).toHaveBeenCalledOnce();
+});
+
+it('frames the selected smooth split destination crop instead of the preceding dock', async () => {
+  const camera = createQuickEditWebcam('project-asset:camera', source, source);
+  camera.positions = [
+    {
+      id: 'panel',
+      time: 2,
+      placement: camera.placement,
+      split: 'left',
+      crop: { zoom: 2, panX: 0.3, panY: -0.2 },
+      transition: { type: 'ease-in-out', duration: 1 },
+    },
+  ];
+  setup(camera);
+  await act(async () => editor.navigate('panel'));
+  expect(editor.split).toBe('left');
+  expect(editor.crop).toEqual(camera.positions[0]!.crop);
+  expect(editor.cropPlacement).toEqual({ x: 0, y: 0, width: 0.49, height: 1 });
+  expect(editor.camera!.placement).toEqual(camera.placement);
+});
+
+it('uses the circle destination for dock crop and retains the authored 4:3 rectangle', async () => {
+  const camera = createQuickEditWebcam('project-asset:camera', { width: 640, height: 480 }, source);
+  camera.appearance.shape = 'circle';
+  const authored = structuredClone(camera.placement);
+  setup(camera);
+  await act(async () => {});
+  expect(editor.cropPlacement!.width * source.width).toBeCloseTo(
+    editor.cropPlacement!.height * source.height,
+    8
+  );
+  expect(editor.camera!.placement).toEqual(authored);
 });

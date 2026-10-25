@@ -18,7 +18,10 @@ import { isBoundedNumber } from '../../project/validation/primitives';
 import {
   cameraSplitPanels,
   FULL_CAMERA_PANEL,
-  interpolateCameraPanel,
+  interpolateCameraScreen,
+  isCameraScreenBehavior,
+  type CameraScreenBehavior,
+  type CameraScreenPanel,
   isCameraSplitSide,
   type CameraSplitSide,
 } from '../../project/camera/split';
@@ -39,6 +42,7 @@ interface QuickEditWebcamPosition {
   time: number;
   placement: QuickEditWebcamPlacement;
   split?: CameraSplitSide | null;
+  screenBehavior?: CameraScreenBehavior;
   crop?: QuickEditWebcamCrop;
   transition: { type: 'none' | 'ease-in-out' | 'shrink'; duration: number };
 }
@@ -54,6 +58,7 @@ export interface QuickEditWebcam {
   shadow?: { intensity: number; color: string };
   placement: QuickEditWebcamPlacement;
   split?: CameraSplitSide | undefined;
+  screenBehavior?: CameraScreenBehavior;
   positions: QuickEditWebcamPosition[];
   hiddenRanges: CameraHiddenRange[];
 }
@@ -95,6 +100,8 @@ function parsePosition(value: unknown): QuickEditWebcamPosition | null {
     !isBoundedNumber(transition['duration'], 0, 60)
   )
     return null;
+  if (value['screenBehavior'] !== undefined && !isCameraScreenBehavior(value['screenBehavior']))
+    return null;
   const crop = value['crop'];
   if (crop !== undefined && !isCameraCrop(crop)) return null;
   if (value['split'] !== undefined && value['split'] !== null && !isCameraSplitSide(value['split']))
@@ -105,6 +112,7 @@ function parsePosition(value: unknown): QuickEditWebcamPosition | null {
     time: value['time'],
     placement,
     ...(value['split'] === undefined ? {} : { split: value['split'] }),
+    ...(value['screenBehavior'] === undefined ? {} : { screenBehavior: value['screenBehavior'] }),
     transition: { type: transition['type'], duration: transition['duration'] },
   };
 }
@@ -145,6 +153,8 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
   const hiddenRanges = parseCameraHiddenRanges(value['hiddenRanges']);
   if (!placement || !positions || !hiddenRanges) return null;
   const appearance = value['appearance'];
+  if (value['screenBehavior'] !== undefined && !isCameraScreenBehavior(value['screenBehavior']))
+    return null;
   const shadow = value['shadow'];
   if (value['split'] !== undefined && !isCameraSplitSide(value['split'])) return null;
   let parsedShadow: QuickEditWebcam['shadow'];
@@ -168,6 +178,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
     ...(parsedShadow ? { shadow: parsedShadow } : {}),
     placement,
     ...(value['split'] === undefined ? {} : { split: value['split'] }),
+    ...(value['screenBehavior'] === undefined ? {} : { screenBehavior: value['screenBehavior'] }),
     positions,
     hiddenRanges,
   };
@@ -236,13 +247,24 @@ export function quickEditWebcamPlacementAt(webcam: QuickEditWebcam, sourceTime: 
 export function quickEditWebcamScreenPlacementAt(
   webcam: QuickEditWebcam,
   sourceTime: number
-): QuickEditWebcamPlacement {
+): CameraScreenPanel {
   const index = webcam.positions.findLastIndex((position) => position.time <= sourceTime);
   const current = webcam.positions[index];
-  if (!current) return webcam.split ? cameraSplitPanels(webcam.split).screen : FULL_CAMERA_PANEL;
+  if (!current)
+    return webcam.split
+      ? cameraSplitPanels(webcam.split, webcam.screenBehavior).screen
+      : FULL_CAMERA_PANEL;
   const previousSplit = webcam.positions[index - 1]?.split ?? (index === 0 ? webcam.split : null);
-  const from = previousSplit ? cameraSplitPanels(previousSplit).screen : FULL_CAMERA_PANEL;
-  const to = current.split ? cameraSplitPanels(current.split).screen : FULL_CAMERA_PANEL;
+  const from = previousSplit
+    ? cameraSplitPanels(
+        previousSplit,
+        webcam.positions[index - 1]?.screenBehavior ??
+          (index === 0 ? webcam.screenBehavior : undefined)
+      ).screen
+    : FULL_CAMERA_PANEL;
+  const to = current.split
+    ? cameraSplitPanels(current.split, current.screenBehavior).screen
+    : FULL_CAMERA_PANEL;
   const duration = Math.min(
     current.transition.duration,
     (webcam.positions[index + 1]?.time ?? Infinity) - current.time
@@ -252,7 +274,7 @@ export function quickEditWebcamScreenPlacementAt(
       ? 1
       : Math.min(1, Math.max(0, (sourceTime - current.time) / duration));
   const eased = progress * progress * (3 - 2 * progress);
-  return interpolateCameraPanel(from, to, eased);
+  return interpolateCameraScreen(from, to, eased);
 }
 
 /** One visibility and clock policy consumed by live preview and frame export. */

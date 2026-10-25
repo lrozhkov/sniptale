@@ -59,5 +59,10 @@ export const galleryVideoReviewWebcamMessages = defineMessageSource({
   },
   webcamLoading: { ru: 'Загрузка камеры…', en: 'Loading camera…' },
   webcamSettings: { ru: 'Настройки камеры', en: 'Camera settings' },
+  webcamScreenBehavior: { ru: 'Основное видео', en: 'Main video' },
+  webcamScreenBehavior_shrink: { ru: 'Уменьшить', en: 'Shrink' },
+  webcamScreenBehavior_shift: { ru: 'Сместить', en: 'Shift' },
+  webcamScreenBehavior_overlay: { ru: 'Оставить на месте', en: 'Keep in place' },
+  webcamScreenBehavior_legacy: { ru: 'Растянуть (прежний вид)', en: 'Stretch (legacy)' },
   webcamHidden: { ru: 'Камера скрыта', en: 'Camera hidden' },
 });

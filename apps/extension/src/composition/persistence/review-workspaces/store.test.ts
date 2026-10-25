@@ -1,3 +1,4 @@
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
@@ -898,10 +899,22 @@ it.each(['legacy', 'metadata', 'rollback'] as const)(
   }
 );
 
-it('preserves crop history across stale writers, quota refusal, retry, undo and reopen', async () => {
+it('retains crop and camera history through stale writes, quota failure, retry, undo and reopen', async () => {
   const opened = await openVideoWorkspace(id, source);
   const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
   const canvas = { width: 360, height: 360, crop: { x: 0.2, y: 0, width: 0.5625, height: 1 } };
+  const webcam = {
+    ...createQuickEditWebcam('project-asset:camera', source, canvas),
+    split: 'left' as const,
+    screenBehavior: 'shift' as const,
+  };
+  rows.get('project_assets')!.set('camera', {
+    id: 'camera',
+    assetId: 'camera-bytes',
+    mimeType: 'video/webm',
+    size: 4,
+    createdAt: 1,
+  });
   const args = {
     aggregateId: id,
     expectedSourceAssetId: opened.workspace.sourceAssetId,
@@ -911,7 +924,7 @@ it('preserves crop history across stale writers, quota refusal, retry, undo and 
       at: 1,
       target: 'advancedContent' as const,
       before,
-      after: { ...before, canvas },
+      after: { ...before, canvas, webcam },
     },
   };
   harness.failure = true;
@@ -922,7 +935,7 @@ it('preserves crop history across stale writers, quota refusal, retry, undo and 
   await expect(commitVideoWorkspace(args)).rejects.toMatchObject({ code: 'conflict' });
   const reopened = await openVideoWorkspace(id, source);
   expect(reopened.workspace.history).toHaveLength(1);
-  expect(reopened.workspace.history[0]).toMatchObject({ after: { canvas } });
+  expect(reopened.workspace.history[0]).toMatchObject({ after: { canvas, webcam } });
   const undone = await moveVideoWorkspaceHistory({
     aggregateId: id,
     expectedSourceAssetId: opened.workspace.sourceAssetId,

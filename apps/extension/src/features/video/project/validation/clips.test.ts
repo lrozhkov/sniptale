@@ -21,6 +21,12 @@ it('accepts camera split sides only on video clips', () => {
   expect(isVideoProjectClip({ ...video, cameraSplit: null })).toBe(false);
   const audio = createAudioClipFromAsset('audio-track', project.assets[0]!);
   expect(isVideoProjectClip({ ...audio, cameraSplit: 'left' })).toBe(false);
+  for (const cameraScreenBehavior of ['shrink', 'shift', 'overlay']) {
+    expect(isVideoProjectClip({ ...video, cameraScreenBehavior })).toBe(true);
+    expect(isVideoProjectClip({ ...audio, cameraScreenBehavior })).toBe(false);
+  }
+  expect(isVideoProjectClip({ ...video, cameraScreenBehavior: 'unknown' })).toBe(false);
+  expect(isVideoProjectClip({ ...video, cameraScreenBehavior: null })).toBe(false);
 });
 
 it('validates timed split positions and retained camera layout without normalizing data', () => {
@@ -44,6 +50,18 @@ it('validates timed split positions and retained camera layout without normalizi
     cameraSplit: 'right',
   };
   expect(isVideoProjectClip({ ...video, cameraPositions: [position] })).toBe(true);
+  expect(
+    isVideoProjectClip({
+      ...video,
+      cameraPositions: [{ ...position, cameraScreenBehavior: 'shift' }],
+    })
+  ).toBe(true);
+  expect(
+    isVideoProjectClip({
+      ...video,
+      cameraPositions: [{ ...position, cameraScreenBehavior: 'unknown' }],
+    })
+  ).toBe(false);
   expect(
     isVideoProjectClip({ ...video, cameraPositions: [{ ...position, cameraSplit: null }] })
   ).toBe(true);

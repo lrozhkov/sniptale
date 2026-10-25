@@ -320,3 +320,92 @@ it('shows destination framing and resets its override without copying crop into 
   expect(reset.disabled).toBe(true);
   expect(input.value).toBe('125');
 });
+
+it('previews the resolved rectangular split camera crop without rewriting the dormant dock', () => {
+  const base = createProps();
+  base.project.tracks = [
+    {
+      id: base.clip.trackId,
+      name: 'Camera',
+      kind: 'PRIMARY',
+      role: 'CAMERA',
+      order: 0,
+      visible: true,
+      locked: false,
+    },
+  ];
+  base.clip.cameraSplit = 'left';
+  base.clip.cameraScreenBehavior = 'shrink';
+  base.clip.cameraAppearance = {
+    ...DEFAULT_CAMERA_APPEARANCE,
+    shape: 'circle',
+    zoom: 2,
+    panX: 0.3,
+  };
+  const dormant = structuredClone(base.clip.transform);
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={base.clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={vi.fn()}
+      />
+    )
+  );
+  const preview = container.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.sidebar.cameraCropPreview"]'
+  )!;
+  expect(preview.style.aspectRatio).toBe(`${base.project.width * 0.49} / ${base.project.height}`);
+  expect(base.clip.transform).toEqual(dormant);
+});
+
+it('keeps the selected destination crop aperture while scrubbing inside a smooth dock-to-split transition', () => {
+  const base = createProps();
+  base.project.tracks = [
+    {
+      id: base.clip.trackId,
+      name: 'Camera',
+      kind: 'PRIMARY',
+      role: 'CAMERA',
+      order: 0,
+      visible: true,
+      locked: false,
+    },
+  ];
+  base.clip.cameraAppearance = { ...DEFAULT_CAMERA_APPEARANCE, shape: 'circle' };
+  base.clip.cameraPositions = [
+    {
+      id: 'panel',
+      sourceTime: 2,
+      cameraSplit: 'left',
+      transform: { ...base.clip.transform },
+      fitMode: base.clip.fitMode,
+      crop: { zoom: 2, panX: 0.3, panY: -0.2 },
+      transition: { kind: 'smooth', duration: 2 },
+    },
+  ];
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={base.clip}
+        currentTime={2.5}
+        disabled={false}
+        onEdit={vi.fn()}
+      />
+    )
+  );
+  const preview = container.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.sidebar.cameraCropPreview"]'
+  )!;
+  expect(preview.style.aspectRatio).toBe(`${base.project.width * 0.49} / ${base.project.height}`);
+  expect(
+    container.querySelector<HTMLInputElement>('[aria-label="videoEditor.sidebar.cameraCropZoom"]')!
+      .value
+  ).toBe('200');
+  const video = container.querySelector<HTMLVideoElement>('video')!;
+  act(() => video.dispatchEvent(new Event('loadedmetadata')));
+  expect(video.currentTime).toBe(2.5);
+});

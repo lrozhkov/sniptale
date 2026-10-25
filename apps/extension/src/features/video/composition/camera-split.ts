@@ -1,6 +1,10 @@
 import { acquireVideoCompositionBuffer } from './canvas/buffer-pool';
 import type { VideoCompositionVisualLayer } from './types';
-import { resolveCameraSplitPresentation, type CameraPanel } from '../project/camera/split';
+import {
+  resolveCameraSplitPresentation,
+  type CameraPanel,
+  type CameraScreenPanel,
+} from '../project/camera/split';
 import type { VideoProject } from '../project/types';
 import { drawCompositionSceneSpotlights } from './draw/project-spotlight';
 
@@ -14,7 +18,7 @@ export function resolveActiveCameraSplit(
 ): {
   clipId: string;
   layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
-  screen: CameraPanel;
+  screen: CameraScreenPanel;
   camera: CameraPanel;
 } | null {
   for (const layer of layers) {
@@ -22,7 +26,14 @@ export function resolveActiveCameraSplit(
     const clip = project.clips.find((item) => item.id === layer.clipId);
     if (!clip || clip.type !== 'VIDEO') continue;
     const split = resolveCameraSplitPresentation(project, clip, time);
-    if (!split || (split.screen.width === 1 && split.screen.height === 1)) continue;
+    if (
+      !split ||
+      (split.screen.width === 1 &&
+        split.screen.height === 1 &&
+        !split.screen.clip &&
+        !split.screen.cameraOverlay)
+    )
+      continue;
     return {
       clipId: clip.id,
       layer,
@@ -72,7 +83,7 @@ export function drawDeferredCameraSplitSpotlights(
 export function paintCameraSplitScreen(
   context: CanvasRenderingContext2D,
   viewport: { x: number; y: number; width: number; height: number },
-  screen: CameraPanel,
+  screen: CameraScreenPanel,
   ownerDocument?: Document | null
 ): void {
   const canvas = context.canvas;
@@ -91,6 +102,16 @@ export function paintCameraSplitScreen(
       context.filter = 'none';
       context.fillStyle = '#101014';
       context.fillRect(viewport.x, viewport.y, viewport.width, viewport.height);
+      if (screen.clip) {
+        context.beginPath();
+        context.rect(
+          viewport.x + screen.clip.x * viewport.width,
+          viewport.y + screen.clip.y * viewport.height,
+          screen.clip.width * viewport.width,
+          screen.clip.height * viewport.height
+        );
+        context.clip();
+      }
       context.drawImage(
         scratch.canvas,
         viewport.x,

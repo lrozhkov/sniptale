@@ -303,9 +303,34 @@ it('admits independent quick projects without rewriting released sources or work
   expect(target.stores).toEqual(source.stores);
   expect(target.indexes).toEqual(source.indexes);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 28 });
-  expect(DATABASE_MIGRATIONS.at(-1)).toMatchObject({
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 36)).toMatchObject({
     backupCoverage: 'none',
     risk: 'additive',
     domainVersions: [{ domainId: 'mediaLibrary', from: 27, to: 28 }],
+  });
+});
+
+it('admits camera screen behavior without rewriting released projects, history or bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 36
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 37);
+  expect(target).toBeDefined();
+  expect(target?.records).toEqual(source.records);
+  expect(target?.opfsObjects).toEqual(source.opfsObjects);
+  expect(target?.stores).toEqual(source.stores);
+  expect(target?.indexes).toEqual(source.indexes);
+  expect(target?.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 29,
+    videoProjects: 6,
+  });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 37)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 28, to: 29 },
+      { domainId: 'videoProjects', from: 5, to: 6 },
+    ],
   });
 });

@@ -66,6 +66,9 @@ beforeEach(() => {
     selectedPosition: undefined,
     hidden: undefined,
     placement: camera.placement,
+    cropPlacement: camera.placement,
+    screenBehavior: undefined,
+    setScreenBehavior: vi.fn(),
     split: null,
     setSplit: vi.fn((split) => {
       editor.split = split;
@@ -461,3 +464,22 @@ it('drags position markers once, cancels with Escape, and offers keyboard nudges
   );
   expect(editor.movePosition).toHaveBeenCalledExactlyOnceWith('p0', 4.1);
 });
+
+it.each(['shrink', 'shift', 'overlay'] as const)(
+  'does not place dormant dock handles over the %s camera panel',
+  (screenBehavior) => {
+    editor.camera!.split = 'left';
+    editor.camera!.screenBehavior = screenBehavior;
+    const props = {
+      main: { current: document.createElement('video') },
+      output: source,
+      binding: { settings: editor.camera!, editor, disabled: false },
+      manual: { phase: 'ready' as const, duration: 12, ready: true, onPreviewPlacement: vi.fn() },
+    };
+    act(() => root.render(<ReviewWebcamOverlay {...props} />));
+    expect(host.querySelector('[data-ui="gallery.videoReview.focusArea"]')).toBeNull();
+    delete editor.camera!.split;
+    act(() => root.render(<ReviewWebcamOverlay {...props} />));
+    expect(host.querySelector('[data-ui="gallery.videoReview.focusArea"]')).not.toBeNull();
+  }
+);

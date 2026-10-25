@@ -682,3 +682,12 @@ Capture admission completes recovery before it creates a new token. Cleanup fail
 Raw transcript publication precedes optional correction. Correction failure retains that raw text. Deletion, eviction, erasure, and identity recreation invalidate old results. Complete local-data erasure deletes metadata and the private OPFS root even when preferences remain preserved. Its required participant verifies deletion without reopening the deleted database under the exclusive erasure barrier.
 
 Browser termination before a completed audio Blob has no crash recovery guarantee. Retained audio remains available after recognition failure. Voice history never becomes a project source or an AI provider authorization record.
+
+
+## Camera screen behavior
+
+Gallery advanced schema 24 admits optional `screenBehavior` on cameras and their positions. Montage schema 46 admits the corresponding `cameraScreenBehavior` fields. Valid values are `shrink`, `shift` and `overlay`. Earlier schemas refuse these fields. Readers refuse future schemas. Mutation retains the required schema after field removal.
+
+An absent field retains the previous split rendering. New split choices use `shrink`. New docked cameras retain their overlay layout. Shrink fits the complete main scene inside the free panel and preserves its aspect ratio. Shift preserves the scene scale, centers it in the free panel and clips outside that panel. Overlay leaves the main scene in place. The camera retains the selected panel in each mode. Existing source-time positions control transitions and retain the saved dock geometry and crop. Hidden or unavailable camera content does not reserve a main-scene panel.
+
+Database version 37 changes the mediaLibrary contract to 29 and the videoProjects contract to 6. This additive migration preserves all rows, history, stores, indexes and immutable media. Earlier writers cannot admit this database. Existing project mutation, history, CAS, save and resource owners retain authority. The change adds no writer, queue, store or resource reference.

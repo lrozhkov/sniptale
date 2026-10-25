@@ -203,6 +203,31 @@ function WebcamLayout({ editor }: { editor: Editor }) {
         onChange={(id) => editor.navigate(id === 'base' ? null : id)}
       />
 
+      {editor.split ? (
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.webcamScreenBehavior')}
+          value={editor.screenBehavior ?? 'legacy'}
+          options={[
+            ...(!editor.screenBehavior
+              ? [
+                  {
+                    value: 'legacy',
+                    label: translate('gallery.videoReview.webcamScreenBehavior_legacy'),
+                  },
+                ]
+              : []),
+            ...(['shrink', 'shift', 'overlay'] as const).map((behavior) => ({
+              value: behavior,
+              label: translate(`gallery.videoReview.webcamScreenBehavior_${behavior}`),
+            })),
+          ]}
+          onChange={(behavior) => {
+            if (behavior === 'shrink' || behavior === 'shift' || behavior === 'overlay')
+              editor.setScreenBehavior(behavior);
+          }}
+        />
+      ) : null}
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.webcamSplit')}
@@ -430,11 +455,15 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
 function WebcamCrop({ editor }: { editor: Editor }) {
   const camera = editor.camera!,
     crop = editor.crop!,
-    placement = editor.placement!;
+    placement = editor.cropPlacement!;
   return (
     <div className="sniptale-parameter-stack">
       <ReviewWebcamCropPreview
-        camera={camera}
+        camera={
+          editor.split
+            ? { ...camera, appearance: { ...camera.appearance, shape: 'rounded', roundness: 0 } }
+            : camera
+        }
         crop={crop}
         time={editor.selectedPosition?.time ?? Math.max(0, camera.offsetSeconds)}
         width={placement.width * editor.scene.width}

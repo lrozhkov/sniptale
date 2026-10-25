@@ -148,8 +148,20 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 45) &&
+    isBoundedNumber(version, 2, 46) &&
     Number.isInteger(version) &&
+    (version >= 46 ||
+      !Array.isArray(value['clips']) ||
+      value['clips'].every(
+        (clip: unknown) =>
+          !isRecord(clip) ||
+          (clip['cameraScreenBehavior'] === undefined &&
+            (!Array.isArray(clip['cameraPositions']) ||
+              clip['cameraPositions'].every(
+                (position: unknown) =>
+                  !isRecord(position) || position['cameraScreenBehavior'] === undefined
+              )))
+      )) &&
     (version >= 45 ||
       !Array.isArray(value['textDocuments']) ||
       value['textDocuments'].every(

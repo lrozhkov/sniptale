@@ -9,7 +9,12 @@ import {
   type QuickEditWebcam,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
-import type { CameraSplitSide } from '../../features/video/project/camera/split';
+import {
+  isCameraScreenBehavior,
+  cameraSplitPanels,
+  type CameraScreenBehavior,
+  type CameraSplitSide,
+} from '../../features/video/project/camera/split';
 import type { ReviewSelection } from '../../features/video/review/types';
 import {
   attachReviewWebcam,
@@ -49,10 +54,18 @@ function setReviewWebcamSplit(
     return {
       ...camera,
       positions: camera.positions.map((position) =>
-        position.id === positionId ? { ...position, split } : position
+        position.id === positionId
+          ? {
+              ...position,
+              split,
+              ...(split ? { screenBehavior: position.screenBehavior ?? 'shrink' } : {}),
+            }
+          : position
       ),
     };
-  return split ? { ...camera, split } : { ...camera, split: undefined };
+  return split
+    ? { ...camera, split, screenBehavior: camera.screenBehavior ?? 'shrink' }
+    : { ...camera, split: undefined };
 }
 
 type WebcamEditorArgs = {
@@ -99,6 +112,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     (item) => args.selection.kind === 'webcam-hidden' && item.id === args.selection.id
   );
   const authoredPlacement = selectedPosition?.placement ?? camera?.placement;
+  const split = selectedPosition ? (selectedPosition.split ?? null) : (camera?.split ?? null);
   const placement =
     camera && authoredPlacement
       ? quickEditWebcamBounds(authoredPlacement, args.scene, camera.appearance.shape)
@@ -127,7 +141,22 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     selectedPosition,
     hidden,
     placement,
-    split: selectedPosition ? (selectedPosition.split ?? null) : (camera?.split ?? null),
+    cropPlacement: split ? cameraSplitPanels(split).camera : placement,
+    screenBehavior: selectedPosition ? selectedPosition.screenBehavior : camera?.screenBehavior,
+    setScreenBehavior: (behavior: CameraScreenBehavior) => {
+      if (!isCameraScreenBehavior(behavior)) return;
+      mutate((current) =>
+        selectedPosition
+          ? {
+              ...current,
+              positions: current.positions.map((item) =>
+                item.id === selectedPosition.id ? { ...item, screenBehavior: behavior } : item
+              ),
+            }
+          : { ...current, screenBehavior: behavior }
+      );
+    },
+    split,
     scene: args.scene,
     crop:
       selectedPosition?.crop ??
@@ -164,6 +193,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       const id = crypto.randomUUID();
       mutate((current) => {
         const previous = current.positions.findLast((item) => item.time <= time);
+        const behavior = previous ? previous.screenBehavior : current.screenBehavior;
         return {
           ...current,
           positions: [
@@ -173,6 +203,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
               time,
               placement: previous?.placement ?? current.placement,
               split: previous ? (previous.split ?? null) : (current.split ?? null),
+              ...(behavior ? { screenBehavior: behavior } : {}),
               crop: quickEditWebcamCropAt(current, time),
               transition: { type: 'ease-in-out' as const, duration: 0.5 },
             },

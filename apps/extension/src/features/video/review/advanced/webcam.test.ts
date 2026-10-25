@@ -283,3 +283,29 @@ it('clamps marker movement between neighbours, retaining identity, crop and tran
   expect(moveQuickEditWebcamPosition(value, '1', NaN, 12)).toBe(value);
   expect(value.positions[1]!.time).toBe(4);
 });
+
+it.each(['shrink', 'shift', 'overlay'] as const)(
+  'retains %s behavior only in schema 24, including positions',
+  (screenBehavior) => {
+    const webcam: ReturnType<typeof camera> = { ...camera(), split: 'left', screenBehavior };
+    const state = { ...createQuickEditAdvancedState(), webcam };
+    expect(loadQuickEditAdvancedState(state)?.webcam).toEqual(webcam);
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 23 })).toBeNull();
+    expect(parseQuickEditWebcam({ ...webcam, screenBehavior: 'unknown' })).toBeNull();
+    const position = {
+      id: 'position',
+      time: 1,
+      placement: webcam.placement,
+      split: 'right' as const,
+      screenBehavior,
+      transition: { type: 'none' as const, duration: 0 },
+    };
+    delete webcam.screenBehavior;
+    const positioned = { ...state, webcam: { ...webcam, positions: [position] } };
+    expect(loadQuickEditAdvancedState(positioned)?.webcam?.positions[0]).toEqual(position);
+    expect(loadQuickEditAdvancedState({ ...positioned, schemaVersion: 23 })).toBeNull();
+    expect(
+      parseQuickEditWebcam({ ...webcam, positions: [{ ...position, screenBehavior: null }] })
+    ).toBeNull();
+  }
+);

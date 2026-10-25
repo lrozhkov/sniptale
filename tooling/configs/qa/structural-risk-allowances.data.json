@@ -193,11 +193,11 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: These tests exercise one workspace transaction protocol through its existing fixture. Archive, rollback, retry, and source retention share that fixture. Test-local receivers do not introduce product state authorities. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-10-24",
-      "astHash": "53971a65442059b62a42acae4d54eb8ed9b01e940dae940dea22d8519e5f6903",
-      "signatureHash": "9dfc00c5a9420d6c1e1dceed91000dcf61bc920fa208beb8063006bbbb9a1e0b"
+      "reason": "tool-noise: One canonical workspace transaction fixture retains serialized writes, quota refusal, stale revisions, restore fencing, history and retry. The camera screen behavior is data in the same advancedContent operation and private asset metadata rows, with no new acquisition, writer or resource lifetime. Main inspection and independent read-only diagnosis support Keep. Final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent fixture, writer, transaction protocol, resource lifetime or recovery authority. Remove when the analyzer recognizes this cohesive persistence proof boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "354c74ef17661c7cffc5be157e7536f9f54986e7e25853e8b17e895d5550b8f8",
+      "signatureHash": "aa2976033c2c32dd68794adf3434898c3439caf4654ba2a7868bdb8d490eb52f"
     },
     {
       "rule": "structural-file-risk",
@@ -380,10 +380,10 @@
       "file": "apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This test file checks one presentation hook through a shared browser fixture. The added cases prove semantic identity, resource reuse, and visible frame publication. Fixture variables describe the same disposable session. Splitting these cases would duplicate the fixture without separating a product authority. Independent architecture review must assess this exact classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-23",
-      "astHash": "5fe6f84fd1268ebc0c9cd28259f22280fc21695679e2cb98b569161256d83c25",
+      "reason": "tool-noise: One presentation-hook fixture owns the mounted root, controlled clock, renderer mocks and teardown. New camera cases share that same publication and resource lifetime, without an independent harness authority. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "d1082b395e67b4c66d852829376c3a0142ab1c0dd131fb4f5bacfcaf0fa42d1a",
       "signatureHash": "be757cb3047b9229806d267e986f4b3c24aceb428f1e7a77aa44ec3feae9dea8"
     },
     {
@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: This chronological migration registry adds one additive admission descriptor. It introduces no independent writer, state authority, resource lifetime, or recovery owner. Splitting the registry would add indirection without separating behavior. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-10-24",
-      "astHash": "1660495eeaf8771fa3a87716dfa207dc2d716c0f38d7105dfe510f0111ae46ad",
+      "reason": "tool-noise: One chronological migration registry adds a metadata-only admission descriptor. Existing upgrade execution retains every writer, transaction, resource lifetime and recovery owner. Splitting by version would distribute the contiguous migration contract. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "15e23167f4a20f743d4905d70a630b7e7dd61789c0e627f6ea739e42ecd7b2b9",
       "signatureHash": "e475b1fb64e96c97e8e5f06c50cd59834a250f161221c716acf6b3c21840b0ee"
     },
     {
@@ -1755,10 +1755,10 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This operation builds one detached Native candidate. The original-audio clip gain and track visibility map one Gallery policy into that graph. Schema selection and final root validation belong to the same decision. No new writer, resource lifetime, coordinator or recovery applies. Main and independent structural diagnosis inspected this exact body. Final independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
-      "reviewDate": "2026-10-24",
-      "astHash": "0a639c044e029614117fd4223f7633f7f0a5e58a84138df657bef06f87519e9c",
+      "reason": "tool-noise: One detached conversion candidate composes existing domain planners and owns final schema selection and admission. The new minimum version creates no publication, durable commit, partial result or recovery authority. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "b1806c0fd9637b11a1a2782eaab70b0385f4046573324a61d686253d59a51380",
       "signatureHash": "aff1ec32267bff7533ef76c684c337421199883ca7e1fad8d395795e6fc50eb7"
     },
     {
@@ -2508,6 +2508,50 @@
       "astHash": "cba427b83f35016ca8100686ab5cda37de7108cb25cd63c1a3bd94f16ab81e2c",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
       "reviewDate": "2026-10-25"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/project/validation/clips.ts",
+      "symbol": "isVideoProjectClip",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One pure discriminated clip predicate composes existing shape helpers. The new enum check rejects camera behavior on non-video clips. Variant admission introduces no state, normalization, effect or independent runtime responsibility. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "f6c2f8c60b0d9c80b02ad9bb8df0a3d1e10e9aa675d254335fc1e7eaab564853",
+      "signatureHash": "86a73f2b2e96d10d4c7047ad5f49a32ed148f9087d8695c5a17816b3c0e863a8"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/project/validation/root.ts",
+      "symbol": "isProjectSchemaCompatible",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One private pure reader-version gate checks whether the declared version can retain present fields. The new base and position checks retain existing shape admission, without a second parser, normalization or lifecycle. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "d6bfaa8fadc55ed077007572061b93f1317e298a07360688411908da2d3d95ef",
+      "signatureHash": "346d804c14ab0289db12c220cacfd66ba4e5301510c52178259b0d1bb8c74a0d"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/webcam-editor.ts",
+      "symbol": "useReviewWebcamEditor",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One selected-camera UI adapter routes base and position commands through the existing admitted mutation and history writer. Its latest-arguments ref and injected navigation callbacks share one selection receiver. Private acquisition remains in its separate lifecycle hook. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "cf5a4cd35b825d02616fde6507a047e4b967b9142ec0890f6e780ca3a3d69b45",
+      "signatureHash": "430b5d846893fdd918f7f3e480646bb4d521cbf4069675e005f4ea5c62e65986"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-camera-split.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One browser journey retains the same authored camera across saved history, Undo and Redo, crop, responsive navigation, reload and Native transfer. The callback owns one page and one host lifetime with final cleanup. Splitting would recreate state and weaken continuity proof. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "a6a0f76d29ae4ba743e8f3683fb4d83c507725750cee5440602c86dcf6787f20",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     }
   ]
 }

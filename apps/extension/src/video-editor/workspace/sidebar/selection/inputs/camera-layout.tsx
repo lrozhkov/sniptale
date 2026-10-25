@@ -70,6 +70,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
         transform: position.transform,
         fitMode: position.fitMode,
         cameraSplit: position.cameraSplit ?? undefined,
+        cameraScreenBehavior: position.cameraScreenBehavior,
       }
     : props.clip;
   const layout = resolveVideoProjectCameraLayout(props.project, clip);
@@ -167,6 +168,31 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
           </InspectorActionButton>
         ))}
       </div>
+      {clip.cameraSplit ? (
+        <CompactSelect
+          aria-label={translate('gallery.videoReview.webcamScreenBehavior')}
+          value={clip.cameraScreenBehavior ?? 'legacy'}
+          disabled={props.disabled || !props.onEditCameraPosition}
+          options={[
+            ...(!clip.cameraScreenBehavior
+              ? [
+                  {
+                    value: 'legacy',
+                    label: translate('gallery.videoReview.webcamScreenBehavior_legacy'),
+                  },
+                ]
+              : []),
+            ...(['shrink', 'shift', 'overlay'] as const).map((behavior) => ({
+              value: behavior,
+              label: translate(`gallery.videoReview.webcamScreenBehavior_${behavior}`),
+            })),
+          ]}
+          onChange={(behavior) => {
+            if (behavior === 'shrink' || behavior === 'shift' || behavior === 'overlay')
+              props.onEditCameraPosition?.(props.clip.id, { kind: 'screen-behavior', behavior });
+          }}
+        />
+      ) : null}
       {custom ? props.customControls : null}
       <CameraTransitionFields {...props} />
     </div>
