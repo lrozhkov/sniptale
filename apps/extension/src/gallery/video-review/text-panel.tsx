@@ -136,19 +136,25 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
           }}
         />
       </div>
-      <SegmentedRow
-        label={translate('gallery.videoReview.textView')}
-        ariaLabel={translate('gallery.videoReview.textView')}
-        value={view}
-        options={[
-          { value: 'document', label: translate('gallery.videoReview.textViewDocument') },
-          { value: 'cards', label: translate('gallery.videoReview.textViewCards') },
-        ]}
-        onChange={(value: 'document' | 'cards') => {
-          props.editor.endTyping();
-          setView(value);
-        }}
-      />
+      <div
+        data-ui="text-document.commands"
+        className="sticky top-0 z-10 space-y-1 bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)] py-1"
+      >
+        <SegmentedRow
+          label={translate('gallery.videoReview.textView')}
+          ariaLabel={translate('gallery.videoReview.textView')}
+          value={view}
+          options={[
+            { value: 'document', label: translate('gallery.videoReview.textViewDocument') },
+            { value: 'cards', label: translate('gallery.videoReview.textViewCards') },
+          ]}
+          onChange={(value: 'document' | 'cards') => {
+            props.editor.endTyping();
+            setView(value);
+          }}
+        />
+        {view === 'document' && <TextDocumentContext props={props} list={list} mode={voiceMode} />}
+      </div>
       <p className="text-xs text-[var(--sniptale-color-text-muted)]">
         {translate('gallery.videoReview.textFragmentCount')
           .replace('{found}', String(query.found.length))
@@ -191,7 +197,6 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
       )}
       {view === 'document' && (
         <>
-          <TextDocumentContext props={props} list={list} mode={voiceMode} />
           <TextDocument
             label={translate('gallery.videoReview.textViewDocument')}
             phrases={query.found.map((fragment) => ({
@@ -627,10 +632,7 @@ function TextDocumentContext({
     <div
       data-ui="text-document.actions"
       data-selected-count={ids.length}
-      className={[
-        'sticky top-0 z-10 flex flex-wrap items-center gap-1',
-        'bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)] py-1',
-      ].join(' ')}
+      className="flex flex-wrap items-center gap-1"
     >
       {ids.length > 1 && (
         <span role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">

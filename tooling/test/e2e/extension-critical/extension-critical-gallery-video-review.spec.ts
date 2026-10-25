@@ -4439,7 +4439,36 @@ for (const locale of ['en', 'ru'] as const) {
         .poll(async () => (await readNativeReviewWorkspace(page, sourceId))?.project?.name)
         .toBe('First project');
       await page.screenshot({ path: info.outputPath('renamed-project.png'), fullPage: false });
-      await page.locator('[data-ui="gallery.videoReview.newProject"]').click();
+      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
+      await expect(
+        review.locator('header').getByRole('button', {
+          name: label('videoEditor.app.newProjectAction'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await review
+        .getByRole('button', {
+          name: label('gallery.videoReview.moreActions'),
+          exact: true,
+        })
+        .click();
+      const menu = page.getByRole('menu', {
+        name: label('gallery.videoReview.moreActions'),
+        exact: true,
+      });
+      await expect(
+        menu.getByRole('menuitem', { name: label('gallery.keyboard.title'), exact: true })
+      ).toBeVisible();
+      await expect(
+        menu.getByRole('menuitem', { name: label('gallery.app.selectionBackup'), exact: true })
+      ).toBeVisible();
+      await page.screenshot({ path: info.outputPath('more-new-project.png'), fullPage: false });
+      await menu
+        .getByRole('menuitem', {
+          name: label('videoEditor.app.newProjectAction'),
+          exact: true,
+        })
+        .click();
       await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
       const archiveId = await page.evaluate(
         async ({ dbName, sourceId }) => {

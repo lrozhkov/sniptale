@@ -550,3 +550,82 @@ it('uses the circle destination for dock crop and retains the authored 4:3 recta
   );
   expect(editor.camera!.placement).toEqual(authored);
 });
+
+it('resizes only the current hidden ID with valid source bounds and preserves camera clocks', async () => {
+  const camera = createQuickEditWebcam('project-asset:saved', source, source);
+  camera.hiddenRanges = [
+    { id: 'a', start: 1, end: 2 },
+    { id: 'b', start: 4, end: 6 },
+  ];
+  const fixture = setup(camera);
+  await act(async () => {});
+  expect(fixture.session.getSnapshot().document.advancedContent.webcam?.hiddenRanges).toEqual(
+    camera.hiddenRanges
+  );
+  const original = structuredClone(editor.camera!);
+  expect(editor.canResizeHidden('b', { start: 3, end: 7 })).toBe(true);
+  act(() => editor.resizeHidden('b', { start: 3, end: 7 }));
+  expect(editor.camera!.hiddenRanges).toEqual([
+    original.hiddenRanges[0],
+    { id: 'b', start: 3, end: 7 },
+  ]);
+  expect(editor.selection).toEqual({ kind: 'annotation', id: 'note' });
+  expect({ ...editor.camera!, hiddenRanges: original.hiddenRanges }).toEqual(original);
+  await act(async () => {
+    await fixture.session.flushAutosave(['content']);
+  });
+  expect(fixture.history).toHaveLength(1);
+  expect(fixture.history[0]).toMatchObject({ target: 'advancedContent' });
+  const before = editor.camera;
+  for (const range of [
+    { start: -1, end: 5 },
+    { start: 3, end: 13 },
+    { start: 1.5, end: 5 },
+    { start: 5, end: 5.0001 },
+    { start: NaN, end: 6 },
+  ]) {
+    expect(editor.canResizeHidden('b', range)).toBe(false);
+    act(() => editor.resizeHidden('b', range));
+    expect(editor.camera).toEqual(before);
+  }
+  act(() => editor.select({ kind: 'webcam-hidden', id: 'b' }));
+  const stale = editor.resizeHidden;
+  act(() => editor.remove());
+  act(() => stale('b', { start: 8, end: 9 }));
+  expect(editor.camera!.hiddenRanges).toEqual([original.hiddenRanges[0]]);
+  allowed = false;
+  act(() => editor.resizeHidden('a', { start: 0, end: 2 }));
+  expect(editor.camera!.hiddenRanges).toEqual([original.hiddenRanges[0]]);
+  expect(editor.duration).toBe(12);
+});
+
+it('merges a stale hidden resize with current camera edits and retries after command refusal', async () => {
+  const camera = createQuickEditWebcam('project-asset:saved', source, source);
+  camera.hiddenRanges = [{ id: 'hidden', start: 2, end: 4 }];
+  const fixture = setup(camera);
+  await act(async () => {});
+  const staleResize = editor.resizeHidden;
+  act(() => editor.patch({ offsetSeconds: 1.25 }));
+  act(() => staleResize('hidden', { start: 3, end: 5 }));
+  expect(editor.camera).toEqual({
+    ...camera,
+    offsetSeconds: 1.25,
+    hiddenRanges: [{ id: 'hidden', start: 3, end: 5 }],
+  });
+  allowed = false;
+  act(() => staleResize('hidden', { start: 4, end: 6 }));
+  expect(editor.camera!.hiddenRanges).toEqual([{ id: 'hidden', start: 3, end: 5 }]);
+  allowed = true;
+  act(() => staleResize('hidden', { start: 4, end: 6 }));
+  expect(editor.camera).toEqual({
+    ...camera,
+    offsetSeconds: 1.25,
+    hiddenRanges: [{ id: 'hidden', start: 4, end: 6 }],
+  });
+  await act(async () => fixture.session.flushAutosave(['content']));
+  const persisted = fixture.session.getSnapshot();
+  expect(persisted.snapshot.workspace.source).toEqual(source);
+  expect(persisted.document.advancedContent.webcam).toEqual(editor.camera);
+  expect(fixture.history).toHaveLength(1);
+  expect(editor.duration).toBe(12);
+});

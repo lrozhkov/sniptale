@@ -207,6 +207,7 @@ export function ReviewToolbar(props: {
   playing: boolean;
   resultDuration?: number;
   historyControls?: ReactNode;
+  utilityControls?: ReactNode;
   tools?: ReactNode;
   expandedTools?: boolean;
   onPlay(): void;
@@ -310,7 +311,7 @@ export function ReviewToolbar(props: {
             </ReviewButton>
           </>
         ) : null}
-        <ReviewKeyboardHelp />
+        {props.utilityControls ?? <ReviewKeyboardHelp />}
       </div>
     </div>
   );

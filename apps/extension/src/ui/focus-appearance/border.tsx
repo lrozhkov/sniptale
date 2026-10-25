@@ -2,8 +2,19 @@ import { normalizePaintColor } from '@sniptale/foundation/paint';
 import type { ComponentType } from 'react';
 import type { QuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 import { FocusRoundnessField, FocusAreaFields } from './geometry';
-import { RotateCw, RotateCcw } from 'lucide-react';
-import { ColorField, SegmentedRow, SelectField } from '../compact-inspector-controls';
+import {
+  RotateCw,
+  RotateCcw,
+  Pause,
+  Activity,
+  Waves,
+  Zap,
+  Blend,
+  PenLine,
+  Eraser,
+  ChevronsLeftRight,
+} from 'lucide-react';
+import { ColorField, SegmentedRow } from '../compact-inspector-controls';
 import { PreviewNumericRow } from '../compact-inspector-controls/numeric-preview';
 import type { InspectorDisclosureProps } from '../compact-inspector-controls/shared';
 import { translate } from '../../platform/i18n';
@@ -57,6 +68,7 @@ export function BorderAppearanceFields(props: {
         options={(['solid', 'dashed', 'dotted'] as const).map((style) => ({
           value: style,
           label: translate(`gallery.videoReview.borderStyle_${style}`),
+          icon: <BorderStrokeIcon style={style} />,
         }))}
         onChange={(style: QuickEditBorder['style']) =>
           onChange({
@@ -73,7 +85,10 @@ export function BorderAppearanceFields(props: {
         value.style !== 'solid' &&
         value.segmentPercent < 100 &&
         (value.motion === 'clockwise' || value.motion === 'counterclockwise')) ? (
-        <SelectField
+        <SegmentedRow
+          columns={5}
+          layout="stacked"
+          ariaLabel={translate('gallery.videoReview.borderOrigin')}
           label={translate('gallery.videoReview.borderOrigin')}
           value={value.origin ?? 'top-center'}
           options={(
@@ -81,6 +96,7 @@ export function BorderAppearanceFields(props: {
           ).map((origin) => ({
             value: origin,
             label: translate(`gallery.videoReview.borderOrigin_${origin}`),
+            icon: <BorderOriginIcon origin={origin} />,
           }))}
           onChange={(origin) => onChange({ origin })}
         />
@@ -123,17 +139,30 @@ export function BorderHoldFields(props: {
         label={translate('gallery.videoReview.focusReveal')}
         value={mode}
         options={[
-          { value: 'still', label: translate('gallery.videoReview.borderStill') },
+          {
+            value: 'still',
+            label: translate('gallery.videoReview.borderStill'),
+            icon: <Pause size={16} aria-hidden="true" />,
+          },
           ...(border.style === 'solid'
             ? []
             : [
                 {
                   value: 'rotate' as const,
                   label: translate('gallery.videoReview.borderRotation'),
+                  icon: <RotateCw size={16} aria-hidden="true" />,
                 },
               ]),
-          { value: 'pulse', label: translate('gallery.videoReview.borderPulse') },
-          { value: 'ripple', label: translate('gallery.videoReview.borderRipple') },
+          {
+            value: 'pulse',
+            label: translate('gallery.videoReview.borderPulse'),
+            icon: <Activity size={16} aria-hidden="true" />,
+          },
+          {
+            value: 'ripple',
+            label: translate('gallery.videoReview.borderRipple'),
+            icon: <Waves size={16} aria-hidden="true" />,
+          },
         ]}
         onChange={(value) =>
           onChange({ loop: value !== 'still', motion: borderHoldMotion(value, border.motion) })
@@ -268,18 +297,32 @@ export function BorderRevealFields(props: {
         options={[
           {
             value: 'none',
+            icon: <Zap size={16} aria-hidden="true" />,
             label: translate(
               enter ? 'gallery.videoReview.borderAppear' : 'gallery.videoReview.borderDisappear'
             ),
           },
-          { value: 'fade', label: translate('gallery.videoReview.focusFade') },
+          {
+            value: 'fade',
+            label: translate('gallery.videoReview.focusFade'),
+            icon: <Blend size={16} aria-hidden="true" />,
+          },
           {
             value: 'draw',
+            icon: enter ? (
+              <PenLine size={16} aria-hidden="true" />
+            ) : (
+              <Eraser size={16} aria-hidden="true" />
+            ),
             label: translate(
               enter ? 'gallery.videoReview.borderDrawing' : 'gallery.videoReview.borderErasing'
             ),
           },
-          { value: 'both', label: translate('gallery.videoReview.borderBothSides') },
+          {
+            value: 'both',
+            label: translate('gallery.videoReview.borderBothSides'),
+            icon: <ChevronsLeftRight size={16} aria-hidden="true" />,
+          },
         ]}
         onChange={(value) =>
           props.onChange(
@@ -300,5 +343,44 @@ export function BorderRevealFields(props: {
         />
       ) : null}
     </>
+  );
+}
+
+function BorderStrokeIcon({ style }: { style: QuickEditBorder['style'] }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path
+        d="M3 12h18"
+        strokeDasharray={style === 'dashed' ? '4 4' : style === 'dotted' ? '0 5' : undefined}
+      />
+    </svg>
+  );
+}
+
+function BorderOriginIcon({ origin }: { origin: NonNullable<QuickEditBorder['origin']> }) {
+  const x = origin === 'top-center' ? 12 : origin.endsWith('left') ? 4 : 20;
+  const y = origin.startsWith('bottom') ? 19 : 5;
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      aria-hidden="true"
+    >
+      <rect x="4" y="5" width="16" height="14" rx="2" opacity="0.5" />
+      <circle cx={x} cy={y} r="2.5" fill="currentColor" stroke="none" />
+    </svg>
   );
 }

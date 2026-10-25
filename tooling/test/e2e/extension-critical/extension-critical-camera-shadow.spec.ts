@@ -30,22 +30,18 @@ async function savedCamera(page: Page) {
 }
 
 async function chooseDirection(surface: Locator, locale: AppLocale, mode: Direction) {
-  const control = surface.getByRole('button', {
+  const group = surface.getByRole('group', {
     name: translate('gallery.videoReview.webcamShadowDirection', locale),
     exact: true,
   });
-  await control.scrollIntoViewIfNeeded();
-  await control.click();
-  await surface
-    .page()
-    .getByRole('option', {
-      name: translate(`gallery.videoReview.webcamShadowDirection_${mode}`, locale),
-      exact: true,
-    })
-    .click();
-  await expect(control).toContainText(
-    translate(`gallery.videoReview.webcamShadowDirection_${mode}`, locale)
-  );
+  const choice = group.getByRole('button', {
+    name: translate(`gallery.videoReview.webcamShadowDirection_${mode}`, locale),
+    exact: true,
+  });
+  await choice.scrollIntoViewIfNeeded();
+  await choice.click();
+  await expect(choice).toHaveAttribute('aria-pressed', 'true');
+  await expect(surface.page().getByRole('option')).toHaveCount(0);
 }
 
 async function setNumber(surface: Locator, locale: AppLocale, key: Message, value: number) {

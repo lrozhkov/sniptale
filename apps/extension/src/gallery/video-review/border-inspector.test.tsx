@@ -57,15 +57,6 @@ async function enter(node: HTMLInputElement, value: string) {
   );
 }
 async function choose(label: string, option: string, scope: ParentNode = host) {
-  if (label !== 'focusReveal' && label !== 'borderStyle') {
-    await act(async () => field(label, scope).click());
-    await act(async () =>
-      [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-        .find((node) => node.textContent?.includes(`gallery.videoReview.${option}`))!
-        .click()
-    );
-    return;
-  }
   const direct = (key: string) =>
     scope.querySelector<HTMLButtonElement>(`[title="gallery.videoReview.${key}"]`)!;
   const reveal = option.startsWith('borderDraw')
@@ -75,7 +66,13 @@ async function choose(label: string, option: string, scope: ParentNode = host) {
       : option.startsWith('borderRotate')
         ? 'borderRotation'
         : option;
-  await act(async () => direct(reveal).click());
+  const control = direct(reveal);
+  expect(control).not.toBeNull();
+  expect(control.closest('[role="group"]')?.getAttribute('aria-label')).toBe(
+    `gallery.videoReview.${label}`
+  );
+  await act(async () => control.click());
+  expect(document.querySelector('[role="option"]')).toBeNull();
   if (
     option.startsWith('borderDraw') ||
     option.startsWith('borderErase') ||
@@ -267,8 +264,8 @@ it('offers no rotating hold for a solid stroke', async () => {
     border: createQuickEditBorder(),
   };
   act(() => root.render(<ReviewBorderAnimation region={region} onChange={vi.fn()} />));
-  const options = [...field('focusReveal', hold()).querySelectorAll('button')].map(
-    (node) => node.textContent
+  const options = [...field('focusReveal', hold()).querySelectorAll('button')].map((node) =>
+    node.getAttribute('title')
   );
   expect(options).toEqual([
     'gallery.videoReview.borderStill',
@@ -390,7 +387,15 @@ it('edits a retained origin and hides direction for both two-sided phases', asyn
     );
   act(render);
   expect(host.textContent).toContain('gallery.videoReview.borderOrigin');
-  await choose('borderOrigin', 'borderOrigin_bottom-left');
+  for (const origin of ['top-center', 'top-left', 'top-right', 'bottom-right', 'bottom-left']) {
+    await choose('borderOrigin', `borderOrigin_${origin}`);
+    expect(region.border).toMatchObject({ origin });
+    expect(
+      host
+        .querySelector(`[title="gallery.videoReview.borderOrigin_${origin}"]`)
+        ?.getAttribute('aria-pressed')
+    ).toBe('true');
+  }
   expect(region.border).toMatchObject({ origin: 'bottom-left' });
   expect(host.querySelector('[title="gallery.videoReview.borderClockwise"]')).toBeNull();
   const phases = [...host.querySelectorAll('fieldset')].filter((node) => node !== hold());

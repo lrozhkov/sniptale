@@ -90,6 +90,7 @@ type TimelineBindingProps = {
   busy: boolean;
   composerBusy: boolean;
   historyControls?: ReactNode;
+  utilityControls?: ReactNode;
   selection: ReviewAnchor;
   setSelection(value: ReviewAnchor): void;
   advanced: QuickEditAdvancedState;
@@ -359,6 +360,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}
         exportActive={props.exportActive}
         historyControls={props.historyControls}
+        utilityControls={props.utilityControls}
         expandedTools={props.editing.mode === 'speed'}
         busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
         duration={props.source.duration}

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page, type Locator, type TestInfo } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
@@ -47,6 +47,14 @@ for (const viewport of [
         .toContain(label('common.states.saved'));
       expect(await toggles.count()).toBeGreaterThan(4);
       for (const toggle of await toggles.all()) {
+        const trackId = await toggle.evaluate((node) =>
+          node.closest('[data-review-header-track]')?.getAttribute('data-review-header-track')
+        );
+        if (trackId === 'source') {
+          await expect(toggle).toBeDisabled();
+          await expect(toggle).toBeChecked();
+          continue;
+        }
         if (
           (await toggle.getAttribute('aria-label'))?.includes(label('gallery.videoReview.webcam'))
         )
@@ -99,6 +107,23 @@ for (const viewport of [
             .evaluate((node) => node.scrollTop)
         )
         .toBe(0);
+      const focusHeader = dialog.locator('[data-review-header-track="zoom"]');
+      const sourceHeader = dialog.locator('[data-review-header-track="source"]');
+      await focusHeader.locator('[data-review-track-select]').click();
+      await expect(focusHeader).toHaveAttribute('data-review-header-selected', 'true');
+      await expect(sourceHeader).toHaveAttribute('data-review-header-selected', 'false');
+      const selectedColor = await focusHeader.evaluate(
+        (node) => getComputedStyle(node).backgroundColor
+      );
+      const idleColor = await sourceHeader.evaluate(
+        (node) => getComputedStyle(node).backgroundColor
+      );
+      expect(selectedColor).not.toBe(idleColor);
+      expect(await focusHeader.evaluate((node) => getComputedStyle(node).boxShadow)).toBe('none');
+      await expect(focusHeader.locator('[data-review-track-select]')).toHaveCSS(
+        'background-color',
+        'rgba(0, 0, 0, 0)'
+      );
       await page.screenshot({ path: info.outputPath('track-settings-saved.png'), fullPage: false });
       const gaps = await dialog
         .locator('[data-review-track] > [data-review-track-content]')
@@ -115,11 +140,17 @@ for (const viewport of [
           const track = row.getAttribute('data-review-track');
           const header = document.querySelector(`[data-review-header-track="${track}"]`);
           return header
-            ? Math.abs(header.getBoundingClientRect().top - row.getBoundingClientRect().top)
+            ? Math.abs(
+                header.getBoundingClientRect().top -
+                  (
+                    row.querySelector('[data-ui="gallery.videoReview.sourceLane"]') ?? row
+                  ).getBoundingClientRect().top
+              )
             : Infinity;
         })
       );
       for (const delta of alignment) expect(delta).toBeLessThanOrEqual(1);
+      await verifySourceHeaderPaint(page, dialog, info);
       await button('gallery.videoReview.trackSettings').click();
       for (let i = 0; i < 4; i++) await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.trackSettings').click();
@@ -134,6 +165,18 @@ for (const viewport of [
         'true'
       );
       for (const toggle of await toggles.all()) {
+        const trackId = await toggle.evaluate((node) =>
+          node.closest('[data-review-header-track]')?.getAttribute('data-review-header-track')
+        );
+        if (trackId === 'source') {
+          await expect(toggle).toBeDisabled();
+          await expect(toggle).toBeChecked();
+          continue;
+        }
+        if (trackId === 'webcam') {
+          await expect(toggle).toBeDisabled();
+          continue;
+        }
         if (await toggle.isChecked()) {
           await expect(toggle).toBeEnabled();
           await toggle.click();
@@ -152,8 +195,8 @@ for (const viewport of [
         )
         .toContain(label('common.states.saved'));
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).last().click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      // The editor URL resumes this same source project after reload.
+      await expect(dialog).toBeVisible();
       await button('gallery.videoReview.trackSettings').click();
       await expect(focusToggle).not.toBeChecked();
     } finally {
@@ -365,4 +408,73 @@ for (const variant of [
       );
     }
   });
+}
+
+/** The annotation strip is separate from the selected video row in either density. */
+async function verifySourceHeaderPaint(page: Page, dialog: Locator, info: TestInfo) {
+  const header = dialog.locator('[data-review-header-track="source"]');
+  const lane = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+  const select = header.locator('[data-review-track-select]');
+  const button = (key: Parameters<typeof translate>[0]) =>
+    dialog.getByRole('button', {
+      name: translate(key, 'en'),
+      exact: true,
+    });
+  const aligned = async () => {
+    const strip = (await lane.boundingBox())!;
+    const box = (await header.boundingBox())!;
+    expect(Math.abs(box.y - strip.y)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(box.height - strip.height)).toBeLessThanOrEqual(0.5);
+    const right = await dialog
+      .locator('[data-ui="gallery.videoReview.trackListViewport"]')
+      .evaluate((node) => node.getBoundingClientRect().x + node.clientLeft + node.clientWidth);
+    expect(Math.abs(box.x + box.width - right)).toBeLessThanOrEqual(0.5);
+  };
+  const paint = async () => {
+    await expect(header).toHaveAttribute('data-review-header-selected', 'true');
+    const fill = await header.evaluate((node) => getComputedStyle(node).backgroundColor);
+    for (const target of [select.locator('svg'), select.locator('[data-track-label]')]) {
+      await target.hover();
+      await expect(header).toHaveCSS('background-color', fill);
+      await expect(select).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    }
+    const backgrounds = await header
+      .locator('button')
+      .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
+    expect(backgrounds.every((value) => value === 'rgba(0, 0, 0, 0)')).toBe(true);
+    await page.mouse.move(0, 0);
+  };
+  await select.click();
+  await aligned();
+  await paint();
+  await header.locator('.review-track-reorder').focus();
+  await page.keyboard.press('Tab');
+  await expect(select).toBeFocused();
+  await expect(select).toHaveCSS('outline-width', '1px');
+  await expect(select).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await button('gallery.videoReview.trackSettings').click();
+  await aligned();
+  await paint();
+  await page.screenshot({ path: info.outputPath('whole-source-selection.png'), fullPage: false });
+  await button('gallery.videoReview.trackSettings').click();
+  await button('gallery.videoReview.addComment')
+    .and(dialog.locator('[data-ui="gallery.videoReview.toolbar"] button'))
+    .click();
+  await dialog
+    .getByRole('textbox', { name: translate('gallery.videoReview.commentText', 'en'), exact: true })
+    .fill('Header alignment note');
+  await button('gallery.videoReview.save').click();
+  await expect(lane).toHaveCSS('margin-top', '24px');
+  await select.click();
+  await aligned();
+  await paint();
+  await page.screenshot({
+    path: info.outputPath('source-selection-with-note.png'),
+    fullPage: false,
+  });
+  await button('gallery.videoReview.compactTrackHeight').click();
+  await aligned();
+  await paint();
+  await button('gallery.videoReview.compactTrackHeight').click();
+  await aligned();
 }

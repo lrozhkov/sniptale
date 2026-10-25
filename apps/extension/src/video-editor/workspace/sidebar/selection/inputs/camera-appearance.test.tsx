@@ -136,8 +136,12 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
   expect(
     container.querySelector('input[aria-label="videoEditor.sidebar.cameraRoundness"]')
   ).toBeNull();
-  const shapeChoices = [...container.querySelectorAll<HTMLButtonElement>('[aria-pressed]')];
-  expect(shapeChoices).toHaveLength(6);
+  const shapeChoices = [
+    ...container.querySelectorAll<HTMLButtonElement>(
+      '[role="group"][aria-label="videoEditor.sidebar.cameraShape"] button'
+    ),
+  ];
+  expect(shapeChoices).toHaveLength(4);
   expect(shapeChoices.every((button) => button.disabled)).toBe(true);
   expect(
     shapeChoices
@@ -428,17 +432,17 @@ it('retains camera shadow angle through Native mode changes using the existing c
     );
   act(render);
   const choose = async (mode: string) => {
-    act(() =>
-      container
-        .querySelector<HTMLButtonElement>(
-          '[aria-label="gallery.videoReview.webcamShadowDirection"]'
-        )!
-        .click()
-    );
-    const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
-      (item) => item.textContent === `gallery.videoReview.webcamShadowDirection_${mode}`
+    const option = container.querySelector<HTMLButtonElement>(
+      `[title="gallery.videoReview.webcamShadowDirection_${mode}"]`
     )!;
+    expect(option).not.toBeNull();
     await act(async () => option.click());
+    expect(
+      container
+        .querySelector(`[title="gallery.videoReview.webcamShadowDirection_${mode}"]`)
+        ?.getAttribute('aria-pressed')
+    ).toBe('true');
+    expect(document.querySelector('[role="option"]')).toBeNull();
   };
   expect(
     [...container.querySelectorAll('label, span')].some(
@@ -466,4 +470,28 @@ it('retains camera shadow angle through Native mode changes using the existing c
   await choose('angle');
   await enter('360');
   expect(base.clip.cameraShadowDirection).toEqual({ mode: 'angle', angle: 0 });
+});
+
+it('keeps all direct shadow choices disabled when Native camera editing is refused', () => {
+  const base = createProps();
+  const onEdit = vi.fn();
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={base.clip}
+        currentTime={0}
+        disabled
+        onEdit={onEdit}
+      />
+    )
+  );
+  for (const mode of ['classic', 'angle', 'center', 'nearest-edge']) {
+    const option = container.querySelector<HTMLButtonElement>(
+      `[title="gallery.videoReview.webcamShadowDirection_${mode}"]`
+    )!;
+    expect(option.disabled).toBe(true);
+    act(() => option.click());
+  }
+  expect(onEdit).not.toHaveBeenCalled();
 });

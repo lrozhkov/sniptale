@@ -73,7 +73,10 @@ function mount() {
   click('gallery.videoReview.textViewCards');
 }
 function click(label: string) {
-  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+  const scope = label.startsWith('gallery.videoReview.textView')
+    ? host.querySelector('[data-ui="text-document.commands"]')!
+    : host;
+  const button = [...scope.querySelectorAll<HTMLButtonElement>('button')].find(
     (node) =>
       node.textContent?.includes(label) ||
       node.title === label ||

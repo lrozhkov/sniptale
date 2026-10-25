@@ -42,19 +42,18 @@ async function chooseOrigin(
   locale: AppLocale,
   origin: NonNullable<QuickEditBorder['origin']>
 ) {
-  const control = surface.getByRole('button', {
+  const group = surface.getByRole('group', {
     name: translate('gallery.videoReview.borderOrigin', locale),
     exact: true,
   });
-  await control.scrollIntoViewIfNeeded();
-  await control.click();
-  await surface
-    .page()
-    .getByRole('option', {
-      name: translate(`gallery.videoReview.borderOrigin_${origin}`, locale),
-      exact: true,
-    })
-    .click();
+  const choice = group.getByRole('button', {
+    name: translate(`gallery.videoReview.borderOrigin_${origin}`, locale),
+    exact: true,
+  });
+  await choice.scrollIntoViewIfNeeded();
+  await choice.click();
+  await expect(choice).toHaveAttribute('aria-pressed', 'true');
+  await expect(surface.page().getByRole('option')).toHaveCount(0);
 }
 
 async function seekGallery(page: Page, time: number) {
@@ -192,7 +191,7 @@ async function galleryWidths(
   info: TestInfo
 ) {
   const size = page.viewportSize()!;
-  const origin = inspector.getByRole('button', {
+  const origin = inspector.getByRole('group', {
     name: translate('gallery.videoReview.borderOrigin', locale),
     exact: true,
   });
@@ -330,11 +329,13 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
         .click();
       await blocks.first().click();
       await expect(
-        inspector.getByRole('button', {
-          name: label('gallery.videoReview.borderOrigin'),
-          exact: true,
-        })
-      ).toContainText(label('gallery.videoReview.borderOrigin_top-center'));
+        inspector
+          .getByRole('group', { name: label('gallery.videoReview.borderOrigin'), exact: true })
+          .getByRole('button', {
+            name: label('gallery.videoReview.borderOrigin_top-center'),
+            exact: true,
+          })
+      ).toHaveAttribute('aria-pressed', 'true');
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.redo'), exact: true })
         .click();

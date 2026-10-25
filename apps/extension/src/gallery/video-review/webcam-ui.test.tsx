@@ -8,6 +8,7 @@ import {
 } from '../../features/video/review/advanced/webcam';
 import type { useReviewWebcamEditor } from './webcam-editor';
 import { ReviewWebcamInspector } from './webcam-inspector';
+import { cancelReviewTimelineGestures } from './timeline-drag';
 import { ReviewWebcamTrack } from './webcam-track';
 import { ReviewWebcamOverlay } from './webcam-overlay';
 import { createTrackProjection } from './track-projection';
@@ -103,6 +104,24 @@ beforeEach(() => {
     addPosition: vi.fn(),
     navigate: vi.fn(),
     canHide: vi.fn(() => true),
+    canResizeHidden: vi.fn(
+      (id, range) =>
+        !!editor.camera?.enabled &&
+        editor.camera.hiddenRanges.some((item) => item.id === id) &&
+        range.start >= 0 &&
+        range.end <= 12 &&
+        range.end - range.start >= 0.001 &&
+        !editor.camera.hiddenRanges.some(
+          (item) => item.id !== id && item.start < range.end && item.end > range.start
+        )
+    ),
+    resizeHidden: vi.fn((id, range) =>
+      editor.patch({
+        hiddenRanges: editor.camera!.hiddenRanges.map((item) =>
+          item.id === id ? { ...item, ...range } : item
+        ),
+      })
+    ),
     hide: vi.fn(),
     remove: vi.fn(),
   };
@@ -129,6 +148,14 @@ async function enter(name: string, value: string) {
   act(() => node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
 }
 async function choose(name: string, option: string) {
+  if (name === label('webcamShadowDirection')) {
+    const direct = host.querySelector<HTMLButtonElement>(`[title="${option}"]`)!;
+    expect(direct).not.toBeNull();
+    await act(async () => direct.click());
+    expect(direct.getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('[role="option"]')).toBeNull();
+    return;
+  }
   act(() => field(name).click());
   const node = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
     (item) => item.textContent === option
@@ -287,7 +314,10 @@ it('keeps camera markers on the source axis and creates hide intervals through a
   expect(track.style.height).toBe('36px');
   click('webcamSettings');
   expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam' });
-  const markers = track.querySelectorAll<HTMLButtonElement>('button');
+  const markers = [
+    track.querySelector<HTMLButtonElement>('[title="gallery.videoReview.webcamHidden"]')!,
+    track.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.webcamPosition"]')!,
+  ];
   act(() => markers[0]!.click());
   expect(editor.select).toHaveBeenLastCalledWith({ kind: 'webcam-hidden', id: 'hidden' });
   act(() => markers[1]!.click());
@@ -499,4 +529,167 @@ it('retains shadow angle across inspector modes and normalizes a full turn', asy
   expect(field(label('webcamShadowAngle')).value).toBe('225');
   await enter(label('webcamShadowAngle'), '360');
   expect(editor.camera?.shadowDirection).toEqual({ mode: 'angle', angle: 0 });
+});
+
+function hiddenHandle(edge: 'start' | 'end') {
+  return host.querySelector<HTMLButtonElement>(
+    `[data-webcam-hidden-id="hidden"][data-edge="${edge}"]`
+  )!;
+}
+function renderHidden(admit: (action: () => void) => void = (action) => action()) {
+  editor.camera!.hiddenRanges = [
+    { id: 'before', start: 0, end: 1 },
+    { id: 'hidden', start: 2, end: 4 },
+    { id: 'after', start: 5, end: 6 },
+  ];
+  render = () =>
+    root.render(
+      <ReviewWebcamTrack
+        editor={editor}
+        projection={createTrackProjection(12, [])}
+        beforeAction={admit}
+      />
+    );
+  act(render);
+}
+it.each([false, true])(
+  'previews hidden resizing and commits one target ID only on release (selected=%s)',
+  (selected) => {
+    if (selected) editor.selection = { kind: 'webcam-hidden', id: 'hidden' };
+    renderHidden();
+    const handle = hiddenHandle('start');
+    const marker = handle.parentElement!;
+    pointer(handle, 'pointerdown', 200);
+    pointer(handle, 'pointermove', 150);
+    expect(editor.resizeHidden).not.toHaveBeenCalled();
+    expect(marker.style.left).toBe('12.5%');
+    expect(editor.hide).not.toHaveBeenCalled();
+    pointer(handle, 'pointerup', 150);
+    expect(editor.resizeHidden).toHaveBeenCalledExactlyOnceWith('hidden', { start: 1.5, end: 4 });
+    expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam-hidden', id: 'hidden' });
+    expect(editor.duration).toBe(12);
+  }
+);
+it.each(['escape', 'cancel', 'blur', 'lost', 'disabled', 'unmount', 'deleted', 'lane'])(
+  'cancels the hidden edge gesture on %s without a mutation',
+  (reason) => {
+    renderHidden();
+    const handle = hiddenHandle('end');
+    pointer(handle, 'pointerdown', 400);
+    pointer(handle, 'pointermove', 450);
+    if (reason === 'escape')
+      act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    if (reason === 'cancel') pointer(handle, 'pointercancel', 450);
+    if (reason === 'lost') pointer(handle, 'lostpointercapture', 450);
+    if (reason === 'blur') act(() => window.dispatchEvent(new Event('blur')));
+    if (reason === 'disabled') {
+      editor.camera!.enabled = false;
+      act(render);
+    }
+    if (reason === 'unmount') act(() => root.render(null));
+    if (reason === 'deleted') {
+      editor.camera!.hiddenRanges = [];
+      act(render);
+    }
+    if (reason === 'lane') act(() => cancelReviewTimelineGestures());
+    pointer(handle, 'pointerup', 450);
+    expect(editor.resizeHidden).not.toHaveBeenCalled();
+  }
+);
+it('bounds keyboard edges by neighbors and minimum span, and cancels a delayed admission on unmount', () => {
+  renderHidden();
+  act(() =>
+    hiddenHandle('start').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })
+    )
+  );
+  expect(editor.resizeHidden).toHaveBeenLastCalledWith('hidden', { start: 2 - 1 / 30, end: 4 });
+  act(() =>
+    hiddenHandle('end').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true })
+    )
+  );
+  expect(editor.resizeHidden).toHaveBeenLastCalledWith('hidden', { start: 2 - 1 / 30, end: 5 });
+  vi.mocked(editor.resizeHidden).mockClear();
+  pointer(hiddenHandle('start'), 'pointerdown', 200);
+  pointer(hiddenHandle('start'), 'pointermove', -400);
+  pointer(hiddenHandle('start'), 'pointerup', -400);
+  expect(editor.resizeHidden).toHaveBeenLastCalledWith('hidden', { start: 1, end: 5 });
+  pointer(hiddenHandle('start'), 'pointerdown', 100);
+  pointer(hiddenHandle('start'), 'pointermove', 800);
+  pointer(hiddenHandle('start'), 'pointerup', 800);
+  const next = vi.mocked(editor.resizeHidden).mock.calls.at(-1)![1];
+  expect(next.end - next.start).toBeGreaterThanOrEqual(0.001);
+  let admit!: () => void;
+  renderHidden((action) => {
+    admit = action;
+  });
+  vi.mocked(editor.resizeHidden).mockClear();
+  const handle = hiddenHandle('end');
+  pointer(handle, 'pointerdown', 400);
+  pointer(handle, 'pointermove', 450);
+  pointer(handle, 'pointerup', 450);
+  act(() => root.render(null));
+  act(() => admit());
+  expect(editor.resizeHidden).not.toHaveBeenCalled();
+});
+
+it('admits only the latest hidden resize when an earlier released gesture is still waiting', () => {
+  const admissions: (() => void)[] = [];
+  renderHidden((action) => admissions.push(action));
+  const handle = hiddenHandle('end');
+  pointer(handle, 'pointerdown', 400);
+  pointer(handle, 'pointermove', 450);
+  pointer(handle, 'pointerup', 450);
+  pointer(handle, 'pointerdown', 400);
+  pointer(handle, 'pointermove', 480);
+  pointer(handle, 'pointerup', 480);
+  act(() => admissions[0]!());
+  expect(editor.resizeHidden).not.toHaveBeenCalled();
+  act(() => admissions[1]!());
+  expect(editor.resizeHidden).toHaveBeenCalledExactlyOnceWith('hidden', { start: 2, end: 4.8 });
+});
+it('cancels delayed keyboard resize before a deleted identity is restored after marker unmount', () => {
+  let admit!: () => void;
+  renderHidden((action) => {
+    admit = action;
+  });
+  act(() =>
+    hiddenHandle('end').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+    )
+  );
+  expect(editor.resizeHidden).not.toHaveBeenCalled();
+  editor.camera!.hiddenRanges = [];
+  act(render);
+  editor.camera!.hiddenRanges = [{ id: 'hidden', start: 8, end: 10 }];
+  act(render);
+  act(() => admit());
+  expect(editor.resizeHidden).not.toHaveBeenCalled();
+  expect(editor.camera!.hiddenRanges).toEqual([{ id: 'hidden', start: 8, end: 10 }]);
+});
+
+it('retries the same source range after disabled resize input is refused', () => {
+  renderHidden();
+  vi.mocked(editor.canResizeHidden).mockReturnValue(false);
+  act(render);
+  const handle = hiddenHandle('start');
+  expect(handle.disabled).toBe(true);
+  pointer(handle, 'pointerdown', 200);
+  pointer(handle, 'pointermove', 300);
+  pointer(handle, 'pointerup', 300);
+  act(() =>
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(editor.resizeHidden).not.toHaveBeenCalled();
+  expect(editor.camera!.hiddenRanges[1]).toEqual({ id: 'hidden', start: 2, end: 4 });
+  vi.mocked(editor.canResizeHidden).mockReturnValue(true);
+  act(render);
+  expect(hiddenHandle('start').disabled).toBe(false);
+  pointer(hiddenHandle('start'), 'pointerdown', 200);
+  pointer(hiddenHandle('start'), 'pointermove', 300);
+  pointer(hiddenHandle('start'), 'pointerup', 300);
+  expect(editor.resizeHidden).toHaveBeenCalledExactlyOnceWith('hidden', { start: 3, end: 4 });
+  expect(editor.camera!.hiddenRanges[1]).toEqual({ id: 'hidden', start: 3, end: 4 });
+  expect(editor.duration).toBe(12);
 });

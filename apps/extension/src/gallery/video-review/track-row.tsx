@@ -115,6 +115,7 @@ function ReviewTrackHeader({
   return (
     <div
       data-review-header-track={track}
+      data-review-header-selected={!!track && controls?.selectedTrack === track ? 'true' : 'false'}
       data-review-header-muted={props.muted ? 'true' : 'false'}
       data-ui="gallery.videoReview.trackHeader"
       className="sticky left-0 z-30 flex h-full min-w-0 items-center gap-1 border-r

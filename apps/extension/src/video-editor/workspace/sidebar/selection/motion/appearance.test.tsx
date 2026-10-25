@@ -91,6 +91,15 @@ it('labels the shared origin and commits two-sided Native phases without directi
     )
   );
   expect(host.textContent).toContain('gallery.videoReview.borderOrigin');
+  const origin = host.querySelector<HTMLButtonElement>(
+    '[title="gallery.videoReview.borderOrigin_bottom-right"]'
+  )!;
+  act(() => origin.click());
+  expect(panel.onUpdateMotionRegion).toHaveBeenCalledWith(
+    panel.selectedMotionRegion!.id,
+    expect.objectContaining({ focusEdit: { kind: 'border', settings: { origin: 'bottom-right' } } })
+  );
+  expect(host.querySelector('[role="option"]')).toBeNull();
   expect(host.querySelector('[title="gallery.videoReview.borderClockwise"]')).toBeNull();
   const phases = [...host.querySelectorAll('fieldset')].filter(
     (node) => node.getAttribute('aria-label') !== 'gallery.videoReview.borderHold'

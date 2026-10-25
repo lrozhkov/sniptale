@@ -16,6 +16,7 @@ import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
   ...galleryVideoReviewTimelineMessages,
+  moreActions: { ru: 'Ещё действия', en: 'More actions' },
   trackSettings: { ru: 'Настройка дорожек', en: 'Track settings' },
   trackEnabled: { ru: 'Включено', en: 'Enabled' },
   trackReorder: { ru: 'Порядок дорожки (↑/↓)', en: 'Track order (↑/↓)' },

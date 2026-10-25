@@ -5,7 +5,14 @@ import {
   reviewTimelineInspectorCommands,
 } from './inspector-navigation';
 import { useReviewAudioWiring } from './voiceover-recording';
-import { ReviewInspectorBinding, reviewInspectorContext } from './inspector-binding';
+import {
+  ReviewInspectorBinding,
+  reviewInspectorContext,
+  backupReview,
+  flushReviewTextVoiceBuffers,
+} from './inspector-binding';
+import { useReviewProjectCommands } from './project-controls';
+import { ReviewKeyboardHelp } from './keyboard-help';
 import { usePresentationPreview } from './use-presentation-preview';
 import { ReviewEditorPresentationDialog } from './presentation-preview-dialog';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
@@ -138,6 +145,11 @@ function ReviewEditor({
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
     state;
   const joinPreview = useEditorPresentationPreview(resource, state, previewPreferences.preferences);
+  const projectCommands = useReviewProjectCommands(
+    state,
+    () => flushReviewTextVoiceBuffers(state, canvasComments),
+    onProjectCreated
+  );
 
   const waveforms = useReviewWaveforms(
     resource.file,
@@ -179,7 +191,7 @@ function ReviewEditor({
             />
           </div>
           <ReviewInspectorBinding
-            onProjectCreated={onProjectCreated}
+            onRenameProject={projectCommands.rename}
             recording={
               voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
             }
@@ -247,6 +259,13 @@ function ReviewEditor({
               zoomAnchor={state.zoomAnchor}
               beforeAction={state.beforeAction}
               historyControls={<ReviewHistoryControlBinding state={state} />}
+              utilityControls={
+                <ReviewKeyboardHelp
+                  busy={busy || editing.exporter.phase !== 'idle'}
+                  onNewProject={projectCommands.newProject}
+                  onBackup={() => void state.run(() => backupReview(state, canvasComments))}
+                />
+              }
               editing={editing}
               edits={snapshot.document.edits}
               annotations={snapshot.document.annotations}

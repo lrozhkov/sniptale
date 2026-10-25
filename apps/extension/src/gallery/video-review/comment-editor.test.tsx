@@ -68,7 +68,7 @@ it('commits text after the debounce and switches the zoom behavior once', async 
   });
   const editor = host.querySelector('[data-ui="gallery.videoReview.canvasCommentEditor"]')!;
   const area = editor!.querySelector('textarea')!;
-  typeValue(area, 'Hello there');
+  await act(async () => typeValue(area, 'Hello there'));
   await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
   expect(onPatch).toHaveBeenCalledWith({ text: 'Hello there' });
 
@@ -161,10 +161,10 @@ it('keeps the typed draft when the acknowledged text arrives and commits it late
     });
   render('Hello');
   const area = host.querySelector('textarea') as HTMLTextAreaElement;
-  typeValue(area, 'A');
+  await act(async () => typeValue(area, 'A'));
   await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
   expect(onPatch).toHaveBeenCalledWith({ text: 'A' });
-  typeValue(area, 'AB');
+  await act(async () => typeValue(area, 'AB'));
   render('A');
   expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('AB');
   await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
@@ -187,7 +187,7 @@ it('commits pending text when the editor unmounts', async () => {
       />
     );
   });
-  typeValue(host.querySelector('textarea') as HTMLTextAreaElement, 'Draft');
+  await act(async () => typeValue(host.querySelector('textarea') as HTMLTextAreaElement, 'Draft'));
   await act(async () => root.unmount());
   expect(onPatch).toHaveBeenCalledWith({ text: 'Draft' });
 });

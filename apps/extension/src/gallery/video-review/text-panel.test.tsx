@@ -131,7 +131,7 @@ function Fixture({
 }
 function cards() {
   const control = host.querySelector<HTMLButtonElement>(
-    '[title="gallery.videoReview.textViewCards"]'
+    '[data-ui="text-document.commands"] [title="gallery.videoReview.textViewCards"]'
   );
   if (control) act(() => control.click());
 }

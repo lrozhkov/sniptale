@@ -1,8 +1,23 @@
 import { isCameraShadowDirection } from '../../features/video/project/camera/shadow-direction';
 import { ReviewWebcamCropPreview } from './webcam-crop-preview';
-import { Camera, Clock3, Move, Plus, Trash2 } from 'lucide-react';
+import {
+  Camera,
+  Clock3,
+  Move,
+  Plus,
+  Trash2,
+  Layers2,
+  Compass,
+  Focus,
+  ArrowRightToLine,
+} from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { ColorField, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
+import {
+  ColorField,
+  SelectField,
+  SegmentedRow,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import {
@@ -423,13 +438,25 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
         />
       </div>
       <div className="sniptale-parameter-stack">
-        <SelectField
-          className={reviewSelectFieldClassName}
+        <SegmentedRow
+          columns={4}
+          layout="stacked"
+          ariaLabel={translate('gallery.videoReview.webcamShadowDirection')}
           label={translate('gallery.videoReview.webcamShadowDirection')}
           value={camera.shadowDirection?.mode ?? 'classic'}
           options={(['classic', 'angle', 'center', 'nearest-edge'] as const).map((mode) => ({
             value: mode,
             label: translate(`gallery.videoReview.webcamShadowDirection_${mode}`),
+            icon:
+              mode === 'classic' ? (
+                <Layers2 size={16} aria-hidden="true" />
+              ) : mode === 'angle' ? (
+                <Compass size={16} aria-hidden="true" />
+              ) : mode === 'center' ? (
+                <Focus size={16} aria-hidden="true" />
+              ) : (
+                <ArrowRightToLine size={16} aria-hidden="true" />
+              ),
           }))}
           onChange={(mode) => {
             const direction = { mode, angle: camera.shadowDirection?.angle ?? 0 };

@@ -81,6 +81,26 @@ type WebcamEditorArgs = {
   allowed(): boolean;
 };
 
+function canResizeHiddenCameraRange(
+  camera: QuickEditWebcam | undefined,
+  id: string,
+  range: { start: number; end: number },
+  duration: number
+) {
+  return (
+    !!camera?.enabled &&
+    camera.hiddenRanges.some((item) => item.id === id) &&
+    Number.isFinite(range.start) &&
+    Number.isFinite(range.end) &&
+    range.start >= 0 &&
+    range.end <= duration &&
+    range.end - range.start >= 0.001 &&
+    !camera.hiddenRanges.some(
+      (item) => item.id !== id && item.start < range.end && item.end > range.start
+    )
+  );
+}
+
 /** Authored camera edits use the existing history writer and selection authority. */
 export function useReviewWebcamEditor(args: WebcamEditorArgs) {
   const camera = args.advanced.advanced.webcam;
@@ -218,6 +238,35 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       if (latest.current.allowed()) args.seek(target?.time ?? 0);
     },
     canHide,
+    canResizeHidden: (id: string, range: { start: number; end: number }) =>
+      latest.current.allowed() &&
+      !acquisition.busy() &&
+      canResizeHiddenCameraRange(
+        latest.current.advanced.advanced.webcam,
+        id,
+        range,
+        latest.current.sourceDuration
+      ),
+    resizeHidden: (id: string, range: { start: number; end: number }) => {
+      mutate((current) => {
+        if (!canResizeHiddenCameraRange(current, id, range, latest.current.sourceDuration))
+          return current;
+        if (
+          current.hiddenRanges.some(
+            (item) => item.id === id && item.start === range.start && item.end === range.end
+          )
+        )
+          return current;
+        return {
+          ...current,
+          hiddenRanges: current.hiddenRanges
+            .map((item) =>
+              item.id === id ? { ...item, start: range.start, end: range.end } : item
+            )
+            .sort((a, b) => a.start - b.start),
+        };
+      });
+    },
     hide: (range: { start: number; end: number }, replace = false) => {
       if (!canHide(range, replace)) return;
       const id = (replace ? hidden?.id : undefined) ?? crypto.randomUUID();

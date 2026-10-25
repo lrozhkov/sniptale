@@ -125,6 +125,27 @@ async function copyBlock(
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: native });
   });
   await phrase(root, first).evaluate((node) => node.scrollIntoView({ block: 'center' }));
+  // Centering a multiline phrase can put its first line behind the sticky commands.
+  const commandsBottom = await root
+    .locator('[data-ui="text-document.commands"]')
+    .evaluate((node) => node.getBoundingClientRect().bottom);
+  const start = await textPoint(phrase(root, first), false);
+  if (start.y < commandsBottom + 8) {
+    await phrase(root, first).evaluate(
+      (node, delta) => {
+        for (let owner = node.parentElement; owner; owner = owner.parentElement) {
+          if (
+            /(auto|scroll)/.test(getComputedStyle(owner).overflowY) &&
+            owner.scrollHeight > owner.clientHeight
+          ) {
+            owner.scrollTop += delta;
+            break;
+          }
+        }
+      },
+      start.y - commandsBottom - 8
+    );
+  }
   await expect(phrase(root, first)).toBeInViewport();
   await expect(phrase(root, first + 1)).toBeInViewport();
   const a = await textPoint(phrase(root, first), false);
@@ -151,17 +172,27 @@ async function copyBlock(
 }
 
 async function view(root: Locator, locale: AppLocale, mode: 'document' | 'cards') {
-  await root
-    .getByRole('button', {
-      name: translate(
-        mode === 'document'
-          ? 'gallery.videoReview.textViewDocument'
-          : 'gallery.videoReview.textViewCards',
-        locale
-      ),
-      exact: true,
+  const control = root.getByRole('button', {
+    name: translate(
+      mode === 'document'
+        ? 'gallery.videoReview.textViewDocument'
+        : 'gallery.videoReview.textViewCards',
+      locale
+    ),
+    exact: true,
+  });
+  await expect(control).toBeInViewport();
+  expect(
+    await control.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      return (
+        rect.top >= 0 &&
+        rect.bottom <= innerHeight &&
+        node.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2))
+      );
     })
-    .click();
+  ).toBe(true);
+  await control.click();
 }
 
 async function noOverflow(page: Page) {
@@ -290,6 +321,10 @@ for (const variant of [
             .evaluate((node: HTMLVideoElement) => node.readyState >= 2 && !node.seeking)
         )
         .toBe(true);
+      await view(document, variant.locale, 'cards');
+      await expect(document.locator('[data-ui="text-document"]')).toHaveCount(0);
+      await view(document, variant.locale, 'document');
+      await expect(phrase(document, 55)).toHaveAttribute('aria-pressed', 'true');
       await page.screenshot({
         path: info.outputPath('gallery-document-last-phrase.png'),
         fullPage: false,
@@ -402,6 +437,9 @@ for (const variant of [
       await phrase(native, 55).click();
       await expect(phrase(native, 55)).toBeInViewport();
       await expect.poll(() => nativeTime(page)).toBeGreaterThan(9);
+      await view(native, variant.locale, 'cards');
+      await view(native, variant.locale, 'document');
+      await expect(phrase(native, 55)).toHaveAttribute('aria-pressed', 'true');
       await page.screenshot({
         path: info.outputPath('native-document-last-phrase.png'),
         fullPage: false,

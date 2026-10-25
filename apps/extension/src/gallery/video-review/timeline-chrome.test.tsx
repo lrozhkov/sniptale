@@ -127,6 +127,7 @@ it('keeps compact toolbar transport and zoom actions usable in playing and stopp
   try {
     act(() => root.render(<ReviewToolbar {...props} />));
     expect(host.querySelector('[data-toolbar-side="leading"]')?.textContent).toBe('Tools');
+    expect(host.querySelector('[data-ui="gallery.videoReview.moreActions"]')).not.toBeNull();
     expect(host.querySelector('[data-toolbar-side="trailing"]')?.textContent).toContain('History');
     expect(host.querySelector('[data-toolbar-transport]')?.textContent).toContain('0:00.00');
     const start = host.querySelector<HTMLButtonElement>(
@@ -179,6 +180,13 @@ it('keeps compact toolbar transport and zoom actions usable in playing and stopp
     );
     expect(host.querySelector('[data-toolbar-transport]')?.textContent).not.toContain('0:03.00');
     expect(host.querySelector('[title="gallery.videoReview.resultDuration"]')).toBeNull();
+    act(() =>
+      root.render(<ReviewToolbar {...props} utilityControls={<button>Project utilities</button>} />)
+    );
+    expect(host.querySelector('[data-ui="gallery.videoReview.moreActions"]')).toBeNull();
+    expect(host.querySelector('[data-toolbar-side="trailing"]')?.textContent).toContain(
+      'Project utilities'
+    );
   } finally {
     act(() => root.unmount());
     host.remove();

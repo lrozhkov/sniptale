@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Page, type TestInfo, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
@@ -249,6 +249,58 @@ for (const variant of [
           name: label('gallery.videoReview.webcamHidden'),
         });
         await expect(hidden).toHaveCount(1);
+        const hiddenMarker = track.locator('[data-ui="gallery.videoReview.webcamHiddenMarker"]');
+        for (const density of ['compact', 'expanded'] as const) {
+          if (density === 'expanded')
+            await button('gallery.videoReview.compactTrackHeight').click();
+          const geometry = {
+            density,
+            row: await track.boundingBox(),
+            header: await dialog.locator('[data-review-header-track="webcam"]').boundingBox(),
+            marker: await hiddenMarker.boundingBox(),
+          };
+          const top = geometry.marker!.y - geometry.row!.y;
+          const bottom =
+            geometry.row!.y + geometry.row!.height - geometry.marker!.y - geometry.marker!.height;
+          expect(Math.abs(top - bottom)).toBeLessThanOrEqual(0.5);
+          expect(geometry.marker!.height).toBe(density === 'compact' ? 24 : 32);
+          expect(geometry.row!.height).toBe(density === 'compact' ? 28 : 36);
+          const sourceLane = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+          const sourceHeader = dialog.locator('[data-review-header-track="source"]');
+          const sourceBox = (await sourceLane.boundingBox())!;
+          const sourceHeaderBox = (await sourceHeader.boundingBox())!;
+          expect(Math.abs(sourceHeaderBox.y - sourceBox.y)).toBeLessThanOrEqual(0.5);
+          expect(Math.abs(sourceHeaderBox.height - sourceBox.height)).toBeLessThanOrEqual(0.5);
+          await expect(
+            hiddenMarker.getByRole('button', {
+              name: label('gallery.videoReview.resizeStart'),
+              exact: true,
+            })
+          ).toBeVisible();
+          await expect(
+            hiddenMarker.getByRole('button', {
+              name: label('gallery.videoReview.resizeEnd'),
+              exact: true,
+            })
+          ).toBeVisible();
+          await track.scrollIntoViewIfNeeded();
+          await page.screenshot({
+            path: info.outputPath(`camera-hidden-${density}.png`),
+            fullPage: false,
+          });
+        }
+        await button('gallery.videoReview.compactTrackHeight').click();
+        if (!('lowCadence' in variant)) {
+          await verifyHiddenCameraHandles(
+            page,
+            dialog,
+            track,
+            hiddenMarker,
+            sourceDuration,
+            variant.locale,
+            info
+          );
+        }
         expect(
           await dialog
             .locator('video')
@@ -823,4 +875,107 @@ for (const viewport of [
       }
     });
   }
+}
+
+/** Real handles retain source time, one released edit and the existing reversible history. */
+async function verifyHiddenCameraHandles(
+  page: Page,
+  dialog: Locator,
+  track: Locator,
+  marker: Locator,
+  duration: number,
+  locale: 'en' | 'ru',
+  info: TestInfo
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const saved = async () => {
+    const workspace = (await readWebcamWorkspace(page))!;
+    const content = workspace.history
+      .slice(0, workspace.cursor)
+      .findLast((operation) => operation.target === 'advancedContent');
+    return {
+      cursor: workspace.cursor,
+      range:
+        content?.target === 'advancedContent' ? content.after.webcam?.hiddenRanges[0] : undefined,
+    };
+  };
+  await expect.poll(async () => (await saved()).range?.start).toBeCloseTo(2.5, 1);
+  const original = (await saved()).range!;
+  const initialCursor = (await saved()).cursor;
+  const video = dialog.locator('video').first();
+  const time = await video.evaluate((node) => node.currentTime);
+  const mediaDuration = await video.evaluate((node) => node.duration);
+  const sourceHeader = dialog.locator('[data-review-header-track="source"]');
+  await sourceHeader.locator('[data-review-track-select]').click();
+  await expect(sourceHeader).toHaveAttribute('data-review-header-selected', 'true');
+  await expect(sourceHeader.locator('[data-review-track-select]')).toHaveCSS(
+    'background-color',
+    'rgba(0, 0, 0, 0)'
+  );
+  await page.screenshot({ path: info.outputPath('source-selection-aligned.png'), fullPage: false });
+  const cameraHeader = dialog.locator('[data-review-header-track="webcam"]');
+  await cameraHeader.locator('[data-review-track-select]').click();
+  await expect(cameraHeader).toHaveAttribute('data-review-header-selected', 'true');
+  await marker.getByRole('button', { name: label('gallery.videoReview.webcamHidden') }).click();
+  const lane = (await track.boundingBox())!;
+  const tolerance = duration / lane.width + 0.001; // One CSS pixel of pointer rounding plus numeric parsing.
+  const edge = (name: 'start' | 'end') =>
+    marker.getByRole('button', {
+      name: label(
+        name === 'start' ? 'gallery.videoReview.resizeStart' : 'gallery.videoReview.resizeEnd'
+      ),
+      exact: true,
+    });
+  const drag = async (name: 'start' | 'end', seconds: number, cancel = false) => {
+    const cursor = (await saved()).cursor;
+    const box = (await edge(name).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      box.x + box.width / 2 + (seconds / duration) * lane.width,
+      box.y + box.height / 2,
+      { steps: 6 }
+    );
+    expect((await saved()).cursor).toBe(cursor);
+    if (cancel) await page.keyboard.press('Escape');
+    await page.mouse.up();
+  };
+  const closeTo = async (name: 'start' | 'end', target: number) =>
+    expect
+      .poll(async () => Math.abs((await saved()).range![name] - target))
+      .toBeLessThanOrEqual(tolerance);
+  await drag('start', -0.2);
+  await closeTo('start', original.start - 0.2);
+  const resizedStart = (await saved()).range!.start;
+  await drag('end', 0.2);
+  await closeTo('end', original.end + 0.2);
+  const resizedEnd = (await saved()).range!.end;
+  await edge('end').press('Shift+ArrowLeft');
+  await closeTo('end', resizedEnd - 1);
+  const undo = dialog.getByRole('button', { name: label('gallery.videoReview.undo'), exact: true });
+  await undo.click();
+  await closeTo('end', resizedEnd);
+  await undo.click();
+  await closeTo('end', original.end);
+  await undo.click();
+  await closeTo('start', original.start);
+  await dialog
+    .getByRole('button', { name: label('gallery.videoReview.redo'), exact: true })
+    .click();
+  await closeTo('start', resizedStart);
+  await undo.click();
+  await closeTo('start', original.start);
+  expect((await saved()).cursor).toBe(initialCursor);
+  const before = (await marker.boundingBox())!;
+  await drag('start', 0.1, true);
+  expect((await marker.boundingBox())!.x).toBeCloseTo(before.x, 0);
+  expect((await saved()).range).toEqual(original);
+  expect((await saved()).cursor).toBe(initialCursor);
+  expect(await video.evaluate((node) => node.currentTime)).toBeCloseTo(time, 3);
+  expect(await video.evaluate((node) => node.duration)).toBe(mediaDuration);
+  await page.mouse.move(0, 0);
+  await page.screenshot({
+    path: info.outputPath('camera-selection-resize-handles.png'),
+    fullPage: false,
+  });
 }

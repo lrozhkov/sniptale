@@ -8,7 +8,6 @@ import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
 import './inspector-navigation.css';
 import {
-  Archive,
   Clapperboard,
   List,
   PanelLeft,
@@ -83,8 +82,7 @@ export function ReviewInspector(props: {
   recording?: ReactNode;
   beforeAction?: ReviewBeforeAction | undefined;
   filename: string;
-  onRenameProject?(name: string): Promise<void>;
-  onNewProject?: (() => void) | undefined;
+  onRenameProject?: ((name: string) => Promise<void>) | undefined;
   annotations: readonly ReviewAnnotation[];
   selectedId: string | null;
   busy: boolean;
@@ -110,7 +108,6 @@ export function ReviewInspector(props: {
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
-  onBackup?(): void;
   onOpenVideoEditor?(): void;
   children: ReactNode;
   actions?: ReactNode;
@@ -341,7 +338,7 @@ function ReviewAnnotationList(props: {
 
 /** Project actions reuse the inspector's compact export controls. */
 function ReviewProjectActions(
-  props: Pick<Parameters<typeof ReviewInspector>[0], 'onBackup' | 'onOpenVideoEditor' | 'busy'>
+  props: Pick<Parameters<typeof ReviewInspector>[0], 'onOpenVideoEditor' | 'busy'>
 ) {
   return (
     <>
@@ -355,17 +352,6 @@ function ReviewProjectActions(
         >
           <Clapperboard size={15} aria-hidden="true" />
           <span>{translate('gallery.videoReview.openVideoEditor')}</span>
-        </ReviewButton>
-      ) : null}
-      {props.onBackup ? (
-        <ReviewButton
-          label={translate('gallery.app.selectionBackup')}
-          disabled={props.busy}
-          className={`${reviewTextButtonClassName} justify-start`}
-          onClick={props.onBackup}
-        >
-          <Archive size={15} aria-hidden="true" />
-          <span>{translate('gallery.app.selectionBackup')}</span>
         </ReviewButton>
       ) : null}
     </>
@@ -477,19 +463,6 @@ function ReviewInspectorHeader(
           props.filename
         )}
       </h2>
-      {props.onNewProject ? (
-        <ContentToolbarButton
-          type="button"
-          tone="utility"
-          size="compact"
-          title={translate('videoEditor.app.newProjectAction')}
-          disabled={props.busy}
-          onClick={props.onNewProject}
-          dataUi="gallery.videoReview.newProject"
-        >
-          <Plus size={16} aria-hidden="true" />
-        </ContentToolbarButton>
-      ) : null}
       {props.section === 'scene' ||
       props.section === 'speech' ||
       (props.section === 'selected' && props.selectionHasSections === true) ? (

@@ -9,7 +9,7 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import type { ReviewActionHistory } from './action-history';
 import type { ReviewOriginalSpeechPanel } from './speech-panel';
 import type { ReviewSelectedProperties } from './selected-properties';
-import { ReviewInspectorBinding } from './inspector-binding';
+import { ReviewInspectorBinding, backupReview } from './inspector-binding';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { translate } from '../../platform/i18n';
 
@@ -40,7 +40,6 @@ vi.mock('./advanced-panels', () => ({
 }));
 vi.mock('./inspector', () => ({
   ReviewInspector: (props: {
-    onBackup(): void;
     onOpenVideoEditor(): void;
     message: string | null;
     scene: ReactNode;
@@ -50,7 +49,6 @@ vi.mock('./inspector', () => ({
     textDocument: ReactNode;
   }) => (
     <div>
-      <button onClick={props.onBackup}>Backup current work</button>
       <button onClick={props.onOpenVideoEditor}>Continue in full editor</button>
       <p role="status">{props.message}</p>
       {sceneProbe.enabled ? props.scene : null}
@@ -223,7 +221,9 @@ it('joins every editor buffer for either recognition source and guards related-t
     backupExport.mockImplementationOnce(async () => {
       order.push('export');
     });
-    await click('Backup current work');
+    await act(async () =>
+      backupProps.state.run(() => backupReview(backupProps.state, backupProps.canvasComments))
+    );
     expect(order.slice(-5)).toEqual(['notes', 'advanced', 'canvas', 'save', 'export']);
     expect(backupExport).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -237,10 +237,14 @@ it('joins every editor buffer for either recognition source and guards related-t
       { expectedReview, requireSelected: true }
     );
     save.mockRejectedValueOnce(new Error('Save refused'));
-    await click('Backup current work');
+    await act(async () =>
+      backupProps.state.run(() => backupReview(backupProps.state, backupProps.canvasComments))
+    );
     expect(failure).toHaveBeenCalledOnce();
     expect(backupExport).toHaveBeenCalledOnce();
-    await click('Backup current work');
+    await act(async () =>
+      backupProps.state.run(() => backupReview(backupProps.state, backupProps.canvasComments))
+    );
     expect(backupExport).toHaveBeenCalledTimes(2);
     openFullEditor.mockImplementationOnce(async () => {
       order.push('navigate');

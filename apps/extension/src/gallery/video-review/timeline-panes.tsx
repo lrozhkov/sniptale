@@ -171,7 +171,11 @@ function observeReviewPaneLayout(
       const position = row.ruler ? 0 : index++;
       if (parent.children[position] !== row.header)
         parent.insertBefore(row.header, parent.children[position] ?? null);
-      const rect = row.body.getBoundingClientRect();
+      // Source comments occupy leading clearance above the visible video strip.
+      const visibleLane = row.body.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.sourceLane"]'
+      );
+      const rect = (visibleLane ?? row.body).getBoundingClientRect();
       row.header.style.position = 'absolute';
       row.header.style.insetInline = '0';
       row.header.style.top = `${row.ruler ? 0 : rect.top - planeRect.top - rulerHeight}px`;

@@ -497,13 +497,15 @@ it('fits the time plane to live CSS width without a resize-observer frame of ove
   expect(viewport.style.overflowX).toBe('hidden');
 });
 
-it('keeps export before keyboard help and available while timeline edits are busy', async () => {
+it('keeps export before More and available while timeline edits are busy', async () => {
   const onOpenExport = vi.fn();
   renderTimeline({ busy: true, onOpenExport });
   const buttons = environment.host!.querySelectorAll<HTMLButtonElement>(
     '[data-ui="gallery.videoReview.toolbar"] button'
   );
-  expect(buttons[buttons.length - 1]!.getAttribute('aria-label')).toBe('gallery.keyboard.title');
+  expect(buttons[buttons.length - 1]!.getAttribute('aria-label')).toBe(
+    'gallery.videoReview.moreActions'
+  );
   const opener = buttons[buttons.length - 2]!;
   expect(opener.getAttribute('aria-label')).toBe('gallery.videoReview.exportSection');
   expect(opener.getAttribute('title')).toBe('gallery.videoReview.exportSection');

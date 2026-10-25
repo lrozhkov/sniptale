@@ -1,9 +1,9 @@
-import { SelectField, NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { SegmentedRow, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { isCameraShadowDirection } from '../../../../../features/video/project/camera/shadow-direction';
 import { cameraSplitPanels } from '../../../../../features/video/project/camera/split';
 import { getMediaClipSourceTime } from '../../../../../features/video/project/timeline/rate';
 import { useContext } from 'react';
-import { Scan, RotateCcw } from 'lucide-react';
+import { Scan, RotateCcw, Layers2, Compass, Focus, ArrowRightToLine } from 'lucide-react';
 import { InspectorActionButton } from '../shared/actions';
 import {
   activeCameraPosition,
@@ -136,13 +136,26 @@ export function CameraAppearanceControls(props: {
         onEdit: props.onEdit,
         url: runtime?.assetUrls[props.clip.assetId],
       })}
-      <SelectField
+      <SegmentedRow
+        columns={4}
+        layout="stacked"
+        ariaLabel={translate('gallery.videoReview.webcamShadowDirection')}
         label={translate('gallery.videoReview.webcamShadowDirection')}
         value={props.clip.cameraShadowDirection?.mode ?? 'classic'}
-        disabled={disabled}
         options={(['classic', 'angle', 'center', 'nearest-edge'] as const).map((mode) => ({
           value: mode,
           label: translate(`gallery.videoReview.webcamShadowDirection_${mode}`),
+          icon:
+            mode === 'classic' ? (
+              <Layers2 size={16} aria-hidden="true" />
+            ) : mode === 'angle' ? (
+              <Compass size={16} aria-hidden="true" />
+            ) : mode === 'center' ? (
+              <Focus size={16} aria-hidden="true" />
+            ) : (
+              <ArrowRightToLine size={16} aria-hidden="true" />
+            ),
+          disabled,
         }))}
         onChange={(mode) => {
           const direction = { mode, angle: props.clip.cameraShadowDirection?.angle ?? 0 };

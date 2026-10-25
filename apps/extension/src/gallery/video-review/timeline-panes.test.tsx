@@ -92,3 +92,30 @@ it('accepts alternating native scroll input without replaying a delayed mirror',
   renderTimeline({ ...props, busy: false });
   expect(labels.hasAttribute('inert')).toBe(false);
 });
+
+it('keeps annotation clearance above the source header instead of inside its selected paint', () => {
+  const rectangles = vi
+    .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    .mockImplementation(function (this: HTMLElement) {
+      if (this.dataset['ui'] === 'gallery.videoReview.timePlane')
+        return new DOMRect(200, 50, 700, 200);
+      if (this.dataset['ui'] === 'gallery.videoReview.sourceLane')
+        return new DOMRect(200, 120, 700, 48);
+      if (this.dataset['reviewTrack'] === 'source') return new DOMRect(200, 96, 700, 72);
+      if (this.querySelector('[data-ui="gallery.videoReview.ruler"]'))
+        return new DOMRect(200, 50, 700, 28);
+      return new DOMRect(0, 0, 800, 0);
+    });
+  try {
+    const { host } = renderTimeline({
+      annotations: [{ id: 'note', text: 'Saved note', anchor: { kind: 'point', time: 1 } }],
+    });
+    const header = host.querySelector<HTMLElement>('[data-review-header-track="source"]')!;
+    expect(header.parentElement!.style.top).toBe('42px');
+    expect(header.parentElement!.style.height).toBe('48px');
+    expect(host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')).not.toBeNull();
+    expect(host.querySelector('[data-review-track="source"]')).not.toBeNull();
+  } finally {
+    rectangles.mockRestore();
+  }
+});

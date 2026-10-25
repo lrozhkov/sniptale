@@ -1,4 +1,3 @@
-import { useReviewProjectCommands } from './project-controls';
 import {
   exportMediaHubBackup,
   createMediaHubBackupExportOptions,
@@ -133,7 +132,7 @@ function ReviewInspectorFragment({ state }: { state: InspectorState }) {
 }
 
 export function ReviewInspectorBinding({
-  onProjectCreated,
+  onRenameProject,
   resource,
   state,
   canvasComments,
@@ -161,15 +160,11 @@ export function ReviewInspectorBinding({
   audio: ReturnType<typeof useReviewAudio>;
   onBack(): void;
   onClose(): void;
-  onProjectCreated?(aggregateId: string): void;
+  onRenameProject?: ((name: string) => Promise<void>) | undefined;
 }) {
   const { editing, snapshot, composer, busy, run } = state;
   const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
-  const projectCommands = useReviewProjectCommands(
-    state,
-    () => flushReviewTextVoiceBuffers(state, canvasComments),
-    onProjectCreated
-  );
+
   const leave = (done: () => void) => leaveReviewInspector(state, canvasComments, done);
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
@@ -191,8 +186,7 @@ export function ReviewInspectorBinding({
         navigation={navigation}
         onToggleHeight={onToggleHeight}
         filename={snapshot.snapshot.workspace.project?.name ?? resource.filename}
-        onNewProject={projectCommands.newProject}
-        onRenameProject={projectCommands.rename}
+        onRenameProject={onRenameProject}
         annotations={snapshot.document.annotations}
         selectedId={state.selected?.id ?? null}
         busy={busy || editing.exporter.phase !== 'idle'}
@@ -261,7 +255,6 @@ export function ReviewInspectorBinding({
         onAdd={state.add}
         onSelect={state.selectComment}
         onHover={state.setHovered}
-        onBackup={() => void run(() => backupReview(state, canvasComments))}
         onOpenVideoEditor={() =>
           void run(async () => {
             await flushReviewTextVoiceBuffers(state, canvasComments);
@@ -423,7 +416,7 @@ function ReviewRecordedHistory({
 }
 
 /** Backup joins accepted edits and recovery before reading the exact saved snapshot. */
-async function backupReview(
+export async function backupReview(
   state: Pick<InspectorState, 'composer' | 'flushAdvanced' | 'session' | 'setMessage'>,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
@@ -790,7 +783,7 @@ function reviewTextVoiceAccess(
 }
 
 /** All-buffer joins are shared by explicit voice actions and leaving the inspector. */
-async function flushReviewTextVoiceBuffers(
+export async function flushReviewTextVoiceBuffers(
   state: Pick<InspectorState, 'composer' | 'flushAdvanced'>,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {

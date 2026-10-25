@@ -167,19 +167,94 @@ export function InspectProjectTextPanel({
           <InspectorActionButton onClick={add}>
             <Plus size={14} /> {translate('videoEditor.sidebar.newProjectText')}
           </InspectorActionButton>
-          <SegmentedRow
-            label={translate('gallery.videoReview.textView')}
-            ariaLabel={translate('gallery.videoReview.textView')}
-            value={view}
-            options={[
-              { value: 'document', label: translate('gallery.videoReview.textViewDocument') },
-              { value: 'cards', label: translate('gallery.videoReview.textViewCards') },
-            ]}
-            onChange={(value: 'document' | 'cards') => {
-              editor.endTyping();
-              setView(value);
-            }}
-          />
+          <div
+            data-ui="text-document.commands"
+            className="sticky top-0 z-10 space-y-1 bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)] py-1"
+          >
+            <SegmentedRow
+              label={translate('gallery.videoReview.textView')}
+              ariaLabel={translate('gallery.videoReview.textView')}
+              value={view}
+              options={[
+                { value: 'document', label: translate('gallery.videoReview.textViewDocument') },
+                { value: 'cards', label: translate('gallery.videoReview.textViewCards') },
+              ]}
+              onChange={(value: 'document' | 'cards') => {
+                editor.endTyping();
+                setView(value);
+              }}
+            />
+            {view === 'document' && entry && active && (
+              <div
+                data-ui="text-document.actions"
+                data-selected-count={actionIds.length}
+                className="flex flex-wrap items-center gap-1"
+              >
+                {actionIds.length > 1 && (
+                  <span
+                    role="status"
+                    className="text-xs text-[var(--sniptale-color-text-secondary)]"
+                  >
+                    {translate('gallery.videoReview.speechBatchSelected').replace(
+                      '{count}',
+                      String(actionIds.length)
+                    )}
+                  </span>
+                )}
+                <InspectorActionButton
+                  iconOnly
+                  title={translate('gallery.videoReview.textPhraseEdit')}
+                  aria-label={translate('gallery.videoReview.textPhraseEdit')}
+                  disabled={actionIds.length !== 1}
+                  onClick={() => {
+                    editor.endTyping();
+                    setCreated(active.id);
+                    setOpened(active.id);
+                    setFocusRevision((current) => current + 1);
+                  }}
+                >
+                  <Pencil size={14} />
+                </InspectorActionButton>
+                <InspectorActionButton
+                  iconOnly
+                  title={translate('gallery.videoReview.textPlayFromHere')}
+                  aria-label={translate('gallery.videoReview.textPlayFromHere')}
+                  disabled={
+                    !runtime ||
+                    !projectVideoProjectTextFragment(project, entry, active).ranges.length
+                  }
+                  onClick={() => navigate(active.id, true)}
+                >
+                  <Play size={14} />
+                </InspectorActionButton>
+                {voice && (
+                  <InspectorActionButton
+                    iconOnly
+                    data-project-text-voice={actionIds.length === 1 ? active.id : 'selected'}
+                    disabled={actionIds.length === 1 && !active.text.trim()}
+                    title={translate('gallery.videoReview.speechGenerateSelected')}
+                    aria-label={translate('gallery.videoReview.speechGenerateSelected')}
+                    onClick={() => openVoice(actionIds.length === 1 ? active.id : actionIds)}
+                  >
+                    <Volume2 size={14} />
+                  </InspectorActionButton>
+                )}
+                {rewrite && (
+                  <InspectorActionButton
+                    iconOnly
+                    data-project-text-rewrite={actionIds.length === 1 ? active.id : 'document'}
+                    title={translate('gallery.videoReview.textRewriteSelected')}
+                    aria-label={translate('gallery.videoReview.textRewriteSelected')}
+                    onClick={() =>
+                      openRewrite(actionIds, false, actionIds.length === 1 ? active.id : 'document')
+                    }
+                  >
+                    <WandSparkles size={14} />
+                  </InspectorActionButton>
+                )}
+              </div>
+            )}
+          </div>
           {entry ? (
             <>
               <ProjectTextDocumentChoice
@@ -213,85 +288,6 @@ export function InspectProjectTextPanel({
               )}
               {view === 'document' && (
                 <>
-                  {active && (
-                    <div
-                      data-ui="text-document.actions"
-                      data-selected-count={actionIds.length}
-                      className={[
-                        'sticky top-0 z-10 flex flex-wrap items-center gap-1',
-                        'bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)] py-1',
-                      ].join(' ')}
-                    >
-                      {actionIds.length > 1 && (
-                        <span
-                          role="status"
-                          className="text-xs text-[var(--sniptale-color-text-secondary)]"
-                        >
-                          {translate('gallery.videoReview.speechBatchSelected').replace(
-                            '{count}',
-                            String(actionIds.length)
-                          )}
-                        </span>
-                      )}
-                      <InspectorActionButton
-                        iconOnly
-                        title={translate('gallery.videoReview.textPhraseEdit')}
-                        aria-label={translate('gallery.videoReview.textPhraseEdit')}
-                        disabled={actionIds.length !== 1}
-                        onClick={() => {
-                          editor.endTyping();
-                          setCreated(active.id);
-                          setOpened(active.id);
-                          setFocusRevision((current) => current + 1);
-                        }}
-                      >
-                        <Pencil size={14} />
-                      </InspectorActionButton>
-                      <InspectorActionButton
-                        iconOnly
-                        title={translate('gallery.videoReview.textPlayFromHere')}
-                        aria-label={translate('gallery.videoReview.textPlayFromHere')}
-                        disabled={
-                          !runtime ||
-                          !projectVideoProjectTextFragment(project, entry, active).ranges.length
-                        }
-                        onClick={() => navigate(active.id, true)}
-                      >
-                        <Play size={14} />
-                      </InspectorActionButton>
-                      {voice && (
-                        <InspectorActionButton
-                          iconOnly
-                          data-project-text-voice={actionIds.length === 1 ? active.id : 'selected'}
-                          disabled={actionIds.length === 1 && !active.text.trim()}
-                          title={translate('gallery.videoReview.speechGenerateSelected')}
-                          aria-label={translate('gallery.videoReview.speechGenerateSelected')}
-                          onClick={() => openVoice(actionIds.length === 1 ? active.id : actionIds)}
-                        >
-                          <Volume2 size={14} />
-                        </InspectorActionButton>
-                      )}
-                      {rewrite && (
-                        <InspectorActionButton
-                          iconOnly
-                          data-project-text-rewrite={
-                            actionIds.length === 1 ? active.id : 'document'
-                          }
-                          title={translate('gallery.videoReview.textRewriteSelected')}
-                          aria-label={translate('gallery.videoReview.textRewriteSelected')}
-                          onClick={() =>
-                            openRewrite(
-                              actionIds,
-                              false,
-                              actionIds.length === 1 ? active.id : 'document'
-                            )
-                          }
-                        >
-                          <WandSparkles size={14} />
-                        </InspectorActionButton>
-                      )}
-                    </div>
-                  )}
                   <TextDocument
                     label={translate('gallery.videoReview.textViewDocument')}
                     phrases={entry.document.fragments.map((fragment) => ({

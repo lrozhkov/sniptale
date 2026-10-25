@@ -448,10 +448,23 @@ test('quick editor Space keeps transport priority after buttons and closed selec
     await expect(zoom).toHaveValue(value);
     await page.keyboard.press('Space');
     await expect(video).toHaveJSProperty('paused', true);
-    await button('gallery.keyboard.title').click();
+    const more = button('gallery.videoReview.moreActions');
+    await more.focus();
+    await page.keyboard.press('ArrowDown');
+    const menu = page.getByRole('menu', {
+      name: label('gallery.videoReview.moreActions'),
+      exact: true,
+    });
+    const keyboard = menu.getByRole('menuitem', {
+      name: label('gallery.keyboard.title'),
+      exact: true,
+    });
+    await keyboard.focus();
+    await page.keyboard.press('Enter');
     const help = dialog.locator('[data-ui="gallery.videoReview.keyboardHelp"]');
     await help.getByRole('button').press('Space');
     await expect(help).toHaveCount(0);
+    await expect(more).toBeFocused();
     await expect(video).toHaveJSProperty('paused', true);
     await button('common.actions.close').click();
     await expect(dialog).toHaveCount(0);
