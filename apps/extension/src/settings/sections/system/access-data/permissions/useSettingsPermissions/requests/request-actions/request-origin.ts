@@ -53,30 +53,36 @@ async function rollbackOriginPermissions(originPatterns: string[]): Promise<void
   }
 }
 
+/** Requests origin access and registers it through the existing page-access owner. */
+export async function requestSettingsOriginAccess(permission: PermissionInfo): Promise<boolean> {
+  const originPatterns = permission.originPatterns ?? [];
+  const rollbackOrigins =
+    originPatterns.length > 0 ? await getMissingOriginPermissions(originPatterns) : [];
+  const granted =
+    originPatterns.length > 0
+      ? await requestOriginPermissions(originPatterns)
+      : await requestOriginPermission(permission.originPattern!);
+  if (granted) {
+    try {
+      await registerGrantedOriginPermissions(originPatterns);
+    } catch (error) {
+      await rollbackOriginPermissions(rollbackOrigins);
+      throw error;
+    }
+  }
+  return granted;
+}
+
 export function createRequestOriginAction(setPermissions: PermissionSetter) {
   const markPermissionGranted = createMarkPermissionGranted(setPermissions);
-
   return async function requestOrigin(permission: PermissionInfo) {
-    const originPatterns = permission.originPatterns ?? [];
-    const rollbackOrigins =
-      originPatterns.length > 0 ? await getMissingOriginPermissions(originPatterns) : [];
-    const granted =
-      originPatterns.length > 0
-        ? await requestOriginPermissions(originPatterns)
-        : await requestOriginPermission(permission.originPattern!);
-    if (granted) {
-      try {
-        await registerGrantedOriginPermissions(originPatterns);
-      } catch (error) {
-        await rollbackOriginPermissions(rollbackOrigins);
-        throw error;
-      }
+    const granted = await requestSettingsOriginAccess(permission);
+    if (granted)
       markPermissionGranted((item) =>
-        originPatterns.length > 0
-          ? item.originPatterns?.join('\n') === originPatterns.join('\n')
+        permission.originPatterns?.length
+          ? item.originPatterns?.join('\n') === permission.originPatterns.join('\n')
           : item.originPattern === permission.originPattern
       );
-    }
     return granted;
   };
 }

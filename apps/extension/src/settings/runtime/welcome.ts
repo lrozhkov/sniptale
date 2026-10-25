@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
 import {
   requestMicrophoneAccess,
   type MicrophoneAccessState,
@@ -10,52 +11,41 @@ import {
   type AppThemePreference,
 } from '../../ui/theme';
 import {
-  loadVideoSettings,
-  patchVideoSettings,
-} from '../../composition/persistence/capture-settings';
-import { runWithPersistenceMutationTransition } from '../../composition/persistence/infrastructure/mutation-barrier';
-import { loadSettingsRuntimeState, updateSettingsRuntimeState } from './store/runtime';
-import {
   initialPermissions,
   readPermissionsSnapshot,
   requestCameraAccess,
+  subscribeToPermissionChanges,
   type PermissionState,
 } from '../sections/system/access-data/permissions/permissions-lib';
+import { requestSettingsOriginAccess } from '../sections/system/access-data/permissions/useSettingsPermissions';
 
-type DeviceKind = 'microphone' | 'camera';
-type Device = { deviceId: string; label: string };
+type PermissionKind = 'microphone' | 'camera' | 'origins';
 type Access = MicrophoneAccessState | PermissionState;
-type DeviceChoice = { microphoneDeviceId: string | null; webcamDeviceId: string | null };
-export interface WelcomeDevices {
-  microphones: Device[];
-  cameras: Device[];
-  microphoneAccess: Access;
-  cameraAccess: Access;
+export type WelcomeAccess = Record<PermissionKind, Access>;
+export interface WelcomeDependencies {
+  observe(): Promise<WelcomeAccess>;
+  subscribe(listener: () => void): () => void;
+  request(kind: PermissionKind): Promise<Access>;
+  locale(locale: AppLocale): Promise<void>;
+  theme(theme: AppThemePreference): Promise<unknown>;
 }
 
-async function observeDevices(): Promise<WelcomeDevices> {
-  const [devices, permissions] = await Promise.all([
-    navigator.mediaDevices?.enumerateDevices() ?? Promise.resolve([]),
-    readPermissionsSnapshot(
-      initialPermissions.filter((item) => item.id === 'microphone' || item.id === 'camera')
-    ),
-  ]);
-  const options = (kind: MediaDeviceKind) =>
-    devices
-      .filter((device) => device.kind === kind && device.deviceId !== '')
-      .map(({ deviceId, label }) => ({ deviceId, label }));
+async function observeAccess(): Promise<WelcomeAccess> {
+  const snapshot = await readPermissionsSnapshot(
+    initialPermissions.filter(
+      (item) => item.id === 'microphone' || item.id === 'camera' || item.id === 'origins'
+    )
+  );
   return {
-    microphones: options('audioinput'),
-    cameras: options('videoinput'),
-    microphoneAccess: permissions.find((item) => item.id === 'microphone')?.state ?? 'unknown',
-    cameraAccess: permissions.find((item) => item.id === 'camera')?.state ?? 'unknown',
+    microphone: snapshot.find((item) => item.id === 'microphone')?.state ?? 'unknown',
+    camera: snapshot.find((item) => item.id === 'camera')?.state ?? 'unknown',
+    origins: snapshot.find((item) => item.id === 'origins')?.state ?? 'unknown',
   };
 }
-
-function subscribeDevices(listener: () => void): () => void {
+function subscribeAccess(listener: () => void): () => void {
+  const unsubscribe = subscribeToPermissionChanges(listener);
   let disposed = false;
   const statuses: PermissionStatus[] = [];
-  navigator.mediaDevices?.addEventListener('devicechange', listener);
   window.addEventListener('focus', listener);
   for (const name of ['microphone', 'camera'] as const) {
     void navigator.permissions
@@ -69,110 +59,73 @@ function subscribeDevices(listener: () => void): () => void {
   }
   return () => {
     disposed = true;
-    navigator.mediaDevices?.removeEventListener('devicechange', listener);
+    unsubscribe();
     window.removeEventListener('focus', listener);
     for (const status of statuses) status.removeEventListener('change', listener);
   };
 }
-
-export interface WelcomeDependencies {
-  load(): Promise<DeviceChoice>;
-  observe(): Promise<WelcomeDevices>;
-  subscribe(listener: () => void): () => void;
-  request(kind: DeviceKind, deviceId: string | null): Promise<Access>;
-  saveVideo(choice: DeviceChoice): Promise<unknown>;
-  saveVoice(microphoneDeviceId: string | null): Promise<unknown>;
-  locale(locale: AppLocale): Promise<void>;
-  theme(theme: AppThemePreference): Promise<unknown>;
-}
-
 const defaultDependencies: WelcomeDependencies = {
-  load: async () => {
-    const [settings, video] = await Promise.all([loadSettingsRuntimeState(), loadVideoSettings()]);
-    return {
-      microphoneDeviceId: settings.voiceInput?.microphoneDeviceId ?? null,
-      webcamDeviceId: video.webcamDeviceId ?? null,
-    };
+  observe: observeAccess,
+  subscribe: subscribeAccess,
+  request: async (kind) => {
+    if (kind === 'microphone') return requestMicrophoneAccess();
+    if (kind === 'camera') return requestCameraAccess();
+    const permission = initialPermissions.find((item) => item.id === 'origins');
+    if (!permission) return 'error';
+    try {
+      return (await requestSettingsOriginAccess(permission)) ? 'granted' : 'denied';
+    } catch {
+      return 'error';
+    }
   },
-  observe: observeDevices,
-  subscribe: subscribeDevices,
-  request: (kind, deviceId) =>
-    kind === 'microphone' ? requestMicrophoneAccess(deviceId) : requestCameraAccess(),
-  saveVideo: patchVideoSettings,
-  saveVoice: (microphoneDeviceId) =>
-    updateSettingsRuntimeState({ voiceInput: { microphoneDeviceId } }),
   locale: setLocalePreference,
   theme: setAppThemePreference,
 };
+const emptyAccess: WelcomeAccess = { microphone: 'unknown', camera: 'unknown', origins: 'unknown' };
 
-const emptyDevices: WelcomeDevices = {
-  microphones: [],
-  cameras: [],
-  microphoneAccess: 'unknown',
-  cameraAccess: 'unknown',
-};
-
-/** Owns disposable setup drafts and calls the existing preference and permission owners. */
+/** Owns disposable welcome state and calls existing preference and permission owners. */
 export function useWelcomeSetup(dependencies?: WelcomeDependencies) {
   const [deps] = useState(() => dependencies ?? defaultDependencies);
   const locale = useAppLocale();
   const [theme, setTheme] = useState<AppThemePreference>(
     () => getStoredThemePreference() ?? 'system'
   );
+  useEffect(() => {
+    const syncTheme = () => setTheme(getStoredThemePreference() ?? 'system');
+    syncTheme();
+    window.addEventListener(THEME_PREFERENCE_CHANGE_EVENT, syncTheme);
+    return () => window.removeEventListener(THEME_PREFERENCE_CHANGE_EVENT, syncTheme);
+  }, []);
   const [step, setStep] = useState<0 | 1 | 2>(0);
-  const [choice, setChoice] = useState<DeviceChoice>({
-    microphoneDeviceId: null,
-    webcamDeviceId: null,
-  });
-  const [devices, setDevices] = useState(emptyDevices);
+  const [access, setAccess] = useState(emptyAccess);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<'load' | 'save' | null>(null);
   const lifecycle = useRef(0);
   const observation = useRef(0);
   const operation = useRef(false);
-
   const refresh = useCallback(
-    async (generation: number, failure?: { kind: DeviceKind; access: Access }) => {
+    async (generation: number, failure?: { kind: PermissionKind; access: Access }) => {
       const version = ++observation.current;
       try {
         const next = await deps.observe();
-        if (generation === lifecycle.current && version === observation.current) {
-          setDevices(
-            failure
-              ? {
-                  ...next,
-                  [failure.kind === 'microphone' ? 'microphoneAccess' : 'cameraAccess']:
-                    failure.access,
-                }
-              : next
-          );
-        }
+        if (generation === lifecycle.current && version === observation.current)
+          setAccess(failure ? { ...next, [failure.kind]: failure.access } : next);
       } catch {
         if (generation === lifecycle.current && version === observation.current) setError('load');
       }
     },
     [deps]
   );
-
   const load = useCallback(
     async (generation: number) => {
       setLoading(true);
       setError(null);
-      try {
-        const next = await deps.load();
-        if (generation !== lifecycle.current) return;
-        setChoice(next);
-        await refresh(generation);
-      } catch {
-        if (generation === lifecycle.current) setError('load');
-      } finally {
-        if (generation === lifecycle.current) setLoading(false);
-      }
+      await refresh(generation);
+      if (generation === lifecycle.current) setLoading(false);
     },
-    [deps, refresh]
+    [refresh]
   );
-
   useEffect(() => {
     const generation = ++lifecycle.current;
     void load(generation);
@@ -183,7 +136,6 @@ export function useWelcomeSetup(dependencies?: WelcomeDependencies) {
       dispose();
     };
   }, [deps, load, refresh]);
-
   async function perform(action: (generation: number) => Promise<void>) {
     if (operation.current) return;
     operation.current = true;
@@ -200,43 +152,24 @@ export function useWelcomeSetup(dependencies?: WelcomeDependencies) {
       if (generation === lifecycle.current) setBusy(false);
     }
   }
-
-  function request(kind: DeviceKind) {
+  function request(kind: PermissionKind) {
     return perform(async (generation) => {
       observation.current += 1;
-      const access = await deps.request(
-        kind,
-        kind === 'microphone' ? choice.microphoneDeviceId : choice.webcamDeviceId
-      );
+      const state = await deps.request(kind);
       if (generation !== lifecycle.current) return;
-      // A failed acquisition carries device errors that permission queries cannot describe.
-      await refresh(generation, access === 'granted' ? undefined : { kind, access });
+      await refresh(generation, state === 'granted' ? undefined : { kind, access: state });
     });
   }
-
   function next() {
-    if (step === 0) {
-      setStep(1);
-      return Promise.resolve();
-    }
-    if (step !== 1 || loading || error === 'load') return Promise.resolve();
-    return perform(async (generation) => {
-      await runWithPersistenceMutationTransition(async () => {
-        if (generation !== lifecycle.current) return;
-        await deps.saveVideo(choice);
-        if (generation !== lifecycle.current) return;
-        await deps.saveVoice(choice.microphoneDeviceId);
-        if (generation === lifecycle.current) setStep(2);
-      });
-    });
+    if (operation.current || (step === 1 && (loading || error === 'load'))) return;
+    if (step === 0) setStep(1);
+    if (step === 1) setStep(2);
   }
-
   return {
     locale,
     theme,
     step,
-    choice,
-    devices,
+    access,
     loading,
     busy,
     error,
@@ -244,10 +177,6 @@ export function useWelcomeSetup(dependencies?: WelcomeDependencies) {
     request,
     next,
     back: () => setStep(step === 2 ? 1 : 0),
-    chooseMicrophone: (value: string) =>
-      setChoice((current) => ({ ...current, microphoneDeviceId: value || null })),
-    chooseCamera: (value: string) =>
-      setChoice((current) => ({ ...current, webcamDeviceId: value || null })),
     setLocale: (value: string) => {
       if (value !== 'en' && value !== 'ru') return;
       void perform(() => deps.locale(value));

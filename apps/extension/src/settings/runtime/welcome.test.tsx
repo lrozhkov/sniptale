@@ -2,37 +2,24 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useWelcomeSetup, type WelcomeDependencies, type WelcomeDevices } from './welcome';
-import {
-  installPersistenceLockManagerForTests,
-  runWithPersistentDataErasureBarrier,
-} from '../../composition/persistence/infrastructure/mutation-barrier';
+import { THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
+import { useWelcomeSetup, type WelcomeDependencies, type WelcomeAccess } from './welcome';
 
+const owners = vi.hoisted(() => ({
+  theme: vi.fn(() => 'system'),
+  permissions: vi.fn(),
+  camera: vi.fn(),
+  microphone: vi.fn(),
+  origins: vi.fn(),
+  permissionChanges: vi.fn<(listener: () => void) => () => void>(() => vi.fn()),
+}));
 vi.mock('../../ui/theme', () => ({
-  getStoredThemePreference: () => 'system',
+  getStoredThemePreference: owners.theme,
   setAppThemePreference: vi.fn(),
 }));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
   useAppLocale: () => 'en',
-}));
-
-const owners = vi.hoisted(() => ({
-  loadSettings: vi.fn(),
-  loadVideo: vi.fn(),
-  saveVideo: vi.fn(),
-  saveVoice: vi.fn(),
-  permissions: vi.fn(),
-  camera: vi.fn(),
-  microphone: vi.fn(),
-}));
-vi.mock('./store/runtime', () => ({
-  loadSettingsRuntimeState: owners.loadSettings,
-  updateSettingsRuntimeState: owners.saveVoice,
-}));
-vi.mock('../../composition/persistence/capture-settings', () => ({
-  loadVideoSettings: owners.loadVideo,
-  patchVideoSettings: owners.saveVideo,
 }));
 vi.mock('../sections/system/access-data/permissions/permissions-lib', async (original) => ({
   ...(await original<
@@ -40,18 +27,16 @@ vi.mock('../sections/system/access-data/permissions/permissions-lib', async (ori
   >()),
   readPermissionsSnapshot: owners.permissions,
   requestCameraAccess: owners.camera,
+  subscribeToPermissionChanges: owners.permissionChanges,
+}));
+vi.mock('../sections/system/access-data/permissions/useSettingsPermissions', () => ({
+  requestSettingsOriginAccess: owners.origins,
 }));
 vi.mock('@sniptale/platform/browser/user-media', async (original) => ({
   ...(await original<typeof import('@sniptale/platform/browser/user-media')>()),
   requestMicrophoneAccess: owners.microphone,
 }));
-
-const devices: WelcomeDevices = {
-  microphoneAccess: 'prompt',
-  cameraAccess: 'prompt',
-  microphones: [{ deviceId: 'mic', label: 'Desk microphone' }],
-  cameras: [{ deviceId: 'cam', label: 'Desk camera' }],
-};
+const access: WelcomeAccess = { microphone: 'prompt', camera: 'prompt', origins: 'prompt' };
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((yes) => {
@@ -61,17 +46,13 @@ function deferred<T>() {
 }
 function fixture() {
   return {
-    load: vi.fn(async () => ({ microphoneDeviceId: null, webcamDeviceId: null })),
-    observe: vi.fn(async () => devices),
+    observe: vi.fn(async () => access),
     subscribe: vi.fn<WelcomeDependencies['subscribe']>(() => vi.fn()),
     request: vi.fn<WelcomeDependencies['request']>().mockResolvedValue('granted'),
-    saveVideo: vi.fn<WelcomeDependencies['saveVideo']>().mockResolvedValue(undefined),
-    saveVoice: vi.fn<WelcomeDependencies['saveVoice']>().mockResolvedValue(undefined),
     locale: vi.fn<WelcomeDependencies['locale']>().mockResolvedValue(undefined),
     theme: vi.fn<WelcomeDependencies['theme']>().mockResolvedValue(undefined),
   };
 }
-let host: HTMLDivElement;
 let root: Root;
 let setup: ReturnType<typeof useWelcomeSetup>;
 function Harness({ deps }: { deps: WelcomeDependencies | undefined }) {
@@ -83,206 +64,119 @@ async function mount(deps?: WelcomeDependencies) {
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('chrome', undefined);
-  installPersistenceLockManagerForTests(null);
-  host = document.createElement('div');
-  root = createRoot(host);
+  owners.theme.mockReset().mockReturnValue('system');
+  owners.origins.mockReset();
+  owners.microphone.mockReset();
+  owners.camera.mockReset();
+  root = createRoot(document.createElement('div'));
 });
 afterEach(() => {
   act(() => root.unmount());
-  installPersistenceLockManagerForTests(null);
   vi.unstubAllGlobals();
 });
-
-it('loads setup without prompting, recording or writing preferences', async () => {
+it('observes access without prompting, recording, enumerating or writing device preferences', async () => {
+  const enumerate = vi.fn();
+  const capture = vi.fn();
+  vi.stubGlobal('navigator', {
+    mediaDevices: { enumerateDevices: enumerate, getUserMedia: capture },
+  });
   const deps = fixture();
   await mount(deps);
+  expect(setup.access).toEqual(access);
   expect(setup.loading).toBe(false);
-  expect(setup.devices).toEqual(devices);
   expect(deps.request).not.toHaveBeenCalled();
-  expect(deps.saveVideo).not.toHaveBeenCalled();
-  expect(deps.saveVoice).not.toHaveBeenCalled();
+  expect(deps.locale).not.toHaveBeenCalled();
+  expect(deps.theme).not.toHaveBeenCalled();
+  await act(async () => setup.next());
+  await act(async () => setup.next());
+  expect(setup.step).toBe(2);
+  expect(enumerate).not.toHaveBeenCalled();
+  expect(capture).not.toHaveBeenCalled();
 });
-
-it('saves only selected device fields through both existing owners', async () => {
+it.each(['denied', 'no-device', 'device-busy', 'error'] as const)(
+  'keeps %s feedback and permits continuing without access',
+  async (state) => {
+    const deps = fixture();
+    deps.request.mockResolvedValue(state);
+    await mount(deps);
+    await act(async () => setup.request('microphone'));
+    expect(deps.request).toHaveBeenCalledExactlyOnceWith('microphone');
+    expect(setup.access.microphone).toBe(state);
+    await act(async () => setup.next());
+    await act(async () => setup.next());
+    expect(setup.step).toBe(2);
+  }
+);
+it('serializes explicit requests and ignores completion after unmount', async () => {
   const deps = fixture();
+  const pending = deferred<'denied'>();
+  deps.request.mockReturnValue(pending.promise);
   await mount(deps);
+  let work!: Promise<void>;
   act(() => {
-    setup.chooseMicrophone('mic');
-    setup.chooseCamera('cam');
+    work = setup.request('camera');
+    void setup.request('origins');
+    setup.next();
   });
-  await act(async () => setup.next());
-  expect(setup.step).toBe(1);
-  await act(async () => setup.next());
-  expect(deps.saveVideo).toHaveBeenCalledWith({ microphoneDeviceId: 'mic', webcamDeviceId: 'cam' });
-  expect(deps.saveVoice).toHaveBeenCalledWith('mic');
-  expect(setup.step).toBe(2);
-});
-
-it('retains completed video preferences and drafts when the voice write fails, then permits retry', async () => {
-  const deps = fixture();
-  deps.saveVoice.mockRejectedValueOnce(new Error('storage-failed'));
-  await mount(deps);
-  act(() => setup.chooseMicrophone('mic'));
-  await act(async () => setup.next());
-  await act(async () => setup.next());
-  expect(setup.step).toBe(1);
-  expect(setup.error).toBe('save');
-  expect(setup.choice.microphoneDeviceId).toBe('mic');
-  expect(deps.saveVideo).toHaveBeenCalledOnce();
-  await act(async () => setup.next());
-  expect(setup.step).toBe(2);
-  expect(deps.saveVoice).toHaveBeenCalledTimes(2);
-});
-
-it('does not start the voice writer after video refusal and retries without losing the draft', async () => {
-  const deps = fixture();
-  deps.saveVideo.mockRejectedValueOnce(new Error('refused'));
-  await mount(deps);
-  act(() => setup.chooseCamera('cam'));
-  await act(async () => setup.next());
-  await act(async () => setup.next());
-  expect(deps.saveVoice).not.toHaveBeenCalled();
-  expect(setup.choice.webcamDeviceId).toBe('cam');
-  expect(setup.step).toBe(1);
-  await act(async () => setup.next());
-  expect(setup.step).toBe(2);
-});
-
-it('keeps a load failure visible across appearance changes and refuses device writes until reload', async () => {
-  const deps = fixture();
-  deps.load.mockRejectedValueOnce(new Error('unavailable'));
-  await mount(deps);
-  expect(setup.error).toBe('load');
-  await act(async () => setup.setTheme('dark'));
-  expect(setup.error).toBe('load');
-  await act(async () => setup.next());
-  await act(async () => setup.next());
-  expect(deps.saveVideo).not.toHaveBeenCalled();
-  await act(async () => setup.retry());
-  await act(async () => setup.next());
-  expect(setup.step).toBe(2);
-});
-
-it('preserves acquisition errors that an ordinary permission query cannot describe', async () => {
-  const deps = fixture();
-  deps.request.mockResolvedValueOnce('no-device');
-  await mount(deps);
-  await act(async () => setup.request('microphone'));
-  expect(setup.devices.microphoneAccess).toBe('no-device');
-  expect(setup.error).toBeNull();
-  expect(deps.saveVideo).not.toHaveBeenCalled();
-});
-
-it('does not repeat pending writes or start a second writer after unmount', async () => {
-  const deps = fixture();
-  const gate = deferred<void>();
-  deps.saveVideo.mockReturnValue(gate.promise);
-  await mount(deps);
-  await act(async () => setup.next());
-  let pending!: Promise<void>;
+  expect(deps.request).toHaveBeenCalledTimes(1);
+  expect(setup.step).toBe(0);
+  expect(setup.busy).toBe(true);
+  act(() => root.render(null));
+  const reads = deps.observe.mock.calls.length;
   await act(async () => {
-    pending = setup.next();
+    pending.resolve('denied');
+    await work;
   });
-  await act(async () => setup.next());
-  expect(deps.saveVideo).toHaveBeenCalledOnce();
-  act(() => root.unmount());
-  root = createRoot(host);
-  await act(async () => {
-    gate.resolve();
-    await pending;
-  });
-  expect(deps.saveVoice).not.toHaveBeenCalled();
+  expect(deps.observe).toHaveBeenCalledTimes(reads);
 });
-
-it('holds the transition through both writes so erasure cannot occur between them', async () => {
+it('ignores out-of-order observations and unsubscribes on disposal', async () => {
   const deps = fixture();
-  const entered = deferred<void>();
-  const release = deferred<void>();
-  const events: string[] = [];
-  deps.saveVideo.mockImplementation(async () => {
-    entered.resolve();
-    await release.promise;
-    events.push('video');
-  });
-  deps.saveVoice.mockImplementation(async () => {
-    events.push('voice');
-  });
+  const dispose = vi.fn();
+  deps.subscribe.mockReturnValue(dispose);
   await mount(deps);
-  await act(async () => setup.next());
-  let pending!: Promise<void>;
-  await act(async () => {
-    pending = setup.next();
-    await entered.promise;
-  });
-  const erasure = runWithPersistentDataErasureBarrier(async () => {
-    events.push('erase');
-  });
-  expect(events).toEqual([]);
-  await act(async () => {
-    release.resolve();
-    await pending;
-    await erasure;
-  });
-  expect(events).toEqual(['video', 'voice', 'erase']);
-});
-
-it('ignores out-of-order device observations without overwriting a newer browser result', async () => {
-  const deps = fixture();
-  await mount(deps);
-  const old = deferred<WelcomeDevices>();
-  const current = deferred<WelcomeDevices>();
+  const old = deferred<WelcomeAccess>();
+  const current = deferred<WelcomeAccess>();
   deps.observe.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
-  const listener = deps.subscribe.mock.calls[0]?.[0];
-  if (!listener) throw new Error('Device listener missing');
+  const listener = deps.subscribe.mock.calls[0]![0];
   act(() => {
     listener();
     listener();
   });
-  await act(async () =>
-    current.resolve({ ...devices, cameras: [{ deviceId: 'new', label: 'New camera' }] })
-  );
-  await act(async () => old.resolve(devices));
-  expect(setup.devices.cameras[0]?.deviceId).toBe('new');
+  await act(async () => current.resolve({ ...access, origins: 'granted' }));
+  await act(async () => old.resolve(access));
+  expect(setup.access.origins).toBe('granted');
+  act(() => root.render(null));
+  expect(dispose).toHaveBeenCalledOnce();
 });
-
-it('keeps loading active while initial preferences are pending and discards completion after unmount', async () => {
+it('retains load failure until explicit retry before entering the final step', async () => {
   const deps = fixture();
-  const loaded = deferred<{ microphoneDeviceId: null; webcamDeviceId: null }>();
-  deps.load.mockReturnValue(loaded.promise);
-  await mount(deps);
-  expect(setup.loading).toBe(true);
-  act(() => {
-    setup.chooseCamera('cam');
-  });
-  await act(async () => setup.next());
-  await act(async () => setup.next());
-  expect(deps.saveVideo).not.toHaveBeenCalled();
-  act(() => root.unmount());
-  root = createRoot(host);
-  await act(async () => loaded.resolve({ microphoneDeviceId: null, webcamDeviceId: null }));
-  expect(deps.observe).not.toHaveBeenCalled();
-});
-
-it('reports observation failure and retries loading before allowing device writes', async () => {
-  const deps = fixture();
-  deps.observe.mockRejectedValueOnce(new Error('enumeration-failed'));
+  deps.observe.mockRejectedValueOnce(new Error('read failed'));
   await mount(deps);
   expect(setup.error).toBe('load');
+  act(() => setup.next());
+  act(() => setup.next());
+  expect(setup.step).toBe(1);
   await act(async () => setup.retry());
   expect(setup.error).toBeNull();
-  act(() => {
-    setup.chooseCamera('');
-    setup.chooseMicrophone('');
-  });
-  expect(setup.choice).toEqual({ microphoneDeviceId: null, webcamDeviceId: null });
+  act(() => setup.next());
+  expect(setup.step).toBe(2);
 });
-
-it('saves valid appearance preferences and ignores invalid values', async () => {
+it('restores late theme hydration and removes its event listener on unmount', async () => {
+  await mount(fixture());
+  expect(setup.theme).toBe('system');
+  owners.theme.mockReturnValue('dark');
+  act(() => window.dispatchEvent(new Event(THEME_PREFERENCE_CHANGE_EVENT)));
+  expect(setup.theme).toBe('dark');
+  act(() => root.render(null));
+  const reads = owners.theme.mock.calls.length;
+  window.dispatchEvent(new Event(THEME_PREFERENCE_CHANGE_EVENT));
+  expect(owners.theme).toHaveBeenCalledTimes(reads);
+});
+it('saves appearance through existing owners and retains a valid theme after refusal', async () => {
   const deps = fixture();
   await mount(deps);
-  await act(async () => {
-    setup.setLocale('xx');
+  act(() => {
+    setup.setLocale('invalid');
     setup.setTheme('invalid');
   });
   expect(deps.locale).not.toHaveBeenCalled();
@@ -291,82 +185,53 @@ it('saves valid appearance preferences and ignores invalid values', async () => 
   expect(deps.locale).toHaveBeenCalledWith('ru');
   await act(async () => setup.setTheme('dark'));
   expect(setup.theme).toBe('dark');
-  deps.theme.mockRejectedValueOnce(new Error('write-failed'));
+  deps.theme.mockRejectedValueOnce(new Error('save failed'));
   await act(async () => setup.setTheme('light'));
-  expect(setup.error).toBe('save');
   expect(setup.theme).toBe('dark');
-  await act(async () => setup.next());
-  act(() => setup.back());
-  expect(setup.step).toBe(0);
+  expect(setup.error).toBe('save');
 });
-
-it('connects browser device observations and explicit permission requests to canonical preference owners', async () => {
-  const media = new EventTarget();
-  const permission = new EventTarget();
-  const enumerate = vi.fn(async () => [
-    { kind: 'audioinput', deviceId: 'native-mic', label: 'Microphone' },
-    { kind: 'videoinput', deviceId: 'native-cam', label: '' },
-    { kind: 'audioinput', deviceId: '', label: '' },
-  ]);
-  Object.assign(media, { enumerateDevices: enumerate });
-  vi.stubGlobal('navigator', {
-    mediaDevices: media,
-    permissions: { query: vi.fn(async () => permission) },
-  });
-  owners.loadSettings.mockResolvedValue({ voiceInput: { microphoneDeviceId: 'native-mic' } });
-  owners.loadVideo.mockResolvedValue({ webcamDeviceId: 'native-cam' });
-  owners.permissions.mockResolvedValue([
-    { id: 'microphone', state: 'granted' },
-    { id: 'camera', state: 'granted' },
-  ]);
+it('uses default media probes and the existing optional origin transaction only on explicit requests', async () => {
+  owners.permissions.mockResolvedValue([{ id: 'origins', state: 'prompt' }]);
   owners.microphone.mockResolvedValue('granted');
   owners.camera.mockResolvedValue('granted');
-  owners.saveVideo.mockResolvedValue(undefined);
-  owners.saveVoice.mockResolvedValue(undefined);
   await mount();
-  expect(setup.devices.microphones).toEqual([{ deviceId: 'native-mic', label: 'Microphone' }]);
-  expect(setup.devices.cameras).toEqual([{ deviceId: 'native-cam', label: '' }]);
+  expect(owners.origins).not.toHaveBeenCalled();
   expect(owners.microphone).not.toHaveBeenCalled();
   await act(async () => setup.request('microphone'));
-  expect(owners.microphone).toHaveBeenCalledWith('native-mic');
+  expect(owners.microphone).toHaveBeenCalledExactlyOnceWith();
   await act(async () => setup.request('camera'));
-  expect(owners.camera).toHaveBeenCalledOnce();
-  await act(async () => {
-    media.dispatchEvent(new Event('devicechange'));
-  });
-  await act(async () => {
-    permission.dispatchEvent(new Event('change'));
-  });
-  await act(async () => setup.next());
-  await act(async () => setup.next());
-  expect(owners.saveVideo).toHaveBeenCalledWith({
-    microphoneDeviceId: 'native-mic',
-    webcamDeviceId: 'native-cam',
-  });
-  expect(owners.saveVoice).toHaveBeenCalledWith({
-    voiceInput: { microphoneDeviceId: 'native-mic' },
-  });
-  const remove = vi.spyOn(permission, 'removeEventListener');
-  act(() => root.unmount());
-  root = createRoot(host);
-  expect(remove).toHaveBeenCalledTimes(2);
+  expect(owners.camera).toHaveBeenCalledExactlyOnceWith();
+  owners.origins.mockResolvedValueOnce(false);
+  await act(async () => setup.request('origins'));
+  expect(setup.access.origins).toBe('denied');
+  expect(owners.origins).toHaveBeenCalledWith(
+    expect.objectContaining({ id: 'origins', originPatterns: ['<all_urls>'] })
+  );
+  owners.origins.mockRejectedValueOnce(new Error('registration failed'));
+  await act(async () => setup.request('origins'));
+  expect(setup.access.origins).toBe('error');
+  expect(setup.error).toBeNull();
+  owners.origins.mockResolvedValueOnce(true);
+  owners.permissions.mockResolvedValue([{ id: 'origins', state: 'granted' }]);
+  await act(async () => setup.request('origins'));
+  expect(setup.access.origins).toBe('granted');
+  owners.permissions.mockResolvedValue([{ id: 'origins', state: 'prompt' }]);
+  await act(async () => owners.permissionChanges.mock.calls.at(-1)![0]());
+  expect(setup.access.origins).toBe('prompt');
 });
 
-it('preserves actual camera absence through the production welcome dependency', async () => {
+it('preserves actual camera absence through the production permission adapter', async () => {
   const actual = await vi.importActual<
     typeof import('../sections/system/access-data/permissions/permissions-lib')
   >('../sections/system/access-data/permissions/permissions-lib');
-  const media = new EventTarget();
-  Object.assign(media, {
-    getUserMedia: vi.fn().mockRejectedValue(new DOMException('No camera', 'NotFoundError')),
-    enumerateDevices: vi.fn(async () => []),
+  vi.stubGlobal('navigator', {
+    mediaDevices: {
+      getUserMedia: vi.fn().mockRejectedValue(new DOMException('No camera', 'NotFoundError')),
+    },
   });
-  vi.stubGlobal('navigator', { mediaDevices: media });
-  owners.loadSettings.mockResolvedValue({});
-  owners.loadVideo.mockResolvedValue({});
   owners.permissions.mockResolvedValue([{ id: 'camera', state: 'prompt' }]);
   owners.camera.mockImplementationOnce(actual.requestCameraAccess);
   await mount();
   await act(async () => setup.request('camera'));
-  expect(setup.devices.cameraAccess).toBe('no-device');
+  expect(setup.access.camera).toBe('no-device');
 });
