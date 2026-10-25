@@ -1,3 +1,4 @@
+import type { CameraShadowVector } from '../../project/camera/shadow-direction';
 import type { QuickEditHomography } from '../motion/spatial-geometry';
 import {
   resolveDecoratedMediaFrame,
@@ -281,6 +282,8 @@ export function drawFittedMediaLayer(params: {
   windowHeader?: WindowHeader;
   hideWindowHeader?: boolean;
   camera?: boolean;
+  /** Camera-local vector already compensates layer rotation/scale, but retains viewport raster scaling. */
+  cameraShadowLocalVector?: CameraShadowVector;
   context: CanvasRenderingContext2D;
   displayScale: number;
   fitMode: VideoMediaFitMode;
@@ -353,7 +356,8 @@ export function drawFittedMediaLayer(params: {
     params.cameraAppearance,
     params.camera,
     params.shadowColor,
-    radius
+    radius,
+    params.cameraShadowLocalVector
   );
   if (radius > 0) {
     params.context.save();

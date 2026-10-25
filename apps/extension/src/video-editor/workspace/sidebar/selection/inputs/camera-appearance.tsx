@@ -1,3 +1,5 @@
+import { SelectField, NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { isCameraShadowDirection } from '../../../../../features/video/project/camera/shadow-direction';
 import { cameraSplitPanels } from '../../../../../features/video/project/camera/split';
 import { getMediaClipSourceTime } from '../../../../../features/video/project/timeline/rate';
 import { useContext } from 'react';
@@ -134,6 +136,38 @@ export function CameraAppearanceControls(props: {
         onEdit: props.onEdit,
         url: runtime?.assetUrls[props.clip.assetId],
       })}
+      <SelectField
+        label={translate('gallery.videoReview.webcamShadowDirection')}
+        value={props.clip.cameraShadowDirection?.mode ?? 'classic'}
+        disabled={disabled}
+        options={(['classic', 'angle', 'center', 'nearest-edge'] as const).map((mode) => ({
+          value: mode,
+          label: translate(`gallery.videoReview.webcamShadowDirection_${mode}`),
+        }))}
+        onChange={(mode) => {
+          const direction = { mode, angle: props.clip.cameraShadowDirection?.angle ?? 0 };
+          if (isCameraShadowDirection(direction))
+            props.onEdit?.(props.clip.id, { kind: 'shadow-direction', direction });
+        }}
+      />
+      {props.clip.cameraShadowDirection?.mode === 'angle' ? (
+        <NumericRow
+          label={translate('gallery.videoReview.webcamShadowAngle')}
+          value={props.clip.cameraShadowDirection.angle}
+          min={0}
+          max={360}
+          step={1}
+          unit="deg"
+          disabled={disabled}
+          onCommitValue={(angle) =>
+            props.onEdit?.(props.clip.id, {
+              kind: 'shadow-direction',
+              direction: { mode: 'angle', angle: angle % 360 },
+            })
+          }
+          onPreviewValue={() => undefined}
+        />
+      ) : null}
     </div>
   );
 }

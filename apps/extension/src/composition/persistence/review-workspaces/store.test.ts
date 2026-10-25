@@ -907,6 +907,7 @@ it('retains crop and camera history through stale writes, quota failure, retry, 
     ...createQuickEditWebcam('project-asset:camera', source, canvas),
     split: 'left' as const,
     screenBehavior: 'shift' as const,
+    shadowDirection: { mode: 'angle' as const, angle: 225 },
   };
   rows.get('project_assets')!.set('camera', {
     id: 'camera',

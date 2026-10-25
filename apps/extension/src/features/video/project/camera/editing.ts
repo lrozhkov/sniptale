@@ -1,3 +1,4 @@
+import { isCameraShadowDirection } from './shadow-direction';
 import { isCameraScreenBehavior } from './split';
 import { isCameraHiddenRange, MAX_CAMERA_HIDDEN_RANGES } from './visibility';
 import {
@@ -33,6 +34,20 @@ export function editCameraPosition(
     )
   )
     return project;
+  if (edit.kind === 'shadow-direction') {
+    if (
+      !isCameraShadowDirection(edit.direction) ||
+      (clip.cameraShadowDirection?.mode === edit.direction.mode &&
+        clip.cameraShadowDirection.angle === edit.direction.angle)
+    )
+      return project;
+    return applyVideoProjectClipsPatch(
+      project,
+      project.clips.map((item) =>
+        item.id === clipId ? { ...clip, cameraShadowDirection: { ...edit.direction } } : item
+      )
+    );
+  }
   if (edit.kind === 'screen-behavior') {
     if (!isCameraScreenBehavior(edit.behavior)) return project;
     const position = activeCameraPosition(clip, time);

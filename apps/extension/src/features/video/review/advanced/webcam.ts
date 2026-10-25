@@ -1,4 +1,8 @@
 import {
+  isCameraShadowDirection,
+  type CameraShadowDirection,
+} from '../../project/camera/shadow-direction';
+import {
   parseCameraHiddenRanges,
   isCameraHiddenAt,
   type CameraHiddenRange,
@@ -56,6 +60,7 @@ export interface QuickEditWebcam {
   mirrored: boolean;
   appearance: CameraAppearance;
   shadow?: { intensity: number; color: string };
+  shadowDirection?: CameraShadowDirection;
   placement: QuickEditWebcamPlacement;
   split?: CameraSplitSide | undefined;
   screenBehavior?: CameraScreenBehavior;
@@ -155,6 +160,8 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
   const appearance = value['appearance'];
   if (value['screenBehavior'] !== undefined && !isCameraScreenBehavior(value['screenBehavior']))
     return null;
+  const direction = value['shadowDirection'];
+  if (direction !== undefined && !isCameraShadowDirection(direction)) return null;
   const shadow = value['shadow'];
   if (value['split'] !== undefined && !isCameraSplitSide(value['split'])) return null;
   let parsedShadow: QuickEditWebcam['shadow'];
@@ -176,6 +183,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
       panY: appearance.panY,
     },
     ...(parsedShadow ? { shadow: parsedShadow } : {}),
+    ...(direction ? { shadowDirection: { mode: direction.mode, angle: direction.angle } } : {}),
     placement,
     ...(value['split'] === undefined ? {} : { split: value['split'] }),
     ...(value['screenBehavior'] === undefined ? {} : { screenBehavior: value['screenBehavior'] }),

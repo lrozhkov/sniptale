@@ -93,6 +93,7 @@ export function planReviewProjectCamera(args: {
       transitionOut: 'NONE',
       fitMode: 'COVER',
       transform: transform(webcam.placement),
+      ...(webcam.shadowDirection ? { cameraShadowDirection: { ...webcam.shadowDirection } } : {}),
       ...(webcam.screenBehavior ? { cameraScreenBehavior: webcam.screenBehavior } : {}),
       ...(webcam.split ? { cameraSplit: webcam.split } : {}),
       cameraTiming: { offsetSeconds: webcam.offsetSeconds, transitions: 'bounded' },

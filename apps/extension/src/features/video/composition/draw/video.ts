@@ -1,3 +1,4 @@
+import { cameraShadowLocalOffset } from '../../project/camera/shadow-direction';
 import { drawCompositionBorders } from './border';
 import { roundedWindowRadius } from '../../project/window-geometry';
 import { cameraWindowFrame } from '../../project/camera/appearance';
@@ -185,6 +186,20 @@ function resolveVideoWindowMedia(
   loadedImages: Record<string, HTMLImageElement>
 ) {
   const header = admittedVisualWindowHeader(layer.clip, loadedImages, layer.trackRole === 'CAMERA');
+  const radians = (layer.rotation * Math.PI) / 180;
+  const cos = Math.cos(radians),
+    sin = Math.sin(radians);
+  const sx = layer.renderState?.scaleX ?? 1,
+    sy = layer.renderState?.scaleY ?? 1;
+  // Compensate only the camera transform. The receiver retains its viewport raster scale.
+  const localDirection = layer.cameraShadowVector
+    ? cameraShadowLocalOffset(layer.cameraShadowVector, 1, {
+        a: sx * cos,
+        b: sy * sin,
+        c: -sx * sin,
+        d: sy * cos,
+      })
+    : undefined;
   return {
     ...header,
     displayScale,
@@ -194,10 +209,12 @@ function resolveVideoWindowMedia(
       ? { windowCornerRadius: layer.clip.windowCornerRadius }
       : {}),
     camera: layer.trackRole === 'CAMERA',
+    ...(localDirection ? { cameraShadowLocalVector: localDirection } : {}),
     ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
       ? { cameraAppearance: layer.clip.cameraAppearance }
       : {}),
-    shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
+    shadowIntensity:
+      layer.effectActionsOnly || localDirection === null ? 0 : layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,
     ...(layer.clip.shadowColor === undefined ? {} : { shadowColor: layer.clip.shadowColor }),
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,

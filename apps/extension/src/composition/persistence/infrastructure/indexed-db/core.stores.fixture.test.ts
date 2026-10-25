@@ -334,3 +334,28 @@ it('admits camera screen behavior without rewriting released projects, history o
     ],
   });
 });
+
+it('admits camera shadow direction without rewriting released projects, history or bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 37
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 38);
+  expect(target).toBeDefined();
+  expect(target?.records).toEqual(source.records);
+  expect(target?.opfsObjects).toEqual(source.opfsObjects);
+  expect(target?.stores).toEqual(source.stores);
+  expect(target?.indexes).toEqual(source.indexes);
+  expect(target?.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 30,
+    videoProjects: 7,
+  });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 38)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 29, to: 30 },
+      { domainId: 'videoProjects', from: 6, to: 7 },
+    ],
+  });
+});

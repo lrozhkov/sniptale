@@ -1,3 +1,4 @@
+import { isCameraShadowDirection } from '../camera/shadow-direction';
 import { parseReviewSpeechTranscript } from '../../review/speech-validation';
 import { parseMediaSourceCrop } from '../media-crop';
 import { parseCameraHiddenRanges } from '../camera/visibility';
@@ -422,6 +423,13 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
       value['type'] !== VideoProjectClipType.IMAGE) ||
       !isColorString(value['shadowColor']) ||
       parseColor(value['shadowColor']) === null)
+  )
+    return false;
+
+  if (
+    value['cameraShadowDirection'] !== undefined &&
+    (value['type'] !== VideoProjectClipType.VIDEO ||
+      !isCameraShadowDirection(value['cameraShadowDirection']))
   )
     return false;
 

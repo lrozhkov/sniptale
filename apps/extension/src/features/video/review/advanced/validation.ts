@@ -575,6 +575,8 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
       webcam.positions.some((position) => position.screenBehavior !== undefined))
   )
     return null;
+  if (webcam?.shadowDirection !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 25))
+    return null;
   if (raw['watermark'] !== undefined && !supportsAdvancedSchema(raw['schemaVersion'], 5))
     return null;
   const watermark =
@@ -665,7 +667,7 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].some(
+    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24].some(
       (known) => known >= firstHistorical && version === known
     )
   );

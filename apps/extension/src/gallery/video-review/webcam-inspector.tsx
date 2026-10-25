@@ -1,3 +1,4 @@
+import { isCameraShadowDirection } from '../../features/video/project/camera/shadow-direction';
 import { ReviewWebcamCropPreview } from './webcam-crop-preview';
 import { Camera, Clock3, Move, Plus, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -422,6 +423,32 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
         />
       </div>
       <div className="sniptale-parameter-stack">
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.webcamShadowDirection')}
+          value={camera.shadowDirection?.mode ?? 'classic'}
+          options={(['classic', 'angle', 'center', 'nearest-edge'] as const).map((mode) => ({
+            value: mode,
+            label: translate(`gallery.videoReview.webcamShadowDirection_${mode}`),
+          }))}
+          onChange={(mode) => {
+            const direction = { mode, angle: camera.shadowDirection?.angle ?? 0 };
+            if (isCameraShadowDirection(direction)) editor.patch({ shadowDirection: direction });
+          }}
+        />
+        {camera.shadowDirection?.mode === 'angle' ? (
+          <ReviewNumberRow
+            label={translate('gallery.videoReview.webcamShadowAngle')}
+            value={camera.shadowDirection.angle}
+            min={0}
+            max={360}
+            step={1}
+            unit="deg"
+            onChange={(angle) =>
+              editor.patch({ shadowDirection: { mode: 'angle', angle: angle % 360 } })
+            }
+          />
+        ) : null}
         <ReviewNumberRow
           label={translate('gallery.videoReview.webcamShadow')}
           value={camera.shadow?.intensity ?? 0}

@@ -326,7 +326,7 @@ it('fences timing at schema 32 and admits video timing on compatible ordinary tr
     expect(isHydratableVideoProject({ ...project, version })).toBe(false);
   for (const version of [32, 33, 34, 35, 36, 37, 38, 39, 40])
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
-  expect(isHydratableVideoProject({ ...project, version: 47 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 48 })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -494,4 +494,27 @@ it('restores Native dock appearance, shadow and fit at Shift transition endpoint
     shadowIntensity: 0,
     fitMode: 'COVER',
   });
+});
+
+it('edits camera shadow direction, retains angle and refuses unchanged or locked commands', () => {
+  const { project, clip } = fixture();
+  const first = editCameraPosition(project, clip.id, 3, {
+    kind: 'shadow-direction',
+    direction: { mode: 'angle', angle: 225 },
+  });
+  expect(first.version).toBe(47);
+  expect(first.clips[0]).toMatchObject({ cameraShadowDirection: { mode: 'angle', angle: 225 } });
+  expect(
+    editCameraPosition(first, clip.id, 3, {
+      kind: 'shadow-direction',
+      direction: { mode: 'angle', angle: 225 },
+    })
+  ).toBe(first);
+  const locked = { ...first, tracks: first.tracks.map((track) => ({ ...track, locked: true })) };
+  expect(
+    editCameraPosition(locked, clip.id, 3, {
+      kind: 'shadow-direction',
+      direction: { mode: 'center', angle: 225 },
+    })
+  ).toBe(locked);
 });

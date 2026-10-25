@@ -1,3 +1,4 @@
+import type { CameraShadowDirection } from './shadow-direction';
 import { getMediaClipSourceTime } from '../timeline/rate';
 import { isCameraHiddenAt } from './visibility';
 import {
@@ -14,6 +15,7 @@ import { resolveCameraSplitPresentation, type CameraScreenBehavior } from './spl
 type CameraPosition = NonNullable<VideoProjectVideoClip['cameraPositions']>[number];
 
 export type CameraPositionEdit =
+  | { kind: 'shadow-direction'; direction: CameraShadowDirection }
   | { kind: 'screen-behavior'; behavior: CameraScreenBehavior }
   | { kind: 'offset'; offsetSeconds: number }
   | { kind: 'mirror'; mirrored: boolean }

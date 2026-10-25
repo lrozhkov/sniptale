@@ -309,3 +309,15 @@ it.each(['shrink', 'shift', 'overlay'] as const)(
     ).toBeNull();
   }
 );
+
+it.each(['classic', 'angle', 'center', 'nearest-edge'] as const)(
+  'retains %s shadow direction only in schema 25',
+  (mode) => {
+    const webcam = { ...camera(), shadowDirection: { mode, angle: 225 } };
+    const state = { ...createQuickEditAdvancedState(), webcam };
+    expect(loadQuickEditAdvancedState(state)?.webcam).toEqual(webcam);
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 24 })).toBeNull();
+    for (const direction of [null, { mode, angle: 360 }, { mode, angle: NaN }])
+      expect(parseQuickEditWebcam({ ...webcam, shadowDirection: direction })).toBeNull();
+  }
+);

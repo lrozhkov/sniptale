@@ -21,6 +21,16 @@ it('accepts camera split sides only on video clips', () => {
   expect(isVideoProjectClip({ ...video, cameraSplit: null })).toBe(false);
   const audio = createAudioClipFromAsset('audio-track', project.assets[0]!);
   expect(isVideoProjectClip({ ...audio, cameraSplit: 'left' })).toBe(false);
+  expect(
+    isVideoProjectClip({ ...video, cameraShadowDirection: { mode: 'angle', angle: 225 } })
+  ).toBe(true);
+  expect(
+    isVideoProjectClip({ ...audio, cameraShadowDirection: { mode: 'angle', angle: 225 } })
+  ).toBe(false);
+  expect(isVideoProjectClip({ ...video, cameraShadowDirection: null })).toBe(false);
+  expect(
+    isVideoProjectClip({ ...video, cameraShadowDirection: { mode: 'angle', angle: 360 } })
+  ).toBe(false);
   for (const cameraScreenBehavior of ['shrink', 'shift', 'overlay']) {
     expect(isVideoProjectClip({ ...video, cameraScreenBehavior })).toBe(true);
     expect(isVideoProjectClip({ ...audio, cameraScreenBehavior })).toBe(false);

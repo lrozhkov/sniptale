@@ -409,3 +409,61 @@ it('keeps the selected destination crop aperture while scrubbing inside a smooth
   act(() => video.dispatchEvent(new Event('loadedmetadata')));
   expect(video.currentTime).toBe(2.5);
 });
+
+it('retains camera shadow angle through Native mode changes using the existing camera edit port', async () => {
+  const base = createProps();
+  const onEdit = vi.fn((_id, edit) => {
+    if (edit.kind === 'shadow-direction') base.clip.cameraShadowDirection = edit.direction;
+    render();
+  });
+  const render = () =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={base.clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+      />
+    );
+  act(render);
+  const choose = async (mode: string) => {
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="gallery.videoReview.webcamShadowDirection"]'
+        )!
+        .click()
+    );
+    const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (item) => item.textContent === `gallery.videoReview.webcamShadowDirection_${mode}`
+    )!;
+    await act(async () => option.click());
+  };
+  expect(
+    [...container.querySelectorAll('label, span')].some(
+      (element) =>
+        element.childElementCount === 0 &&
+        element.textContent === 'gallery.videoReview.webcamShadowDirection'
+    )
+  ).toBe(true);
+  await choose('angle');
+  const enter = async (value: string) => {
+    const input = container.querySelector<HTMLInputElement>(
+      '[aria-label="gallery.videoReview.webcamShadowAngle"]'
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  };
+  await enter('225');
+  for (const mode of ['classic', 'center', 'nearest-edge']) {
+    await choose(mode);
+    expect(base.clip.cameraShadowDirection).toEqual({ mode, angle: 225 });
+  }
+  await choose('angle');
+  await enter('360');
+  expect(base.clip.cameraShadowDirection).toEqual({ mode: 'angle', angle: 0 });
+});

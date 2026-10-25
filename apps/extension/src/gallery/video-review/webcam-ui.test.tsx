@@ -483,3 +483,20 @@ it.each(['shrink', 'shift', 'overlay'] as const)(
     expect(host.querySelector('[data-ui="gallery.videoReview.focusArea"]')).not.toBeNull();
   }
 );
+
+it('retains shadow angle across inspector modes and normalizes a full turn', async () => {
+  render = () =>
+    root.render(<ReviewWebcamInspector editor={editor} range={{ start: 4, end: 6 }} />);
+  act(render);
+  await choose(label('webcamShadowDirection'), label('webcamShadowDirection_angle'));
+  await enter(label('webcamShadowAngle'), '225');
+  for (const mode of ['center', 'nearest-edge', 'classic']) {
+    await choose(label('webcamShadowDirection'), label(`webcamShadowDirection_${mode}`));
+    expect(editor.camera?.shadowDirection).toEqual({ mode, angle: 225 });
+    expect(field(label('webcamShadowAngle'))).toBeNull();
+  }
+  await choose(label('webcamShadowDirection'), label('webcamShadowDirection_angle'));
+  expect(field(label('webcamShadowAngle')).value).toBe('225');
+  await enter(label('webcamShadowAngle'), '360');
+  expect(editor.camera?.shadowDirection).toEqual({ mode: 'angle', angle: 0 });
+});

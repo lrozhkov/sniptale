@@ -1,3 +1,4 @@
+import type { CameraShadowDirection } from '../camera/shadow-direction';
 import type { ReviewOriginalSpeech } from '../../review/original-speech';
 import type { SourceAudioGainRange } from '../../audio/source-envelope';
 import type { QuickEditAudioClip } from '../../review/advanced/types';
@@ -262,6 +263,7 @@ export interface VideoProjectUtilityLanes {
 }
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
+  cameraShadowDirection?: CameraShadowDirection;
   cameraSplit?: CameraSplitSide | undefined;
   cameraScreenBehavior?: CameraScreenBehavior | undefined;
   /** Camera-native source seconds survive cuts, rates and project moves. */
@@ -411,7 +413,8 @@ export interface VideoProject {
     | 43
     | 44
     | 45
-    | 46;
+    | 46
+    | 47;
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

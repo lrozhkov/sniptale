@@ -381,3 +381,17 @@ it.each(['shrink', 'shift', 'overlay'] as const)(
     }
   }
 );
+
+it.each(['classic', 'angle', 'center', 'nearest-edge'] as const)(
+  'transfers %s camera shadow direction with strict Native 47 admission',
+  (mode) => {
+    const input = cameraFixture();
+    input.document.advancedContent.webcam!.shadowDirection = { mode, angle: 225 };
+    const { project } = prepared(input);
+    expect(project.version).toBe(47);
+    for (const camera of cameras(project))
+      expect(camera.cameraShadowDirection).toEqual({ mode, angle: 225 });
+    expect(parseHydratableVideoProject(project)).not.toBeNull();
+    expect(parseHydratableVideoProject({ ...project, version: 46 })).toBeNull();
+  }
+);
