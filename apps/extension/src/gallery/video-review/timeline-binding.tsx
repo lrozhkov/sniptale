@@ -131,6 +131,8 @@ type TimelineBindingProps = {
 function ReviewTimelineToolsBinding(
   props: TimelineBindingProps & {
     focusTool: { active: boolean; available: boolean; hint?: string | undefined; onToggle(): void };
+    selectedTrack: QuickEditTrack | null;
+    trackHasActions: boolean;
     clearFocusTool(): void;
     annotationTool?: ReviewAnnotationTool;
     clearAnnotationTool(): void;
@@ -147,6 +149,8 @@ function ReviewTimelineToolsBinding(
       className="contents"
     >
       <ReviewTimelineToolbar
+        selectedTrack={props.selectedTrack}
+        trackHasActions={props.trackHasActions}
         beforeAction={props.beforeAction}
         originalAudioEditor={props.audio}
         rulerRange={props.playbackRange ? range : undefined}
@@ -211,13 +215,73 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   useOriginalAudioPlacement(props);
   const focus = useFocusPlacement(props, projection);
   const annotation = useAnnotationPlacement(props);
+  const [trackSelection, setTrackSelection] = useState({
+    sourceId: props.annotationSourceId,
+    mode: features.mode,
+    track: 'source' as QuickEditTrack,
+  });
+  const selectable = reviewSelectableTracks(props, features);
+  const resetTrack =
+    trackSelection.sourceId !== props.annotationSourceId ||
+    trackSelection.mode !== features.mode ||
+    !selectable[trackSelection.track];
+  const selectedTrack = resetTrack || props.editing.mode ? 'source' : trackSelection.track;
+  const clearTools = () => {
+    cancelReviewTimelineGestures();
+    annotation.clear();
+    focus.clear();
+    props.audio.setOriginalTool(false);
+    props.editing.setCutting(false);
+  };
+  const latestSelection = useRef({ clearTools, props, selectable });
+  latestSelection.current = { clearTools, props, selectable };
+  useEffect(() => {
+    if (
+      selectedTrack === trackSelection.track &&
+      trackSelection.sourceId === props.annotationSourceId &&
+      trackSelection.mode === features.mode
+    )
+      return;
+    if (resetTrack) latestSelection.current.clearTools();
+    setTrackSelection({
+      sourceId: props.annotationSourceId,
+      mode: features.mode,
+      track: selectedTrack,
+    });
+  }, [selectedTrack, trackSelection, props.annotationSourceId, features.mode, resetTrack]);
+  const selectTrack = (track: QuickEditTrack) => {
+    if (
+      track === selectedTrack ||
+      !selectable[track] ||
+      props.busy ||
+      props.composerBusy ||
+      props.editing.exporter.phase !== 'idle'
+    )
+      return;
+    (props.beforeAction ?? ((action) => action()))(() => {
+      const latest = latestSelection.current;
+      if (
+        latest.props.annotationSourceId !== props.annotationSourceId ||
+        latest.props.advanced.ui.mode !== features.mode ||
+        !latest.selectable[track] ||
+        latest.props.busy ||
+        latest.props.composerBusy ||
+        latest.props.editing.exporter.phase !== 'idle'
+      )
+        return;
+      latest.clearTools();
+      setTrackSelection({ sourceId: props.annotationSourceId, mode: features.mode, track });
+    });
+  };
   return (
     <ReviewTrackControlsProvider
       value={{
         ui: props.advanced.ui,
+        selectedTrack,
+        selectTrack,
         order: trackOrder,
         configuring: features.mode === 'advanced' && configuring,
-        busy: props.busy,
+        busy: props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle',
         unavailable: {
           webcam: !props.webcam?.available,
           originalAudio:
@@ -301,6 +365,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         tools={
           <ReviewTimelineToolsBinding
             {...props}
+            selectedTrack={selectedTrack}
+            trackHasActions={selectable[selectedTrack]}
             focusTool={{
               ...focus.tool,
               onToggle: () => {
@@ -389,6 +455,27 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       />
     </ReviewTrackControlsProvider>
   );
+}
+
+/** Selection follows supported visible rows, excluding settings-only placeholders. */
+function reviewSelectableTracks(
+  props: TimelineBindingProps,
+  features: ReturnType<typeof resolveQuickEditEffectiveFeatures>
+): Record<QuickEditTrack, boolean> {
+  return {
+    source: true,
+    actions:
+      features.actionsTrackVisible && (!!props.markers.length || !!props.onAddCursorFocusKey),
+    zoom: features.zoomTrackVisible,
+    originalAudio:
+      features.originalAudioTrackVisible &&
+      (props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec),
+    annotationEffects: features.annotationEffectsTrackVisible && !!props.annotationEffects,
+    text: features.textTrackVisible && !!props.text && !!props.onOpenText && !!props.onSelectText,
+    voiceover: features.voiceoverTrackVisible,
+    music: features.musicTrackVisible,
+    webcam: features.webcamTrackVisible && !!props.webcam?.camera,
+  };
 }
 
 /** Source-qualified tool state is disposable; the annotation command owns resource acquisition and history. */

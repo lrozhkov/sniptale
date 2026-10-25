@@ -153,3 +153,18 @@
 .review-track-reordering * {
   cursor: grabbing !important;
 }
+
+.review-track-select {
+  align-self: stretch;
+  border-radius: var(--sniptale-radius-sm);
+  color: var(--sniptale-color-text-secondary);
+}
+.review-track-select:enabled:hover,
+.review-track-select[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+  background-color: var(--sniptale-color-surface-hover);
+}
+.review-track-select:focus-visible {
+  outline: 1px solid var(--sniptale-color-accent);
+  outline-offset: -1px;
+}

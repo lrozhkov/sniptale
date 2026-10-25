@@ -64,7 +64,7 @@ vi.mock('../../workflows/video-review/media-index', async (original) => ({
   }),
 }));
 
-function resource(id: string): LoadedReview {
+function resource(id: string, zoom = false): LoadedReview {
   const source = readFileSync(
     'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
     'utf8'
@@ -83,6 +83,8 @@ function resource(id: string): LoadedReview {
   };
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = zoom;
+  advanced.zoom.enabled = zoom;
   advanced.annotationEffects = { enabled: true, instances: [instance] };
   const snapshot: VideoWorkspaceSnapshot = {
     workspace: {
@@ -244,6 +246,13 @@ it('retains a refused choice, completes one placement and ignores an old activat
           }}
         />
       )
+    );
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="annotationEffects"] [data-review-track-select]'
+        )!
+        .click()
     );
     await act(async () => current?.setSelection({ kind: 'range', start: 2, end: 3 }));
     await act(async () => trigger().click());
@@ -439,9 +448,16 @@ it('retains a refused choice, completes one placement and ignores an old activat
       )
     );
     expect(selector()).toBeNull();
-    expect(trigger().getAttribute('aria-pressed')).toBe('false');
+    expect(trigger()).toBeNull();
     expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
     expect(replacement.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="annotationEffects"] [data-review-track-select]'
+        )!
+        .click()
+    );
     await act(async () => trigger().click());
     await act(async () =>
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -677,7 +693,7 @@ it('mounted result-time lanes keep zoom changes behind the existing action admis
   );
   const host = document.createElement('div'),
     root = createRoot(host),
-    loaded = resource('lane-source');
+    loaded = resource('lane-source', true);
   let current: ReturnType<typeof useReviewEditorState> | undefined,
     allowed = false;
   const render = () =>
@@ -729,6 +745,81 @@ it('mounted result-time lanes keep zoom changes behind the existing action admis
     await act(async () => root.unmount());
     loaded.session.dispose();
     host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('admits track changes and falls back after disabling or replacing the source', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const loaded = resource('lane-source', true);
+  const replacement = resource('lane-replacement');
+  let current: ReturnType<typeof useReviewEditorState> | undefined;
+  let continuation: (() => void) | undefined;
+  let hold = false;
+  const beforeAction = (action: () => void) => {
+    if (hold) continuation = action;
+    else action();
+  };
+  const render = (value = loaded) =>
+    act(async () =>
+      root.render(
+        <BindingHarness
+          loaded={value}
+          beforeAction={beforeAction}
+          onState={(state) => {
+            current = state;
+          }}
+        />
+      )
+    );
+  const select = (track: string) =>
+    host.querySelector<HTMLButtonElement>(
+      `[data-review-header-track="${track}"] [data-review-track-select]`
+    )!;
+  const annotation = () =>
+    host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.annotationEffectsAdd')}"]`
+    );
+  try {
+    await render();
+    expect(annotation()).toBeNull();
+    await act(async () => select('annotationEffects').click());
+    await act(async () => annotation()!.click());
+    expect(annotation()?.getAttribute('aria-pressed')).toBe('true');
+    hold = true;
+    await act(async () => select('zoom').click());
+    expect(select('annotationEffects').getAttribute('aria-pressed')).toBe('true');
+    expect(annotation()?.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => continuation?.());
+    expect(select('zoom').getAttribute('aria-pressed')).toBe('true');
+    expect(annotation()).toBeNull();
+    expect(loaded.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+    hold = false;
+    await act(async () => current?.setTrackVisibility('zoom', false));
+    expect(
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.cutMode')}"]`)
+    ).not.toBeNull();
+    await act(async () => select('annotationEffects').click());
+    await render(replacement);
+    expect(annotation()).toBeNull();
+    expect(replacement.session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+  } finally {
+    await act(async () => root.unmount());
+    await loaded.session.dispose();
+    await replacement.session.dispose();
+    host.remove();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   }
 });

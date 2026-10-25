@@ -8,7 +8,10 @@ import {
   hasSuppressedAdvancedFeatures,
   resolveQuickEditEffectiveFeatures,
 } from '../../features/video/review/advanced/effective';
-import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type {
+  QuickEditAdvancedState,
+  QuickEditTrack,
+} from '../../features/video/review/advanced/types';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import {
   reviewIconButtonClassName,
@@ -51,6 +54,8 @@ export type ReviewAnnotationTool = {
 };
 
 type ToolbarProps = {
+  selectedTrack?: QuickEditTrack | null;
+  trackHasActions?: boolean;
   beforeAction?: ReviewBeforeAction | undefined;
   annotationTool?: ReviewAnnotationTool;
   focusTool?: {
@@ -92,6 +97,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
   const busy = props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle';
   const admit = props.beforeAction ?? ((action: () => void) => action());
   const advanced = props.advanced;
+  const track = props.selectedTrack === undefined ? 'source' : props.selectedTrack;
   const features = resolveQuickEditEffectiveFeatures(advanced);
   const sourceAudioReady = !!props.editing.exporter.index?.audioCodec;
   const volumeIssue =
@@ -133,52 +139,75 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         className="flex min-w-max flex-1 flex-nowrap items-center justify-center gap-0.5 px-2"
         data-ui="gallery.videoReview.editingTools"
       >
-        <ReviewTimelineTools
-          mode={
-            props.focusTool?.active
-              ? 'focus'
-              : props.annotationTool?.active
-                ? 'annotation'
-                : props.originalAudioEditor?.originalTool
-                  ? 'audio'
-                  : props.editing.mode
-          }
-          available={!!props.editing.exporter.index}
-          cutHint={props.placementHints?.cut}
-          speedHint={props.placementHints?.speed}
-          cutAvailable={
-            !props.placementHints?.cut &&
-            (props.rulerRange ||
-              props.selectedObject ||
-              !props.originalAudioEditor?.originalRangeSelected) &&
-            (props.selectedObject ||
-              props.selection.kind !== 'range' ||
-              props.editing.canApply('cut', props.selection))
-          }
-          speedAvailable={
-            !props.placementHints?.speed &&
-            (props.rulerRange ||
-              props.selectedObject ||
-              !props.originalAudioEditor?.originalRangeSelected) &&
-            (props.selectedObject ||
-              props.selection.kind !== 'range' ||
-              props.editing.canApply('speed', props.selection))
-          }
-          busy={busy}
-          rate={props.editing.rate}
-          audio={props.editing.audio}
-          onPointer={() => admit(() => props.editing.setCutting(false))}
-          onToggle={(kind) => admit(() => props.editing.toggle(kind))}
-          onRate={(rate) => admit(() => props.editing.changeRate(rate))}
-          onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
-        />
-        {features.annotationEffectsTrackVisible && props.annotationTool ? (
+        {track === 'source' ||
+        track === 'zoom' ||
+        track === 'originalAudio' ||
+        track === 'annotationEffects' ? (
+          <ReviewTimelineTools
+            sourceTools={track === 'source'}
+            mode={
+              props.focusTool?.active
+                ? 'focus'
+                : props.annotationTool?.active
+                  ? 'annotation'
+                  : props.originalAudioEditor?.originalTool
+                    ? 'audio'
+                    : props.editing.mode
+            }
+            available={!!props.editing.exporter.index}
+            cutHint={props.placementHints?.cut}
+            speedHint={props.placementHints?.speed}
+            cutAvailable={
+              !props.placementHints?.cut &&
+              (props.rulerRange ||
+                props.selectedObject ||
+                !props.originalAudioEditor?.originalRangeSelected) &&
+              (props.selectedObject ||
+                props.selection.kind !== 'range' ||
+                props.editing.canApply('cut', props.selection))
+            }
+            speedAvailable={
+              !props.placementHints?.speed &&
+              (props.rulerRange ||
+                props.selectedObject ||
+                !props.originalAudioEditor?.originalRangeSelected) &&
+              (props.selectedObject ||
+                props.selection.kind !== 'range' ||
+                props.editing.canApply('speed', props.selection))
+            }
+            busy={busy}
+            rate={props.editing.rate}
+            audio={props.editing.audio}
+            onPointer={() => admit(() => props.editing.setCutting(false))}
+            onToggle={(kind) => admit(() => props.editing.toggle(kind))}
+            onRate={(rate) => admit(() => props.editing.changeRate(rate))}
+            onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
+          />
+        ) : (
+          <span
+            data-ui="gallery.videoReview.trackToolHint"
+            className="px-1 text-xs text-[var(--sniptale-color-text-secondary)]"
+          >
+            {translate(
+              track === null
+                ? 'gallery.videoReview.noTrackSelected'
+                : props.trackHasActions === false
+                  ? 'gallery.videoReview.noTrackActions'
+                  : 'gallery.videoReview.trackActionsHint'
+            )}
+          </span>
+        )}
+        {track === 'annotationEffects' &&
+        features.annotationEffectsTrackVisible &&
+        props.annotationTool ? (
           <ReviewAnnotationToolControl tool={props.annotationTool} busy={busy} admit={admit} />
         ) : null}
-        {features.zoomTrackVisible && props.focusTool ? (
+        {track === 'zoom' && features.zoomTrackVisible && props.focusTool ? (
           <ReviewFocusToolControl tool={props.focusTool} busy={busy} admit={admit} />
         ) : null}
-        {props.originalAudioEditor && features.originalAudioTrackVisible ? (
+        {track === 'originalAudio' &&
+        props.originalAudioEditor &&
+        features.originalAudioTrackVisible ? (
           <ReviewToolGroup
             active={props.originalAudioEditor.originalTool && sourceAudioReady}
             label={translate('gallery.videoReview.volume')}
@@ -231,14 +260,16 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             ) : null}
           </ReviewToolGroup>
         ) : null}
-        <ReviewFragmentAction
-          selection={props.selection}
-          snapToKeyframes={advanced.ui.mode !== 'advanced'}
-          index={props.editing.exporter.index}
-          edits={props.edits}
-          busy={busy}
-          onDownload={() => admit(props.onDownloadFragment)}
-        />
+        {track === 'source' ? (
+          <ReviewFragmentAction
+            selection={props.selection}
+            snapToKeyframes={advanced.ui.mode !== 'advanced'}
+            index={props.editing.exporter.index}
+            edits={props.edits}
+            busy={busy}
+            onDownload={() => admit(props.onDownloadFragment)}
+          />
+        ) : null}
       </div>
     </>
   );

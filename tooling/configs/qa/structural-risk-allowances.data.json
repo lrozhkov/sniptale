@@ -347,33 +347,33 @@
       "file": "apps/extension/src/gallery/video-review/review-toolbar.tsx",
       "symbol": "ReviewTimelineToolbar",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when toolbar advanced/busy admission becomes a captured-gesture, catalog or command authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "ba7c3c57022e3b574adaaf54cdcc1d955e960efc660415df694b518ca3b8f92c",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "astHash": "cd6e648abea038578f1c0a1cee66f41ba4092eaf4f2a825fc54d085e95b40069",
       "signatureHash": "e1ff77daa2f84b7f1dbad2e2eecae269fab7b8885d929c1680e08490127531c9",
-      "reason": "tool-noise: The candidate adds a menu presentation class to the existing toolbar composition. Admission callbacks, mutation receivers, imports, state and effect ownership remain unchanged. The function has no state or effects. Main and an independent reader inspected the exact diff. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-16"
+      "reason": "tool-noise: Stateless selected-track projection filters existing controls and secondary hint text. Existing admission callbacks retain mutations; no state, effects, gesture capture, catalog acquisition or command lifetime added. Splitting would distribute one tool projection. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "reviewDate": "2026-10-25"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/gallery/video-review/timeline-binding.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when real binding/source replacement/note admission/field flush proof gains another fixture session authority or media inspection contract. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "7db26aa853579e8a1459966e5cd7b092c7e07ccf755cdccc7c4ea235a5882e4e",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "astHash": "07bb0f127f01394ba9ec90bf0fac7b7a4ba0904cac87856000bde025b2f8908b",
       "signatureHash": "aaef421483bbba38d8fd8d8934aa77f69b5465cf6f8d013d9f003584fbd77d75",
-      "reason": "tool-noise: The real binding is mounted with useReviewEditorState and real local sessions; timeline scroll chrome/catalog listing are mocked and media inspection rejects the explicit Synthetic media fixture. The cases jointly prove selected range/free-lane addition, actual source replacement, held note admission and draft flush before Save/selection. Each test creates and disposes its resources/root; session identity and history assertions require the combined binding receiver, not isolated callback proxies. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: One private real-session mounted binding fixture proves held admission, tool cancellation, visibility fallback and source replacement with unchanged authored history. Each case disposes its root and sessions; no new fixture authority. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "reviewDate": "2026-10-25"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "d4ec02d9e295dfbe3db9aaf2e58fd53bae92c566b553b6bb7ac28a498ef98281",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "astHash": "36f365f3250459f838e8032f1090bb6acb56213e2d51473eb7844199a6141cb0",
       "signatureHash": "7346c30b64985a66d19928dbbe396ca17d7c0360e4059bc036d30fa30f20adc9",
-      "reason": "tool-noise: One timeline/session composition delegates writers and keeps disposable ordering, gesture and placement state. Source edits 6a772bd66 and ae24e2f79 adjust track ordering, gesture cancellation, lane composition and annotation default selection; the same session retains command and media authority. Signatures remain unchanged. Independently inspected by pr_structural_wrapper_diagnosis. Complete-candidate architecture review remains required.",
-      "reviewDate": "2026-10-18"
+      "reason": "tool-noise: One timeline/session composition retains existing annotation, focus and audio placement owners. Pure supported-row derivation and disposable lane selection add no durable writer, media acquisition or independent recovery owner. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "reviewDate": "2026-10-25"
     },
     {
       "rule": "structural-file-risk",
@@ -457,11 +457,11 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-review-annotations.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when continuous imported recording/history/resource retention/archive observations gain another shared mutable test authority. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "7af36a7ffe2574c90d88e98cb8cec304eb39dd24719b073a6907b1f0da449d8a",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "astHash": "66e75dbb416e393e345434c6e189794c8a4a80782d210d79b0575163538216e7",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
-      "reason": "tool-noise: One uninterrupted browser transaction imports exact PNG/SVG bytes, edits with autosave off/on, exercises Undo/Redo, removes the catalog, reopens and proves retained pixels plus portable archive/restore. Its dependent observations require the same real recording/history/source. try/finally closes the page before its own HTTP host, and actual native proof passed. Splitting the callback into separate tests would lose that retention history or require a shared mutable test authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: One imported PNG/SVG resource history checks creation, Undo/Redo, retention, reopen and archive recovery. Explicit annotation selection precedes placement. Existing page-before-host cleanup remains unchanged. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "reviewDate": "2026-10-25"
     },
     {
       "rule": "structural-function-risk",
@@ -699,10 +699,10 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.test.tsx",
       "symbol": "it callback",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One mounted placement lifecycle covers refusal, late completion, reactivation and successful completion with controlled promises and shared cleanup. The statement increase extends the same lifecycle fixture, not an independent test owner. Independently inspected by annotation_structural_diagnosis. Complete-candidate architecture review remains required before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-15",
-      "astHash": "0c1710ea01def71673fb3fe61cd829cd836249539c7ca50f3fa67d1a168c6485",
+      "reason": "tool-noise: One mounted annotation placement lifecycle proves refusal, controlled stale completion, reactivation, capture cleanup, failure and source replacement. Explicit lane navigation preserves this uninterrupted lifecycle and the single final root/session cleanup. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "9ca73da8265781c46bf55da1dc04c89e39a781d32d0c8eec4384515e159bb99c",
       "signatureHash": "4bd833e688236b8c036afdb49f63adf0e750f7446aac250c82600d04b76483fb"
     },
     {
@@ -776,11 +776,11 @@
       "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
       "symbol": "ReviewTimelineBinding",
       "owner": "extension:gallery:video-review",
-      "astHash": "3e72dd4ed3080ba36b5ac8b0a6aaf78f17763758c05514d357064959c4ea76ac",
+      "astHash": "9d825e4a3061e3e467ed4799323d5774ade26a944d61d7625bbc1b2ceadd48b7",
       "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81",
-      "reviewDate": "2026-10-18",
-      "reason": "tool-noise: One timeline/session composition delegates writers and keeps disposable ordering, gesture and placement state. Source edits 6a772bd66 and ae24e2f79 adjust track ordering, gesture cancellation, lane composition and annotation default selection; the same session retains command and media authority. Signatures remain unchanged. Independently inspected by pr_structural_wrapper_diagnosis. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
+      "reviewDate": "2026-10-25",
+      "reason": "tool-noise: Source/mode-qualified lane selection is disposable. One admitted transition checks current source, mode, availability and busy phase, then coordinates existing gesture/tool cancellation. Keeping it together preserves ordering without authored mutations or resource authority. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary."
     },
     {
       "rule": "structural-function-risk",
@@ -1095,11 +1095,11 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-fragment-inspectors.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "astHash": "cb701711c619b9c65528af7f9befcdd9e63257662b4a9a011c73a5bc15f85eed",
+      "astHash": "7333ec27c9ca36e640a380ac20522051e6326cbb104d0c66ecd6c585a357c297",
       "signatureHash": "8ce7fbe82a9ac3169f4e857873f03fe064522448e787f418923e9ccafaf643b1",
-      "reviewDate": "2026-10-18",
-      "reason": "tool-noise: One seeded review and speech fixture exercises fragment inspector composition. Independently inspected by pr_structural_wrapper_diagnosis. This correction leaves the existing fixture sequence and cleanup unchanged; no product authority moves. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
+      "reviewDate": "2026-10-25",
+      "reason": "tool-noise: One seeded review/speech fixture checks inspector composition. Explicit annotation selection precedes the existing placement action; host/page lifecycle and cleanup are unchanged. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary."
     },
     {
       "rule": "structural-file-risk",
@@ -1128,22 +1128,22 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-panel-layout.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "astHash": "cebc3791cf1ea03d38b1cefdf06e15b0c7c25afe9f46156b1f97bb602cc2358c",
+      "astHash": "eb36ac1e6806dcd8aa6d642c6941dc04c861d4c0e96546bf2a0068b5e1ed184c",
       "signatureHash": "8ce7fbe82a9ac3169f4e857873f03fe064522448e787f418923e9ccafaf643b1",
-      "reviewDate": "2026-10-18",
-      "reason": "tool-noise: One mounted editor sequence verifies resize/dock/restore and transport reachability. Independently inspected by pr_structural_wrapper_diagnosis. This correction leaves the existing fixture sequence and cleanup unchanged; no product authority moves. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
+      "reviewDate": "2026-10-25",
+      "reason": "tool-noise: One mounted editor journey checks resize, docking, restoration and control reachability. Explicit lane choice belongs to the existing source/audio loop; no new fixture or lifecycle. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary."
     },
     {
       "rule": "structural-function-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-review-annotations.spec.ts",
       "symbol": "test callback#2",
       "owner": "tooling:test:e2e",
-      "astHash": "2bfd0c1a2c0e3fdbff14afd8652e043a596840b9fcae6c1d63434a244acb8258",
+      "astHash": "49cd420f9d546e09db5738532abd909a3cb3c5062256804a294b31a8b4c150b5",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
-      "reviewDate": "2026-10-18",
-      "reason": "tool-noise: One seeded annotation placement/edit/recovery lifetime. Independently inspected by pr_structural_wrapper_diagnosis. This correction leaves the existing fixture sequence and cleanup unchanged; no product authority moves. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
+      "reviewDate": "2026-10-25",
+      "reason": "tool-noise: One seeded annotation/history lifecycle covers viewport variants. Explicit template-loop lane selection exposes existing placement controls with the same workspace, observers and cleanup. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary."
     },
     {
       "rule": "structural-file-risk",
@@ -1205,10 +1205,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: These Gallery review scenarios use the existing host, bootstrap, and media fixture. Each test owns and closes its host and page lifecycle. Project continuity and its accessible name use the same supported editor flow. Test-local receivers do not introduce product authorities. Main inspection and independent read-only diagnosis established this cohesive boundary. Formal architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any executable selection policy or independent fixture, runtime, state, writer, resource, or recovery authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-10-24",
-      "astHash": "8db3c68c4a2884d0375147f41166b2ce05f9efda103603e4f3408699547d53fc",
+      "reason": "tool-noise: Existing review scenarios keep private per-test hosts/pages and named helpers. Explicit lane navigation exposes existing tools without generic routing or shared mutable fixture authority. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "3a834d042938884263f8f8a3f499298e4c90c876d19d5bea6978240084e2691c",
       "signatureHash": "d15476fb38ca97d1f58054d63d4cff17a7ff6ef96e34bba43a95262d492462c9"
     },
     {
@@ -2338,10 +2338,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This suite proves resource transfer through one montage journey. Private helpers extend two existing cases with actual backup, duplicate restore and encoding. Browser and project owners remain the same. No new product authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "f30111fb5394e1cf3204429e5192bac4d944f9a368c334d87b0c84419ce8fa45",
+      "reason": "tool-noise: Existing private resource-transfer journeys retain Gallery-to-Native reopen/export continuity. Explicit annotation/source lane navigation adds no runtime or fixture authority. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "cd7c037b8d7279fcc83c54b5ff10355a34b0dc9f350fb5becd5c82abe5c4f61c",
       "signatureHash": "9955b32c07fed0d6507abd495b601d9d5045a110c96bfd40e63e3c5721fb73dd"
     },
     {
@@ -2349,10 +2349,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This callback follows the same imported root through creation, editing, backup, restored copy and export. Private helpers preserve ordering and browser cleanup. No new runtime owner or state authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "c543d776aaffa04a1c866a5c9a96f2ec105a1af681f4f94eafe2e9f838c00172",
+      "reason": "tool-noise: The same imported recording/root and authored resource history proceed through Native transfer and real export. Lane navigation precedes existing placement/Cut; nested page and final host cleanup are unchanged. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "8a7bd257d8b45f5e116096fb475714c70ba737b6216ae02ed9199fd86c70e831",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {
@@ -2497,6 +2497,17 @@
       "reviewDate": "2026-10-24",
       "astHash": "cef065755ac77a658a6727c23d15c864f04c8d5f47bcd85c556472d37991f541",
       "signatureHash": "6d23a277aceac252acea99a9af1c5c7f1c28d91726fa538014e7e764cf4ae596"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-playback-range.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One seeded editor checks ruler loop and tools against the same playback range and history. Explicit lane navigation preserves gesture and disabled/title assertions; viewport and server cleanup owners remain unchanged. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary.",
+      "astHash": "cba427b83f35016ca8100686ab5cda37de7108cb25cd63c1a3bd94f16ab81e2c",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
+      "reviewDate": "2026-10-25"
     }
   ]
 }

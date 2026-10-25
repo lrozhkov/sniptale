@@ -35,6 +35,11 @@ for (const width of [1280, 1920])
         await button('gallery.videoReview.advancedEditing').click();
         await page.evaluate(() => document.fonts.ready);
         const toolbar = page.locator('.review-timeline-toolbar');
+        const lane = (track: string) =>
+          page.locator(`[data-review-header-track="${track}"] [data-review-track-select]`);
+        await expect(lane('source')).toHaveAttribute('aria-pressed', 'true');
+        await expect(button('gallery.videoReview.cutMode')).toBeVisible();
+        await expect(button('gallery.videoReview.focusRangeTool')).toHaveCount(0);
         const autosave = toolbar.locator('[data-ui="autosave-control"] button');
         await autosave.click();
         const autosaveToggle = page.getByRole('switch', {
@@ -71,7 +76,12 @@ for (const width of [1280, 1920])
           .toBeLessThanOrEqual(1);
         const trackSwitch = page.locator('[data-review-header-track="zoom"]').getByRole('switch');
         await expect.soft(trackSwitch).toHaveClass(/sniptale-glass-switch/);
+        await lane('zoom').click();
+        await expect(lane('zoom')).toHaveAttribute('aria-pressed', 'true');
+        await expect(button('gallery.videoReview.cutMode')).toHaveCount(0);
         await trackSwitch.click();
+        await expect(lane('source')).toHaveAttribute('aria-pressed', 'true');
+        await expect(button('gallery.videoReview.cutMode')).toBeVisible();
         await expect(trackSwitch).toHaveAttribute('aria-checked', 'false');
         await trackSwitch.press('Space');
         await expect(trackSwitch).toHaveAttribute('aria-checked', 'true');
@@ -108,6 +118,26 @@ for (const width of [1280, 1920])
         await cut.hover();
         await expect.soft(cut).toHaveCSS('font-weight', '450');
         await page.screenshot({ path: info.outputPath('toolbar-hover.png'), fullPage: false });
+        await cut.click();
+        await expect(cut).toHaveAttribute('aria-pressed', 'true');
+        await lane('zoom').focus();
+        await lane('zoom').press('Enter');
+        await expect(lane('zoom')).toHaveAttribute('aria-pressed', 'true');
+        await expect(cut).toHaveCount(0);
+        await expect(button('gallery.videoReview.focusRangeTool')).toBeVisible();
+        await page.screenshot({ path: info.outputPath('zoom-lane-tools.png'), fullPage: false });
+        await lane('originalAudio').click();
+        await expect(button('gallery.videoReview.originalAudioRange')).toBeVisible();
+        await expect(cut).toHaveCount(0);
+        await lane('text').click();
+        await expect(lane('text')).toHaveAttribute('aria-pressed', 'true');
+        await expect(button('gallery.videoReview.originalAudioRange')).toHaveCount(0);
+        await page.screenshot({ path: info.outputPath('text-lane-actions.png'), fullPage: false });
+        await lane('source').focus();
+        await lane('source').press('Space');
+        await expect(button('gallery.videoReview.play')).toBeVisible();
+        await expect(lane('source')).toHaveAttribute('aria-pressed', 'true');
+        await expect(cut).toHaveAttribute('aria-pressed', 'false');
         await addReviewFocus(page);
         await button('gallery.videoReview.undo').click();
         await expect(button('gallery.videoReview.redo')).toBeEnabled();
@@ -118,6 +148,8 @@ for (const width of [1280, 1920])
         await pause.click();
         await expect(button('gallery.videoReview.play')).toBeVisible();
         if (width === 1280 && theme === 'light') {
+          await lane('annotationEffects').click();
+          await expect(cut).toHaveCount(0);
           await button('gallery.videoReview.annotationEffectsAdd').click();
           const selector = button('gallery.videoReview.annotationEffectsChoose');
           await expect(selector).not.toHaveAttribute('aria-describedby');
@@ -135,6 +167,9 @@ for (const width of [1280, 1920])
           await page.setViewportSize({ width: 1100, height: 560 });
           const scroll = page.locator('[data-ui="gallery.videoReview.workspaceScroll"]');
           await expect(scroll).toHaveCSS('overflow-x', 'auto');
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+          ).toBe(true);
           expect(await scroll.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
           await scroll.evaluate((node) => {
             node.scrollLeft = node.scrollWidth;

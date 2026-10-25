@@ -41,7 +41,11 @@ export function reviewOwnsPlaybackKeys(target: HTMLElement): boolean {
     return true;
   if (
     target.closest(
-      '[aria-haspopup][aria-expanded="true"],[role="checkbox"],[role="radio"],[role="switch"]'
+      [
+        '[data-review-track-select]',
+        '[aria-haspopup][aria-expanded="true"]',
+        '[role="checkbox"],[role="radio"],[role="switch"]',
+      ].join(',')
     )
   )
     return true;

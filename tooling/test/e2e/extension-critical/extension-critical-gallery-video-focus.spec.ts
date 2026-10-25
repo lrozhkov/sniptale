@@ -35,6 +35,9 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.originalAudioRange').click();
       await expect(button('gallery.videoReview.volume')).toContainText('50%');
       await page.screenshot({
@@ -135,6 +138,7 @@ for (const variant of [
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
       const plane = page.locator('[data-ui="gallery.videoReview.timePlane"]');
       const source = page.locator('[data-ui="gallery.videoReview.sourceLane"]');
       const box = (await source.boundingBox())!;
@@ -152,6 +156,7 @@ for (const variant of [
         path: testInfo.outputPath(`timeline-cursor-${variant.locale}-dpr${variant.dpr}.png`),
       });
       await button('gallery.videoReview.advancedEditing').click();
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       const focus = page.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const focusBox = (await focus.boundingBox())!;
@@ -192,6 +197,9 @@ for (const variant of [
         restrictedSource.y + restrictedSource.height / 2
       );
       await expect(plane).toHaveCSS('cursor', 'default');
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.originalAudioRange').click();
       const original = page.locator('[data-original-audio-lane]');
       const audioBox = (await original.boundingBox())!;
@@ -447,6 +455,11 @@ for (const theme of ['light', 'dark'] as const) {
         .click();
       for (const kind of ['cutMode', 'originalAudioRange'] as const) {
         await dialog
+          .locator(
+            `[data-review-header-track="${kind === 'cutMode' ? 'source' : 'originalAudio'}"] [data-review-track-select]`
+          )
+          .click();
+        await dialog
           .getByRole('button', {
             name: translate(`gallery.videoReview.${kind}`, 'en'),
             exact: true,
@@ -580,6 +593,7 @@ for (const variant of [
         translate('gallery.videoReview.cutGesture', variant.locale)
       );
       await button('gallery.videoReview.advancedEditing').click();
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute('title', /Alt/);
       await addReviewFocus(page);
       const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
@@ -682,6 +696,7 @@ for (const variant of [
         await draw('[data-ui="gallery.videoReview.sourceLane"]', 0.1, 11.9);
         await expect(dialog.getByRole('button', { name: /^Speed 2×/ })).toBeVisible();
       }
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       await draw('[data-ui="gallery.videoReview.zoomLane"]', 0.5, 10.5);
       const block = dialog

@@ -71,6 +71,9 @@ for (const theme of ['light', 'dark'] as const) {
           await expect(fields).toHaveCount(0);
         }
         await dialog
+          .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+          .click();
+        await dialog
           .getByRole('button', {
             name: label('gallery.videoReview.annotationEffectsAdd'),
             exact: true,

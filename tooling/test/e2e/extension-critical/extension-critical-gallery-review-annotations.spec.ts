@@ -219,6 +219,9 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
       await page.keyboard.press('Escape');
     };
     await toggleAutosave(false);
+    await dialog
+      .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+      .click();
     await button('gallery.videoReview.annotationEffectsAdd').click();
     const typeSelector = button('gallery.videoReview.annotationEffectsChoose');
     await typeSelector.click();
@@ -232,6 +235,9 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
     );
     await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(1);
     expect(JSON.stringify(await workspace())).toBe(durableBeforeAdd);
+    await dialog
+      .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+      .click();
     await button('gallery.videoReview.annotationEffectsAdd').click();
     await typeSelector.click();
     await page.getByRole('option', { name: templates[0].ru, exact: true }).click();
@@ -534,6 +540,9 @@ for (const variant of [
       await button('gallery.videoReview.advancedEditing').click();
       await expect.poll(async () => (await persistedReviewContent(page))?.zoom.enabled).toBe(true);
       for (const [index, template] of templates.entries()) {
+        await dialog
+          .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+          .click();
         const toggle = button('gallery.videoReview.annotationEffectsAdd');
         if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
         const selector = button('gallery.videoReview.annotationEffectsChoose');

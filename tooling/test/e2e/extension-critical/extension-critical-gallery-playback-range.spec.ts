@@ -172,6 +172,7 @@ for (const variant of [
       await expect(button('gallery.videoReview.undo')).toBeDisabled();
       await button('gallery.videoReview.advancedEditing').click();
       await rulerDrag(page, 0.5, 6.5);
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'focus');
       const focus = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
@@ -202,10 +203,16 @@ for (const variant of [
           .getByRole('option', { name: label(`gallery.videoReview.${kind}`), exact: true })
           .click();
         await expect(button('gallery.videoReview.focusRangeTool')).toBeEnabled();
+        await dialog
+          .locator('[data-review-header-track="zoom"] [data-review-track-select]')
+          .click();
         await button('gallery.videoReview.focusRangeTool').click();
       }
       await expect(focus.locator('[role="button"]')).toHaveCount(3);
 
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'source');
       await proveToolGroup(
@@ -272,12 +279,18 @@ for (const variant of [
       await expect(
         toolbar.locator('[title="' + label('gallery.videoReview.resultDuration') + '"]')
       ).toHaveCount(0);
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await expect(button('gallery.videoReview.originalAudioRange')).toHaveAttribute(
         'title',
         variant.locale === 'ru'
           ? 'Выделите участок исходного аудио, чтобы создать изменение громкости'
           : 'Drag a range on the source audio to add a volume change'
       );
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.originalAudioRange').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'original');
       await proveToolGroup(
@@ -327,6 +340,9 @@ for (const variant of [
       await button('gallery.videoReview.fit').click();
       await button('gallery.videoReview.clearPlaybackRange').click();
       // Existing source-lane drawing still creates an edit.
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
       await source.scrollIntoViewIfNeeded();
       const sourceRect = (await source.boundingBox())!;
@@ -342,7 +358,15 @@ for (const variant of [
       await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(3);
       await expect(summary).toHaveCount(0);
       await rulerDrag(page, 10.8, 11.7);
-      for (const key of ['cutMode', 'speedMode', 'focusRangeTool', 'originalAudioRange'] as const) {
+      for (const [track, key] of [
+        ['source', 'cutMode'],
+        ['source', 'speedMode'],
+        ['zoom', 'focusRangeTool'],
+        ['originalAudio', 'originalAudioRange'],
+      ] as const) {
+        await dialog
+          .locator(`[data-review-header-track="${track}"] [data-review-track-select]`)
+          .click();
         await expect(button(`gallery.videoReview.${key}`)).toBeDisabled();
         await expect(button(`gallery.videoReview.${key}`)).toHaveAttribute(
           'title',

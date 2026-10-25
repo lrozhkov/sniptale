@@ -19,6 +19,8 @@ export function reviewTrackMetrics(compact = false) {
 type ReviewTrackControlsState = {
   ui: QuickEditUiState;
   configuring: boolean;
+  selectedTrack?: QuickEditTrack | null;
+  selectTrack?(track: QuickEditTrack): void;
   busy: boolean;
   unavailable: Partial<Record<QuickEditTrack, boolean>>;
   setEnabled(track: Exclude<QuickEditTrack, 'source'>, enabled: boolean): void;
@@ -143,14 +145,35 @@ function ReviewTrackHeader({
           }}
         />
       ) : null}
-      {props.icon}
-      {!props.ruler ? (
-        <>
-          <span className="min-w-0 flex-1 text-[11px]" title={props.label}>
+      {!props.ruler && track && controls?.selectTrack ? (
+        <button
+          type="button"
+          data-review-track-select
+          aria-pressed={controls.selectedTrack === track}
+          disabled={!enabled || controls.busy}
+          className="review-track-select flex min-w-0 flex-1 items-center gap-1 text-left"
+          title={props.label}
+          onClick={() => controls.selectTrack?.(track)}
+        >
+          {props.icon}
+          <span className="min-w-0 text-[11px]">
             <span data-track-label className="inline-block whitespace-nowrap">
               {props.label}
             </span>
           </span>
+        </button>
+      ) : (
+        props.icon
+      )}
+      {!props.ruler ? (
+        <>
+          {!controls?.selectTrack ? (
+            <span className="min-w-0 flex-1 text-[11px]" title={props.label}>
+              <span data-track-label className="inline-block whitespace-nowrap">
+                {props.label}
+              </span>
+            </span>
+          ) : null}
           <div data-track-controls className="flex shrink-0 items-center">
             {props.controls}
           </div>

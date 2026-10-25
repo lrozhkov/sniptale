@@ -108,6 +108,12 @@ it('reserves playback Space for command surfaces while preserving editing and op
   const toggle = document.createElement('button');
   toggle.setAttribute('role', 'switch');
   expect(reviewOwnsPlaybackKeys(toggle)).toBe(true);
+  const lane = document.createElement('button');
+  lane.dataset['reviewTrackSelect'] = '';
+  const label = document.createElement('span');
+  lane.append(label);
+  expect(reviewOwnsPlaybackKeys(label)).toBe(true);
+  expect(reviewOwnsKeys(label)).toBe(false);
   const slider = document.createElement('input');
   slider.type = 'range';
   expect(reviewOwnsPlaybackKeys(slider)).toBe(false);

@@ -124,6 +124,7 @@ for (const viewport of [
       for (let i = 0; i < 4; i++) await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.trackSettings').click();
       const focusToggle = dialog.locator('[data-review-header-track="zoom"] [role="switch"]');
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       await focusToggle.click();
       await expect(focusToggle).not.toBeChecked();
@@ -249,6 +250,7 @@ for (const variant of [
       await link.click();
       await expect(link).toHaveAttribute('data-connected', 'true');
       await seek(6);
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.editingTools"]')
@@ -326,6 +328,9 @@ for (const variant of [
         await page.mouse.move(rect.x + (rect.width * end) / 12.01, rect.y + 12, { steps: 5 });
         await page.mouse.up();
       };
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
       await selectRange(8, 11);
       await button('gallery.videoReview.cutMode').click();

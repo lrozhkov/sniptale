@@ -348,6 +348,7 @@ export async function recordedAudioResources(page: Page, excludedKeys: string[] 
 /** Create focus through its supported toolbar and ruler interval, including occupied lanes. */
 export async function addReviewFocus(page: Page) {
   const dialog = page.locator('dialog');
+  await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
   const tool = dialog.locator(
     '[data-ui="gallery.videoReview.editingTools"] button:has(svg.lucide-focus)'
   );

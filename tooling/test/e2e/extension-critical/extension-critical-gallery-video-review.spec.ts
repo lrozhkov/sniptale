@@ -1583,6 +1583,9 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
       dialog.getByRole('button', { name: translate(key, 'ru'), exact: true });
     await button('gallery.videoReview.advancedEditing').click();
     await expect(button('gallery.videoReview.audioTrack')).toHaveAttribute('aria-pressed', 'true');
+    await dialog
+      .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+      .click();
     await button('gallery.videoReview.originalAudioRange').click();
     const lane = dialog.locator('[data-original-audio-lane]');
     const box = (await lane.boundingBox())!;
@@ -1593,6 +1596,7 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     const range = dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]');
     await expect(range).toHaveCount(1);
     await expect(range).toHaveAttribute('aria-pressed', 'true');
+    await dialog.locator('[data-review-header-track="source"] [data-review-track-select]').click();
     await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
     await expect(button('gallery.videoReview.muteAudioRange')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('source-audio-range-ru.png') });
@@ -1682,6 +1686,9 @@ for (const variant of [
         0
       );
       await expect(button('gallery.videoReview.downloadSelection')).toHaveCount(0);
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.originalAudioRange').click();
       await expect(button('gallery.videoReview.pointerTool')).toHaveAttribute(
         'aria-pressed',
@@ -1710,6 +1717,7 @@ for (const variant of [
         .toBeGreaterThan(original.width + audioBox.width * 0.08);
       // A plain click clears the former interval before arming the focus tool.
       await focus.click({ position: { x: focusBox.width * 0.1, y: focusBox.height / 2 } });
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute(
         'aria-pressed',
@@ -1750,8 +1758,14 @@ for (const variant of [
       await page.screenshot({ path: testInfo.outputPath('lane-tools.png') });
       await page.setViewportSize({ width: 900, height: 720 });
       await expect(button('gallery.videoReview.focusRangeTool')).toBeInViewport();
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await expect(button('gallery.videoReview.originalAudioRange').first()).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('lane-tools-compact.png') });
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
       const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
       await drag((await source.boundingBox())!, 0.75, 0.9);
@@ -2567,6 +2581,7 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const lane = (await focusLane.boundingBox())!;
@@ -2580,6 +2595,9 @@ for (const variant of [
       await expect(focus).toHaveCount(1);
       await button('gallery.videoReview.pointerTool').click();
       await timelineGesture(page, 9);
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
       await timelineGesture(page, 1, 5);
       await button('gallery.videoReview.pointerTool').click();
@@ -2644,6 +2662,7 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const lane = (await focusLane.boundingBox())!;
@@ -2658,6 +2677,9 @@ for (const variant of [
       await button('gallery.videoReview.pointerTool').click();
       const authored = await focus.boundingBox();
       await timelineGesture(page, 9);
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.cutMode').click();
       await timelineGesture(page, 2, 7);
       await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');

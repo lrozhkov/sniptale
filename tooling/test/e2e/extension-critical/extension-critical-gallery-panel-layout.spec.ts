@@ -450,6 +450,11 @@ for (const variant of [
           ['gallery.videoReview.cutMode', 3, 4],
           ['gallery.videoReview.originalAudioRange', 5, 6],
         ] as const) {
+          await dialog
+            .locator(
+              `[data-review-header-track="${tool === 'gallery.videoReview.originalAudioRange' ? 'originalAudio' : 'source'}"] [data-review-track-select]`
+            )
+            .click();
           if (await button('gallery.videoReview.clearPlaybackRange').count())
             await button('gallery.videoReview.clearPlaybackRange').click();
           await button('gallery.videoReview.pointerTool').click();

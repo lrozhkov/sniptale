@@ -1766,6 +1766,9 @@ for (const {
         [1, 5],
         [6, 10],
       ]) {
+        await dialog
+          .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+          .click();
         await button('gallery.videoReview.annotationEffectsAdd').click();
         await button('gallery.videoReview.annotationEffectsChoose').click();
         await page.getByRole('option', { name: title, exact: true }).click();
@@ -1784,6 +1787,9 @@ for (const {
           exact: true,
         })
         .click();
+      await dialog
+        .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.annotationEffectsAdd').click();
       await button('gallery.videoReview.annotationEffectsChoose').click();
       await page.getByRole('option', { name: title, exact: true }).click();
@@ -1792,6 +1798,9 @@ for (const {
       const createdSpeech = spatialDetails
         ? await createGallerySpeechForTransfer(page, dialog, label, (name) => info.outputPath(name))
         : undefined;
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.cutMode').click();
       const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
       const cutLane = plane.locator(

@@ -78,6 +78,7 @@ const CAMERA_REASON_LABEL: Record<
 /** The timeline owns the editing tools; a drag applies the current tool directly. */
 export function ReviewTimelineTools(props: {
   mode: 'cut' | 'speed' | 'audio' | 'focus' | 'annotation' | null;
+  sourceTools?: boolean;
   available: boolean;
   cutAvailable?: boolean;
   cutHint?: string | undefined;
@@ -102,34 +103,38 @@ export function ReviewTimelineTools(props: {
       >
         <MousePointer2 size={16} />
       </ReviewButton>
-      <ReviewButton
-        label={translate('gallery.videoReview.cutMode')}
-        toolbarLabel={translate('gallery.videoReview.toolbarCut')}
-        title={props.cutHint ?? translate('gallery.videoReview.cutGesture')}
-        aria-pressed={props.mode === 'cut'}
-        className={plain}
-        disabled={!props.available || props.busy || props.cutAvailable === false}
-        onClick={() => props.onToggle('cut')}
-      >
-        <Scissors size={16} />
-      </ReviewButton>
-      <ReviewToolGroup
-        active={props.mode === 'speed'}
-        label={translate('gallery.videoReview.speedMode')}
-      >
-        <ReviewButton
-          label={translate('gallery.videoReview.speedMode')}
-          toolbarLabel={translate('gallery.videoReview.speedMode')}
-          title={props.speedHint ?? translate('gallery.videoReview.speedMode')}
-          aria-pressed={props.mode === 'speed'}
-          className={plain}
-          disabled={!props.available || props.busy || props.speedAvailable === false}
-          onClick={() => props.onToggle('speed')}
-        >
-          <Gauge size={16} />
-        </ReviewButton>
-        {props.mode === 'speed' ? <ReviewSpeedOptions {...props} /> : null}
-      </ReviewToolGroup>
+      {props.sourceTools !== false ? (
+        <>
+          <ReviewButton
+            label={translate('gallery.videoReview.cutMode')}
+            toolbarLabel={translate('gallery.videoReview.toolbarCut')}
+            title={props.cutHint ?? translate('gallery.videoReview.cutGesture')}
+            aria-pressed={props.mode === 'cut'}
+            className={plain}
+            disabled={!props.available || props.busy || props.cutAvailable === false}
+            onClick={() => props.onToggle('cut')}
+          >
+            <Scissors size={16} />
+          </ReviewButton>
+          <ReviewToolGroup
+            active={props.mode === 'speed'}
+            label={translate('gallery.videoReview.speedMode')}
+          >
+            <ReviewButton
+              label={translate('gallery.videoReview.speedMode')}
+              toolbarLabel={translate('gallery.videoReview.speedMode')}
+              title={props.speedHint ?? translate('gallery.videoReview.speedMode')}
+              aria-pressed={props.mode === 'speed'}
+              className={plain}
+              disabled={!props.available || props.busy || props.speedAvailable === false}
+              onClick={() => props.onToggle('speed')}
+            >
+              <Gauge size={16} />
+            </ReviewButton>
+            {props.mode === 'speed' ? <ReviewSpeedOptions {...props} /> : null}
+          </ReviewToolGroup>
+        </>
+      ) : null}
     </>
   );
 }

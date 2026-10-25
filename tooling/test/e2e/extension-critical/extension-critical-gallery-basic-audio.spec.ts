@@ -112,6 +112,9 @@ for (const variant of [
         await expect(master).toHaveValue('100');
         await button('gallery.videoReview.redo').click();
         await expect(master).toHaveValue('50');
+        await dialog
+          .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+          .click();
         await button('gallery.videoReview.originalAudioRange').click();
         await original.scrollIntoViewIfNeeded();
         const rect = (await original.boundingBox())!;
@@ -218,7 +221,7 @@ for (const viewport of [
           name: translate('gallery.videoReview.originalAudioRange', 'en'),
           exact: true,
         })
-      ).toBeDisabled();
+      ).toHaveCount(0);
       await expect(dialog.locator('[data-original-audio-lane]')).toHaveCount(0);
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, 'en'), exact: true });
