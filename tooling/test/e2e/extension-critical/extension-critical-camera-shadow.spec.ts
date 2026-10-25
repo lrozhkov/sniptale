@@ -16,6 +16,72 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
+/** Reset the actual Gallery or Native inspector scroll owner before each capture. */
+async function inspectorTop(page: Page) {
+  const owners = page.locator(
+    '.review-inspector-scroll:visible, [data-ui="video-editor.inspector.body"]:visible'
+  );
+  await expect.poll(() => owners.count()).toBeGreaterThan(0);
+  await owners.evaluateAll((nodes) => {
+    for (const node of nodes) node.scrollTop = 0;
+  });
+  await expect
+    .poll(() => owners.evaluateAll((nodes) => nodes.every((node) => node.scrollTop === 0)))
+    .toBe(true);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+  });
+}
+
+async function captureGalleryAll(page: Page, screenshot: string) {
+  const dialog = page.locator('dialog');
+  const scroll = dialog.locator('.review-inspector-scroll');
+  const handle = dialog.locator('[data-ui="gallery.videoReview.resizeInspector"]');
+  const width = () =>
+    scroll.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+  const original = await width();
+  const resize = async (target: number) => {
+    const current = await width();
+    const box = (await handle.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + current - target, box.y + 12);
+    await page.mouse.up();
+    await expect.poll(width).toBe(target);
+  };
+  try {
+    await resize(600);
+    const sections = dialog.locator(
+      '[data-ui="gallery.videoReview.webcamInspector"] [data-ui="gallery.videoReview.inspectorSections"]'
+    );
+    await expect(sections).toHaveAttribute('data-presentation', 'all');
+    const columns = sections.locator(':scope > .review-inspector-section-column');
+    await expect(columns).toHaveCount(2);
+    const first = (await columns.first().boundingBox())!;
+    const second = (await columns.last().boundingBox())!;
+    expect(second.x - first.x).toBeGreaterThan(200);
+    const placement = (await sections.locator('[data-section="webcam-layout"]').boundingBox())!;
+    const appearance = (await sections
+      .locator('[data-section="webcam-appearance"]')
+      .boundingBox())!;
+    expect(
+      appearance.x - placement.x,
+      'camera appearance must use the second column'
+    ).toBeGreaterThan(200);
+    expect(Math.abs(appearance.y - placement.y)).toBeLessThanOrEqual(0.5);
+    await inspectorTop(page);
+    await page.screenshot({ path: screenshot, fullPage: false });
+  } finally {
+    await resize(original);
+  }
+}
+
 type Message = Parameters<typeof translate>[0];
 type Direction = 'classic' | 'angle' | 'center' | 'nearest-edge';
 
@@ -245,12 +311,14 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true
         );
+        await inspectorTop(page);
         await page.screenshot({
           path: info.outputPath('gallery-narrow-shadow.png'),
           fullPage: false,
         });
         await page.setViewportSize(size);
       } else {
+        await captureGalleryAll(page, info.outputPath('gallery-camera-all-wide-top.png'));
         await dialog
           .getByRole('button', {
             name: label('scenario.editor.inspectorShowSections'),
@@ -291,13 +359,16 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
               exact: true,
             })
             .scrollIntoViewIfNeeded();
-          if (width !== originalWidth)
+          if (width !== originalWidth) {
+            await inspectorTop(page);
             await page.screenshot({
               path: info.outputPath(`gallery-shadow-breakpoint-${width}.png`),
               fullPage: false,
             });
+          }
         }
       }
+      await inspectorTop(page);
       await page.screenshot({ path: info.outputPath('gallery-shadow-angle.png'), fullPage: false });
       await page.reload();
       await expect(dialog).toBeVisible();
@@ -345,6 +416,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
           })
         )
         .toBeGreaterThan(100);
+      await inspectorTop(page);
       await page.screenshot({
         path: info.outputPath('transferred-camera-shadow.png'),
         fullPage: false,
@@ -449,6 +521,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
         .poll(async () => (await shadowCentroid(stage, centerAt(0))).x)
         .toBeGreaterThan(3);
       const right = await shadowCentroid(stage, centerAt(0));
+      await inspectorTop(page);
       await page.screenshot({
         path: info.outputPath('native-rotated-shadow-right.png'),
         fullPage: false,
@@ -464,6 +537,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true
         );
+        await inspectorTop(page);
         await page.screenshot({
           path: info.outputPath('native-narrow-shadow.png'),
           fullPage: false,
@@ -511,6 +585,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
       await expect
         .poll(async () => (await shadowCentroid(stage, centerAt(2.25))).x)
         .toBeGreaterThan(3);
+      await inspectorTop(page);
       await page.screenshot({
         path: info.outputPath('native-moving-shadow-center-left.png'),
         fullPage: false,
@@ -519,6 +594,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
       await expect
         .poll(async () => (await shadowCentroid(stage, centerAt(2.75))).x)
         .toBeLessThan(-3);
+      await inspectorTop(page);
       await page.screenshot({
         path: info.outputPath('native-moving-shadow-center-right.png'),
         fullPage: false,
@@ -559,6 +635,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
         body: JSON.stringify(await shadowCentroid(stage, centerAt(0))),
         contentType: 'application/json',
       });
+      await inspectorTop(page);
       await page.screenshot({
         path: info.outputPath('native-reopened-shadow.png'),
         fullPage: false,

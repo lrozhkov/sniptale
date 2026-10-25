@@ -10,6 +10,89 @@ import {
 } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`single recorded signal fills the inspector ${viewport.width}`, async ({ page }, info) => {
+    await page.setViewportSize(viewport);
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await seedReviewVideo(page, 'review-vp8-opus.webm', {
+        width: 160,
+        height: 90,
+        duration: 12.01,
+      });
+      await seedHistory(page, true);
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      const signal = dialog
+        .getByRole('button', {
+          name: new RegExp(label('gallery.videoReview.eventCursorIdle')),
+        })
+        .first();
+      await signal.focus();
+      await signal.press('Enter');
+      const properties = dialog.locator('[data-ui="gallery.videoReview.actionProperties"]');
+      await expect(properties).toBeVisible();
+      const all = dialog.getByRole('button', {
+        name: label('scenario.editor.inspectorShowAll'),
+        exact: true,
+      });
+      if (await all.isVisible()) await all.click();
+      const scroll = dialog.locator('.review-inspector-scroll');
+      const resize = dialog.locator('[data-ui="gallery.videoReview.resizeInspector"]');
+      const width = () =>
+        scroll.evaluate((node) => {
+          const css = getComputedStyle(node);
+          return node.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
+        });
+      for (const target of [523, 524, 525]) {
+        const current = await width();
+        const handle = (await resize.boundingBox())!;
+        await page.mouse.move(handle.x + handle.width / 2, handle.y + 12);
+        await page.mouse.down();
+        await page.mouse.move(handle.x + handle.width / 2 + current - target, handle.y + 12);
+        await page.mouse.up();
+        await expect.poll(width).toBe(target);
+        const sections = properties.locator('[data-ui="gallery.videoReview.inspectorSections"]');
+        const facts = sections.locator('[data-section="information"]');
+        const actions = sections.locator('[data-section="actions"]');
+        await expect(facts).toHaveCount(1);
+        await expect(actions).toHaveCount(1);
+        const owner = (await sections.boundingBox())!;
+        const first = (await facts.boundingBox())!;
+        const last = (await actions.boundingBox())!;
+        expect(
+          Math.abs(first.width - owner.width),
+          'one parameter group must use the full width'
+        ).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(last.x - first.x)).toBeLessThanOrEqual(0.5);
+        expect(last.y).toBeGreaterThanOrEqual(first.y + first.height);
+      }
+      await scroll.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await expect.poll(() => scroll.evaluate((node) => node.scrollTop)).toBe(0);
+      await page.screenshot({ path: info.outputPath('recorded-signal-top.png'), fullPage: false });
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
 for (const variant of [
   { locale: 'en', theme: 'light', narrow: false },
   { locale: 'ru', theme: 'dark', narrow: false },

@@ -147,6 +147,7 @@ export function ReviewWebcamInspector({
         </>
       ) : (
         <ReviewInspectorSections
+          leadingSectionColumn
           sections={[
             {
               id: 'webcam-layout',

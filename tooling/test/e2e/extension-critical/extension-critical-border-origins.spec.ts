@@ -18,6 +18,26 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
+/** Reset the actual Gallery or Native inspector scroll owner before each capture. */
+async function inspectorTop(page: Page) {
+  const owners = page.locator(
+    '.review-inspector-scroll:visible, [data-ui="video-editor.inspector.body"]:visible'
+  );
+  await expect.poll(() => owners.count()).toBeGreaterThan(0);
+  await owners.evaluateAll((nodes) => {
+    for (const node of nodes) node.scrollTop = 0;
+  });
+  await expect
+    .poll(() => owners.evaluateAll((nodes) => nodes.every((node) => node.scrollTop === 0)))
+    .toBe(true);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+  });
+}
+
 type Message = Parameters<typeof translate>[0];
 type Phase = 'enter' | 'hold' | 'exit';
 const phaseKeys = {
@@ -201,6 +221,7 @@ async function galleryWidths(
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true
     );
+    await inspectorTop(page);
     await page.screenshot({ path: info.outputPath('gallery-border-narrow.png'), fullPage: false });
     await page.setViewportSize(size);
     return;
@@ -237,11 +258,13 @@ async function galleryWidths(
     } else {
       expect(Math.abs(animation!.x - framing!.x)).toBeLessThanOrEqual(0.5);
     }
-    if (target !== original)
+    if (target !== original) {
+      await inspectorTop(page);
       await page.screenshot({
         path: info.outputPath(`gallery-border-width-${target}.png`),
         fullPage: false,
       });
+    }
   }
 }
 
@@ -385,6 +408,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
       ] as const) {
         await seekGallery(page, times[phase]);
         await expect.poll(() => galleryStroke(overlay, border)).toEqual(expected);
+        await inspectorTop(page);
         await page.screenshot({
           path: info.outputPath(`gallery-border-${phase}.png`),
           fullPage: false,
@@ -505,6 +529,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect
           .poll(() => nativeStroke(stage, transferred.width, transferred.height, border))
           .toEqual(expected);
+        await inspectorTop(page);
         await page.screenshot({
           path: info.outputPath(`native-border-${phase}.png`),
           fullPage: false,
@@ -543,6 +568,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
           expect(
             await nativeInspector.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)
           ).toBe(true);
+          await inspectorTop(page);
           await page.screenshot({
             path: info.outputPath(`native-border-width-${width}.png`),
             fullPage: false,
@@ -558,6 +584,7 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true
         );
+        await inspectorTop(page);
         await page.screenshot({
           path: info.outputPath('native-border-narrow.png'),
           fullPage: false,

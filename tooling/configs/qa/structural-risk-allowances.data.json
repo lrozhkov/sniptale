@@ -1073,11 +1073,11 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-action-history.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "astHash": "76417c5b7f2018e1483c5d329641bc67e578a22b3e8e9ffc5404a5d3fe4fa828",
-      "signatureHash": "ec33b335f57581f89c371195b3dd2b2fe5c46176a02f83d9b5e2395c17305c34",
-      "reviewDate": "2026-10-18",
-      "reason": "tool-noise: History editing/search/facets/exported click facts exercise one recorded-history receiver. Independently inspected by pr_structural_wrapper_diagnosis. This correction leaves the existing fixture sequence and cleanup unchanged; no product authority moves. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
+      "reason": "tool-noise: The sparse-signal journey has its own viewport, host, bootstrap and finally, and reuses established fixtures. Existing independent history journeys do not share live mutable state. File scale is not multiple runtime authority. Main inspection and independent read-only diagnosis support Keep for this exact scope.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent live state, unrelated fixture lifetimes, production effect boundaries or loss of authored-state continuity. Reassess if fixture decoration gains unrelated consumers. Remove when the analyzer models this cohesive test boundary.",
+      "reviewDate": "2026-10-26",
+      "astHash": "69daf27e652f94a4cfe8fb4917d68fca17ff79e69c54ffd715beed9597662c5f",
+      "signatureHash": "ec33b335f57581f89c371195b3dd2b2fe5c46176a02f83d9b5e2395c17305c34"
     },
     {
       "rule": "structural-function-risk",
@@ -1095,11 +1095,11 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-fragment-inspectors.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "astHash": "7333ec27c9ca36e640a380ac20522051e6326cbb104d0c66ecd6c585a357c297",
-      "signatureHash": "8ce7fbe82a9ac3169f4e857873f03fe064522448e787f418923e9ccafaf643b1",
-      "reviewDate": "2026-10-25",
-      "reason": "tool-noise: One seeded review/speech fixture checks inspector composition. Explicit annotation selection precedes the existing placement action; host/page lifecycle and cleanup are unchanged. Independently inspected by video006_structure_diagnosis. Fresh complete-candidate architecture review must validate this exact classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, fixture/page/session/resource lifetime, writer, recovery policy, command authority or cross-owner contract. Remove when the analyzer recognizes this cohesive owner/proof boundary."
+      "reason": "tool-noise: One authored Gallery session visits its inspector families. The capture transaction owns width, actual scroll reset, font settling, geometry artifact and screenshot for that panel. The existing adaptive-choice helper selects the same property through its current segment or dropdown presentation. JSON writes are test artifacts; no product writer or second runtime lifetime is added. Main inspection and independent read-only diagnosis support Keep for this exact cohesive scenario.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent live state, unrelated fixture lifetimes, production effect boundaries or loss of authored-state continuity. Reassess if fixture decoration gains unrelated consumers. Remove when the analyzer models this cohesive test boundary.",
+      "reviewDate": "2026-10-26",
+      "astHash": "88f2f16b1ae33c3375925d22194314282d324f8e27b30cd98ea065452015c464",
+      "signatureHash": "8ce7fbe82a9ac3169f4e857873f03fe064522448e787f418923e9ccafaf643b1"
     },
     {
       "rule": "structural-file-risk",
@@ -2569,10 +2569,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-camera-shadow.spec.ts",
       "symbol": "test callback#2",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: One Native camera journey proves direction, rotated raster, source-clock motion, history, reopen and encoded output against the same authored project. Fixture mutations precede bootstrap; subsequent changes use existing UI commands. Measurement and navigation helpers retain no state. Existing export proof owns decoding cleanup, and the callback owns one host lifetime. Splitting would recreate the state whose continuity this journey proves. Main inspection and independent read-only diagnosis support Keep. Final architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent project, page, fixture, resource lifetime, cleanup policy or journey without authored-state continuity. Remove when the analyzer recognizes this cohesive browser proof boundary.",
-      "reviewDate": "2026-10-25",
-      "astHash": "64ab6ced561fede1bd05407707a2dcd1f97f171cad326b71287a749268d2bb38",
+      "reason": "tool-noise: One project fixture and camera cross direct edits, history, movement, reopen and export in one browser lifetime. Added scroll resets only frame screenshots. Fixture configuration and observed UI edits retain the same authority. Main inspection and independent read-only diagnosis support Keep for this exact scope.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent live state, unrelated fixture lifetimes, production effect boundaries or loss of authored-state continuity. Reassess if fixture decoration gains unrelated consumers. Remove when the analyzer models this cohesive test boundary.",
+      "reviewDate": "2026-10-26",
+      "astHash": "65859371c47c13b98210b21a54a9a3d28532e70168f94354a1ed42f7f1340f25",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {
@@ -2591,10 +2591,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-border-origins.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: One authored border crosses Gallery editing, history, reopen, Native transfer and output checks. Direct-button selectors replace dropdown selectors in the same journey. One page and host retain their existing cleanup. Main inspection and independent read-only diagnosis support Keep. Fresh complete-candidate architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, command, gesture, writer, resource or recovery lifetime, or loss of authored-state continuity. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-25",
-      "astHash": "84e97d809ad6c2a53416c7190b47e49ea1bf57e0543696f55dbb5b3dc4123f8f",
+      "reason": "tool-noise: One authored border crosses Gallery edits, transfer, Native rendering and reopen checks with one server finally. Added scroll resets frame the existing screenshots; no state or resource owner is added. Main inspection and independent read-only diagnosis support Keep for this exact scope.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent live state, unrelated fixture lifetimes, production effect boundaries or loss of authored-state continuity. Reassess if fixture decoration gains unrelated consumers. Remove when the analyzer models this cohesive test boundary.",
+      "reviewDate": "2026-10-26",
+      "astHash": "0815ea5fb4ca266ec1a117774ef2307fc93b250d4a33b1f91995590435e00e9e",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {
@@ -2739,6 +2739,17 @@
       "reviewDate": "2026-10-25",
       "astHash": "fc251250ffc3947c6ea4eff4507fa97011206626f4f3da0c6ae4dea3544424a9",
       "signatureHash": "10eff182f64d28c06b18768db12a2bd9a169d0ae0af7e8d9bb33809fc7606409"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-inspector-audit.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: Each audit uses a fresh fixture and browser lifetime. Note and source voiceover preparation uses existing domain admission owners before bootstrap; imported effects use existing UI helpers. Local selection and capture helpers serve the same inspector audit owner. Main inspection and independent read-only diagnosis support Keep for this exact scope.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent live state, unrelated fixture lifetimes, production effect boundaries or loss of authored-state continuity. Reassess if fixture decoration gains unrelated consumers. Remove when the analyzer models this cohesive test boundary.",
+      "reviewDate": "2026-10-26",
+      "astHash": "44279cdf2a63f65c1218261119337cf4c77b067824d2490b0c9fd946e7ea2158",
+      "signatureHash": "e334f60762c5cd84fd18aa0402084a7fdff701dfec12d1adcc97957992db825f"
     }
   ]
 }
