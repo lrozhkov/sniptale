@@ -223,6 +223,20 @@ async function galleryWidths(
     await expect.poll(width).toBe(target);
     await origin.scrollIntoViewIfNeeded();
     await expect(origin).toBeVisible();
+    const sections = inspector.locator('[data-ui="gallery.videoReview.inspectorSections"]').first();
+    const framing = await sections.locator('[data-section="framing"]').first().boundingBox();
+    const animation = await sections.locator('[data-section="animation"]').first().boundingBox();
+    expect(framing).not.toBeNull();
+    expect(animation).not.toBeNull();
+    if (target >= 524) {
+      expect(
+        Math.abs(animation!.x - framing!.x - framing!.width - 12),
+        'parameter groups must occupy adjacent columns with the existing 12px gap'
+      ).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(animation!.y - framing!.y)).toBeLessThanOrEqual(0.5);
+    } else {
+      expect(Math.abs(animation!.x - framing!.x)).toBeLessThanOrEqual(0.5);
+    }
     if (target !== original)
       await page.screenshot({
         path: info.outputPath(`gallery-border-width-${target}.png`),
