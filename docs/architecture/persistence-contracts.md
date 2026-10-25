@@ -701,3 +701,15 @@ An absent field retains the classic shadow. Angle mode uses clockwise degrees fr
 Explicit directions retain shadow intensity, color and blur. They use the existing camera shadow offset length, including for the glow style. Classic glow remains centered. Split layouts and crop previews retain their existing shadow suppression. Conversion retains the authored settings. Rendering evaluates automatic directions after camera position animation. A directional shadow retains its scene angle when the camera rotates or scales.
 
 Database version 38 changes the mediaLibrary contract to 30 and the videoProjects contract to 7. This additive migration preserves all rows, history, stores, indexes and immutable media. Earlier writers cannot admit this database. Existing mutation, history, CAS, save and resource owners retain authority.
+
+## Border origins and two-sided phases
+
+Gallery advanced schema 26 admits optional border `origin`, entrance `draw-both` and exit `erase-both`. Montage schema 48 admits the same values. Earlier declared schemas refuse these additions. Existing border values remain supported. Mutation retains the required schema after field removal.
+
+Origin values are `top-center`, `top-left`, `top-right`, `bottom-right` and `bottom-left`. An absent origin retains the previous top-center behavior. A corner origin lies halfway along that corner's rounded arc. A square corner uses the corner itself. Distances follow the actual contour rather than quadrant fractions. The path retains its previous starting point and dash phase. Patterned paths retain their existing chord approximation.
+
+Two-sided entrance reveals equal contour lengths in both directions from the origin. Two-sided exit contracts the current visible interval equally from both ends. A rotating partial segment therefore retains its interval when exit starts. Existing entrance, hold and exit clocks remain authoritative. Fade, clockwise and counterclockwise reveal, hold rotation, pulse, ripple, speed and segment settings remain available. The painter retains its rules for closed strokes and empty intervals.
+
+Both editors retain the origin across phase changes and preserve it through conversion, history, save and reopen. Sampling remains independent of previous frames. Existing source cuts, rates and retained phase clocks keep their semantics.
+
+Database version 39 changes the mediaLibrary contract to 31 and the videoProjects contract to 8. This additive migration preserves all rows, history, stores, indexes and immutable media. Earlier writers cannot admit this database. Existing mutation, history, CAS, save and resource owners retain authority.

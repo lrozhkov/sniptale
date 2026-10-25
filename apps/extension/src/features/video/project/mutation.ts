@@ -1,3 +1,4 @@
+import { requiresExtendedBorderSchema } from './scene/focus-appearance';
 import type { VideoProject } from './types/index';
 
 /**
@@ -26,6 +27,7 @@ function getMutationSchemaVersion(
 }
 
 function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoProject['version'] {
+  if (regions?.some((region) => requiresExtendedBorderSchema(region.border))) return 48;
   if (regions?.some((region) => region.spotlightTarget === 'source-scene')) return 39;
   if (
     regions?.some(

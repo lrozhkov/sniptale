@@ -193,10 +193,10 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One canonical workspace transaction fixture retains serialized writes, quota refusal, stale revisions, restore fencing, history and retry. The camera screen behavior is data in the same advancedContent operation and private asset metadata rows, with no new acquisition, writer or resource lifetime. Main inspection and independent read-only diagnosis support Keep. Final architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent fixture, writer, transaction protocol, resource lifetime or recovery authority. Remove when the analyzer recognizes this cohesive persistence proof boundary.",
+      "reason": "tool-noise: The changed case adds a complete border payload to the existing canonical workspace snapshot. One private fixture and serialized queue prove quota refusal, retry, stale rejection, history and reopen. Camera, crop and border share the same transaction protocol. Main and independent read-only structural diagnosis inspected this exact scope and classified Keep. Final independent architecture review must assess it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery, parser or selection authority. Remove when the analyzer recognizes this cohesive registry or proof boundary.",
       "reviewDate": "2026-10-25",
-      "astHash": "5f1ed5caf3cba04c509bcad2d5495cf4986d632b5c5f8e48323980852f6d62bd",
+      "astHash": "6a780b1409d1616c2f7d5be85b53da856377d23d162c99524c98b013284a51dd",
       "signatureHash": "aa2976033c2c32dd68794adf3434898c3439caf4654ba2a7868bdb8d490eb52f"
     },
     {
@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One chronological migration registry adds a metadata-only admission descriptor. Existing upgrade execution retains every writer, transaction, resource lifetime and recovery owner. Splitting by version would distribute the contiguous migration contract. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reason": "tool-noise: The chronological registry appends one metadata-only DB38 to39 descriptor. It performs no row writes; upgrade transaction and recovery stay in the existing executor. Splitting the registry by length adds navigation without an independent authority. Main and independent read-only structural diagnosis inspected this exact scope and classified Keep. Final independent architecture review must assess it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery, parser or selection authority. Remove when the analyzer recognizes this cohesive registry or proof boundary.",
       "reviewDate": "2026-10-25",
-      "astHash": "b5f64f26a08dd7b6f9f28df8a8393da1f61610c3f2de0827745b5d3f6dd1ecbd",
+      "astHash": "f24a0f3b6225d82f507e24826d84b44c588743beecc93436a445eb68fe64ac97",
       "signatureHash": "e475b1fb64e96c97e8e5f06c50cd59834a250f161221c716acf6b3c21840b0ee"
     },
     {
@@ -1930,11 +1930,11 @@
       "rule": "structural-file-risk",
       "file": "apps/extension/src/features/video/project/validation/root.test.ts",
       "symbol": "<file>",
-      "owner": "project:validation:proof",
-      "reason": "tool-noise: This suite tests one Native root parser with existing project fixtures. Added cases distinguish raw observation bounds from clip bounds. Fixture values and assertions add no product state, writer, or resource lifetime. The score remains 2 and cohesion remains 1. Splitting the admission cases would duplicate the same parser fixture. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
-      "reviewDate": "2026-10-23",
-      "astHash": "f9db9be3a3cccd91ca5b58614a8e5f5107cd0ff299b9f9354f7dd77471a664e6",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: All cases exercise the Native root admission contract through local project fixtures. New parameterized cases distinguish schema48 from47 for each border field; future-version sentinels advance to49. No writer or independent fixture lifecycle enters this proof. Main and independent read-only structural diagnosis inspected this exact scope and classified Keep. Final independent architecture review must assess it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery, parser or selection authority. Remove when the analyzer recognizes this cohesive registry or proof boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "8f94ace85b5732be6bb2946d4d1967d7ef7190f2c5df6c45c4fedd18f0366e01",
       "signatureHash": "85d80d305d90413787f4fd06541033136498dab3df551a6e51d559b3b9548a63"
     },
     {
@@ -2525,10 +2525,10 @@
       "file": "apps/extension/src/features/video/project/validation/root.ts",
       "symbol": "isProjectSchemaCompatible",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One private pure reader-version gate checks whether the declared version can retain present fields. The new base and position checks retain existing shape admission, without a second parser, normalization or lifecycle. Main inspection and independent read-only structural diagnosis support Keep. Final architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, admission result, writer, resource lifetime, recovery authority or runtime contract. Remove when the analyzer recognizes this cohesive boundary.",
+      "reason": "tool-noise: The private pure compatibility gate checks one declared reader version. New motion-region detection delegates to requiresExtendedBorderSchema. Shape admission remains separate; no normalization, migration, state or effect enters this version matrix. Main and independent read-only structural diagnosis inspected this exact scope and classified Keep. Final independent architecture review must assess it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery, parser or selection authority. Remove when the analyzer recognizes this cohesive registry or proof boundary.",
       "reviewDate": "2026-10-25",
-      "astHash": "4bae58bec22061fa4b4b3696a4a88ef326798351a65914f4d97b2656be98e0ba",
+      "astHash": "b11b87d237975c6e5444321981495796137a8623aa7d9cc789d869417fd686ea",
       "signatureHash": "346d804c14ab0289db12c220cacfd66ba4e5301510c52178259b0d1bb8c74a0d"
     },
     {
@@ -2573,6 +2573,28 @@
       "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent project, page, fixture, resource lifetime, cleanup policy or journey without authored-state continuity. Remove when the analyzer recognizes this cohesive browser proof boundary.",
       "reviewDate": "2026-10-25",
       "astHash": "64ab6ced561fede1bd05407707a2dcd1f97f171cad326b71287a749268d2bb38",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/qa/proof/focused-coverage/maps/editor.mjs",
+      "symbol": "<file>",
+      "owner": "tooling:qa:proof",
+      "reason": "tool-noise: One static owner-to-proof array feeds the existing mapping aggregator. Two canonical persistence suites join the existing video-focus-appearance entry. No selection algorithm, executable check or second registry is added. Main and independent read-only structural diagnosis inspected this exact scope and classified Keep. Final independent architecture review must assess it. The existing Spotlight geometry consumer suite also joins this same static mapping after actual checkpoint coverage proved its omission; no selector algorithm or new registry changes.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery, parser or selection authority. Remove when the analyzer recognizes this cohesive registry or proof boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "cac644116ca4e1455e0c009e0ea02cf370236fd00c60c6f53aee397e857ce1e6",
+      "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-border-origins.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One authored border passes through Gallery editing/history, raster phase checks, reopen, real Native transfer, editing/history, reopen and encoded output. One page and host preserve authored-state continuity; the host closes in finally and existing export support owns decoding cleanup. Main and independent read-only structural diagnosis inspected this exact journey and classified Keep. The added lane selection uses the incumbent route and adds no authority. Final architecture review must assess this record. Final route waits for Native conversion before reading its project and selects the existing Appearance category. Positive encoded border pixels retain RGB10; absent points assert the same nonwhite contour mask, excluding unrelated moving-source color parity. These checks retain one authored-state journey and add no authority.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent projects, pages, fixtures, resource lifetimes or journeys without authored-state continuity. Remove when the analyzer recognizes this cohesive browser proof boundary.",
+      "reviewDate": "2026-10-25",
+      "astHash": "047089e2c315e3c686ae51812017afcb9a68dcaf5e225f0296647c686d679fcf",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     }
   ]

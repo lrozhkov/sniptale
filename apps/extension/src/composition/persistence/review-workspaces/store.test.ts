@@ -1,5 +1,8 @@
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
-import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../features/video/project/scene/focus-appearance';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 
@@ -899,7 +902,7 @@ it.each(['legacy', 'metadata', 'rollback'] as const)(
   }
 );
 
-it('retains crop and camera history through stale writes, quota failure, retry, undo and reopen', async () => {
+it('retains scene history through stale writes, quota failure, retry, undo and reopen', async () => {
   const opened = await openVideoWorkspace(id, source);
   const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
   const canvas = { width: 360, height: 360, crop: { x: 0.2, y: 0, width: 0.5625, height: 1 } };
@@ -908,6 +911,20 @@ it('retains crop and camera history through stale writes, quota failure, retry, 
     split: 'left' as const,
     screenBehavior: 'shift' as const,
     shadowDirection: { mode: 'angle' as const, angle: 225 },
+  };
+  const zoom = {
+    enabled: true,
+    regions: [
+      {
+        ...createQuickEditZoomRegion({ id: 'border', at: 1, duration: 2, endMax: source.duration }),
+        border: {
+          ...createQuickEditBorder(),
+          origin: 'bottom-left' as const,
+          reveal: 'draw-both' as const,
+          exitReveal: 'erase-both' as const,
+        },
+      },
+    ],
   };
   rows.get('project_assets')!.set('camera', {
     id: 'camera',
@@ -925,7 +942,7 @@ it('retains crop and camera history through stale writes, quota failure, retry, 
       at: 1,
       target: 'advancedContent' as const,
       before,
-      after: { ...before, canvas, webcam },
+      after: { ...before, canvas, webcam, zoom },
     },
   };
   harness.failure = true;
@@ -936,7 +953,7 @@ it('retains crop and camera history through stale writes, quota failure, retry, 
   await expect(commitVideoWorkspace(args)).rejects.toMatchObject({ code: 'conflict' });
   const reopened = await openVideoWorkspace(id, source);
   expect(reopened.workspace.history).toHaveLength(1);
-  expect(reopened.workspace.history[0]).toMatchObject({ after: { canvas, webcam } });
+  expect(reopened.workspace.history[0]).toMatchObject({ after: { canvas, webcam, zoom } });
   const undone = await moveVideoWorkspaceHistory({
     aggregateId: id,
     expectedSourceAssetId: opened.workspace.sourceAssetId,

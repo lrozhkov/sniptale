@@ -1,3 +1,4 @@
+import { requiresExtendedBorderSchema } from '../project/scene/focus-appearance';
 import { resolveQuickEditFocusLink } from './advanced/focus-layout';
 import { projectMotionSourceBinding } from '../project/motion/source-binding';
 import { getVideoProjectUtilityLanes } from '../project/utility-lanes';
@@ -76,9 +77,11 @@ export function planReviewProjectMotion(
         easing: region.linkEasing === 'linear' ? 'LINEAR' : 'EASE_IN_OUT',
       };
   }
-  const minimumVersion = regions.some((region) => region.spotlightTarget === 'source-scene')
-    ? 39
-    : 34;
+  const minimumVersion = regions.some((region) => requiresExtendedBorderSchema(region.border))
+    ? 48
+    : regions.some((region) => region.spotlightTarget === 'source-scene')
+      ? 39
+      : 34;
   const utilityLanes = getVideoProjectUtilityLanes(project);
   return {
     ...project,

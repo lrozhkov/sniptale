@@ -359,3 +359,28 @@ it('admits camera shadow direction without rewriting released projects, history 
     ],
   });
 });
+
+it('admits border origins and two-sided phases without rewriting released projects, history or bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 38
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 39);
+  expect(target).toBeDefined();
+  expect(target?.records).toEqual(source.records);
+  expect(target?.opfsObjects).toEqual(source.opfsObjects);
+  expect(target?.stores).toEqual(source.stores);
+  expect(target?.indexes).toEqual(source.indexes);
+  expect(target?.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 31,
+    videoProjects: 8,
+  });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 39)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 30, to: 31 },
+      { domainId: 'videoProjects', from: 7, to: 8 },
+    ],
+  });
+});

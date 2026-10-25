@@ -77,10 +77,36 @@ export function sceneBorderPath(rect: SceneRect, radius: number, patterned = fal
   };
 }
 
+/** Contour distance to a corner midpoint uses the same arc/chord length as the painted path. */
+function borderOrigin(
+  rect: SceneRect,
+  radius: number,
+  patterned: boolean,
+  origin: QuickEditBorder['origin'],
+  perimeter: number
+): number {
+  if (!origin || origin === 'top-center' || perimeter <= 0) return 0;
+  const r = Math.max(0, Math.min(radius, rect.width / 2, rect.height / 2));
+  const steps = Math.max(4, Math.ceil((Math.PI / 2) * Math.sqrt(r / 0.2)));
+  const arc = patterned ? steps * 2 * r * Math.sin(Math.PI / (4 * steps)) : (Math.PI * r) / 2;
+  const first = rect.width / 2 - r;
+  const vertical = rect.height - 2 * r,
+    horizontal = rect.width - 2 * r;
+  const distance =
+    origin === 'top-right'
+      ? first + arc / 2
+      : origin === 'bottom-right'
+        ? first + arc * 1.5 + vertical
+        : origin === 'bottom-left'
+          ? first + arc * 2.5 + vertical + horizontal
+          : first + arc * 3.5 + 2 * vertical + horizontal;
+  return distance / perimeter;
+}
+
 function borderPhase(
   clock: SceneBorderClock,
   border: QuickEditBorder,
-  geometry: { width: number; perimeter: number }
+  geometry: { width: number; perimeter: number; origin: number }
 ) {
   const { duration, enter, exit } = clock;
   const t = clock.time;
@@ -97,20 +123,23 @@ function borderPhase(
   const pitch = geometry.width * (border.style === 'dashed' ? 5 : 2);
   const movement = rotation ? direction * elapsed * (2 / border.period) * pitch : 0;
   const holdInterval = () => {
-    if (!rotation) return { start: 0, end: 1 };
+    if (!rotation) return { start: geometry.origin, end: geometry.origin + 1 };
     const shrink = Math.min(1, elapsed / Math.min(0.2, hold));
-    const start = geometry.perimeter > 0 ? movement / geometry.perimeter : 0;
+    const start = geometry.origin + (geometry.perimeter > 0 ? movement / geometry.perimeter : 0);
     return { start, end: start + 1 - (1 - border.segmentPercent / 100) * shrink };
   };
-  let start = 0,
-    end = 1,
+  let start = geometry.origin,
+    end = geometry.origin + 1,
     opacity = 1;
   if (t < enterDuration) {
     const p = cameraTransitionProgress(t / enterDuration, enter.type);
-    if (border.reveal === 'draw') end = p;
+    if (border.reveal === 'draw') end = geometry.origin + p;
     else if (border.reveal === 'draw-ccw') {
-      start = -p;
-      end = 0;
+      start = geometry.origin - p;
+      end = geometry.origin;
+    } else if (border.reveal === 'draw-both') {
+      start = geometry.origin - p / 2;
+      end = geometry.origin + p / 2;
     } else opacity = p;
   } else {
     ({ start, end } = holdInterval());
@@ -120,7 +149,11 @@ function borderPhase(
       const p = cameraTransitionProgress((t - duration + exitDuration) / exitDuration, exit.type);
       if (border.exitReveal === 'erase') start += (end - start) * p;
       else if (border.exitReveal === 'erase-ccw') end -= (end - start) * p;
-      else opacity *= 1 - p;
+      else if (border.exitReveal === 'erase-both') {
+        const trim = ((end - start) * p) / 2;
+        start += trim;
+        end -= trim;
+      } else opacity *= 1 - p;
     }
   }
   const ripple = (elapsed / border.period) % 1;
@@ -165,7 +198,11 @@ export function sampleSceneBorder(args: {
   };
   const radius = Math.max(0, Math.min(area.width, area.height) * border.roundness - inset);
   const path = sceneBorderPath(rect, radius, border.style !== 'solid');
-  const phase = borderPhase(args.clock, border, { width, perimeter: path.perimeter });
+  const phase = borderPhase(args.clock, border, {
+    width,
+    perimeter: path.perimeter,
+    origin: borderOrigin(rect, radius, border.style !== 'solid', border.origin, path.perimeter),
+  });
   const primary: SceneBorderFrame = {
     id: args.id,
     ...path,

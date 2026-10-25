@@ -152,8 +152,11 @@ export const EDITOR_OWNER_MAPPINGS = [
     reason:
       'Spotlight and border admission retain Gallery scene, edit, persistence and backup contracts.',
     testFiles: [
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-advanced.test.ts',
       'apps/extension/src/features/video/review/advanced/focus.test.ts',
       'apps/extension/src/features/video/review/advanced/border.test.ts',
+      'apps/extension/src/features/video/composition/scene-spotlight.test.ts',
       'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
       'apps/extension/src/features/video/review/advanced/migration.test.ts',
       'apps/extension/src/composition/persistence/review-workspaces/focus-compatibility.test.ts',

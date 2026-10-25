@@ -326,7 +326,7 @@ it('fences timing at schema 32 and admits video timing on compatible ordinary tr
     expect(isHydratableVideoProject({ ...project, version })).toBe(false);
   for (const version of [32, 33, 34, 35, 36, 37, 38, 39, 40])
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
-  expect(isHydratableVideoProject({ ...project, version: 48 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 49 })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,

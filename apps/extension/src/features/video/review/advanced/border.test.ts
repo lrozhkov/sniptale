@@ -201,6 +201,10 @@ it.each([
   ['draw', 'erase', 'clockwise'],
   ['draw-ccw', 'erase-ccw', 'counterclockwise'],
   ['fade', 'fade', 'pulse'],
+  ['draw-both', 'erase-both', 'clockwise'],
+  ['draw-both', 'erase-both', 'counterclockwise'],
+  ['draw-both', 'erase-both', 'pulse'],
+  ['draw-both', 'erase-both', 'ripple'],
 ] as const)(
   'matches source %s and %s with %s exactly after cuts and speed boundaries',
   (reveal, exitReveal, motion) => {
@@ -217,6 +221,7 @@ it.each([
       style: 'dashed',
       loop: true,
       segmentPercent: 37,
+      ...(reveal === 'draw-both' ? { origin: 'bottom-left' as const } : {}),
     };
     const map = buildReviewTimeMap(10, [
       {
@@ -639,4 +644,19 @@ it('orders active borders by source anchor and stable identity while omitting do
     regions: [second, { ...first, id: 'dormant', dormant: true }, first, earlier, unanchored],
   });
   expect(frames.map((frame) => frame.id)).toEqual(['unanchored', 'c', 'a', 'b']);
+});
+
+it.each([
+  { origin: 'top-center' as const },
+  { origin: 'bottom-left' as const },
+  { reveal: 'draw-both' as const },
+  { exitReveal: 'erase-both' as const },
+])('admits new border setting %j only in schema 26', (patch) => {
+  const region = border();
+  region.border = { ...region.border, ...patch };
+  const state = { ...createQuickEditAdvancedState(), zoom: { enabled: true, regions: [region] } };
+  expect(loadQuickEditAdvancedState(state)?.zoom.regions[0]?.border).toEqual(region.border);
+  expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 25 })).toBeNull();
+  for (const origin of [null, 'unknown', 7])
+    expect(parseQuickEditBorder({ ...region.border, origin })).toBeNull();
 });

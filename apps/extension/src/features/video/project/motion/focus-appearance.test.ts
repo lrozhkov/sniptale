@@ -136,3 +136,39 @@ it.each([0, 31, NaN, Infinity])('refuses invalid lens rim width %s', (lensEdgeWi
   ).toBeNull();
   expect(region.spotlight).toBeUndefined();
 });
+
+it('retains two-sided origin edits without changing clocks or rewriting equal settings', () => {
+  const project = createEmptyVideoProject('Border');
+  const initial = {
+    ...createVideoProjectMotionRegion(project, 0),
+    border: createQuickEditBorder(),
+  };
+  const before = structuredClone(initial);
+  const changed = editMotionFocus(project, initial, {
+    kind: 'border',
+    settings: { origin: 'bottom-right', reveal: 'draw-both', exitReveal: 'erase-both' },
+  })!;
+  expect(changed).toEqual({
+    ...initial,
+    borderTarget: 'viewport',
+    border: {
+      ...initial.border,
+      origin: 'bottom-right',
+      reveal: 'draw-both',
+      exitReveal: 'erase-both',
+    },
+  });
+  expect(
+    editMotionFocus(project, changed, { kind: 'border', settings: { origin: 'bottom-right' } })
+  ).toBe(changed);
+  expect(initial).toEqual(before);
+  for (const settings of [
+    { origin: 'unknown' },
+    { reveal: 'draw-sideways' },
+    { exitReveal: 'erase-sideways' },
+  ]) {
+    const edit: MotionFocusEdit = { kind: 'border' };
+    Reflect.set(edit, 'settings', settings);
+    expect(editMotionFocus(project, changed, edit)).toBeNull();
+  }
+});

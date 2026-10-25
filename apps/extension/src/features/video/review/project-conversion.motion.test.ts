@@ -4,7 +4,7 @@ import { createVideoProjectFromRecording } from '../project/factories/creation';
 import { VideoMotionFocusMode } from '../project/types';
 import { normalizeVideoProjectCursorSkin } from '../project/cursor';
 import { hydrateVideoProject } from '../project/hydration';
-import { isExportReadyVideoProject } from '../project/validation/root';
+import { isExportReadyVideoProject, isHydratableVideoProject } from '../project/validation/root';
 import {
   resolveVideoCompositionCamera,
   mapCompositionPointThroughCamera,
@@ -597,5 +597,24 @@ it.each(
   const saved = JSON.parse(JSON.stringify(converted.project));
   expect(isExportReadyVideoProject(saved)).toBe(true);
   expect(hydrateVideoProject(saved).motionRegions).toMatchObject(converted.project.motionRegions!);
+  expect(input).toEqual(before);
+});
+
+it.each([
+  { origin: 'bottom-left' as const },
+  { reveal: 'draw-both' as const },
+  { exitReveal: 'erase-both' as const },
+])('transfers extended border %j through schema 48 and reopen', (settings) => {
+  const input = motionFixture();
+  const source = input.document.advancedContent.zoom.regions[0]!;
+  source.border = { ...createQuickEditBorder(), ...settings };
+  const before = structuredClone(input);
+  const plan = planReviewProjectConversion(input);
+  if (plan.status !== 'prepared') throw new Error(JSON.stringify(plan));
+  expect(plan.project.version).toBe(48);
+  const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(plan.project)));
+  expect(isExportReadyVideoProject(reopened)).toBe(true);
+  expect(reopened.motionRegions![0]!.border).toEqual(source.border);
+  expect(isHydratableVideoProject({ ...reopened, version: 47 })).toBe(false);
   expect(input).toEqual(before);
 });
