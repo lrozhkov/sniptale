@@ -602,8 +602,26 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         expect(box.width).toBeGreaterThanOrEqual(24);
         expect(box.width).toBeLessThanOrEqual(36);
       }
+      const contentScroll = ui(page, 'settings.page.content-scroll');
+      const historyList = ui(page, 'settings.voice.history').getByRole('list');
+      const historyHeading = ui(page, 'settings.voice.history').getByRole('heading');
+      await contentScroll.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      const initialHeight = await contentScroll.evaluate((node) => node.scrollHeight);
+      const initialHeading = (await historyHeading.boundingBox())!;
       await voiceScreenshot(page, info, `history-compact-${viewport.name}`);
       await expand.click();
+      expect(await contentScroll.evaluate((node) => node.scrollHeight)).toBeLessThanOrEqual(
+        initialHeight + 1
+      );
+      expect(
+        Math.abs((await historyHeading.boundingBox())!.y - initialHeading.y)
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await historyList.evaluate((node) => node.scrollHeight - node.clientHeight)
+      ).toBeGreaterThan(0);
+      await expect(historyList).toHaveCSS('overflow-y', 'auto');
       await expect(paragraph).toBeFocused();
       await paragraph.click({ clickCount: 3 });
       await expect.poll(() => page.evaluate(() => getSelection()?.toString().trim())).toBe(text);
@@ -629,6 +647,43 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await ui(row, 'settings.voice.history-copy').scrollIntoViewIfNeeded();
       await ui(row, 'settings.voice.history-copy').click();
       await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+      await page.setViewportSize(viewport.size);
+      for (let index = 0; index < 5; index += 1) {
+        await recordSettingsMicrophone(page);
+        await expect(ui(page, 'settings.voice.history-row')).toHaveCount(index + 2);
+      }
+      await contentScroll.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await historyList.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await expect(ui(page, 'settings.voice.history').locator('dl')).toHaveCount(0);
+      expect(await historyList.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(
+        true
+      );
+      const headerBefore = (await historyHeading.boundingBox())!;
+      const outerBefore = await contentScroll.evaluate((node) => ({
+        top: node.scrollTop,
+        height: node.scrollHeight,
+      }));
+      await historyList.hover();
+      await page.mouse.wheel(0, 10000);
+      await expect.poll(() => historyList.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      expect(
+        await contentScroll.evaluate((node) => ({ top: node.scrollTop, height: node.scrollHeight }))
+      ).toEqual(outerBefore);
+      expect(
+        Math.abs((await historyHeading.boundingBox())!.y - headerBefore.y)
+      ).toBeLessThanOrEqual(1);
+      const lastRow = ui(page, 'settings.voice.history-row').last();
+      await ui(lastRow, 'settings.voice.history-play').click();
+      await expect(ui(lastRow, 'settings.voice.history-audio')).toBeVisible();
+      await ui(lastRow, 'settings.voice.history-play').click();
+      await ui(lastRow, 'settings.voice.history-delete').click();
+      await expect(ui(lastRow, 'settings.voice.history-delete-cancel')).toBeFocused();
+      await ui(lastRow, 'settings.voice.history-delete-cancel').click();
+      await voiceScreenshot(page, info, `history-list-scroll-${viewport.name}`);
     });
   });
 }

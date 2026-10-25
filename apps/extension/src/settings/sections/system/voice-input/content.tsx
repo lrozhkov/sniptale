@@ -612,18 +612,16 @@ export function VoiceInputSettingsContent(controller: VoiceInputSettingsControll
         </div>
         {controller.preferences.enabled !== false && controller.preferences.backend === 'model' ? (
           <aside
-            className="min-w-0 border-l border-[var(--sniptale-color-border-subtle)] pl-4"
+            className={[
+              'sticky top-0 flex h-[calc(100dvh-124px)] min-h-0 min-w-0 flex-col overflow-hidden border-l pl-4',
+              'border-[var(--sniptale-color-border-subtle)]',
+            ].join(' ')}
             aria-label={translate('settings.voiceInput.historyTitle')}
           >
             <VoiceInputHistoryPanel
               showRetry={controller.preferences.backend === 'model'}
               refreshToken={phase}
               canRetry={controller.models.transcriptionSelectionId !== null}
-              retryModelLabel={
-                controller.models.transcription.models.find(
-                  (model) => model.id === controller.models.transcriptionSelectionId
-                )?.displayName ?? null
-              }
             />
           </aside>
         ) : null}

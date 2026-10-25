@@ -28,13 +28,11 @@ export function VoiceInputHistoryPanel({
   refreshToken,
   showRetry = true,
   canRetry = false,
-  retryModelLabel = null,
 }: {
   dependencies?: VoiceHistoryDependencies;
   refreshToken?: string | number;
   canRetry?: boolean;
   showRetry?: boolean;
-  retryModelLabel?: string | null;
 } = {}) {
   const history = useVoiceHistory(dependencies);
   const locale = useAppLocale();
@@ -49,10 +47,10 @@ export function VoiceInputHistoryPanel({
   const [confirmId, setConfirmId] = useState<string | null>(null);
   return (
     <section
-      className={`${settingsCompactWorkbenchClassName} space-y-2`}
+      className={`${settingsCompactWorkbenchClassName} flex min-h-0 flex-1 flex-col gap-2 overflow-hidden`}
       data-ui="settings.voice.history"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <h2
             className={[
@@ -82,24 +80,18 @@ export function VoiceInputHistoryPanel({
           {translate('settings.voiceInput.historyEmpty')}
         </p>
       ) : null}
-      {showRetry && retryModelLabel ? (
-        <dl className="text-xs leading-5">
-          <div className="flex flex-wrap gap-x-2">
-            <dt className="text-[var(--sniptale-color-text-secondary)]">
-              {translate('settings.voiceInput.historyRetryModel')}
-            </dt>
-            <dd className="min-w-0 break-words text-[var(--sniptale-color-text-primary)]">
-              {retryModelLabel}
-            </dd>
-          </div>
-        </dl>
-      ) : null}
       {showRetry && history.entries.length > 0 && !canRetry ? (
         <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('settings.voiceInput.historyRetryUnavailable')}
         </p>
       ) : null}
-      <ul className="divide-y divide-[var(--sniptale-color-border-subtle)]">
+      <ul
+        data-ui="settings.voice.history-scroll"
+        className={[
+          'min-h-0 flex-1 divide-y overflow-y-auto overscroll-contain',
+          'divide-[var(--sniptale-color-border-subtle)]',
+        ].join(' ')}
+      >
         {history.entries.map((entry) => (
           <HistoryEntryRow
             key={entry.incarnation}

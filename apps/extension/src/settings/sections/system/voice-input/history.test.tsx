@@ -55,12 +55,7 @@ function fixture() {
   return {
     client,
     deps,
-    async render(
-      refreshToken = 0,
-      canRetry?: boolean,
-      retryModelLabel?: string | null,
-      showRetry = true
-    ) {
+    async render(refreshToken = 0, canRetry?: boolean, showRetry = true) {
       await act(async () =>
         root.render(
           <CommandPressScope value>
@@ -69,7 +64,6 @@ function fixture() {
               dependencies={deps}
               refreshToken={refreshToken}
               {...(canRetry === undefined ? {} : { canRetry })}
-              {...(retryModelLabel === undefined ? {} : { retryModelLabel })}
             />
           </CommandPressScope>
         )
@@ -101,13 +95,11 @@ describe('private voice history panel', () => {
     await act(async () => button('retry').click());
     expect(f.client.retry).toHaveBeenCalledOnce();
   });
-  it('names the speech model used for saved-audio recognition', async () => {
+  it('keeps model metadata out of the history header', async () => {
     const f = fixture();
-    await f.render(0, true, 'Speech model');
-    expect(container.querySelector('dt')?.textContent).toBe(
-      'settings.voiceInput.historyRetryModel'
-    );
-    expect(container.querySelector('dd')?.textContent).toBe('Speech model');
+    await f.render(0, true);
+    expect(container.querySelector('dl')).toBeNull();
+    expect(container.textContent).not.toContain('settings.voiceInput.historyRetryModel');
   });
 
   it('requires an explicit saved-audio transcription capability before Retry', async () => {
@@ -199,16 +191,16 @@ describe('private voice history panel', () => {
 
 it('keeps Chrome history readable without model retry controls and restores them on return', async () => {
   const f = fixture();
-  await f.render(0, true, 'Speech model', false);
+  await f.render(0, true, false);
   expect(button('retry')).toBeNull();
   expect(button('play')).not.toBeNull();
   expect(button('copy')).not.toBeNull();
   expect(button('delete')).not.toBeNull();
   expect(container.textContent).not.toContain('Speech model');
   expect(container.textContent).not.toContain('settings.voiceInput.historyRetryUnavailable');
-  await f.render(0, true, 'Speech model', true);
+  await f.render(0, true, true);
   expect(button('retry').disabled).toBe(false);
-  expect(container.textContent).toContain('Speech model');
+  expect(container.textContent).not.toContain('Speech model');
   expect(f.client.remove).not.toHaveBeenCalled();
 });
 

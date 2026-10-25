@@ -1,7 +1,6 @@
 import { defineMessageSource } from '../source';
 
 export const settingsVoiceInputMessages = defineMessageSource({
-  historyRetryModel: { ru: 'Модель для сохранённого аудио', en: 'Saved audio recognition model' },
   reloadModels: { ru: 'Загрузить настройки заново', en: 'Reload model settings' },
   historyRetryUnavailable: {
     ru: 'Для повторного распознавания сохранённого аудио выберите модель распознавания.',
