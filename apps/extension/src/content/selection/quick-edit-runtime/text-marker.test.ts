@@ -261,3 +261,28 @@ it('uses zero alpha as an eraser, preserves remainders and does not record an em
   history.undo('page-editing');
   expect(spans()).toHaveLength(2);
 });
+
+it('accepts whitespace-only selection as a no-op without opening history', () => {
+  target.textContent = ' \t \n';
+  const range = document.createRange();
+  range.selectNodeContents(target);
+  const begin = vi.spyOn(history, 'beginTransaction');
+  expect(controller.add(range, '#ffdf0066')).toBe(true);
+  expect(begin).not.toHaveBeenCalled();
+  expect(list()).toEqual([]);
+  expect(registry.size).toBe(0);
+});
+
+it('excludes trailing whitespace across inline nodes and replays the trimmed range', () => {
+  const range = document.createRange();
+  range.setStart(target.firstChild!, 0);
+  range.setEnd(target.lastChild!, 1);
+  const html = target.innerHTML;
+  expect(controller.add(range, '#ffdf0066')).toBe(true);
+  expect(list().map((item) => item.text)).toEqual(['First second']);
+  expect(target.innerHTML).toBe(html);
+  history.undo('page-editing');
+  expect(list()).toEqual([]);
+  history.redo('page-editing');
+  expect(list().map((item) => item.text)).toEqual(['First second']);
+});

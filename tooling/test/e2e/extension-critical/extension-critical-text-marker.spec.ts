@@ -108,6 +108,23 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     const eraser = panel.locator('[data-ui="content.toolbar.text-marker-eraser"]');
     await expect(eraser).toBeVisible();
     const highlights = () => page.evaluate(() => CSS.highlights.size);
+    await paintText(page, 'marker-proof', 6, 7);
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    await expect.poll(highlights).toBe(0);
+    await paintText(page, 'marker-proof', 0, 7);
+    await expect.poll(highlights).toBe(1);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Array.from(CSS.highlights.values()).flatMap((highlight) =>
+            Array.from(highlight).map((range) => (range instanceof Range ? range.toString() : null))
+          )
+        )
+      )
+      .toEqual(['Marker']);
+    await page.screenshot({ path: info.outputPath('marker-trailing-space.png'), fullPage: false });
+    await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+    await expect.poll(highlights).toBe(0);
     await paintText(page, 'marker-proof', 0, 30);
     await expect.poll(highlights).toBe(1);
     await page.screenshot({ path: info.outputPath('marker-translucent.png'), fullPage: false });

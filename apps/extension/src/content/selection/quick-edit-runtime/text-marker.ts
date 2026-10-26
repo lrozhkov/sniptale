@@ -214,6 +214,8 @@ export function createTextMarkerController(deps: {
     supported: () =>
       typeof Highlight !== 'undefined' && typeof CSS !== 'undefined' && 'highlights' in CSS,
     add: (range: Range, value: string): boolean => {
+      const selectedText = range.toString();
+      if (!selectedText.trim()) return true;
       const color = normalizeColor(value);
       const common = range.commonAncestorContainer;
       const ElementType = common.ownerDocument?.defaultView?.Element ?? Element;
@@ -224,15 +226,7 @@ export function createTextMarkerController(deps: {
         if (ancestor instanceof HTMLElementType && isQuickEditTextElement(ancestor))
           target = ancestor;
       }
-      if (
-        !color ||
-        !target ||
-        !target.isConnected ||
-        isContentOwnedElement(target) ||
-        range.collapsed ||
-        !range.toString().trim()
-      )
-        return false;
+      if (!color || !target || !target.isConnected || isContentOwnedElement(target)) return false;
       if (target.closest('script,style,noscript,textarea,input,[contenteditable="true"]'))
         return false;
       const prefix = target.ownerDocument.createRange();
@@ -244,7 +238,7 @@ export function createTextMarkerController(deps: {
         color,
         source: target.textContent ?? '',
         start,
-        end: start + range.toString().length,
+        end: start + selectedText.trimEnd().length,
       };
       return mutate(
         planMarkerPaint(
