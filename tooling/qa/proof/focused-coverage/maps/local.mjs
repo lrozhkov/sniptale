@@ -1,5 +1,83 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-inspector-section-consumers',
+    productionFile: 'apps/extension/src/gallery/video-review/inspector-sections.tsx',
+    reason:
+      'The shared section presentation and remembered disclosure owner serves scene, selection, history, speech, note and camera inspector consumers.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/annotation-effects-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/cursor-path-overlay.test.tsx',
+      'apps/extension/src/gallery/video-review/selected-properties.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/advanced-panels.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/click-animation-fields.test.tsx',
+      'apps/extension/src/gallery/video-review/key-animation-fields.test.tsx',
+      'apps/extension/src/gallery/video-review/comment-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/original-audio-track.test.tsx',
+      'apps/extension/src/gallery/video-review/audio-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-ui.test.tsx',
+      'apps/extension/src/gallery/video-review/action-history.test.tsx',
+      'apps/extension/src/gallery/video-review/action-properties.test.tsx',
+      'apps/extension/src/gallery/video-review/text-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/caption-controls.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-speech-phrase-consumers',
+    productionFile: 'apps/extension/src/gallery/video-review/speech-phrase.tsx',
+    reason:
+      'The shared phrase receiver preserves native text input, captions, speech panel editing and subtitle delivery.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/selected-properties.test.tsx',
+      'apps/extension/src/gallery/video-review/caption-controls.test.tsx',
+      'apps/extension/src/gallery/video-review/text-input-save.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/review-subtitles.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-webcam-hidden-marker-gestures',
+    productionFile: 'apps/extension/src/gallery/video-review/webcam-hidden-marker.tsx',
+    reason:
+      'The camera UI proves source-axis hidden ranges, delayed keyboard admission, stale gesture refusal, unmount cancellation and retry.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-ui.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-webcam-track-gestures',
+    productionFile: 'apps/extension/src/gallery/video-review/webcam-track.tsx',
+    reason:
+      'The camera track consumer proves source-axis placement, source selection, admitted drag cancellation and keyboard movement.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-ui.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-advanced-content-gesture-journal',
+    productionFile: 'apps/extension/src/gallery/video-review/use-advanced-content.ts',
+    allowCrossOwner: true,
+    reason:
+      'The content writer preserves closed gesture groups, failed-capture retry, concurrent rebasing, reset generations and the existing autosave session boundary.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
+      'apps/extension/src/gallery/video-review/use-advanced.test.tsx',
+      'apps/extension/src/gallery/video-review/use-advanced.autosave.test.tsx',
+      'apps/extension/src/workflows/video-review/session.autosave.test.ts',
+    ],
+  },
+  {
     owner: 'native-workspace-preview-selection',
     productionFile: 'apps/extension/src/video-editor/runtime/controller/workspace/core.ts',
     reason:
@@ -695,6 +773,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/background/ai/audio/authorization.test.ts',
       'apps/extension/src/background/ai/audio/authorization.source.test.ts',
+      'apps/extension/src/background/ai/audio/authorization.project.test.ts',
+      'apps/extension/src/background/ai/audio/authorization.project-text.test.ts',
       'apps/extension/src/background/ai/audio/chat-transcription.test.ts',
       'apps/extension/src/background/ai/audio/model-config.test.ts',
     ],

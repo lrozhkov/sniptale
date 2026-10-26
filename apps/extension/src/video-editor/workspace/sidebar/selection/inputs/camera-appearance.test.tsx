@@ -136,8 +136,12 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
   expect(
     container.querySelector('input[aria-label="videoEditor.sidebar.cameraRoundness"]')
   ).toBeNull();
-  const shapeChoices = [...container.querySelectorAll<HTMLButtonElement>('[aria-pressed]')];
-  expect(shapeChoices).toHaveLength(6);
+  const shapeChoices = [
+    ...container.querySelectorAll<HTMLButtonElement>(
+      '[role="group"][aria-label="videoEditor.sidebar.cameraShape"] button'
+    ),
+  ];
+  expect(shapeChoices).toHaveLength(4);
   expect(shapeChoices.every((button) => button.disabled)).toBe(true);
   expect(
     shapeChoices
@@ -319,4 +323,175 @@ it('shows destination framing and resets its override without copying crop into 
   render();
   expect(reset.disabled).toBe(true);
   expect(input.value).toBe('125');
+});
+
+it('previews the resolved rectangular split camera crop without rewriting the dormant dock', () => {
+  const base = createProps();
+  base.project.tracks = [
+    {
+      id: base.clip.trackId,
+      name: 'Camera',
+      kind: 'PRIMARY',
+      role: 'CAMERA',
+      order: 0,
+      visible: true,
+      locked: false,
+    },
+  ];
+  base.clip.cameraSplit = 'left';
+  base.clip.cameraScreenBehavior = 'shrink';
+  base.clip.cameraAppearance = {
+    ...DEFAULT_CAMERA_APPEARANCE,
+    shape: 'circle',
+    zoom: 2,
+    panX: 0.3,
+  };
+  const dormant = structuredClone(base.clip.transform);
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={base.clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={vi.fn()}
+      />
+    )
+  );
+  const preview = container.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.sidebar.cameraCropPreview"]'
+  )!;
+  expect(preview.style.aspectRatio).toBe(`${base.project.width * 0.49} / ${base.project.height}`);
+  expect(base.clip.transform).toEqual(dormant);
+});
+
+it('keeps the selected destination crop aperture while scrubbing inside a smooth dock-to-split transition', () => {
+  const base = createProps();
+  base.project.tracks = [
+    {
+      id: base.clip.trackId,
+      name: 'Camera',
+      kind: 'PRIMARY',
+      role: 'CAMERA',
+      order: 0,
+      visible: true,
+      locked: false,
+    },
+  ];
+  base.clip.cameraAppearance = { ...DEFAULT_CAMERA_APPEARANCE, shape: 'circle' };
+  base.clip.cameraPositions = [
+    {
+      id: 'panel',
+      sourceTime: 2,
+      cameraSplit: 'left',
+      transform: { ...base.clip.transform },
+      fitMode: base.clip.fitMode,
+      crop: { zoom: 2, panX: 0.3, panY: -0.2 },
+      transition: { kind: 'smooth', duration: 2 },
+    },
+  ];
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={base.clip}
+        currentTime={2.5}
+        disabled={false}
+        onEdit={vi.fn()}
+      />
+    )
+  );
+  const preview = container.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.sidebar.cameraCropPreview"]'
+  )!;
+  expect(preview.style.aspectRatio).toBe(`${base.project.width * 0.49} / ${base.project.height}`);
+  expect(
+    container.querySelector<HTMLInputElement>('[aria-label="videoEditor.sidebar.cameraCropZoom"]')!
+      .value
+  ).toBe('200');
+  const video = container.querySelector<HTMLVideoElement>('video')!;
+  act(() => video.dispatchEvent(new Event('loadedmetadata')));
+  expect(video.currentTime).toBe(2.5);
+});
+
+it('retains camera shadow angle through Native mode changes using the existing camera edit port', async () => {
+  const base = createProps();
+  const onEdit = vi.fn((_id, edit) => {
+    if (edit.kind === 'shadow-direction') base.clip.cameraShadowDirection = edit.direction;
+    render();
+  });
+  const render = () =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={base.clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+      />
+    );
+  act(render);
+  const choose = async (mode: string) => {
+    const option = container.querySelector<HTMLButtonElement>(
+      `[title="gallery.videoReview.webcamShadowDirection_${mode}"]`
+    )!;
+    expect(option).not.toBeNull();
+    await act(async () => option.click());
+    expect(
+      container
+        .querySelector(`[title="gallery.videoReview.webcamShadowDirection_${mode}"]`)
+        ?.getAttribute('aria-pressed')
+    ).toBe('true');
+    expect(document.querySelector('[role="option"]')).toBeNull();
+  };
+  expect(
+    [...container.querySelectorAll('label, span')].some(
+      (element) =>
+        element.childElementCount === 0 &&
+        element.textContent === 'gallery.videoReview.webcamShadowDirection'
+    )
+  ).toBe(true);
+  await choose('angle');
+  const enter = async (value: string) => {
+    const input = container.querySelector<HTMLInputElement>(
+      '[aria-label="gallery.videoReview.webcamShadowAngle"]'
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  };
+  await enter('225');
+  for (const mode of ['classic', 'center', 'nearest-edge']) {
+    await choose(mode);
+    expect(base.clip.cameraShadowDirection).toEqual({ mode, angle: 225 });
+  }
+  await choose('angle');
+  await enter('360');
+  expect(base.clip.cameraShadowDirection).toEqual({ mode: 'angle', angle: 0 });
+});
+
+it('keeps all direct shadow choices disabled when Native camera editing is refused', () => {
+  const base = createProps();
+  const onEdit = vi.fn();
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={base.clip}
+        currentTime={0}
+        disabled
+        onEdit={onEdit}
+      />
+    )
+  );
+  for (const mode of ['classic', 'angle', 'center', 'nearest-edge']) {
+    const option = container.querySelector<HTMLButtonElement>(
+      `[title="gallery.videoReview.webcamShadowDirection_${mode}"]`
+    )!;
+    expect(option.disabled).toBe(true);
+    act(() => option.click());
+  }
+  expect(onEdit).not.toHaveBeenCalled();
 });

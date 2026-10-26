@@ -1,7 +1,23 @@
+import { isCameraShadowDirection } from '../../features/video/project/camera/shadow-direction';
 import { ReviewWebcamCropPreview } from './webcam-crop-preview';
-import { Camera, Clock3, Move, Plus, Trash2 } from 'lucide-react';
+import {
+  Camera,
+  Clock3,
+  Move,
+  Plus,
+  Trash2,
+  Layers2,
+  Compass,
+  Focus,
+  ArrowRightToLine,
+} from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { ColorField, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
+import {
+  ColorField,
+  SelectField,
+  SegmentedRow,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import {
@@ -131,6 +147,7 @@ export function ReviewWebcamInspector({
         </>
       ) : (
         <ReviewInspectorSections
+          leadingSectionColumn
           sections={[
             {
               id: 'webcam-layout',
@@ -203,6 +220,31 @@ function WebcamLayout({ editor }: { editor: Editor }) {
         onChange={(id) => editor.navigate(id === 'base' ? null : id)}
       />
 
+      {editor.split ? (
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.webcamScreenBehavior')}
+          value={editor.screenBehavior ?? 'legacy'}
+          options={[
+            ...(!editor.screenBehavior
+              ? [
+                  {
+                    value: 'legacy',
+                    label: translate('gallery.videoReview.webcamScreenBehavior_legacy'),
+                  },
+                ]
+              : []),
+            ...(['shrink', 'shift', 'overlay'] as const).map((behavior) => ({
+              value: behavior,
+              label: translate(`gallery.videoReview.webcamScreenBehavior_${behavior}`),
+            })),
+          ]}
+          onChange={(behavior) => {
+            if (behavior === 'shrink' || behavior === 'shift' || behavior === 'overlay')
+              editor.setScreenBehavior(behavior);
+          }}
+        />
+      ) : null}
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.webcamSplit')}
@@ -397,6 +439,44 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
         />
       </div>
       <div className="sniptale-parameter-stack">
+        <SegmentedRow
+          columns={4}
+          layout="stacked"
+          ariaLabel={translate('gallery.videoReview.webcamShadowDirection')}
+          label={translate('gallery.videoReview.webcamShadowDirection')}
+          value={camera.shadowDirection?.mode ?? 'classic'}
+          options={(['classic', 'angle', 'center', 'nearest-edge'] as const).map((mode) => ({
+            value: mode,
+            label: translate(`gallery.videoReview.webcamShadowDirection_${mode}`),
+            icon:
+              mode === 'classic' ? (
+                <Layers2 size={16} aria-hidden="true" />
+              ) : mode === 'angle' ? (
+                <Compass size={16} aria-hidden="true" />
+              ) : mode === 'center' ? (
+                <Focus size={16} aria-hidden="true" />
+              ) : (
+                <ArrowRightToLine size={16} aria-hidden="true" />
+              ),
+          }))}
+          onChange={(mode) => {
+            const direction = { mode, angle: camera.shadowDirection?.angle ?? 0 };
+            if (isCameraShadowDirection(direction)) editor.patch({ shadowDirection: direction });
+          }}
+        />
+        {camera.shadowDirection?.mode === 'angle' ? (
+          <ReviewNumberRow
+            label={translate('gallery.videoReview.webcamShadowAngle')}
+            value={camera.shadowDirection.angle}
+            min={0}
+            max={360}
+            step={1}
+            unit="deg"
+            onChange={(angle) =>
+              editor.patch({ shadowDirection: { mode: 'angle', angle: angle % 360 } })
+            }
+          />
+        ) : null}
         <ReviewNumberRow
           label={translate('gallery.videoReview.webcamShadow')}
           value={camera.shadow?.intensity ?? 0}
@@ -430,11 +510,15 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
 function WebcamCrop({ editor }: { editor: Editor }) {
   const camera = editor.camera!,
     crop = editor.crop!,
-    placement = editor.placement!;
+    placement = editor.cropPlacement!;
   return (
     <div className="sniptale-parameter-stack">
       <ReviewWebcamCropPreview
-        camera={camera}
+        camera={
+          editor.split
+            ? { ...camera, appearance: { ...camera.appearance, shape: 'rounded', roundness: 0 } }
+            : camera
+        }
         crop={crop}
         time={editor.selectedPosition?.time ?? Math.max(0, camera.offsetSeconds)}
         width={placement.width * editor.scene.width}

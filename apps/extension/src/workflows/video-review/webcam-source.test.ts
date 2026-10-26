@@ -128,7 +128,7 @@ it('cancels pre-attachment failure but retains bytes for an ambiguous durable wr
   await expect(attachReviewWebcam(args)).rejects.toThrow('write');
   expect(io.cancel).toHaveBeenCalledOnce();
   io.cancel.mockClear();
-  io.readWorkspace.mockRejectedValue(new Error('storage'));
+  io.readWorkspace.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('storage'));
   await expect(attachReviewWebcam(args)).rejects.toThrow('write');
   expect(io.cancel).not.toHaveBeenCalled();
   args.attach.mockResolvedValue(undefined);
@@ -204,4 +204,14 @@ it('keeps explicit recovery retryable when publication is still unavailable', as
     recoverReviewWebcam('project-asset:private', new AbortController().signal)
   ).rejects.toThrow('Review webcam is unavailable');
   expect(io.recover).toHaveBeenCalledOnce();
+});
+
+it('discovers and attaches the archived workspace source while retaining archive ownership', async () => {
+  io.readWorkspace.mockResolvedValue({ workspace: { sourceMediaId: 'display' } });
+  io.get.mockImplementation(async (id: string) => (id === 'display' ? root : null));
+  expect((await findReviewWebcam('archived', new AbortController().signal))?.id).toBe('camera');
+  const args = { ...request(), aggregateId: 'archived' };
+  await attachReviewWebcam(args);
+  expect(args.attach).toHaveBeenCalledWith('project-asset:private', source);
+  expect(io.prepare.mock.calls[0]?.[5]).toEqual({ aggregateId: 'archived', clipId: 'webcam' });
 });

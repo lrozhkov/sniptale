@@ -73,6 +73,9 @@ export function InspectorGroupedPanel<TId extends string>(props: {
   groups: readonly InspectorGroupDefinition<TId>[];
 }) {
   const groups = resolveVisibleInspectorGroups(props.groups);
+  const parameterGroups = groups.filter(
+    (group) => group.semantic !== 'info' && group.semantic !== 'actions' && group.id !== 'actions'
+  );
   const [presentation] = useWorkspacePreference('inspectorPresentation');
   const memory = useInspectorSectionMemory();
   const consumeReturn = memory.consumeReturn;
@@ -126,6 +129,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
         ref={surface}
         data-ui="video-editor.inspector.sections"
         data-presentation="all"
+        data-layout={parameterGroups.length > 1 ? 'two' : 'single'}
         className="video-editor-inspector-all-groups"
       >
         {groups.map((group) => {

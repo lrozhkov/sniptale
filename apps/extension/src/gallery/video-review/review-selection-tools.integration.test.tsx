@@ -127,6 +127,16 @@ async function dragRange(
     );
 }
 
+async function selectTrack(host: HTMLElement, track: 'source' | 'zoom' | 'originalAudio') {
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>(
+        `[data-review-header-track="${track}"] [data-review-track-select]`
+      )!
+      .click()
+  );
+}
+
 /** History controls act on accepted content, after the product autosave acknowledgement. */
 async function waitForContentCommit(
   fixture: ReturnType<typeof createEditorFixture>,
@@ -169,6 +179,7 @@ it('creates a source-audio mute from a range, opens properties and restores it t
     expect(fixture.host.querySelector('[data-review-track="originalAudio"]')).not.toBeNull();
     expect(fixture.host.querySelector('[data-review-track="zoom"]')).not.toBeNull();
     await dragRange(fixture.host);
+    await selectTrack(fixture.host, 'originalAudio');
     await fixture.click('originalAudioRange');
     await waitForContentCommit(fixture, 2);
     expect(
@@ -224,6 +235,7 @@ it('draws a source-audio volume edit with an independent toolbar default', async
     await fixture.click('advancedEditing');
     // First entry commits zoom enablement before the independent audio gesture.
     await waitForContentCommit(fixture, 1);
+    await selectTrack(fixture.host, 'originalAudio');
     await fixture.click('originalAudioRange');
     await dragRange(fixture.host, { lane: 'original' });
     await waitForContentCommit(fixture, 2, {
@@ -244,6 +256,7 @@ it('draws a source-audio volume edit with an independent toolbar default', async
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
     ).not.toBeNull();
+    await selectTrack(fixture.host, 'originalAudio');
     await fixture.click('originalAudioRange');
     await dragRange(fixture.host, { lane: 'original', start: 400, end: 300 });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
@@ -270,10 +283,10 @@ it('keeps Volume unavailable without source audio and drops the tool on leaving 
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
-    expect(fixture.button('originalAudioRange').disabled).toBe(true);
-    expect(fixture.button('originalAudioRange').title).toContain(
-      'gallery.videoReview.originalAudioUnavailable'
-    );
+    expect(fixture.host.querySelector('[data-review-header-track="originalAudio"]')).toBeNull();
+    expect(
+      fixture.host.querySelector('[aria-label="gallery.videoReview.originalAudioRange"]')
+    ).toBeNull();
   } finally {
     await fixture.cleanup();
   }
@@ -296,6 +309,7 @@ it('keeps Volume unavailable without source audio and drops the tool on leaving 
       '[aria-label^="gallery.videoReview.telemetry ·"]'
     )!;
     await act(async () => marker.click());
+    await selectTrack(audible.host, 'originalAudio');
     await audible.click('originalAudioRange');
     expect(audible.button('originalAudioRange').getAttribute('aria-pressed')).toBe('true');
     await audible.click('advancedEditing');
@@ -344,6 +358,7 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
     await fixture.click('advancedEditing');
     // First entry saves zoom enablement independently of the later focus gesture.
     await waitForContentCommit(fixture, 2);
+    await selectTrack(fixture.host, 'zoom');
     await fixture.click('focusRangeTool');
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
     expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('false');
@@ -352,12 +367,19 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
     );
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
     expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('true');
+    await selectTrack(fixture.host, 'zoom');
     await fixture.click('focusRangeTool');
+    await selectTrack(fixture.host, 'originalAudio');
     await fixture.click('originalAudioRange');
-    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
+    expect(
+      fixture.host.querySelector('[aria-label="gallery.videoReview.focusRangeTool"]')
+    ).toBeNull();
     expect(fixture.button('originalAudioRange').getAttribute('aria-pressed')).toBe('true');
+    await selectTrack(fixture.host, 'zoom');
     await fixture.click('focusRangeTool');
-    expect(fixture.button('originalAudioRange').getAttribute('aria-pressed')).toBe('false');
+    expect(
+      fixture.host.querySelector('[aria-label="gallery.videoReview.originalAudioRange"]')
+    ).toBeNull();
     const plane = fixture.host.querySelector<HTMLElement>(
       '[data-ui="gallery.videoReview.timePlane"]'
     )!;
@@ -428,6 +450,7 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
+    await selectTrack(fixture.host, 'zoom');
     await fixture.click('focusRangeTool');
     await dragRange(fixture.host, { lane: 'zoomLane' });
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
@@ -438,6 +461,7 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
     expect(fixture.button('focusRangeTool').disabled).toBe(true);
     await dragRange(fixture.host, { start: 25, end: 75 });
     expect(fixture.button('focusRangeTool').disabled).toBe(false);
+    await selectTrack(fixture.host, 'zoom');
     await fixture.click('focusRangeTool');
     const inspector = fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]');
     expect(inspector).not.toBeNull();
@@ -465,10 +489,12 @@ it('dismisses and repeats gain feedback without changing source selection', asyn
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
+    await selectTrack(fixture.host, 'originalAudio');
     await fixture.click('originalAudioRange');
     await dragRange(fixture.host, { lane: 'original' });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     const timeline = fixture.host.querySelector('[data-ui="gallery.videoReview.timeline"]')!;
+    await selectTrack(fixture.host, 'originalAudio');
     await fixture.click('originalAudioRange');
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await dragRange(fixture.host, { lane: 'original', start: 80, end: 180 });

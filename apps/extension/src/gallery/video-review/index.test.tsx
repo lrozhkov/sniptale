@@ -12,6 +12,7 @@ import type { useReviewEditorState } from './use-editor-state';
 import type { ReviewHistoryControls } from './timeline-chrome';
 import type { ReviewTimelineBinding } from './timeline-binding';
 import { VideoReview } from './index';
+import { translate } from '../../platform/i18n';
 import { inspectReviewMedia } from '../../workflows/video-review/media-index';
 import type { usePresentationPreview } from './use-presentation-preview';
 
@@ -61,8 +62,12 @@ vi.mock('./inspector-binding', async (original) => ({
   ReviewInspectorBinding: () => null,
 }));
 vi.mock('./timeline-binding', () => ({
-  ReviewTimelineBinding: (props: ComponentProps<typeof ReviewTimelineBinding>) =>
-    props.historyControls,
+  ReviewTimelineBinding: (props: ComponentProps<typeof ReviewTimelineBinding>) => (
+    <>
+      {props.historyControls}
+      {props.utilityControls}
+    </>
+  ),
 }));
 vi.mock('./timeline-chrome', async (original) => ({
   ...(await original<typeof import('./timeline-chrome')>()),
@@ -85,6 +90,7 @@ vi.mock('./panel-layout', () => ({
 vi.mock('./audio-waveform', () => ({ useReviewWaveforms: () => new Map() }));
 
 let root: Root;
+let host: HTMLDivElement;
 let loaded: LoadedReview;
 let failRead = false;
 const save = vi.fn();
@@ -192,10 +198,13 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   failRead = false;
   save.mockReset();
-  root = createRoot(document.createElement('div'));
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
 afterEach(async () => {
   await act(async () => root.unmount());
+  host.remove();
   await loaded.session.dispose();
   observed.preview = null;
   observed.loaded = null;
@@ -268,4 +277,28 @@ it('passes the coherent EffectV1 snapshots into the Gallery presentation preview
     state().snapshot.snapshot.workspace.effectSnapshots
   );
   expect(observed.preview?.effectSnapshots?.[0]?.documentId).toBe('sniptale-title');
+});
+
+it('routes rare commands into one More menu in Basic and Advanced without permanent project actions', async () => {
+  setup();
+  await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={vi.fn()} />));
+  for (const mode of ['basic', 'advanced'] as const) {
+    await act(async () => state().setMode(mode));
+    expect(host.querySelector('[data-ui="gallery.videoReview.newProject"]')).toBeNull();
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.moreActions"]'
+    )!;
+    expect(trigger).not.toBeNull();
+    await act(async () => trigger.click());
+    const menu = document.querySelector('[role="menu"]')!;
+    expect([...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)).toEqual(
+      [
+        translate('videoEditor.app.newProjectAction'),
+        translate('gallery.keyboard.title'),
+        translate('gallery.app.selectionBackup'),
+      ]
+    );
+    await act(async () => trigger.click());
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  }
 });

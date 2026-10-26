@@ -410,7 +410,7 @@ function capturePresentationCamera(
   const mapped = quickEditWebcamFrameAt(binding.settings, video.currentTime, state.duration);
   if (!mapped) return undefined;
   const screen = quickEditWebcamScreenPlacementAt(binding.settings, video.currentTime);
-  const split = screen.width < 1 || screen.height < 1;
+  const split = screen.width < 1 || screen.height < 1 || !!screen.clip || !!screen.cameraOverlay;
   const selected =
     !binding.disabled && ['webcam', 'webcam-position'].includes(binding.editor.selection.kind);
   const result = source.captureAccepted(

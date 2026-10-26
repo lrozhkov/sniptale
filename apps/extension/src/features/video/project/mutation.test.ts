@@ -1,3 +1,5 @@
+import { createVideoProjectMotionRegion } from './motion';
+import { createQuickEditBorder } from './scene/focus-appearance';
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from './factories/creation';
 import {
@@ -39,4 +41,21 @@ describe('video project mutation helpers', () => {
       updatedAt: 6789,
     });
   });
+});
+
+it.each([
+  { origin: 'top-right' as const },
+  { reveal: 'draw-both' as const },
+  { exitReveal: 'erase-both' as const },
+])('retains the schema 48 fence after removing extended border %j', (settings) => {
+  const project = { ...createEmptyVideoProject('Border'), version: 47 as const };
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    border: { ...createQuickEditBorder(), ...settings },
+  };
+  const changed = applyVideoProjectMutationPatch(project, { motionRegions: [region] });
+  expect(changed.version).toBe(48);
+  const removed = applyVideoProjectMutationPatch(changed, { motionRegions: [] });
+  expect(removed.version).toBe(48);
+  expect(project.motionRegions).toEqual([]);
 });

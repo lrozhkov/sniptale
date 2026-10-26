@@ -1,12 +1,16 @@
+import { TextDocument } from '../../../../../ui/text-document';
+import { projectVideoProjectTextFragment } from '../../../../../features/video/project/text/projection';
 import { ProjectTextVoicePanel } from './text-voice';
 import type { VideoProjectTextVoiceController } from '../../../../runtime/session/text-voice';
-import { useEffect, useRef, useState } from 'react';
-import { Plus, WandSparkles } from 'lucide-react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { RuntimePlaybackContext } from '../../../../runtime/controller/composition/contexts';
+import { useVideoEditorPlaybackPort } from '../../../../runtime/controller/store';
+import { Plus, WandSparkles, Play, Pencil, Volume2 } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
 import type { VideoProjectTextDocument } from '../../../../../features/video/project/text/types';
 import { addVideoProjectManualText } from '../../../../../features/video/project/text/authoring';
 import { translate } from '../../../../../platform/i18n';
-import { SelectField } from '../../../../../ui/compact-inspector-controls';
+import { SelectField, SegmentedRow } from '../../../../../ui/compact-inspector-controls';
 import { InspectorActionButton } from '../shared/actions';
 import { useProjectTextEditing } from './text-editing';
 import { DocumentCaptions, TextEditFeedback } from './text-captions';
@@ -25,9 +29,20 @@ export function InspectProjectTextPanel({
   voice?: VideoProjectTextVoiceController | undefined;
 }) {
   const editor = useProjectTextEditing(project);
+  const runtime = useContext(RuntimePlaybackContext);
+  const playing = useVideoEditorPlaybackPort((port) => port.isPlaying);
+  const pendingPlay = useRef<{ frame: number | null } | null>(null);
+  const cancelPendingPlay = () => {
+    const pending = pendingPlay.current;
+    pendingPlay.current = null;
+    if (!pending) return;
+    if (pending.frame !== null) cancelAnimationFrame(pending.frame);
+  };
+  const [view, setView] = useState<'document' | 'cards'>('document');
   const [choice, setChoice] = useState(voice?.target?.documentId ?? '');
   const [opened, setOpened] = useState('');
   const [created, setCreated] = useState('');
+  const [focusRevision, setFocusRevision] = useState(0);
   const [limit, setLimit] = useState(50);
   // A category remount restores the invoking scope from its still-mounted operation.
   const [batch, setBatch] = useState(!!voice?.target && voice.batch);
@@ -46,6 +61,61 @@ export function InspectProjectTextPanel({
     editor.endTyping();
     focus.rememberTrigger(source);
     rewrite.open(entry.id, ids, wholeDocument);
+  };
+  const actionIds = selected.length
+    ? selectedIds
+    : entry?.document.fragments.some((fragment) => fragment.id === opened)
+      ? [opened]
+      : [];
+  const active = entry?.document.fragments.find((fragment) => fragment.id === actionIds[0]);
+  const targetKey = JSON.stringify(actionIds);
+  const currentPlayback = useRef({
+    runtime,
+    project,
+    targetKey,
+    time: editor.playback.time,
+    playing,
+  });
+  currentPlayback.current = { runtime, project, targetKey, time: editor.playback.time, playing };
+  useEffect(() => () => cancelPendingPlay(), [project, entry?.id, view, targetKey]);
+  const navigate = (id: string, play = false) => {
+    const fragment = entry?.document.fragments.find((item) => item.id === id);
+    if (!entry || !fragment) return;
+    const ranges = projectVideoProjectTextFragment(project, entry, fragment).ranges;
+    if (!ranges.length) return;
+    cancelPendingPlay();
+    editor.endTyping();
+    const time = ranges[0]!.start;
+    if (!runtime) {
+      editor.playback.setPlaying(false);
+      editor.playback.seek(time);
+      return;
+    }
+    runtime.pausePlayback();
+    runtime.seekTo(time);
+    if (!play) return;
+    const request = { frame: null as number | null };
+    pendingPlay.current = request;
+    // Commit the seek before the existing prepared transport reads its latest time.
+    request.frame = requestAnimationFrame(() => {
+      request.frame = null;
+      const current = currentPlayback.current;
+      if (pendingPlay.current !== request) return;
+      if (
+        current.project !== project ||
+        current.targetKey !== targetKey ||
+        current.runtime?.setPlaybackPlaying !== runtime.setPlaybackPlaying ||
+        current.time !== time ||
+        current.playing ||
+        current.runtime.isPreparingPlayback
+      ) {
+        pendingPlay.current = null;
+        return;
+      }
+      // After handoff the shared transport owns preparation and subsequent playback intents.
+      pendingPlay.current = null;
+      void runtime.setPlaybackPlaying(true);
+    });
   };
   const targetEntry = documents.find((document) => document.id === rewrite?.target?.documentId);
   const add = () => {
@@ -97,6 +167,94 @@ export function InspectProjectTextPanel({
           <InspectorActionButton onClick={add}>
             <Plus size={14} /> {translate('videoEditor.sidebar.newProjectText')}
           </InspectorActionButton>
+          <div
+            data-ui="text-document.commands"
+            className="sticky top-0 z-10 space-y-1 bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)] py-1"
+          >
+            <SegmentedRow
+              label={translate('gallery.videoReview.textView')}
+              ariaLabel={translate('gallery.videoReview.textView')}
+              value={view}
+              options={[
+                { value: 'document', label: translate('gallery.videoReview.textViewDocument') },
+                { value: 'cards', label: translate('gallery.videoReview.textViewCards') },
+              ]}
+              onChange={(value: 'document' | 'cards') => {
+                editor.endTyping();
+                setView(value);
+              }}
+            />
+            {view === 'document' && entry && active && (
+              <div
+                data-ui="text-document.actions"
+                data-selected-count={actionIds.length}
+                className="flex flex-wrap items-center gap-1"
+              >
+                {actionIds.length > 1 && (
+                  <span
+                    role="status"
+                    className="text-xs text-[var(--sniptale-color-text-secondary)]"
+                  >
+                    {translate('gallery.videoReview.speechBatchSelected').replace(
+                      '{count}',
+                      String(actionIds.length)
+                    )}
+                  </span>
+                )}
+                <InspectorActionButton
+                  iconOnly
+                  title={translate('gallery.videoReview.textPhraseEdit')}
+                  aria-label={translate('gallery.videoReview.textPhraseEdit')}
+                  disabled={actionIds.length !== 1}
+                  onClick={() => {
+                    editor.endTyping();
+                    setCreated(active.id);
+                    setOpened(active.id);
+                    setFocusRevision((current) => current + 1);
+                  }}
+                >
+                  <Pencil size={14} />
+                </InspectorActionButton>
+                <InspectorActionButton
+                  iconOnly
+                  title={translate('gallery.videoReview.textPlayFromHere')}
+                  aria-label={translate('gallery.videoReview.textPlayFromHere')}
+                  disabled={
+                    !runtime ||
+                    !projectVideoProjectTextFragment(project, entry, active).ranges.length
+                  }
+                  onClick={() => navigate(active.id, true)}
+                >
+                  <Play size={14} />
+                </InspectorActionButton>
+                {voice && (
+                  <InspectorActionButton
+                    iconOnly
+                    data-project-text-voice={actionIds.length === 1 ? active.id : 'selected'}
+                    disabled={actionIds.length === 1 && !active.text.trim()}
+                    title={translate('gallery.videoReview.speechGenerateSelected')}
+                    aria-label={translate('gallery.videoReview.speechGenerateSelected')}
+                    onClick={() => openVoice(actionIds.length === 1 ? active.id : actionIds)}
+                  >
+                    <Volume2 size={14} />
+                  </InspectorActionButton>
+                )}
+                {rewrite && (
+                  <InspectorActionButton
+                    iconOnly
+                    data-project-text-rewrite={actionIds.length === 1 ? active.id : 'document'}
+                    title={translate('gallery.videoReview.textRewriteSelected')}
+                    aria-label={translate('gallery.videoReview.textRewriteSelected')}
+                    onClick={() =>
+                      openRewrite(actionIds, false, actionIds.length === 1 ? active.id : 'document')
+                    }
+                  >
+                    <WandSparkles size={14} />
+                  </InspectorActionButton>
+                )}
+              </div>
+            )}
+          </div>
           {entry ? (
             <>
               <ProjectTextDocumentChoice
@@ -112,7 +270,7 @@ export function InspectProjectTextPanel({
                 }}
               />
               <DocumentCaptions entry={entry} editor={editor} />
-              {rewrite || voice ? (
+              {view === 'cards' && (rewrite || voice) ? (
                 <TextRewriteCommands
                   ids={entry.document.fragments.map((fragment) => fragment.id)}
                   selectedIds={selectedIds}
@@ -128,8 +286,35 @@ export function InspectProjectTextPanel({
                   {translate('gallery.videoReview.textFragmentEmpty')}
                 </p>
               )}
+              {view === 'document' && (
+                <>
+                  <TextDocument
+                    label={translate('gallery.videoReview.textViewDocument')}
+                    phrases={entry.document.fragments.map((fragment) => ({
+                      id: fragment.id,
+                      text: fragment.text || translate('gallery.videoReview.speechText'),
+                      unavailable: !projectVideoProjectTextFragment(project, entry, fragment).ranges
+                        .length,
+                    }))}
+                    selectedIds={selectedIds}
+                    onSelection={setSelected}
+                    onActivate={(id) => navigate(id)}
+                  />
+                </>
+              )}
               <ProjectTextPhrases
-                {...{ project, entry, editor, limit, opened, created, batch, selected }}
+                {...{
+                  project,
+                  entry,
+                  editor,
+                  limit,
+                  opened,
+                  created,
+                  batch,
+                  selected,
+                  view,
+                  focusRevision,
+                }}
                 voice={!!voice}
                 rewrite={!!rewrite}
                 onRewrite={openRewrite}
@@ -147,7 +332,7 @@ export function InspectProjectTextPanel({
                   )
                 }
               />
-              {entry.document.fragments.length > limit && (
+              {view === 'cards' && entry.document.fragments.length > limit && (
                 <InspectorActionButton onClick={() => setLimit(limit + 50)}>
                   {translate('gallery.videoReview.textFragmentMore')}
                 </InspectorActionButton>
@@ -325,6 +510,8 @@ function useTextRewriteFocus(target: object | null | undefined) {
 function ProjectTextPhrases(props: {
   project: VideoProject;
   entry: VideoProjectTextDocument;
+  view: 'document' | 'cards';
+  focusRevision: number;
   editor: ReturnType<typeof useProjectTextEditing>;
   limit: number;
   opened: string;
@@ -340,9 +527,11 @@ function ProjectTextPhrases(props: {
 }) {
   return (
     <>
-      {props.entry.document.fragments.slice(0, props.limit).map((fragment, index) => (
+      {props.entry.document.fragments.map((fragment, index) => (
         <ProjectTextPhrase
           key={JSON.stringify([props.entry.id, fragment.id])}
+          documentView={props.view === 'document'}
+          visible={props.view === 'cards' && index < props.limit}
           project={props.project}
           entry={props.entry}
           fragment={fragment}
@@ -350,6 +539,7 @@ function ProjectTextPhrases(props: {
           next={props.entry.document.fragments[index + 1]}
           expanded={props.opened === fragment.id}
           focus={props.created === fragment.id}
+          focusRevision={props.focusRevision}
           onToggle={() => props.onToggle(fragment.id)}
           {...(props.voice ? { onVoice: () => props.onVoice(fragment.id) } : {})}
           batch={props.batch}

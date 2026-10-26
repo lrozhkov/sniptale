@@ -1,6 +1,15 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewTimelineMessages = defineMessageSource({
+  noTrackSelected: { ru: 'Дорожка не выбрана', en: 'No track selected' },
+  noTrackActions: {
+    ru: 'Для этой дорожки нет доступных действий',
+    en: 'No actions available for this track',
+  },
+  trackActionsHint: {
+    ru: 'Используйте кнопки дорожки или перетаскивайте её элементы',
+    en: 'Use the track controls or drag its items',
+  },
   intervalBounds: { ru: 'Границы интервала', en: 'Interval bounds' },
   resizeDuration: { ru: 'Длительность {duration}', en: 'Duration {duration}' },
   resizeBefore: { ru: 'Было {duration}', en: 'Was {duration}' },

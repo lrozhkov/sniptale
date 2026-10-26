@@ -64,6 +64,7 @@ type InspectorState = Pick<
   | 'video'
   | 'time'
   | 'playing'
+  | 'play'
   | 'features'
   | 'selected'
   | 'setHovered'
@@ -131,6 +132,7 @@ function ReviewInspectorFragment({ state }: { state: InspectorState }) {
 }
 
 export function ReviewInspectorBinding({
+  onRenameProject,
   resource,
   state,
   canvasComments,
@@ -158,9 +160,11 @@ export function ReviewInspectorBinding({
   audio: ReturnType<typeof useReviewAudio>;
   onBack(): void;
   onClose(): void;
+  onRenameProject?: ((name: string) => Promise<void>) | undefined;
 }) {
   const { editing, snapshot, composer, busy, run } = state;
   const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
+
   const leave = (done: () => void) => leaveReviewInspector(state, canvasComments, done);
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
@@ -181,7 +185,8 @@ export function ReviewInspectorBinding({
         resizeHandle={resizeHandle}
         navigation={navigation}
         onToggleHeight={onToggleHeight}
-        filename={resource.filename}
+        filename={snapshot.snapshot.workspace.project?.name ?? resource.filename}
+        onRenameProject={onRenameProject}
         annotations={snapshot.document.annotations}
         selectedId={state.selected?.id ?? null}
         busy={busy || editing.exporter.phase !== 'idle'}
@@ -250,7 +255,6 @@ export function ReviewInspectorBinding({
         onAdd={state.add}
         onSelect={state.selectComment}
         onHover={state.setHovered}
-        onBackup={() => void run(() => backupReview(state, canvasComments))}
         onOpenVideoEditor={() =>
           void run(async () => {
             await flushReviewTextVoiceBuffers(state, canvasComments);
@@ -295,6 +299,8 @@ function reviewInspectorTextDocument(
     | 'beforeAction'
     | 'setVoiceoverSilent'
     | 'editing'
+    | 'seek'
+    | 'play'
   >,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
@@ -302,6 +308,23 @@ function reviewInspectorTextDocument(
     <ReviewTextDocumentPanel
       editor={state.text}
       snapshots={state.text.snapshots}
+      onPlay={(fragment) =>
+        state.beforeAction(() => {
+          state.video.current?.pause();
+          state.seek(state.text.sourceInterval(fragment).start, false);
+          void state.play();
+        })
+      }
+      canCut={(ids) => {
+        const range = reviewTextCutRange(state.text, ids);
+        return !!range && state.editing.canApply('cut', range);
+      }}
+      onCut={(ids) =>
+        state.beforeAction(() => {
+          const range = reviewTextCutRange(state.text, ids);
+          if (range && state.editing.canApply('cut', range)) void state.editing.apply('cut', range);
+        })
+      }
       busy={state.busy || state.editing.exporter.phase !== 'idle'}
       voice={reviewTextVoiceAccess(state, canvasComments)}
       subtitleMainOffset={reviewSubtitleMainOffset(
@@ -393,7 +416,7 @@ function ReviewRecordedHistory({
 }
 
 /** Backup joins accepted edits and recovery before reading the exact saved snapshot. */
-async function backupReview(
+export async function backupReview(
   state: Pick<InspectorState, 'composer' | 'flushAdvanced' | 'session' | 'setMessage'>,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
@@ -760,7 +783,7 @@ function reviewTextVoiceAccess(
 }
 
 /** All-buffer joins are shared by explicit voice actions and leaving the inspector. */
-async function flushReviewTextVoiceBuffers(
+export async function flushReviewTextVoiceBuffers(
   state: Pick<InspectorState, 'composer' | 'flushAdvanced'>,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
 ) {
@@ -784,4 +807,25 @@ function hasSelectionSections(state: InspectorState): boolean {
         'annotation-effect',
       ].includes(state.activeSelection.kind))
   );
+}
+
+/** Only consecutive canonical phrases on one clock can name an existing temporal Cut. */
+function reviewTextCutRange(editor: InspectorState['text'], ids: readonly string[]) {
+  const wanted = new Set(ids);
+  const fragments = editor.document.fragments;
+  const indexes = fragments.flatMap((fragment, index) => (wanted.has(fragment.id) ? [index] : []));
+  if (
+    !indexes.length ||
+    indexes.length !== wanted.size ||
+    indexes.some((index, i) => i > 0 && index !== indexes[i - 1]! + 1)
+  )
+    return null;
+  const selected = indexes.map((index) => fragments[index]!);
+  if (selected.some((fragment) => fragment.timeDomain !== selected[0]!.timeDomain)) return null;
+  const intervals = selected.map(editor.sourceInterval);
+  return {
+    kind: 'range' as const,
+    start: Math.min(...intervals.map((range) => range.start)),
+    end: Math.max(...intervals.map((range) => range.end)),
+  };
 }

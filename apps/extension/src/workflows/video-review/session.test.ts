@@ -692,3 +692,125 @@ it('retains legacy lock flags while admitting ordinary authored lane edits', asy
   });
   expect(write).not.toHaveBeenCalled();
 });
+
+it('serializes project rename with content and publishes metadata without adding Undo history', async () => {
+  let stored = initial();
+  const rename = vi.fn(async (id: string, revision: number, name: string) => {
+    expect(id).toBe(stored.workspace.aggregateId);
+    expect(revision).toBe(stored.workspace.revision);
+    stored = {
+      ...stored,
+      workspace: {
+        ...stored.workspace,
+        revision: revision + 1,
+        project: { name, lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2 } },
+      },
+    };
+  });
+  const read = vi.fn(async () => structuredClone(stored));
+  const write = vi.fn(async () => structuredClone(stored));
+  const session = createVideoReviewSession(stored, {
+    readVideoWorkspace: read,
+    commitVideoWorkspace: write,
+    moveVideoWorkspaceHistory: write,
+    saveVideoWorkspaceAdvanced: write,
+    saveVideoWorkspaceDraft: write,
+    saveVideoWorkspaceSnapshot: write,
+    renameVideoWorkspaceProject: rename,
+  });
+  await session.rename('Named project');
+  expect(session.getSnapshot().snapshot.workspace.project?.name).toBe('Named project');
+  expect(session.getSnapshot().snapshot.workspace.history).toEqual([]);
+  expect(session.getSnapshot()).toMatchObject({ pending: 0, dirty: false, error: null });
+  expect(rename).toHaveBeenCalledOnce();
+  await session.dispose();
+});
+
+it('retains a rename draft for retry after a storage refusal without blocking content flush', async () => {
+  let stored = initial();
+  const rename = vi
+    .fn(async (_id: string, _revision: number, name: string) => {
+      stored = {
+        ...stored,
+        workspace: {
+          ...stored.workspace,
+          revision: stored.workspace.revision + 1,
+          project: { name, lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2 } },
+        },
+      };
+    })
+    .mockRejectedValueOnce(new Error('quota'));
+  const read = vi.fn(async () => structuredClone(stored));
+  const write = vi.fn(async () => structuredClone(stored));
+  const session = createVideoReviewSession(stored, {
+    readVideoWorkspace: read,
+    commitVideoWorkspace: write,
+    moveVideoWorkspaceHistory: write,
+    saveVideoWorkspaceAdvanced: write,
+    saveVideoWorkspaceDraft: write,
+    saveVideoWorkspaceSnapshot: write,
+    renameVideoWorkspaceProject: rename,
+  });
+  await expect(session.rename('Retry')).rejects.toThrow('quota');
+  expect(session.getSnapshot().snapshot.workspace.project).toBeUndefined();
+  await session.flush();
+  read.mockRejectedValueOnce(new Error('read unavailable'));
+  await expect(session.rename('Retry')).rejects.toThrow('read unavailable');
+  await session.flush();
+  await session.rename('Retry');
+  expect(session.getSnapshot().snapshot.workspace.project?.name).toBe('Retry');
+  expect(rename).toHaveBeenCalledTimes(2);
+  await session.dispose();
+});
+
+it('saves buffered content before New and retries the same stable archive identity after refusal', async () => {
+  let stored = initial();
+  const read = vi.fn(async () => structuredClone(stored));
+  const write = vi.fn(async () => structuredClone(stored));
+  const save = vi.fn(async (args: { workspace: unknown }) => {
+    const workspace = parseVideoWorkspace(args.workspace);
+    if (!workspace) throw new Error('Invalid saved workspace');
+    stored = { workspace: { ...workspace, revision: stored.workspace.revision + 1 }, draft: null };
+    return structuredClone(stored);
+  });
+  const create = vi
+    .fn(async (args: { expectedRevision: number; archiveId: string }) => {
+      expect(args.expectedRevision).toBe(2);
+      expect(args.archiveId).toBe('recording:quick-project:stable-command');
+      expect(stored.workspace.history[0]).toMatchObject({
+        target: 'annotation',
+        after: annotation,
+      });
+      return {
+        ...stored,
+        workspace: { ...stored.workspace, revision: 3, history: [], cursor: 0, createdAt: 2 },
+      };
+    })
+    .mockRejectedValueOnce(new Error('quota'));
+  const session = createVideoReviewSession(stored, {
+    readVideoWorkspace: read,
+    commitVideoWorkspace: write,
+    moveVideoWorkspaceHistory: write,
+    saveVideoWorkspaceAdvanced: write,
+    saveVideoWorkspaceDraft: write,
+    saveVideoWorkspaceSnapshot: save,
+    createVideoWorkspaceProject: create,
+  });
+  await session.setAutosaveEnabled(false);
+  await session.commit({
+    id: 'annotation-change',
+    at: 1,
+    target: 'annotation',
+    before: null,
+    after: annotation,
+  });
+  await expect(session.createProject('stable-command')).rejects.toThrow('quota');
+  await session.flush();
+  const created = await session.createProject('stable-command');
+  expect(created.workspace.cursor).toBe(0);
+  expect(created.workspace.createdAt).toBe(2);
+  expect(create).toHaveBeenCalledTimes(2);
+  expect(create.mock.calls[0]?.[0]).toEqual(create.mock.calls[1]?.[0]);
+  expect(save).toHaveBeenCalledOnce();
+  await session.dispose();
+});

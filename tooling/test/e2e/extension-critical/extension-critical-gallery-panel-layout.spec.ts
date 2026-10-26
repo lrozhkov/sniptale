@@ -243,6 +243,9 @@ for (const variant of [
         await page.screenshot({ path: info.outputPath('resized-panels.png'), fullPage: false });
         await button('videoEditor.app.panelFullHeight').click();
         await height.press('Home');
+        await expect(height).toHaveAttribute('aria-valuenow', '120');
+        await height.press('End');
+        await expect(height).not.toHaveAttribute('aria-valuenow', '120');
         await addReviewFocus(page);
         const focus = inspector.locator('[data-ui="gallery.videoReview.zoomInspector"]');
         for (const kind of [
@@ -450,6 +453,11 @@ for (const variant of [
           ['gallery.videoReview.cutMode', 3, 4],
           ['gallery.videoReview.originalAudioRange', 5, 6],
         ] as const) {
+          await dialog
+            .locator(
+              `[data-review-header-track="${tool === 'gallery.videoReview.originalAudioRange' ? 'originalAudio' : 'source'}"] [data-review-track-select]`
+            )
+            .click();
           if (await button('gallery.videoReview.clearPlaybackRange').count())
             await button('gallery.videoReview.clearPlaybackRange').click();
           await button('gallery.videoReview.pointerTool').click();

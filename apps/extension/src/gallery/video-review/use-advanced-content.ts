@@ -1,4 +1,5 @@
 import { authoredCursorFocusPath } from '../../features/video/project/cursor-focus-path/authoring';
+import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
 import { useRecoveryLifecycle } from './use-recovery-lifecycle';
 import type { ReviewTextTypingTarget } from '../../features/video/review/text-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -43,6 +44,7 @@ export function useReviewAdvancedContent(
   const [saveFailed, setSaveFailed] = useState(false);
   const pending = useRef<PendingContent[]>([]);
   const action = useRef<TypingAction | null>(null);
+  const commandGroup = useRef<string | null>(null);
   const generation = useRef(0);
   const nextRevision = useRef(0);
   const optimistic = useRef<PendingContent | null>(null);
@@ -103,6 +105,9 @@ export function useReviewAdvancedContent(
   }, [session]);
   const endTyping = useCallback(() => {
     action.current = null;
+    // Keep malformed captures open for correction. Close valid groups at the interaction boundary.
+    const tail = pending.current.at(-1);
+    if (!tail || loadQuickEditAdvancedContentState(tail.value)) commandGroup.current = null;
   }, []);
   const stage = useCallback(
     (mutate: ContentMutation, target?: ReviewTextTypingTarget) => {
@@ -111,15 +116,19 @@ export function useReviewAdvancedContent(
       const value = mutate(base);
       if (JSON.stringify(value) === JSON.stringify(base)) return;
       if (!target) action.current = null;
-      else if (!action.current || action.current.target.fragmentId !== target.fragmentId)
-        action.current = { id: crypto.randomUUID(), target, continuation: false };
+      else {
+        commandGroup.current = null;
+        if (!action.current || action.current.target.fragmentId !== target.fragmentId)
+          action.current = { id: crypto.randomUUID(), target, continuation: false };
+      }
       const active = action.current;
-      const sameGroup = active ? previous?.group === active.id : !!previous && !previous.action;
+      const group = active?.id ?? (commandGroup.current ??= crypto.randomUUID());
+      const sameGroup = previous?.group === group;
       const entry: PendingContent = {
         revision: ++nextRevision.current,
         value,
         mutations: [...(sameGroup && previous ? previous.mutations : []), mutate],
-        group: active?.id ?? (sameGroup && previous ? previous.group : crypto.randomUUID()),
+        group,
         ...(active ? { action: active } : {}),
       };
       pending.current = sameGroup
@@ -144,6 +153,7 @@ export function useReviewAdvancedContent(
     optimistic.current = null;
     failedCapture.current = null;
     action.current = null;
+    commandGroup.current = null;
     if (mounted.current) {
       setSaveFailed(false);
       setVersion((version) => version + 1);

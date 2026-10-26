@@ -414,6 +414,10 @@ async function checkTransferredResultVoiceEditing(
     })
     .click();
   const textPanel = page.locator('[data-ui="video-editor.text.panel"]');
+  await textPanel
+    .getByRole('group', { name: label('gallery.videoReview.textView'), exact: true })
+    .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+    .click();
   const phrase = textPanel.locator('[data-text-id="current-result-phrase"]');
   await expect(phrase).toContainText('Current editable words');
   const editor = phrase.getByRole('textbox', {
@@ -508,6 +512,10 @@ async function createGallerySpeechForTransfer(
     .toBe(1);
   await command('gallery.videoReview.textTrackOpen').click();
   const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
+  await document
+    .getByRole('group', { name: label('gallery.videoReview.textView'), exact: true })
+    .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+    .click();
   const phrase = document.locator('[data-ui="gallery.videoReview.textPhrase"]');
   const text = phrase.getByRole('textbox', {
     name: label('gallery.videoReview.speechText'),
@@ -629,9 +637,12 @@ async function checkCreatedSpeechTransfer(
   await page
     .getByRole('button', { name: label('videoEditor.sidebar.textDocuments'), exact: true })
     .click();
-  const phrase = page
-    .locator('[data-ui="video-editor.text.panel"]')
-    .locator(`[data-text-id="${created.fragment.id}"]`);
+  const textPanel = page.locator('[data-ui="video-editor.text.panel"]');
+  await textPanel
+    .getByRole('group', { name: label('gallery.videoReview.textView'), exact: true })
+    .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+    .click();
+  const phrase = textPanel.locator(`[data-text-id="${created.fragment.id}"]`);
   const editor = phrase.getByRole('textbox', {
     name: label('gallery.videoReview.speechText'),
     exact: true,
@@ -1243,6 +1254,11 @@ async function checkRestoredNativeExport(args: {
   await page
     .getByRole('button', { name: label('videoEditor.sidebar.textDocuments'), exact: true })
     .click();
+  await page
+    .locator('[data-ui="video-editor.text.panel"]')
+    .getByRole('group', { name: label('gallery.videoReview.textView'), exact: true })
+    .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+    .click();
   const fragment = restored.textDocuments![0]!.document.fragments[0]!;
   const phrase = page.locator(`[data-text-id="${fragment.id}"]`);
   const editor = phrase.getByRole('textbox', {
@@ -1766,6 +1782,9 @@ for (const {
         [1, 5],
         [6, 10],
       ]) {
+        await dialog
+          .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+          .click();
         await button('gallery.videoReview.annotationEffectsAdd').click();
         await button('gallery.videoReview.annotationEffectsChoose').click();
         await page.getByRole('option', { name: title, exact: true }).click();
@@ -1784,6 +1803,9 @@ for (const {
           exact: true,
         })
         .click();
+      await dialog
+        .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.annotationEffectsAdd').click();
       await button('gallery.videoReview.annotationEffectsChoose').click();
       await page.getByRole('option', { name: title, exact: true }).click();
@@ -1792,6 +1814,9 @@ for (const {
       const createdSpeech = spatialDetails
         ? await createGallerySpeechForTransfer(page, dialog, label, (name) => info.outputPath(name))
         : undefined;
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.cutMode').click();
       const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
       const cutLane = plane.locator(
@@ -3100,7 +3125,15 @@ for (const {
       const durationBeforeDormantEdit = native.duration;
       const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
       await playhead.press('Home');
-      for (let n = 0; n < 6; n++) await playhead.press('ArrowRight');
+      // The active intro and first source cut both fade through black at 0.2 s.
+      // Sample the brighter retained frame before the first live annotation starts.
+      const dormantProofFrames = activeIntro ? 8 : 6;
+      for (let n = 0; n < dormantProofFrames; n++) await playhead.press('ArrowRight');
+      await expect(playhead).toHaveAttribute(
+        'aria-valuenow',
+        String(dormantProofFrames / native.fps)
+      );
+      if (activeIntro) expect(dormantProofFrames / native.fps).toBeLessThan(content.startTime);
       const dormantPoint = {
         x: Math.round(dormant.transform.x + dormant.transform.width / 2),
         y: Math.round(dormant.transform.y + dormant.transform.height / 2),

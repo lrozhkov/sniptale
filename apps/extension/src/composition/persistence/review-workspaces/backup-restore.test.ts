@@ -1,3 +1,4 @@
+import type { CursorFocusPath } from '../../../features/video/project/cursor-focus-path/types';
 import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
 import { annotation, workspace, snapshotDatabase } from './backup-restore.test-support';
 import { workspaceStorageHead, workspaceStorageRows } from './storage-format';
@@ -11,6 +12,7 @@ import {
   prepareVideoReviewRestore,
   putVideoReviewRestore,
   readVideoReviewForBackup,
+  remapVideoReviewRecordingSource,
 } from './backup-restore';
 import type { VideoWorkspace } from './contracts';
 import { collectReviewAssetReferences, encodePortableReviewAssetRefs } from './asset-refs';
@@ -677,4 +679,48 @@ it('admits the agreed backup snapshot and refuses a later writer, deletion or re
     'changed'
   );
   await expect(read(workspace)).resolves.toMatchObject({ draft });
+});
+
+it('preserves recording-bound focus history across archived-source aliases and restored copies', async () => {
+  const path: CursorFocusPath = {
+    version: 1,
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'focus',
+        binding: { kind: 'recording-source', recordingId: 'original', sourceInstanceId: 'source' },
+        start: 0,
+        end: 2,
+        keys: [{ id: 'manual', time: 0, x: 0.2, y: 0.4, anchor: 'manual', interpolation: 'hold' }],
+      },
+    ],
+  };
+  const advanced = { ...workspace.advanced, cursorFocusPath: path };
+  const input: VideoWorkspace = { ...workspace, advanced };
+  const portable = await readVideoReviewForBackup({
+    aggregateId: input.aggregateId,
+    sourceAssetId: input.sourceAssetId,
+    db: snapshotDatabase(input, undefined),
+  });
+  if (!portable) throw new Error('Missing focus fixture');
+  const archived = remapVideoReviewRecordingSource(portable, 'original', 'quick-project:archived');
+  const restored = prepareVideoReviewRestore({
+    review: archived,
+    sourceAggregateId: input.aggregateId,
+    targetAggregateId: 'recording:restored',
+    sourceAssetId: 'restored-source',
+    recordingIdMap: new Map([['quick-project:archived', 'restored']]),
+  });
+  expect(restored.workspace.advanced.cursorFocusPath?.segments[0]?.binding).toEqual({
+    kind: 'recording-source',
+    recordingId: 'restored',
+    sourceInstanceId: 'source',
+  });
+  expect(restored.workspace.history).toEqual(input.history);
+  expect(input.advanced.cursorFocusPath?.segments[0]?.binding).toMatchObject({
+    recordingId: 'original',
+  });
 });

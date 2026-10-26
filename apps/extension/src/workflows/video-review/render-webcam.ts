@@ -1,3 +1,4 @@
+import { resolveCameraShadowVector } from '../../features/video/project/camera/shadow-direction';
 import { bindReviewMediaInput } from './media-input-lifetime';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from 'mediabunny';
 import { cameraContentFrame } from '../../features/video/project/camera/appearance';
@@ -81,7 +82,18 @@ export function drawReviewWebcam(
         Math.min(output.width, output.height) / 720,
         appearance,
         true,
-        webcam.shadow.color
+        webcam.shadow.color,
+        0,
+        resolveCameraShadowVector(
+          webcam.shadowDirection,
+          {
+            x: placement.x * output.width,
+            y: placement.y * output.height,
+            width: placement.width * output.width,
+            height: placement.height * output.height,
+          },
+          output
+        )
       );
     }
     traceCameraShape(context, { x: 0, y: 0, width, height }, appearance);

@@ -18,8 +18,34 @@ for (const variant of [
     const host = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
-    const backup = () =>
+    const libraryBackup = () =>
       page.getByRole('button', { name: label('gallery.app.selectionBackup'), exact: true });
+    const more = review.getByRole('button', {
+      name: label('gallery.videoReview.moreActions'),
+      exact: true,
+    });
+    const menu = page.getByRole('menu', {
+      name: label('gallery.videoReview.moreActions'),
+      exact: true,
+    });
+    const backup = () =>
+      menu.getByRole('menuitem', { name: label('gallery.app.selectionBackup'), exact: true });
+    const openMenu = async (keyboard = false) => {
+      await expect(more).toBeInViewport();
+      if (keyboard) {
+        await more.focus();
+        await page.keyboard.press('ArrowUp');
+        await expect(backup()).toBeFocused();
+      } else await more.click();
+      await expect(menu).toBeVisible();
+      await expect(
+        menu.getByRole('menuitem', { name: label('videoEditor.app.newProjectAction'), exact: true })
+      ).toBeEnabled();
+      await expect(
+        menu.getByRole('menuitem', { name: label('gallery.keyboard.title'), exact: true })
+      ).toBeEnabled();
+      await expect(backup()).toBeEnabled();
+    };
     const files = () => page.evaluate(() => window.__sniptaleHarness?.getSavedFiles() ?? []);
     try {
       await applyHarnessBootstrap(page, {
@@ -34,10 +60,22 @@ for (const variant of [
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 320, height: 180, duration: 4 });
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-      await backup().click();
+      await libraryBackup().click();
       await expect.poll(async () => (await files()).length).toBe(1);
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      await expect(backup()).toBeVisible();
+      await expect(
+        review.getByRole('button', { name: label('gallery.app.selectionBackup'), exact: true })
+      ).toHaveCount(0);
+      await expect(
+        review
+          .locator('header')
+          .getByRole('button', { name: label('videoEditor.app.newProjectAction'), exact: true })
+      ).toHaveCount(0);
+      await openMenu();
+      await page.screenshot({ path: info.outputPath('more-basic.png'), fullPage: false });
+      await page.keyboard.press('Escape');
+      await expect(more).toBeFocused();
+      await expect(review).toBeVisible();
       if (!variant.autosave) {
         await review.locator('[data-ui="autosave-control"] button').first().click();
         await page.getByRole('switch').focus();
@@ -63,13 +101,14 @@ for (const variant of [
             },
           });
         });
+        await openMenu();
         await backup().click();
         await expect(
           review.getByRole('status').filter({ hasText: label('gallery.videoReview.backupFailed') })
         ).toBeVisible();
         expect((await files()).length).toBe(1);
       }
-      await backup().focus();
+      await openMenu(true);
       await page.keyboard.press('Enter');
       await expect.poll(async () => (await files()).length).toBe(2);
       const saved = (await files())[1]!;
@@ -78,11 +117,18 @@ for (const variant of [
       await review
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
+      await openMenu();
+      await page.screenshot({ path: info.outputPath('more-advanced.png'), fullPage: false });
+      await page.keyboard.press('Escape');
       await review.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await expect(review.locator('[data-ui="gallery.videoReview.exportSection"]')).toBeVisible();
-      await backup().scrollIntoViewIfNeeded();
+      await expect(
+        review.getByRole('button', { name: label('gallery.app.selectionBackup'), exact: true })
+      ).toHaveCount(0);
+      await openMenu();
       await expect(backup()).toBeInViewport();
-      await page.screenshot({ path: info.outputPath('backup-footer.png'), fullPage: false });
+      await page.screenshot({ path: info.outputPath('more-export.png'), fullPage: false });
+      await page.keyboard.press('Escape');
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
       const before = await page.evaluate(async () =>
         (await window.__sniptaleHarness!.getMediaLibraryState()).map((item) => item.id)

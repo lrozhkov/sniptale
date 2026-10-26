@@ -42,14 +42,14 @@
 }
 
 @container inspector-surface (min-width: 524px) {
-  .video-editor-inspector-all-groups {
+  .video-editor-inspector-all-groups[data-layout='two'] {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
     gap: 12px;
   }
 
-  .video-editor-inspector-all-groups > section {
+  .video-editor-inspector-all-groups[data-layout='two'] > section {
     min-width: 0;
     padding-block: 0;
     border-top: 0;

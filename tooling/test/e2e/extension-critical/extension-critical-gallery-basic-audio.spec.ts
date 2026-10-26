@@ -94,10 +94,17 @@ for (const variant of [
         const button = (key: Parameters<typeof translate>[0]) =>
           dialog.getByRole('button', { name: label(key), exact: true });
         const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video');
-        const master = dialog.getByRole('textbox', {
-          name: label('gallery.videoReview.sourceAudioVolume'),
-          exact: true,
-        });
+        const openSourceAudio = () =>
+          dialog
+            .locator('[data-review-header-track="originalAudio"]')
+            .getByRole('button', { name: label('gallery.videoReview.speechTitle'), exact: true })
+            .click();
+        const master = dialog
+          .locator('[data-ui="gallery.videoReview.speechPanel"]')
+          .getByRole('textbox', {
+            name: label('gallery.videoReview.volume'),
+            exact: true,
+          });
         const original = dialog.locator('[data-original-audio-lane]');
         await expect(original).toBeVisible();
         await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
@@ -105,6 +112,7 @@ for (const variant of [
           'false'
         );
         await expect(button('gallery.videoReview.scene')).toHaveCount(0);
+        await openSourceAudio();
         await master.fill('50');
         await master.press('Enter');
         await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.volume)).toBe(0.5);
@@ -112,6 +120,9 @@ for (const variant of [
         await expect(master).toHaveValue('100');
         await button('gallery.videoReview.redo').click();
         await expect(master).toHaveValue('50');
+        await dialog
+          .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+          .click();
         await button('gallery.videoReview.originalAudioRange').click();
         await original.scrollIntoViewIfNeeded();
         const rect = (await original.boundingBox())!;
@@ -162,8 +173,9 @@ for (const variant of [
         expect(comparison.output.packets).toEqual(comparison.source.packets);
         expect(comparison.output.rms / comparison.source.rms).toBeCloseTo(0.5, 1);
         await page.reload();
-        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await expect(dialog).toBeVisible();
+        await expect(dialog.locator('[data-ui="gallery.videoReview.stage"] video')).toBeVisible();
+        await openSourceAudio();
         await expect(master).toHaveValue('50');
         await expect(range).toHaveCount(1);
         await range.click();
@@ -218,7 +230,7 @@ for (const viewport of [
           name: translate('gallery.videoReview.originalAudioRange', 'en'),
           exact: true,
         })
-      ).toBeDisabled();
+      ).toHaveCount(0);
       await expect(dialog.locator('[data-original-audio-lane]')).toHaveCount(0);
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, 'en'), exact: true });
@@ -239,7 +251,7 @@ for (const viewport of [
         .fill('A silent video can have its own script.');
       await document
         .getByRole('button', {
-          name: translate('gallery.videoReview.speechGenerate', 'en'),
+          name: translate('gallery.videoReview.speechGenerateSelected', 'en'),
           exact: true,
         })
         .click();

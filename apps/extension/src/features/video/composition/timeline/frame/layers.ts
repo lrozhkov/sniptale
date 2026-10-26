@@ -1,3 +1,4 @@
+import { resolveCameraShadowVector } from '../../../project/camera/shadow-direction';
 import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../../project/types/export';
 import type { VideoProjectRenderScope } from '../../../project/export/render-scope';
 import { resolveVideoCompositionSpotlights } from './spotlights';
@@ -84,8 +85,24 @@ function createVisualLayer(
   const resolvedBaseLayer = createBaseVisualLayer(clip, project, currentTime, opacity, zIndex);
 
   switch (clip.type) {
-    case 'VIDEO':
+    case 'VIDEO': {
+      const camera =
+        project.tracks.find((track) => track.id === clip.trackId)?.role ===
+        VideoProjectTrackRole.CAMERA;
+      const state = resolvedBaseLayer.renderState;
+      const direction = camera
+        ? resolveCameraShadowVector(
+            clip.cameraShadowDirection,
+            {
+              ...clip.transform,
+              x: clip.transform.x + (state?.translateX ?? 0),
+              y: clip.transform.y + (state?.translateY ?? 0),
+            },
+            project
+          )
+        : undefined;
       return {
+        ...(direction ? { cameraShadowVector: direction } : {}),
         ...resolvedBaseLayer,
         clip,
         kind: 'video',
@@ -101,6 +118,7 @@ function createVisualLayer(
           ? { trackRole: VideoProjectTrackRole.CAMERA }
           : {}),
       };
+    }
     case 'IMAGE':
       return { ...resolvedBaseLayer, clip, kind: 'image' };
     case 'TEXT':

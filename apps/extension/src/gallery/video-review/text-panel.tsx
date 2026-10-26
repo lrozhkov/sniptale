@@ -1,12 +1,23 @@
+import { TextDocument } from '../../ui/text-document';
 import { useEffect, useRef, useState } from 'react';
-import { Download, Plus, SlidersHorizontal, Trash2, Volume2, WandSparkles } from 'lucide-react';
+import {
+  Download,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+  Volume2,
+  WandSparkles,
+  Pencil,
+  Play,
+  Scissors,
+} from 'lucide-react';
 import { ReviewTextSubtitlesForm } from './text-subtitles-panel';
 import { ReviewTextVoiceForm } from './text-voice-panel';
 import { ReviewTextRewriteForm } from './text-rewrite-panel';
 import { useReviewTextFormMode } from './text-voice-focus';
 import type { ReviewTextVoiceAccess } from './use-text-voice';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { SelectField } from '../../ui/compact-inspector-controls';
+import { SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { HistorySearch } from './action-history-filters';
 import {
   reviewTextRecordingMaximum,
@@ -57,9 +68,15 @@ type TextDocumentPanelProps = {
   busy: boolean;
   voice?: ReviewTextVoiceAccess | undefined;
   subtitleMainOffset?: number | null;
+  onPlay?:
+    | ((fragment: import('../../features/video/review/text-document').ReviewTextFragment) => void)
+    | undefined;
+  canCut?: ((ids: readonly string[]) => boolean) | undefined;
+  onCut?: ((ids: readonly string[]) => void) | undefined;
 };
 
 export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
+  const [view, setView] = useState<'document' | 'cards'>('document');
   const voiceMode = useReviewTextFormMode<HTMLElement>();
   const list = useReviewTextDocumentList(props);
   const {
@@ -119,25 +136,46 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
           }}
         />
       </div>
+      <div
+        data-ui="text-document.commands"
+        className="sticky top-0 z-10 space-y-1 bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)] py-1"
+      >
+        <SegmentedRow
+          label={translate('gallery.videoReview.textView')}
+          ariaLabel={translate('gallery.videoReview.textView')}
+          value={view}
+          options={[
+            { value: 'document', label: translate('gallery.videoReview.textViewDocument') },
+            { value: 'cards', label: translate('gallery.videoReview.textViewCards') },
+          ]}
+          onChange={(value: 'document' | 'cards') => {
+            props.editor.endTyping();
+            setView(value);
+          }}
+        />
+        {view === 'document' && <TextDocumentContext props={props} list={list} mode={voiceMode} />}
+      </div>
       <p className="text-xs text-[var(--sniptale-color-text-muted)]">
         {translate('gallery.videoReview.textFragmentCount')
           .replace('{found}', String(query.found.length))
           .replace('{total}', String(fragments.length))}
       </p>
       {showFilters && <TextDocumentFilters filters={filters} onChange={setFilters} />}
-      <TextDocumentBatchActions
-        batch={batch}
-        setBatch={setBatch}
-        setSelected={setSelected}
-        query={query}
-        busy={props.busy}
-        remove={props.editor.remove}
-        onVoice={props.voice ? (ids) => voiceMode.open(ids, 'batch') : undefined}
-        onRewrite={
-          props.voice ? (ids) => voiceMode.open(ids, 'rewrite:batch', 'rewrite') : undefined
-        }
-        onSubtitles={(ids) => voiceMode.open(ids, 'subtitles:batch', 'subtitles')}
-      />
+      {view === 'cards' && (
+        <TextDocumentBatchActions
+          batch={batch}
+          setBatch={setBatch}
+          setSelected={setSelected}
+          query={query}
+          busy={props.busy}
+          remove={props.editor.remove}
+          onVoice={props.voice ? (ids) => voiceMode.open(ids, 'batch') : undefined}
+          onRewrite={
+            props.voice ? (ids) => voiceMode.open(ids, 'rewrite:batch', 'rewrite') : undefined
+          }
+          onSubtitles={(ids) => voiceMode.open(ids, 'subtitles:batch', 'subtitles')}
+        />
+      )}
       {props.editor.error && (
         <p role="alert" className="text-xs">
           {textDocumentErrorMessage(props.editor.error)}
@@ -157,11 +195,30 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
           )}
         </div>
       )}
-      {list.rendered.map((fragment) => {
+      {view === 'document' && (
+        <>
+          <TextDocument
+            label={translate('gallery.videoReview.textViewDocument')}
+            phrases={query.found.map((fragment) => ({
+              id: fragment.id,
+              text: fragment.text || translate('gallery.videoReview.speechText'),
+            }))}
+            selectedIds={list.selected}
+            onSelection={setSelected}
+            onActivate={(id) => {
+              const fragment = fragments.find((item) => item.id === id);
+              if (fragment) props.editor.jump(fragment);
+            }}
+          />
+        </>
+      )}
+      {query.found.map((fragment, foundIndex) => {
         const index = fragments.findIndex((item) => item.id === fragment.id);
         return (
           <ReviewTextPhrase
             key={fragment.id}
+            documentView={view === 'document'}
+            visible={view === 'cards' && foundIndex < limit}
             fragment={fragment}
             next={fragments[index + 1]}
             index={index}
@@ -169,7 +226,8 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
             expanded={list.opened === fragment.id}
             selected={list.selected.includes(fragment.id)}
             batch={batch}
-            focus={props.editor.createdId === fragment.id}
+            focus={props.editor.createdId === fragment.id || list.focus.id === fragment.id}
+            focusRevision={list.focus.revision}
             busy={props.busy}
             limit={
               fragment.timeDomain === 'source'
@@ -180,6 +238,7 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
             onSelect={() => list.toggleSelected(fragment.id)}
             onJump={() => props.editor.jump(fragment)}
             actions={
+              view === 'cards' &&
               props.voice && (
                 <TextPhraseVoiceActions fragment={fragment} busy={props.busy} mode={voiceMode} />
               )
@@ -187,7 +246,7 @@ export function ReviewTextDocumentPanel(props: TextDocumentPanelProps) {
           />
         );
       })}
-      {query.found.length > limit && (
+      {view === 'cards' && query.found.length > limit && (
         <ReviewButton
           label={translate('gallery.videoReview.textFragmentMore')}
           className={buttonClass}
@@ -305,14 +364,12 @@ function useReviewTextDocumentList(props: TextDocumentPanelProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [batch, setBatch] = useState(false);
+  const [focus, setFocus] = useState({ id: '', revision: 0 });
   const [opened, setOpened] = useState<string | null>(null);
   const [limit, setLimit] = useState(50);
   const consumedCreation = useRef(props.editor.createdId);
   const fragments = props.editor.document.fragments;
   const query = queryReviewText(fragments, props.snapshots, filters, selected);
-  const rendered = query.found.slice(0, limit);
-  const openedFragment = query.found.find((fragment) => fragment.id === opened);
-  if (openedFragment && !rendered.includes(openedFragment)) rendered.push(openedFragment);
   const filtered =
     filters.query !== '' ||
     filters.origin !== 'all' ||
@@ -343,6 +400,11 @@ function useReviewTextDocumentList(props: TextDocumentPanelProps) {
     batch,
     setBatch,
     opened,
+    focus,
+    open: (id: string) => {
+      setOpened(id);
+      setFocus((current) => ({ id, revision: current.revision + 1 }));
+    },
     toggleOpened: (id: string) => setOpened((current) => (current === id ? null : id)),
     toggleSelected: (id: string) =>
       setSelected((current) =>
@@ -352,7 +414,6 @@ function useReviewTextDocumentList(props: TextDocumentPanelProps) {
     setLimit,
     fragments,
     query,
-    rendered,
     filtered,
   };
 }
@@ -541,6 +602,104 @@ function TextDocumentCommands({
         onClick={onAdd}
       >
         <Plus size={14} />
+      </ReviewButton>
+    </div>
+  );
+}
+
+/** One contextual command strip keeps prose free of repeated controls. */
+function TextDocumentContext({
+  props,
+  list,
+  mode,
+}: {
+  props: TextDocumentPanelProps;
+  list: ReturnType<typeof useReviewTextDocumentList>;
+  mode: ReturnType<typeof useReviewTextFormMode>;
+}) {
+  const ids = list.selected.length
+    ? list.query.eligible
+    : list.opened && list.query.found.some((fragment) => fragment.id === list.opened)
+      ? [list.opened]
+      : [];
+  const active = list.query.found.find((fragment) => fragment.id === ids[0]);
+  if (!active) return null;
+  const open = (kind: 'voice' | 'rewrite' | 'subtitles') => {
+    props.editor.endTyping();
+    mode.open(ids, `document:${kind}`, kind);
+  };
+  return (
+    <div
+      data-ui="text-document.actions"
+      data-selected-count={ids.length}
+      className="flex flex-wrap items-center gap-1"
+    >
+      {ids.length > 1 && (
+        <span role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('gallery.videoReview.speechBatchSelected').replace(
+            '{count}',
+            String(ids.length)
+          )}
+        </span>
+      )}
+      <ReviewButton
+        label={translate('gallery.videoReview.textPhraseEdit')}
+        className={reviewTextButtonClassName}
+        disabled={props.busy || ids.length !== 1}
+        onClick={() => list.open(active.id)}
+      >
+        <Pencil size={14} />
+      </ReviewButton>
+      {props.onPlay && (
+        <ReviewButton
+          label={translate('gallery.videoReview.textPlayFromHere')}
+          className={reviewTextButtonClassName}
+          disabled={props.busy}
+          onClick={() => props.onPlay?.(active)}
+        >
+          <Play size={14} />
+        </ReviewButton>
+      )}
+      {props.onCut && (
+        <ReviewButton
+          label={translate('gallery.videoReview.textCut')}
+          className={reviewTextButtonClassName}
+          disabled={props.busy || !props.canCut?.(ids)}
+          onClick={() => props.onCut?.(ids)}
+        >
+          <Scissors size={14} />
+        </ReviewButton>
+      )}
+      {props.voice && (
+        <>
+          <ReviewButton
+            data-text-voice-trigger="document:voice"
+            label={translate('gallery.videoReview.speechGenerateSelected')}
+            className={reviewTextButtonClassName}
+            disabled={props.busy || (ids.length === 1 && !active.text.trim())}
+            onClick={() => open('voice')}
+          >
+            <Volume2 size={14} />
+          </ReviewButton>
+          <ReviewButton
+            data-text-voice-trigger="document:rewrite"
+            label={translate('gallery.videoReview.textRewriteSelected')}
+            className={reviewTextButtonClassName}
+            disabled={props.busy}
+            onClick={() => open('rewrite')}
+          >
+            <WandSparkles size={14} />
+          </ReviewButton>
+        </>
+      )}
+      <ReviewButton
+        data-text-voice-trigger="document:subtitles"
+        label={translate('gallery.videoReview.subtitlesSelected')}
+        className={reviewTextButtonClassName}
+        disabled={props.busy}
+        onClick={() => open('subtitles')}
+      >
+        <Download size={14} />
       </ReviewButton>
     </div>
   );

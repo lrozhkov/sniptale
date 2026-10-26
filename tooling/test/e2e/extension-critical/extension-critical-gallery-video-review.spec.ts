@@ -1,3 +1,4 @@
+import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import {
   addReviewFocus,
   seedReviewVideo,
@@ -9,6 +10,7 @@ import {
 } from '../support/quick-editor-media-fixture';
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createHash } from 'node:crypto';
+import { SHOWCASE_GRADIENT_IDS } from '../../../../apps/extension/src/features/highlighter/showcase-resources';
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -30,11 +32,12 @@ async function timelineGesture(page: Page, start: number, end?: number) {
   const box = (await target.boundingBox())!;
   const duration = Number(await plane.getAttribute('aria-valuemax'));
   const x = (time: number) => box.x + (box.width * time) / duration;
-  await page.mouse.move(x(start), box.y + 12);
-  if (end === undefined) await page.mouse.click(x(start), box.y + 12);
+  const y = box.y + (placement ? 2 : 12);
+  await page.mouse.move(x(start), y);
+  if (end === undefined) await page.mouse.click(x(start), y);
   else {
     await page.mouse.down();
-    await page.mouse.move(x(end), box.y + 12, { steps: 8 });
+    await page.mouse.move(x(end), y, { steps: 8 });
     await page.mouse.up();
   }
 }
@@ -84,21 +87,31 @@ for (const variant of [
         true
       );
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog'),
         video = dialog.locator('video');
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
       await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
-      await expect(button('gallery.videoReview.telemetry')).toBeVisible();
+      await expect(
+        button('gallery.videoReview.telemetry').and(dialog.locator('[data-review-toolbar-button]'))
+      ).toBeVisible();
       const historyMarker = dialog
         .getByRole('button', { name: label('gallery.videoReview.telemetry'), exact: false })
         .and(dialog.locator('button[title*=" · "]'));
       await expect(historyMarker).toHaveCount(1);
-      await button('gallery.videoReview.telemetry').click();
+      await button('gallery.videoReview.telemetry')
+        .and(dialog.locator('[data-review-toolbar-button]'))
+        .click();
       await expect(historyMarker).toHaveCount(0);
-      await button('gallery.videoReview.telemetry').click();
+      await button('gallery.videoReview.telemetry')
+        .and(dialog.locator('[data-review-toolbar-button]'))
+        .click();
       await expect(historyMarker).toHaveCount(1);
       await expect(dialog.locator('input[type="number"]')).toHaveCount(0);
       await expect(button('gallery.videoReview.point')).toHaveCount(0);
@@ -245,8 +258,15 @@ for (const variant of [
       });
       expect(payload.telemetry.cursorTrack).not.toHaveProperty('samples');
       expect(Buffer.byteLength(report)).toBeLessThan(128 * 1024);
+      const retainedWorkspace = await readNativeReviewWorkspace(
+        page,
+        `recording:${betaV1Fixture.records.recordings[0].id}`
+      );
+      expect(retainedWorkspace).not.toBeNull();
       await button('common.actions.close').click();
       const preview = page.locator('[data-ui="gallery.preview.surface"]');
+      await expect(preview.locator('[data-ui="gallery.preview.project-thumbnail"]')).toBeVisible();
+      await preview.locator('[data-ui="gallery.preview.navigationZone.next"]').click();
       const previewVideo = preview.locator('video');
       await expect(previewVideo).toBeVisible();
       await preview
@@ -265,8 +285,18 @@ for (const variant of [
       await expect(previewVideo).toHaveJSProperty('paused', true);
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(
+        dialog.getByRole('heading', { name: label('gallery.videoReview.comments'), exact: true })
+      ).toBeVisible();
+      await expect(
         dialog.locator('ol').getByText('Interval with region', { exact: true })
       ).toBeVisible();
+      await expect
+        .poll(() => readNativeReviewWorkspace(page, retainedWorkspace!.aggregateId))
+        .toMatchObject({
+          aggregateId: retainedWorkspace!.aggregateId,
+          sourceAssetId: retainedWorkspace!.sourceAssetId,
+          createdAt: retainedWorkspace!.createdAt,
+        });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -287,7 +317,11 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     const dialog = page.locator('dialog');
     const button = (key: Parameters<typeof translate>[0]) =>
@@ -441,7 +475,11 @@ for (const { container, gaps } of [
             gaps
           );
           await page.reload();
-          await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+          await page
+            .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+            .getByRole('button', { name: 'beta-v1.webm', exact: true })
+            .first()
+            .click();
           await page.locator('[data-ui="gallery.videoReview.enter"]').click();
           const dialog = page.locator('dialog');
           const button = (key: Parameters<typeof translate>[0]) =>
@@ -609,7 +647,11 @@ for (const variant of [
         true
       );
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -697,19 +739,20 @@ for (const variant of [
         canvasBounds.y + canvasBounds.height * 0.5
       );
       await page.mouse.down();
-      const originTransform = await stageVideo.evaluate((node) => node.style.transform);
+      const originTransform = await stageVideo.evaluate((node) => node.getBoundingClientRect().x);
       await page.mouse.move(
         canvasBounds.x + canvasBounds.width * 0.61,
         canvasBounds.y + canvasBounds.height * 0.5,
         { steps: 5 }
       );
       await expect
-        .poll(() => stageVideo.evaluate((node) => node.style.transform))
+        .poll(() => stageVideo.evaluate((node) => node.getBoundingClientRect().x))
         .not.toBe(originTransform);
       expect(
         await stageVideo.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).m11)
       ).toBeCloseTo(2.25);
-      await expect(focusX).toHaveValue('51');
+      await expect(focusX).toHaveValue('61');
+      await expect.poll(() => persistedFocus(page)).toMatchObject({ transform: { centerX: 0.51 } });
       await page.mouse.up();
       await expect(focusX).toHaveValue('61');
       await button('gallery.videoReview.undo').click();
@@ -723,19 +766,22 @@ for (const variant of [
         panBounds.y + panBounds.height * 0.5
       );
       await page.mouse.down();
-      const beforePan = await stageVideo.evaluate((node) => node.style.transform);
+      const beforePan = await stageVideo.evaluate((node) => node.getBoundingClientRect().x);
       await page.mouse.move(
         panBounds.x + panBounds.width * 0.6125,
         panBounds.y + panBounds.height * 0.5,
         { steps: 5 }
       );
       await expect
-        .poll(() => stageVideo.evaluate((node) => node.style.transform))
+        .poll(() => stageVideo.evaluate((node) => node.getBoundingClientRect().x))
         .not.toBe(beforePan);
-      await expect(focusX).toHaveValue('51');
+      await expect(focusX).not.toHaveValue('51');
+      await expect.poll(() => persistedFocus(page)).toMatchObject({ transform: { centerX: 0.51 } });
       await page.keyboard.press('Escape');
       await page.mouse.up();
-      await expect.poll(() => stageVideo.evaluate((node) => node.style.transform)).toBe(beforePan);
+      await expect
+        .poll(() => stageVideo.evaluate((node) => node.getBoundingClientRect().x))
+        .toBe(beforePan);
       await expect(focusX).toHaveValue('51');
       await enter.scrollIntoViewIfNeeded();
       await page.screenshot({ path: testInfo.outputPath('zoom-transition-controls.png') });
@@ -750,7 +796,11 @@ for (const variant of [
         await new Promise<void>((resolve) => {
           const sample = () => {
             const matrix = new DOMMatrix(getComputedStyle(node).transform);
-            samples.push({ width: node.offsetWidth, x: matrix.m41, scale: matrix.m11 });
+            samples.push({
+              width: node.offsetWidth,
+              x: node.getBoundingClientRect().x,
+              scale: matrix.m11,
+            });
             if (performance.now() - start < 700) requestAnimationFrame(sample);
             else resolve();
           };
@@ -766,6 +816,11 @@ for (const variant of [
         expect(motion[i]!.x).toBeLessThanOrEqual(motion[i - 1]!.x + 0.01);
       }
 
+      await lane.locator('[role="button"]').last().click();
+      await expect(focusX).toHaveValue('51');
+      await expect
+        .poll(() => persistedFocus(page))
+        .toMatchObject({ transform: { centerX: 0.51, scale: 2.25 }, enter: { duration: 1.5 } });
       await page.setViewportSize({ width: 800, height: 600 });
       await preview.scrollIntoViewIfNeeded();
       await expect(preview).toBeInViewport();
@@ -789,15 +844,19 @@ for (const variant of [
       await expect(
         linkInspector.locator('[data-ui="gallery.videoReview.zoomLinkDuration"]')
       ).not.toBeEmpty();
-      const easing = linkInspector.getByRole('button', {
+      const easing = linkInspector.getByRole('group', {
         name: label('gallery.videoReview.zoomLinkEasing'),
         exact: true,
       });
-      await easing.click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.transitionLinear'), exact: true })
+      await easing
+        .getByRole('button', { name: label('gallery.videoReview.transitionLinear'), exact: true })
         .click();
-      await expect(easing).toContainText(label('gallery.videoReview.transitionLinear'));
+      await expect(
+        easing.getByRole('button', {
+          name: label('gallery.videoReview.transitionLinear'),
+          exact: true,
+        })
+      ).toHaveAttribute('aria-pressed', 'true');
       await page.screenshot({ path: testInfo.outputPath('zoom-link.png') });
       // The inspector removes the connection explicitly.
       await linkInspector
@@ -817,7 +876,12 @@ for (const variant of [
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(link).toHaveAttribute('data-connected', 'true');
       await link.click();
-      await expect(easing).toContainText(label('gallery.videoReview.transitionLinear'));
+      await expect(
+        easing.getByRole('button', {
+          name: label('gallery.videoReview.transitionLinear'),
+          exact: true,
+        })
+      ).toHaveAttribute('aria-pressed', 'true');
       await clickReviewExport(button, 'gallery.videoReview.exportVideo');
       await expect.poll(() => recordingCount(page)).toBe(2);
     } finally {
@@ -841,7 +905,11 @@ test('quick editor exports an exact portrait fragment and exposes compact speed 
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     const dialog = page.locator('dialog');
     const button = (key: Parameters<typeof translate>[0]) =>
@@ -875,15 +943,22 @@ test('quick editor exports an exact portrait fragment and exposes compact speed 
       ).toBe(true);
     }
     await page.keyboard.press('Escape');
-    await button('gallery.videoReview.pointerTool').focus();
+    const pointer = button('gallery.videoReview.pointerTool');
+    const video = dialog.locator('video');
+    await pointer.focus();
     await page.keyboard.press('Space');
+    await expect(video).toHaveJSProperty('paused', false);
+    await expect(pointer).toBeFocused();
+    await expect(dialog).not.toHaveAttribute('data-playback-focus', 'true');
+    await page.keyboard.press('Space');
+    await expect(video).toHaveJSProperty('paused', true);
+    await expect(pointer).toBeFocused();
+    const timePlane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+    await timePlane.focus();
+    await page.keyboard.press('ArrowRight');
     await expect(dialog).toHaveAttribute('data-playback-focus', 'true');
-    expect(
-      await button('gallery.videoReview.pointerTool').evaluate(
-        (node) => getComputedStyle(node).boxShadow
-      )
-    ).toBe('none');
-    await page.keyboard.press('Space');
+    await expect(timePlane).toHaveCSS('outline-style', 'none');
+    await expect(timePlane).toHaveCSS('box-shadow', 'none');
     await page.keyboard.press('Tab');
     await expect(dialog).not.toHaveAttribute('data-playback-focus');
     await page.keyboard.press('ArrowRight');
@@ -913,8 +988,15 @@ test('quick editor exports an exact portrait fragment and exposes compact speed 
     );
     expect(timelineBox.x + timelineBox.width).toBeLessThanOrEqual(dockBox.x + 2);
     await page.setViewportSize({ width: 800, height: 600 });
-    for (const control of await toolbar.getByRole('button').all())
+    const workspaceScroll = dialog.locator('[data-ui="gallery.videoReview.workspaceScroll"]');
+    await expect(workspaceScroll).toHaveCSS('overflow-x', 'auto');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true
+    );
+    for (const control of await toolbar.getByRole('button').all()) {
+      await control.scrollIntoViewIfNeeded();
       await expect(control).toBeInViewport();
+    }
     await page.screenshot({ path: testInfo.outputPath('full-height-inspector.png') });
     await button('videoEditor.app.panelRestoreHeight').click();
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -981,7 +1063,11 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -1110,9 +1196,9 @@ for (const variant of [
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first()
         .click();
-      await button('gallery.videoReview.focusOutside').click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.focusBlur'), exact: true })
+      await dialog
+        .getByRole('group', { name: label('gallery.videoReview.focusOutside'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.focusBlur'), exact: true })
         .click();
       await timelineGesture(page, 1);
       await expect(stage.locator('[data-ui="gallery.videoReview.spotlight"]')).not.toHaveCSS(
@@ -1272,9 +1358,9 @@ for (const variant of [
       await button('gallery.videoReview.undo').click();
       await expect(link).toHaveAttribute('data-connected', 'true');
       await lane.locator('[role="button"]').first().click();
-      await button('gallery.videoReview.focusOutside').click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.focusDim'), exact: true })
+      await dialog
+        .getByRole('group', { name: label('gallery.videoReview.focusOutside'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.focusDim'), exact: true })
         .click();
       await button('gallery.videoReview.scene').click();
       const background = await page.evaluate(() => {
@@ -1286,7 +1372,11 @@ for (const variant of [
         context.fillRect(0, 0, 16, 16);
         return canvas.toDataURL('image/png').split(',')[1]!;
       });
-      await dialog.locator('input[accept="image/png,image/jpeg,image/webp"]').setInputFiles({
+      await dialog
+        .getByRole('group', { name: label('gallery.videoReview.background'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.backgroundImage'), exact: true })
+        .click();
+      await dialog.locator('[data-ui="background.image.picker"] input[type="file"]').setInputFiles({
         name: 'focus-background.png',
         mimeType: 'image/png',
         buffer: Buffer.from(background, 'base64'),
@@ -1337,7 +1427,11 @@ test('quick editor continues playback after a fractional cut and accepts navigat
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     const dialog = page.locator('dialog');
     const button = (key: Parameters<typeof translate>[0]) =>
@@ -1357,6 +1451,11 @@ test('quick editor continues playback after a fractional cut and accepts navigat
     await button('gallery.videoReview.pause').click();
     await button('gallery.videoReview.comments').click();
     await button('gallery.videoReview.addComment').and(dialog.locator('aside button')).click();
+    const note = dialog.getByRole('textbox', {
+      name: label('gallery.videoReview.commentText'),
+      exact: true,
+    });
+    await note.fill('Navigation draft');
     const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
     for (const time of [4, 6, 3, 5]) {
       await plane.focus();
@@ -1368,8 +1467,8 @@ test('quick editor continues playback after a fractional cut and accepts navigat
         .toBeCloseTo(time, 0);
       expect(await dialog.evaluate((node) => getComputedStyle(node).outlineStyle)).toBe('none');
     }
-    await expect(dialog.locator('textarea')).toBeVisible();
-    await button('gallery.videoReview.discard').click();
+    await expect(dialog.locator('textarea')).toHaveCount(0);
+    await expect(dialog.locator('ol').getByText('Navigation draft', { exact: true })).toBeVisible();
   } finally {
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
@@ -1402,8 +1501,41 @@ for (const variant of [
         false,
         true
       );
+      await page.evaluate(
+        async ({ databaseName, recordingId }) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(databaseName);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          try {
+            const tx = db.transaction('recording_telemetry', 'readwrite');
+            const store = tx.objectStore('recording_telemetry');
+            const request = store.get(recordingId);
+            request.onsuccess = () => {
+              const row = request.result;
+              row.actionEvents[0].kind = 'SCROLL';
+              store.put(row);
+            };
+            await new Promise<void>((resolve, reject) => {
+              tx.oncomplete = () => resolve();
+              tx.onabort = () => reject(tx.error);
+            });
+          } finally {
+            db.close();
+          }
+        },
+        {
+          databaseName: betaV1Fixture.databaseName,
+          recordingId: betaV1Fixture.records.recordings[0].id,
+        }
+      );
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -1431,7 +1563,7 @@ for (const variant of [
       await expect(focus).toBeVisible();
       await expect(
         focus.getByRole('textbox', { name: label('gallery.videoReview.zoomScale'), exact: true })
-      ).toHaveValue('2.5');
+      ).toHaveValue('1.5');
       await page.screenshot({ path: testInfo.outputPath('contextual-focus.png') });
       await action.click();
       await expect(
@@ -1459,25 +1591,42 @@ for (const variant of [
       const lanes = dialog.locator('[data-ui="gallery.videoReview.audioLane"]');
       await expect(lanes.first().locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
       await expect(button('gallery.videoReview.copyReport')).toHaveCount(0);
+      await timelineGesture(page, 5);
       await button('gallery.videoReview.comments').click();
       const addNote = button('gallery.videoReview.addComment').and(dialog.locator('aside button'));
       const noteBounds = (await addNote.boundingBox())!;
-      const listBounds = (await dialog.locator('aside ol').boundingBox())!;
+      const listBounds = (await dialog.locator('aside .review-inspector-list').boundingBox())!;
       expect(noteBounds.width).toBeCloseTo(listBounds.width, 0);
       await expect(addNote).toHaveCSS('justify-content', 'center');
       await addNote.click();
       await dialog.locator('textarea').fill('Context note');
       await button('gallery.videoReview.save').click();
-      await button('gallery.videoReview.editComment').click();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.commentComposer"]')).toHaveCount(
+        0
+      );
+      await button('gallery.videoReview.comments').click();
+      const savedNote = dialog
+        .locator('.review-inspector-list > li')
+        .filter({ hasText: 'Context note' });
+      await expect(savedNote).toBeVisible();
+      await savedNote
+        .getByRole('button', { name: label('gallery.videoReview.editComment'), exact: true })
+        .click();
       const composer = dialog.locator('[data-ui="gallery.videoReview.commentComposer"]');
       await expect(composer).toHaveCount(1);
       await expect(composer.locator('textarea')).toHaveValue('Context note');
-      await expect(composer.locator('textarea')).toHaveCSS('border-width', '0px');
+      await expect(composer.locator('textarea')).toHaveAttribute(
+        'data-ui',
+        'shared.ui.compact-textarea'
+      );
+      await expect(composer.locator('textarea')).toHaveCSS('border-width', '1px');
       await expect(
         dialog.locator('ol li:has([data-ui="gallery.videoReview.commentComposer"])')
       ).toHaveCSS('border-width', '0px');
       await page.screenshot({ path: testInfo.outputPath('note-editor.png') });
       await button('gallery.videoReview.discard').click();
+      await expect(composer).toHaveCount(0);
+      await button('gallery.videoReview.comments').click();
       const report = button('gallery.videoReview.downloadReport');
       const reportIconX = (await report.locator('svg').boundingBox())!.x;
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
@@ -1489,8 +1638,11 @@ for (const variant of [
       await page.mouse.move(0, 0);
       await expect(exporting).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(exporting).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      const exportColor = await exporting.evaluate((node) => getComputedStyle(node).color);
       await exporting.hover();
-      await expect(exporting).not.toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await expect(exporting).not.toHaveCSS('color', exportColor);
+      await expect(exporting).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await expect(exporting).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(dialog.locator('textarea')).toHaveCount(0);
       await button('gallery.videoReview.pointerTool').click();
       await timelineGesture(page, 5, 7);
@@ -1526,12 +1678,15 @@ for (const variant of [
       );
       await exporting.scrollIntoViewIfNeeded();
       await expect(exporting).toBeInViewport({ ratio: 1 });
+      await button('gallery.videoReview.downloadVideo').scrollIntoViewIfNeeded();
       await expect(button('gallery.videoReview.downloadVideo')).toBeInViewport({ ratio: 1 });
       await expect(inspector.locator('header h2')).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('polish-hd-export.png') });
-      await inspector
-        .locator('[data-ui="gallery.videoReview.inspectorNavigation"]')
-        .getByRole('button', { name: label('gallery.videoReview.speedMode'), exact: true })
+      await dialog
+        .getByRole('button', {
+          name: `${label('gallery.videoReview.speedMode')} 2× · 5.0 – 7.0`,
+          exact: true,
+        })
         .click();
       const speedValue = inspector.getByRole('button', {
         name: label('gallery.videoReview.speedRate'),
@@ -1548,12 +1703,12 @@ for (const variant of [
       });
       await remove.scrollIntoViewIfNeeded();
       await expect(remove).toBeInViewport();
-      await expect(remove).toHaveCSS('min-height', '36px');
-      const baseBorder = await remove.evaluate((node) => getComputedStyle(node).borderColor);
+      await expect(remove).toHaveCSS('min-height', '32px');
+      const baseColor = await remove.evaluate((node) => getComputedStyle(node).color);
       await remove.hover();
-      expect(await remove.evaluate((node) => getComputedStyle(node).borderColor)).not.toBe(
-        baseBorder
-      );
+      await expect(remove).not.toHaveCSS('color', baseColor);
+      await expect(remove).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await page.screenshot({ path: testInfo.outputPath('polish-hd-delete.png') });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
@@ -1575,13 +1730,20 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     const dialog = page.locator('dialog');
     const button = (key: Parameters<typeof translate>[0]) =>
       dialog.getByRole('button', { name: translate(key, 'ru'), exact: true });
     await button('gallery.videoReview.advancedEditing').click();
-    await expect(button('gallery.videoReview.audioTrack')).toHaveAttribute('aria-pressed', 'true');
+    await expect(dialog.locator('[data-original-audio-lane]')).toBeVisible();
+    await dialog
+      .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+      .click();
     await button('gallery.videoReview.originalAudioRange').click();
     const lane = dialog.locator('[data-original-audio-lane]');
     const box = (await lane.boundingBox())!;
@@ -1592,6 +1754,7 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     const range = dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]');
     await expect(range).toHaveCount(1);
     await expect(range).toHaveAttribute('aria-pressed', 'true');
+    await dialog.locator('[data-review-header-track="source"] [data-review-track-select]').click();
     await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
     await expect(button('gallery.videoReview.muteAudioRange')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('source-audio-range-ru.png') });
@@ -1600,6 +1763,8 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     await button('gallery.videoReview.redo').click();
     await expect(range).toHaveCount(1);
     await range.click();
+    await button('gallery.videoReview.muteAudioRange').click();
+    await expect(range).toHaveAttribute('title', /0%$/);
     await button('common.actions.close').click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await expect(range).toHaveCount(1);
@@ -1653,7 +1818,11 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -1681,6 +1850,9 @@ for (const variant of [
         0
       );
       await expect(button('gallery.videoReview.downloadSelection')).toHaveCount(0);
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.originalAudioRange').click();
       await expect(button('gallery.videoReview.pointerTool')).toHaveAttribute(
         'aria-pressed',
@@ -1709,6 +1881,7 @@ for (const variant of [
         .toBeGreaterThan(original.width + audioBox.width * 0.08);
       // A plain click clears the former interval before arming the focus tool.
       await focus.click({ position: { x: focusBox.width * 0.1, y: focusBox.height / 2 } });
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute(
         'aria-pressed',
@@ -1749,10 +1922,17 @@ for (const variant of [
       await page.screenshot({ path: testInfo.outputPath('lane-tools.png') });
       await page.setViewportSize({ width: 900, height: 720 });
       await expect(button('gallery.videoReview.focusRangeTool')).toBeInViewport();
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await expect(button('gallery.videoReview.originalAudioRange').first()).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('lane-tools-compact.png') });
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
       const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      await source.scrollIntoViewIfNeeded();
       await drag((await source.boundingBox())!, 0.75, 0.9);
       const editLabel = await source
         .locator('[data-ui="gallery.videoReview.editBlock"] button[aria-pressed]')
@@ -1816,7 +1996,11 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
@@ -1831,7 +2015,14 @@ for (const variant of [
         .evaluate((node) => getComputedStyle(node).strokeWidth);
       const iconColor = await cutTool.evaluate((node) => getComputedStyle(node).color);
       await cutTool.hover();
-      await expect(cutTool.locator('svg')).toHaveCSS('stroke-width', stroke);
+      await expect(cutTool.locator('svg')).toHaveCSS(
+        'stroke-width',
+        await cutTool.evaluate(
+          (node) =>
+            `${Number(getComputedStyle(node).getPropertyValue('--sniptale-control-icon-stroke-hover'))}px`
+        )
+      );
+      expect(Number.parseFloat(stroke)).toBeGreaterThan(0);
       await expect(cutTool).not.toHaveCSS('color', iconColor);
       await page.mouse.move(0, 0);
 
@@ -1858,13 +2049,22 @@ for (const variant of [
         await button('gallery.videoReview.speedMode').click();
         const rate = button('gallery.videoReview.speedRate');
         await expect(rate).toHaveCSS('height', '32px');
-        await expect(rate).toHaveCSS('font-size', '12px');
+        await expect(rate).toHaveCSS(
+          'font-size',
+          await rate.evaluate((node) =>
+            getComputedStyle(node).getPropertyValue('--sniptale-field-font-size').trim()
+          )
+        );
+        await page.mouse.move(0, 0);
         await expect(rate).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
         if (width >= 1920) await expect(toolbar).toHaveAttribute('data-labels', 'shown');
         if (width === 1280) {
-          const border = await rate.evaluate((node) => getComputedStyle(node).borderTopColor);
+          const color = await rate.evaluate((node) => getComputedStyle(node).color);
+          const background = await rate.evaluate((node) => getComputedStyle(node).backgroundColor);
           await rate.hover();
-          await expect(rate).not.toHaveCSS('border-top-color', border);
+          await expect(rate).not.toHaveCSS('color', color);
+          await expect(rate).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+          await expect(rate).not.toHaveCSS('background-color', background);
           await page.mouse.move(0, 0);
           const widths = await toolbar.evaluate(async (node) => {
             const values: number[] = [];
@@ -1916,7 +2116,12 @@ for (const variant of [
       await page.setViewportSize({ width: 1920, height: 1080 });
       await addReviewFocus(page);
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
-      const position = inspector.locator('details[data-level="group"]');
+      const position = inspector.locator('details[data-level="group"]').filter({
+        has: page.getByRole('heading', {
+          name: label('gallery.videoReview.precisePosition'),
+          exact: true,
+        }),
+      });
       await expect(position).not.toHaveAttribute('open', '');
       await expect(
         inspector.getByRole('textbox', {
@@ -1936,10 +2141,14 @@ for (const variant of [
         .locator('[data-ui="gallery.videoReview.focusType"]')
         .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
         .click();
-      await expect(inspector.locator('details[data-level="group"]')).not.toHaveAttribute(
-        'open',
-        ''
-      );
+      await expect(
+        inspector.locator('details[data-level="group"]').filter({
+          has: page.getByRole('heading', {
+            name: label('gallery.videoReview.preciseArea'),
+            exact: true,
+          }),
+        })
+      ).not.toHaveAttribute('open', '');
       const entry = inspector.getByRole('group', {
         name: label('gallery.videoReview.zoomTransitionIn'),
         exact: true,
@@ -1949,19 +2158,17 @@ for (const variant of [
         exact: true,
       });
       await entry
-        .getByRole('button', { name: label('gallery.videoReview.focusReveal'), exact: true })
-        .click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.focusContract'), exact: true })
+        .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.focusContract'), exact: true })
         .click();
       await expect(
-        exit.getByRole('button', { name: label('gallery.videoReview.focusReveal'), exact: true })
-      ).toContainText(label('gallery.videoReview.focusFade'));
+        exit
+          .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
+          .getByRole('button', { name: label('gallery.videoReview.focusFade'), exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
       await exit
-        .getByRole('button', { name: label('gallery.videoReview.focusReveal'), exact: true })
-        .click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.focusExpand'), exact: true })
+        .getByRole('group', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.focusExpand'), exact: true })
         .click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.exportFooter"]')).toHaveCount(0);
       const noteGroup = toolbar.locator('[data-ui="gallery.videoReview.noteHistoryTools"]');
@@ -2026,7 +2233,11 @@ for (const advanced of [false, true]) {
           duration: 12,
         });
         await page.reload();
-        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page
+          .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+          .getByRole('button', { name: 'beta-v1.webm', exact: true })
+          .first()
+          .click();
         await page.locator('[data-ui="gallery.videoReview.enter"]').click();
         const dialog = page.locator('dialog');
         const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
@@ -2113,6 +2324,7 @@ for (const advanced of [false, true]) {
             name: `${label('gallery.videoReview.rangeStart')} increase`,
             exact: true,
           });
+          await input.hover();
           await increase.hover();
           await page.mouse.down();
           await page.waitForTimeout(700);
@@ -2142,22 +2354,29 @@ for (const advanced of [false, true]) {
         }
         if (!advanced) await button('gallery.videoReview.advancedEditing').click();
         await button('gallery.videoReview.scene').click();
-        await button('gallery.videoReview.backgroundGradient').click();
-        await expect(
-          dialog.locator('[data-ui="gallery.videoReview.gradientPresets"] button')
-        ).toHaveCount(10);
+        await button('gallery.videoReview.backgroundSolid').click();
+        const swatches = dialog.locator('[data-ui="gallery.videoReview.gradientPresets"]');
+        const showMore = swatches.getByRole('button', {
+          name: label('settings.editor.backgrounds.showMore'),
+          exact: true,
+        });
+        while (await showMore.count()) await showMore.click();
+        const gradients = swatches.locator('button[style*="gradient("]');
+        await expect(gradients).toHaveCount(SHOWCASE_GRADIENT_IDS.length);
         const paint = dialog.locator(
           '[data-ui="gallery.videoReview.backgroundInspector"] [data-ui="shared.ui.paint-selector"]'
         );
         await expect(paint).toHaveAttribute('data-trigger-variant', 'swatch');
         const paintButton = paint.locator('[data-ui="shared.ui.paint-selector.trigger"]');
-        await expect(paintButton.locator('.lucide-palette')).toHaveCount(1);
+        await expect(
+          paintButton.locator('[data-ui="shared.ui.paint-selector.preview"]')
+        ).toBeVisible();
         await expect(paintButton).toHaveCSS('border-top-width', '0px');
         await paintButton.click();
         await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toBeVisible();
         await paintButton.click();
         await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
-        const backgroundChoice = button('gallery.videoReview.backgroundGradient');
+        const backgroundChoice = button('gallery.videoReview.backgroundSolid');
         await backgroundChoice.hover();
         await expect(backgroundChoice).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
         await expect(backgroundChoice).toHaveCSS('box-shadow', 'none');
@@ -2175,9 +2394,7 @@ for (const advanced of [false, true]) {
           })
         );
         expect(new Set(fonts).size).toBe(1);
-        const preset = dialog
-          .locator('[data-ui="gallery.videoReview.gradientPresets"] button')
-          .first();
+        const preset = gradients.first();
         await preset.click();
         await expect(preset).toHaveAttribute('aria-pressed', 'true');
         await expect(preset).toHaveCSS('outline-style', 'solid');
@@ -2231,7 +2448,11 @@ test('quick editor preview has no black raster seam after resizing and changing 
       duration: 2,
     });
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     const dialog = page.locator('dialog');
     const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
@@ -2257,13 +2478,13 @@ test('quick editor preview has no black raster seam after resizing and changing 
       await padding.fill('48');
       await padding.press('Enter');
       await button('gallery.videoReview.advancedEditing').click();
-      const screenshot = await page.screenshot({
+      const screenshot = await stage.screenshot({
         path: testInfo.outputPath(`preview-${width}.png`),
       });
       const bounds = await stage.boundingBox();
       expect(bounds).not.toBeNull();
       const edges = await page.evaluate(
-        async ({ encoded, box }) => {
+        async ({ encoded }) => {
           const image = new Image();
           const loaded = new Promise<void>((resolve, reject) => {
             image.onload = () => resolve();
@@ -2276,14 +2497,14 @@ test('quick editor preview has no black raster seam after resizing and changing 
           canvas.height = image.height;
           const context = canvas.getContext('2d')!;
           context.drawImage(image, 0, 0);
-          const x = Math.floor(box.x + box.width / 2),
-            y = Math.floor(box.y + box.height / 2);
+          const x = Math.floor(image.width / 2),
+            y = Math.floor(image.height / 2);
           return [
-            [x, Math.ceil(box.y + box.height) - 1],
-            [Math.ceil(box.x + box.width) - 1, y],
+            [x, image.height - 1],
+            [image.width - 1, y],
           ].map(([px, py]) => Array.from(context.getImageData(px!, py!, 1, 1).data).slice(0, 3));
         },
-        { encoded: screenshot.toString('base64'), box: bounds! }
+        { encoded: screenshot.toString('base64') }
       );
       // The synthetic fixture has bright bottom/right edges; a black pixel belongs to the stage.
       for (const edge of edges) expect(Math.max(...edge)).toBeGreaterThan(64);
@@ -2317,7 +2538,11 @@ for (const locale of ['ru', 'en'] as const) {
           duration: 12,
         });
         await page.reload();
-        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page
+          .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+          .getByRole('button', { name: 'beta-v1.webm', exact: true })
+          .first()
+          .click();
         await page.locator('[data-ui="gallery.videoReview.enter"]').click();
         const dialog = page.locator('dialog');
         const button = (key: Parameters<typeof translate>[0]) =>
@@ -2384,15 +2609,48 @@ for (const locale of ['ru', 'en'] as const) {
           .poll(() => timelineViewport.evaluate((node) => node.scrollWidth - node.clientWidth))
           .toBeLessThanOrEqual(1);
 
-        const nested = zoom.locator('details[data-level="group"]');
+        const nested = zoom.locator('details[data-level="group"]').filter({
+          has: page.getByRole('heading', {
+            name: label('gallery.videoReview.precisePosition'),
+            exact: true,
+          }),
+        });
         const parents = zoom.locator('details[data-level="section"]');
-        await expect(parents).toHaveCount(2);
-        await expect(parents.first().locator('summary').first()).toHaveCSS('font-weight', '600');
-        await expect(nested.locator('summary')).toHaveCSS('font-size', '12px');
-        await expect(nested.locator('summary')).toHaveCSS('font-weight', '500');
+        await expect(parents).toHaveCount(3);
+        for (const key of [
+          'gallery.videoReview.zoomPreview',
+          'videoEditor.sidebar.inspectorGroupAnimation',
+          'gallery.videoReview.actionActions',
+        ] as const) {
+          await expect(parents.getByRole('heading', { name: label(key), exact: true })).toHaveCount(
+            1
+          );
+        }
+        await expect(parents.first().locator('summary').first()).toHaveCSS('font-size', '14px');
+        const headingWeight = await parents
+          .first()
+          .evaluate((node) =>
+            getComputedStyle(node)
+              .getPropertyValue('--sniptale-font-weight-interface-heading')
+              .trim()
+          );
+        await expect(parents.first().locator('summary').first()).toHaveCSS(
+          'font-weight',
+          headingWeight
+        );
+        await expect(nested.locator('summary')).toHaveCSS('font-size', '13px');
+        await expect(nested.locator('summary')).toHaveCSS('font-weight', headingWeight);
         await expect(nested).toHaveCSS('border-top-width', '0px');
+        await page.mouse.move(0, 0);
+        const summaryBackground = await nested
+          .locator('summary')
+          .evaluate((node) => getComputedStyle(node).backgroundColor);
         await nested.locator('summary').hover();
-        await expect(nested.locator('summary')).not.toHaveCSS('box-shadow', 'none');
+        await expect(nested.locator('summary')).not.toHaveCSS(
+          'background-color',
+          summaryBackground
+        );
+        await expect(nested.locator('summary')).toHaveCSS('box-shadow', 'none');
         await expect(zoom.locator('.review-inspector-phase').first()).toHaveCSS(
           'border-top-width',
           '0px'
@@ -2406,7 +2664,7 @@ for (const locale of ['ru', 'en'] as const) {
         await expect(remove).not.toHaveCSS('color', resetColor);
         await page.mouse.move(0, 0);
         await nested.locator('summary').focus();
-        await page.keyboard.press('Space');
+        await page.keyboard.press('Enter');
         await expect(nested).toHaveAttribute('open', '');
         await expect.poll(() => dialog.locator('video').evaluate((node) => node.paused)).toBe(true);
         const focusX = zoom.getByRole('textbox', {
@@ -2419,9 +2677,13 @@ for (const locale of ['ru', 'en'] as const) {
         await nested.locator('summary').click();
         await expect(focusX).toHaveValue('61');
         const modes = zoom.locator('[data-ui="gallery.videoReview.previewMode"]');
-        const fill = modes.locator(':scope > span[aria-hidden]');
-        await expect(fill).toHaveCSS('box-shadow', 'none');
-        const neutral = await fill.evaluate((node) => getComputedStyle(node).backgroundColor);
+        const areaMode = modes.getByRole('button', {
+          name: label('gallery.videoReview.zoomPreviewArea'),
+          exact: true,
+        });
+        await expect(areaMode).toHaveAttribute('aria-pressed', 'true');
+        await expect(areaMode).toHaveCSS('box-shadow', 'none');
+        const neutral = await areaMode.evaluate((node) => getComputedStyle(node).backgroundColor);
         await expect(modes).toHaveCSS('border-top-width', '0px');
         await expect(modes).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
         await modes
@@ -2430,19 +2692,30 @@ for (const locale of ['ru', 'en'] as const) {
             exact: true,
           })
           .click();
-        await expect(fill).toHaveCSS('background-color', neutral);
-        await expect(modes.locator('[aria-pressed="true"]')).toHaveCSS('font-weight', '500');
+        await expect(
+          modes.getByRole('button', {
+            name: label('gallery.videoReview.zoomPreviewResult'),
+            exact: true,
+          })
+        ).toHaveAttribute('aria-pressed', 'true');
+        await expect(modes.locator('[aria-pressed="true"]')).toHaveCSS('background-color', neutral);
+        await expect(modes.locator('[aria-pressed="true"]')).toHaveCSS(
+          'font-weight',
+          await modes.evaluate((node) =>
+            getComputedStyle(node).getPropertyValue('--sniptale-font-weight-interface').trim()
+          )
+        );
         await expect(modes.locator('[aria-pressed="true"]')).toHaveCSS('box-shadow', 'none');
         const toggle = panel.locator('[data-ui="gallery.videoReview.inspectorPresentation"]');
-        for (const utility of await panel.locator('header button').all()) {
-          await checkInspectorUtility(page, utility);
+        for (const utility of await panel.locator('header > button').all()) {
+          await checkInspectorUtility(page, utility, '4px', 'secondary');
         }
         await checkInspectorLabels(panel);
         await page.screenshot({ path: info.outputPath('inspector-utilities.png') });
         const toggleClass = await toggle.getAttribute('class');
         await toggle.click();
         await expect(toggle).toHaveAttribute('class', toggleClass!);
-        await checkInspectorUtility(page, toggle);
+        await checkInspectorUtility(page, toggle, '4px', 'secondary');
         await checkInspectorLabels(panel);
         const categories = panel.locator('[data-ui="gallery.videoReview.inspectorCategories"]');
         const railGeometry = await categories.evaluate((node) => {
@@ -2468,7 +2741,7 @@ for (const locale of ['ru', 'en'] as const) {
         await animation.hover();
         await expect(animation).toHaveAttribute('aria-pressed', 'false');
         await animation.focus();
-        await page.keyboard.press('Space');
+        await page.keyboard.press('Enter');
         await expect(animation).toHaveAttribute('aria-pressed', 'true');
         await expect(dialog).not.toHaveAttribute('data-playback-focus', 'true');
         await expect(zoom.locator('[data-ui="gallery.videoReview.zoomPreview"]')).toHaveCount(0);
@@ -2478,44 +2751,68 @@ for (const locale of ['ru', 'en'] as const) {
           'true'
         );
         await expect(zoom.locator('[data-ui="gallery.videoReview.zoomPreview"]')).toBeVisible();
-        await panel.locator('header h2').click();
+        await categories.locator('nav button').first().blur();
+        await page.mouse.move(0, 0);
         for (const width of [1280, 1920]) {
           await page.setViewportSize({ width, height: 1000 });
           await expect
             .poll(() => panel.evaluate((node) => node.scrollWidth - node.clientWidth))
             .toBeLessThanOrEqual(1);
-          await info.attach(`quick-zoom-sections-${width}`, {
-            body: await panel.screenshot(),
-            contentType: 'image/png',
+          await page.screenshot({
+            path: info.outputPath(`quick-zoom-sections-${width}.png`),
+            fullPage: false,
           });
         }
         await panel
           .locator('[data-ui="gallery.videoReview.inspectorNavigation"]')
           .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
           .click();
-        await expect(categories.locator('nav button')).toHaveCount(3);
+        const sceneLabels = [
+          'gallery.videoReview.canvas',
+          'gallery.videoReview.windowHeader',
+          'gallery.videoReview.background',
+          'gallery.videoReview.presentation',
+          'gallery.videoReview.watermark',
+          'gallery.videoReview.captions',
+          'gallery.videoReview.volume',
+          'videoEditor.sidebar.cursorFocusPathTitle',
+        ] as const;
+        await expect(categories.locator('nav button')).toHaveCount(sceneLabels.length);
+        for (const key of sceneLabels)
+          await expect(
+            categories.locator('nav').getByRole('button', { name: label(key), exact: true })
+          ).toHaveCount(1);
         await categories
           .locator('nav')
           .getByRole('button', { name: label('gallery.videoReview.background'), exact: true })
           .click();
         await button('gallery.videoReview.backgroundSolid').click();
         const paint = panel.locator('[data-ui="shared.ui.paint-selector.trigger"]');
+        const selectedPaint = (await paint.getAttribute('title'))!;
+        expect(selectedPaint).toMatch(/^#[0-9a-f]{8}$/iu);
         await paint.click();
         await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toBeVisible();
         await toggle.click();
         await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
         const sceneSections = panel.locator('details[data-level="section"]');
-        await expect(sceneSections).toHaveCount(4);
+        await expect(sceneSections).toHaveCount(sceneLabels.length);
+        for (const key of sceneLabels)
+          await expect(
+            sceneSections.locator(':scope > summary').getByRole('heading', {
+              name: label(key),
+              exact: true,
+            })
+          ).toHaveCount(1);
         const background = sceneSections.filter({
           has: page.locator('[data-ui="gallery.videoReview.backgroundInspector"]'),
         });
         await background.locator(':scope > summary').click();
         await expect(background).not.toHaveAttribute('open', '');
         await background.locator(':scope > summary').click();
-        await expect(paint).toContainText('#');
-        await info.attach('quick-scene-all', {
-          body: await panel.screenshot(),
-          contentType: 'image/png',
+        await expect(paint).toHaveAttribute('title', selectedPaint);
+        await page.screenshot({
+          path: info.outputPath('quick-scene-all.png'),
+          fullPage: false,
         });
         await background.locator(':scope > summary').click();
         await expect(background).not.toHaveAttribute('open', '');
@@ -2526,7 +2823,7 @@ for (const locale of ['ru', 'en'] as const) {
           });
         });
         await addReviewFocus(page);
-        await expect(zoom.locator('details[data-level="group"]')).toHaveAttribute('open', '');
+        await expect(nested).toHaveAttribute('open', '');
         await panel
           .locator('[data-ui="gallery.videoReview.inspectorNavigation"]')
           .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
@@ -2560,12 +2857,17 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const lane = (await focusLane.boundingBox())!;
@@ -2579,6 +2881,9 @@ for (const variant of [
       await expect(focus).toHaveCount(1);
       await button('gallery.videoReview.pointerTool').click();
       await timelineGesture(page, 9);
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
       await timelineGesture(page, 1, 5);
       await button('gallery.videoReview.pointerTool').click();
@@ -2637,12 +2942,17 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const lane = (await focusLane.boundingBox())!;
@@ -2657,6 +2967,9 @@ for (const variant of [
       await button('gallery.videoReview.pointerTool').click();
       const authored = await focus.boundingBox();
       await timelineGesture(page, 9);
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.cutMode').click();
       await timelineGesture(page, 2, 7);
       await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
@@ -2729,7 +3042,11 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -3116,7 +3433,11 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
@@ -3128,18 +3449,19 @@ for (const variant of [
       await expect(start).toBeDisabled();
       await expect(end).toBeEnabled();
       await timelineGesture(page, 2, 4);
-      const range = dialog.locator('[data-ui="gallery.videoReview.sourceRange"]');
+      const range = dialog.locator('[data-ui="gallery.videoReview.playbackRangeOverlay"]');
       await expect(range).toBeVisible();
       const rangeBox = (await range.boundingBox())!;
       await dialog.getByRole('slider', { name: label('videoEditor.timeline.zoom') }).press('End');
+      await expect(range).toBeVisible();
+      expect((await range.boundingBox())!.width).toBeCloseTo(rangeBox.width * 16, -1);
       await end.click();
       await expect(end).toBeDisabled();
       await expect
         .poll(async () => Number(await plane.getAttribute('aria-valuenow')))
         .toBeGreaterThan(11.9);
       await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
-      await expect(range).toBeVisible();
-      expect((await range.boundingBox())!.width).toBeCloseTo(rangeBox.width * 16, -1);
+      await expect(range).toHaveCount(0);
       expect(
         await dialog.locator('video').evaluate((video: HTMLVideoElement) => video.paused)
       ).toBe(true);
@@ -3153,7 +3475,7 @@ for (const variant of [
       await plane.focus();
       await page.keyboard.press('End');
       await expect(end).toBeDisabled();
-      await expect(range).toBeVisible();
+      await expect(range).toHaveCount(0);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -3185,7 +3507,7 @@ for (const variant of [
       await page.addStyleTag({
         content: await readFile('apps/extension/src/gallery/shell/app-shell/startup.css', 'utf8'),
       });
-      const card = page.getByRole('group', { name: 'beta-v1.webm', exact: true });
+      const card = page.locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]');
       await card.focus();
       await page.keyboard.press('Enter');
       const surface = page.locator('[data-ui="gallery.preview.surface"]');
@@ -3243,7 +3565,7 @@ for (const variant of [
         node.append(probes);
       });
       const probes = [
-        surface.getByRole('switch', { name: 'Space checkbox probe' }),
+        surface.getByRole('checkbox', { name: 'Space checkbox probe' }),
         surface.getByRole('textbox', { name: 'Space text probe' }),
         surface.locator('[data-space-probes] summary'),
       ];
@@ -3336,7 +3658,11 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -3447,9 +3773,32 @@ for (const variant of [
           video.currentTime = 1.701;
         });
       });
-      const canvas = dialog.locator('[data-ui="gallery.videoReview.cutTransitionCanvas"]');
+      const canvas = dialog.locator(
+        variant.locale === 'ru'
+          ? '[data-ui="gallery.videoReview.cutTransitionCanvas"]'
+          : '[data-ui="gallery.videoReview.manualPreview"] canvas'
+      );
       await expect(canvas).toBeVisible();
-      await expect.poll(() => canvas.evaluate((node: HTMLCanvasElement) => node.width)).toBe(160);
+      if (variant.locale === 'ru') {
+        await expect.poll(() => canvas.evaluate((node: HTMLCanvasElement) => node.width)).toBe(160);
+      } else {
+        await expect
+          .poll(async () => {
+            const raster = await canvas.evaluate((node: HTMLCanvasElement) => ({
+              width: node.width,
+              height: node.height,
+            }));
+            const stageBox = (await dialog
+              .locator('[data-ui="gallery.videoReview.stage"]')
+              .boundingBox())!;
+            return (
+              raster.width > 0 &&
+              raster.height > 0 &&
+              Math.abs(raster.width / raster.height - stageBox.width / stageBox.height) < 0.02
+            );
+          })
+          .toBe(true);
+      }
       await dialog.screenshot({
         path: testInfo.outputPath(`cut-transition-${variant.locale}.png`),
       });
@@ -3548,7 +3897,11 @@ test('cut transition VFR fragment excludes cut and outside-fragment rasters', as
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await seedReviewVideo(page, 'review-cut-vfr.webm', { width: 160, height: 90, duration: 6 });
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     const dialog = page.locator('dialog');
     const button = (key: Parameters<typeof translate>[0]) =>
@@ -3693,7 +4046,11 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -3838,7 +4195,7 @@ for (const variant of [
             });
             await new Promise<void>((resolve) => {
               video.onseeked = () => resolve();
-              video.currentTime = 0.001;
+              video.currentTime = 0.501;
             });
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -3900,7 +4257,11 @@ for (const locale of ['en', 'ru'] as const) {
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 4 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -3974,7 +4335,7 @@ for (const locale of ['en', 'ru'] as const) {
             });
             await new Promise<void>((resolve) => {
               video.onseeked = () => resolve();
-              video.currentTime = 0.001;
+              video.currentTime = 0.501;
             });
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
@@ -4027,7 +4388,11 @@ for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
@@ -4220,7 +4585,11 @@ test('Gallery downloads a compact summary while retaining a dense recorded traje
       }
     }, createVideoProjectCursorTrack('embedded-fallback'));
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page
+      .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+      .getByRole('button', { name: 'beta-v1.webm', exact: true })
+      .first()
+      .click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     const download = page.waitForEvent('download');
     await page
@@ -4292,7 +4661,11 @@ for (const variant of [
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .locator('[data-gallery-keyboard-id="recording:beta-v1-recording"]')
+        .getByRole('button', { name: 'beta-v1.webm', exact: true })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       await dialog
@@ -4373,6 +4746,132 @@ for (const variant of [
         path: info.outputPath('scene-camera-segments.png'),
         fullPage: false,
       });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const locale of ['en', 'ru'] as const) {
+  test(`quick projects rename and preserve previous project (${locale})`, async ({
+    page,
+  }, info) => {
+    const host = await startHostServer();
+    const theme = locale === 'en' ? 'dark' : 'light';
+    const sourceId = betaV1Fixture.records.media_library[0].id;
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(sourceId)}&mode=edit&theme=${theme}`
+      );
+      const title = page.locator('header h2 button').filter({ hasText: 'beta-v1.webm' });
+      await expect(title).toHaveAccessibleName('beta-v1.webm');
+      await title.click();
+      const name = page.getByRole('textbox', {
+        name: label('videoEditor.app.projectNameLabel'),
+        exact: true,
+      });
+      await expect(name).toBeFocused();
+      await name.fill('First project');
+      await name.press('Enter');
+      await expect(page.locator('header h2')).toHaveText('First project');
+      await expect
+        .poll(async () => (await readNativeReviewWorkspace(page, sourceId))?.project?.name)
+        .toBe('First project');
+      await page.screenshot({ path: info.outputPath('renamed-project.png'), fullPage: false });
+      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
+      await expect(
+        review.locator('header').getByRole('button', {
+          name: label('videoEditor.app.newProjectAction'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await review
+        .getByRole('button', {
+          name: label('gallery.videoReview.moreActions'),
+          exact: true,
+        })
+        .click();
+      const menu = page.getByRole('menu', {
+        name: label('gallery.videoReview.moreActions'),
+        exact: true,
+      });
+      await expect(
+        menu.getByRole('menuitem', { name: label('gallery.keyboard.title'), exact: true })
+      ).toBeVisible();
+      await expect(
+        menu.getByRole('menuitem', { name: label('gallery.app.selectionBackup'), exact: true })
+      ).toBeVisible();
+      await page.screenshot({ path: info.outputPath('more-new-project.png'), fullPage: false });
+      await menu
+        .getByRole('menuitem', {
+          name: label('videoEditor.app.newProjectAction'),
+          exact: true,
+        })
+        .click();
+      await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
+      const archiveId = await page.evaluate(
+        async ({ dbName, sourceId }) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(dbName);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          const result = await new Promise<unknown[]>((resolve, reject) => {
+            const request = db
+              .transaction('video_workspaces')
+              .objectStore('video_workspaces')
+              .getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          db.close();
+          const archived = result.find(
+            (value) =>
+              value &&
+              typeof value === 'object' &&
+              'sourceMediaId' in value &&
+              value.sourceMediaId === sourceId
+          );
+          if (
+            !archived ||
+            typeof archived !== 'object' ||
+            !('aggregateId' in archived) ||
+            typeof archived.aggregateId !== 'string'
+          )
+            throw new Error('Previous project missing');
+          return archived.aggregateId;
+        },
+        { dbName: betaV1Fixture.databaseName, sourceId }
+      );
+      expect((await readNativeReviewWorkspace(page, archiveId))?.project?.name).toBe(
+        'First project'
+      );
+      await page.reload();
+      await expect(page.locator('header h2')).toHaveText('beta-v1.webm');
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent(archiveId)}&mode=edit&theme=${theme}`
+      );
+      await expect(page.locator('header h2')).toHaveText('First project');
+      await page.locator('header h2 button').click();
+      await name.fill('Discard this');
+      await name.press('Escape');
+      await expect(page.locator('header h2')).toHaveText('First project');
+      await page.screenshot({ path: info.outputPath('archived-project.png'), fullPage: false });
+      await page.setViewportSize({ width: 1200, height: 560 });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      ).toBe(true);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

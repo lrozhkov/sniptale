@@ -205,7 +205,6 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         onHover={vi.fn()}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-        onBackup={vi.fn()}
         onReport={vi.fn()}
         settingsAvailable={advanced}
         selectionHasSections={advanced && contextKey.startsWith('settings:zoom:')}
@@ -226,7 +225,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
       host.querySelector(
         '[data-ui="gallery.videoReview.reportActions"] [aria-label="gallery.app.selectionBackup"]'
       )
-    ).not.toBeNull();
+    ).toBeNull();
     await act(async () => render(false, 'edit:cut-1', 'Cut'));
     expect(host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')).toBeNull();
     expect(host.textContent).toContain('Selected controls');
@@ -310,7 +309,6 @@ it('consumes export requests once and returns to the same selected edit', async 
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
-  const onBackup = vi.fn();
   let selection = { kind: 'edit' as const, id: 'cut-1' };
   const render = (request: number, busy = false) =>
     root.render(
@@ -327,7 +325,6 @@ it('consumes export requests once and returns to the same selected edit', async 
         onEdit={vi.fn()}
         onDelete={vi.fn()}
         onReport={vi.fn()}
-        onBackup={onBackup}
         contextKey="edit:cut-1"
         contextSelection={selection}
         selectionLabel="Cut"
@@ -355,12 +352,7 @@ it('consumes export requests once and returns to the same selected edit', async 
     await act(async () => render(1));
     const exporting = () => host.querySelector('[data-ui="gallery.videoReview.exportSection"]');
     expect(exporting()).not.toBeNull();
-    const backup = exporting()!.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.app.selectionBackup"]'
-    )!;
-    expect(backup).not.toBeNull();
-    await act(async () => backup.click());
-    expect(onBackup).toHaveBeenCalledOnce();
+    expect(exporting()!.querySelector('[aria-label="gallery.app.selectionBackup"]')).toBeNull();
     expect(
       Array.from(
         host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')

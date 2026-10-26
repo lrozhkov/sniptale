@@ -23,14 +23,23 @@ for (const theme of ['light', 'dark'] as const) {
         { tourFixture: '1' }
       );
       const panel = page.locator('#guide-inspector-panel');
-      await checkInspectorUtility(page, panel.locator('.guide-panel-heading > button').last());
-      await page.screenshot({ path: info.outputPath('inspector-utilities.png') });
+      await checkInspectorUtility(
+        page,
+        panel.locator('.guide-panel-heading > button').last(),
+        '4px',
+        'secondary'
+      );
+      await page.screenshot({ path: info.outputPath('inspector-utilities.png'), fullPage: false });
       const mode = page.locator('.tour-representation-switch [aria-pressed="true"]');
       await page.mouse.move(700, 100);
       const idleBorder = await mode.evaluate((node) => getComputedStyle(node).borderTopColor);
       await check(mode).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
-      await check(mode).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await check(mode.locator('span')).toHaveCSS('font-size', '13px');
+      await check(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      check(await mode.evaluate((node) => getComputedStyle(node, '::before').height)).toBe('2px');
+      await check(mode.locator(':scope > .sniptale-command-content > span')).toHaveCSS(
+        'font-size',
+        '13px'
+      );
       await check(mode.locator('svg')).toHaveCSS(
         'color',
         await mode.evaluate((node) => getComputedStyle(node).color)
@@ -44,8 +53,8 @@ for (const theme of ['light', 'dark'] as const) {
       const nestedStyle = panel.locator('.guide-style-fields > .guide-inspector-group');
       for (const group of await nestedStyle.all()) {
         await check(group).toHaveCSS('border-top-width', '0px');
-        await check(group.locator('.guide-inspector-group-heading')).toHaveCSS('font-size', '12px');
-        await check(group.locator('button[aria-expanded]').first()).toHaveCSS('min-height', '28px');
+        await check(group.locator('.guide-inspector-group-heading')).toHaveCSS('font-size', '13px');
+        await check(group.locator('button[aria-expanded]').first()).toHaveCSS('min-height', '32px');
       }
       const accent = panel.locator('.guide-style-accent');
       check((await accent.boundingBox())!.height).toBeLessThanOrEqual(40);
@@ -56,7 +65,7 @@ for (const theme of ['light', 'dark'] as const) {
       );
       check(Math.abs(resetEdge)).toBeLessThanOrEqual(1);
       const colorTrigger = accent.locator('[data-ui="shared.ui.color-selector.trigger"]');
-      await check(colorTrigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await check(colorTrigger).toHaveCSS('border-top-width', '0px');
       await check(colorTrigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const picker = accent.locator('[data-ui="shared.ui.color-selector.picker-trigger"]');
       const palette = accent.locator('[data-ui="shared.ui.color-selector.palette-trigger"]');
@@ -74,11 +83,8 @@ for (const theme of ['light', 'dark'] as const) {
       const triggerBounds = await picker.boundingBox();
       const popupBounds = await popup.boundingBox();
       check(popupBounds!.x + popupBounds!.width).toBeLessThanOrEqual(triggerBounds!.x - 8);
-      await info.attach(`color-open-${locale}-${theme}`, {
-        body: await page.screenshot(),
-        contentType: 'image/png',
-      });
-      await popup.getByRole('button', { name: 'HEX', exact: true }).click();
+      await page.screenshot({ path: info.outputPath('color-open.png'), fullPage: false });
+      await popup.getByRole('button', { name: 'RGB', exact: true }).click();
       await page.keyboard.press('Escape');
       await expect(picker).toBeFocused();
       await expect(value).toContainText('RGB(');
@@ -94,12 +100,20 @@ for (const theme of ['light', 'dark'] as const) {
         height: node.getBoundingClientRect().height,
       }));
       check(valueGeometry.width).toBeGreaterThan(20);
-      check(valueGeometry.content).toBeLessThanOrEqual(valueGeometry.width + 1);
+      await check(value).toHaveCSS('overflow-x', 'hidden');
+      await check(value).toHaveCSS('text-overflow', 'ellipsis');
+      await check(value).toHaveAttribute('title', (await value.textContent())!);
+      const narrowValueBounds = (await value.boundingBox())!;
+      const narrowTriggerBounds = (await colorTrigger.boundingBox())!;
+      check(narrowValueBounds.x).toBeGreaterThanOrEqual(narrowTriggerBounds.x - 1);
+      check(narrowValueBounds.x + narrowValueBounds.width).toBeLessThanOrEqual(
+        narrowTriggerBounds.x + narrowTriggerBounds.width + 1
+      );
+      check(
+        await colorTrigger.evaluate((node) => node.scrollWidth - node.clientWidth)
+      ).toBeLessThanOrEqual(1);
       check(valueGeometry.height).toBeGreaterThan(1);
-      await info.attach(`color-value-narrow-${locale}-${theme}`, {
-        body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
-        contentType: 'image/png',
-      });
+      await page.screenshot({ path: info.outputPath('color-value-narrow.png'), fullPage: false });
       await divider.focus();
       await page.keyboard.press('Home');
       await panel
@@ -141,6 +155,7 @@ for (const theme of ['light', 'dark'] as const) {
             baseline + (metrics.actualBoundingBoxDescent - metrics.actualBoundingBoxAscent) / 2;
           return {
             title: label.textContent,
+            level: node.closest('[data-level]')?.getAttribute('data-level'),
             iconSize: svg.height,
             lineHeight: style.lineHeight,
             boxDelta: box.top + box.height / 2 - svg.top - svg.height / 2,
@@ -153,17 +168,18 @@ for (const theme of ['light', 'dark'] as const) {
         contentType: 'application/json',
       });
       check(
-        geometry.every(({ iconSize, lineHeight }) => iconSize === 16 && lineHeight === '20px')
+        geometry.every(({ level, iconSize, lineHeight }) =>
+          level === 'group'
+            ? iconSize === 14 && lineHeight === '18px'
+            : iconSize === 16 && lineHeight === '20px'
+        )
       ).toBe(true);
       check(geometry.every(({ boxDelta }) => Math.abs(boxDelta) <= 1)).toBe(true);
       await check(panel.locator('.guide-inspector-disclosure').first()).not.toHaveCSS(
         'border-radius',
         '0px'
       );
-      await info.attach(`headings-${locale}-${theme}`, {
-        body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
-        contentType: 'image/png',
-      });
+      await page.screenshot({ path: info.outputPath('headings.png'), fullPage: false });
       await panel
         .getByRole('button', { name: ru ? 'Точка действия' : 'Hotspot', exact: true })
         .click();
@@ -174,6 +190,10 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(
         panel.getByText(ru ? 'Скругление' : 'Corner radius', { exact: true })
       ).toHaveCount(0);
+      const hintDetails = panel.locator('[data-ui="scenario-editor.hint-style-details"]');
+      await expect(hintDetails).not.toHaveAttribute('open', '');
+      await hintDetails.locator(':scope > summary').click();
+      await expect(hintDetails).toHaveAttribute('open', '');
       const width = panel.getByRole('textbox', {
         name: ru ? 'Ширина пояснения' : 'Explanation width',
         exact: true,
@@ -189,10 +209,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(paddingBounds.y - widthBounds.y - widthBounds.height).toBeGreaterThanOrEqual(8);
       expect(paddingBounds.height).toBeCloseTo(widthBounds.height, 1);
       await textColor.scrollIntoViewIfNeeded();
-      await info.attach(`hotspot-fields-${locale}-${theme}`, {
-        body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
-        contentType: 'image/png',
-      });
+      await page.screenshot({ path: info.outputPath('hotspot-fields.png'), fullPage: false });
       await page
         .locator('#guide-library-panel')
         .getByRole('button', {
@@ -202,7 +219,7 @@ for (const theme of ['light', 'dark'] as const) {
         .click();
       const title = panel.getByRole('textbox', { name: ru ? 'Заголовок' : 'Title', exact: true });
       await title.fill('Navigation title');
-      const clear = title.locator('..').locator('.guide-text-clear');
+      const clear = title.locator('..').locator('.sniptale-field-clear');
       await page.mouse.move(0, 0);
       const textColorValue = await title.evaluate((node) => getComputedStyle(node).color);
       await expect(clear).not.toHaveCSS('color', textColorValue);
@@ -212,8 +229,7 @@ for (const theme of ['light', 'dark'] as const) {
       await clear.click();
       await expect(title).toHaveValue('');
       await expect(title).toBeFocused();
-      await expect(clear).toBeDisabled();
-      await expect(clear).toHaveCSS('opacity', '0.4');
+      await expect(clear).toHaveCount(0);
     });
   }
 }
@@ -411,7 +427,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect((await apply.boundingBox())!.height).toBeLessThanOrEqual(28);
       expect(await field.boundingBox()).toEqual(before);
       await page.screenshot({ path: info.outputPath('color-picker.png') });
-      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill('#123456');
+      await picker.getByRole('textbox', { name: 'RGB', exact: true }).fill('#123456');
       await cancel.click();
       await expect(value).toHaveText('#ABCDEF');
       await expect(swatch).toBeFocused();
@@ -447,7 +463,7 @@ for (const theme of ['light', 'dark'] as const) {
     await swatch.click();
     const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
     await expect(picker).toBeVisible();
-    await expect(picker.getByRole('textbox', { name: 'HEX', exact: true })).toBeVisible();
+    await expect(picker.getByRole('textbox', { name: 'RGB', exact: true })).toBeVisible();
     await page.screenshot({ path: info.outputPath('drawing-color-picker.png') });
     await page.keyboard.press('Escape');
     await expect(swatch).toBeFocused();
@@ -512,7 +528,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(await colors()).toEqual(saved.colors.slice(0, 5));
       await options.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
       const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
-      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill('#abcdef');
+      await picker.getByRole('textbox', { name: 'RGB', exact: true }).fill('#abcdef');
       await picker.getByRole('button', { name: /^(Apply|Применить)$/ }).click();
       expect(await colors()).toEqual(saved.colors.slice(0, 5));
       await page.screenshot({ path: info.outputPath('fixed-palette-drawing.png') });

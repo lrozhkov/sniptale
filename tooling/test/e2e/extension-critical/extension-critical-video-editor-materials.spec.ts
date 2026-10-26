@@ -592,7 +592,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       const webcamSwitch = dialog
         .locator('[data-review-header-track="webcam"]')
         .getByRole('switch');
-      await webcamSwitch.click();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.webcamTrack"]')).toBeVisible();
       await expect(webcamSwitch).toHaveAttribute('aria-checked', 'true');
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
@@ -1722,15 +1722,16 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await cameraPlayhead.press('Home');
       for (let step = 0; step < migrated.fps; step++) await cameraPlayhead.press('ArrowRight');
       await page.locator(`[data-project-timeline-clip="${cameraClips[0]!.id}"]`).click();
-      const cameraGroup = page.getByRole('button', {
-        name: label('videoEditor.sidebar.inspectorGroupCamera'),
+      const cameraTimingGroup = page.getByRole('button', {
+        name: label('videoEditor.sidebar.inspectorGroupTiming'),
         exact: true,
       });
-      await cameraGroup.scrollIntoViewIfNeeded();
-      await cameraGroup.click();
-      const nativeOffset = page
-        .locator('[data-ui="video-editor.camera-placement-controls"]')
-        .getByRole('textbox', { name: label('gallery.videoReview.webcamOffset'), exact: true });
+      await cameraTimingGroup.scrollIntoViewIfNeeded();
+      await cameraTimingGroup.click();
+      const nativeOffset = page.getByRole('textbox', {
+        name: label('gallery.videoReview.webcamOffset'),
+        exact: true,
+      });
       await expect(nativeOffset).toHaveValue(String(authoredOffset));
       const editedOffset = authoredOffset / 2;
       await nativeOffset.fill(String(editedOffset));
@@ -2184,7 +2185,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         );
       }
       const final = (await readNativeVideoProject(page))!;
-      expect(final.version).toBe(37);
+      expect(final.version).toBe(beforeCameraMode.version);
       expect(hydrateVideoProject(final).clips).toEqual(hydrateVideoProject(beforeCameraMode).clips);
       await page.screenshot({
         path: info.outputPath('migrated-project-content-camera.png'),

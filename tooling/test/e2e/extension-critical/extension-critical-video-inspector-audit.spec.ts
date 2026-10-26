@@ -1,7 +1,16 @@
+import { addVideoProjectCommentDocument } from '../../../../apps/extension/src/features/video/project/comments/authoring';
+import { addProjectSourceVoiceoverDocument } from '../../../../apps/extension/src/features/video/project/source-voiceover';
+import { createVideoProjectTrack } from '../../../../apps/extension/src/features/video/project/factories/creation';
+import { anchorReviewVoiceoverAtSource } from '../../../../apps/extension/src/features/video/review/voiceover-edits';
+import { buildReviewTimeMap } from '../../../../apps/extension/src/features/video/review/timeline';
+import { formatPreciseTime } from '../../../../apps/extension/src/video-editor/timeline/project/interaction-state/helpers';
 import { writeFile } from 'node:fs/promises';
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
-import type { VideoProjectClip } from '../../../../apps/extension/src/features/video/project/types';
+import type {
+  VideoProject,
+  VideoProjectClip,
+} from '../../../../apps/extension/src/features/video/project/types';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { test } from '../support/extension-fixture';
 import { createInspectorAuditFixture } from '../support/inspector-audit-fixture';
@@ -114,61 +123,206 @@ for (const variant of variants) {
   });
 }
 
-test('expanded inspector keeps every selected clip and track in two bounded columns', async ({
-  page,
-  hostOrigin,
-}, info) => {
+for (const variant of [variants[0], { ...variants[2], theme: 'light' }] as const) {
+  test(`expanded inspector uses only meaningful columns ${variant.size.width} ${variant.locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(300_000);
+    const fixture = await openAuditProject(page, hostOrigin, variant);
+    await setInspectorWidth(page, 800);
+    const panel = page.locator(INSPECTOR);
+    const inventory: unknown[] = [];
+    const checkSelection = async (selection: string) => {
+      if (!(await panel.locator('[data-presentation="all"]').count()))
+        await page.locator(TOGGLE).click();
+      await openAllDetails(panel);
+      await checkAndCaptureAllLayout(page, panel, info, selection);
+    };
+    await page
+      .getByRole('button', {
+        name: translate('videoEditor.sidebar.sceneProperties', variant.locale),
+        exact: true,
+      })
+      .click();
+    await checkSelection('scene');
+    for (const clip of fixture.project.clips) {
+      await selectAuditClip(page, clip, variant.locale);
+      await checkSelection(`clip-${clip.type}-${clip.id}`);
+    }
+    for (const track of fixture.project.tracks) {
+      await page
+        .locator('[data-ui="video-editor.timeline.track-select"]')
+        .filter({ hasText: track.name })
+        .first()
+        .click();
+      await checkSelection(`track-${track.kind}-${track.id}`);
+    }
+    await auditUtilitySelections(page, info, inventory, fixture, variant.locale);
+    await saveAuditInventory(info, variant, 'expanded-columns', inventory);
+  });
+}
+
+for (const variant of [variants[0], { ...variants[2], theme: 'light' }] as const) {
+  test(`expanded inspector note and source voiceover audit ${variant.size.width} ${variant.locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(300_000);
+    await openAuditProject(page, hostOrigin, variant, withAuditNoteAndVoiceover);
+    await setInspectorWidth(page, 800);
+    const inventory: unknown[] = [];
+    await page
+      .getByRole('button', {
+        name: `${translate('videoEditor.sidebar.commentNote', variant.locale)} · ${formatPreciseTime(2)} · Inspector audit note`,
+        exact: true,
+      })
+      .click();
+    await expect(page.locator('[data-ui="video-editor.comment.inspector"]')).toBeVisible();
+    await auditSelection(page, info, inventory, 'comment');
+    const take = page.locator('[data-source-voiceover-document="audit-source-voice"]').first();
+    await take.scrollIntoViewIfNeeded();
+    await take.click();
+    await expect(page.locator('[data-ui="video-editor.inspector.source-voiceover"]')).toBeVisible();
+    await auditSelection(page, info, inventory, 'source-voiceover');
+    await saveAuditInventory(info, variant, 'note-and-source-voiceover', inventory);
+  });
+}
+
+test('expanded inspector imported effect groups audit 1920', async ({ page, hostOrigin }, info) => {
   test.setTimeout(300_000);
   const variant = variants[3];
   const fixture = await openAuditProject(page, hostOrigin, variant);
   await setInspectorWidth(page, 800);
-  const panel = page.locator(INSPECTOR);
-  const checkColumns = async (selection: string) => {
-    if (!(await panel.locator('[data-presentation="all"]').count()))
-      await page.locator(TOGGLE).click();
-    await openAllDetails(panel);
-    const geometry = await panel.evaluate((root) => {
-      const body = root.querySelector('[data-ui="video-editor.inspector.body"]');
-      const groups = root.querySelector('[data-presentation="all"]');
-      const sections = [...(groups?.querySelectorAll(':scope > section') ?? [])];
-      return {
-        columns: groups ? getComputedStyle(groups).gridTemplateColumns : '',
-        sectionBoxes: sections.map((section) => {
-          const box = section.getBoundingClientRect();
-          return { x: box.x, right: box.right, width: box.width };
-        }),
-        overflow: body ? body.scrollWidth - body.clientWidth : -1,
-      };
-    });
-    expect(geometry.overflow, selection).toBeLessThanOrEqual(1);
-    if (geometry.sectionBoxes.length > 1) {
-      expect(geometry.columns.split(' ').length, selection).toBe(2);
-      expect(geometry.sectionBoxes[1]!.x - geometry.sectionBoxes[0]!.x, selection).toBeGreaterThan(
-        100
-      );
-      expect(geometry.sectionBoxes[0]!.right, selection).toBeLessThanOrEqual(
-        geometry.sectionBoxes[1]!.x - 8
-      );
-    }
-  };
-  for (const clip of fixture.project.clips) {
-    await selectAuditClip(page, clip, variant.locale);
-    await checkColumns(`clip ${clip.type} ${clip.id}`);
-  }
-  for (const track of fixture.project.tracks) {
-    await page
-      .locator('[data-ui="video-editor.timeline.track-select"]')
-      .filter({ hasText: track.name })
-      .first()
-      .click();
-    await checkColumns(`track ${track.kind} ${track.name}`);
-  }
-  await page.screenshot({ path: info.outputPath('expanded-inspector.png'), fullPage: false });
+  const inventory: unknown[] = [];
+  await auditImportedEffects(page, info, inventory, fixture, variant.locale);
+  await saveAuditInventory(info, variant, 'expanded-imported-effects', inventory);
 });
 
-async function openAuditProject(page: Page, hostOrigin: string, variant: AuditVariant) {
+/** Add admitted editorial documents without changing the shared fixture's existing selections. */
+function withAuditNoteAndVoiceover(project: VideoProject): VideoProject {
+  const note = addVideoProjectCommentDocument(project, {
+    id: 'audit-notes',
+    target: { kind: 'project' },
+    note: {
+      id: 'audit-note',
+      text: 'Inspector audit note',
+      anchor: { kind: 'range', start: 2, end: 5 },
+    },
+  });
+  if (!note.ok) throw new Error('Inspector note fixture refused');
+  const video = note.project.clips.find((clip) => clip.type === 'VIDEO');
+  const audio = note.project.assets.find((asset) => asset.type === 'AUDIO');
+  if (!video || video.type !== 'VIDEO' || !audio)
+    throw new Error('Missing voiceover fixture sources');
+  const track = createVideoProjectTrack(
+    'Inspector source voice',
+    note.project.tracks.length,
+    'AUDIO'
+  );
+  const reference = buildReviewTimeMap(12, []);
+  const voice = addProjectSourceVoiceoverDocument(
+    { ...note.project, tracks: [...note.project.tracks, track] },
+    {
+      id: 'audit-source-voice',
+      enabled: true,
+      trackId: track.id,
+      binding: {
+        kind: 'source',
+        assetId: video.assetId,
+        sourceInstanceId: video.sourceInstanceId ?? video.id,
+      },
+      reference,
+      take: anchorReviewVoiceoverAtSource(
+        {
+          id: 'audit-source-take',
+          assetId: audio.id,
+          timelineStart: 0,
+          sourceOffset: 0,
+          duration: 2,
+          tempo: 1,
+          volume: 0.8,
+          muted: false,
+          fadeIn: 0.1,
+          fadeOut: 0.2,
+        },
+        reference
+      ),
+    }
+  );
+  if (!voice.ok) throw new Error('Inspector source voiceover fixture refused');
+  return voice.project;
+}
+
+/** Supporting metadata and commands must not reserve a second parameter column. */
+async function checkAndCaptureAllLayout(page: Page, panel: Locator, info: TestInfo, name: string) {
+  const body = panel.locator('[data-ui="video-editor.inspector.body"]');
+  const all = panel.locator('[data-presentation="all"]');
+  const containerWidth = () =>
+    body.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+  if (!(await all.count()) || (await containerWidth()) < 524) return;
+  const shellWidth = (await page.locator(SHELL).boundingBox())!.width;
+  const widths =
+    name === 'object-track' || name === 'transition-junction' || name === 'motion-region'
+      ? [null, 523, 524, 525]
+      : [null];
+  try {
+    for (const width of widths) {
+      if (width !== null) {
+        const current = await containerWidth();
+        const shell = (await page.locator(SHELL).boundingBox())!.width;
+        await setInspectorWidth(page, shell + width - current);
+        await expect.poll(containerWidth).toBe(width);
+      }
+      const geometry = await all.evaluate((root) => {
+        const box = root.getBoundingClientRect();
+        const sections = [...root.querySelectorAll(':scope > section')].map((section) => {
+          const rect = section.getBoundingClientRect();
+          return { id: section.getAttribute('data-section'), x: rect.x, width: rect.width };
+        });
+        return { width: box.width, sections };
+      });
+      const parameters = geometry.sections.filter(
+        (section) => section.id !== 'info' && section.id !== 'actions'
+      );
+      const fullWidth = parameters.length <= 1 || (width !== null && width < 524);
+      expect(
+        await body.evaluate((node) => node.scrollWidth - node.clientWidth),
+        name
+      ).toBeLessThanOrEqual(1);
+      for (const section of geometry.sections) {
+        if (fullWidth)
+          expect(
+            Math.abs(section.width - geometry.width),
+            `${name}: ${section.id}`
+          ).toBeLessThanOrEqual(1);
+        else expect(section.width, `${name}: ${section.id}`).toBeLessThan(geometry.width * 0.6);
+      }
+      await body.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await page.screenshot({
+        path: info.outputPath(`${name}-all-${width ?? 'wide'}-top.png`),
+        fullPage: false,
+      });
+    }
+  } finally {
+    await setInspectorWidth(page, shellWidth);
+  }
+}
+
+async function openAuditProject(
+  page: Page,
+  hostOrigin: string,
+  variant: AuditVariant,
+  decorate?: (project: VideoProject) => VideoProject
+) {
   page.setDefaultTimeout(10_000);
   const fixture = createInspectorAuditFixture();
+  if (decorate) fixture.project = decorate(fixture.project);
   await page.setViewportSize({ ...variant.size });
   await page.emulateMedia({ colorScheme: variant.theme });
   await applyHarnessBootstrap(page, {
@@ -334,6 +488,7 @@ async function auditSelection(
   await checkInspectorParameterRows(panel);
   inventory.push({ selection: name, presentation: 'all', fields: await collectParameters(panel) });
   if (capture) await captureScrollPositions(page, panel, info, `${name}-all`);
+  await checkAndCaptureAllLayout(page, panel, info, name);
 }
 
 async function collectParameters(panel: Locator) {
@@ -693,6 +848,11 @@ async function auditSceneText(page: Page, info: TestInfo, inventory: unknown[], 
   if (!(await panel.locator('[data-presentation="all"]').count()))
     await page.locator(TOGGLE).click();
   await openAllDetails(panel);
+  await panel
+    .locator('[data-ui="video-editor.text.panel"]')
+    .getByRole('group', { name: label('gallery.videoReview.textView'), exact: true })
+    .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+    .click();
   const phrase = panel.locator('[data-text-id="audit-phrase"] > button').first();
   await expect(phrase).toHaveAttribute('title', /deliberately long phrase/u);
   await phrase.click();

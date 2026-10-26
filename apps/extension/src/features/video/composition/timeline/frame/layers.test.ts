@@ -480,3 +480,42 @@ it('omits uncovered camera pixels from normal and transparent effect input layer
   expect(resolveVideoCompositionFrame(project, 3).visualLayers).toHaveLength(1);
   expect(resolveVideoCompositionEffectInputLayers(project, 3, [plan])).toHaveLength(1);
 });
+
+it('evaluates dynamic shadow direction from the moving camera window on each source-clock frame', () => {
+  const project = createEmptyVideoProject();
+  const asset = createMediaAsset('camera-shadow', 'Camera', VideoProjectAssetType.VIDEO, 8, false);
+  const track = { ...project.tracks[0]!, role: VideoProjectTrackRole.CAMERA };
+  const clip = createVideoClipFromAsset(track.id, asset, project.width, project.height, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected camera video');
+  clip.cameraShadowDirection = { mode: 'center', angle: 225 };
+  clip.transform = {
+    x: 0,
+    y: project.height / 2 - 50,
+    width: 100,
+    height: 100,
+    rotation: 0,
+    opacity: 1,
+  };
+  clip.cameraPositions = [
+    {
+      id: 'right',
+      sourceTime: 2,
+      transform: { ...clip.transform, x: project.width - 100 },
+      fitMode: clip.fitMode,
+      transition: { kind: 'smooth', duration: 2 },
+    },
+  ];
+  project.tracks = [track];
+  project.assets = [asset];
+  project.clips = [clip];
+  const vector = (time: number) => {
+    const layer = resolveVideoCompositionFrame(project, time).visualLayers.find(
+      (layer) => layer.kind === 'video'
+    );
+    return layer?.kind === 'video' ? layer.cameraShadowVector : undefined;
+  };
+  expect(vector(2)).toEqual({ x: 1, y: 0 });
+  expect(vector(3)).toEqual({ x: 0, y: 0 });
+  expect(vector(4)).toEqual({ x: -1, y: 0 });
+  expect(vector(2)).toEqual({ x: 1, y: 0 });
+});

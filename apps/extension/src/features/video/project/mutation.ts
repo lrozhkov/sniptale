@@ -1,3 +1,4 @@
+import { requiresExtendedBorderSchema } from './scene/focus-appearance';
 import type { VideoProject } from './types/index';
 
 /**
@@ -26,6 +27,7 @@ function getMutationSchemaVersion(
 }
 
 function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoProject['version'] {
+  if (regions?.some((region) => requiresExtendedBorderSchema(region.border))) return 48;
   if (regions?.some((region) => region.spotlightTarget === 'source-scene')) return 39;
   if (
     regions?.some(
@@ -63,6 +65,17 @@ function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoP
 }
 
 function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
+  if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraShadowDirection !== undefined))
+    return 47;
+  if (
+    clips.some(
+      (clip) =>
+        clip.type === 'VIDEO' &&
+        (clip.cameraScreenBehavior !== undefined ||
+          clip.cameraPositions?.some((position) => position.cameraScreenBehavior !== undefined))
+    )
+  )
+    return 46;
   if (clips.some((clip) => clip.type === 'AUDIO' && clip.transcript !== undefined)) return 44;
   if (clips.some((clip) => clip.playbackWindow !== undefined)) return 43;
   if (

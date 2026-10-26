@@ -27,3 +27,16 @@ it.each(['left', 'right', 'top', 'bottom'] as const)(
 it('keeps the unsplit screen at full scene size', () => {
   expect(FULL_CAMERA_PANEL).toEqual({ x: 0, y: 0, width: 1, height: 1 });
 });
+
+it.each(['left', 'right', 'top', 'bottom'] as const)(
+  'preserves main video aspect in Shrink and scale in Shift for %s',
+  (side) => {
+    const shrink = cameraSplitPanels(side, 'shrink').screen;
+    expect(shrink.width).toBeCloseTo(shrink.height, 10);
+    const shift = cameraSplitPanels(side, 'shift').screen;
+    expect(shift.width).toBe(1);
+    expect(shift.height).toBe(1);
+    expect(shift.clip).toEqual(cameraSplitPanels(side).screen);
+    expect(cameraSplitPanels(side, 'overlay').screen).toMatchObject(FULL_CAMERA_PANEL);
+  }
+);

@@ -420,3 +420,53 @@ it('uses authored text authority without resolving source bytes, while source jo
   fragment.text = 'Changed after selection';
   await expect(authorizeAudioJob(speech)).rejects.toThrow('stale');
 });
+
+it.each<MediaAssetSource>([
+  { kind: 'recording', recordingId: 'scene' },
+  { kind: 'project-export', exportId: 'scene', projectId: 'project' },
+  { kind: 'project-asset', projectAssetId: 'scene' },
+])('admits archived quick-project audio through its exact $kind source binding', async (source) => {
+  setSource(source);
+  workspace.aggregateId = 'recording:quick-project:previous';
+  workspace.sourceMediaId = 'media';
+  await expect(
+    authorizeAudioJob({
+      ...request,
+      scope: {
+        ...request.scope,
+        workspaceId: workspace.aggregateId,
+      },
+    })
+  ).resolves.toBeUndefined();
+  // The source media card cannot impersonate its independent archived workspace.
+  await expect(authorizeAudioJob(request)).rejects.toThrow('unauthorized');
+});
+
+it.each(['missing', 'other-bytes', 'other-workspace'] as const)(
+  'refuses an archived original with %s without calling the provider',
+  async (failure) => {
+    workspace.aggregateId = 'recording:quick-project:previous';
+    workspace.sourceMediaId = 'media';
+    const archivedRequest = {
+      ...request,
+      scope: { ...request.scope, workspaceId: workspace.aggregateId },
+    };
+    if (failure === 'missing') workspace.sourceMediaId = 'unrelated-source';
+    if (failure === 'other-bytes') workspace.sourceAssetId = 'replacement-object';
+    if (failure === 'other-workspace') archivedRequest.scope.workspaceId = 'another-project';
+    const post = vi.fn();
+    const messages: AudioJobServerMessage[] = [];
+    const service = createAudioJobService({ authorize: authorizeAudioJob, request: post });
+    const connection = service.connect((message) => messages.push(message));
+    connection.receive(archivedRequest);
+    await vi.waitFor(() =>
+      expect(messages).toContainEqual({
+        type: 'failure',
+        requestId: 'original',
+        code: 'unauthorized',
+      })
+    );
+    expect(post).not.toHaveBeenCalled();
+    await connection.disconnect();
+  }
+);

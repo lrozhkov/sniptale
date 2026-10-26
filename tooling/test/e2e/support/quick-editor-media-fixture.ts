@@ -288,7 +288,12 @@ export async function expectTimelineSelection(item: Locator, paint: Locator = it
     .poll(() =>
       paint.evaluate((node) => {
         const style = getComputedStyle(node);
-        return style.borderTopColor === style.color;
+        const swatch = document.createElement('span');
+        swatch.style.color = 'var(--sniptale-color-accent)';
+        node.append(swatch);
+        const accent = getComputedStyle(swatch).color;
+        swatch.remove();
+        return style.borderTopColor === accent;
       })
     )
     .toBe(true);
@@ -348,6 +353,7 @@ export async function recordedAudioResources(page: Page, excludedKeys: string[] 
 /** Create focus through its supported toolbar and ruler interval, including occupied lanes. */
 export async function addReviewFocus(page: Page) {
   const dialog = page.locator('dialog');
+  await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
   const tool = dialog.locator(
     '[data-ui="gallery.videoReview.editingTools"] button:has(svg.lucide-focus)'
   );

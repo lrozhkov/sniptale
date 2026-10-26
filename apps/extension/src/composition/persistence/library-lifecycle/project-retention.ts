@@ -100,10 +100,10 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         const workspace = parseVideoWorkspace(raw);
         if (!workspace) continue;
         const media = parseMediaLibraryEntry(
-          await stores.mediaLibraryStore.get(workspace.aggregateId)
+          await stores.mediaLibraryStore.get(workspace.sourceMediaId ?? workspace.aggregateId)
         );
         await promoteReferencedMediaLifecycles({
-          mediaIds: new Set([workspace.aggregateId]),
+          mediaIds: new Set([workspace.sourceMediaId ?? workspace.aggregateId]),
           mediaStore: stores.mediaLibraryStore,
           recordingStore: stores.recordingStore,
           now,

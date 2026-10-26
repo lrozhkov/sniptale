@@ -64,8 +64,8 @@ it('loads once, previews crop gestures, commits once and releases resources on c
     Object.defineProperties(video, {
       duration: { value: 10 },
       readyState: { value: 2 },
-      videoWidth: { value: 100 },
-      videoHeight: { value: 100 },
+      videoWidth: { value: 100, configurable: true },
+      videoHeight: { value: 100, configurable: true },
     });
     Object.assign(button, {
       setPointerCapture: vi.fn(),
@@ -102,6 +102,21 @@ it('loads once, previews crop gestures, commits once and releases resources on c
     pointer(button, 'pointerup', 60);
     expect(props.onChange).toHaveBeenLastCalledWith({ zoom: 2, panX: 0.2, panY: -0.2 });
     expect(drawReviewWebcam).toHaveBeenCalled();
+    Object.defineProperties(video, { videoWidth: { value: 640 }, videoHeight: { value: 480 } });
+    props = {
+      ...props,
+      camera: { ...camera, appearance: { ...camera.appearance, shape: 'circle' } },
+      crop: { zoom: 1, panX: 0, panY: 0 },
+    };
+    await render();
+    expect(button.style.aspectRatio).toBe('100 / 100');
+    props.onChange.mockClear();
+    pointer(button, 'pointerdown', 50);
+    pointer(button, 'pointermove', 60);
+    pointer(button, 'pointerup', 60);
+    expect(props.onChange).toHaveBeenCalledOnce();
+    expect(props.onChange.mock.lastCall?.[0]).toMatchObject({ zoom: 1, panY: 0 });
+    expect(props.onChange.mock.lastCall?.[0].panX).toBeCloseTo(-0.6, 8);
     act(() => video.dispatchEvent(new Event('error')));
     expect(host.textContent).toContain('videoEditor.sidebar.framingPreviewFailed');
     await act(async () =>

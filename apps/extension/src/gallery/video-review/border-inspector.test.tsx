@@ -3,7 +3,10 @@ import {
   type BorderAppearancePatch,
 } from '../../ui/focus-appearance/border';
 import { ReviewDetails } from './controls';
-import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
+import {
+  createQuickEditBorder,
+  parseQuickEditBorder,
+} from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -54,15 +57,6 @@ async function enter(node: HTMLInputElement, value: string) {
   );
 }
 async function choose(label: string, option: string, scope: ParentNode = host) {
-  if (label !== 'focusReveal' && label !== 'borderStyle') {
-    await act(async () => field(label, scope).click());
-    await act(async () =>
-      [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-        .find((node) => node.textContent?.includes(`gallery.videoReview.${option}`))!
-        .click()
-    );
-    return;
-  }
   const direct = (key: string) =>
     scope.querySelector<HTMLButtonElement>(`[title="gallery.videoReview.${key}"]`)!;
   const reveal = option.startsWith('borderDraw')
@@ -72,7 +66,13 @@ async function choose(label: string, option: string, scope: ParentNode = host) {
       : option.startsWith('borderRotate')
         ? 'borderRotation'
         : option;
-  await act(async () => direct(reveal).click());
+  const control = direct(reveal);
+  expect(control).not.toBeNull();
+  expect(control.closest('[role="group"]')?.getAttribute('aria-label')).toBe(
+    `gallery.videoReview.${label}`
+  );
+  await act(async () => control.click());
+  expect(document.querySelector('[role="option"]')).toBeNull();
   if (
     option.startsWith('borderDraw') ||
     option.startsWith('borderErase') ||
@@ -242,7 +242,7 @@ it('commits an edited color and discards an open picker draft on Escape', async 
       .click()
   );
   await enter(field('borderColor'), '#123456');
-  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ color: '#123456' }));
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ color: '#123456ff' }));
   act(() =>
     host
       .querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.picker-trigger"]')!
@@ -253,7 +253,7 @@ it('commits an edited color and discards an open picker draft on Escape', async 
     document.querySelector<HTMLInputElement>('input[aria-label="shared.ui.colorSelectorHex"]')!,
     '#abcdef'
   );
-  expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ color: '#abcdef' }));
+  expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ color: '#abcdefff' }));
   act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(onPreview).toHaveBeenLastCalledWith(null);
 });
@@ -264,8 +264,8 @@ it('offers no rotating hold for a solid stroke', async () => {
     border: createQuickEditBorder(),
   };
   act(() => root.render(<ReviewBorderAnimation region={region} onChange={vi.fn()} />));
-  const options = [...field('focusReveal', hold()).querySelectorAll('button')].map(
-    (node) => node.textContent
+  const options = [...field('focusReveal', hold()).querySelectorAll('button')].map((node) =>
+    node.getAttribute('title')
   );
   expect(options).toEqual([
     'gallery.videoReview.borderStill',
@@ -351,3 +351,93 @@ it('shows legacy Solid rotation as still without rewriting saved state', () => {
   expect(onChange).not.toHaveBeenCalled();
   expect(region.border.loop).toBe(true);
 });
+
+it('edits a retained origin and hides direction for both two-sided phases', async () => {
+  let region = {
+    ...createQuickEditZoomRegion({ id: 'border', at: 0, duration: 10, endMax: 10 }),
+    border: {
+      ...createQuickEditBorder(),
+      reveal: 'draw-both' as const,
+      exitReveal: 'erase-both' as const,
+    },
+  };
+  const change = (patch: Parameters<typeof updateQuickEditZoomRegion>[2]) => {
+    region = updateQuickEditZoomRegion([region], region.id, patch)[0]! as typeof region;
+    render();
+  };
+  const render = () =>
+    root.render(
+      <>
+        <BorderAppearanceFields
+          Details={ReviewDetails}
+          preferenceId="origin"
+          value={region.border}
+          onChange={(patch) =>
+            change({
+              border: {
+                ...region.border,
+                ...patch,
+                area: { ...region.border.area, ...patch.area },
+              },
+            })
+          }
+        />
+        <ReviewBorderAnimation region={region} onChange={change} />
+      </>
+    );
+  act(render);
+  expect(host.textContent).toContain('gallery.videoReview.borderOrigin');
+  for (const origin of ['top-center', 'top-left', 'top-right', 'bottom-right', 'bottom-left']) {
+    await choose('borderOrigin', `borderOrigin_${origin}`);
+    expect(region.border).toMatchObject({ origin });
+    expect(
+      host
+        .querySelector(`[title="gallery.videoReview.borderOrigin_${origin}"]`)
+        ?.getAttribute('aria-pressed')
+    ).toBe('true');
+  }
+  expect(region.border).toMatchObject({ origin: 'bottom-left' });
+  expect(host.querySelector('[title="gallery.videoReview.borderClockwise"]')).toBeNull();
+  const phases = [...host.querySelectorAll('fieldset')].filter((node) => node !== hold());
+  await choose('focusReveal', 'focusFade', phases[0]);
+  await choose('focusReveal', 'focusFade', phases[1]);
+  expect(field('borderOrigin')).toBeNull();
+  expect(region.border).toMatchObject({ origin: 'bottom-left' });
+  await choose('focusReveal', 'borderBothSides', phases[0]);
+  await choose('focusReveal', 'borderBothSides', phases[1]);
+  expect(region.border).toMatchObject({
+    origin: 'bottom-left',
+    reveal: 'draw-both',
+    exitReveal: 'erase-both',
+  });
+  expect(host.querySelector('[title="gallery.videoReview.borderClockwise"]')).toBeNull();
+});
+
+it.each(['#ffffffff', '#ffffff80'])(
+  'commits color %s in the canonical border storage format',
+  async (color) => {
+    let value = createQuickEditBorder();
+    const change = (patch: BorderAppearancePatch) => {
+      value = { ...value, ...patch, area: { ...value.area, ...patch.area } };
+      render();
+    };
+    const render = () =>
+      root.render(
+        <BorderAppearanceFields
+          Details={ReviewDetails}
+          preferenceId="color"
+          value={value}
+          onChange={change}
+        />
+      );
+    act(render);
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.value-trigger"]')!
+        .click()
+    );
+    await enter(field('borderColor'), color);
+    expect(value.color).toBe(color);
+    expect(parseQuickEditBorder(value)).toEqual(value);
+  }
+);

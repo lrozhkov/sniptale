@@ -1,3 +1,4 @@
+import { cameraShadowLocalOffset } from '../../project/camera/shadow-direction';
 import { afterEach, expect, it, vi } from 'vitest';
 import { VideoMediaShadowMode } from '../../project/types/index';
 import { drawMediaFrameShadow } from './media-shadow';
@@ -263,4 +264,79 @@ it('uses the same rounded silhouette for shadow paint and interior subtraction',
   expect(fill).toHaveBeenCalledTimes(2);
   expect(mask.globalCompositeOperation).toBe('destination-out');
   expect(context.drawImage).toHaveBeenCalledOnce();
+});
+
+it.each(['BACKDROP', 'GLOW'] as const)(
+  'keeps explicit %s shadow scene direction after rotation and anisotropic scale',
+  (mode) => {
+    const context = createContext();
+    context.getTransform = vi.fn(() => ({ a: 0, b: 3, c: -2, d: 0 }) as DOMMatrix);
+    const offsets: { x: number; y: number }[] = [];
+    context.__maskContext.fillRect.mockImplementation(() => {
+      offsets.push({
+        x: context.__maskContext.shadowOffsetX,
+        y: context.__maskContext.shadowOffsetY,
+      });
+    });
+    drawMediaFrameShadow(
+      context,
+      50,
+      mode,
+      { x: 0, y: 0, width: 120, height: 80 },
+      1,
+      undefined,
+      true,
+      undefined,
+      0,
+      cameraShadowLocalOffset({ x: 1, y: 0 }, 1, { a: 0, b: 3, c: -2, d: 0 })!
+    );
+    expect(context.getTransform).not.toHaveBeenCalled();
+    expect(offsets[0]).toEqual({ x: 0, y: -2.25 });
+    expect(context.drawImage).toHaveBeenCalledOnce();
+    expect(context.restore).toHaveBeenCalledOnce();
+  }
+);
+it.each([1e-12])(
+  'skips unallocatable directional shadow for scale %s while leaving its receiver usable',
+  (scale) => {
+    const context = createContext();
+    context.getTransform = vi.fn(() => ({ a: scale, b: 0, c: 0, d: scale }) as DOMMatrix);
+    drawMediaFrameShadow(
+      context,
+      50,
+      undefined,
+      { x: 0, y: 0, width: 120, height: 80 },
+      1,
+      undefined,
+      true,
+      undefined,
+      0,
+      { x: 1 / scale, y: 0 }
+    );
+    expect(context.getTransform).not.toHaveBeenCalled();
+    expect(context.drawImage).not.toHaveBeenCalled();
+    expect(context.save).not.toHaveBeenCalled();
+  }
+);
+it('preserves the receiver when an optional directional shadow cannot acquire a bitmap', () => {
+  const context = createContext();
+  context.getTransform = vi.fn(() => ({ a: 1, b: 0, c: 0, d: 1 }) as DOMMatrix);
+  vi.spyOn(context.canvas.ownerDocument!, 'createElement').mockImplementation(() => {
+    throw new Error('unavailable');
+  });
+  expect(() =>
+    drawMediaFrameShadow(
+      context,
+      50,
+      undefined,
+      { x: 0, y: 0, width: 123, height: 87 },
+      1,
+      undefined,
+      true,
+      undefined,
+      0,
+      { x: 1, y: 0 }
+    )
+  ).not.toThrow();
+  expect(context.restore).toHaveBeenCalledOnce();
 });

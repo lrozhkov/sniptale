@@ -307,6 +307,13 @@ export function createEditorFixture(
       }
     },
     async addFocus(start?: number, end?: number) {
+      await act(async () =>
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-review-header-track="zoom"] [data-review-track-select]'
+          )!
+          .click()
+      );
       const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
       const at = start ?? Number(plane.getAttribute('aria-valuenow'));
       const until = end ?? Math.min(Number(plane.getAttribute('aria-valuemax')), at + 2);

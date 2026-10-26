@@ -105,6 +105,13 @@ export function prepareStandaloneMediaVideoReview(args: {
     targetAggregateId: args.mediaId,
     sourceAssetId: args.original.ref.assetId,
     assetIdMap: new Map(args.reviewAssets.map((asset) => [asset.sourceId, asset.entry.id])),
+    ...(args.metadata.entry.source.kind === 'recording' && args.mediaId.startsWith('recording:')
+      ? {
+          recordingIdMap: new Map([
+            [args.metadata.entry.source.recordingId, args.mediaId.slice('recording:'.length)],
+          ]),
+        }
+      : {}),
   });
 }
 

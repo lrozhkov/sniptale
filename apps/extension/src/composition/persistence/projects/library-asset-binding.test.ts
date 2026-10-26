@@ -57,6 +57,9 @@ import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-bar
 import { readLibraryAudioSource } from './library-audio-source';
 
 const aggregateId = 'recording:beta-v1-recording';
+// Native Web Locks are shared across Vitest workers; independent fixture databases need distinct identities.
+const audioAssetId = 'library-audio-binding:audio';
+const privateAssetId = 'library-audio-binding:private';
 const mainSource = { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 };
 const ref: AssetRef = {
   assetId: 'audio-bytes',
@@ -162,12 +165,13 @@ beforeEach(() => {
 });
 
 function seed(kind: 'project-asset' | 'recording' | 'stored-asset') {
-  const mediaId = kind === 'project-asset' ? 'project-asset:audio' : `${kind}:audio`;
+  const mediaId =
+    kind === 'project-asset' ? `project-asset:${audioAssetId}` : `${kind}:${audioAssetId}`;
   const source =
     kind === 'project-asset'
-      ? { kind, projectAssetId: 'audio' }
+      ? { kind, projectAssetId: audioAssetId }
       : kind === 'recording'
-        ? { kind, recordingId: 'audio' }
+        ? { kind, recordingId: audioAssetId }
         : { kind, assetId: ref.assetId };
   const media = createMediaLibraryEntry({
     id: mediaId,
@@ -183,20 +187,20 @@ function seed(kind: 'project-asset' | 'recording' | 'stored-asset') {
   const owner = {
     assetId: ref.assetId,
     ownerKind: kind === 'stored-asset' ? 'media-library' : kind,
-    ownerId: kind === 'stored-asset' ? mediaId : 'audio',
+    ownerId: kind === 'stored-asset' ? mediaId : audioAssetId,
     role: kind === 'stored-asset' ? 'source' : 'body',
   };
   table('asset_owners').set(keyOf(owner), owner);
   const entry = {
-    id: 'audio',
+    id: audioAssetId,
     assetId: ref.assetId,
     size: ref.size,
     mimeType: ref.mimeType,
     createdAt: 1,
   };
-  if (kind === 'project-asset') table('project_assets').set('audio', entry);
+  if (kind === 'project-asset') table('project_assets').set(audioAssetId, entry);
   if (kind === 'recording')
-    table('recordings').set('audio', { ...entry, filename: media.filename });
+    table('recordings').set(audioAssetId, { ...entry, filename: media.filename });
   harness.objects.set(ref.assetId, new File(['audio'], 'original', { type: ref.mimeType }));
   return { mediaId, media };
 }
@@ -243,7 +247,7 @@ it.each(['project-asset', 'recording', 'stored-asset'] as const)(
     const { mediaId, media } = seed(kind);
     const snapshot = await readLibraryAudioBindingSource(mediaId);
     expect(snapshot.file.name).toBe(media.filename);
-    const id = snapshot.entry?.id ?? 'private';
+    const id = snapshot.entry?.id ?? privateAssetId;
     await withVoiceoverAttachmentLock(`project-asset:${id}`, async () => {
       const prepared = await prepareLibraryAudioBinding(
         snapshot,
@@ -277,13 +281,13 @@ it.each(['project-asset', 'recording', 'stored-asset'] as const)(
     const prepared = await prepareLibraryAudioBinding(
       snapshot,
       { aggregateId, clipId: 'music' },
-      snapshot.entry?.id ?? 'private'
+      snapshot.entry?.id ?? privateAssetId
     );
     await prepared.cancel();
     expect(harness.journals.size).toBe(0);
     expect(harness.objects.has(ref.assetId)).toBe(true);
     expect(table('media_library').get(mediaId)).toEqual(media);
-    expect(table('project_assets').has('private')).toBe(false);
+    expect(table('project_assets').has(privateAssetId)).toBe(false);
   }
 );
 
@@ -311,7 +315,7 @@ it.each(['trash', 'purge', 'replace', 'missing-ref'] as const)(
     }
     if (change === 'missing-ref') table('asset_refs').delete(ref.assetId);
     await expect(
-      prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'music' }, 'private')
+      prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'music' }, privateAssetId)
     ).rejects.toHaveProperty('code');
     expect(harness.journals.size).toBe(0);
   }
@@ -319,12 +323,12 @@ it.each(['trash', 'purge', 'replace', 'missing-ref'] as const)(
 
 it('revalidates a direct acquisition even when its asset is already retained', async () => {
   const { mediaId, media } = seed('project-asset');
-  await attach('project-asset:audio', 'old');
+  await attach(`project-asset:${audioAssetId}`, 'old');
   const snapshot = await readLibraryAudioBindingSource(mediaId);
   const prepared = await prepareLibraryAudioBinding(
     snapshot,
     { aggregateId, clipId: 'new' },
-    'audio'
+    audioAssetId
   );
   table('media_library').set(mediaId, {
     ...media,
@@ -342,16 +346,16 @@ it('revalidates a direct acquisition even when its asset is already retained', a
 it('recovers an adopted private binding after publication failure and permits later Trash', async () => {
   const { mediaId, media } = seed('stored-asset');
   const snapshot = await readLibraryAudioBindingSource(mediaId);
-  await withVoiceoverAttachmentLock('project-asset:private', async () => {
+  await withVoiceoverAttachmentLock(`project-asset:${privateAssetId}`, async () => {
     const prepared = await prepareLibraryAudioBinding(
       snapshot,
       { aggregateId, clipId: 'music' },
-      'private'
+      privateAssetId
     );
     await attach(prepared.assetId);
     harness.failPublication = true;
     await expect(prepared.publish()).rejects.toThrow();
-    expect(table('project_assets').has('private')).toBe(false);
+    expect(table('project_assets').has(privateAssetId)).toBe(false);
     expect(harness.journals.size).toBe(1);
   });
   harness.failPublication = false;
@@ -361,7 +365,7 @@ it('recovers an adopted private binding after publication failure and permits la
   });
   expect(await recoverProjectMediaPublications()).toBe(1);
   expect(await recoverProjectMediaPublications()).toBe(0);
-  expect(table('project_assets').get('private')).toMatchObject({
+  expect(table('project_assets').get(privateAssetId)).toMatchObject({
     assetId: ref.assetId,
     originMediaId: mediaId,
   });
@@ -371,9 +375,13 @@ it('recovers an adopted private binding after publication failure and permits la
 
 it('recovery cancels an unadopted direct claim even when another clip retains its asset', async () => {
   const { mediaId } = seed('project-asset');
-  await attach('project-asset:audio', 'old');
+  await attach(`project-asset:${audioAssetId}`, 'old');
   const snapshot = await readLibraryAudioBindingSource(mediaId);
-  await prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'never-attached' }, 'audio');
+  await prepareLibraryAudioBinding(
+    snapshot,
+    { aggregateId, clipId: 'never-attached' },
+    audioAssetId
+  );
   expect(await recoverProjectMediaPublications()).toBe(1);
   expect(harness.journals.size).toBe(0);
   expect(harness.objects.has(ref.assetId)).toBe(true);
@@ -396,7 +404,7 @@ it('serializes source admission and ready protection against a competing lifecyc
   const prepared = await prepareLibraryAudioBinding(
     snapshot,
     { aggregateId, clipId: 'music' },
-    'private'
+    privateAssetId
   );
   await mutation;
   await expect(attach(prepared.assetId)).rejects.toMatchObject({ code: 'missing-media' });
@@ -414,24 +422,24 @@ it('does not decode or repair malformed Library metadata on the read path', asyn
 it('keeps simultaneous direct claims scoped to their exact clips and refuses conflicting evidence', async () => {
   const { mediaId } = seed('project-asset');
   const snapshot = await readLibraryAudioBindingSource(mediaId);
-  await prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'unrelated' }, 'audio');
+  await prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'unrelated' }, audioAssetId);
   const unrelated = [...harness.journals.values()][0]!;
   unrelated.assetRefs = [{ ...ref, assetId: 'stale-bytes' }];
-  await prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'selected' }, 'audio');
-  await attach('project-asset:audio', 'selected');
+  await prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'selected' }, audioAssetId);
+  await attach(`project-asset:${audioAssetId}`, 'selected');
   const before = await readVideoWorkspace(aggregateId);
-  await expect(attach('project-asset:audio', 'unrelated', true)).rejects.toMatchObject({
+  await expect(attach(`project-asset:${audioAssetId}`, 'unrelated', true)).rejects.toMatchObject({
     code: 'missing-media',
   });
   expect(await readVideoWorkspace(aggregateId)).toEqual(before);
-  await prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'conflict' }, 'audio');
+  await prepareLibraryAudioBinding(snapshot, { aggregateId, clipId: 'conflict' }, audioAssetId);
   const current = [...harness.journals.values()].at(-1)!;
   harness.journals.set('conflicting', {
     ...structuredClone(current),
     journalId: 'conflicting',
     assetRefs: [{ ...ref, size: 6 }],
   });
-  await expect(attach('project-asset:audio', 'conflict', true)).rejects.toMatchObject({
+  await expect(attach(`project-asset:${audioAssetId}`, 'conflict', true)).rejects.toMatchObject({
     code: 'missing-media',
   });
 });
@@ -442,16 +450,16 @@ it('cannot borrow a private ready source for a different clip or review', async 
   const prepared = await prepareLibraryAudioBinding(
     snapshot,
     { aggregateId, clipId: 'selected' },
-    'private'
+    privateAssetId
   );
   await expect(attach(prepared.assetId, 'other')).rejects.toMatchObject({ code: 'missing-media' });
   await prepared.cancel();
   await prepareLibraryAudioBinding(
     snapshot,
     { aggregateId: 'different-review', clipId: 'selected' },
-    'private'
+    privateAssetId
   );
-  await expect(attach('project-asset:private', 'selected')).rejects.toMatchObject({
+  await expect(attach(`project-asset:${privateAssetId}`, 'selected')).rejects.toMatchObject({
     code: 'missing-media',
   });
 });

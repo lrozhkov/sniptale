@@ -1,3 +1,4 @@
+import type { CameraShadowDirection } from '../camera/shadow-direction';
 import type { ReviewOriginalSpeech } from '../../review/original-speech';
 import type { SourceAudioGainRange } from '../../audio/source-envelope';
 import type { QuickEditAudioClip } from '../../review/advanced/types';
@@ -6,7 +7,7 @@ import type { VideoProjectTextBinding } from '../text/types';
 import type { ReviewSpeechTranscript } from '../../review/speech-transcript';
 import type { CameraHiddenRange } from '../camera/visibility';
 import type { CameraAppearance, CameraCrop } from '../camera/appearance';
-import type { CameraSplitSide } from '../camera/split';
+import type { CameraSplitSide, CameraScreenBehavior } from '../camera/split';
 import type { VideoProjectVoiceTextSnapshot } from '../text/types';
 import type { VideoMediaFitMode } from './media';
 import type {
@@ -65,6 +66,7 @@ interface CameraPosition {
   /** An absent destination crop inherits the clip-wide source framing. */
   crop?: CameraCrop;
   cameraSplit?: CameraSplitSide | null;
+  cameraScreenBehavior?: CameraScreenBehavior | undefined;
   id: string;
   /** Source seconds keep the trajectory continuous across trims, splits and rate changes. */
   sourceTime: number;
@@ -261,7 +263,9 @@ export interface VideoProjectUtilityLanes {
 }
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
+  cameraShadowDirection?: CameraShadowDirection;
   cameraSplit?: CameraSplitSide | undefined;
+  cameraScreenBehavior?: CameraScreenBehavior | undefined;
   /** Camera-native source seconds survive cuts, rates and project moves. */
   cameraHiddenRanges?: CameraHiddenRange[];
   /** Authored camera anchors use main-source seconds; media seconds subtract the offset. */
@@ -408,7 +412,10 @@ export interface VideoProject {
     | 42
     | 43
     | 44
-    | 45;
+    | 45
+    | 46
+    | 47
+    | 48;
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

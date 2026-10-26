@@ -936,3 +936,24 @@ it('does not publish again when persistence only reorders scene properties', asy
   await step(3200);
   expect(io.render).toHaveBeenCalledTimes(3);
 });
+
+it.each(['shift', 'overlay'] as const)(
+  'keeps the resolved camera panel when selected in %s mode',
+  async (screenBehavior) => {
+    const camera = cameraBinding();
+    camera.settings.split = 'left';
+    camera.settings.screenBehavior = screenBehavior;
+    await render();
+    await step(0);
+    act(() => {
+      camera.events().loaded(20);
+      camera.events().ready(true);
+    });
+    await step(50);
+    expect(result.status.phase).toBe('ready');
+    expect(camera.captureAccepted.mock.lastCall![0]).toEqual({
+      placement: undefined,
+      crop: props.webcam!.editor.crop,
+    });
+  }
+);

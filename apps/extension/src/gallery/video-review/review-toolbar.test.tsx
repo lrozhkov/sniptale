@@ -31,11 +31,18 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
     onRetry: vi.fn(),
   };
   let admitted: (() => void) | undefined;
-  const render = async (mode: 'basic' | 'advanced', busy = false) => {
+  const render = async (
+    mode: 'basic' | 'advanced',
+    busy = false,
+    selectedTrack: Parameters<
+      typeof ReviewTimelineToolbar
+    >[0]['selectedTrack'] = 'annotationEffects'
+  ) => {
     advanced.ui.mode = mode;
     await act(async () =>
       root.render(
         <ReviewTimelineToolbar
+          selectedTrack={selectedTrack}
           advanced={advanced}
           busy={busy}
           composerBusy={false}
@@ -152,6 +159,18 @@ it('annotation addition is advanced-only, admitted through the note owner and bl
     expect(tool.onRetry).not.toHaveBeenCalled();
     act(() => admitted?.());
     expect(tool.onRetry).toHaveBeenCalledOnce();
+    for (const track of ['text', 'voiceover', 'music', 'webcam', 'actions', null] as const) {
+      await render('advanced', false, track);
+      expect(button()).toBeNull();
+      expect(host.querySelector('[data-ui="gallery.videoReview.trackToolHint"]')?.textContent).toBe(
+        translate(
+          track === null
+            ? 'gallery.videoReview.noTrackSelected'
+            : 'gallery.videoReview.trackActionsHint'
+        )
+      );
+      expect(host.textContent).not.toContain(translate('gallery.videoReview.noTrackActions'));
+    }
   } finally {
     await act(async () => root.unmount());
     host.remove();
@@ -303,10 +322,11 @@ it('shows the Focus type only while Focus is active and retains the insertion ch
   const beforeAction = vi.fn((action: () => void) => {
     if (admitted) action();
   });
-  const render = (active: boolean, busy = false) =>
+  const render = (active: boolean, busy = false, selectedTrack: 'source' | 'zoom' = 'zoom') =>
     act(async () =>
       root.render(
         <ReviewTimelineToolbar
+          selectedTrack={selectedTrack}
           advanced={advanced}
           busy={busy}
           beforeAction={beforeAction}
@@ -372,6 +392,7 @@ it('shows the Focus type only while Focus is active and retains the insertion ch
     expect(onToggle).toHaveBeenCalledOnce();
     await click('gallery.videoReview.pointerTool');
     expect(setCutting).toHaveBeenCalledWith(false);
+    await render(false, false, 'source');
     await click('gallery.videoReview.speedMode');
     expect(toggle).toHaveBeenCalledWith('speed');
     await speedOption('gallery.videoReview.speedRate', '4×');

@@ -27,8 +27,9 @@ export interface QuickEditBorder {
   width: number;
   roundness: number;
   style: 'solid' | 'dashed' | 'dotted';
-  reveal: 'fade' | 'draw' | 'draw-ccw';
-  exitReveal: 'fade' | 'erase' | 'erase-ccw';
+  origin?: 'top-center' | 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left';
+  reveal: 'fade' | 'draw' | 'draw-ccw' | 'draw-both';
+  exitReveal: 'fade' | 'erase' | 'erase-ccw' | 'erase-both';
   loop: boolean;
   motion: 'clockwise' | 'counterclockwise' | 'pulse' | 'ripple';
   period: number;
@@ -202,16 +203,27 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
       value['motion'] !== 'ripple') ||
     typeof value['loop'] !== 'boolean' ||
     (value['style'] !== 'solid' && value['style'] !== 'dashed' && value['style'] !== 'dotted') ||
-    (value['reveal'] !== 'fade' && value['reveal'] !== 'draw' && value['reveal'] !== 'draw-ccw') ||
+    (value['origin'] !== undefined &&
+      value['origin'] !== 'top-center' &&
+      value['origin'] !== 'top-left' &&
+      value['origin'] !== 'top-right' &&
+      value['origin'] !== 'bottom-right' &&
+      value['origin'] !== 'bottom-left') ||
+    (value['reveal'] !== 'fade' &&
+      value['reveal'] !== 'draw' &&
+      value['reveal'] !== 'draw-ccw' &&
+      value['reveal'] !== 'draw-both') ||
     (value['exitReveal'] !== 'fade' &&
       value['exitReveal'] !== 'erase' &&
-      value['exitReveal'] !== 'erase-ccw')
+      value['exitReveal'] !== 'erase-ccw' &&
+      value['exitReveal'] !== 'erase-both')
   )
     return null;
   return {
     area,
     color,
     width: value['width'],
+    ...(value['origin'] === undefined ? {} : { origin: value['origin'] }),
     roundness: value['roundness'],
     period: value['period'],
     segmentPercent: typeof value['segmentPercent'] === 'number' ? value['segmentPercent'] : 25,
@@ -248,4 +260,14 @@ export function constrainQuickEditLensArea(
   const origin = resolveQuickEditLensArea(value, window);
   if (areQuickEditSpotlightAreasEqual(area, origin)) return origin;
   return resolveQuickEditLensArea({ ...value, area: authorQuickEditLensArea(value, area) }, window);
+}
+
+/** Detect declared-schema requirements before admitting the complete border payload. */
+export function requiresExtendedBorderSchema(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (value['origin'] !== undefined ||
+      value['reveal'] === 'draw-both' ||
+      value['exitReveal'] === 'erase-both')
+  );
 }

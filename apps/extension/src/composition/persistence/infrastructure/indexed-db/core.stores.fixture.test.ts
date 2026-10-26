@@ -284,9 +284,103 @@ it('adds private voice history without rewriting released rows media or indexes'
   expect(target.opfsObjects).toEqual(source.opfsObjects);
   expect(target.stores.filter((name) => name !== 'voice_input_history')).toEqual(source.stores);
   expect(target.domainVersions).toEqual({ ...source.domainVersions, voiceInputHistory: 1 });
-  expect(DATABASE_MIGRATIONS.at(-1)).toMatchObject({
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 35)).toMatchObject({
     backupCoverage: 'none',
     risk: 'additive',
     domainVersions: [{ domainId: 'voiceInputHistory', from: 0, to: 1 }],
+  });
+});
+
+it('admits independent quick projects without rewriting released sources or workspace rows', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 35
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 36
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 28 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 36)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 27, to: 28 }],
+  });
+});
+
+it('admits camera screen behavior without rewriting released projects, history or bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 36
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 37);
+  expect(target).toBeDefined();
+  expect(target?.records).toEqual(source.records);
+  expect(target?.opfsObjects).toEqual(source.opfsObjects);
+  expect(target?.stores).toEqual(source.stores);
+  expect(target?.indexes).toEqual(source.indexes);
+  expect(target?.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 29,
+    videoProjects: 6,
+  });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 37)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 28, to: 29 },
+      { domainId: 'videoProjects', from: 5, to: 6 },
+    ],
+  });
+});
+
+it('admits camera shadow direction without rewriting released projects, history or bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 37
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 38);
+  expect(target).toBeDefined();
+  expect(target?.records).toEqual(source.records);
+  expect(target?.opfsObjects).toEqual(source.opfsObjects);
+  expect(target?.stores).toEqual(source.stores);
+  expect(target?.indexes).toEqual(source.indexes);
+  expect(target?.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 30,
+    videoProjects: 7,
+  });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 38)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 29, to: 30 },
+      { domainId: 'videoProjects', from: 6, to: 7 },
+    ],
+  });
+});
+
+it('admits border origins and two-sided phases without rewriting released projects, history or bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 38
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 39);
+  expect(target).toBeDefined();
+  expect(target?.records).toEqual(source.records);
+  expect(target?.opfsObjects).toEqual(source.opfsObjects);
+  expect(target?.stores).toEqual(source.stores);
+  expect(target?.indexes).toEqual(source.indexes);
+  expect(target?.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 31,
+    videoProjects: 8,
+  });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 39)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 30, to: 31 },
+      { domainId: 'videoProjects', from: 7, to: 8 },
+    ],
   });
 });
