@@ -27,6 +27,16 @@ function createAppearanceState(
   updateContextMenu: AppearanceSectionState['updateContextMenu']
 ): AppearanceSectionState {
   return {
+    pageLaunch: {
+      enabled: false,
+      hoverOnly: false,
+      corner: 'bottom-right',
+      quickActionsPopup: true,
+      quickActionsCorner: false,
+      quickActionsToolbar: false,
+    },
+    pageLaunchReady: true,
+    updatePageLaunch: vi.fn(async () => undefined),
     contextMenu: {
       enabled: false,
       showExport: true,

@@ -439,3 +439,8 @@ body.sniptale-navigation-locked {
     transition: none;
   }
 }
+
+/* Mode motion owns both size and position; a previous dock drag must not add a second clock. */
+.sniptale-toolbar-positioner:has(> .sniptale-toolbar[data-mode-transition='true']) {
+  transition: none;
+}

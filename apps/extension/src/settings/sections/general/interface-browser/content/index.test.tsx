@@ -18,6 +18,16 @@ function createState(
   overrides: Partial<AppearanceSectionContentState> = {}
 ): AppearanceSectionContentState {
   return {
+    pageLaunch: {
+      enabled: false,
+      hoverOnly: false,
+      corner: 'bottom-right',
+      quickActionsPopup: true,
+      quickActionsCorner: false,
+      quickActionsToolbar: false,
+    },
+    pageLaunchReady: true,
+    updatePageLaunch: vi.fn(async () => undefined),
     contextMenu: {
       enabled: true,
       showExport: true,

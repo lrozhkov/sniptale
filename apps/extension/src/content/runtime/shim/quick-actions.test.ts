@@ -8,6 +8,7 @@ import { createShimQuickActionLoader, createShimQuickActionStorage } from './qui
 function createBrowserAdapter(payload: Record<string, unknown>): ContentRuntimeShimBrowserAdapter {
   return {
     canObserveStorageChanges: vi.fn(() => true),
+    getSyncStorage: vi.fn(async () => ({})),
     getLocalStorage: vi.fn(async (keys: string[]) =>
       Object.fromEntries(keys.map((key) => [key, payload[key]]))
     ),
@@ -15,13 +16,14 @@ function createBrowserAdapter(payload: Record<string, unknown>): ContentRuntimeS
   };
 }
 
-it('loads only compact quick-action hotkey fields from browser storage', async () => {
+it('loads compact hotkey and menu display fields without artwork or capture settings', async () => {
   const browser = createBrowserAdapter({
     sniptale_quick_actions: [
       {
         hotkey: { altKey: false, ctrlKey: true, key: 'k', metaKey: false, shiftKey: false },
         id: 'quick-action-1',
-        name: 'ignored',
+        name: 'Menu action',
+        appearance: { private: 'not projected' },
         status: true,
       },
       {
@@ -37,10 +39,13 @@ it('loads only compact quick-action hotkey fields from browser storage', async (
     ],
   });
 
-  await expect(createShimQuickActionLoader(browser)()).resolves.toEqual([
+  const actions = await createShimQuickActionLoader(browser)();
+  expect(actions).toHaveLength(9);
+  expect(actions.slice(0, 2)).toEqual([
     {
       hotkey: { altKey: false, ctrlKey: true, key: 'k', metaKey: false, shiftKey: false },
       id: 'quick-action-1',
+      name: 'Menu action',
       status: true,
     },
     {
@@ -69,4 +74,36 @@ it('subscribes to storage changes through the compact observer', () => {
   unsubscribe();
 
   expect(browser.subscribeToStorageChanges).toHaveBeenCalledWith(listener);
+});
+
+it('shows the same seven bundled defaults before any explicit settings write', async () => {
+  const browser = createBrowserAdapter({});
+  const actions = await createShimQuickActionLoader(browser)();
+  expect(actions.map((action) => action.id)).toEqual([
+    'default-visible-download',
+    'default-full-page-download',
+    'default-selection-download',
+    'default-visible-copy',
+    'default-visible-edit',
+    'default-desktop-capture',
+    'default-visible-library',
+  ]);
+  expect(actions.every((action) => action.status && action.hotkey === null)).toBe(true);
+  expect(browser.getLocalStorage).toHaveBeenCalledOnce();
+});
+it('admits optional hotkeys and appends missing defaults after the accepted stored order', async () => {
+  const actions = await createShimQuickActionLoader(
+    createBrowserAdapter({
+      sniptale_quick_actions: [
+        { id: 'custom', name: 'Custom', status: true },
+        { id: 'default-visible-copy', status: false, hotkey: null },
+      ],
+    })
+  )();
+  expect(actions.slice(0, 2)).toEqual([
+    { id: 'custom', name: 'Custom', status: true, hotkey: null },
+    { id: 'default-visible-copy', status: false, hotkey: null },
+  ]);
+  expect(actions).toHaveLength(8);
+  expect(actions.filter((action) => action.id === 'default-visible-copy')).toHaveLength(1);
 });

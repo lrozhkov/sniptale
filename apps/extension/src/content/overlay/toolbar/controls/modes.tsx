@@ -1,3 +1,4 @@
+import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from './page-layout';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useRef } from 'react';
 import { Icon } from '@iconify/react';
@@ -14,11 +15,7 @@ import {
   Video,
 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
-import {
-  ContentToolbarButton,
-  ContentToolbarDivider,
-  ContentToolbarGroup,
-} from '@sniptale/ui/content-toolbar';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
@@ -362,7 +359,9 @@ function PageEditingModeButton(props: {
     </ContentToolbarButton>
   );
   return props.mode === 'block-selection' ? (
-    <PageProtectedControls>{control}</PageProtectedControls>
+    <PageToolbarSlot id="editing-block-selection" label={copy.label}>
+      <PageProtectedControls>{control}</PageProtectedControls>
+    </PageToolbarSlot>
   ) : (
     <PageControlVisibility
       control={props.mode === 'ai' ? 'editing-ai' : 'editing-direct-text'}
@@ -374,7 +373,7 @@ function PageEditingModeButton(props: {
 }
 
 function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
-  if (!props.quickEditMode && !props.aiPickMode) {
+  if (getSelectedMode(props) !== 'quick-edit') {
     return null;
   }
 
@@ -386,7 +385,7 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
   const pending = props.pendingMode !== null && props.pendingMode !== undefined;
 
   return (
-    <ContentToolbarGroup className="sniptale-page-editing-mode-group">
+    <PageToolbarGroup className="sniptale-page-editing-mode-group">
       {(['block-selection', 'direct-text', 'ai'] as ToolbarPageEditingMode[]).map((mode) => (
         <PageEditingModeButton
           key={mode}
@@ -396,7 +395,7 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
           onSelect={props.onSelectPageEditingMode}
         />
       ))}
-    </ContentToolbarGroup>
+    </PageToolbarGroup>
   );
 }
 
@@ -420,36 +419,38 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
 
   return (
     <>
-      <ContentToolbarGroup className="sniptale-mode-selector-group">
-        <div className="sniptale-mode-wrapper" data-menu-side={menuSide}>
-          <ModeSelectorButton
-            label={buttonCopy.label}
-            title={
-              selectedMode === 'cursor'
-                ? translate('content.toolbar.cursorDefault')
-                : buttonCopy.label
-            }
-            disabled={pending}
-            menuIndicator
-            onToggle={() => props.toolbarMenuState.toggleMenu('mode')}
-            open={open}
-            triggerRef={triggerRef}
-          >
-            {getModeIcon(selectedMode)}
-          </ModeSelectorButton>
-
-          {open ? (
-            <ToolbarModeMenu
-              menuRef={menuRef}
-              onClose={() => props.toolbarMenuState.closeMenu('mode')}
-              triggerProps={props}
+      <PageToolbarGroup className="sniptale-mode-selector-group">
+        <PageToolbarSlot id="mode" label={buttonCopy.label} interactiveWhileEditing>
+          <div className="sniptale-mode-wrapper" data-menu-side={menuSide}>
+            <ModeSelectorButton
+              label={buttonCopy.label}
+              title={
+                selectedMode === 'cursor'
+                  ? translate('content.toolbar.cursorDefault')
+                  : buttonCopy.label
+              }
+              disabled={pending}
+              menuIndicator
+              onToggle={() => props.toolbarMenuState.toggleMenu('mode')}
+              open={open}
               triggerRef={triggerRef}
-            />
-          ) : null}
-        </div>
-      </ContentToolbarGroup>
+            >
+              {getModeIcon(selectedMode)}
+            </ModeSelectorButton>
+
+            {open ? (
+              <ToolbarModeMenu
+                menuRef={menuRef}
+                onClose={() => props.toolbarMenuState.closeMenu('mode')}
+                triggerProps={props}
+                triggerRef={triggerRef}
+              />
+            ) : null}
+          </div>
+        </PageToolbarSlot>
+      </PageToolbarGroup>
       {selectedMode === 'cursor' || selectedMode === 'video-recording' ? null : (
-        <ContentToolbarDivider
+        <PageToolbarDivider
           className="sniptale-mode-leading-divider"
           dataUi="content.toolbar.mode-leading-divider"
         />

@@ -1,3 +1,7 @@
+vi.mock('../quick-action-appearance/header', () => ({
+  renderQuickActionHeader: mocks.renderQuickActionHeader,
+}));
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const readiness = vi.hoisted(() => ({
@@ -27,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   listMediaDevices: vi.fn(),
   pause: vi.fn(),
   rasterize: vi.fn(),
+  renderQuickActionHeader: vi.fn(),
   reserveDesktopFrame: vi.fn(),
   resume: vi.fn(),
   setClipboard: vi.fn(),
@@ -417,4 +422,21 @@ it('explicitly prepares download assets and fails a cold lease without joining a
     })
   ).rejects.toThrow('Offscreen assets are not prepared');
   expect(readiness.ensureAssets).toHaveBeenCalledOnce();
+});
+
+it('renders quick-action header artwork without joining data admission', async () => {
+  mocks.renderQuickActionHeader.mockResolvedValue({ dataUrl: 'header' });
+  await expect(
+    handleOffscreenRuntimeMessage({
+      type: MessageType.OFFSCREEN_QUICK_ACTION_HEADER,
+      capabilityToken: 'capability-1',
+      header: DEFAULT_WINDOW_HEADER,
+      source: { width: 1280, height: 560 },
+    })
+  ).resolves.toEqual({ dataUrl: 'header' });
+  expect(readiness.ensureAdmission).not.toHaveBeenCalled();
+  expect(readiness.requireAdmission).not.toHaveBeenCalled();
+  expect(resolveOffscreenRuntimeResponseMode(MessageType.OFFSCREEN_QUICK_ACTION_HEADER)).toBe(
+    'deferred-ack'
+  );
 });

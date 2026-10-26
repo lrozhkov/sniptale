@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import { DrawingSelectionActions } from './selection-actions';
+import { DrawingSelectionActions, useDrawingSelectionDisclosure } from './selection-actions';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -28,32 +28,47 @@ it.each([false, true])(
       onMerge: vi.fn(),
       onUngroup: vi.fn(),
     };
+    function Harness({ enabled, ungroup }: { enabled: boolean; ungroup: boolean }) {
+      const disclosure = useDrawingSelectionDisclosure(true);
+      return (
+        <DrawingSelectionActions
+          disclosure={disclosure}
+          {...callbacks}
+          vertical
+          canReorder={enabled}
+          canDuplicate={enabled}
+          canDelete={enabled}
+          layerCombination={{
+            canGroup: enabled,
+            canMerge: enabled,
+            canUngroup: ungroup,
+            showMerge: true,
+            onGroup: callbacks.onGroup,
+            onMerge: callbacks.onMerge,
+            onUngroup: callbacks.onUngroup,
+          }}
+        />
+      );
+    }
     const render = (enabled: boolean, ungroup = false) =>
       act(() =>
         root.render(
           <CommandPressScope value={scoped}>
-            <DrawingSelectionActions
-              {...callbacks}
-              vertical
-              canReorder={enabled}
-              canDuplicate={enabled}
-              canDelete={enabled}
-              layerCombination={{
-                canGroup: enabled,
-                canMerge: enabled,
-                canUngroup: ungroup,
-                showMerge: true,
-                onGroup: callbacks.onGroup,
-                onMerge: callbacks.onMerge,
-                onUngroup: callbacks.onUngroup,
-              }}
-            />
+            <Harness enabled={enabled} ungroup={ungroup} />
           </CommandPressScope>
         )
       );
     const button = (suffix: string) =>
       host.querySelector<HTMLButtonElement>(`[data-ui="drawing.selection.actions.${suffix}"]`);
     render(true);
+    expect([...host.querySelectorAll('button')].map((button) => button.dataset['ui'])).toEqual([
+      'drawing.selection.actions.reveal',
+      'drawing.selection.actions.delete',
+      'content.toolbar.drawing-options.deselect',
+    ]);
+    expect(button('front')).toBeNull();
+    act(() => button('reveal')?.click());
+    expect(button('reveal')?.getAttribute('aria-expanded')).toBe('true');
     expect(button('front')?.getAttribute('data-command-chrome')).toBe(scoped ? 'true' : null);
     expect(button('front')?.title).toBe('editor.toolbar.frontLayer');
     expect(button('delete')?.classList.contains('sniptale-btn-danger')).toBe(true);

@@ -13,12 +13,20 @@ export function WindowHeaderSettings({
   onChange,
   disabled = false,
   allowNone = true,
-}: WindowHeaderSettingsProps) {
+  titleField,
+  addressField,
+  faviconControls,
+}: WindowHeaderSettingsProps & {
+  titleField?: ReactNode;
+  addressField?: ReactNode;
+  faviconControls?: ReactNode;
+}) {
   useAppLocale();
   const inspector = useInspectorLayout();
   const editing = useWindowHeaderEditing({ header, rememberedHeader, onChange, disabled });
   const iconControls =
-    header?.kind === 'browser' ? (
+    faviconControls ??
+    (header?.kind === 'browser' ? (
       <WindowHeaderIconControls
         header={header}
         busy={editing.busy}
@@ -26,7 +34,7 @@ export function WindowHeaderSettings({
         onClearFile={editing.clearFile}
         onFile={editing.loadFile}
       />
-    ) : null;
+    ) : null);
   return (
     <fieldset
       disabled={disabled}
@@ -64,25 +72,29 @@ export function WindowHeaderSettings({
             ]}
             onChange={(theme) => editing.patch({ theme })}
           />
-          <HeaderTextField
-            label={translate(
-              header.kind === 'browser' ? 'windowHeader.tabTitle' : 'windowHeader.windowTitle'
-            )}
-            value={header.title}
-            maxLength={512}
-            onCommit={(title) => editing.patch({ title })}
-          />
+          {titleField ?? (
+            <HeaderTextField
+              label={translate(
+                header.kind === 'browser' ? 'windowHeader.tabTitle' : 'windowHeader.windowTitle'
+              )}
+              value={header.title}
+              maxLength={512}
+              onCommit={(title) => editing.patch({ title })}
+            />
+          )}
           {header.kind === 'browser' ? (
             <div className={inspector ? 'min-w-0' : 'flex min-w-0 items-end gap-1.5'}>
-              <HeaderTextField
-                label={translate('windowHeader.address')}
-                value={header.url}
-                maxLength={2048}
-                placeholder="example.com"
-                onCommit={editing.changeAddress}
-                trailingActions={inspector ? iconControls : undefined}
-              />
-              {inspector ? null : iconControls}
+              {addressField ?? (
+                <HeaderTextField
+                  label={translate('windowHeader.address')}
+                  value={header.url}
+                  maxLength={2048}
+                  placeholder="example.com"
+                  onCommit={editing.changeAddress}
+                  trailingActions={inspector ? iconControls : undefined}
+                />
+              )}
+              {inspector && !addressField ? null : iconControls}
             </div>
           ) : null}
         </>

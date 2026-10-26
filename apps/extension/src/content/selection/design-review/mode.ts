@@ -167,6 +167,11 @@ function finishTextSession(): void {
   }
 }
 
+/** Commits the current inline text session before page capture or reset. */
+export function finalizeDesignReviewTextEditing(): void {
+  finishTextSession();
+}
+
 /** Reports whether the selected page target supports the Content Editing interaction. */
 export function canEditDesignReviewText(target: Element): boolean {
   return canEditQuickEditTarget(target);

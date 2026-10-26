@@ -57,6 +57,7 @@ export type ScreenshotModeStatusResponse = RuntimeMessageResponse<{
 }>;
 
 export type CaptureResponse = RuntimeMessageResponse<{
+  filename?: string;
   dataUrl?: string;
   action?: CaptureActionType;
   captureGeometry?: import('../../full-page-capture').FullPageCaptureGeometry;
@@ -66,6 +67,8 @@ export type CaptureResponse = RuntimeMessageResponse<{
 }>;
 
 export type SaveAssetResponse = RuntimeMessageResponse<{
+  dataUrl?: string;
+  filename?: string;
   assetId?: string;
   editorAssetCapability?: RecentCaptureEditorAssetCapability;
 }>;

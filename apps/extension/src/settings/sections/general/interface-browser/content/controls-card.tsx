@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { SettingsSwitch } from '../../../../section-surface/panel-controls';
 import { translate } from '../../../../../platform/i18n';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -9,6 +11,20 @@ import type { AppearanceSectionState } from './types';
 import { ThemeChips } from './theme-chips';
 
 export function AppearanceControlsCard({ state }: { state: AppearanceSectionState }) {
+  const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const updateLaunch = async (patch: Parameters<typeof state.updatePageLaunch>[0]) => {
+    if (saving) return;
+    setSaving(true);
+    setFailed(false);
+    try {
+      await state.updatePageLaunch(patch);
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <div className="space-y-1">
       <SettingsControlRow
@@ -30,6 +46,29 @@ export function AppearanceControlsCard({ state }: { state: AppearanceSectionStat
         />
       </SettingsControlRow>
 
+      <SettingsControlRow label={translate('settings.appearance.pageLauncher', state.locale)}>
+        <SettingsSwitch
+          size="sm"
+          checked={state.pageLaunch.enabled}
+          disabled={!state.pageLaunchReady || saving}
+          aria-label={translate('settings.appearance.pageLauncher', state.locale)}
+          onClick={() => {
+            void updateLaunch({ enabled: !state.pageLaunch.enabled });
+          }}
+        />
+      </SettingsControlRow>
+      <SettingsControlRow label={translate('settings.appearance.pageLauncherHover', state.locale)}>
+        <SettingsSwitch
+          size="sm"
+          checked={state.pageLaunch.hoverOnly}
+          disabled={!state.pageLaunchReady || !state.pageLaunch.enabled || saving}
+          aria-label={translate('settings.appearance.pageLauncherHover', state.locale)}
+          onClick={() => {
+            void updateLaunch({ hoverOnly: !state.pageLaunch.hoverOnly });
+          }}
+        />
+      </SettingsControlRow>
+      {failed ? <p role="alert">{translate('content.pageLauncher.failed', state.locale)}</p> : null}
       <SettingsControlRow label={translate('settings.appearance.popupStartupLabel', state.locale)}>
         <ProductSelect
           id="settings-popup-startup"

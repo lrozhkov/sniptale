@@ -13,8 +13,8 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 export const contentToolbarModesMessages = defineMessageSource({
   pageCustomizeControls: { ru: 'Настроить кнопки панели', en: 'Customize toolbar buttons' },
   pageCustomizeControlsHint: {
-    ru: 'Выберите, какие кнопки показывать.',
-    en: 'Choose which buttons to show.',
+    ru: 'Переставьте кнопки, выберите видимые и настройте разделители.',
+    en: 'Reorder buttons, choose visibility, and customize dividers.',
   },
   pageControlOverride: {
     ru: 'Своя настройка для этого режима.',
@@ -335,6 +335,29 @@ export const contentToolbarModesMessages = defineMessageSource({
   drawingTextFontSerif: { ru: 'С засечками', en: 'Serif' },
   drawingTextFontMono: { ru: 'Моноширинный', en: 'Monospace' },
   drawingTextFontHandwritten: { ru: 'Рукописный', en: 'Handwritten' },
+  pageReorderHint: {
+    ru: 'Перетащите для перестановки или нажмите Alt + стрелку.',
+    en: 'Drag to reorder or press Alt + an arrow key.',
+  },
+  pageReorderVisibilityHint: {
+    ru: 'Нажмите, чтобы изменить видимость.',
+    en: 'Click to change visibility.',
+  },
+  pageAddDivider: { ru: 'Добавить разделитель', en: 'Add divider' },
+  pageRemoveDivider: { ru: 'Удалить разделитель', en: 'Remove divider' },
+  pageResetToolbar: { ru: 'Сбросить настройку панели', en: 'Reset toolbar customization' },
+  pageResetToolbarHint: {
+    ru: 'Исходный порядок, видимость кнопок и разделители во всех режимах страницы',
+    en: 'Default order, button visibility, and dividers in every page mode',
+  },
+  drawingShowSelectionActions: {
+    ru: 'Показать дополнительные действия с выделением',
+    en: 'Show more selection actions',
+  },
+  drawingHideSelectionActions: {
+    ru: 'Скрыть дополнительные действия с выделением',
+    en: 'Hide extra selection actions',
+  },
   drawingDeselect: { ru: 'Снять выделение', en: 'Deselect' },
   drawingDelete: { ru: 'Удалить выбранное', en: 'Delete selected' },
   drawingClear: { ru: 'Очистить рисунки', en: 'Clear drawings' },
@@ -433,6 +456,11 @@ export const contentToolbarModesMessages = defineMessageSource({
   redoPageEdit: {
     ru: 'Повторить правку страницы: текст и дизайн',
     en: 'Redo page change: text and design',
+  },
+  restorePageChanges: { ru: 'Восстановить правки', en: 'Restore page changes' },
+  pageRecoveryFailed: {
+    ru: 'Не удалось сохранить или восстановить правки. Текущие правки сохранены на странице. Повторите действие.',
+    en: 'Could not save or restore page changes. Your current changes remain on the page. Try again.',
   },
   clearPagePreparation: {
     ru: 'Сбросить всё',

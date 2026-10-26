@@ -77,6 +77,13 @@ export function createPorts(order: string[] = []): PrivacyErasurePorts {
       }),
       reserveErasureExclusion: reservePopupExportErasureExclusion,
     },
+    pageRecovery: {
+      cleanup: vi.fn(async () => {
+        order.push('page-recovery');
+        return [verified('page-recovery-runtime-state')];
+      }),
+      reserveErasureExclusion: () => ({ release() {}, async waitForActiveMutations() {} }),
+    },
     runtime: {
       cleanup: vi.fn(async () => {
         order.push('runtime');

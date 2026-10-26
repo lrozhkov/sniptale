@@ -303,3 +303,23 @@ it('requires voice audio erasure and verification even when preferences remain',
     ).failedRequiredParticipantIds
   ).toContain('opfs:voice-input-history');
 });
+
+it('erases private recovery records and claims through the canonical inventory', async () => {
+  const local: Record<string, unknown> = { sniptale_page_recovery: { private: 'authored' } };
+  const session: Record<string, unknown> = { sniptale_page_recovery_claims: { private: 'lease' } };
+  deps.browserStorageAreas.local.get.mockImplementation(async () => ({ ...local }));
+  deps.browserStorageAreas.session.get.mockImplementation(async () => ({ ...session }));
+  deps.browserStorageAreas.local.remove.mockImplementation(async (keys) => {
+    for (const key of typeof keys === 'string' ? [keys] : keys) delete local[key];
+  });
+  deps.browserStorageAreas.session.remove.mockImplementation(async (keys) => {
+    for (const key of typeof keys === 'string' ? [keys] : keys) delete session[key];
+  });
+  const result = await erasePersistentLocalExtensionData(
+    { includeAiProviderSecrets: false, preservePreferences: true },
+    deps
+  );
+  expect(result.success).toBe(true);
+  expect(local).toEqual({});
+  expect(session).toEqual({});
+});

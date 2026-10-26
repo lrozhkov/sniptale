@@ -106,3 +106,13 @@ it('accepts the persisted popup export destination in its own settings backup', 
     'interface.preferences': { data: { popupStartup: { lastExportDestination: 'export' } } },
   });
 });
+
+it('classifies page launcher and quick-action placements as one transferable interface preference', () => {
+  expect(
+    SETTINGS_TRANSFER_REGISTRY.find((node) => node.id === 'interface.preferences.page-launch')
+  ).toMatchObject({
+    domainId: 'interface.preferences',
+    classification: 'transferable',
+    kind: 'scalar',
+  });
+});

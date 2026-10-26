@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
+import type { BrowserAnnotationSessionSnapshot } from '../../../parser/page-preparation/annotations';
 import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
 import type { FrameManagerRefs } from '../contracts';
 import { createFrameDataFixture } from '../test-support';
@@ -17,7 +18,9 @@ const CALLOUT_STYLE = createDefaultCalloutSettings().style;
 
 const mocks = vi.hoisted(() => ({
   applyAnnotationSnapshot: vi.fn(),
-  captureAnnotationSnapshot: vi.fn(() => ({
+  rebindAnnotationTargets: vi.fn(),
+  resolveAnnotationTarget: vi.fn(),
+  captureAnnotationSnapshot: vi.fn((): BrowserAnnotationSessionSnapshot => ({
     domRecords: [],
     frameOrders: [],
     nextAnnotationId: 1,
@@ -34,6 +37,8 @@ vi.mock('../../../parser/page-preparation/annotations', async (importOriginal) =
   ...(await importOriginal<typeof import('../../../parser/page-preparation/annotations')>()),
   browserAnnotationSession: {
     applySnapshot: mocks.applyAnnotationSnapshot,
+    rebindTargets: mocks.rebindAnnotationTargets,
+    getRecoveryTarget: mocks.resolveAnnotationTarget,
     captureSnapshot: mocks.captureAnnotationSnapshot,
   },
 }));
@@ -291,3 +296,68 @@ function expectBridgeSnapshotCapture() {
     stepBadgeOrder: refs.stepBadgeOrderRef.current,
   });
 }
+
+it('rebinds restored annotation targets only at the explicit recovery boundary', () => {
+  const bridge = createPagePreparationHistoryBridge({
+    refs: createRefs(),
+    setFrames: vi.fn(),
+    setFrameStates: vi.fn(),
+  });
+  mocks.rebindAnnotationTargets.mockClear();
+  bridge.onRecoveryApplied?.();
+  expect(mocks.rebindAnnotationTargets).toHaveBeenCalledTimes(1);
+});
+
+it('binds a restored linked frame to its current page target at the recovery boundary', () => {
+  const target = document.createElement('button');
+  target.id = 'restored-target';
+  document.body.append(target);
+  const refs = createRefs();
+  refs.framesRef.current = [
+    { ...createFrame('restored-frame'), linkedElementSelector: '#restored-target' },
+  ];
+  const bridge = createPagePreparationHistoryBridge({
+    refs,
+    setFrames: vi.fn(),
+    setFrameStates: vi.fn(),
+  });
+  expect(refs.hostLayoutServiceRef.current.getNode('restored-frame')).toBeNull();
+  bridge.onRecoveryApplied?.();
+  expect(refs.hostLayoutServiceRef.current.getNode('restored-frame')).toBe(target);
+  refs.hostLayoutServiceRef.current.dispose();
+  target.remove();
+});
+
+it('refuses a missing note target before accepting any recovered bindings', () => {
+  const snapshot = mocks.captureAnnotationSnapshot();
+  mocks.captureAnnotationSnapshot.mockReturnValueOnce({
+    ...snapshot,
+    domRecords: [
+      {
+        annotationId: 1,
+        creationOrder: 1,
+        comment: 'Preserve this note',
+        propertyChanges: [],
+        evidence: {
+          fileLabel: 'Missing',
+          frame: { kind: 'top-document' },
+          locator: '#missing-note-target',
+          nodePosition: { x: 0, y: 0 },
+          pageUrl: 'https://example.test',
+          targetPath: '#missing-note-target',
+          targetSelector: '#missing-note-target',
+          targetText: 'Missing',
+          viewport: { width: 1280, height: 560 },
+        },
+      },
+    ],
+  });
+  const bridge = createPagePreparationHistoryBridge({
+    refs: createRefs(),
+    setFrames: vi.fn(),
+    setFrameStates: vi.fn(),
+  });
+  expect(() => bridge.onRecoveryApplied?.()).toThrow(
+    'Page recovery annotation target is unavailable'
+  );
+});

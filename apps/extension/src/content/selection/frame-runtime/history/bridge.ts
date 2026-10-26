@@ -8,6 +8,7 @@ import {
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
+import { resolveRecoveryLocator } from '../../../parser/page-preparation/history/recovery-locators';
 import { cloneCalloutStyle } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 export function applyHistorySnapshotToFrameManager(args: {
@@ -57,6 +58,31 @@ export function createPagePreparationHistoryBridge(args: {
   setFrameStates: FrameStateSetter;
 }): PagePreparationHistoryBridge {
   return {
+    resolveRecoveryAnnotationTarget: browserAnnotationSession.getRecoveryTarget,
+    resolveRecoveryFrameTarget: (frameId) =>
+      args.refs.hostLayoutServiceRef.current.getNode(frameId),
+    onRecoveryApplied: () => {
+      const annotations = new Map(
+        browserAnnotationSession.captureSnapshot().domRecords.map((record) => {
+          const target = resolveRecoveryLocator(record.evidence.locator);
+          if (!target) throw new Error('Page recovery annotation target is unavailable');
+          return [record.annotationId, target];
+        })
+      );
+      const linked = args.refs.framesRef.current.flatMap((frame) => {
+        if (!frame.linkedElementSelector) return [];
+        const target = resolveRecoveryLocator(frame.linkedElementSelector);
+        const view = target?.ownerDocument.defaultView;
+        if (!view || !(target instanceof view.HTMLElement))
+          throw new Error('Page recovery frame target is unavailable');
+        return [{ frame, target }];
+      });
+      for (const { frame, target } of linked)
+        args.refs.hostLayoutServiceRef.current.link(frame.id, target, frame.linkedElementSelector!);
+      browserAnnotationSession.rebindTargets(
+        (record) => annotations.get(record.annotationId) ?? null
+      );
+    },
     applySnapshot: (snapshot) => {
       applyHistorySnapshotToFrameManager({
         refs: args.refs,

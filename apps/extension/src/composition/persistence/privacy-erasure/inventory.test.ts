@@ -157,3 +157,13 @@ it('preserves the first-show marker with preferences and removes it during a ful
       .local
   ).toContain('sniptale_welcome_shown');
 });
+
+it('erases page recovery records and identity claims while preferences are preserved', () => {
+  const plan = buildBrowserStorageErasurePlan({
+    includeAiProviderSecrets: false,
+    preservePreferences: true,
+  });
+  expect(plan.local).toContain('sniptale_page_recovery');
+  expect(plan.session).toContain('sniptale_page_recovery_claims');
+  expect(plan.local).not.toContain('sniptale_drawing_palette');
+});

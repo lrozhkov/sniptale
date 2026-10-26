@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import { normalizePageLaunchPreferences } from '../../../../contracts/page-launch';
+import { SettingsControlRow } from '../../../section-surface';
+import { SettingsSwitch } from '../../../section-surface/panel-controls';
 import { useSettingsStore } from '../../../runtime/store/useSettingsStore';
 import { translate } from '../../../../platform/i18n';
 import { getQuickActionDisplayName } from '../../../../features/quick-actions-presets/catalog';
@@ -15,7 +19,24 @@ function getDeleteActionMessage(name: string | undefined): string {
 }
 
 export function QuickActionsSection() {
-  const { settings } = useSettingsStore();
+  const { settings, updateSettings, hasLoaded } = useSettingsStore();
+  const placements = normalizePageLaunchPreferences(settings.pageLaunch);
+  const [savingPlacement, setSavingPlacement] = useState(false);
+  const [placementFailed, setPlacementFailed] = useState(false);
+  const updatePlacement = async (
+    key: 'quickActionsPopup' | 'quickActionsCorner' | 'quickActionsToolbar'
+  ) => {
+    if (savingPlacement) return;
+    setSavingPlacement(true);
+    setPlacementFailed(false);
+    try {
+      await updateSettings({ pageLaunch: { [key]: !placements[key] } });
+    } catch {
+      setPlacementFailed(true);
+    } finally {
+      setSavingPlacement(false);
+    }
+  };
   const state = useQuickActionsSection();
   const handleConfirmDelete = async () => {
     if (!state.confirmDelete) {
@@ -28,6 +49,28 @@ export function QuickActionsSection() {
 
   return (
     <div className={settingsSectionClassName}>
+      <div className="space-y-1">
+        {(
+          [
+            ['quickActionsPopup', 'settings.quickActions.placementPopup'],
+            ['quickActionsCorner', 'settings.quickActions.placementCorner'],
+            ['quickActionsToolbar', 'settings.quickActions.placementToolbar'],
+          ] as const
+        ).map(([key, label]) => (
+          <SettingsControlRow key={key} label={translate(label)}>
+            <SettingsSwitch
+              size="sm"
+              checked={placements[key]}
+              disabled={!hasLoaded || savingPlacement}
+              aria-label={translate(label)}
+              onClick={() => {
+                void updatePlacement(key);
+              }}
+            />
+          </SettingsControlRow>
+        ))}
+        {placementFailed ? <p role="alert">{translate('content.pageLauncher.failed')}</p> : null}
+      </div>
       <QuickActionsEditor state={state} viewportPresets={settings.viewportPresets} />
       <QuickActionsList state={state} viewportPresets={settings.viewportPresets} />
 

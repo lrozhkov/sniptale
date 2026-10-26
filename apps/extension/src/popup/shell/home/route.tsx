@@ -1,3 +1,5 @@
+import { normalizePageLaunchPreferences } from '../../../contracts/page-launch';
+import { browserStorage } from '../../../composition/persistence/infrastructure/browser-storage';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
@@ -14,6 +16,7 @@ import { PopupHomePage } from './page-shell';
 export function ScreenshotsRoute({ startup }: { startup: PopupStartupDescriptor }) {
   const capabilities = useActiveTabCapabilities();
   const pageAccess = usePopupPageAccessRuntime(capabilities);
+  const [showQuickActions, setShowQuickActions] = useState(true);
   const [quickActions, setQuickActions] = useState<QuickAction[]>([]);
   const [quickActionsReady, setQuickActionsReady] = useState(false);
   const [viewportPresets, setViewportPresets] = useState<ViewportPreset[]>([]);
@@ -31,17 +34,37 @@ export function ScreenshotsRoute({ startup }: { startup: PopupStartupDescriptor 
       .finally(() => {
         if (active) setQuickActionsReady(true);
       });
-    void loadSettings().then((settings) => {
-      if (active) setViewportPresets(settings.viewportPresets ?? []);
-    });
+    let epoch = 0;
+    const loadPreferences = async () => {
+      const version = ++epoch;
+      try {
+        const settings = await loadSettings();
+        if (active && epoch === version) {
+          setViewportPresets(settings.viewportPresets ?? []);
+          setShowQuickActions(
+            normalizePageLaunchPreferences(settings.pageLaunch).quickActionsPopup
+          );
+        }
+      } catch {
+        if (active) setHomeError(translate('popup.home.quickActionsLoadError'));
+      }
+    };
+    void loadPreferences();
+    const unsubscribe = browserStorage.canObserveChanges()
+      ? browserStorage.subscribeToChanges((changes, area) => {
+          if (area === 'sync' && changes['sniptale_settings']) void loadPreferences();
+        })
+      : () => undefined;
     return () => {
       active = false;
+      ++epoch;
+      unsubscribe();
     };
   }, []);
 
   return (
     <PopupHomePage
-      quickActions={quickActions}
+      quickActions={showQuickActions ? quickActions : []}
       quickActionsReady={quickActionsReady}
       viewportPresets={viewportPresets}
       activeTabCapabilities={capabilities}

@@ -4,6 +4,7 @@ import { canResetPagePreparation, clearPagePreparation } from './reset';
 import { createDrawingSession } from '../../../features/drawing/public';
 import { createContentDrawingController } from '../../drawing/controller';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
+import * as designReview from '../../selection/design-review';
 import * as quickEdit from '../../selection/quick-edit';
 import { registerDesignReviewCommentDraftFinalizer } from '../design-review/session/comment-draft-finalization';
 import { createProps } from './toolbar.test-support';
@@ -158,4 +159,16 @@ describe('Reset owner finalization and failure handling', () => {
     verifiesDocumentModeFailurePreservesResetState
   );
   it('reports an incomplete page preparation reset', verifiesIncompleteResetReportsFailure);
+});
+
+it('finalizes the separate Design Review text session before clearing page data', () => {
+  const finish = vi.spyOn(designReview, 'finalizeDesignReviewTextEditing');
+  const props = createProps();
+  for (const key of Object.keys(props.toolbar.modes) as (keyof typeof props.toolbar.modes)[])
+    props.toolbar.modes[key] = false;
+  clearPagePreparation(props.toolbar);
+  expect(finish).toHaveBeenCalledOnce();
+  expect(finish.mock.invocationCallOrder[0]).toBeLessThan(
+    clearAllPagePreparationChangesMock.mock.invocationCallOrder[0]!
+  );
 });

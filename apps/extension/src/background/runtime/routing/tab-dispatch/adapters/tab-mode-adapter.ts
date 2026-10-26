@@ -1,6 +1,7 @@
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isTabModeMessage } from '../../message-guards/guards/tab';
 import { routeTabModeMessage } from '../../../tab-mode-router/router';
-import { routeWithPageAccess } from './page-access-guard';
+import { routeWithPageAccess, routeWithReadOnlyPageAccess } from './page-access-guard';
 import { authorizeRouteSender } from './sender-rejection';
 import type { ResolvedTabRouteArgs } from './types';
 
@@ -24,7 +25,12 @@ export function routeResolvedTabModeMessage(args: ResolvedTabRouteArgs): boolean
       ? authorization.preauthorization.senderBinding
       : undefined;
 
-  return routeWithPageAccess(args, () =>
+  const withAccess =
+    message.type === MessageType.SCREENSHOT_MODE_STATUS ||
+    message.type === MessageType.GET_VIEWPORT_PRESET_AVAILABILITY
+      ? routeWithReadOnlyPageAccess
+      : routeWithPageAccess;
+  return withAccess(args, () =>
     routeTabModeMessage({
       ...(contentPreauthorization ? { contentPreauthorization } : {}),
       message,

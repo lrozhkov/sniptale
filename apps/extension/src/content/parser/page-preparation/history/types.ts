@@ -1,3 +1,4 @@
+import type { DrawingDocumentV1 } from '../../../../features/drawing/model';
 import type {
   AppliedBorderSettings,
   BlurSettings,
@@ -45,6 +46,8 @@ export interface PageDomElementState {
 }
 
 export interface PageDomMutationPatch {
+  /** Stable source position captured before a later rich-text edit can detach this target. */
+  recoveryLocator?: string;
   after: PageDomElementState;
   before: PageDomElementState;
   locator: string;
@@ -62,7 +65,14 @@ export interface PagePreparationHistoryDomEffectResult {
 }
 
 /** Reversible owner effect retained by in-memory page-preparation history. */
+export interface DrawingRecoveryEffect {
+  before: DrawingDocumentV1;
+  after: DrawingDocumentV1;
+}
+
 export interface PagePreparationHistoryDomEffect {
+  /** Data-only drawing versions for an explicit reload recovery; never executable code. */
+  recovery?: DrawingRecoveryEffect;
   /** Exact live targets whose identity must survive foreign HTML replacement. */
   targets?: readonly PagePreparationDomElement[];
   apply: (direction: 'undo' | 'redo') => PagePreparationHistoryDomEffectResult;
@@ -95,6 +105,9 @@ export interface PagePreparationHistoryEntry {
 export interface PagePreparationHistoryBridge {
   applySnapshot: (snapshot: PagePreparationSessionSnapshot) => void;
   captureSnapshot: () => PagePreparationSessionSnapshot;
+  resolveRecoveryAnnotationTarget?: (annotationId: number) => Element | null;
+  resolveRecoveryFrameTarget?: (frameId: string) => Element | null;
+  onRecoveryApplied?: () => void;
   onHistoryCleared?: () => void;
   onHistoryReachabilityChanged?: (frameIds: readonly string[]) => void;
 }
@@ -103,4 +116,16 @@ export interface PagePreparationHistoryState {
   canRedo: boolean;
   canUndo: boolean;
   revision: number;
+}
+
+/** Data-only versions retain producer scopes without copying live DOM targets or callbacks. */
+export interface PagePreparationRecovery {
+  version: 1;
+  entries: Array<{
+    scope: PagePreparationChangeScope;
+    before: PagePreparationSessionSnapshot;
+    after: PagePreparationSessionSnapshot;
+    patches: Array<{ selector: string; before: PageDomElementState; after: PageDomElementState }>;
+    drawing: DrawingRecoveryEffect | null;
+  }>;
 }

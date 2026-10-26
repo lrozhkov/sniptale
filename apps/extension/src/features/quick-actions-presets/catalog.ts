@@ -5,6 +5,7 @@ import type {
   QuickAction,
 } from '../../contracts/settings';
 import type { BundledQuickActionConfig } from './types';
+import { bundledQuickActionConfigs } from './bundled';
 
 interface CaptureActionDescriptor {
   value: CaptureActionType;
@@ -46,67 +47,6 @@ export function getCaptureActionDescriptors(): CaptureActionDescriptor[] {
     },
   ];
 }
-
-const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
-  {
-    id: 'default-visible-download',
-    icon: 'MonitorDown',
-    nameKey: 'shared.defaults.quickActionVisibleDownload',
-    screenshotMode: 'visible',
-    afterCapture: 'download_default',
-    delay: null,
-  },
-  {
-    id: 'default-full-page-download',
-    icon: 'Maximize',
-    nameKey: 'shared.defaults.quickActionFullPageDownload',
-    screenshotMode: 'full',
-    afterCapture: 'download_default',
-    delay: null,
-  },
-  {
-    id: 'default-selection-download',
-    icon: 'SquareDashedMousePointer',
-    nameKey: 'shared.defaults.quickActionSelectionDownload',
-    screenshotMode: 'selection',
-    afterCapture: 'download_default',
-    delay: null,
-  },
-  {
-    id: 'default-visible-copy',
-    icon: 'ClipboardCopy',
-    nameKey: 'shared.defaults.quickActionVisibleCopy',
-    screenshotMode: 'visible',
-    afterCapture: 'copy',
-    delay: null,
-  },
-  {
-    id: 'default-visible-edit',
-    icon: 'PencilLine',
-    nameKey: 'shared.defaults.quickActionVisibleEdit',
-    screenshotMode: 'visible',
-    afterCapture: 'edit',
-    delay: null,
-  },
-  {
-    id: 'default-desktop-capture',
-    icon: 'Monitor',
-    nameKey: 'shared.defaults.quickActionDesktopDownload',
-    screenshotMode: 'desktop',
-    afterCapture: 'download_default',
-    delay: 3,
-    imageFormat: null,
-    exitAfterCapture: false,
-  },
-  {
-    id: 'default-visible-library',
-    icon: 'FileImage',
-    nameKey: 'shared.defaults.quickActionVisibleLibrary',
-    screenshotMode: 'visible',
-    afterCapture: 'save_to_library',
-    delay: null,
-  },
-] as const;
 
 const bundledQuickActionIdSet = new Set<BundledQuickActionId>(
   bundledQuickActionConfigs.map((config) => config.id)

@@ -1,3 +1,4 @@
+import { pageLauncherMessages } from './page-launcher';
 import { contentAutoBlurMessages } from './auto-blur';
 import { contentCalloutMessages } from './callout';
 import { contentInteractiveFrameMessages } from './interactive-frame';
@@ -12,6 +13,7 @@ import { contentToolbarMessages } from './toolbar/index';
 import { defineMessageSource } from '../source';
 
 export const contentMessages = defineMessageSource({
+  pageLauncher: pageLauncherMessages,
   runtime: contentRuntimeMessages,
   autoBlur: contentAutoBlurMessages,
   toolbar: contentToolbarMessages,

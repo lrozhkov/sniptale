@@ -98,6 +98,7 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     reason: 'Settings quick-action suites.',
     testFiles: [
       'apps/extension/src/settings/sections/capture/quick-actions/editor-output.test.tsx',
+      'apps/extension/src/settings/sections/capture/quick-actions/editor-appearance.test.tsx',
     ],
   },
   {

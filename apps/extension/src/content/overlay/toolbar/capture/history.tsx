@@ -1,8 +1,10 @@
+import { PageRecoveryContext } from '../../../application/page-recovery/use-page-recovery';
 import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
 import { useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { PageToolbarControlsContext } from '../state/page-controls';
+import { PageToolbarSlot } from '../controls/page-layout';
 import { PageProtectedControls } from '../controls/control-visibility';
-import { Redo2, Undo2 } from 'lucide-react';
+import { Redo2, Undo2, History } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { normalizeHotkeyKey } from '../../../../features/keyboard-shortcuts/hotkeys';
@@ -176,17 +178,13 @@ export function ToolbarHistoryControls(props: {
       : undefined;
   const historyState = usePagePreparationHistoryState(domain);
   const visibility = useContext(PageToolbarControlsContext);
+  const recovery = useContext(PageRecoveryContext);
   const frameEditing = useFrameEditingState();
-  const canUndo =
-    !visibility?.editing &&
-    historyState.canUndo &&
-    !historyState.hasOpenTransactions &&
-    !frameEditing;
-  const canRedo =
-    !visibility?.editing &&
-    historyState.canRedo &&
-    !historyState.hasOpenTransactions &&
-    !frameEditing;
+  const historyBlocked = Boolean(
+    visibility?.editing || historyState.hasOpenTransactions || frameEditing
+  );
+  const canUndo = !historyBlocked && historyState.canUndo;
+  const canRedo = !historyBlocked && historyState.canRedo;
 
   usePagePreparationHistoryHotkeys({
     canRedo,
@@ -197,21 +195,53 @@ export function ToolbarHistoryControls(props: {
 
   return (
     <>
-      <PageProtectedControls>
-        {props.isNavigationMode ? null : (
-          <HistoryButton action="undo" canRun={canUndo} domain={domain} />
-        )}
-        {props.isNavigationMode ? null : (
-          <HistoryButton action="redo" canRun={canRedo} domain={domain} />
-        )}
-        <ToolbarResetConfirmControl
-          displayMode={props.displayMode}
-          toolbarMenuState={props.toolbarMenuState}
-          available={Boolean(props.canClearPagePreparation && props.onClearPagePreparation)}
-          onConfirm={props.onClearPagePreparation}
-          scope={props.resetScope ?? 'all'}
-        />
-      </PageProtectedControls>
+      {props.isNavigationMode ? null : (
+        <PageToolbarSlot id="history-undo" label={translate('editor.toolbar.undo')}>
+          <PageProtectedControls>
+            <HistoryButton action="undo" canRun={canUndo} domain={domain} />
+          </PageProtectedControls>
+        </PageToolbarSlot>
+      )}
+      {props.isNavigationMode ? null : (
+        <PageToolbarSlot id="history-redo" label={translate('editor.toolbar.redo')}>
+          <PageProtectedControls>
+            <HistoryButton action="redo" canRun={canRedo} domain={domain} />
+          </PageProtectedControls>
+        </PageToolbarSlot>
+      )}
+      {props.isNavigationMode && recovery?.state.available ? (
+        <PageToolbarSlot
+          id="history-restore"
+          label={translate('content.toolbar.restorePageChanges')}
+        >
+          <PageProtectedControls>
+            <ContentToolbarButton
+              tone="utility"
+              type="button"
+              dataUi="content.toolbar.history-restore-button"
+              title={translate('content.toolbar.restorePageChanges')}
+              aria-label={translate('content.toolbar.restorePageChanges')}
+              disabled={recovery.state.pending || recovery.busy || Boolean(visibility?.editing)}
+              onClick={() => {
+                void recovery.restore();
+              }}
+            >
+              <History size={18} strokeWidth={2} />
+            </ContentToolbarButton>
+          </PageProtectedControls>
+        </PageToolbarSlot>
+      ) : null}
+      <PageToolbarSlot id="history-reset" label={translate('content.toolbar.clearPagePreparation')}>
+        <PageProtectedControls>
+          <ToolbarResetConfirmControl
+            displayMode={props.displayMode}
+            toolbarMenuState={props.toolbarMenuState}
+            available={Boolean(props.canClearPagePreparation && props.onClearPagePreparation)}
+            onConfirm={props.onClearPagePreparation}
+            scope={props.resetScope ?? 'all'}
+          />
+        </PageProtectedControls>
+      </PageToolbarSlot>
     </>
   );
 }

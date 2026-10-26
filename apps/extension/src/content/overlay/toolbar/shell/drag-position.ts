@@ -16,6 +16,7 @@ import { useContentUiScale } from '../../../platform/dom-host';
 import { getToolbarDockDisplayMode } from './docking';
 
 export type ToolbarDragPositionState = {
+  commitLayout: () => ContentToolbarPosition;
   compactMenus: boolean;
   displayMode: ContentToolbarDisplayMode;
   freePlacement: boolean;
@@ -73,7 +74,8 @@ export function useToolbarDragPosition(
     uiScale,
     ...dockLayout,
   });
-  useToolbarViewportClamping({
+  const commitLayout = useToolbarViewportClamping({
+    position,
     currentViewport,
     displayMode,
     isInitialized: positionReady,
@@ -105,6 +107,7 @@ export function useToolbarDragPosition(
   });
 
   return {
+    commitLayout,
     compactMenus,
     displayMode,
     freePlacement,

@@ -138,6 +138,10 @@ it('moves and duplicates a selected page drawing from the separate action panel'
   session.select('one');
   commits.mockClear();
   const { host, root } = renderSelectionToolbar(session);
+  expect(host.querySelector('[data-ui="drawing.selection.actions.front"]')).toBeNull();
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.reveal"]')?.click()
+  );
   act(() =>
     host.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.front"]')?.click()
   );
@@ -236,6 +240,44 @@ it.each([
       expect(pair?.children[0]?.contains(action)).toBe(actionsFirst);
       expect(host.querySelector('[data-ui="drawing.selection.actions.delete"]')).toBe(action);
     }
+    act(() => root.unmount());
+  }
+);
+
+it.each(['horizontal', 'vertical'] as const)(
+  'keeps disclosure across selection changes and resets after clear in %s',
+  (displayMode) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject({
+      id: 'one',
+      kind: 'blur',
+      bounds: { x: 0, y: 0, width: 10, height: 10 },
+    });
+    session.commitObject({
+      id: 'two',
+      kind: 'rectangle',
+      color: '#ff0000',
+      width: 4,
+      bounds: { x: 30, y: 0, width: 10, height: 10 },
+    });
+    session.setActiveTool('select');
+    session.select('one');
+    const { host, root } = renderSelectionToolbar(session, displayMode);
+    const button = (suffix: string) =>
+      host.querySelector<HTMLButtonElement>(`[data-ui="drawing.selection.actions.${suffix}"]`);
+    expect(button('front')).toBeNull();
+    act(() => button('reveal')?.click());
+    expect(button('front')).not.toBeNull();
+    act(() => session.select('two'));
+    expect(button('reveal')?.getAttribute('aria-expanded')).toBe('true');
+    act(() => session.setSelection(['one', 'two']));
+    expect(button('reveal')?.getAttribute('aria-expanded')).toBe('true');
+    act(() => session.select(null));
+    expect(button('reveal')).toBeNull();
+    act(() => session.select('one'));
+    expect(button('reveal')?.getAttribute('aria-expanded')).toBe('false');
+    expect(button('front')).toBeNull();
     act(() => root.unmount());
   }
 );

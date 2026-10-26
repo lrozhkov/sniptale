@@ -122,6 +122,7 @@ function createToolbarPrimaryViewModel(
       setAction: vi.fn(),
     },
     derivedState: {
+      commitLayout: () => ({ x: 24, y: 12 }),
       freePlacement: false,
       dockPreview: null,
       setFreePlacement: vi.fn(),

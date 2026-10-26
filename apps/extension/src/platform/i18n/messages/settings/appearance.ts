@@ -11,6 +11,11 @@ const APPEARANCE_DESCRIPTION_EN = [
 ].join(' ');
 
 export const settingsAppearanceMessages = defineMessageSource({
+  pageLauncher: { ru: 'Кнопка запуска на странице', en: 'Page launcher' },
+  pageLauncherHover: {
+    ru: 'Показывать только при наведении в угол',
+    en: 'Show only when hovering over the corner',
+  },
   badge: {
     ru: 'Интерфейс',
     en: 'Interface',

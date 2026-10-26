@@ -64,6 +64,7 @@ export type ExecuteSaveMessage = {
 };
 
 export type SaveScreenshotToGalleryMessage = {
+  quickActionTransactionId?: string;
   type: MessageType.SAVE_SCREENSHOT_TO_GALLERY;
   dataUrl: string;
   filename: string;

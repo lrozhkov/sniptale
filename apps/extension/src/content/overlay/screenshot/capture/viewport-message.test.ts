@@ -56,3 +56,22 @@ it('creates visible and full capture messages with optional scenario payloads', 
     actionType: 'copy',
   });
 });
+
+it('binds visible and full capture only to the current quick-action transaction', () => {
+  const runtime = createRuntime();
+  runtime.quickActionOverlayRef = {
+    current: {
+      transactionId: 'tx-1',
+      afterCapture: 'copy',
+      exitAfterCapture: false,
+      imageFormat: 'png',
+      imageQuality: 90,
+    },
+  };
+  expect(createViewportCaptureMessage('visible', 'copy', runtime, false)).toMatchObject({
+    quickActionTransactionId: 'tx-1',
+  });
+  expect(createViewportCaptureMessage('full', 'copy', runtime, false)).toMatchObject({
+    quickActionTransactionId: 'tx-1',
+  });
+});

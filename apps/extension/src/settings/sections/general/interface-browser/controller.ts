@@ -1,3 +1,7 @@
+import {
+  normalizePageLaunchPreferences,
+  type PageLaunchPreferences,
+} from '../../../../contracts/page-launch';
 import { useEffect, useMemo, useState } from 'react';
 
 import { LOCALE_CHANGE_EVENT, THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
@@ -118,6 +122,11 @@ export function useAppearanceSection() {
       : 'loading';
 
   return {
+    pageLaunch: normalizePageLaunchPreferences(settings.pageLaunch),
+    pageLaunchReady: hasLoaded,
+    updatePageLaunch: async (patch: Partial<PageLaunchPreferences>) => {
+      await updateSettings({ pageLaunch: patch });
+    },
     contextMenu: settings.contextMenu,
     contextMenuCatalogStatus,
     contextMenuSettingsStatus,

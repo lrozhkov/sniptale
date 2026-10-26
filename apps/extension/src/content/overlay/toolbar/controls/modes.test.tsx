@@ -472,3 +472,19 @@ it('blocks conflicting Content Editing actions while the AI transition is pendin
   expect(onSelectPageEditingMode).not.toHaveBeenCalled();
   expect(document.querySelector('[data-ui="content.toolbar.mode-option.quick-edit"]')).toBeNull();
 });
+
+it('removes old editing submodes during the requested annotation transition and restores on refusal', () => {
+  renderModeButtons({ quickEditMode: true });
+  expect(document.querySelector('.sniptale-page-editing-mode-group')).not.toBeNull();
+  renderModeButtons({ quickEditMode: true, pendingMode: 'highlighter' });
+  expect(document.querySelector('.sniptale-page-editing-mode-group')).toBeNull();
+  renderModeButtons({ quickEditMode: true });
+  expect(document.querySelector('.sniptale-page-editing-mode-group')).not.toBeNull();
+});
+
+it('projects requested editing submodes before the previous runtime mode finishes', () => {
+  renderModeButtons({ drawingMode: true, pendingMode: 'quick-edit' });
+  const group = document.querySelector('.sniptale-page-editing-mode-group');
+  expect(group).not.toBeNull();
+  expect([...group!.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+});

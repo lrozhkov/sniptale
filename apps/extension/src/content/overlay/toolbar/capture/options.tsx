@@ -11,7 +11,12 @@ import { getCaptureActionDescriptors } from '../../../../features/quick-actions-
 import { FullPageCaptureSplitButton } from './full-page-menu';
 import { CaptureActionIcons } from './action-icons';
 import { ScreenshotCaptureSplitButton } from './screenshot-menu';
-import { NumericValueField, SegmentedRow } from '../../../../ui/compact-inspector-controls';
+import { NumericValueField } from '../../../../ui/compact-inspector-controls';
+import { CompactSegmentedSelector } from '../../../../ui/compact-inspector-controls/control-renderers';
+import {
+  InspectorParameterRow,
+  InspectorSurface,
+} from '../../../../ui/compact-inspector-controls/layout';
 import { useToolbarImagePreferences } from './image-preferences';
 import { useFullPageCapturePreferences } from './full-page-preferences';
 import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
@@ -218,12 +223,10 @@ function CaptureImageParameters({
     if (!image.saving) setQuality(image.imageQuality);
   }, [image.imageQuality, image.saving]);
   return (
-    <div className="sniptale-capture-image-parameters">
-      <div className="sniptale-capture-parameter-field">
-        <span className="sniptale-capture-parameter-label">
-          {translate('imageSettings.section.formatLabel')}
-        </span>
-        <SegmentedRow
+    <InspectorSurface className="sniptale-capture-image-parameters">
+      <InspectorParameterRow label={translate('imageSettings.section.formatLabel')} keepInline>
+        <CompactSegmentedSelector
+          columns={3}
           ariaLabel={translate('imageSettings.section.formatLabel')}
           value={image.imageFormat}
           options={[
@@ -233,12 +236,9 @@ function CaptureImageParameters({
           ]}
           onChange={(imageFormat) => void image.updatePreferences({ imageFormat })}
         />
-      </div>
+      </InspectorParameterRow>
       {image.imageFormat !== 'png' ? (
-        <div className="sniptale-capture-parameter-field">
-          <span className="sniptale-capture-parameter-label">
-            {translate('imageSettings.section.qualityLabel')}
-          </span>
+        <InspectorParameterRow label={translate('imageSettings.section.qualityLabel')} keepInline>
           <NumericValueField
             className="sniptale-capture-quality-input"
             label={translate('imageSettings.section.qualityLabel')}
@@ -253,9 +253,9 @@ function CaptureImageParameters({
               void image.updatePreferences({ imageQuality });
             }}
           />
-        </div>
+        </InspectorParameterRow>
       ) : null}
-    </div>
+    </InspectorSurface>
   );
 }
 

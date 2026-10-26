@@ -1,9 +1,7 @@
+import { usePageLaunchPreferences } from '../../quick-actions/preferences';
+import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from '../controls/page-layout';
 import { PanelBottomClose, Pin, PinOff } from 'lucide-react';
-import {
-  ContentToolbarButton,
-  ContentToolbarDivider,
-  ContentToolbarGroup,
-} from '@sniptale/ui/content-toolbar';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
 import type { ToolbarCaptureActionsProps } from '../types';
@@ -29,36 +27,44 @@ function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
 
   return (
     <>
-      <ContentToolbarButton
-        type="button"
-        data-content-tool="true"
-        active={pinned}
-        aria-pressed={pinned}
-        dataUi="content.toolbar.navigation.pin-to-tab"
-        disabled={props.pinToTabLocked || !props.pinToTabAvailable}
-        title={pinTitle}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onPinToTabChange(
-            !props.pinToTab,
-            createTrustedContentActionIntentSource(event.nativeEvent) ?? undefined
-          );
-        }}
-      >
-        {pinned ? <Pin size={18} strokeWidth={2} /> : <PinOff size={18} strokeWidth={2} />}
-      </ContentToolbarButton>
-      <ContentToolbarButton
-        type="button"
-        tone="utility"
-        dataUi="content.toolbar.navigation.collapse"
-        title={translate('content.toolbar.hideToolbar')}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onClose(event.detail === 0);
-        }}
-      >
-        <PanelBottomClose size={18} strokeWidth={2} />
-      </ContentToolbarButton>
+      <PageToolbarSlot id="pin-to-tab" label={pinTitle}>
+        <PageProtectedControls>
+          <ContentToolbarButton
+            type="button"
+            data-content-tool="true"
+            active={pinned}
+            aria-pressed={pinned}
+            dataUi="content.toolbar.navigation.pin-to-tab"
+            disabled={props.pinToTabLocked || !props.pinToTabAvailable}
+            title={pinTitle}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onPinToTabChange(
+                !props.pinToTab,
+                createTrustedContentActionIntentSource(event.nativeEvent) ?? undefined
+              );
+            }}
+          >
+            {pinned ? <Pin size={18} strokeWidth={2} /> : <PinOff size={18} strokeWidth={2} />}
+          </ContentToolbarButton>
+        </PageProtectedControls>
+      </PageToolbarSlot>
+      <PageToolbarSlot id="collapse" label={translate('content.toolbar.hideToolbar')}>
+        <PageProtectedControls>
+          <ContentToolbarButton
+            type="button"
+            tone="utility"
+            dataUi="content.toolbar.navigation.collapse"
+            title={translate('content.toolbar.hideToolbar')}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onClose(event.detail === 0);
+            }}
+          >
+            <PanelBottomClose size={18} strokeWidth={2} />
+          </ContentToolbarButton>
+        </PageProtectedControls>
+      </PageToolbarSlot>
     </>
   );
 }
@@ -70,11 +76,13 @@ export function ToolbarCaptureActionGroup(
   }
 ) {
   const { menus, onSelectCaptureAction, ...captureProps } = props;
+  const { preferences } = usePageLaunchPreferences();
   const visibility = useContext(PageToolbarControlsContext);
   const capturesVisible =
     !visibility ||
     (['capture-visible', 'capture-selection', 'capture-full'] as const).some(visibility.isVisible);
   const optionsVisible =
+    (preferences.quickActionsToolbar && (!visibility || visibility.isVisible('quick-actions'))) ||
     !visibility ||
     (['after-capture', 'capture-delay', 'capture-size', 'scenario-panel'] as const).some(
       visibility.isVisible
@@ -82,12 +90,12 @@ export function ToolbarCaptureActionGroup(
 
   return (
     <>
-      <ContentToolbarDivider
+      <PageToolbarDivider
         className="sniptale-capture-leading-divider"
         dataUi="content.toolbar.capture-leading-divider"
       />
       {capturesVisible ? (
-        <ContentToolbarGroup>
+        <PageToolbarGroup>
           <ToolbarCaptureButtons
             compactMenus={captureProps.compactMenus}
             currentViewport={captureProps.currentViewport}
@@ -96,25 +104,26 @@ export function ToolbarCaptureActionGroup(
             onTakeScreenshot={captureProps.onTakeScreenshot}
             toolbarMenuState={captureProps.toolbarMenuState}
           />
-        </ContentToolbarGroup>
+        </PageToolbarGroup>
       ) : null}
-      {capturesVisible && optionsVisible ? <ContentToolbarDivider /> : null}
+      {capturesVisible && optionsVisible ? <PageToolbarDivider /> : null}
       {optionsVisible ? (
-        <ContentToolbarGroup>
+        <PageToolbarGroup>
           <ToolbarCaptureMenuGroup
             {...captureProps}
             menus={menus}
+            quickActionsAvailable={preferences.quickActionsToolbar}
             onSelectCaptureAction={onSelectCaptureAction}
           />
-        </ContentToolbarGroup>
+        </PageToolbarGroup>
       ) : null}
       {!captureProps.videoRecordingMode &&
       (captureProps.screenshotMode ||
         captureProps.canClearPagePreparation ||
         captureProps.isNavigationMode) ? (
         <>
-          <ContentToolbarDivider dataUi="content.toolbar.history-divider-before" />
-          <ContentToolbarGroup dataUi="content.toolbar.history-group">
+          <PageToolbarDivider dataUi="content.toolbar.history-divider-before" />
+          <PageToolbarGroup dataUi="content.toolbar.history-group">
             <ToolbarHistoryControls
               screenshotMode={captureProps.screenshotMode}
               displayMode={captureProps.displayMode}
@@ -126,38 +135,36 @@ export function ToolbarCaptureActionGroup(
                 ? {}
                 : { onClearPagePreparation: captureProps.onClearPagePreparation })}
             />
-          </ContentToolbarGroup>
-          <ContentToolbarDivider dataUi="content.toolbar.history-divider-after" />
+          </PageToolbarGroup>
+          <PageToolbarDivider dataUi="content.toolbar.history-divider-after" />
         </>
       ) : null}
-      <ContentToolbarGroup dataUi="content.toolbar.settings-group">
-        {captureProps.isNavigationMode ? (
-          <PageProtectedControls>
-            <NavigationToolbarActions {...captureProps} />
-          </PageProtectedControls>
-        ) : null}
-        <ToolbarSettingsMenu
-          compactMenus={captureProps.compactMenus}
-          pinToTab={captureProps.pinToTab}
-          pinToTabAvailable={captureProps.pinToTabAvailable}
-          pinToTabLocked={captureProps.pinToTabLocked}
-          autoBlurEnabled={captureProps.autoBlurEnabled ?? false}
-          showPinItem={!captureProps.isNavigationMode}
-          showHideItem={!captureProps.isNavigationMode}
-          sidebarVisible={captureProps.scenario?.sidebarVisible ?? false}
-          screenshotMode={captureProps.screenshotMode}
-          displayMode={captureProps.displayMode}
-          toolbarMenuState={captureProps.toolbarMenuState}
-          onCompactMenusChange={captureProps.onCompactMenusChange}
-          onClose={captureProps.onClose}
-          onDisableScreenshotMode={captureProps.onDisableScreenshotMode}
-          onDisplayModeChange={captureProps.onDisplayModeChange}
-          freePlacement={captureProps.freePlacement ?? true}
-          onFreePlacementChange={captureProps.onFreePlacementChange}
-          onPinToTabChange={captureProps.onPinToTabChange}
-        />
+      <PageToolbarGroup dataUi="content.toolbar.settings-group">
+        {captureProps.isNavigationMode ? <NavigationToolbarActions {...captureProps} /> : null}
+        <PageToolbarSlot id="settings" label={translate('content.toolbar.settingsLabel')}>
+          <ToolbarSettingsMenu
+            compactMenus={captureProps.compactMenus}
+            pinToTab={captureProps.pinToTab}
+            pinToTabAvailable={captureProps.pinToTabAvailable}
+            pinToTabLocked={captureProps.pinToTabLocked}
+            autoBlurEnabled={captureProps.autoBlurEnabled ?? false}
+            showPinItem={!captureProps.isNavigationMode}
+            showHideItem={!captureProps.isNavigationMode}
+            sidebarVisible={captureProps.scenario?.sidebarVisible ?? false}
+            screenshotMode={captureProps.screenshotMode}
+            displayMode={captureProps.displayMode}
+            toolbarMenuState={captureProps.toolbarMenuState}
+            onCompactMenusChange={captureProps.onCompactMenusChange}
+            onClose={captureProps.onClose}
+            onDisableScreenshotMode={captureProps.onDisableScreenshotMode}
+            onDisplayModeChange={captureProps.onDisplayModeChange}
+            freePlacement={captureProps.freePlacement ?? true}
+            onFreePlacementChange={captureProps.onFreePlacementChange}
+            onPinToTabChange={captureProps.onPinToTabChange}
+          />
+        </PageToolbarSlot>
         <PageToolbarCustomizationDone onCloseMenus={menus.closeMenus} />
-      </ContentToolbarGroup>
+      </PageToolbarGroup>
     </>
   );
 }

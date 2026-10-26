@@ -59,6 +59,7 @@ export function normalizeSettingsTransferRegistryField(domainId: string, field: 
   if (['borderPresets', 'presets', 'tags'].includes(field)) return 'items';
   if (domainId === 'interface.preferences' && field === 'popupStartup') return 'popup-startup';
   if (domainId === 'interface.preferences' && field === 'contextMenu') return 'context-menu';
+  if (domainId === 'interface.preferences' && field === 'pageLaunch') return 'page-launch';
   if (domainId === 'capture.viewport-presets' && field === 'defaultId') return 'default';
   if (domainId === 'capture.video' && field === 'qualityProfileId') return 'selection';
   if (domainId === 'capture.video' && field === 'outputProfile') return 'output';

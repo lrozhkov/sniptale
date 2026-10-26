@@ -1,3 +1,4 @@
+vi.mock('../../../page-recovery/ports', () => ({ registerPageRecoveryPorts: vi.fn() }));
 vi.mock('../../../ai/audio/port', () => ({ registerAudioJobPorts: vi.fn() }));
 import { expect, it, vi } from 'vitest';
 

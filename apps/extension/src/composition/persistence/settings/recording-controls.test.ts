@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RECORDING_TOOLBAR_CONTROLS } from '../../../contracts/settings';
+import {
+  PAGE_TOOLBAR_LAYOUT_MAX_ITEMS,
+  RECORDING_TOOLBAR_CONTROLS,
+} from '../../../contracts/settings';
 import { parseStoredSettings } from './guards';
 
 const storage = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), remove: vi.fn() }));
@@ -44,6 +47,7 @@ describe('recording toolbar visibility settings', () => {
     );
     const write = patchSettings({
       contentToolbar: {
+        pageLayouts: { drawing: ['drawing-pencil', 'mode', 'separator:old'] },
         pageControls: { 'drawing-pencil': false },
         pageControlOverrides: { drawing: { 'capture-full': false, 'capture-visible': false } },
       },
@@ -57,13 +61,18 @@ describe('recording toolbar visibility settings', () => {
     expect(erase).not.toHaveBeenCalled();
     release();
     await Promise.all([write, erasure]);
+    expect((await loadSettings()).contentToolbar?.pageLayouts).toBeUndefined();
     expect((await loadSettings()).contentToolbar?.pageControls).toBeUndefined();
     expect((await loadSettings()).contentToolbar?.pageControlOverrides).toBeUndefined();
     await patchSettings({
       contentToolbar: {
+        pageLayouts: { drawing: ['mode', 'separator:new', 'drawing-pencil'] },
         pageControls: { 'capture-size': false },
         pageControlOverrides: { drawing: { 'capture-full': true } },
       },
+    });
+    expect((await loadSettings()).contentToolbar?.pageLayouts).toEqual({
+      drawing: ['mode', 'separator:new', 'drawing-pencil'],
     });
     expect((await loadSettings()).contentToolbar?.pageControls).toEqual({ 'capture-size': false });
     expect((await loadSettings()).contentToolbar?.pageControlOverrides).toEqual({
@@ -250,5 +259,81 @@ describe('recording toolbar visibility settings', () => {
     expect((await loadSettings()).contentToolbar?.recordingControls).toEqual({ camera: false });
     await patchSettings(patch);
     expect((await loadSettings()).contentToolbar?.recordingControls).toEqual({ camera: true });
+  });
+});
+
+it('admits bounded page layouts, preserves reset values and clones stored arrays', async () => {
+  const pageLayouts = { cursor: ['mode', 'separator:custom', 'settings'], drawing: null };
+  expect(parseStoredSettings({ contentToolbar: { pageLayouts } })).toMatchObject({
+    invalidFieldCount: 0,
+    value: { contentToolbar: { pageLayouts } },
+  });
+  for (const invalid of [
+    null,
+    [],
+    { recording: [] },
+    { cursor: ['drag-handle'] },
+    { cursor: ['mode', 'mode'] },
+    { cursor: ['separator:'] },
+    { cursor: ['separator:UPPER'] },
+    { cursor: Array.from({ length: 33 }, (_, index) => `separator:${index}`) },
+    { cursor: [true] },
+    {
+      cursor: Array.from({ length: PAGE_TOOLBAR_LAYOUT_MAX_ITEMS + 1 }, (_, i) => `separator:${i}`),
+    },
+  ]) {
+    expect(
+      parseStoredSettings({ contentToolbar: { pageLayouts: invalid } }).invalidFieldCount
+    ).toBeGreaterThan(0);
+  }
+  storage.get.mockResolvedValue({ sniptale_settings: { contentToolbar: { pageLayouts } } });
+  const loaded = await loadSettings();
+  loaded.contentToolbar!.pageLayouts!.cursor!.reverse();
+  expect((await loadSettings()).contentToolbar?.pageLayouts).toEqual(pageLayouts);
+});
+
+it('resets page order visibility and separators after an admitted delayed write', async () => {
+  let persisted: Record<string, unknown> = {
+    contentToolbar: { recordingControls: { camera: false }, position: { x: 20, y: 30 } },
+  };
+  let enter!: () => void;
+  let release!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    enter = resolve;
+  });
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      enter();
+      await released;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const write = patchSettings({
+    contentToolbar: {
+      pageLayouts: { cursor: ['settings', 'separator:custom', 'mode'] },
+      pageControls: { 'capture-full': false },
+      pageControlOverrides: { drawing: { 'capture-full': false } },
+    },
+  });
+  await entered;
+  const reset = patchSettings({
+    contentToolbar: {
+      pageLayouts: { cursor: null, drawing: null },
+      pageControls: { 'capture-full': true },
+      pageControlOverrides: { drawing: { 'capture-full': null } },
+    },
+  });
+  release();
+  await Promise.all([write, reset]);
+  expect((await loadSettings()).contentToolbar).toMatchObject({
+    pageLayouts: { cursor: null, drawing: null },
+    pageControls: { 'capture-full': true },
+    pageControlOverrides: { drawing: { 'capture-full': null } },
+    recordingControls: { camera: false },
+    position: { x: 20, y: 30 },
   });
 });

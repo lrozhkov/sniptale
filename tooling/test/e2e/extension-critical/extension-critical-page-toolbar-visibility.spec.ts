@@ -9,7 +9,7 @@ async function customize(page: Page) {
   const originalIcons = await captureIcons(page);
   await ui(page, 'settings-button').click();
   await expect(
-    page.getByText(/Choose which buttons to show|Выберите, какие кнопки показывать/u)
+    page.getByText(/Reorder buttons, choose visibility|Переставьте кнопки, выберите видимые/u)
   ).toBeVisible();
   await ui(page, 'settings.customize-buttons').click();
   await expect(ui(page, 'customize-done')).toBeVisible();
@@ -22,6 +22,7 @@ async function customize(page: Page) {
 async function hide(page: Page, control: string) {
   const button = ui(page, `visibility.${control}`);
   await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await button.scrollIntoViewIfNeeded();
   const indicator = button.locator('svg').last();
   const before = await indicator.boundingBox();
   await ui(page, 'root').evaluate((root) => {
@@ -57,12 +58,20 @@ async function hide(page: Page, control: string) {
     await ui(page, 'root').evaluate((root) => {
       const proof = Reflect.get(root, '__visibilityProof');
       proof.observer.disconnect();
-      return (
-        proof.changes.length === 0 &&
-        proof.buttons.every((button: HTMLButtonElement) => button.isConnected && !button.disabled)
-      );
+      return {
+        disabledChanges: proof.changes.map((record: MutationRecord) =>
+          record.target instanceof HTMLElement ? record.target.getAttribute('data-ui') : null
+        ),
+        unavailable: proof.buttons
+          .filter((button: HTMLButtonElement) => !button.isConnected || button.disabled)
+          .map((button: HTMLButtonElement) => ({
+            id: button.getAttribute('data-ui'),
+            connected: button.isConnected,
+            disabled: button.disabled,
+          })),
+      };
     })
-  ).toBe(true);
+  ).toEqual({ disabledChanges: [], unavailable: [] });
 }
 
 async function captureIcons(page: Page) {
@@ -116,9 +125,12 @@ async function mode(page: Page, name: string) {
 }
 async function expectSeparators(page: Page) {
   const adjacent = await ui(page, 'root').evaluate((root) => {
-    const visible = [...root.children].filter(
-      (child) => child.getBoundingClientRect().width > 0 && child.getBoundingClientRect().height > 0
-    );
+    const visible = [...root.children]
+      .sort((a, b) => Number(getComputedStyle(a).order) - Number(getComputedStyle(b).order))
+      .filter(
+        (child) =>
+          child.getBoundingClientRect().width > 0 && child.getBoundingClientRect().height > 0
+      );
     return visible.some(
       (child, index) =>
         child.classList.contains('sniptale-divider') &&
@@ -339,6 +351,233 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await mode(page, 'video-recording');
         await expect(ui(page, 'video-recording.customize')).toBeVisible();
         await expect(ui(page, 'customize-done')).toHaveCount(0);
+      } finally {
+        await closeExtensionBrowser(launched);
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    });
+  }
+}
+
+async function reopenToolbarAfterReload(page: Page, popup: Page, origin: string) {
+  await page.reload();
+  await expect
+    .poll(() =>
+      popup.evaluate(async (origin) => {
+        const target = (await chrome.tabs.query({})).find((tab) => tab.url === `${origin}/`);
+        if (target?.id === undefined) return false;
+        await chrome.runtime.sendMessage({
+          type: 'PAGE_ACCESS',
+          operation: 'register-granted-site',
+          tabId: target.id,
+          __sniptaleRuntimeFreshness: { issuedAtEpochMs: Date.now(), nonce: crypto.randomUUID() },
+        });
+        return (
+          (
+            await chrome.tabs
+              .sendMessage(target.id, { type: 'ENABLE_SCREENSHOT_MODE', workingMode: 'drawing' })
+              .catch(() => null)
+          )?.success === true
+        );
+      }, origin)
+    )
+    .toBe(true);
+  await page.bringToFront();
+}
+
+async function verifyNativePageLayoutFocus(page: Page) {
+  const root = ui(page, 'root');
+  const expected = await root.evaluate((root) =>
+    [...root.children]
+      .sort((a, b) => Number(getComputedStyle(a).order) - Number(getComputedStyle(b).order))
+      .flatMap((item) =>
+        item instanceof HTMLButtonElement
+          ? [item]
+          : [...item.querySelectorAll<HTMLButtonElement>('button')]
+      )
+      .filter(
+        (button) =>
+          !button.disabled &&
+          button.tabIndex >= 0 &&
+          !button.closest('[inert]') &&
+          button.getClientRects().length > 0
+      )
+      .map((button) => button.getAttribute('data-ui'))
+  );
+  expect(expected.length).toBeGreaterThan(5);
+  await root.locator(`[data-ui="${expected[0]}"]`).focus();
+  const actual = [];
+  for (let index = 0; index < expected.length; index++) {
+    actual.push(
+      await root.evaluate((node) => {
+        const tree = node.getRootNode();
+        const active =
+          tree instanceof ShadowRoot ? tree.activeElement : node.ownerDocument.activeElement;
+        return active?.getAttribute('data-ui');
+      })
+    );
+    if (index + 1 < expected.length) await page.keyboard.press('Tab');
+  }
+  expect(actual).toEqual(expected);
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const orientation of ['horizontal', 'vertical'] as const) {
+    test(`page toolbar order dividers and unified reset ${name} ${orientation}`, async ({}, info) => {
+      test.setTimeout(120000);
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({ viewport: size });
+      try {
+        const { page, popup } = await openDesignReview(
+          launched.context,
+          launched.extensionId,
+          host.origin,
+          size
+        );
+        page.setDefaultTimeout(10000);
+        await popup.evaluate(
+          async (dark) =>
+            chrome.storage.local.set({
+              'sniptale-theme-preference': dark ? 'dark' : 'light',
+              'sniptale-locale-preference': dark ? 'ru' : 'en',
+            }),
+          size.width === 1920
+        );
+        if (orientation === 'vertical') {
+          await ui(page, 'settings-button').click();
+          const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+          if (!(await vertical.isVisible()))
+            await page
+              .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+              .click();
+          await vertical.click();
+        }
+        await mode(page, 'drawing');
+        await customize(page);
+        const root = ui(page, 'root');
+        const item = (id: string) => root.locator(`[data-page-toolbar-item="${id}"]`);
+        const source = ui(page, 'visibility.capture-visible');
+        const target = ui(page, 'visibility.drawing-marker');
+        await source.scrollIntoViewIfNeeded();
+        const a = (await source.boundingBox())!;
+        const b = (await target.boundingBox())!;
+        await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(b.x + b.width / 4, b.y + b.height / 4, { steps: 10 });
+        await expect(source).toHaveCSS('cursor', 'grabbing');
+        await expect(root.locator('[data-page-toolbar-drop]')).toHaveCount(0);
+        await expect
+          .poll(
+            async () =>
+              Number(
+                await item('capture-visible').evaluate((node) => getComputedStyle(node).order)
+              ) -
+              Number(await item('drawing-marker').evaluate((node) => getComputedStyle(node).order))
+          )
+          .toBe(-1);
+        await root.evaluate(async (node) => {
+          await Promise.allSettled(
+            node.getAnimations({ subtree: true }).map((animation) => animation.finished)
+          );
+        });
+        const grip = (await source.locator('svg').first().boundingBox())!;
+        const slot = (await source.boundingBox())!;
+        expect(grip.x - slot.x).toBeLessThanOrEqual(3);
+        expect(grip.y - slot.y).toBeLessThanOrEqual(3);
+        await page.screenshot({
+          path: info.outputPath('page-toolbar-drop-target.png'),
+          fullPage: false,
+        });
+        await page.mouse.up();
+        await expect
+          .poll(
+            async () =>
+              Number(
+                await item('capture-visible').evaluate((node) => getComputedStyle(node).order)
+              ) -
+              Number(await item('drawing-marker').evaluate((node) => getComputedStyle(node).order))
+          )
+          .toBe(-1);
+        await expect(source).toHaveAttribute('aria-pressed', 'true');
+        await source.focus();
+        await source.press(orientation === 'vertical' ? 'Alt+ArrowDown' : 'Alt+ArrowRight');
+        await expect
+          .poll(
+            async () =>
+              Number(
+                await item('capture-visible').evaluate((node) => getComputedStyle(node).order)
+              ) -
+              Number(await item('drawing-marker').evaluate((node) => getComputedStyle(node).order))
+          )
+          .toBe(1);
+        await expect(source).toBeFocused();
+        const fixed = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
+        await expect(fixed).not.toHaveAttribute('data-page-toolbar-item', /.+/);
+        expect(await fixed.evaluate((node) => Number(getComputedStyle(node).order))).toBeLessThan(
+          0
+        );
+        await ui(page, 'visibility.capture-full').click();
+        await expect(ui(page, 'visibility.capture-full')).toHaveAttribute('aria-pressed', 'false');
+        const before = await root
+          .locator('[data-page-toolbar-divider]')
+          .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-page-toolbar-item')));
+        await ui(page, 'customize-add-divider').click();
+        await expect(root.locator('[data-page-toolbar-divider]')).toHaveCount(before.length + 1);
+        const ids = await root
+          .locator('[data-page-toolbar-divider]')
+          .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-page-toolbar-item')));
+        const added = ids.find((id) => id && !before.includes(id))!;
+        const divider = item(added).locator(':scope > button');
+        const oldOrder = Number(await item(added).evaluate((node) => getComputedStyle(node).order));
+        await divider.focus();
+        await divider.press(orientation === 'vertical' ? 'Alt+ArrowDown' : 'Alt+ArrowRight');
+        await expect
+          .poll(async () =>
+            Number(await item(added).evaluate((node) => getComputedStyle(node).order))
+          )
+          .toBeGreaterThan(oldOrder);
+        await item('separator:capture').locator(':scope > button').click();
+        await expect(item('separator:capture')).toHaveCount(0);
+        await page.screenshot({
+          path: info.outputPath('page-toolbar-customized.png'),
+          fullPage: false,
+        });
+        await ui(page, 'customize-done').click();
+        await expect(ui(page, 'capture-full-button')).toHaveCount(0);
+        await verifyNativePageLayoutFocus(page);
+        await page.screenshot({
+          path: info.outputPath('page-toolbar-saved-layout.png'),
+          fullPage: false,
+        });
+        await mode(page, 'cursor');
+        await customize(page);
+        await ui(page, 'visibility.capture-delay').click();
+        await expect(ui(page, 'visibility.capture-delay')).toHaveAttribute('aria-pressed', 'false');
+        await ui(page, 'customize-done').click();
+        await mode(page, 'drawing');
+        await reopenToolbarAfterReload(page, popup, host.origin);
+        await expect(root).toHaveAttribute('data-page-layout', 'true');
+        await expect(ui(page, 'capture-full-button')).toHaveCount(0);
+        await expect(ui(page, 'timer-button')).toHaveCount(0);
+        await expect(item(added)).toBeVisible();
+        await expect(item('separator:capture')).toHaveCount(0);
+        await ui(page, 'settings-button').click();
+        await expect(ui(page, 'settings.reset-page-toolbar')).toBeEnabled();
+        await ui(page, 'settings.reset-page-toolbar').click();
+        await expect(ui(page, 'settings.reset-page-toolbar')).toBeDisabled();
+        await expect(root).not.toHaveAttribute('data-page-layout', 'true');
+        await page.keyboard.press('Escape');
+        await expect(ui(page, 'capture-full-button')).toBeVisible();
+        await expect(ui(page, 'timer-button')).toBeVisible();
+        await expect(root.locator('[data-page-toolbar-item]')).toHaveCount(0);
+        await expect(ui(page, 'capture-leading-divider')).toBeVisible();
+        await mode(page, 'cursor');
+        await expect(ui(page, 'timer-button')).toBeVisible();
+        await page.setViewportSize({ width: 1000, height: size.height });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true
+        );
+        await page.screenshot({ path: info.outputPath('page-toolbar-reset.png'), fullPage: false });
       } finally {
         await closeExtensionBrowser(launched);
         await new Promise<void>((resolve) => host.server.close(() => resolve()));

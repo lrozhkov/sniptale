@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react
 import { createToolbarMenuFocusOwner } from './menu-focus';
 
 export type ToolbarPopoverMenu =
+  | 'quick-actions'
   | 'auto-blur'
   | 'annotations-export'
   | 'capture'

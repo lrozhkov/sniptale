@@ -400,6 +400,8 @@ async function drawingSemantics(page: Page, toolbar: Locator) {
       hover: Awaited<ReturnType<typeof buttonAppearance>>;
     }
   > = {};
+  const reveal = toolbar.locator('[data-ui="drawing.selection.actions.reveal"]');
+  if ((await reveal.getAttribute('aria-expanded')) === 'false') await reveal.click();
   for (const action of [
     'front',
     'forward',
@@ -1008,4 +1010,44 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
       }
     });
   }
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Crop cancellation preserves compact menu preference ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openCropWorkspace(
+      context,
+      extensionId,
+      hostOrigin,
+      viewport.size
+    );
+    try {
+      for (const compact of [true, false]) {
+        const settings = page.locator('[data-ui="content.toolbar.settings-button"]');
+        await settings.click();
+        const toggle = page.getByRole('button', { name: /Compact menu view|Компактный вид меню/u });
+        if (
+          (await toggle.getAttribute('class'))?.includes('sniptale-popover-item-selected') !==
+          compact
+        )
+          await toggle.click();
+        if (compact) await expect(toggle).toHaveClass(/sniptale-popover-item-selected/u);
+        else await expect(toggle).not.toHaveClass(/sniptale-popover-item-selected/u);
+        await page.keyboard.press('Escape');
+        await selectCrop(page, { x: 200, y: 180, width: 400, height: 200 });
+        await page.locator('.sniptale-selection-size-cancel-button').click();
+        await settings.click();
+        if (compact) await expect(toggle).toHaveClass(/sniptale-popover-item-selected/u);
+        else await expect(toggle).not.toHaveClass(/sniptale-popover-item-selected/u);
+        await page.screenshot({ path: info.outputPath(`compact-${compact}.png`), fullPage: false });
+        await page.keyboard.press('Escape');
+      }
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
 }

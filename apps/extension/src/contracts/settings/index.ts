@@ -1,3 +1,5 @@
+import type { PageLaunchPreferences } from '../page-launch';
+import type { QuickActionAppearance } from '../quick-action-appearance';
 import type { AIModelAudioParameters, AIModelOperation } from './model-operation';
 import type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../features/viewport-presets/contracts';
@@ -94,6 +96,7 @@ export const PAGE_TOOLBAR_CONTROLS = [
   'after-capture',
   'capture-delay',
   'capture-size',
+  'quick-actions',
   'scenario-panel',
   'drawing-pencil',
   'drawing-marker',
@@ -123,7 +126,42 @@ export type PageToolbarControlOverrides = Partial<
   Record<Exclude<PageToolbarMode, 'cursor'>, Partial<Record<PageToolbarControl, boolean | null>>>
 >;
 
+/** Page layout identifiers exclude the fixed toolbar drag handle and recording controls. */
+export const PAGE_TOOLBAR_REQUIRED_ITEMS = [
+  'mode',
+  'drawing-select',
+  'editing-block-selection',
+  'annotation-effects',
+  'history-undo',
+  'history-redo',
+  'history-reset',
+  'history-restore',
+  'pin-to-tab',
+  'collapse',
+  'settings',
+] as const;
+export const PAGE_TOOLBAR_LAYOUT_MODES = ['cursor', ...PAGE_TOOLBAR_OVERRIDE_MODES] as const;
+export const PAGE_TOOLBAR_LAYOUT_MAX_ITEMS = 96;
+export const PAGE_TOOLBAR_LAYOUT_MAX_DIVIDERS = 32;
+export type PageToolbarLayoutItem =
+  | PageToolbarControl
+  | (typeof PAGE_TOOLBAR_REQUIRED_ITEMS)[number]
+  | `separator:${string}`;
+export type PageToolbarLayouts = Partial<Record<PageToolbarMode, PageToolbarLayoutItem[] | null>>;
+
+/** Admits bounded button identities and opaque divider identities; it grants no action authority. */
+export function isPageToolbarLayoutItem(value: unknown): value is PageToolbarLayoutItem {
+  return (
+    typeof value === 'string' &&
+    (PAGE_TOOLBAR_CONTROLS.some((item) => item === value) ||
+      PAGE_TOOLBAR_REQUIRED_ITEMS.some((item) => item === value) ||
+      /^separator:[a-z0-9-]{1,48}$/.test(value))
+  );
+}
+
 export interface ContentToolbarPreferences {
+  /** Null or absence restores the default order and separators for that page mode. */
+  pageLayouts?: PageToolbarLayouts;
   /** Shared non-recording toolbar choices. Missing controls remain visible. */
   pageControls?: Partial<Record<PageToolbarControl, boolean>>;
   /** Mode choices override shared defaults. Null restores inheritance for one control. */
@@ -160,6 +198,7 @@ export interface LocalStoragePolicy {
 import type { FilenameRules } from '../../features/file-naming/rules';
 
 export interface Settings {
+  pageLaunch?: PageLaunchPreferences;
   /** Undefined selects defaults; null records an unusable stored rule and selects strict fallback. */
   filenameRules?: FilenameRules | null;
   captureAction: CaptureActionType;
@@ -208,6 +247,7 @@ export type NormalizedSettings = Omit<
 export type SettingsPatch = Omit<
   Partial<Settings>,
   | 'contentToolbar'
+  | 'pageLaunch'
   | 'contextMenu'
   | 'defaultViewportPresetId'
   | 'fullPageCapture'
@@ -219,6 +259,7 @@ export type SettingsPatch = Omit<
   | 'voiceInput'
 > & {
   contentToolbar?: Partial<ContentToolbarPreferences>;
+  pageLaunch?: Partial<PageLaunchPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
   fullPageCapture?: Partial<FullPageCapturePreferences>;
   exportResourceLimits?: Partial<ExportResourceLimits>;
@@ -318,6 +359,7 @@ export const SCREENSHOT_MODE_COLORS: Record<QuickActionScreenshotMode, string> =
 };
 
 export interface QuickAction {
+  appearance?: QuickActionAppearance;
   id: string;
   status: boolean;
   name: string;

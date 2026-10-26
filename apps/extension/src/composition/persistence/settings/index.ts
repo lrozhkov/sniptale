@@ -1,3 +1,4 @@
+import { normalizePageLaunchPreferences, type PageCorner } from '../../../contracts/page-launch';
 import { normalizeConfigurableCaptureAction } from '../../../features/quick-actions-presets/policy';
 import {
   createRecommendedContextMenuSettings,
@@ -135,6 +136,16 @@ function cloneContentToolbarSettings(
   return {
     ...settings,
     ...(settings.recordingControls ? { recordingControls: { ...settings.recordingControls } } : {}),
+    ...(settings.pageLayouts
+      ? {
+          pageLayouts: Object.fromEntries(
+            Object.entries(settings.pageLayouts).map(([mode, items]) => [
+              mode,
+              items ? [...items] : null,
+            ])
+          ),
+        }
+      : {}),
     ...(settings.pageControls ? { pageControls: { ...settings.pageControls } } : {}),
     ...(settings.pageControlOverrides
       ? {
@@ -491,18 +502,35 @@ function applySettingsPatch(
   currentSettings: NormalizedSettings,
   settingsPatch: SettingsPatch
 ): NormalizedSettings {
+  const { pageLaunch: pageLaunchPatch, ...otherPatch } = settingsPatch;
   const pageControlOverrides = mergePageControlOverrides(
     currentSettings.contentToolbar?.pageControlOverrides,
     settingsPatch.contentToolbar?.pageControlOverrides
   );
   return normalizeLoadedSettings({
     ...currentSettings,
-    ...settingsPatch,
+    ...otherPatch,
+    ...(currentSettings.pageLaunch || pageLaunchPatch
+      ? {
+          pageLaunch: normalizePageLaunchPreferences({
+            ...currentSettings.pageLaunch,
+            ...pageLaunchPatch,
+          }),
+        }
+      : {}),
     contentToolbar: {
       ...DEFAULT_CONTENT_TOOLBAR_SETTINGS,
       ...currentSettings.contentToolbar,
       ...settingsPatch.contentToolbar,
       ...(pageControlOverrides ? { pageControlOverrides } : {}),
+      ...(currentSettings.contentToolbar?.pageLayouts || settingsPatch.contentToolbar?.pageLayouts
+        ? {
+            pageLayouts: {
+              ...currentSettings.contentToolbar?.pageLayouts,
+              ...settingsPatch.contentToolbar?.pageLayouts,
+            },
+          }
+        : {}),
       ...(currentSettings.contentToolbar?.pageControls || settingsPatch.contentToolbar?.pageControls
         ? {
             pageControls: {
@@ -622,6 +650,23 @@ export async function removeRetiredSynchronizedSettings(): Promise<void> {
       delete nextRaw[retiredField];
       await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw }, permit);
       return loadSettings();
+    })
+  );
+}
+
+/** Commits the shared corner inside the existing settings queue and erasure boundary. */
+export function patchPageLaunchCorner(
+  corner: PageCorner,
+  isCurrent: () => boolean
+): Promise<NormalizedSettings> {
+  return queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      if (!isCurrent()) throw new Error('Page-launch preference request is no longer current');
+      const current = await loadSettings();
+      if (!isCurrent()) throw new Error('Page-launch preference request is no longer current');
+      const next = applySettingsPatch(current, { pageLaunch: { corner } });
+      await writeSettings(next, permit);
+      return next;
     })
   );
 }

@@ -333,3 +333,57 @@ it.each([false, true])('honors Escape from the dock positioner with dragging %s'
     controller.session.dispose();
   }
 });
+
+it('defers arrows Delete and Escape to the active page toolbar customization layer', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    id: 'selected',
+    kind: 'blur',
+    bounds: { x: 0, y: 0, width: 20, height: 20 },
+  });
+  session.setActiveTool('select');
+  const controller = createContentDrawingController(session);
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  const { appContainer } = initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
+  const root = createRoot(appContainer);
+  act(() =>
+    root.render(
+      <>
+        <DrawingSurface active chromeHidden={false} controller={controller} />
+        <div data-ui="content.toolbar.root" data-page-customizing="true">
+          <button data-ui="test.customize-button" />
+        </div>
+      </>
+    )
+  );
+  const button = appContainer.querySelector<HTMLButtonElement>(
+    '[data-ui="test.customize-button"]'
+  )!;
+  const received = vi.fn();
+  window.addEventListener('keydown', received);
+  const before = session.getSnapshot();
+  try {
+    act(() => {
+      for (const key of ['ArrowRight', 'Delete', 'Escape'])
+        button.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key,
+            altKey: key === 'ArrowRight',
+            bubbles: true,
+            composed: true,
+            cancelable: true,
+          })
+        );
+    });
+    expect(received).toHaveBeenCalledTimes(3);
+    expect(session.getSnapshot().document).toEqual(before.document);
+    expect(session.getSnapshot().selectedObjectIds).toEqual(before.selectedObjectIds);
+  } finally {
+    window.removeEventListener('keydown', received);
+    act(() => root.unmount());
+    session.dispose();
+  }
+});

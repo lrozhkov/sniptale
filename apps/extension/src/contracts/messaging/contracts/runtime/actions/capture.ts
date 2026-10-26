@@ -42,6 +42,8 @@ export const runtimeActionCaptureMessageContracts = {
         type: CaptureMessageType.CAPTURE_VISIBLE,
         optional: {
           actionType: isCaptureActionType,
+          quickActionTransactionId: (value) =>
+            isString(value) && value.length > 0 && value.length <= 128,
           contentIntent: isContentPrivilegedActionCapability,
           scenarioCapture: isScenarioRuntimeCapturePayload,
         },
@@ -50,7 +52,12 @@ export const runtimeActionCaptureMessageContracts = {
     parseResponse: createGuardParser(
       'runtime CAPTURE_VISIBLE response',
       createRuntimeResponseGuard({
-        optional: { dataUrl: isString, action: isCaptureActionType, result: isString },
+        optional: {
+          dataUrl: isString,
+          filename: isString,
+          action: isCaptureActionType,
+          result: isString,
+        },
       })
     ),
   },
@@ -61,6 +68,8 @@ export const runtimeActionCaptureMessageContracts = {
         type: CaptureMessageType.CAPTURE_FULL,
         optional: {
           actionType: isCaptureActionType,
+          quickActionTransactionId: (value) =>
+            isString(value) && value.length > 0 && value.length <= 128,
           contentIntent: isContentPrivilegedActionCapability,
           scenarioCapture: isScenarioRuntimeCapturePayload,
         },
@@ -69,7 +78,12 @@ export const runtimeActionCaptureMessageContracts = {
     parseResponse: createGuardParser(
       'runtime CAPTURE_FULL response',
       createRuntimeResponseGuard({
-        optional: { dataUrl: isString, action: isCaptureActionType, result: isString },
+        optional: {
+          dataUrl: isString,
+          filename: isString,
+          action: isCaptureActionType,
+          result: isString,
+        },
       })
     ),
   },

@@ -1,9 +1,13 @@
-import { sanitizeHtmlFragment } from '@sniptale/platform/security/sanitizers/html';
+import {
+  sanitizeHtmlFragment,
+  writeSanitizedInnerHtml,
+} from '@sniptale/platform/security/sanitizers/html';
 import {
   hasUnsafeHistoryAttributes,
   isManagedHistoryAttribute,
   normalizeHistoryAttributes,
 } from './attributes';
+import { createRecoveryLocator } from './recovery-locators';
 import { hasExactHistoryLocatorBinding, withHistoryLocatorCapture } from './dom-locators';
 import type { PageDomElementState, PageDomMutationBatch, PageDomMutationPatch } from './types';
 import type { PagePreparationDomElement } from './types';
@@ -64,6 +68,22 @@ const HISTORY_DOM_SANITIZER_OPTIONS = {
   ],
 };
 const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
+
+/** Recovery compares the same safe rich-text profile that history can apply. */
+function createPortableHistoryHtml(html: string): string {
+  const template = document.createElement('template');
+  writeSanitizedInnerHtml(template, html, HISTORY_DOM_SANITIZER_OPTIONS);
+  for (const node of template.content.querySelectorAll('[data-sniptale-id]'))
+    node.removeAttribute('data-sniptale-id');
+  return template.innerHTML;
+}
+
+/** Removes disposable history identities through the existing sanitized rich-text profile. */
+export function portableElementState(state: PageDomElementState): PageDomElementState {
+  const attributes = { ...state.attributes };
+  delete attributes['data-sniptale-id'];
+  return { attributes, html: createPortableHistoryHtml(state.html) };
+}
 
 function replaceWithSanitizedFragment(target: PagePreparationDomElement, html: string): void {
   const sanitizedHtml = sanitizeHtmlFragment(html, HISTORY_DOM_SANITIZER_OPTIONS);
@@ -163,6 +183,7 @@ export function createDomMutationPatch(element: PagePreparationDomElement): Page
     const before = captureDomElementState(element);
 
     return {
+      recoveryLocator: createRecoveryLocator(element),
       after: before,
       before,
       locator,
@@ -182,6 +203,7 @@ export function createDomMutationBatch(
       const locator = getLocator(element);
       const before = beforeStates.get(locator) ?? captureDomElementState(element);
       patches.push({
+        recoveryLocator: createRecoveryLocator(element),
         after: captureDomElementState(element),
         before,
         locator,

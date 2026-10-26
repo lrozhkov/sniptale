@@ -695,6 +695,16 @@ export const EDITOR_OWNER_MAPPINGS = [
   },
 
   {
+    owner: 'content-drawing-history',
+    productionFile: 'apps/extension/src/content/drawing/history.ts',
+    reason:
+      'Canonical history integration and gesture consumers prove drawing commit, replay and reset.',
+    testFiles: [
+      'apps/extension/src/content/drawing/history.integration.test.ts',
+      'apps/extension/src/content/drawing/surface.gesture-parity.test.tsx',
+    ],
+  },
+  {
     owner: 'content-drawing-preferences',
     productionFile: 'apps/extension/src/content/drawing/preferences.ts',
     reason:

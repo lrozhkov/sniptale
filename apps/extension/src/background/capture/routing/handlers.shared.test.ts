@@ -282,3 +282,22 @@ it('prepares capture action settings and delivers the resulting response', async
     action: 'copy',
   });
 });
+
+it.each(['capture.png', 'capture.jpg', 'capture.webp'])(
+  'preserves the prepared native preset-dialog filename %s',
+  async (filename) => {
+    const sendResponse = vi.fn();
+    await respondWithCaptureAction(Promise.resolve('styled'), {
+      resolvedTabId: 7,
+      sendResponse,
+      captureAction: 'ask_preset',
+      filename,
+    });
+    expect(sendResponse).toHaveBeenCalledWith({
+      success: true,
+      dataUrl: 'styled',
+      action: 'ask_preset',
+      filename,
+    });
+  }
+);

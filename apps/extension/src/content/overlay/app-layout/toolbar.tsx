@@ -1,3 +1,8 @@
+import { requestFullContentRuntimeRelease } from '../../runtime/entrypoint/markers';
+import {
+  PageRecoveryContext,
+  usePageRecovery,
+} from '../../application/page-recovery/use-page-recovery';
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { Toolbar } from '../toolbar/view';
@@ -21,6 +26,7 @@ import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.st
 import {
   canResetPagePreparation,
   clearPagePreparation,
+  finalizePagePreparationChanges,
   getPagePreparationResetScope,
   subscribeResetAvailability,
 } from './reset';
@@ -117,7 +123,6 @@ function createFinishScenarioHandler(args: {
 function createScreenshotModeToggleHandler(args: {
   modeController: ContentAppLayoutToolbarProps['modeController'];
   onDisableScreenshotMode: () => void;
-  scenarioActions: Pick<ContentAppScenarioActions, 'handleScreenshotModeDisabled'>;
 }) {
   return (enabled: boolean) => {
     if (enabled) {
@@ -126,7 +131,6 @@ function createScreenshotModeToggleHandler(args: {
     }
 
     args.onDisableScreenshotMode();
-    void args.scenarioActions.handleScreenshotModeDisabled();
   };
 }
 
@@ -181,6 +185,8 @@ function createVideoRecordingModeToggleHandler(toolbar: ContentAppLayoutToolbarP
 function renderToolbarShell(args: {
   onHide: (restoreFocus?: boolean) => void;
   canClearPagePreparation: boolean;
+  onClearPagePreparation: () => void;
+  onClearHighlights: () => void;
   designReview: ContentToolbarShellProps['designReview'];
   handleToggleScreenshotMode: (enabled: boolean) => void;
   scenarioToolbarProps: ReturnType<typeof buildScenarioToolbarProps>;
@@ -231,8 +237,8 @@ function renderToolbarShell(args: {
         onPinToTabChange={args.toolbar.setPinToTab}
         onTakeScreenshot={args.toolbar.handleTakeScreenshot}
         onHide={args.onHide}
-        onClearHighlights={modeController.handleClearHighlights}
-        onClearPagePreparation={() => clearPagePreparation(args.toolbar)}
+        onClearHighlights={args.onClearHighlights}
+        onClearPagePreparation={args.onClearPagePreparation}
         canClearPagePreparation={args.canClearPagePreparation}
         resetScope={getPagePreparationResetScope(modes)}
         autoBlur={autoBlur}
@@ -263,6 +269,7 @@ function renderToolbarShell(args: {
 }
 
 export function ContentToolbarShell({ designReview, scenario, toolbar }: ContentToolbarShellProps) {
+  const recovery = usePageRecovery(() => finalizePagePreparationChanges(toolbar), true);
   const focusRestorePending = useRef(false);
   useEffect(() => {
     if (toolbar.isToolbarVisible || !focusRestorePending.current) return;
@@ -276,9 +283,11 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
   const handleHideToolbar = async (restoreFocus = false) => {
     try {
       if (toolbar.modes.videoRecordingMode) await toolbar.videoRecording?.onHide?.();
-      focusRestorePending.current = restoreFocus;
-      useFrameUIStore.getState().dismissFrameUi();
-      toolbar.setPinnedToolbarVisible(false);
+      await recovery.discard(() => {
+        focusRestorePending.current = restoreFocus;
+        useFrameUIStore.getState().dismissFrameUi();
+        toolbar.setPinnedToolbarVisible(false);
+      });
     } catch (error) {
       logger.error('Failed to hide video recording toolbar', error);
       showToast(translate('content.toolbar.videoRecordingActionFailed'), 'error');
@@ -303,6 +312,10 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
     exitScreenshotModeFromUserAction({
       modeController: toolbar.modeController,
       setPinToTab: toolbar.setPinToTab,
+      onClosed: async () => {
+        await scenario.actions.handleScreenshotModeDisabled();
+        await requestFullContentRuntimeRelease();
+      },
       keepPinnedForAutoBlur:
         toolbar.autoBlurController.autoApplyEnabled && toolbar.autoBlurController.autoApplyAllowed,
     });
@@ -313,7 +326,6 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
   const handleToggleScreenshotMode = createScreenshotModeToggleHandler({
     modeController: toolbar.modeController,
     onDisableScreenshotMode: handleDisableScreenshotMode,
-    scenarioActions: scenario.actions,
   });
 
   useScenarioByClickBlockSync({
@@ -333,12 +345,22 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
     onFinishScenario: handleFinishScenario,
   });
 
-  return renderToolbarShell({
-    onHide: handleHideToolbar,
-    canClearPagePreparation,
-    designReview,
-    handleToggleScreenshotMode,
-    scenarioToolbarProps,
-    toolbar,
-  });
+  return (
+    <PageRecoveryContext.Provider value={recovery}>
+      {renderToolbarShell({
+        onHide: handleHideToolbar,
+        canClearPagePreparation: canClearPagePreparation && !recovery.busy,
+        onClearHighlights: () => {
+          void recovery.discard(toolbar.modeController.handleClearHighlights);
+        },
+        onClearPagePreparation: () => {
+          void recovery.discard(() => clearPagePreparation(toolbar, { finalized: true }));
+        },
+        designReview,
+        handleToggleScreenshotMode,
+        scenarioToolbarProps,
+        toolbar,
+      })}
+    </PageRecoveryContext.Provider>
+  );
 }

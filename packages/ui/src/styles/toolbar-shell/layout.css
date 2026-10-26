@@ -112,3 +112,81 @@
 .sniptale-spacer {
   flex: 1 1 20px;
 }
+
+/* Chrome 148+ supports native visual focus order. Page groups flatten only for saved layouts. */
+.sniptale-toolbar[data-page-layout='true'] {
+  reading-flow: flex-visual;
+  max-inline-size: calc(100vw - 16px);
+  flex-wrap: wrap;
+}
+.sniptale-toolbar[data-page-layout='true'] > .sniptale-drag-handle {
+  order: -2147483647;
+  flex-shrink: 0;
+}
+.sniptale-page-toolbar-slot {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+.sniptale-page-toolbar-slot > div:empty {
+  display: none;
+}
+.sniptale-page-toolbar-slot:not(:has(button)):not([data-page-toolbar-divider]) {
+  display: none;
+}
+.sniptale-toolbar[data-page-customizing='true'] .sniptale-page-toolbar-slot {
+  min-inline-size: var(--sniptale-toolbar-button-size);
+  min-block-size: var(--sniptale-toolbar-button-size);
+}
+.sniptale-toolbar[data-page-customizing='true'] .sniptale-page-toolbar-slot > button {
+  cursor: grab;
+}
+.sniptale-page-toolbar-customization-button > .sniptale-command-content {
+  position: absolute;
+  inset: 0;
+}
+.sniptale-toolbar[data-page-reordering='true'],
+.sniptale-toolbar[data-page-reordering='true'] * {
+  cursor: grabbing !important;
+}
+.sniptale-page-toolbar-slot[data-page-toolbar-dragging='true'] {
+  opacity: 0.8;
+  cursor: grabbing;
+}
+.sniptale-toolbar[data-display-mode='vertical'][data-page-layout='true'] {
+  reading-flow: flex-flow;
+  inline-size: max-content;
+  flex-wrap: wrap;
+  max-block-size: calc(100vh - 16px);
+}
+.sniptale-toolbar[data-display-mode='vertical'][data-page-customizing='true'] {
+  inline-size: var(--sniptale-toolbar-vertical-inline-size);
+  flex-wrap: nowrap;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sniptale-page-toolbar-move-handle {
+  inset-inline-start: 0;
+  inset-block-start: 0;
+  z-index: 1;
+}
+.sniptale-toolbar[data-display-mode='vertical']
+  .sniptale-page-toolbar-slot[data-page-toolbar-divider='true'] {
+  inline-size: var(--sniptale-toolbar-button-size);
+}
+.sniptale-toolbar[data-display-mode='vertical']
+  .sniptale-page-toolbar-slot[data-page-toolbar-divider='true']
+  > div {
+  inline-size: 100%;
+}
+
+/* The geometry owner commits natural placement once; one animation paints size and origin. */
+.sniptale-toolbar[data-mode-transition='true'] {
+  overflow: clip;
+}
+.sniptale-toolbar[data-mode-transition='true'] > * {
+  flex-shrink: 0;
+}

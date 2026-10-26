@@ -1,3 +1,4 @@
+import { beginPageRecoveryTeardown } from '../../../application/page-recovery/lifecycle';
 // policyStateIds: [] - this document-local promise only coalesces one teardown and grants no authority.
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import { restorePagePreparationHistory } from '../../../application/page-preparation-reset';
@@ -115,8 +116,10 @@ export function teardownDesignReviewSessionAfterUiTransition(
   transitionUi: () => void
 ): Promise<void> {
   if (!pendingTeardown) {
+    let finishRecoveryTeardown = () => {};
     pendingTeardown = Promise.resolve()
       .then(() => {
+        finishRecoveryTeardown = beginPageRecoveryTeardown();
         finalizeDesignReviewCommentDraft();
         flushPendingPageStyleHistory();
         if (!restorePagePreparationHistory(pagePreparationHistory)) {
@@ -131,6 +134,7 @@ export function teardownDesignReviewSessionAfterUiTransition(
         browserAnnotationSession.resetForDocument();
       })
       .finally(() => {
+        finishRecoveryTeardown();
         pendingTeardown = null;
       });
   }

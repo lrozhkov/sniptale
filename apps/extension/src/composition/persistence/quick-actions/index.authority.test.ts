@@ -1,3 +1,4 @@
+import { createQuickActionAppearance } from '../../../contracts/quick-action-appearance';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { QuickAction } from '../../../contracts/settings';
@@ -119,5 +120,44 @@ describe('quick-actions storage authority', () => {
     await expect(getQuickActions()).resolves.toEqual([createAction('bundled-1', 'bundled')]);
 
     expect(browserStorageLocalSetMock).not.toHaveBeenCalled();
+  });
+  it('serializes appearance writes without a read-time repair', async () => {
+    let stored = [createAction('original')];
+    let enter!: () => void, release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const writes: string[] = [];
+    browserStorageLocalGetMock.mockImplementation(async () => ({
+      sniptale_quick_actions: structuredClone(stored),
+    }));
+    browserStorageLocalSetMock.mockImplementation(
+      async (payload: Record<string, QuickAction[]>) => {
+        const actions = payload['sniptale_quick_actions']!;
+        writes.push(actions[0]!.appearance!.information.text);
+        if (writes.length === 1) {
+          enter();
+          await gate;
+        }
+        stored = structuredClone(actions);
+      }
+    );
+    const first = { ...createAction('first'), appearance: createQuickActionAppearance() };
+    first.appearance.information.text = 'First';
+    const second = { ...createAction('second'), appearance: createQuickActionAppearance() };
+    second.appearance.information.text = 'Second';
+    const pendingFirst = saveQuickActions([first]);
+    await entered;
+    const pendingSecond = saveQuickActions([second]);
+    expect((await getQuickActions())[0]!.id).toBe('original');
+    expect(writes).toEqual(['First']);
+    release();
+    await Promise.all([pendingFirst, pendingSecond]);
+    expect(writes).toEqual(['First', 'Second']);
+    expect((await getQuickActions())[0]!.appearance?.information.text).toBe('Second');
+    expect(browserStorageLocalSetMock).toHaveBeenCalledTimes(2);
   });
 });

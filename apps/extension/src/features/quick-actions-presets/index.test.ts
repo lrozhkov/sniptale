@@ -1,3 +1,5 @@
+import { createQuickActionAppearance } from '../../contracts/quick-action-appearance';
+import { resetBundledQuickAction } from './catalog';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { QuickAction } from '../../contracts/settings';
@@ -317,4 +319,14 @@ describe('quick-actions-presets merge and display mode', () => {
     expect(result.changed).toBe(false);
     expect(result.actions).toEqual(bundledActions);
   });
+});
+
+it('preserves accepted appearance and removes it only when a bundled action is reset', () => {
+  const appearance = createQuickActionAppearance();
+  const action = { ...getBundledQuickActions()[0]!, customized: true, appearance };
+  expect(normalizeQuickAction(action).appearance).toEqual(appearance);
+  expect(normalizeQuickAction({ ...createUserAction(), appearance }).appearance).toEqual(
+    appearance
+  );
+  expect(resetBundledQuickAction(action)).not.toHaveProperty('appearance');
 });

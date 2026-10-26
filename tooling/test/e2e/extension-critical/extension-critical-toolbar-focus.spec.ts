@@ -391,3 +391,158 @@ test('page editing menus preserve opening focus paint and AutoBlur transitions a
   expect(visited).toContain('content.toolbar.capture-full-settings-button');
   expect(visited).toContain('content.toolbar.capture-action-button');
 });
+
+for (const orientation of ['horizontal', 'vertical']) {
+  for (const size of [
+    { width: 1280, height: 560 },
+    { width: 1920, height: 900 },
+  ]) {
+    test(`mode transitions keep one toolbar geometry ${orientation} ${size.width}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      page.setDefaultTimeout(10_000);
+      if (orientation === 'vertical') {
+        await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+        const free = page.getByRole('button', {
+          name: /Free toolbar placement|Свободное размещение панели/u,
+        });
+        if (!(await free.getAttribute('class'))?.includes('sniptale-popover-item-selected'))
+          await free.click();
+        await page.keyboard.press('Escape');
+        if (
+          (await page
+            .locator('[data-ui="content.toolbar.root"]')
+            .getAttribute('data-display-mode')) !== 'vertical'
+        ) {
+          await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+          await page.getByRole('button', { name: /Vertical view|Вертикальный вид/u }).click();
+        }
+      }
+      const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+      const modes = ['design-review', 'quick-edit', 'drawing', 'highlighter'];
+      await page.evaluate(() => document.fonts.ready);
+      const issues: string[] = [];
+      const select = async (mode: string) => {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+      };
+      try {
+        for (const from of modes) {
+          for (const to of modes.filter((mode) => mode !== from)) {
+            await select(from);
+            await toolbar.evaluate(async (element) => {
+              await Promise.all(
+                element
+                  .getAnimations()
+                  .map((animation) => animation.finished.catch(() => undefined))
+              );
+            });
+            const beforeBounds = (await toolbar.boundingBox())!;
+            const before = orientation === 'vertical' ? beforeBounds.height : beforeBounds.width;
+            await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+            const sampling = toolbar.evaluate(
+              async (element, { direction, target }) => {
+                const frames: Array<{ width: number; mixed: boolean }> = [];
+                const sampled = new Set<Animation>();
+                const capture = () =>
+                  frames.push({
+                    width:
+                      direction === 'vertical'
+                        ? element.getBoundingClientRect().height
+                        : element.getBoundingClientRect().width,
+                    mixed: Boolean(
+                      element.querySelector('.sniptale-page-editing-mode-group') &&
+                      element.querySelector('[data-ui="content.toolbar.annotation-export-button"]')
+                    ),
+                  });
+                let settledFrames = 0;
+                for (let index = 0; index < 180 && settledFrames < 15; index += 1) {
+                  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+                  for (const animation of element.getAnimations()) {
+                    if (
+                      animation.id !== 'sniptale-toolbar-mode-transition' ||
+                      sampled.has(animation)
+                    )
+                      continue;
+                    sampled.add(animation);
+                    animation.pause();
+                    const duration = Number(animation.effect!.getTiming().duration);
+                    for (const progress of [0, 0.25, 0.5, 0.75, 1]) {
+                      animation.currentTime = duration * progress;
+                      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+                      capture();
+                    }
+                    animation.finish();
+                  }
+                  capture();
+                  if (element.getAttribute('data-page-mode') === target) settledFrames += 1;
+                }
+                return frames;
+              },
+              { direction: orientation, target: to }
+            );
+            await page.locator(`[data-ui="content.toolbar.mode-option.${to}"]`).click();
+            const frames = await sampling;
+            const afterBounds = (await toolbar.boundingBox())!;
+            const after = orientation === 'vertical' ? afterBounds.height : afterBounds.width;
+            const low = Math.min(before, after);
+            const high = Math.max(before, after);
+            if (
+              frames.some((frame) => frame.width < low - 1 || frame.width > high + 1 || frame.mixed)
+            )
+              issues.push(
+                `${from} -> ${to}: intermediate controls or size outside ${low}..${high}: ${JSON.stringify(frames)}`
+              );
+            const direction = Math.sign(after - before);
+            if (
+              frames.some(
+                (frame, index) =>
+                  index > 0 && (frame.width - frames[index - 1]!.width) * direction < -1
+              )
+            )
+              issues.push(`${from} -> ${to}: reverses direction during the transition`);
+            if (
+              high - low > 4 &&
+              !frames.some((frame) => frame.width > low + 1 && frame.width < high - 1)
+            )
+              issues.push(`${from} -> ${to}: no intermediate animation frame`);
+          }
+          await select(from);
+          await toolbar.evaluate(async (element) => {
+            await Promise.all(
+              element.getAnimations().map((animation) => animation.finished.catch(() => undefined))
+            );
+          });
+          await page.screenshot({ path: info.outputPath(`mode-${from}.png`), fullPage: false });
+        }
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await select('quick-edit');
+        expect(
+          await toolbar.evaluate((element) =>
+            element
+              .getAnimations()
+              .some(
+                (animation) =>
+                  animation.effect instanceof KeyframeEffect &&
+                  animation.effect.getKeyframes().some((frame) => 'inlineSize' in frame)
+              )
+          )
+        ).toBe(false);
+        if (orientation === 'horizontal') {
+          await page.setViewportSize({ width: 960, height: size.height });
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+          ).toBe(true);
+          await page.screenshot({ path: info.outputPath('narrow-960.png'), fullPage: false });
+        }
+        expect(issues).toEqual([]);
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
+}

@@ -3,7 +3,14 @@ import {
   type ContentRuntimeShimBrowserAdapter,
   type ContentRuntimeShimStorageChangeListener,
 } from '@sniptale/platform/browser/content-runtime-shim';
+import { bundledQuickActionConfigs } from '../../../features/quick-actions-presets/bundled';
 import type { QuickActionHotkeyAction } from '../../platform/quick-action-hotkeys';
+
+export interface ShimQuickAction extends QuickActionHotkeyAction {
+  name?: string;
+  bundledId?: string;
+  customized?: boolean;
+}
 
 const QUICK_ACTIONS_STORAGE_KEY = 'sniptale_quick_actions';
 
@@ -22,12 +29,12 @@ function isHotkey(value: unknown): value is NonNullable<QuickActionHotkeyAction[
   );
 }
 
-function parseQuickActionHotkey(value: unknown): QuickActionHotkeyAction | null {
+function parseQuickActionHotkey(value: unknown): ShimQuickAction | null {
   if (!isRecord(value) || typeof value['id'] !== 'string' || typeof value['status'] !== 'boolean') {
     return null;
   }
 
-  const hotkey = value['hotkey'];
+  const hotkey = value['hotkey'] ?? null;
   if (hotkey !== null && !isHotkey(hotkey)) {
     return null;
   }
@@ -36,11 +43,16 @@ function parseQuickActionHotkey(value: unknown): QuickActionHotkeyAction | null 
     hotkey,
     id: value['id'],
     status: value['status'],
+    ...(typeof value['name'] === 'string' ? { name: value['name'].slice(0, 512) } : {}),
+    ...(typeof value['bundledId'] === 'string'
+      ? { bundledId: value['bundledId'].slice(0, 128) }
+      : {}),
+    ...(typeof value['customized'] === 'boolean' ? { customized: value['customized'] } : {}),
   };
 }
 
 export function createShimQuickActionLoader(browser: ContentRuntimeShimBrowserAdapter) {
-  return async function loadShimQuickActions(): Promise<QuickActionHotkeyAction[]> {
+  return async function loadShimQuickActions(): Promise<ShimQuickAction[]> {
     let stored: Record<string, unknown>;
     try {
       stored = await browser.getLocalStorage([QUICK_ACTIONS_STORAGE_KEY]);
@@ -49,13 +61,18 @@ export function createShimQuickActionLoader(browser: ContentRuntimeShimBrowserAd
     }
 
     const value = stored[QUICK_ACTIONS_STORAGE_KEY];
-    if (!Array.isArray(value)) {
-      return [];
-    }
-
-    return value
-      .map(parseQuickActionHotkey)
-      .filter((action): action is QuickActionHotkeyAction => action !== null);
+    const actions = Array.isArray(value)
+      ? value
+          .map(parseQuickActionHotkey)
+          .filter((action): action is ShimQuickAction => action !== null)
+      : [];
+    const storedIds = new Set(actions.map((action) => action.id));
+    return [
+      ...actions,
+      ...bundledQuickActionConfigs
+        .filter((config) => !storedIds.has(config.id))
+        .map((config) => ({ id: config.id, status: true, hotkey: null })),
+    ];
   };
 }
 

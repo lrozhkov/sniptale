@@ -1,5 +1,6 @@
 import {
   Clipboard,
+  Clock3,
   Code2,
   Database,
   Download,
@@ -28,6 +29,14 @@ export interface RequiredManifestPermissionDisclosure {
 }
 
 export const requiredManifestPermissionDisclosures: RequiredManifestPermissionDisclosure[] = [
+  {
+    category: 'core',
+    descriptionKey: 'settings.permissions.requiredAlarmsDescription',
+    icon: Clock3,
+    id: 'alarms',
+    kind: 'permission',
+    nameKey: 'settings.permissions.requiredAlarmsName',
+  },
   {
     category: 'core',
     descriptionKey: 'settings.permissions.requiredStorageDescription',

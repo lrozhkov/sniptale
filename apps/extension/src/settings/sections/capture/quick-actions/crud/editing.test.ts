@@ -1,3 +1,4 @@
+import { createQuickActionAppearance } from '../../../../../contracts/quick-action-appearance';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -190,5 +191,15 @@ it('keeps the editor open when persistence reports failure', async () => {
   });
 
   expect(onPersist).toHaveBeenCalledTimes(1);
+  expect(onResetEditor).not.toHaveBeenCalled();
+});
+
+it('keeps malformed appearance drafts editable and does not persist them', async () => {
+  const form = { ...createQuickAction(), appearance: createQuickActionAppearance() };
+  form.appearance.background.kind = 'image';
+  const onPersist = vi.fn(),
+    onResetEditor = vi.fn();
+  await saveEditedQuickAction({ actions: [], editForm: form, onPersist, onResetEditor });
+  expect(onPersist).not.toHaveBeenCalled();
   expect(onResetEditor).not.toHaveBeenCalled();
 });

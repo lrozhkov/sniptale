@@ -4,6 +4,7 @@ export {
   dismissDesignReviewSelection,
   disableDesignReviewMode,
   enableDesignReviewMode,
+  finalizeDesignReviewTextEditing,
   getDesignReviewModeState,
   openDesignReviewTarget,
   registerDesignReviewInspectorDismissRequestHandler,

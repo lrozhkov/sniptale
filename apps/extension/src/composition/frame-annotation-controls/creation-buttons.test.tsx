@@ -252,3 +252,28 @@ function createSettings(): FrameAnnotationCreationSettings {
     stepBadge: null,
   };
 }
+
+it('places page controls independently and retains editor grouping by default', () => {
+  act(() =>
+    root.render(
+      <FrameAnnotationCreationControls
+        context="content"
+        activeMenu={null}
+        settings={createSettings()}
+        onChange={vi.fn()}
+        groupAnnotations={false}
+        renderFrameControl={(control) => <div data-frame-slot>{control}</div>}
+      />
+    )
+  );
+  expect(
+    host.querySelector('[data-frame-slot] [data-ui="content.toolbar.future-frame-style"]')
+  ).not.toBeNull();
+  expect(host.querySelector('.sniptale-toolbar-annotation-group')).toBeNull();
+  expect(host.querySelector('[data-ui="content.toolbar.future-frame-callout"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="content.toolbar.future-frame-step-badge"]')).not.toBeNull();
+  act(() =>
+    root.render(<FrameAnnotationCreationControls settings={createSettings()} onChange={vi.fn()} />)
+  );
+  expect(host.querySelector('.sniptale-toolbar-annotation-group')).not.toBeNull();
+});

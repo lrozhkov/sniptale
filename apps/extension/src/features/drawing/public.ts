@@ -10,3 +10,4 @@ export * from './updates';
 export * from './selection';
 export * from './session';
 export * from './text-layout';
+export { parseDrawingDocument } from './parser';

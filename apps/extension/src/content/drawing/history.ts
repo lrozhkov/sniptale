@@ -7,9 +7,15 @@ import {
 } from '../../features/drawing/public';
 /** Drawing supplies reversible effects to the page's existing history owner. */
 export interface DrawingHistoryCommitPort {
+  registerDrawingRecovery?(
+    replay: (document: DrawingDocumentV1) => boolean,
+    hasChanges: () => boolean,
+    captureDocument: () => DrawingDocumentV1
+  ): () => void;
   commitEntry(entry: {
     scope: 'drawing';
     domEffect: {
+      recovery?: { before: DrawingDocumentV1; after: DrawingDocumentV1 };
       hasChanges: boolean;
       hasCurrentChanges: () => boolean;
       apply(direction: 'undo' | 'redo'): { failures: string[]; success: boolean };
@@ -25,6 +31,7 @@ function createDrawingHistoryEffect(
   hasCurrentChanges: () => boolean
 ): Parameters<DrawingHistoryCommitPort['commitEntry']>[0]['domEffect'] {
   return {
+    recovery: { before: commit.before, after: commit.after },
     hasChanges: true,
     hasCurrentChanges,
     apply(direction) {
@@ -41,30 +48,33 @@ export function createPagePreparationDrawingSession(
   layout?: { projection: DrawingObjectProjection; dispose(): void }
 ): DrawingSession {
   let session: DrawingSession | null = null;
-  let replayLatestDocument: DrawingDocumentCommit['replay'] | null = null;
+  let unregisterRecovery = () => {};
   const unsubscribeFromClear = history.subscribeToClear(() => {
-    replayLatestDocument?.(EMPTY_DRAWING_DOCUMENT);
+    session?.restoreDocument(EMPTY_DRAWING_DOCUMENT);
   });
   session = createDrawingSession({
     ...(layout ? { objectProjection: layout.projection } : {}),
     onDocumentCommit(commit) {
       if (!session) return false;
-      const previousReplay = replayLatestDocument;
-      replayLatestDocument = commit.replay;
-      const accepted = history.commitEntry({
+      return history.commitEntry({
         scope: 'drawing',
         domEffect: createDrawingHistoryEffect(
           commit,
           () => (session?.getSnapshot().document.objects.length ?? 0) > 0
         ),
       });
-      if (!accepted) replayLatestDocument = previousReplay;
-      return accepted;
     },
     onDispose() {
+      unregisterRecovery();
       unsubscribeFromClear();
       layout?.dispose();
     },
   });
+  unregisterRecovery =
+    history.registerDrawingRecovery?.(
+      (document) => session?.restoreDocument(document) ?? false,
+      () => (session?.getSnapshot().document.objects.length ?? 0) > 0,
+      () => session?.getCommittedDocument() ?? EMPTY_DRAWING_DOCUMENT
+    ) ?? (() => {});
   return session;
 }

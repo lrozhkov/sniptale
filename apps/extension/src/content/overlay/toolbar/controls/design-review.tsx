@@ -1,3 +1,4 @@
+import { PageToolbarGroup } from './page-layout';
 import { useContext, useSyncExternalStore } from 'react';
 import { Ruler, ScanLine } from 'lucide-react';
 import { PageControlVisibility } from './control-visibility';
@@ -8,7 +9,7 @@ import {
   toggleDesignReviewMeasurementDetails,
   toggleDesignReviewMeasurements,
 } from '../../../selection/design-review';
-import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FeedbackCollectionIcon } from '../../design-review/icons';
 import { translate } from '../../../../platform/i18n';
 import { AnnotationExportMenu } from '../design-review/export-menu';
@@ -35,7 +36,7 @@ export function ToolbarDesignReviewControls(props: {
   )
     return null;
   return (
-    <ContentToolbarGroup dataUi="content.toolbar.design-review-controls" utilities>
+    <PageToolbarGroup dataUi="content.toolbar.design-review-controls" utilities>
       <PageControlVisibility
         control="review-panel"
         label={translate('content.designReview.showFeedbackPanel')}
@@ -115,6 +116,6 @@ export function ToolbarDesignReviewControls(props: {
           toolbarMenuState={props.toolbarMenuState}
         />
       </PageControlVisibility>
-    </ContentToolbarGroup>
+    </PageToolbarGroup>
   );
 }

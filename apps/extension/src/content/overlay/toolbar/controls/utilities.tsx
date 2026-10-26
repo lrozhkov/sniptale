@@ -1,5 +1,5 @@
+import { PageToolbarGroup, PageToolbarDivider } from './page-layout';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
-import { ContentToolbarDivider, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import type { ToolbarAutoBlurProps } from '../types';
 import type { ToolbarFutureFrameCalloutActions, ToolbarFutureFrameStyle } from '../types';
 import type { ToolbarMenuState } from '../state/menu';
@@ -39,7 +39,7 @@ export function ToolbarUtilityButtons(props: {
   }
 
   return (
-    <ContentToolbarGroup className="sniptale-toolbar-highlighter-utilities" utilities>
+    <PageToolbarGroup className="sniptale-toolbar-highlighter-utilities" utilities>
       {highlighterMode && props.futureFrameStyle && props.onFutureFrameEffectModeChange ? (
         <>
           <FutureFrameStyleControls
@@ -55,7 +55,7 @@ export function ToolbarUtilityButtons(props: {
             toolbarMenuState={props.toolbarMenuState}
           />
           {autoBlurVisible ? (
-            <ContentToolbarDivider dataUi="content.toolbar.annotation-divider" />
+            <PageToolbarDivider dataUi="content.toolbar.annotation-divider" />
           ) : null}
         </>
       ) : null}
@@ -71,6 +71,6 @@ export function ToolbarUtilityButtons(props: {
           />
         </PageControlVisibility>
       ) : null}
-    </ContentToolbarGroup>
+    </PageToolbarGroup>
   );
 }

@@ -482,3 +482,29 @@ describe('browser annotation session lifecycle', () => {
     expect(followingListener).toHaveBeenCalledOnce();
   });
 });
+
+it('rebinds restored comments and text to the new document without merging an unrelated target', () => {
+  const source = createBrowserAnnotationSession();
+  const oldTarget = createTarget();
+  source.recordTextChange({
+    after: 'New',
+    before: 'Old',
+    evidence: createEvidence(),
+    target: oldTarget,
+  });
+  source.setComment({ comment: 'Keep this note', evidence: createEvidence(), target: oldTarget });
+  const restored = createBrowserAnnotationSession();
+  restored.applySnapshot(source.captureSnapshot());
+  const newTarget = createTarget();
+  restored.rebindTargets(() => newTarget);
+  expect(restored.getAnnotationId(newTarget)).toBe(1);
+  expect(restored.getAnnotationId(oldTarget)).toBeNull();
+  restored.setComment({ comment: 'Updated', evidence: createEvidence(), target: newTarget });
+  expect(restored.captureSnapshot().domRecords).toHaveLength(1);
+  expect(restored.captureSnapshot().domRecords[0]).toMatchObject({
+    annotationId: 1,
+    markerNumber: 1,
+    comment: 'Updated',
+    textChange: { before: 'Old', after: 'New' },
+  });
+});

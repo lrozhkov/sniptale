@@ -301,13 +301,13 @@ describe('CalloutSettingsPopover', () => {
     );
     expect(paintPopup).not.toBeNull();
     await act(async () =>
-      paintPopup?.querySelector<HTMLButtonElement>('[aria-label="Линейный"]')?.click()
+      paintPopup?.querySelector<HTMLButtonElement>('[aria-label="Градиент"]')?.click()
     );
     await act(async () =>
-      paintPopup?.querySelector<HTMLDetailsElement>('details')?.setAttribute('open', '')
+      paintPopup?.querySelector<HTMLButtonElement>('[aria-label="Дополнительно"]')?.click()
     );
     const interpolation = paintPopup?.querySelector<HTMLButtonElement>(
-      '[aria-label="Интерполяция"]'
+      '[aria-label="Цветовое пространство"]'
     );
     expect(interpolation).not.toBeNull();
     await act(async () => interpolation?.click());

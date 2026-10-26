@@ -491,9 +491,49 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/background/storage/page-recovery/index.ts",
+      "owner": "page-recovery",
+      "justification": "Retains private authored page text, sanitized HTML, drawings, frame annotations, and design notes for explicit recovery.",
+      "reviewNote": "Store one bounded authored recovery set for each native tab identity. Keep data for 45 minutes after its last authored history change. Opening, Restore, and retries do not extend expiry. Refuse old sets after native session proof is lost. Explicit Reset, Clear, or Close deletes the set. Native alarms and startup maintenance delete expired sets. Drain accepted writes and exclude new producers during verified local-data erasure. Erasure deletes both local records and session claims, even when the user keeps preferences. Exclude payloads and claims from sync, Library, backup, project export, logs, and diagnostics. Session claims contain native tab/document IDs, opaque nonces and leases. They contain no authored payload.",
+      "storageWrites": [
+        {
+          "sink": "this.area.set",
+          "keys": [
+            "PAGE_RECOVERY_STORAGE_KEY"
+          ]
+        },
+        {
+          "sink": "this.sessionArea.set",
+          "keys": [
+            "PAGE_RECOVERY_CLAIMS_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/quick-actions/index.ts",
+      "owner": "quick-action-presets",
+      "justification": "Retains explicitly configured static decoration text and bounded uploaded artwork in the existing local preset list.",
+      "reviewNote": "Appearance does not retain automatic page metadata or captured output in preferences. Bound backgrounds to 2 MiB and icons to normalized 64px PNG. Presets follow existing preference retention, including preservation when the user keeps preferences during erasure. Reset or deletion removes the configured appearance. Settings transfer excludes embedded artwork and refuses media-bearing imports. Exclude preset artwork and text from sync, diagnostics and automatic export.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "QUICK_ACTIONS_KEY"
+          ]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [
+    {
+      "file": "packages/platform/src/observability/message-tracer/quick-action-appearance-payload.ts",
+      "owner": "shared-message-tracer",
+      "justification": "Exact quick-action header command projection excludes page text and artwork from trace retention.",
+      "reviewNote": "Preserve only bounded dimensions and success; failures use a fixed code in both payload and event metadata."
+    },
     {
       "file": "packages/platform/src/observability/diagnostics/sanitizer.ts",
       "owner": "shared-diagnostic-sanitizer",

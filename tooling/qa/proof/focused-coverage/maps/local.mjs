@@ -775,6 +775,21 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/workflows/settings-transfer/registry.test.ts',
       'apps/extension/src/workflows/settings-transfer/selection.test.ts',
       'apps/extension/src/workflows/settings-transfer/settings-coverage.test.ts',
+      'apps/extension/src/workflows/settings-transfer/domain-parser.test.ts',
+      'apps/extension/src/workflows/settings-transfer/node-projection.test.ts',
+    ],
+  },
+  {
+    owner: 'settings-transfer-persistence',
+    productionPrefix: 'apps/extension/src/composition/persistence/settings-transfer/',
+    reason:
+      'Transfer storage owns actual apply, compensation and readback under the existing mutation barrier.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/settings-transfer/read.test.ts',
+      'apps/extension/src/composition/persistence/settings-transfer/apply.test.ts',
+      'apps/extension/src/composition/persistence/settings-transfer/page-launch-apply.integration.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/mutation-barrier.test.ts',
+      'apps/extension/src/composition/persistence/settings/coordination.test.ts',
     ],
   },
   {

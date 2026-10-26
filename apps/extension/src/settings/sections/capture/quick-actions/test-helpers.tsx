@@ -17,7 +17,7 @@ const hoistedSpies = vi.hoisted(() => ({
 const { useHotkeyInputControllerSpy, useQuickActionsControllerSpy, useSettingsStoreSpy } =
   hoistedSpies;
 
-export { useQuickActionsControllerSpy };
+export { useQuickActionsControllerSpy, useSettingsStoreSpy };
 
 function createSettingsPanelControlMocks() {
   return {
@@ -30,10 +30,12 @@ function createSettingsPanelControlMocks() {
     SettingsDragHandle: () => <span data-testid="settings-drag-handle">drag</span>,
     SettingsSwitch: (props: {
       checked: boolean;
+      disabled?: boolean;
       onClick: () => void | Promise<void>;
       title?: string;
     }) => (
       <button
+        disabled={props.disabled}
         data-checked={String(props.checked)}
         data-testid="settings-switch"
         title={props.title}

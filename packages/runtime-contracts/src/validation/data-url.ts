@@ -142,9 +142,9 @@ function readJpegDimensions(bytes: Uint8Array): ImageDimensions | null {
   return null;
 }
 
-function readWebpDimensions(bytes: Uint8Array): ImageDimensions | null {
+function readWebpDimensions(bytes: Uint8Array, includeSimple = false): ImageDimensions | null {
   const isRiffWebp =
-    bytes.length >= 30 &&
+    bytes.length >= (includeSimple ? 25 : 30) &&
     bytes[0] === 0x52 &&
     bytes[1] === 0x49 &&
     bytes[2] === 0x46 &&
@@ -157,17 +157,47 @@ function readWebpDimensions(bytes: Uint8Array): ImageDimensions | null {
     return null;
   }
 
-  if (bytes[12] === 0x56 && bytes[13] === 0x50 && bytes[14] === 0x38 && bytes[15] === 0x58) {
+  if (
+    bytes.length >= 30 &&
+    bytes[12] === 0x56 &&
+    bytes[13] === 0x50 &&
+    bytes[14] === 0x38 &&
+    bytes[15] === 0x58
+  ) {
     return {
       height: readUint24LittleEndian(bytes, 27) + 1,
       width: readUint24LittleEndian(bytes, 24) + 1,
     };
   }
 
+  if (includeSimple && bytes[12] === 0x56 && bytes[13] === 0x50 && bytes[14] === 0x38) {
+    if (bytes[15] === 0x4c && bytes[20] === 0x2f) {
+      return {
+        width: 1 + bytes[21]! + ((bytes[22]! & 0x3f) << 8),
+        height: 1 + (bytes[22]! >> 6) + (bytes[23]! << 2) + ((bytes[24]! & 0x0f) << 10),
+      };
+    }
+    if (
+      bytes.length >= 30 &&
+      bytes[15] === 0x20 &&
+      bytes[23] === 0x9d &&
+      bytes[24] === 0x01 &&
+      bytes[25] === 0x2a
+    ) {
+      return {
+        width: (bytes[26]! + bytes[27]! * 256) & 0x3fff,
+        height: (bytes[28]! + bytes[29]! * 256) & 0x3fff,
+      };
+    }
+  }
+
   return null;
 }
 
-function readImageDimensions(parsed: ParsedDataUrl): ImageDimensions | null {
+function readImageDimensions(
+  parsed: ParsedDataUrl,
+  includeSimpleWebp = false
+): ImageDimensions | null {
   const bytes = readBase64HeaderBytes(parsed.payload);
   if (!bytes) {
     return null;
@@ -180,7 +210,7 @@ function readImageDimensions(parsed: ParsedDataUrl): ImageDimensions | null {
     return readJpegDimensions(bytes);
   }
   if (parsed.mimeType === 'image/webp') {
-    return readWebpDimensions(bytes);
+    return readWebpDimensions(bytes, includeSimpleWebp);
   }
 
   return null;
@@ -217,4 +247,25 @@ export function isImageDataUrl(value: unknown): value is string {
     parsed.decodedBytes <= MAX_IMAGE_DATA_URL_BYTES &&
     hasAllowedDimensions(readImageDimensions(parsed))
   );
+}
+
+/** Read bounded raster dimensions without allocating a decoded bitmap. */
+export function readImageDataUrlDimensions(
+  value: unknown,
+  maxBytes = MAX_IMAGE_DATA_URL_BYTES
+): ImageDimensions | null {
+  if (
+    typeof value !== 'string' ||
+    !Number.isSafeInteger(maxBytes) ||
+    maxBytes <= 0 ||
+    maxBytes > 128 * 1024 * 1024 ||
+    value.length > Math.ceil((maxBytes * 4) / 3) + 128
+  )
+    return null;
+  const parsed = parseDataUrl(value);
+  if (!parsed) return null;
+  if (!ALLOWED_RASTER_IMAGE_MIME_TYPES.has(parsed.mimeType) || parsed.decodedBytes > maxBytes)
+    return null;
+  const dimensions = readImageDimensions(parsed, true);
+  return dimensions && hasAllowedDimensions(dimensions) ? dimensions : null;
 }

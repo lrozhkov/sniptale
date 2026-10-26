@@ -83,3 +83,8 @@ export type PreparedCaptureAction = {
   defaultImagePresetId?: string | null | undefined;
   filename: string;
 };
+
+export type CaptureImagePreparation = (
+  dataUrl: string,
+  filename: string
+) => Promise<{ dataUrl: string; filename: string }>;

@@ -266,3 +266,34 @@ describe('message tracer messaging helpers', () => {
     harness.dispose();
   });
 });
+
+it('excludes quick-action artwork and private text from send, response and failure traces', () => {
+  const harness = installObserver();
+  try {
+    const request = {
+      type: 'OFFSCREEN_QUICK_ACTION_HEADER',
+      source: { width: 640, height: 480 },
+      header: {
+        title: 'private-title',
+        url: 'https://private.example/path',
+        iconDataUrl: 'private-icon',
+      },
+      capability: 'private-capability',
+    };
+    const tracker = beginSendTrace(request, request, 'off');
+    recordMessageResponse({ success: true, dataUrl: 'private-raster' }, tracker);
+    const failed = beginSendTrace(request, request, 'off');
+    recordMessageFailure(new Error('private-title private-error'), failed);
+    const serialized = JSON.stringify(harness.events);
+    expect(serialized).not.toContain('private-');
+    expect(serialized).toContain('quick-action-appearance-runtime-failure');
+    expect(harness.events[0]).toMatchObject({
+      payload: {
+        sanitized: { type: 'OFFSCREEN_QUICK_ACTION_HEADER', source: { width: 640, height: 480 } },
+      },
+    });
+    expect(harness.events[3]).toMatchObject({ error: 'quick-action-appearance-runtime-failure' });
+  } finally {
+    harness.dispose();
+  }
+});

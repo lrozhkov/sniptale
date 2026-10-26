@@ -150,7 +150,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
               name: /Image quality|Качество изображения/u,
             });
             const labels = await menu
-              .locator('.sniptale-capture-parameter-label')
+              .locator('.sniptale-capture-image-parameters .sniptale-parameter-name')
               .evaluateAll((nodes) =>
                 nodes.map((node) => {
                   const css = getComputedStyle(node);
@@ -161,6 +161,44 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             expect(labels[0]).toEqual(labels[1]);
             const field = menu.locator('.sniptale-capture-quality-input');
             await expect(field).toHaveCSS('height', '32px');
+            expect((await field.boundingBox())!.width).toBeLessThanOrEqual(100);
+            const formatRow = menu
+              .locator('.sniptale-capture-image-parameters .sniptale-parameter-row')
+              .first();
+            const formatLabel = (await formatRow
+              .locator('.sniptale-parameter-name')
+              .boundingBox())!;
+            const jpeg = menu.getByRole('button', { name: 'JPEG', exact: true });
+            const formatButton = (await jpeg.boundingBox())!;
+            expect(
+              Math.abs(
+                formatLabel.y + formatLabel.height / 2 - formatButton.y - formatButton.height / 2
+              )
+            ).toBeLessThanOrEqual(1);
+            const label = jpeg.locator('.sniptale-interface-label');
+            const beforeHover = await label.evaluate((node) => ({
+              font: getComputedStyle(node).font,
+              transform: getComputedStyle(node).transform,
+            }));
+            await jpeg.hover();
+            await expect
+              .poll(() =>
+                label.evaluate((node) => ({
+                  font: getComputedStyle(node).font,
+                  transform: getComputedStyle(node).transform,
+                }))
+              )
+              .toEqual(beforeHover);
+            await input.focus();
+            await expect(field).toHaveCSS('outline-style', 'none');
+            await page.screenshot({
+              path: info.outputPath(`${orientation}-${mode}-quality-focus.png`),
+              fullPage: false,
+            });
+            const accepted = await input.inputValue();
+            await input.fill('77');
+            await input.press('Escape');
+            await expect(input).toHaveValue(accepted);
             await input.fill('76');
             await input.press('Enter');
             await expect
@@ -177,6 +215,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
               fullPage: false,
             });
             await menu.getByRole('button', { name: 'PNG', exact: true }).click();
+            await expect(input).toHaveCount(0);
             await expect(menu.getByRole('slider')).toHaveCount(0);
             const box = (await menu.locator('.sniptale-toolbar-menu').boundingBox())!;
             expect(box.x).toBeGreaterThanOrEqual(0);

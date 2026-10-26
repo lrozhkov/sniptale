@@ -1,6 +1,7 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React from 'react';
 import { ToolbarDockingGuides } from './docking-guides';
+import { useToolbarModeTransition } from './mode-transition';
 import { useRecordingCaptureVisibility } from './recording-capture-visibility';
 import { ContentToolbarDragHandle, ContentToolbarShell } from '@sniptale/ui/content-toolbar';
 import { ToolbarPrimaryControls } from '../controls/primary';
@@ -14,10 +15,12 @@ import {
   useRecordingToolbarControls,
 } from '../state/recording-controls';
 import { PageToolbarControlsContext, usePageToolbarControls } from '../state/page-controls';
+import { PageToolbarLayoutProvider, PageToolbarLayoutDecorations } from '../controls/page-layout';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
 function getCustomizationMode(toolbarProps: ToolbarProps, viewModel: ToolbarViewModel) {
+  if (viewModel.pendingInteractionMode) return viewModel.pendingInteractionMode;
   if (toolbarProps.drawingMode) return 'drawing';
   if (viewModel.designReviewMode) return 'design-review';
   if (viewModel.highlighterMode) return 'highlighter';
@@ -119,6 +122,15 @@ export function ToolbarShellContent(props: {
   const dragGesture = useToolbarDragGesture(derivedState);
   const uiScale = useContentUiScale();
   const menuOpen = viewModel.toolbarMenuState.activeMenuType !== null;
+  useToolbarModeTransition({
+    commitLayout: derivedState.commitLayout,
+    toolbarRef: derivedState.toolbarRef,
+    mode: getCustomizationMode(toolbarProps, viewModel),
+    orientation: derivedState.displayMode,
+    ready: derivedState.positionReady,
+    uiScale,
+    recording: toolbarProps.videoRecordingMode ?? false,
+  });
   const pageControls = usePageToolbarControls(
     !toolbarProps.videoRecordingMode,
     getCustomizationMode(toolbarProps, viewModel)
@@ -156,75 +168,87 @@ export function ToolbarShellContent(props: {
     <PageToolbarControlsContext.Provider
       value={toolbarProps.videoRecordingMode ? null : pageControls}
     >
-      <RecordingToolbarControlsContext.Provider
-        value={toolbarProps.videoRecordingMode ? recordingControls : null}
-      >
-        {derivedState.isDragging && !derivedState.freePlacement ? (
-          <ToolbarDockingGuides activeEdge={derivedState.dockPreview} uiScale={uiScale} />
-        ) : null}
-        {menuOpen ? <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden /> : null}
-        <div
-          className="sniptale-toolbar-positioner"
-          tabIndex={-1}
-          data-dragging={derivedState.isDragging ? 'true' : 'false'}
-          data-drag-started={dragGesture.hasDragged ? 'true' : undefined}
-          style={getToolbarVisibilityStyle(
-            derivedState.positionReady,
-            derivedState.position,
-            uiScale
-          )}
+      <PageToolbarLayoutProvider toolbarRef={derivedState.toolbarRef}>
+        <RecordingToolbarControlsContext.Provider
+          value={toolbarProps.videoRecordingMode ? recordingControls : null}
         >
-          <CommandPressScope value={true}>
-            <ContentToolbarShell
-              ref={derivedState.toolbarRef}
-              className="sniptale-content-ui-zoom-surface sniptale-content-toolbar-adopted"
-              dragging={derivedState.isDragging}
-              dataUi="content.toolbar.root"
-              data-display-mode={derivedState.displayMode}
-              data-menu-side={
-                derivedState.displayMode === 'vertical'
-                  ? derivedState.position.x * uiScale < window.innerWidth / 2
-                    ? 'right'
-                    : 'left'
-                  : derivedState.position.y * uiScale < window.innerHeight / 2
-                    ? 'down'
-                    : 'up'
-              }
-              data-dock-dragging={
-                derivedState.isDragging && !derivedState.freePlacement ? 'true' : undefined
-              }
-              inert={derivedState.isDragging && !derivedState.freePlacement}
-              data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
-              data-page-controls={toolbarProps.videoRecordingMode ? undefined : 'true'}
-              data-recording-fade={
-                fadeDuringRecording && !outsideRecordingCrop ? 'true' : undefined
-              }
-              data-menu-open={menuOpen ? 'true' : undefined}
-              onPointerDownCapture={blurPointerActivatedToolbarFocus}
-              onMouseDownCapture={preventPointerActivatedToolbarFocus}
-              onMouseOverCapture={onHoverCapture}
-            >
-              <ContentToolbarDragHandle onPointerDown={dragGesture.onPointerDown}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
-                  <circle cx="9" cy="12" r="1" />
-                  <circle cx="9" cy="5" r="1" />
-                  <circle cx="9" cy="19" r="1" />
-                  <circle cx="15" cy="12" r="1" />
-                  <circle cx="15" cy="5" r="1" />
-                  <circle cx="15" cy="19" r="1" />
-                </svg>
-              </ContentToolbarDragHandle>
+          {derivedState.isDragging && !derivedState.freePlacement ? (
+            <ToolbarDockingGuides activeEdge={derivedState.dockPreview} uiScale={uiScale} />
+          ) : null}
+          {menuOpen ? (
+            <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden />
+          ) : null}
+          <div
+            className="sniptale-toolbar-positioner"
+            tabIndex={-1}
+            data-dragging={derivedState.isDragging ? 'true' : 'false'}
+            data-drag-started={dragGesture.hasDragged ? 'true' : undefined}
+            style={getToolbarVisibilityStyle(
+              derivedState.positionReady,
+              derivedState.position,
+              uiScale
+            )}
+          >
+            <CommandPressScope value={true}>
+              <ContentToolbarShell
+                ref={derivedState.toolbarRef}
+                className="sniptale-content-ui-zoom-surface sniptale-content-toolbar-adopted"
+                dragging={derivedState.isDragging}
+                dataUi="content.toolbar.root"
+                data-display-mode={derivedState.displayMode}
+                data-menu-side={
+                  derivedState.displayMode === 'vertical'
+                    ? derivedState.position.x * uiScale < window.innerWidth / 2
+                      ? 'right'
+                      : 'left'
+                    : derivedState.position.y * uiScale < window.innerHeight / 2
+                      ? 'down'
+                      : 'up'
+                }
+                data-dock-dragging={
+                  derivedState.isDragging && !derivedState.freePlacement ? 'true' : undefined
+                }
+                inert={derivedState.isDragging && !derivedState.freePlacement}
+                data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
+                data-page-controls={toolbarProps.videoRecordingMode ? undefined : 'true'}
+                data-page-layout={
+                  pageControls.layoutActive && !toolbarProps.videoRecordingMode ? 'true' : undefined
+                }
+                data-page-customizing={
+                  pageControls.editing && !toolbarProps.videoRecordingMode ? 'true' : undefined
+                }
+                data-page-mode={getCustomizationMode(toolbarProps, viewModel)}
+                data-recording-fade={
+                  fadeDuringRecording && !outsideRecordingCrop ? 'true' : undefined
+                }
+                data-menu-open={menuOpen ? 'true' : undefined}
+                onPointerDownCapture={blurPointerActivatedToolbarFocus}
+                onMouseDownCapture={preventPointerActivatedToolbarFocus}
+                onMouseOverCapture={onHoverCapture}
+              >
+                <ContentToolbarDragHandle onPointerDown={dragGesture.onPointerDown}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
+                    <circle cx="9" cy="12" r="1" />
+                    <circle cx="9" cy="5" r="1" />
+                    <circle cx="9" cy="19" r="1" />
+                    <circle cx="15" cy="12" r="1" />
+                    <circle cx="15" cy="5" r="1" />
+                    <circle cx="15" cy="19" r="1" />
+                  </svg>
+                </ContentToolbarDragHandle>
 
-              <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
-              <ToolbarSecondaryControls
-                toolbarProps={toolbarProps}
-                viewModel={viewModel}
-                onViewportChange={onViewportChange}
-              />
-            </ContentToolbarShell>
-          </CommandPressScope>
-        </div>
-      </RecordingToolbarControlsContext.Provider>
+                <PageToolbarLayoutDecorations />
+                <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
+                <ToolbarSecondaryControls
+                  toolbarProps={toolbarProps}
+                  viewModel={viewModel}
+                  onViewportChange={onViewportChange}
+                />
+              </ContentToolbarShell>
+            </CommandPressScope>
+          </div>
+        </RecordingToolbarControlsContext.Provider>
+      </PageToolbarLayoutProvider>
     </PageToolbarControlsContext.Provider>
   );
 }

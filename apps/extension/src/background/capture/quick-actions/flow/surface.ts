@@ -1,3 +1,4 @@
+import type { QuickActionAppearance } from '../../../../contracts/quick-action-appearance';
 // policyStateId: capture-surface-leases - quick actions borrow and release the canonical capture-surface lease.
 import { loadSettings } from '../../../../composition/persistence/settings';
 import { getCaptureSurfaceService } from '../../../capture-surface';
@@ -13,6 +14,11 @@ import type { QuickActionFlowArgs } from './shared';
 
 type QuickActionSurfaceTransaction = {
   transactionId: string;
+  output: {
+    appearance?: QuickActionAppearance;
+    imageFormat: 'png' | 'jpeg' | 'webp';
+    imageQuality: number;
+  };
   appliedLeaseId: string | null;
   ownsSession: boolean;
   priorViewport: ReturnType<QuickActionFlowArgs['viewportState']['get']>;
@@ -30,6 +36,11 @@ export async function applyQuickActionSurface(
   const session = beginScreenshotSurfaceSession(args.tabId);
   const transaction: QuickActionSurfaceTransaction = {
     transactionId: crypto.randomUUID(),
+    output: structuredClone({
+      ...(args.action.appearance ? { appearance: args.action.appearance } : {}),
+      imageFormat: args.imageFormat,
+      imageQuality: args.imageQuality,
+    }),
     appliedLeaseId: null,
     ownsSession: existingSession === null,
     priorViewport: args.viewportState.get(args.tabId),
@@ -157,4 +168,16 @@ export function forgetQuickActionSurfaceTransaction(tabId: number): void {
 
 export function resetQuickActionSurfaceTransactionsForTests(): void {
   transactions.clear();
+}
+
+export function getQuickActionAppearanceSnapshot(tabId: number, transactionId: string) {
+  const transaction = transactions.get(tabId);
+  if (!transaction || transaction.transactionId !== transactionId)
+    throw new Error('stale-transaction');
+  return structuredClone(transaction.output);
+}
+
+export function assertQuickActionAppearanceTransaction(tabId: number, transactionId: string): void {
+  if (transactions.get(tabId)?.transactionId !== transactionId)
+    throw new Error('stale-transaction');
 }

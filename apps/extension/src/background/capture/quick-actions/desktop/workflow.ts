@@ -1,3 +1,5 @@
+import { prepareDesktopAppearance } from '../appearance';
+import { getMediaAuthorityGeneration } from '../../../mutation-exclusion/media-activity';
 import { createScreenshotFilename as generateFilename } from '../../../../workflows/file-naming/index';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -19,6 +21,7 @@ import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtim
 type DesktopQuickActionResult = { result: 'accepted' | 'cancelled' };
 type ReleasePermit = () => void;
 type PendingPreparation = {
+  authorityGeneration: number;
   contextKey: string;
   releasePermit: ReleasePermit;
   requestId: string;
@@ -39,6 +42,7 @@ function contextKey(context: QuickActionRuntimeContext): string {
     context.imageFormat,
     context.imageQuality,
     context.delaySeconds,
+    context.action.appearance,
   ]);
 }
 
@@ -104,6 +108,7 @@ export async function reserveDesktopQuickAction(args: {
     preparingTabIds.delete(args.tabId);
     throw new Error('Local data erasure is in progress');
   }
+  const authorityGeneration = getMediaAuthorityGeneration();
   const requestId = crypto.randomUUID();
   const reservationToken = crypto.randomUUID();
   try {
@@ -115,6 +120,7 @@ export async function reserveDesktopQuickAction(args: {
     }
     const preparation: PendingPreparation = {
       contextKey: contextKey(args.context),
+      authorityGeneration,
       releasePermit,
       requestId,
       reservationToken,
@@ -251,18 +257,29 @@ export async function runDesktopQuickAction(args: {
     await cancelOffscreenFrame(preparation.requestId);
     const createdJobId = await createRenderedCaptureJob(args.tabId);
     jobId = createdJobId;
+    const appearanceGeneration = preparation.authorityGeneration;
     const filename = await generateFilename('desktop', args.context.imageFormat);
+    const prepared = await prepareDesktopAppearance(
+      {
+        appearance: args.context.action.appearance,
+        imageFormat: args.context.imageFormat,
+        imageQuality: args.context.imageQuality,
+      },
+      appearanceGeneration
+    )(selection.dataUrl, filename);
     const assetId = await saveScreenshotToMediaHubFromDataUrl(
-      selection.dataUrl,
-      filename,
+      prepared.dataUrl,
+      prepared.filename,
       undefined,
       args.context.afterCapture === 'save_to_library' ? 'library' : 'temporary'
     );
+    if (args.context.action.appearance && appearanceGeneration !== getMediaAuthorityGeneration())
+      throw new Error('Quick-action appearance was cancelled');
     await deliverDesktopCapture({
       assetId,
       context: args.context,
-      dataUrl: selection.dataUrl,
-      filename,
+      dataUrl: prepared.dataUrl,
+      filename: prepared.filename,
       jobId: createdJobId,
     });
     return { result: 'accepted' };

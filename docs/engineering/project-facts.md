@@ -108,6 +108,12 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/contracts/full-page-capture`
 - `apps/extension/src/contracts/messaging`
 - `apps/extension/src/contracts/native-app`
+- `apps/extension/src/contracts/page-launch.test.ts`
+- `apps/extension/src/contracts/page-launch.ts`
+- `apps/extension/src/contracts/page-recovery.test.ts`
+- `apps/extension/src/contracts/page-recovery.ts`
+- `apps/extension/src/contracts/quick-action-appearance.test.ts`
+- `apps/extension/src/contracts/quick-action-appearance.ts`
 - `apps/extension/src/contracts/settings`
 - `apps/extension/src/contracts/settings-transfer`
 - `apps/extension/src/contracts/video`
@@ -211,6 +217,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 Required permissions:
 
 - `storage`
+- `alarms`
 - `contextMenus`
 - `unlimitedStorage`
 - `tabs`
@@ -286,6 +293,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/page-access/service.ts`
 - `apps/extension/src/background/routing-contracts/capabilities/content-action/route.ts`
 - `apps/extension/src/background/runtime/native-app/route.ts`
+- `apps/extension/src/background/runtime/page-access/page-launch-preferences.ts`
 - `apps/extension/src/background/runtime/page-access/wakeup-route.ts`
 - `apps/extension/src/background/runtime/routing/boundary/popup-export-routing.ts`
 - `apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities.ts`

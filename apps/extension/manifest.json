@@ -9,6 +9,7 @@
   "incognito": "not_allowed",
   "permissions": [
     "storage",
+    "alarms",
     "contextMenus",
     "unlimitedStorage",
     "tabs",

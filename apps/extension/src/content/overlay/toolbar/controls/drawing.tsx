@@ -1,3 +1,4 @@
+import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from './page-layout';
 import {
   Droplet,
   Highlighter,
@@ -8,11 +9,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { Fragment, useId, useRef, useState, type ReactNode } from 'react';
-import {
-  ContentToolbarButton,
-  ContentToolbarDivider,
-  ContentToolbarGroup,
-} from '@sniptale/ui/content-toolbar';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ContentDrawingController } from '../../../drawing/controller';
 import { useDrawingSessionSnapshot } from '../../../drawing/controller';
 import type { DrawingSessionSnapshot, DrawingTool } from '../../../../features/drawing/public';
@@ -20,6 +17,10 @@ import { translate } from '../../../../platform/i18n';
 import { resolveDrawingQuickOptionsTool, ToolbarDrawingOptions } from './drawing-options';
 import { useDrawingOptionsLayout, type DrawingMenuLayoutResolver } from './drawing-options-layout';
 import { useToolbarMenuDirection } from '../menu/direction';
+import {
+  useDrawingSelectionDisclosure,
+  type DrawingSelectionDisclosure,
+} from '../../../../ui/drawing-tools/selection-actions';
 import { PageControlVisibility, PageProtectedControls } from './control-visibility';
 
 type DrawingToolDescriptor = {
@@ -97,6 +98,7 @@ function DrawingToolControl(props: {
   icon: typeof PenLine;
   label: DrawingToolDescriptor['label'];
   modifierHint: DrawingToolDescriptor['modifierHint'];
+  selectionDisclosure: DrawingSelectionDisclosure;
   optionsTool: ReturnType<typeof resolveDrawingQuickOptionsTool>;
   onActivateTool: () => void;
   onToggleOptions: () => void;
@@ -163,6 +165,7 @@ function DrawingToolControl(props: {
       ) : null}
       {props.optionsTool && props.showOptions ? (
         <ToolbarDrawingOptions
+          selectionDisclosure={props.selectionDisclosure}
           controller={props.controller}
           displayMode={props.displayMode}
           snapshot={props.snapshot}
@@ -183,6 +186,7 @@ export function ToolbarDrawingControls(props: {
 }) {
   const { controller } = props;
   const snapshot = useDrawingSessionSnapshot(controller.session);
+  const selectionDisclosure = useDrawingSelectionDisclosure(snapshot.selectedObjectIds.length > 0);
   const [collapsedOptionsTool, setCollapsedOptionsTool] = useState<DrawingTool | null>(null);
   const [optionsSuppressed, setOptionsSuppressed] = useState(false);
   const optionsTool = resolveDrawingQuickOptionsTool(snapshot);
@@ -198,7 +202,7 @@ export function ToolbarDrawingControls(props: {
     : tools;
   return (
     <>
-      <ContentToolbarGroup
+      <PageToolbarGroup
         aria-label={translate('content.toolbar.drawingTools')}
         dataUi="content.toolbar.drawing-tools-group"
       >
@@ -206,6 +210,7 @@ export function ToolbarDrawingControls(props: {
         {visibleTools.map(({ tool, icon, label, modifierHint }) => {
           const control = (
             <DrawingToolControl
+              selectionDisclosure={selectionDisclosure}
               {...(props.owner?.resolveMenuLayout
                 ? { resolveMenuLayout: props.owner.resolveMenuLayout }
                 : {})}
@@ -246,7 +251,12 @@ export function ToolbarDrawingControls(props: {
               {props.owner?.renderToolControl ? (
                 props.owner.renderToolControl({ tool, control, icon, label: translate(label) })
               ) : tool === 'select' || tool === 'pencil' ? (
-                <PageProtectedControls>{control}</PageProtectedControls>
+                <PageToolbarSlot
+                  id={tool === 'select' ? 'drawing-select' : 'drawing-pencil'}
+                  label={translate(label)}
+                >
+                  <PageProtectedControls>{control}</PageProtectedControls>
+                </PageToolbarSlot>
               ) : (
                 <PageControlVisibility control={`drawing-${tool}`} label={translate(label)}>
                   {control}
@@ -256,16 +266,16 @@ export function ToolbarDrawingControls(props: {
           );
         })}
         {props.owner?.renderTrailingControls?.(snapshot)}
-      </ContentToolbarGroup>
+      </PageToolbarGroup>
       {props.owner?.showActions === false || !props.owner?.renderActions ? null : (
         <>
-          <ContentToolbarDivider dataUi="content.toolbar.drawing-actions-divider" />
-          <ContentToolbarGroup
+          <PageToolbarDivider dataUi="content.toolbar.drawing-actions-divider" />
+          <PageToolbarGroup
             aria-label={translate('content.toolbar.drawingActions')}
             dataUi="content.toolbar.drawing-actions-group"
           >
             <PageProtectedControls>{props.owner.renderActions(snapshot)}</PageProtectedControls>
-          </ContentToolbarGroup>
+          </PageToolbarGroup>
         </>
       )}
     </>

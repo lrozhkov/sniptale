@@ -1,3 +1,4 @@
+import { registerPageRecoveryPorts } from '../../../page-recovery/ports';
 import { createAudioJobService } from '../../../ai/audio/service';
 import { registerAudioJobPorts } from '../../../ai/audio/port';
 import { createReviewTextJobService } from '../../../ai/llm/review-text-job';
@@ -54,6 +55,7 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   registerVoiceInputPorts();
   registerVoiceInputTelemetryPorts();
   registerAggregateEditorPresencePorts();
+  registerPageRecoveryPorts();
   registerExtensionCommandListener(state);
   if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
     registerSecurityE2EControl();

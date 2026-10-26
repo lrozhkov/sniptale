@@ -99,6 +99,7 @@ const aiProviderSecretKeys = [
 ] as const;
 
 const localSensitiveKeys = [
+  'sniptale_page_recovery',
   'sniptale_background_presets',
   ALPHA_RESET_JOURNAL_KEY,
   DATABASE_BACKUP_RECEIPT_KEY,
@@ -125,6 +126,7 @@ const localSensitiveKeys = [
 ] as const;
 
 const sessionSensitiveKeys = [
+  'sniptale_page_recovery_claims',
   'diagnostics-active-sessions',
   'interaction-diagnostics-active-sessions',
   'scenario-tab-sessions',

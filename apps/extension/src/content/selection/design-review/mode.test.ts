@@ -56,6 +56,7 @@ import {
   dismissDesignReviewSelection,
   disableDesignReviewMode,
   enableDesignReviewMode,
+  finalizeDesignReviewTextEditing,
   getDesignReviewModeState,
   openDesignReviewTarget,
   registerDesignReviewInspectorDismissRequestHandler,
@@ -383,4 +384,21 @@ it('toggles measurements without changing selection and resets them between mode
   expect(getDesignReviewModeState().measurementsEnabled).toBe(false);
   enableDesignReviewMode();
   expect(getDesignReviewModeState().measurementsEnabled).toBe(false);
+});
+
+it('finalizes pending text once while preserving the active mode and selection', () => {
+  selectTextTarget();
+  const session = { finish: vi.fn(), dispose: vi.fn() };
+  mocks.createQuickEditTargetSession.mockReturnValue(session);
+  startDesignReviewTextEditing();
+  const selection = getDesignReviewModeState().selection;
+  finalizeDesignReviewTextEditing();
+  finalizeDesignReviewTextEditing();
+  expect(session.finish).toHaveBeenCalledOnce();
+  expect(session.dispose).toHaveBeenCalledOnce();
+  expect(getDesignReviewModeState()).toMatchObject({
+    enabled: true,
+    editingText: false,
+    selection,
+  });
 });

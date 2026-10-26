@@ -204,6 +204,7 @@ it('places selection actions beside drawing properties and allows deselection', 
   });
   const properties = container.querySelector('[data-ui="editor.floating.tool-properties"]');
   const actions = container.querySelector('[data-ui="editor.floating.selection-actions"]');
+  expect(actions?.querySelector('[data-ui="drawing.selection.actions.front"]')).toBeNull();
   expect(properties?.parentElement).toBe(actions?.parentElement);
   expect(properties?.querySelector('[data-ui="drawing.selection.actions"]')).toBeNull();
   expect(actions?.querySelector('[data-ui="drawing.selection.actions.group"]')).toBeNull();
@@ -232,6 +233,11 @@ it('rounds both tool panels and exposes group and merge for multiple selected la
       selectedObjectsAreDrawing: true,
     },
   });
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.reveal"]')
+      ?.click()
+  );
   const properties = container.querySelector('[data-ui="editor.floating.tool-properties"]');
   const actions = container.querySelector('[data-ui="editor.floating.selection-actions"]');
   expect(properties?.className).not.toContain('!rounded-none');
@@ -268,6 +274,11 @@ it('uses layer selection guards and offers ungroup for a selected group', () => 
       selectedObjectsAreDrawing: true,
     },
   });
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.reveal"]')
+      ?.click()
+  );
   expect(
     container.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.group"]')
       ?.disabled
@@ -310,4 +321,27 @@ it('keeps the shared shell gap after viewport changes', () => {
   act(() => window.dispatchEvent(new Event('resize')));
   expect(panel?.parentElement?.style.top).toBe('231px');
   toolbar.remove();
+});
+
+it('keeps expanded commands when selected layer kind or composition changes and resets on clear', () => {
+  const single = {
+    hasSelection: true,
+    selectedObjectCount: 1,
+    selectedObjectType: 'pencil' as const,
+  };
+  renderRail({ activeTool: 'select', selection: single });
+  const reveal = () =>
+    container.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.reveal"]');
+  act(() => reveal()?.click());
+  renderRail({ activeTool: 'select', selection: { ...single, selectedObjectType: 'shape' } });
+  expect(reveal()?.getAttribute('aria-expanded')).toBe('true');
+  renderRail({
+    activeTool: 'select',
+    selection: { hasSelection: true, selectedObjectCount: 2, selectedObjectsAreDrawing: true },
+  });
+  expect(reveal()?.getAttribute('aria-expanded')).toBe('true');
+  renderRail({ activeTool: 'select', selection: { hasSelection: false, selectedObjectCount: 0 } });
+  expect(reveal()).toBeNull();
+  renderRail({ activeTool: 'select', selection: single });
+  expect(reveal()?.getAttribute('aria-expanded')).toBe('false');
 });

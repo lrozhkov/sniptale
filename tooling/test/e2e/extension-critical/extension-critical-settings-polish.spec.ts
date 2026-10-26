@@ -471,10 +471,16 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .getByRole('button', { name: text('settings.quickActions.addButton'), exact: true })
         .click();
       const dialog = page.getByRole('dialog');
+      await dialog
+        .getByRole('button', { name: text('settings.quickActions.appearanceCapture'), exact: true })
+        .click();
       const delay = dialog
         .locator('[data-ui="settings.control-row"]')
         .filter({ hasText: text('settings.quickActions.delayLabel') });
       await expect(delay).toContainText(text('settings.quickActions.delayNone'));
+      await dialog
+        .getByRole('button', { name: text('settings.quickActions.appearanceAction'), exact: true })
+        .click();
       const checkbox = dialog.getByRole('checkbox');
       const header = dialog.locator('.sniptale-modal-header-sm');
       const footer = dialog.locator('.sniptale-modal-footer-sm');
@@ -494,7 +500,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       expect((await footer.boundingBox())!.y).toBeCloseTo(footerBefore!.y, 0);
       await expect(header).toBeInViewport();
       await expect(footer).toBeInViewport();
-      if (viewport.size.height === 560) {
+      if (
+        viewport.size.height === 560 &&
+        (await modalBody.evaluate((element) => element.scrollHeight > element.clientHeight))
+      ) {
         expect(await modalBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
         await modalBody.hover();
         await page.mouse.wheel(0, -10_000);
@@ -611,7 +620,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await colorEditor.getByRole('textbox').press('Escape');
       await dialog.locator('[data-ui="shared.ui.paint-selector.trigger"]').click();
       const paint = page.locator('[data-ui="shared.ui.paint-selector.popup"]');
-      const mode = paint.locator('.paint-selector-modes [aria-pressed="true"]');
+      const mode = paint.locator(
+        '[data-ui="shared.ui.paint-selector.modes"] [aria-pressed="true"]'
+      );
       await mode.hover();
       await expect(mode).not.toHaveCSS('color', accent);
       await settled(page);

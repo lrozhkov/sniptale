@@ -1,3 +1,4 @@
+import { beginPageAppearance } from '../quick-actions/appearance';
 import type { CaptureActionType } from '../../../contracts/settings';
 import { respondWithCaptureAction } from './delivery-response';
 import type { CaptureRouteContext } from './types';
@@ -35,19 +36,30 @@ export async function runPreparedCaptureAction(args: {
   captureTarget: 'full' | 'visible';
   capture: Parameters<typeof runStartCaptureUseCase>[0]['capture'];
 }) {
-  const result = await runStartCaptureUseCase({
-    actionType: args.context.message?.actionType,
-    capture: args.capture,
-    captureTarget: args.captureTarget,
-    resolvedTabId: args.context.resolvedTabId,
-    scenarioCapture: args.context.message?.scenarioCapture,
-    scenarioSessionService: args.context.scenarioSessionService,
-  });
+  const appearance = beginPageAppearance(
+    args.context.resolvedTabId,
+    args.context.message?.quickActionTransactionId
+  );
+  try {
+    const result = await runStartCaptureUseCase({
+      prepareImage: appearance.prepare,
+      assertCurrent: appearance.assertCurrent,
+      actionType: args.context.message?.actionType,
+      capture: args.capture,
+      captureTarget: args.captureTarget,
+      resolvedTabId: args.context.resolvedTabId,
+      scenarioCapture: args.context.message?.scenarioCapture,
+      scenarioSessionService: args.context.scenarioSessionService,
+    });
 
-  await deliverPreparedCaptureAction(Promise.resolve(result.payload), {
-    context: args.context,
-    captureAction: result.captureAction,
-    filename: result.filename,
-    defaultImagePresetId: result.defaultImagePresetId,
-  });
+    appearance.assertCurrent();
+    await deliverPreparedCaptureAction(Promise.resolve(result.payload), {
+      context: args.context,
+      captureAction: result.captureAction,
+      filename: result.filename,
+      defaultImagePresetId: result.defaultImagePresetId,
+    });
+  } finally {
+    appearance.release();
+  }
 }

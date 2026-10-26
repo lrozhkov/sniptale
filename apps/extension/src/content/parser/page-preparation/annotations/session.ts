@@ -470,6 +470,15 @@ export function createBrowserAnnotationSession() {
   const rollbackAuthority = Symbol('BrowserAnnotationFailedMutationRollback');
 
   return {
+    /** Rebinds accepted recovery evidence to this document without allocating new annotation identities. */
+    rebindTargets(resolve: (record: BrowserDomAnnotationRecord) => Element | null): void {
+      for (const record of state.domRecords.values()) {
+        const target = resolve(record);
+        if (target) state.knownTargets.set(record.annotationId, target);
+        else state.knownTargets.delete(record.annotationId);
+      }
+      applySnapshot(state, createSnapshot(state));
+    },
     applySnapshot: (snapshot: BrowserAnnotationSessionSnapshot): void =>
       applySnapshot(state, snapshot),
     captureSnapshot: (): BrowserAnnotationSessionSnapshot => createSnapshot(state),
@@ -481,6 +490,9 @@ export function createBrowserAnnotationSession() {
     }),
     getAnnotationId: (target: Element): number | null =>
       state.liveAnnotationIds.get(target) ?? null,
+    /** History retains deleted evidence until its own reachability boundary ends. */
+    getRecoveryTarget: (annotationId: number): Element | null =>
+      state.knownTargets.get(annotationId) ?? null,
     getLiveTarget: (annotationId: number): Element | null =>
       state.domRecords.has(annotationId) ? (state.knownTargets.get(annotationId) ?? null) : null,
     getState: (): BrowserAnnotationSessionState => ({
