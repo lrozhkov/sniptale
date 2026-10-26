@@ -399,3 +399,20 @@ it('keeps pending capture ownership through hidden panel remounts and allows fai
   await act(async () => click());
   expect(props.handleTakeScreenshot).toHaveBeenCalledTimes(2);
 });
+
+it('routes close and collapse through separate session actions without finishing', async () => {
+  const props = createProps();
+  await renderSidebar(props);
+  const view = scenarioRecorderSidebarMock.mock.lastCall?.[0];
+  if (!view) throw new Error('Sidebar did not render');
+  const event = { detail: 1 } as MouseEvent<HTMLButtonElement>;
+  await act(async () => {
+    await (view['onClose'] as (event: MouseEvent<HTMLButtonElement>) => Promise<void>)(event);
+  });
+  expect(props.scenario.actions.setRecorderPanelVisible).toHaveBeenCalledExactlyOnceWith(false);
+  expect(props.scenario.actions.setSidebarVisible).not.toHaveBeenCalled();
+  (view['onCollapse'] as (event: MouseEvent<HTMLButtonElement>) => void)(event);
+  expect(props.scenario.actions.setSidebarVisible).toHaveBeenCalledExactlyOnceWith(false);
+  expect(props.scenario.actions.finishRecording).not.toHaveBeenCalled();
+  expect(props.modeController.handleToggleScreenshotMode).not.toHaveBeenCalled();
+});

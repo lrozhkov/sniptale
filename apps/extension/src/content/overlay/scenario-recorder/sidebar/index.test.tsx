@@ -87,6 +87,7 @@ async function renderSidebar(
         onDeleteStep={onDeleteStep}
         onFinish={vi.fn()}
         onCollapse={vi.fn()}
+        onClose={vi.fn()}
         onCaptureVisible={vi.fn(async () => undefined)}
         captureBusy={false}
         onMoveStep={vi.fn()}

@@ -35,7 +35,39 @@ import { DesignReviewSurface, useDesignReviewController } from './view';
 function createController(): ReturnType<typeof useDesignReviewController> {
   const element = document.createElement('button');
   return {
+    checkOpen: false,
+    checks: {
+      scope: 'selected',
+      setScope: vi.fn(),
+      result: null,
+      unavailable: false,
+      navigationFailed: false,
+      setNavigationFailed: vi.fn(),
+      newScan: vi.fn(),
+      recheck: vi.fn(),
+      canScan: true,
+      currentViewport: null,
+      rootUnavailable: false,
+      viewportChanged: false,
+    },
+    onFinding: vi.fn(),
     actions: {
+      tools: {
+        cssDrafts: {
+          read: vi.fn(() => ''),
+          write: vi.fn(),
+          accept: vi.fn(),
+          discard: vi.fn(),
+          registerEditorCancel: vi.fn(() => vi.fn()),
+          cancelEditing: vi.fn(() => false),
+          items: [],
+          revision: 0,
+        },
+        cancelGesture: vi.fn(() => false),
+        registerGestureCancel: vi.fn(() => vi.fn()),
+        apply: vi.fn(async () => undefined),
+        finish: vi.fn(),
+      },
       close: vi.fn(),
       comment: {
         commit: vi.fn(() => true),
@@ -56,6 +88,9 @@ function createController(): ReturnType<typeof useDesignReviewController> {
       updateValues: vi.fn(),
       voice: { start: vi.fn(), stop: vi.fn(), cancel: vi.fn() },
     },
+    workspace: { collapsed: false, toggleCollapsed: vi.fn(), close: vi.fn(), comment: vi.fn() },
+    tool: 'comment',
+    toolPanelOpen: false,
     enabled: true,
     inspectorOpen: true,
     panel: {
@@ -66,6 +101,8 @@ function createController(): ReturnType<typeof useDesignReviewController> {
     },
     sessionRevision: 0,
     viewState: {
+      valueError: false,
+      measure: { a: null, b: null, preview: null, slot: 'a', replacing: false },
       treeNavigation: { parent: null, child: null },
       action: 'refine',
       anchor: { x: 20, y: 30 },

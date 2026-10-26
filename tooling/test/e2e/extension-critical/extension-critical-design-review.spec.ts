@@ -1,8 +1,246 @@
 import { expect, test } from '../support/extension-fixture';
 import { saveWebSnapshotThroughPopup } from '../security/support';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
+import type { Page } from 'playwright';
 
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+
+async function expectPrivateReport(page: Page) {
+  const exposure = await page.evaluate(() => {
+    const roots: (Document | ShadowRoot)[] = [document];
+    const reports: HTMLIFrameElement[] = [];
+    for (let index = 0; index < roots.length; index++) {
+      for (const element of roots[index]!.querySelectorAll('*')) {
+        if (element.shadowRoot) roots.push(element.shadowRoot);
+        if (
+          element instanceof HTMLIFrameElement &&
+          element.dataset['ui'] === 'content.design-review.print-report'
+        )
+          reports.push(element);
+      }
+    }
+    return reports.flatMap((frame) =>
+      Array.from(frame.contentDocument?.images ?? [], (image) =>
+        image.src.startsWith('data:image/png')
+      )
+    );
+  });
+  expect(exposure.length).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.dataset['reportPageHookCalls'])).toBe(
+    '0'
+  );
+  const host = page.locator('[data-ui="content.design-review.print-host"]');
+  await expect(host).toHaveCount(1);
+  expect(
+    await host.evaluate((node) => ({
+      open: node.shadowRoot !== null,
+      cloned: node.cloneNode(true).textContent,
+      serializedImage: node.outerHTML.includes('data:image/png'),
+    }))
+  ).toEqual({ open: false, cloned: '', serializedImage: false });
+  expect(
+    await page.evaluate(() => {
+      for (let index = 0; index < window.length; index++) {
+        try {
+          if (window[index]!.document.querySelector('article img[src^="data:image/png"]'))
+            return true;
+        } catch {
+          /* Cross-origin source frames remain inaccessible. */
+        }
+      }
+      return false;
+    })
+  ).toBe(false);
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Design Review exports human PDF cards and preserves Markdown at ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const preferences = await context.newPage();
+    await preferences.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`);
+    await preferences.evaluate(async (small) => {
+      await chrome.storage.local.set({
+        'sniptale-locale-preference': small ? 'ru' : 'en',
+        'sniptale-theme-preference': small ? 'dark' : 'light',
+      });
+    }, viewport.name === '1280x560');
+    await preferences.close();
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport.size);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: hostOrigin });
+    await page.evaluate(() => {
+      const target = document.getElementById('measurement-target')!;
+      const neighbor = target.nextElementSibling as HTMLElement;
+      neighbor.id = 'report-neighbor';
+      neighbor.textContent = 'Secondary action';
+      document.body.style.minHeight = '1800px';
+    });
+    await page.route('http://report-private.test/frame', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<style>html,body{margin:0;background:rgb(145,79,219)}</style>Private frame',
+      })
+    );
+    await page.evaluate(() => {
+      const neighbor = document.getElementById('report-neighbor')!;
+      const frame = document.createElement('iframe');
+      frame.id = 'report-cross-origin';
+      frame.src = 'http://report-private.test/frame';
+      frame.style.cssText = 'display:block;width:160px;height:50px;border:0';
+      neighbor.append(frame);
+    });
+    await expect(page.frameLocator('#report-cross-origin').locator('body')).toContainText(
+      'Private frame'
+    );
+    expect(
+      await page
+        .locator('#report-cross-origin')
+        .evaluate((node) => node instanceof HTMLIFrameElement && node.contentDocument === null)
+    ).toBe(true);
+    const target = page.locator('#measurement-target');
+    const popover = page.locator('[data-ui="content.design-review.popover"]');
+    const panel = page.locator('[data-ui="content.design-review.tool-panel"]');
+    const inspect = page.locator('[data-ui="content.toolbar.review-tool.inspect"]');
+    const chooseTarget = async (selector: string) => {
+      const box = (await page.locator(selector).boundingBox())!;
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    };
+    const notes = [
+      'Improve button contrast and give this action more space.',
+      'Align this secondary action with the adjacent button.',
+    ];
+    await page.locator('[data-ui="content.toolbar.review-tool.comment"]').click();
+    for (const [index, selector] of ['#measurement-target', '#report-neighbor'].entries()) {
+      await chooseTarget(selector);
+      const comment = popover.getByRole('textbox', {
+        name: /Element comment|Комментарий к элементу/u,
+      });
+      await comment.fill(notes[index]!);
+      await comment.press('Enter');
+      await expect(popover).toHaveCount(0);
+    }
+    await inspect.click();
+    await chooseTarget('#measurement-target');
+    await panel.locator('[data-ui="content.design-review.css-section"] > summary').click();
+    await panel
+      .getByRole('textbox', { name: /CSS declarations|Декларации CSS/u })
+      .fill('color: rgb(20, 40, 60); width: 140px;');
+    await panel.getByRole('button', { name: /^(Apply CSS|Применить CSS)$/u }).click();
+    await expect(target).toHaveCSS('width', '140px');
+    await expect(target).toHaveCSS('color', 'rgb(20, 40, 60)');
+    await page.screenshot({ path: info.outputPath('review-report-source.png'), fullPage: false });
+    const copyMarkdown = async () => {
+      await page.locator('[data-ui="content.toolbar.annotation-export-button"]').click();
+      await page.locator('[data-ui="content.toolbar.annotation-export.copy"]').click();
+      await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toContain(notes[0]);
+      return page.evaluate(() => navigator.clipboard.readText());
+    };
+    const markdown = await copyMarkdown();
+    for (const note of notes) expect(markdown).toContain(note);
+    expect(markdown).toContain('width');
+    expect(markdown).toContain('140px');
+    const source = await page.evaluate(() => ({
+      x: scrollX,
+      y: scrollY,
+      title: document.title,
+      url: location.href,
+    }));
+    await page.locator('[data-ui="content.toolbar.annotation-export-button"]').click();
+    await page.evaluate(() => {
+      document.documentElement.dataset['reportPageHookCalls'] = '0';
+      const attachShadow = Element.prototype.attachShadow;
+      Element.prototype.attachShadow = function (options) {
+        const calls = Number(document.documentElement.dataset['reportPageHookCalls']);
+        document.documentElement.dataset['reportPageHookCalls'] = String(calls + 1);
+        return attachShadow.call(this, options);
+      };
+    });
+    await page.locator('[data-ui="content.toolbar.annotation-export.pdf"]').click();
+    await expect
+      .poll(() => page.frames().filter((frame) => frame.url() === 'about:blank').length)
+      .toBe(1);
+    const report = page.frames().find((frame) => frame.url() === 'about:blank')!;
+    await expect(report.locator('article')).toHaveCount(2);
+    for (const note of notes) await expect(report.locator('body')).toContainText(note);
+    await expect(report.locator('.source')).toHaveText(source.title);
+    await expect(report.locator('.cover')).toContainText(source.url);
+    await expect(report.locator('table')).toContainText('width');
+    await expect(report.locator('table')).toContainText('140px');
+    await expect(report.locator('img')).toHaveCount(2);
+    await expectPrivateReport(page);
+    await expect
+      .poll(() =>
+        report
+          .locator('img')
+          .evaluateAll((images) =>
+            images.every(
+              (image) =>
+                image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+            )
+          )
+      )
+      .toBe(true);
+    expect(
+      await report
+        .locator('img')
+        .last()
+        .evaluate((node) => {
+          if (!(node instanceof HTMLImageElement)) return 0;
+          const canvas = document.createElement('canvas');
+          canvas.width = node.naturalWidth;
+          canvas.height = node.naturalHeight;
+          const context = canvas.getContext('2d')!;
+          context.drawImage(node, 0, 0);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          let privatePixels = 0;
+          for (let index = 0; index < pixels.length; index += 4) {
+            if (pixels[index] === 145 && pixels[index + 1] === 79 && pixels[index + 2] === 219)
+              privatePixels++;
+          }
+          return privatePixels;
+        })
+    ).toBeGreaterThan(100);
+    await expect(report.locator('pre')).toHaveCount(0);
+    expect(await report.locator('style').textContent()).toContain('@page{size:A4');
+    expect(
+      await report
+        .locator('article')
+        .first()
+        .evaluate((node) => getComputedStyle(node).breakInside)
+    ).toBe('avoid');
+    await expect
+      .poll(() => page.evaluate(() => ({ x: scrollX, y: scrollY })))
+      .toEqual({ x: source.x, y: source.y });
+    await expect(inspect).toHaveAttribute('aria-pressed', 'true');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('measurement-target');
+    await expect(target).toHaveCSS('width', '140px');
+    const printable = await context.newPage();
+    await printable.setViewportSize({ width: 900, height: 1100 });
+    await printable.setContent(await report.locator('html').evaluate((node) => node.outerHTML));
+    await expect(printable.locator('img').first()).toBeVisible();
+    await expect(printable.locator('img').last()).toBeVisible();
+    await printable.screenshot({
+      path: info.outputPath('review-human-report.png'),
+      fullPage: false,
+    });
+    const pdf = await printable.pdf({ path: info.outputPath('review.pdf'), format: 'A4' });
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    await printable.close();
+    await page.bringToFront();
+    expect(await copyMarkdown()).toBe(markdown);
+    await page.screenshot({
+      path: info.outputPath('review-report-restored-source.png'),
+      fullPage: false,
+    });
+    await popup.close();
+    await page.close();
+  });
+}
 
 test('Design Review measurements stay independent and stable through inspector interactions at HD', async ({
   context,
@@ -147,7 +385,10 @@ test('Design Review pointer choices do not inherit keyboard focus paint at HD', 
   await expect(font).toHaveCSS('box-shadow', 'none');
   await font.press('ArrowDown');
   await page.keyboard.press('Enter');
-  await expect(font).toHaveCSS('outline-width', '2px');
+  await expect(font).toBeFocused();
+  await expect(font).toHaveCSS('outline-width', '1px');
+  await expect(font).toHaveCSS('outline-style', 'solid');
+  await expect(font).toHaveCSS('outline-offset', '2px');
   const properties = popover.getByRole('button', {
     name: /Edit element properties|Изменить свойства элемента/u,
   });
@@ -282,16 +523,13 @@ for (const theme of ['light', 'dark'] as const) {
       await expect
         .poll(() => page.locator('#measurement-target').evaluate((node) => node.style.width))
         .toBe('100px');
-      const reopened = (await page.locator('#measurement-target').boundingBox())!;
-      await page.mouse.click(reopened.x + reopened.width / 2, reopened.y + reopened.height / 2);
-      await popover
-        .getByRole('button', { name: /Edit element properties|Изменить свойства элемента/u })
-        .click();
-      await popover
-        .getByRole('navigation')
-        .getByRole('button', { name: /Size and spacing|Размер и отступы/u })
-        .click();
-      await popover.getByRole('textbox', { name: /^(Width|Ширина)$/u }).fill('50%');
+      await expect(popover).toBeVisible();
+      await expect(
+        popover.getByRole('button', { name: /Edit element properties|Изменить свойства элемента/u })
+      ).toHaveAttribute('aria-expanded', 'true');
+      const restoredWidth = popover.getByRole('textbox', { name: /^(Width|Ширина)$/u });
+      await expect(restoredWidth).toHaveValue('100');
+      await restoredWidth.fill('50%');
       await expect(reset).toBeEnabled();
       const switchMode = async (mode: string) => {
         await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
@@ -436,7 +674,7 @@ test('web copy retains authored text drawings and frames after Library reopen', 
     .toBe(true);
   await frameTrigger.click();
   await page
-    .getByRole('button', { name: /^(Add comment|Добавить комментарий)$/u })
+    .getByRole('button', { name: /^(Comment settings|Настройки комментария)$/u })
     .first()
     .click();
   const comment = page.locator('.sniptale-callout [contenteditable="true"]').last();

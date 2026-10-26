@@ -10,6 +10,11 @@ import {
 import { createPagePreparationDrawingSession } from '../../../drawing/history';
 import { DEFAULT_BORDER_PRESET } from '../../../../features/highlighter/style/defaults';
 import type { PagePreparationSessionSnapshot } from './types';
+import {
+  applyPageStyleMutation,
+  createPageStyleHistoryEffect,
+  createRecoveredPageStyleHistoryEffect,
+} from '../../../selection/design-review/style/mutation';
 
 function snapshot(): PagePreparationSessionSnapshot {
   return {
@@ -38,6 +43,13 @@ function session() {
   const history = createPagePreparationHistoryStore();
   let current = snapshot();
   history.registerBridge({
+    createRecoveryStyleEffect: (selector, value) => {
+      const target = resolveRecoveryLocator(selector);
+      const view = target?.ownerDocument.defaultView;
+      return view && (target instanceof view.HTMLElement || target instanceof view.SVGElement)
+        ? createRecoveredPageStyleHistoryEffect(target, value)
+        : null;
+    },
     captureSnapshot: () => structuredClone(current),
     applySnapshot: (next) => {
       current = structuredClone(next);
@@ -55,6 +67,148 @@ function session() {
 }
 afterEach(() => {
   document.body.replaceChildren();
+});
+
+function commitStyle(
+  source: ReturnType<typeof session>,
+  target: HTMLElement,
+  property: 'color' | 'translate',
+  value: string
+) {
+  Object.defineProperty(target, 'getClientRects', {
+    configurable: true,
+    value: () => [DOMRect.fromRect({ width: 100, height: 40 })],
+  });
+  const result = applyPageStyleMutation({ target, declarations: [{ property, value }] });
+  if (result.status !== 'applied') throw new Error('Expected style mutation');
+  source.history.commitEntry({
+    scope: 'design-review',
+    domEffect: createPageStyleHistoryEffect(result.batch),
+  });
+}
+
+it('restores ordered style and Move declarations with exact priorities and domain Undo/Redo', () => {
+  document.body.innerHTML = '<p style="color:red!important">Original</p>';
+  const source = session();
+  const target = document.querySelector('p')!;
+  commitStyle(source, target, 'color', 'blue');
+  commitStyle(source, target, 'color', 'green');
+  commitStyle(source, target, 'translate', '12px 18px');
+  const packet = source.history.captureRecovery()!;
+  expect(packet.entries.map((entry) => entry.style?.declarations[0]?.after.value)).toEqual([
+    'blue',
+    'green',
+    '12px 18px',
+  ]);
+  source.history.clear();
+  source.drawing.dispose();
+  document.body.innerHTML = '<p style="color:red!important; padding:4px">Original</p>';
+  const destination = session();
+  const restored = document.querySelector('p')!;
+  expect(destination.history.restoreRecovery(packet)).toBe(true);
+  expect(restored.style.color).toBe('green');
+  expect(restored.style.translate).toBe('12px 18px');
+  destination.history.undo('page-editing');
+  expect(restored.style.translate).toBe('');
+  destination.history.undo('page-editing');
+  expect(restored.style.color).toBe('blue');
+  destination.history.undo('page-editing');
+  expect(restored.style.getPropertyPriority('color')).toBe('important');
+  expect(restored.style.color).toBe('red');
+  expect(restored.style.padding).toBe('4px');
+  destination.history.redo('page-editing');
+  expect(restored.style.color).toBe('blue');
+  destination.history.clear();
+  destination.drawing.dispose();
+});
+
+it('compensates earlier text when a style source changed and retries the unchanged packet', () => {
+  document.body.innerHTML = '<p>Original</p><aside style="color:red">Note</aside>';
+  const source = session();
+  const target = document.querySelector('p')!;
+  const patch = createDomMutationPatch(target);
+  target.textContent = 'Edited';
+  patch.after = { ...patch.before, html: 'Edited' };
+  source.history.commitEntry({ scope: 'content-editing', domBatch: { patches: [patch] } });
+  commitStyle(source, document.querySelector('aside')!, 'color', 'blue');
+  const packet = source.history.captureRecovery()!;
+  const encoded = JSON.stringify(packet);
+  source.history.clear();
+  source.drawing.dispose();
+  document.body.innerHTML = '<p>Original</p><aside style="color:purple">Note</aside>';
+  const destination = session();
+  expect(destination.history.restoreRecovery(packet)).toBe(false);
+  expect(document.querySelector('p')?.textContent).toBe('Original');
+  expect(document.querySelector('aside')?.style.color).toBe('purple');
+  expect(destination.history.getState().canUndo).toBe(false);
+  document.querySelector('aside')!.style.color = 'red';
+  expect(destination.history.restoreRecovery(packet)).toBe(true);
+  expect(JSON.stringify(packet)).toBe(encoded);
+  expect(document.querySelector('p')?.textContent).toBe('Edited');
+  expect(document.querySelector('aside')?.style.color).toBe('blue');
+  destination.history.clear();
+  destination.drawing.dispose();
+});
+
+it('restores marker-only history before a later rewrite and retains stale ranges until Undo', () => {
+  document.body.innerHTML = '<p id="target">Original</p>';
+  const source = session();
+  const before = source.read();
+  const marked = structuredClone(before);
+  const marker = { id: 'marker', source: 'Original', start: 0, end: 4, color: '#ffcc00' };
+  marked.annotations.domRecords = [
+    {
+      annotationId: 1,
+      creationOrder: 1,
+      propertyChanges: [],
+      textMarkers: [marker],
+      evidence: {
+        fileLabel: 'p',
+        frame: { kind: 'top-document' },
+        locator: '#target',
+        nodePosition: { x: 0, y: 0 },
+        pageUrl: 'https://example.test',
+        targetPath: 'p',
+        targetSelector: '#target',
+        targetText: 'Original',
+        viewport: { width: 1280, height: 560 },
+      },
+    },
+  ];
+  marked.annotations.nextAnnotationId = 2;
+  marked.annotations.nextCreationOrder = 2;
+  source.change(marked);
+  source.history.commitEntry({ scope: 'content-editing', before, after: marked });
+  const target = document.querySelector('p')!;
+  const patch = createDomMutationPatch(target);
+  target.textContent = 'Rewritten';
+  patch.after = { ...patch.before, html: 'Rewritten' };
+  const rewritten = structuredClone(marked);
+  rewritten.annotations.domRecords[0]!.textChange = { before: 'Original', after: 'Rewritten' };
+  source.change(rewritten);
+  source.history.commitEntry({
+    scope: 'content-editing',
+    before: marked,
+    after: rewritten,
+    domBatch: { patches: [patch] },
+  });
+  const packet = source.history.captureRecovery()!;
+  source.history.clear();
+  source.drawing.dispose();
+  document.body.innerHTML = '<p id="target">Original</p>';
+  const destination = session();
+  expect(destination.history.restoreRecovery(packet)).toBe(true);
+  expect(document.querySelector('p')?.textContent).toBe('Rewritten');
+  expect(destination.read().annotations.domRecords[0]?.textMarkers).toEqual([marker]);
+  destination.history.undo('page-editing');
+  expect(document.querySelector('p')?.textContent).toBe('Original');
+  expect(destination.read().annotations.domRecords[0]?.textMarkers).toEqual([marker]);
+  destination.history.undo('page-editing');
+  expect(destination.read().annotations.domRecords).toEqual([]);
+  destination.history.redo('page-editing');
+  expect(destination.read().annotations.domRecords[0]?.textMarkers).toEqual([marker]);
+  destination.history.clear();
+  destination.drawing.dispose();
 });
 it('restores text and drawing into a fresh DOM and preserves domain undo redo and reset', () => {
   document.body.innerHTML = '<main><p>Original <b>rich text</b></p></main>';

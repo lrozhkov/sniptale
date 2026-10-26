@@ -23,6 +23,16 @@ vi.mock('../../../ui/color-selector/picker.css?inline', async () => {
   };
 });
 
+vi.mock('../../../ui/compact-inspector-controls/disclosure.css?inline', async () => {
+  const { readFileSync } = await import('node:fs');
+  return {
+    default: readFileSync(
+      new URL('../../../ui/compact-inspector-controls/disclosure.css', import.meta.url),
+      'utf8'
+    ),
+  };
+});
+
 import {
   createContentEntrypointStyles,
   normalizeContentEntrypointRemUnits,
@@ -257,4 +267,10 @@ it('keeps embedded settings header commands neutral and aligned', () => {
   const header = styles.split('}')[0];
   expect(header).toContain('min-height: 32px');
   expect(header).toContain('align-items: center');
+});
+
+it('includes the shared disclosure geometry in isolated content UI styles', () => {
+  const styles = createContentEntrypointStyles();
+  expect(styles).toContain('.sniptale-disclosure > summary');
+  expect(styles).toContain('.sniptale-disclosure > summary::-webkit-details-marker');
 });

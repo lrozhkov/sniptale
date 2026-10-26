@@ -14,7 +14,7 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function renderHeader() {
+function renderHeader(onClose = vi.fn(), onCollapse = vi.fn()) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -25,7 +25,8 @@ function renderHeader() {
     root?.render(
       <ScenarioRecorderSidebarHeader
         dragging={false}
-        onCollapse={vi.fn()}
+        onCollapse={onCollapse}
+        onClose={onClose}
         onMouseDown={vi.fn()}
         onProjectMenuToggle={vi.fn()}
         projectMenuOpen={false}
@@ -76,4 +77,21 @@ it('keeps project selection outside the panel drag handle', () => {
     '[data-ui="content.scenario.sidebar.project-button"]'
   );
   expect(dragHandle?.contains(projectButton ?? null)).toBe(false);
+});
+
+it('exposes separate labelled close and collapse commands', () => {
+  const close = vi.fn();
+  const collapse = vi.fn();
+  renderHeader(close, collapse);
+  const closeButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.scenario.sidebar.close"]'
+  );
+  expect(closeButton?.getAttribute('aria-label')).toBe('scenario.content.closePanel');
+  closeButton?.click();
+  expect(close).toHaveBeenCalledOnce();
+  expect(collapse).not.toHaveBeenCalled();
+  container
+    ?.querySelector<HTMLButtonElement>('[data-ui="content.scenario.sidebar.collapse"]')
+    ?.click();
+  expect(collapse).toHaveBeenCalledOnce();
 });

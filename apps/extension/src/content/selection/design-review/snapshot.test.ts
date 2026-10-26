@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
+import {
+  browserAnnotationSession,
+  createBrowserAnnotationTargetEvidence,
+} from '../../parser/page-preparation/annotations';
 import { findInspectablePageStyleElement, readPageStyleSelectionSnapshot } from './snapshot';
 
 function appendVisible<T extends Element>(element: T, root: ParentNode = document.body): T {
@@ -20,6 +24,7 @@ function appendVisible<T extends Element>(element: T, root: ParentNode = documen
 
 afterEach(() => {
   vi.restoreAllMocks();
+  browserAnnotationSession.resetForDocument();
   document.body.replaceChildren();
 });
 
@@ -79,4 +84,80 @@ it('does not climb from an ineligible target to a selectable ancestor', () => {
   const script = appendVisible(document.createElement('script'), wrapper);
 
   expect(findInspectablePageStyleElement(script)).toBeNull();
+});
+
+it.each(['50%', 'calc(50% - 2px)', '10em'])(
+  'keeps accepted authored width %s when browser computed style resolves pixels',
+  (width) => {
+    const element = appendVisible(document.createElement('p'));
+    element.style.width = width;
+    browserAnnotationSession.recordPropertyChanges({
+      target: element,
+      evidence: createBrowserAnnotationTargetEvidence(element),
+      changes: [
+        {
+          property: 'width',
+          before: { value: '', priority: '' },
+          after: { value: element.style.width, priority: '' },
+          order: 1,
+        },
+      ],
+    });
+    const computed = document.createElement('div').style;
+    computed.width = '200px';
+    computed.height = '40px';
+    vi.spyOn(window, 'getComputedStyle').mockReturnValue(computed);
+    const before = element.outerHTML;
+    const snapshot = readPageStyleSelectionSnapshot(element)!;
+    expect(snapshot.patch.declarations.find((item) => item.property === 'width')?.value).toBe(
+      element.style.width
+    );
+    expect(snapshot.patch.declarations.find((item) => item.property === 'height')?.value).toBe(
+      '40px'
+    );
+    expect(element.outerHTML).toBe(before);
+    element.style.setProperty('width', width, 'important');
+    expect(
+      readPageStyleSelectionSnapshot(element)!.patch.declarations.find(
+        (item) => item.property === 'width'
+      )?.value
+    ).toBe('200px');
+    element.style.setProperty('width', width, '');
+    browserAnnotationSession.resetForDocument();
+    expect(
+      readPageStyleSelectionSnapshot(element)!.patch.declarations.find(
+        (item) => item.property === 'width'
+      )?.value
+    ).toBe('200px');
+    element.style.width = '320px';
+    computed.width = '320px';
+    expect(
+      readPageStyleSelectionSnapshot(element)!.patch.declarations.find(
+        (item) => item.property === 'width'
+      )?.value
+    ).toBe('320px');
+    element.style.removeProperty('width');
+    computed.width = '200px';
+    expect(
+      readPageStyleSelectionSnapshot(element)!.patch.declarations.find(
+        (item) => item.property === 'width'
+      )?.value
+    ).toBe('200px');
+  }
+);
+
+it('keeps computed visual values for original variables and overridden original dimensions', () => {
+  const element = appendVisible(document.createElement('p'));
+  element.style.color = 'var(--brand)';
+  element.style.fontFamily = 'var(--family)';
+  element.style.width = '50%';
+  const computed = document.createElement('div').style;
+  computed.color = 'rgb(12, 34, 56)';
+  computed.fontFamily = 'Arial';
+  computed.width = '400px';
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue(computed);
+  const values = readPageStyleSelectionSnapshot(element)!.patch.declarations;
+  expect(values.find((item) => item.property === 'color')?.value).toBe('rgb(12, 34, 56)');
+  expect(values.find((item) => item.property === 'font-family')?.value).toBe('Arial');
+  expect(values.find((item) => item.property === 'width')?.value).toBe('400px');
 });

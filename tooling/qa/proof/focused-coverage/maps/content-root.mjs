@@ -1,5 +1,17 @@
 export const CONTENT_ROOT_OWNER_MAPPINGS = [
   {
+    owner: 'content-page-preparation-scoped-history',
+    productionFile: 'apps/extension/src/content/parser/page-preparation/history/snapshot-delta.ts',
+    reason: 'Scoped history replay must preserve other producers and restore text markers.',
+    testFiles: [
+      'apps/extension/src/content/parser/page-preparation/history/scoped-reset.test.ts',
+      'apps/extension/src/content/parser/page-preparation/history/domain-navigation.test.ts',
+      'apps/extension/src/content/parser/page-preparation/annotations/history.integration.test.ts',
+      'apps/extension/src/content/selection/quick-edit-runtime/annotation.history.integration.test.ts',
+      'apps/extension/src/content/selection/quick-edit-runtime/text-marker.test.ts',
+    ],
+  },
+  {
     owner: 'content-toolbar-page-controls',
     productionFile: 'apps/extension/src/content/overlay/toolbar/state/page-controls.ts',
     reason:

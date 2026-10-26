@@ -1,8 +1,17 @@
-import type { Page } from '@playwright/test';
+import { createServer } from 'node:http';
+import type { BrowserContext, Page } from '@playwright/test';
+import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { expect, test, terminateExtensionServiceWorker } from '../support/extension-fixture';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+import {
+  CORRECTED_TRANSCRIPT,
+  CORRECTION_PROMPT,
+  RAW_TRANSCRIPT,
+  TEXT_MODEL_NAME,
+  withVoiceBrowser,
+} from './voice-input-model.test-support';
 
 const restore = '[data-ui="content.toolbar.history-restore-button"]';
 async function activate(page: Page, popup: Page, mode = 'cursor', knownTabId?: number) {
@@ -37,15 +46,12 @@ async function activate(page: Page, popup: Page, mode = 'cursor', knownTabId?: n
   await expect(page.locator('[data-ui="content.toolbar.mode-selector-button"]')).toBeVisible();
 }
 async function editTitle(page: Page, value: string, commit: boolean) {
+  await mode(page, 'quick-edit');
+  await page.locator('[data-ui="content.toolbar.page-editing-mode.block-selection"]').click();
   const title = page.getByTestId('host-page-title');
   const bounds = await title.boundingBox();
   if (!bounds) throw new Error('Page title is not visible');
   await page.mouse.click(bounds.x + 12, bounds.y + 12);
-  const popover = page.locator('[data-ui="content.design-review.popover"]');
-  await expect(popover).toBeVisible();
-  await popover
-    .getByRole('button', { name: /^(Edit element text|Изменить текст элемента)$/u })
-    .click();
   await expect(title).toHaveAttribute('contenteditable', 'true');
   await title.fill(value);
   if (commit) await title.press('Enter');
@@ -318,3 +324,424 @@ test('refuses note-only Restore when the page target has disappeared and retains
     await page.close();
   }
 });
+
+async function markTitle(page: Page) {
+  await mode(page, 'quick-edit');
+  await page.locator('[data-ui="content.toolbar.text-marker"]').click();
+  const points = await page.getByTestId('host-page-title').evaluate((element) => {
+    const node = element.firstChild;
+    if (!node) throw new Error('Host title text is missing');
+    const character = (offset: number) => {
+      const range = document.createRange();
+      range.setStart(node, offset);
+      range.setEnd(node, offset + 1);
+      return range.getBoundingClientRect().toJSON();
+    };
+    return { first: character(0), last: character(7) };
+  });
+  await page.mouse.move(points.first.left + 0.5, points.first.top + points.first.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(points.last.right - 0.5, points.last.top + points.last.height / 2, {
+    steps: 10,
+  });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.size)).toBe(1);
+}
+
+async function restorePage(page: Page, popup: Page) {
+  await page.reload();
+  await activate(page, popup);
+  await expect(page.locator(restore)).toBeVisible();
+  await page.locator(restore).click();
+  await expect(page.locator(restore)).toHaveCount(0);
+}
+
+async function recoveryProvider(context: BrowserContext, extensionId: string) {
+  let requests = 0;
+  const replacement = 'Recovered provider rewrite';
+  const server = createServer((request, response) => {
+    if (request.method !== 'POST' || request.url !== '/v1/chat/completions') {
+      response.writeHead(404).end();
+      return;
+    }
+    request.resume();
+    request.once('end', () => {
+      requests++;
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          choices: [{ finish_reason: 'stop', message: { content: replacement } }],
+        })
+      );
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Provider address is missing');
+  const origin = `http://127.0.0.1:${address.port}`;
+  const providerName = `Recovery provider ${address.port}`;
+  const modelName = `Recovery model ${address.port}`;
+  const settings = await context.newPage();
+  try {
+    await settings.goto(
+      `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=ai-connections`
+    );
+    const locale = await settings.evaluate(async () =>
+      (await chrome.storage.local.get('sniptale-locale-preference'))[
+        'sniptale-locale-preference'
+      ] === 'ru'
+        ? 'ru'
+        : 'en'
+    );
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    await settings.evaluate((origin) => {
+      const grant = document.createElement('button');
+      grant.textContent = 'Grant recovery provider';
+      grant.onclick = async () => {
+        grant.dataset['granted'] = String(
+          await chrome.permissions.request({ origins: [`${origin}/*`] })
+        );
+      };
+      document.body.append(grant);
+    }, origin);
+    const grant = settings.getByRole('button', { name: 'Grant recovery provider', exact: true });
+    await grant.click();
+    await expect(grant).toHaveAttribute('data-granted', 'true');
+    await grant.evaluate((node) => node.remove());
+    await settings
+      .getByRole('region', { name: label('settings.aiProviders.providersTitle'), exact: true })
+      .getByRole('button', { name: label('common.actions.add'), exact: true })
+      .click();
+    const dialog = settings.getByRole('dialog');
+    await dialog.locator('input').nth(0).fill(providerName);
+    await dialog.locator('input').nth(1).fill(`${origin}/v1`);
+    await dialog.locator('input[type=password]').fill('synthetic-recovery-test-key');
+    await dialog.getByRole('button', { name: label('common.actions.add'), exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await settings
+      .getByRole('region', { name: label('settings.aiProviders.modelsTitle'), exact: true })
+      .getByRole('button', { name: label('common.actions.add'), exact: true })
+      .click();
+    await dialog
+      .getByRole('button', {
+        name: label('settings.aiProviders.modelProviderPlaceholder'),
+        exact: true,
+      })
+      .click();
+    await settings.getByRole('option', { name: providerName, exact: true }).click();
+    await dialog
+      .getByPlaceholder(label('settings.aiProviders.modelNamePlaceholder'), { exact: true })
+      .fill(modelName);
+    await dialog
+      .getByPlaceholder(label('settings.aiProviders.modelCodePlaceholder'), { exact: true })
+      .fill('recovery-model');
+    await dialog.getByRole('button', { name: label('common.actions.add'), exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  } catch (error) {
+    server.closeAllConnections();
+    server.close();
+    throw error;
+  } finally {
+    await settings.close();
+  }
+  return {
+    replacement,
+    modelName,
+    requests: () => requests,
+    close: async () => {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+    },
+  };
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`restores text markers through history and Markdown/PDF at ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport.size);
+    try {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: hostOrigin });
+      await markTitle(page);
+      await expect.poll(() => sourceContains(popup, 'textMarkers')).toBe(true);
+      await restorePage(page, popup);
+      await expect.poll(() => page.evaluate(() => CSS.highlights.size)).toBe(1);
+      await mode(page, 'quick-edit');
+      await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+      await expect.poll(() => page.evaluate(() => CSS.highlights.size)).toBe(0);
+      await page.locator('[data-ui="content.toolbar.history-redo-button"]').click();
+      await expect.poll(() => page.evaluate(() => CSS.highlights.size)).toBe(1);
+      await page.screenshot({ path: info.outputPath('restored-marker.png'), fullPage: false });
+      await mode(page, 'design-review');
+      await page.locator('[data-ui="content.toolbar.annotation-export-button"]').click();
+      await page.locator('[data-ui="content.toolbar.annotation-export.copy"]').click();
+      await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toContain('Sniptale');
+      await expect
+        .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+        .toContain('"Sniptale": #ffdf0066 (text offsets 0–8)');
+      await page.locator('[data-ui="content.toolbar.annotation-export-button"]').click();
+      await page.locator('[data-ui="content.toolbar.annotation-export.pdf"]').click();
+      await expect
+        .poll(() => page.frames().filter((frame) => frame.url() === 'about:blank').length)
+        .toBe(1);
+      const report = page.frames().find((frame) => frame.url() === 'about:blank')!;
+      await expect(report.locator('body')).toContainText(/Text highlighting|Подсветка текста/u);
+      await expect(report.locator('article')).toHaveCount(1);
+      await expect(report.locator('body')).toContainText('Sniptale');
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+
+  test(`restores provider AI text and reveals the old marker on Undo at ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport.size);
+    const provider = await recoveryProvider(context, extensionId);
+    try {
+      await page.bringToFront();
+      await markTitle(page);
+      await page.locator('[data-ui="content.toolbar.ai-text"]').click();
+      await page.getByTestId('host-page-title').click();
+      const popover = page.locator('[data-ui="content.ai-text.popover"]');
+      await expect(popover).toBeVisible();
+      await popover.locator('.sniptale-ai-model-selector-trigger').click();
+      await page.getByRole('button', { name: provider.modelName, exact: true }).click();
+      await page
+        .locator('[data-ui="content.ai-text.prompt"]')
+        .fill('Rewrite only this selected title.');
+      await page.locator('[data-ui="content.ai-text.submit"]').click();
+      await expect(page.getByTestId('host-page-title')).toHaveText(provider.replacement);
+      await expect.poll(provider.requests).toBe(1);
+      await expect.poll(() => page.evaluate(() => CSS.highlights.size)).toBe(0);
+      await expect.poll(() => sourceContains(popup, provider.replacement)).toBe(true);
+      await restorePage(page, popup);
+      await expect(page.getByTestId('host-page-title')).toHaveText(provider.replacement);
+      await expect.poll(() => page.evaluate(() => CSS.highlights.size)).toBe(0);
+      await mode(page, 'quick-edit');
+      await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+      await expect(page.getByTestId('host-page-title')).toHaveText('Sniptale E2E Host');
+      await expect.poll(() => page.evaluate(() => CSS.highlights.size)).toBe(1);
+      await page.screenshot({
+        path: info.outputPath('restored-ai-undo-marker.png'),
+        fullPage: false,
+      });
+      await page.locator('[data-ui="content.toolbar.history-redo-button"]').click();
+      await expect(page.getByTestId('host-page-title')).toHaveText(provider.replacement);
+      await expect.poll(() => page.evaluate(() => CSS.highlights.size)).toBe(0);
+      expect(provider.requests()).toBe(1);
+    } finally {
+      await provider.close();
+      await popup.close();
+      await page.close();
+    }
+  });
+
+  test(`refuses foreign CSS, retries Restore and replays CSS/Move at ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport.size);
+    const title = page.getByTestId('host-page-title');
+    try {
+      await page.addInitScript(() => {
+        document.addEventListener(
+          'DOMContentLoaded',
+          () => {
+            const target = document.querySelector<HTMLElement>('[data-testid="host-page-title"]');
+            target?.style.setProperty('color', 'rgb(1, 2, 3)', 'important');
+          },
+          { once: true }
+        );
+      });
+      await title.evaluate((node) => node.style.setProperty('color', 'rgb(1, 2, 3)', 'important'));
+      const baseline = await title.evaluate((node) => ({
+        value: node.style.getPropertyValue('color'),
+        priority: node.style.getPropertyPriority('color'),
+      }));
+      await page.locator('[data-ui="content.toolbar.review-tool.inspect"]').click();
+      const inspectedBounds = (await title.boundingBox())!;
+      await page.mouse.click(inspectedBounds.x + 12, inspectedBounds.y + 12);
+      const panel = page.locator('[data-ui="content.design-review.tool-panel"]');
+      await panel.locator('[data-ui="content.design-review.css-section"] > summary').click();
+      await panel
+        .getByRole('textbox', { name: /CSS declarations|Декларации CSS/u })
+        .fill('color: rgb(20, 40, 60);');
+      await panel.getByRole('button', { name: /^(Apply CSS|Применить CSS)$/u }).click();
+      await expect(title).toHaveCSS('color', 'rgb(20, 40, 60)');
+      await page.locator('[data-ui="content.toolbar.review-tool.move"]').click();
+      const before = (await title.boundingBox())!;
+      await page.mouse.move(before.x + 12, before.y + 12);
+      await page.mouse.down();
+      await page.mouse.move(before.x + 36, before.y + 24, { steps: 5 });
+      await page.mouse.up();
+      await expect(title).toHaveCSS('translate', '24px 12px');
+      await expect.poll(() => sourceContains(popup, '24px 12px')).toBe(true);
+      await page.reload();
+      await title.evaluate((node) =>
+        node.style.setProperty('color', 'rgb(91, 92, 93)', 'important')
+      );
+      await activate(page, popup);
+      await expect(page.locator(restore)).toBeVisible();
+      await page.locator(restore).click();
+      await expect(
+        page.getByText(
+          /Could not save or restore page changes|Не удалось сохранить или восстановить/u
+        )
+      ).toBeVisible();
+      await expect(page.locator(restore)).toBeVisible();
+      await expect(title).toHaveCSS('color', 'rgb(91, 92, 93)');
+      await expect(title).toHaveCSS('translate', 'none');
+      expect(await sourceContains(popup, '24px 12px')).toBe(true);
+      await title.evaluate((node, original) => {
+        if (original.value) node.style.setProperty('color', original.value, original.priority);
+        else node.style.removeProperty('color');
+      }, baseline);
+      await page.locator(restore).click();
+      await expect(page.locator(restore)).toHaveCount(0);
+      await expect(title).toHaveCSS('translate', '24px 12px');
+      await expect(title).toHaveCSS('color', 'rgb(20, 40, 60)');
+      expect(await title.evaluate((node) => node.style.getPropertyPriority('color'))).toBe('');
+      await mode(page, 'design-review');
+      await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+      await expect(title).toHaveCSS('translate', 'none');
+      await expect(title).toHaveCSS('color', 'rgb(20, 40, 60)');
+      await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+      expect(
+        await title.evaluate((node) => ({
+          value: node.style.getPropertyValue('color'),
+          priority: node.style.getPropertyPriority('color'),
+        }))
+      ).toEqual(baseline);
+      await page.locator('[data-ui="content.toolbar.history-redo-button"]').click();
+      await page.locator('[data-ui="content.toolbar.history-redo-button"]').click();
+      await expect(title).toHaveCSS('translate', '24px 12px');
+      await expect(title).toHaveCSS('color', 'rgb(20, 40, 60)');
+      await page.screenshot({
+        path: info.outputPath('restored-css-move-retry.png'),
+        fullPage: false,
+      });
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  test(`dictated instructions reach the new AI rewrite through click and PTT at ${viewport.name}`, async ({
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const locale = index === 0 ? 'en' : 'ru';
+    await withVoiceBrowser(
+      viewport.size,
+      locale,
+      async ({ page: settings, extensionId, provider, context }) => {
+        const { page, popup } = await openDesignReview(
+          context,
+          extensionId,
+          hostOrigin,
+          viewport.size
+        );
+        try {
+          await mode(page, 'quick-edit');
+          await page.locator('[data-ui="content.toolbar.ai-text"]').click();
+          const title = page.getByTestId('host-page-title');
+          await title.click();
+          const prompt = page.locator('[data-ui="content.ai-text.prompt"]');
+          const microphone = page.locator('[data-ui="content.ai-text.voice"]');
+          await expect(prompt).toBeVisible();
+          await prompt.fill('');
+          await microphone.click();
+          await expect(microphone).toHaveAttribute('aria-pressed', 'true');
+          // Real MediaRecorder requires an audio sample; this wait does not order a state race.
+          await page.waitForTimeout(800);
+          await expect(microphone).toHaveAttribute('aria-pressed', 'true');
+          await microphone.click();
+          await expect(prompt).toHaveValue(CORRECTED_TRANSCRIPT);
+          expect(provider.corrections).toEqual([
+            {
+              model: 'synthetic-text',
+              messages: [
+                { role: 'system', content: CORRECTION_PROMPT },
+                { role: 'user', content: RAW_TRANSCRIPT },
+              ],
+            },
+          ]);
+          await settings.bringToFront();
+          const savedPrompt = 'Keep only the dictated replacement instruction.';
+          await settings.locator('[data-ui="settings.voice.correction-prompt"]').fill(savedPrompt);
+          await settings.locator('[data-ui="settings.voice.prompt-save"]').click();
+          await expect(settings.locator('[data-ui="settings.voice.prompt-save"]')).toBeDisabled();
+          await page.bringToFront();
+          await prompt.fill('Before  after');
+          await prompt.evaluate((input: HTMLTextAreaElement) => input.setSelectionRange(7, 7));
+          await microphone.hover();
+          await page.mouse.down();
+          await page.waitForTimeout(800);
+          await page.mouse.up();
+          const dictatedInstruction = `Before ${CORRECTED_TRANSCRIPT} after`;
+          await expect(prompt).toHaveValue(dictatedInstruction);
+          expect(provider.uploads).toHaveLength(2);
+          expect(provider.corrections).toHaveLength(2);
+          expect(provider.corrections[1]).toEqual({
+            model: 'synthetic-text',
+            messages: [
+              { role: 'system', content: savedPrompt },
+              { role: 'user', content: RAW_TRANSCRIPT },
+            ],
+          });
+          const popover = page.locator('[data-ui="content.ai-text.popover"]');
+          await popover.locator('.sniptale-ai-model-selector-trigger').click();
+          await page.getByRole('button', { name: TEXT_MODEL_NAME, exact: true }).click();
+          await page.screenshot({
+            path: info.outputPath('new-ai-dictated-instruction.png'),
+            fullPage: false,
+          });
+          await page.locator('[data-ui="content.ai-text.submit"]').click();
+          await expect(title).toHaveText(CORRECTED_TRANSCRIPT);
+          await expect.poll(() => provider.corrections.length).toBe(3);
+          expect(provider.corrections[2]).toMatchObject({
+            model: 'synthetic-text',
+            messages: expect.arrayContaining([
+              expect.objectContaining({
+                role: 'user',
+                content: expect.stringContaining(dictatedInstruction),
+              }),
+            ]),
+          });
+          await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+          await expect(title).toHaveText('Sniptale E2E Host');
+          await page.locator('[data-ui="content.toolbar.history-redo-button"]').click();
+          await expect(title).toHaveText(CORRECTED_TRANSCRIPT);
+          expect(provider.uploads).toHaveLength(2);
+          expect(provider.corrections).toHaveLength(3);
+          await page.screenshot({
+            path: info.outputPath('new-ai-dictation-applied.png'),
+            fullPage: false,
+          });
+        } finally {
+          await popup.close();
+          await page.close();
+        }
+      }
+    );
+  });
+}

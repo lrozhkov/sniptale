@@ -5,6 +5,7 @@ const DESIGN_REVIEW_BORDER = '1px solid #000000';
 const DESIGN_REVIEW_FILL = 'rgba(0, 0, 0, 0.07)';
 const SUMMARY_VIEWPORT_GAP = 8;
 let designReviewFrame: HTMLElement | null = null;
+let designReviewCandidateFrame: HTMLElement | null = null;
 
 function createDesignReviewSummary(): HTMLDivElement {
   const summary = document.createElement('div');
@@ -29,11 +30,7 @@ function createDesignReviewSummary(): HTMLDivElement {
   return summary;
 }
 
-function ensureDesignReviewFrame(): HTMLElement {
-  if (designReviewFrame?.isConnected) {
-    return designReviewFrame;
-  }
-
+function createDesignReviewFrame(): HTMLElement {
   const frame = document.createElement('div');
   frame.className = 'sniptale-design-review-frame';
   frame.setAttribute('aria-hidden', 'true');
@@ -58,8 +55,12 @@ function ensureDesignReviewFrame(): HTMLElement {
   frame.append(createDesignReviewSummary());
 
   appendToContentOverlayRoot(frame);
-  designReviewFrame = frame;
   return frame;
+}
+
+function ensureDesignReviewFrame(): HTMLElement {
+  if (!designReviewFrame?.isConnected) designReviewFrame = createDesignReviewFrame();
+  return designReviewFrame;
 }
 
 function getElementSummary(element: Element, width: number, height: number): string {
@@ -119,20 +120,53 @@ function applyDesignReviewFrameRect(
   return rect;
 }
 
-export function showDesignReviewFrame(element: Element): void {
+export function showDesignReviewFrame(
+  element: Element,
+  selected = false,
+  immediate = false,
+  candidate: Element | null = null
+): void {
   const frame = ensureDesignReviewFrame();
+  frame.dataset['state'] = selected ? 'selected' : 'hover';
+  frame.style.transition = immediate
+    ? 'none'
+    : 'left 90ms ease-out, top 90ms ease-out, width 90ms ease-out, height 90ms ease-out';
+  frame.style.border = selected ? '2px solid #000000' : DESIGN_REVIEW_BORDER;
+  frame.style.background = selected ? 'transparent' : DESIGN_REVIEW_FILL;
   const rect = applyDesignReviewFrameRect(frame, element);
   frame.style.display = 'block';
   positionSummary(frame, rect);
+  if (selected && candidate?.isConnected && candidate !== element) {
+    if (!designReviewCandidateFrame?.isConnected) {
+      designReviewCandidateFrame = createDesignReviewFrame();
+      designReviewCandidateFrame.className = 'sniptale-design-review-candidate-frame';
+      const summary = designReviewCandidateFrame.querySelector<HTMLElement>(
+        '.sniptale-design-review-frame-summary'
+      );
+      if (summary) summary.hidden = true;
+    }
+    const preview = designReviewCandidateFrame;
+    preview.dataset['state'] = 'hover';
+    preview.style.border = DESIGN_REVIEW_BORDER;
+    preview.style.background = DESIGN_REVIEW_FILL;
+    const previewRect = applyDesignReviewFrameRect(preview, candidate);
+    preview.style.display = 'block';
+    positionSummary(preview, previewRect);
+  } else if (designReviewCandidateFrame) {
+    designReviewCandidateFrame.style.display = 'none';
+  }
 }
 
 export function hideDesignReviewFrame(): void {
+  if (designReviewCandidateFrame) designReviewCandidateFrame.style.display = 'none';
   if (designReviewFrame) {
     designReviewFrame.style.display = 'none';
   }
 }
 
 export function removeDesignReviewFrame(): void {
+  designReviewCandidateFrame?.remove();
+  designReviewCandidateFrame = null;
   designReviewFrame?.remove();
   designReviewFrame = null;
 }

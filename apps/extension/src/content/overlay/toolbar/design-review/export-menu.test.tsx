@@ -110,6 +110,7 @@ it('uses the canonical toolbar trigger and horizontally aligns the menu with its
   );
 
   expect(commands.map((command) => command.getAttribute('data-ui'))).toEqual([
+    'content.toolbar.annotation-export.pdf',
     'content.toolbar.annotation-export.download',
     'content.toolbar.annotation-export.copy',
     'content.toolbar.annotation-export.export-page',

@@ -13,6 +13,7 @@ import {
   type BrowserAnnotationTextChangesInput,
   type BrowserDesignReviewActionInput,
   type BrowserDomAnnotationRecord,
+  type BrowserTextMarker,
   type BrowserFrameAnnotationInput,
   type BrowserFrameAnnotationRecord,
 } from './types';
@@ -74,6 +75,9 @@ function cloneDomRecord(record: BrowserDomAnnotationRecord): BrowserDomAnnotatio
     evidence: cloneEvidence(record.evidence),
     propertyChanges: record.propertyChanges.map(clonePropertyChange),
     ...(record.designReview ? { designReview: { ...record.designReview } } : {}),
+    ...(record.textMarkers
+      ? { textMarkers: record.textMarkers.map((marker) => ({ ...marker })) }
+      : {}),
     ...(record.textChange ? { textChange: { ...record.textChange } } : {}),
   };
 }
@@ -146,6 +150,7 @@ function removeEmptyRecord(
     record.comment ||
     record.designReview?.action ||
     record.textChange ||
+    record.textMarkers?.length ||
     record.propertyChanges.length > 0
   ) {
     return;
@@ -326,6 +331,29 @@ function applyTextChange(
   return true;
 }
 
+interface TextMarkersInput {
+  target: Element;
+  evidence: BrowserAnnotationTargetEvidence;
+  markers: readonly BrowserTextMarker[];
+}
+function setTextMarkerGroups(
+  state: BrowserAnnotationRuntimeState,
+  inputs: readonly TextMarkersInput[]
+): void {
+  let changed = false;
+  for (const input of inputs) {
+    const existing = getRecordForTarget(state, input.target);
+    if (!existing && input.markers.length === 0) continue;
+    const record = existing ?? createRecord(state, input);
+    record.evidence = cloneEvidence(input.evidence);
+    if (input.markers.length) record.textMarkers = input.markers.map((marker) => ({ ...marker }));
+    else delete record.textMarkers;
+    removeEmptyRecord(state, record);
+    changed = true;
+  }
+  if (changed) publish(state);
+}
+
 function recordTextChanges(
   state: BrowserAnnotationRuntimeState,
   inputs: BrowserAnnotationTextChangesInput
@@ -501,6 +529,9 @@ export function createBrowserAnnotationSession() {
     }),
     recordPropertyChanges: (input: BrowserAnnotationPropertyChangesInput): void =>
       recordPropertyChanges(state, input),
+    setTextMarkers: (input: TextMarkersInput): void => setTextMarkerGroups(state, [input]),
+    setTextMarkerGroups: (inputs: readonly TextMarkersInput[]): void =>
+      setTextMarkerGroups(state, inputs),
     recordTextChange: (input: BrowserAnnotationTextChangeInput): void =>
       recordTextChanges(state, [input]),
     recordTextChanges: (inputs: BrowserAnnotationTextChangesInput): void =>

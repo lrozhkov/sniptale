@@ -126,6 +126,11 @@ export function createEnableAiPickMode(props: {
 
       props.deactivateOtherModes('ai-pick');
       finalizeAiPickEnable(props.state, onContentSelect, nextParsedTree);
+      if (options?.openTable) {
+        props.setModeEnabled('ai-pick', true);
+        onContentSelect(nextParsedTree, new Set());
+        return;
+      }
       props.overlayController.createOverlayContainer();
       props.overlayController.createHoverOverlay();
       attachEnabledAiPickListeners(props, source);

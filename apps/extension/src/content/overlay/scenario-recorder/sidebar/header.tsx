@@ -1,11 +1,12 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { Grip, FileStack, ChevronDown, ChevronsDown } from 'lucide-react';
+import { Grip, FileStack, ChevronDown, ChevronsDown, X } from 'lucide-react';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { translate } from '../../../../platform/i18n';
 
 export function ScenarioRecorderSidebarHeader(props: {
   dragging: boolean;
   onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
+  onClose: (event: MouseEvent<HTMLButtonElement>) => void;
   onMouseDown: MouseEventHandler<HTMLDivElement>;
   onProjectMenuToggle: () => void;
   projectMenuOpen: boolean;
@@ -54,6 +55,18 @@ export function ScenarioRecorderSidebarHeader(props: {
         className="size-8 shrink-0"
       >
         <ChevronsDown aria-hidden="true" size={16} />
+      </ProductActionButton>
+      <ProductActionButton
+        tone="secondary"
+        type="button"
+        onClick={props.onClose}
+        aria-label={translate('scenario.content.closePanel')}
+        title={translate('scenario.content.closePanel')}
+        data-ui="content.scenario.sidebar.close"
+        data-command-chrome="true"
+        className="size-8 shrink-0"
+      >
+        <X aria-hidden="true" size={16} />
       </ProductActionButton>
     </div>
   );

@@ -46,3 +46,22 @@ it('inserts the quick-action control into old layouts without losing saved order
   expect(restored.indexOf('capture-size') + 1).toBe(restored.indexOf('quick-actions'));
   expect(restored.indexOf('quick-actions') + 1).toBe(restored.indexOf('scenario-panel'));
 });
+
+it('includes new editing and review tools in legacy layout migration and the unified reset', () => {
+  for (const [mode, additions] of [
+    ['quick-edit', ['editing-marker', 'editing-ai-text']],
+    [
+      'design-review',
+      ['review-comment', 'review-inspect', 'review-compare', 'review-move', 'review-check'],
+    ],
+  ] as const) {
+    const migrated = getPageToolbarLayout(mode, ['settings', 'mode']);
+    const reset = createPageToolbarResetPatch();
+    for (const control of additions) {
+      expect(migrated).toContain(control);
+      expect(reset.pageControls).toHaveProperty(control, true);
+      expect(reset.pageControlOverrides?.[mode]).toHaveProperty(control, null);
+    }
+    expect(migrated.indexOf('settings')).toBeLessThan(migrated.indexOf('mode'));
+  }
+});

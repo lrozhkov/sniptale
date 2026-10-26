@@ -1,7 +1,6 @@
 import type React from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../../../../platform/i18n';
-import { saveSpoilerState } from '../../persistence/spoiler-state';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { resizeElement, type ResizePointerEvent } from './resize';
 
@@ -14,8 +13,6 @@ export function createToggleSpoilerHandler(
   return () => {
     const next = !isDataSpoilerOpen;
     setIsDataSpoilerOpen(next);
-    // The spoiler preference is advisory-only: local UI state wins even if persistence fails.
-    void saveSpoilerState(next);
   };
 }
 

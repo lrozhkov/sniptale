@@ -1,6 +1,8 @@
 import { registerPageRecoveryPorts } from '../../../page-recovery/ports';
 import { createAudioJobService } from '../../../ai/audio/service';
 import { registerAudioJobPorts } from '../../../ai/audio/port';
+import { createContentTextJobService } from '../../../ai/llm/content-text-job';
+import { registerContentTextPorts } from '../../../ai/llm/content-text-port';
 import { createReviewTextJobService } from '../../../ai/llm/review-text-job';
 import { registerReviewTextPorts } from '../../../ai/llm/review-text-port';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -43,9 +45,11 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   subscribeToLocaleChanges(() => undefined);
   const audioJobs = createAudioJobService();
   const textJobs = createReviewTextJobService();
-  configureAudioJobPrivacyErasurePort(audioJobs, textJobs);
+  const contentTextJobs = createContentTextJobService();
+  configureAudioJobPrivacyErasurePort(audioJobs, textJobs, contentTextJobs);
   registerAudioJobPorts(audioJobs);
   registerReviewTextPorts(textJobs);
+  registerContentTextPorts(contentTextJobs);
   configureDownloadPort({ executeDownloadBlob });
   runStartupMaintenance(state, logger);
   registerInstallListener(logger);

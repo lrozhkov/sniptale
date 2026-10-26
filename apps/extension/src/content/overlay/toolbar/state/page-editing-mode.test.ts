@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { createPageEditingModeSelector } from './page-editing-mode';
 
 function createSelector(overrides?: {
-  aiPickMode?: boolean;
   quickEditDocumentMode?: boolean;
   quickEditMode?: boolean;
   toggleResult?: boolean;
@@ -15,7 +14,6 @@ function createSelector(overrides?: {
   return {
     actions,
     select: createPageEditingModeSelector({
-      aiPickMode: overrides?.aiPickMode ?? false,
       quickEditDocumentMode: overrides?.quickEditDocumentMode ?? false,
       quickEditMode: overrides?.quickEditMode ?? false,
       ...actions,
@@ -56,11 +54,11 @@ describe('createPageEditingModeSelector', () => {
     expect(blockSelection.actions.toggleQuickEditMode).not.toHaveBeenCalled();
   });
 
-  it('keeps the already active AI submode stable', async () => {
-    const { actions, select } = createSelector({ aiPickMode: true });
-
+  it('requests the table on each click without retoggling Content Editing', async () => {
+    const { actions, select } = createSelector();
     await select('ai');
-
-    expect(actions.onAiPickContentStart).not.toHaveBeenCalled();
+    await select('ai');
+    expect(actions.onAiPickContentStart).toHaveBeenCalledTimes(2);
+    expect(actions.toggleQuickEditMode).not.toHaveBeenCalled();
   });
 });

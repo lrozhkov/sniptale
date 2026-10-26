@@ -508,3 +508,32 @@ it('rebinds restored comments and text to the new document without merging an un
     textChange: { before: 'Old', after: 'New' },
   });
 });
+
+it('publishes a multi-target marker edit once and keeps the existing rollback revision guard', () => {
+  const session = createBrowserAnnotationSession();
+  const first = createTarget();
+  const second = createTarget();
+  const rollback = session.captureFailedMutationRollbackPoint();
+  const changed = vi.fn();
+  session.subscribe(changed);
+  session.setTextMarkerGroups(
+    [first, second].map((target, index) => ({
+      target,
+      evidence: createEvidence(),
+      markers: [{ id: String(index), source: 'Text', start: 0, end: 4, color: '#ff0000' }],
+    }))
+  );
+  expect(changed).toHaveBeenCalledOnce();
+  expect(session.captureSnapshot().domRecords).toHaveLength(2);
+  expect(session.rollbackFailedMutation(rollback)).toBe(true);
+  expect(session.captureSnapshot().domRecords).toEqual([]);
+  const stale = session.captureFailedMutationRollbackPoint();
+  session.setTextMarkers({
+    target: first,
+    evidence: createEvidence(),
+    markers: [{ id: 'new', source: 'Text', start: 0, end: 4, color: '#000000' }],
+  });
+  session.setComment({ target: first, evidence: createEvidence(), comment: 'Keep unrelated edit' });
+  expect(session.rollbackFailedMutation(stale)).toBe(false);
+  expect(session.captureSnapshot().domRecords[0]?.comment).toBe('Keep unrelated edit');
+});

@@ -7,15 +7,6 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
 import { useAIModalDataPanelState } from './controller';
 
-const loadSpoilerState = vi.fn().mockResolvedValue(false);
-const saveSpoilerState = vi.fn();
-
-vi.mock('../../persistence/spoiler-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../persistence/spoiler-state')>()),
-  loadSpoilerState: () => loadSpoilerState(),
-  saveSpoilerState: (...args: unknown[]) => saveSpoilerState(...args),
-}));
-
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
@@ -71,8 +62,6 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
-  loadSpoilerState.mockClear();
-  saveSpoilerState.mockClear();
 });
 
 function renderHarness(node: React.ReactNode) {

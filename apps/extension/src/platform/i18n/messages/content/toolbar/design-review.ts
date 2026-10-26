@@ -1,6 +1,26 @@
 import { defineMessageSource } from '../../source';
 
 export const contentToolbarDesignReviewMessages = defineMessageSource({
+  annotationExportPdfLabel: {
+    ru: 'Сохранить в PDF…',
+    en: 'Save as PDF…',
+  },
+  annotationExportPdfHint: {
+    ru: 'Открыть печатный отчёт и выбрать «Сохранить как PDF»',
+    en: 'Open the print report and choose Save as PDF',
+  },
+  annotationExportPdfTitle: {
+    ru: 'Дизайн-ревью',
+    en: 'Design review',
+  },
+  annotationExportPdfOpened: {
+    ru: 'Открыт диалог печати отчёта',
+    en: 'Report print dialog opened',
+  },
+  annotationExportPdfError: {
+    ru: 'Не удалось открыть печать. Повторите экспорт.',
+    en: 'Could not open printing. Retry the export.',
+  },
   annotationExportMenuTitle: {
     ru: 'Экспорт дизайн-ревью',
     en: 'Export design review',

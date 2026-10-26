@@ -13,7 +13,6 @@ import {
 const {
   aiModelSelectorMock,
   loggerErrorMock,
-  loadSpoilerStateMock,
   reconcileSelectedAIModelIdMock,
   requestAIModelSelectionBootstrapMock,
   selectLastPromptMock,
@@ -22,7 +21,6 @@ const {
 } = vi.hoisted(() => ({
   aiModelSelectorMock: vi.fn(),
   loggerErrorMock: vi.fn(),
-  loadSpoilerStateMock: vi.fn(),
   reconcileSelectedAIModelIdMock: vi.fn(),
   requestAIModelSelectionBootstrapMock: vi.fn(),
   selectLastPromptMock: vi.fn(),
@@ -59,11 +57,6 @@ vi.mock('../../../state/ai-modal.store', () => ({
       lastPrompt: 'Stored prompt',
       setLastPrompt: setLastPromptMock,
     }),
-}));
-
-vi.mock('../../persistence/spoiler-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../persistence/spoiler-state')>()),
-  loadSpoilerState: loadSpoilerStateMock,
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -169,7 +162,9 @@ async function clickElement(element: Element | null | undefined) {
 }
 
 async function expandDataPanel() {
-  await clickElement(container?.querySelector('.sniptale-ai-spoiler-toggle'));
+  expect(
+    container?.querySelector('.sniptale-ai-spoiler-toggle')?.getAttribute('aria-expanded')
+  ).toBe('true');
 }
 
 async function toggleJsonPreview() {
@@ -190,7 +185,6 @@ beforeEach(() => {
   aiModelSelectorMock.mockReset();
   selectLastPromptMock.mockImplementation((state: { lastPrompt: string }) => state.lastPrompt);
   usePromptTemplatesMock.mockReturnValue(createIntegrationTemplatesState());
-  loadSpoilerStateMock.mockResolvedValue(false);
   requestAIModelSelectionBootstrapMock.mockResolvedValue(createIntegrationBootstrapPayload());
   reconcileSelectedAIModelIdMock.mockResolvedValue('model-1');
   loggerErrorMock.mockReset();

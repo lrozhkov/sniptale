@@ -11,6 +11,68 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
+  aiTableLabel: { ru: 'AI: таблица', en: 'AI: table' },
+  aiTableHint: { ru: 'Выбрать элементы в таблице', en: 'Select elements in the table' },
+  aiTextSelect: { ru: 'Выбрать текст для AI', en: 'Select text for AI' },
+  aiTextSelectHint: {
+    ru: 'Выберите текстовый элемент на странице и задайте инструкцию.',
+    en: 'Select a text element on the page and enter an instruction.',
+  },
+  aiTextTitle: { ru: 'Изменить текст с AI', en: 'Edit text with AI' },
+  aiTextPrompt: { ru: 'Инструкция для выбранного текста', en: 'Instruction for selected text' },
+  aiTextPlaceholder: { ru: 'Как изменить этот текст?', en: 'How should this text change?' },
+  aiTextDisclosureData: {
+    ru: 'инструкция и текст выбранного элемента страницы',
+    en: 'the instruction and text of the selected page element',
+  },
+  aiTextSend: { ru: 'Отправить', en: 'Send' },
+  aiTextStop: { ru: 'Остановить', en: 'Stop' },
+  aiTextWaiting: { ru: 'Ожидание ответа', en: 'Waiting for response' },
+  aiTextElapsed: { ru: '{seconds} с', en: '{seconds}s' },
+  aiTextStale: {
+    ru: 'Выбранный текст изменился. Выберите элемент снова.',
+    en: 'The selected text changed. Select the element again.',
+  },
+  aiTextError: {
+    ru: 'Не удалось изменить текст. Исходный текст сохранён. Повторите запрос.',
+    en: 'Could not change the text. The original text is preserved. Try the request again.',
+  },
+  aiTextTooLarge: {
+    ru: 'Текст слишком длинный. Выберите элемент с меньшим текстом.',
+    en: 'The text is too long. Select a smaller text element.',
+  },
+  aiTextTimeout: {
+    ru: 'Время ожидания истекло. Исходный текст сохранён. Повторите запрос.',
+    en: 'The request timed out. The original text is preserved. Try the request again.',
+  },
+  aiTextCancelled: {
+    ru: 'Запрос остановлен. Исходный текст сохранён.',
+    en: 'Request stopped. The original text is preserved.',
+  },
+  aiTextModelsError: {
+    ru: 'Не удалось загрузить модели. Закройте окно и откройте его снова.',
+    en: 'Could not load models. Close and reopen this window.',
+  },
+  aiTextModelUnavailable: {
+    ru: 'Модель недоступна. Проверьте настройки и откройте окно снова.',
+    en: 'The model is unavailable. Check its settings and reopen this window.',
+  },
+  aiTextClose: { ru: 'Закрыть окно AI-правки', en: 'Close AI text editor' },
+  textMarker: { ru: 'Текстовый маркер', en: 'Text marker' },
+  textMarkerColor: { ru: 'Цвет и прозрачность маркера', en: 'Marker color and opacity' },
+  textMarkerHint: {
+    ru: 'Выделите текст, чтобы применить цвет. Повторное выделение перекрашивает его. Ластик или 0% снимает подсветку. 100% закрывает буквы.',
+    en: 'Select text to apply the color. Select it again to repaint it. Eraser or 0% removes highlighting. Any color at 100% covers the letters.',
+  },
+  textMarkerUnsupported: {
+    ru: 'Этот браузер не поддерживает текстовый маркер.',
+    en: 'This browser does not support text markers.',
+  },
+  textMarkerErase: { ru: 'Ластик: снять подсветку текста', en: 'Eraser: remove text highlighting' },
+  textMarkerError: {
+    ru: 'Не удалось изменить маркер. Выделите обычный текст на странице и повторите.',
+    en: 'Could not change the marker. Select ordinary page text and try again.',
+  },
   pageCustomizeControls: { ru: 'Настроить кнопки панели', en: 'Customize toolbar buttons' },
   pageCustomizeControlsHint: {
     ru: 'Переставьте кнопки, выберите видимые и настройте разделители.',

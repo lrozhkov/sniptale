@@ -220,7 +220,6 @@ export function useToolbarModeToggles(params: UseToolbarModeTogglesParams) {
   };
 
   const selectPageEditingMode = createPageEditingModeSelector({
-    aiPickMode: params.aiPickMode,
     onAiPickContentStart: params.onAiPickContentStart,
     onToggleQuickEditDocumentMode: params.onToggleQuickEditDocumentMode,
     quickEditDocumentMode: params.quickEditDocumentMode,

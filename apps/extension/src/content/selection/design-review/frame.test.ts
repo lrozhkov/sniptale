@@ -32,6 +32,22 @@ afterEach(() => {
 });
 
 describe('design review frame', () => {
+  it('keeps the selected summary readable while the candidate uses only outline and fill', () => {
+    const selected = createTarget();
+    const candidate = createTarget();
+    candidate.id = 'candidate';
+    showDesignReviewFrame(selected, true, false, candidate);
+    const selectedSummary = document.querySelector<HTMLElement>(
+      '.sniptale-design-review-frame .sniptale-design-review-frame-summary'
+    );
+    const candidateSummary = document.querySelector<HTMLElement>(
+      '.sniptale-design-review-candidate-frame .sniptale-design-review-frame-summary'
+    );
+    expect(selectedSummary?.hidden).toBe(false);
+    expect(candidateSummary?.hidden).toBe(true);
+    expect(candidateSummary?.textContent).toContain('candidate');
+  });
+
   it('shows, reuses, and hides the compact animated inspection frame', () => {
     const target = createTarget();
 
@@ -52,6 +68,11 @@ describe('design review frame', () => {
     const summary = firstFrame?.querySelector<HTMLElement>('.sniptale-design-review-frame-summary');
     expect(summary?.textContent).toBe('img#hero.preview · 64 × 64');
     expect(summary?.style.pointerEvents).toBe('none');
+
+    showDesignReviewFrame(target, true);
+    expect(firstFrame?.dataset['state']).toBe('selected');
+    expect(firstFrame?.style.border).toBe('2px solid rgb(0, 0, 0)');
+    expect(firstFrame?.style.background).toBe('transparent');
 
     hideDesignReviewFrame();
     expect(firstFrame?.style.display).toBe('none');

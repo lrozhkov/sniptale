@@ -9,6 +9,59 @@ import {
 import { createFrameAnnotationSnapshot } from '../../../../features/highlighter/frame-annotation/model';
 import type { PagePreparationRecovery, PagePreparationSessionSnapshot } from './types';
 
+it('retains marker-only ranges in both snapshots including stale source descriptors', () => {
+  const value = packet();
+  const marker = { id: 'range-1', source: 'A😀 old text', start: 1, end: 3, color: '#ffcc00' };
+  for (const side of ['before', 'after'] as const) {
+    const record = value.entries[0]![side].annotations.domRecords[0]!;
+    record.propertyChanges = [];
+    record.textMarkers = [marker];
+  }
+  const decoded = parsePagePreparationRecovery(value);
+  for (const side of ['before', 'after'] as const)
+    expect(decoded?.entries[0]?.[side].annotations.domRecords[0]?.textMarkers).toEqual([marker]);
+});
+
+it.each([
+  { start: -1 },
+  { end: 99 },
+  { start: 2, end: 2 },
+  { start: 0.5 },
+  { color: 'url(https://example.test/private)' },
+])('refuses malformed marker data before recovery: %j', (invalid) => {
+  const value = packet();
+  value.entries[0]!.after.annotations.domRecords[0]!.textMarkers = [
+    { id: 'range', source: 'text', start: 0, end: 4, color: '#ffcc00', ...invalid },
+  ];
+  expect(parsePagePreparationRecovery(value)).toBeNull();
+});
+
+it.each([
+  { property: 'background-image' },
+  { beforePolicy: { source: 'page' } },
+  { after: { value: 'blue', priority: 'urgent' } },
+])('refuses unsupported declaration recovery data: %j', (invalid) => {
+  const value = packet();
+  const entry = value.entries[0]!;
+  entry.scope = 'design-review';
+  entry.patches = [];
+  entry.style = {
+    selector: 'p',
+    declarations: [
+      {
+        property: 'color',
+        order: 1,
+        before: { value: 'red', priority: '' },
+        after: { value: 'blue', priority: '' },
+        beforePolicy: { source: 'inspector' },
+        afterPolicy: { source: 'inspector' },
+      },
+    ],
+  };
+  Object.assign(entry.style.declarations[0]!, invalid);
+  expect(parsePagePreparationRecovery(value)).toBeNull();
+});
+
 function packet(): PagePreparationRecovery {
   const frame = createFrameAnnotationSnapshot(
     {

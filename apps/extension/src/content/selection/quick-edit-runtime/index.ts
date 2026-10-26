@@ -171,3 +171,11 @@ export function createQuickEditRuntimeController(
     },
   };
 }
+
+export { createTextMarkerController, startTextMarkerSelection } from './text-marker';
+
+export {
+  createQuickEditTextReplacementTarget,
+  startQuickEditTextPicker,
+  type QuickEditTextReplacementTarget,
+} from './text-rewrite';

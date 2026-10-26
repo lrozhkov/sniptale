@@ -36,8 +36,15 @@ function captureRecovery(
   if (state.past.length === 0) return null;
   const retained = new Map<Element, string>();
   for (const entry of state.past) {
-    if (entry.domEffect && (!entry.domEffect.recovery || entry.domEffect.recoveryOnly))
+    if (
+      entry.domEffect &&
+      ((!entry.domEffect.recovery && !entry.domEffect.styleRecovery) ||
+        entry.domEffect.recoveryOnly)
+    )
       throw new Error('Page recovery cannot capture the pending owner effect');
+    for (const target of entry.domEffect?.targets ?? [])
+      if (entry.domEffect?.styleRecovery)
+        retained.set(target, entry.domEffect.styleRecovery.selector);
     for (const patch of entry.domBatch?.patches ?? [])
       if (patch.recoveryLocator) retained.set(patch.target, patch.recoveryLocator);
   }
@@ -71,6 +78,7 @@ function captureRecovery(
         after: portableElementState(patch.after),
       })),
       drawing: entry.scope === 'drawing' && drawingVersion ? structuredClone(drawingVersion) : null,
+      style: entry.domEffect?.styleRecovery ? structuredClone(entry.domEffect.styleRecovery) : null,
     })),
   };
 }
@@ -84,9 +92,14 @@ type DrawingReplay = {
 /** Prepares one ordered step after earlier edits have created its possible DOM targets. */
 function prepareEntry(
   entry: PagePreparationRecovery['entries'][number],
-  drawing: DrawingReplay | null
+  drawing: DrawingReplay | null,
+  bridge: HistoryStoreRuntimeState['bridge']
 ): PagePreparationHistoryEntry | null {
   let recoveredDrawing: DrawingRecoveryEffect | null = null;
+  const recoveredStyle = entry.style
+    ? (bridge?.createRecoveryStyleEffect?.(entry.style.selector, entry.style) ?? null)
+    : null;
+  if (entry.style && !recoveredStyle) return null;
   if (entry.drawing) {
     if (!drawing) return null;
     const before = parseDrawingDocument(entry.drawing.before);
@@ -145,7 +158,7 @@ function prepareEntry(
               ? { success: true, failures: [] }
               : { success: false, failures: ['drawing-recovery-unavailable'] },
         }
-      : null,
+      : recoveredStyle,
   };
 }
 
@@ -206,7 +219,7 @@ export function createHistoryRecoveryApi(state: HistoryStoreRuntimeState, applie
       const applied: PagePreparationHistoryEntry[] = [];
       try {
         for (const saved of packet.entries) {
-          const entry = prepareEntry(saved, drawing);
+          const entry = prepareEntry(saved, drawing, state.bridge);
           if (!entry) return rollbackRecovery(state, applied, appliedEvent);
           const outcome = applyHistoryEntry('redo', appliedEvent, entry, state);
           if (outcome.status !== 'applied') {

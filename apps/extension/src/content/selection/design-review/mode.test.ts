@@ -54,6 +54,13 @@ vi.mock('./picker', () => ({
 
 import {
   dismissDesignReviewSelection,
+  beginDesignReviewMeasureSelection,
+  cancelTransientDesignReviewMeasure,
+  dismissDesignReviewMeasureLayer,
+  setDesignReviewTool,
+  openDesignReviewChecks,
+  closeDesignReviewChecks,
+  registerDesignReviewToolSwitchRequestHandler,
   disableDesignReviewMode,
   enableDesignReviewMode,
   finalizeDesignReviewTextEditing,
@@ -75,6 +82,7 @@ beforeEach(() => {
   mocks.startDesignReviewPicker.mockReturnValue({
     dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
+    refreshFrame: vi.fn(),
     selectElement: mocks.selectElement,
     setTextEditing: mocks.setTextEditing,
   });
@@ -122,7 +130,7 @@ it('edits only the selected target and restores the same snapshot after completi
   expect(args.target).toBe(target);
   args.onFinish();
   expect(mocks.setTextEditing).toHaveBeenLastCalledWith(false);
-  expect(mocks.selectElement).toHaveBeenLastCalledWith(target);
+  expect(mocks.selectElement).toHaveBeenLastCalledWith(target, 'tool');
   expect(getDesignReviewModeState().editingText).toBe(false);
   expect(mocks.deactivateOtherContentModes).toHaveBeenCalledTimes(1);
 });
@@ -215,7 +223,7 @@ it('reports commit failure and lets the session completion restore the selected 
   callbacks.onError(new Error('commit failed'));
   callbacks.onFinish();
   expect(mocks.showToast).toHaveBeenCalledWith('content.designReview.textEditFailed', 'error');
-  expect(mocks.selectElement).toHaveBeenLastCalledWith(target);
+  expect(mocks.selectElement).toHaveBeenLastCalledWith(target, 'tool');
   expect(getDesignReviewModeState()).toMatchObject({ enabled: true, editingText: false });
 });
 
@@ -225,7 +233,7 @@ it('resets only the selected text and refreshes its snapshot', () => {
   expect(resetDesignReviewText(document.createElement('p'))).toBe(false);
   expect(resetDesignReviewText(target)).toBe(true);
   expect(mocks.resetQuickEditText).toHaveBeenCalledWith(target);
-  expect(mocks.selectElement).toHaveBeenLastCalledWith(target);
+  expect(mocks.selectElement).toHaveBeenLastCalledWith(target, 'tool');
   mocks.resetQuickEditText.mockImplementationOnce(() => {
     throw new Error('reset failed');
   });
@@ -237,6 +245,7 @@ it('registers and owns the standalone Design Review mode lifecycle', () => {
   mocks.startDesignReviewPicker.mockReturnValue({
     dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
+    refreshFrame: vi.fn(),
     selectElement: mocks.selectElement,
   });
   const listener = vi.fn();
@@ -263,6 +272,7 @@ it('scrolls a live target into view and delegates programmatic selection to the 
   mocks.startDesignReviewPicker.mockReturnValue({
     dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
+    refreshFrame: vi.fn(),
     selectElement: mocks.selectElement,
   });
   const target = document.createElement('button');
@@ -272,14 +282,15 @@ it('scrolls a live target into view and delegates programmatic selection to the 
   enableDesignReviewMode();
 
   expect(openDesignReviewTarget(target)).toBe(true);
-  expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', inline: 'center' });
-  expect(mocks.selectElement).toHaveBeenCalledWith(target);
+  expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+  expect(mocks.selectElement).toHaveBeenCalledWith(target, 'tree');
 });
 
 it('scrolls nested iframe containers before selecting an inner feedback target', () => {
   mocks.startDesignReviewPicker.mockReturnValue({
     dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
+    refreshFrame: vi.fn(),
     selectElement: mocks.selectElement,
   });
   const iframe = document.createElement('iframe');
@@ -295,13 +306,14 @@ it('scrolls nested iframe containers before selecting an inner feedback target',
   expect(openDesignReviewTarget(target)).toBe(true);
   expect(targetScroll).toHaveBeenCalledOnce();
   expect(iframeScroll).toHaveBeenCalledOnce();
-  expect(mocks.selectElement).toHaveBeenCalledWith(target);
+  expect(mocks.selectElement).toHaveBeenCalledWith(target, 'tree');
 });
 
 it('routes picker outside-dismiss through the registered inspector owner', () => {
   mocks.startDesignReviewPicker.mockReturnValue({
     dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
+    refreshFrame: vi.fn(),
     selectElement: mocks.selectElement,
   });
   const dismissHandler = vi.fn(() => true);
@@ -319,6 +331,7 @@ it('releases the active picker selection and publishes the cleared inspector sta
   mocks.startDesignReviewPicker.mockReturnValue({
     dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
+    refreshFrame: vi.fn(),
     selectElement: mocks.selectElement,
   });
   const listener = vi.fn();
@@ -351,6 +364,7 @@ it('toggles measurements without changing selection and resets them between mode
   mocks.startDesignReviewPicker.mockReturnValue({
     dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
+    refreshFrame: vi.fn(),
     selectElement: mocks.selectElement,
     setMeasurementsEnabled,
     setMeasurementsExpanded,
@@ -401,4 +415,114 @@ it('finalizes pending text once while preserving the active mode and selection',
     editingText: false,
     selection,
   });
+});
+
+it('switches an independent tool without discarding the selected object', () => {
+  const target = selectTextTarget();
+  const cleanup = registerDesignReviewInspectorDismissRequestHandler(() => true);
+  try {
+    expect(setDesignReviewTool('inspect')).toBe(true);
+    expect(getDesignReviewModeState().tool).toBe('inspect');
+    expect(getDesignReviewModeState().selection?.snapshot.element).toBe(target);
+    expect(mocks.dismissSelection).not.toHaveBeenCalled();
+  } finally {
+    cleanup();
+  }
+});
+
+it('distinguishes accepted page targets, tree previews, and finding navigation for Measure', () => {
+  const a = selectTextTarget();
+  const unregister = registerDesignReviewInspectorDismissRequestHandler(() => true);
+  expect(setDesignReviewTool('compare')).toBe(true);
+  const picker = mocks.startDesignReviewPicker.mock.calls.at(-1)![0];
+  const b = document.createElement('p');
+  const c = document.createElement('p');
+  document.body.append(b, c);
+  const snapshot = (element: HTMLElement) => ({
+    anchor: { x: 0, y: 0 },
+    snapshot: {
+      element,
+      domPath: 'p',
+      kind: 'text',
+      patch: { declarations: [] },
+      selectorLabel: 'p',
+      tagName: 'p',
+      textPreview: '',
+    },
+  });
+  expect(getDesignReviewModeState().measure).toMatchObject({ a, b: null, slot: 'b' });
+  picker.onSelection(snapshot(b), 'tree');
+  expect(getDesignReviewModeState().measure).toMatchObject({ a, b: null, preview: b });
+  picker.onSelection(snapshot(b), 'page');
+  expect(getDesignReviewModeState().measure).toMatchObject({ a, b, slot: null });
+  expect(picker.onSelection(snapshot(c), 'page')).toBe(false);
+  picker.onSelection(snapshot(c), 'finding');
+  expect(getDesignReviewModeState().selection?.snapshot.element).toBe(c);
+  expect(getDesignReviewModeState().measure).toMatchObject({ a, b, slot: null });
+  beginDesignReviewMeasureSelection('b');
+  picker.onHover(c);
+  cancelTransientDesignReviewMeasure();
+  expect(getDesignReviewModeState().measure).toMatchObject({ a, b, preview: null, slot: null });
+  expect(dismissDesignReviewMeasureLayer()).toBe(true);
+  expect(getDesignReviewModeState().measure).toMatchObject({ a, b: null });
+  expect(dismissDesignReviewMeasureLayer()).toBe(true);
+  expect(getDesignReviewModeState().measure.a).toBeNull();
+  expect(dismissDesignReviewMeasureLayer()).toBe(false);
+  unregister();
+});
+
+it('guards Check and keeps accepted Measure identities after finding navigation', () => {
+  const a = selectTextTarget();
+  const allowInitial = registerDesignReviewToolSwitchRequestHandler(() => true);
+  setDesignReviewTool('compare');
+  allowInitial();
+  const callback = mocks.startDesignReviewPicker.mock.calls.at(-1)?.[0].onSelection;
+  const snapshot = getDesignReviewModeState().selection!.snapshot;
+  const b = document.createElement('p');
+  const c = document.createElement('p');
+  document.body.append(b, c);
+  callback({ anchor: { x: 1, y: 2 }, snapshot: { ...snapshot, element: b } }, 'page');
+  beginDesignReviewMeasureSelection('b');
+  const before = getDesignReviewModeState();
+  const remove = registerDesignReviewToolSwitchRequestHandler(() => false);
+  expect(openDesignReviewChecks()).toBe(false);
+  expect(getDesignReviewModeState()).toBe(before);
+  remove();
+  const accept = registerDesignReviewToolSwitchRequestHandler(() => true);
+  expect(openDesignReviewChecks()).toBe(true);
+  expect(getDesignReviewModeState()).toMatchObject({
+    tool: 'compare',
+    checkOpen: true,
+    measure: { a, b, preview: null, replacing: false },
+  });
+  callback({ anchor: { x: 1, y: 2 }, snapshot: { ...snapshot, element: c } }, 'finding');
+  expect(getDesignReviewModeState()).toMatchObject({
+    checkOpen: true,
+    selectionOrigin: 'finding',
+    measure: { a, b, preview: null },
+  });
+  expect(setDesignReviewTool('compare')).toBe(true);
+  expect(getDesignReviewModeState()).toMatchObject({ checkOpen: false, measure: { a, b } });
+  accept();
+});
+
+it('publishes explicit same-tool return from a finding after Check closes', () => {
+  selectTextTarget();
+  const callback = mocks.startDesignReviewPicker.mock.calls.at(-1)?.[0].onSelection;
+  const selected = getDesignReviewModeState().selection!;
+  const allow = registerDesignReviewToolSwitchRequestHandler(() => true);
+  openDesignReviewChecks();
+  callback(selected, 'finding');
+  closeDesignReviewChecks();
+  const notify = vi.fn();
+  const unsubscribe = subscribeToDesignReviewMode(notify);
+  setDesignReviewTool('comment');
+  expect(notify).toHaveBeenCalledOnce();
+  expect(getDesignReviewModeState()).toMatchObject({
+    tool: 'comment',
+    checkOpen: false,
+    selectionOrigin: 'tool',
+  });
+  unsubscribe();
+  allow();
 });

@@ -4,16 +4,28 @@ import { isBrowserAnnotationsExportText } from '@sniptale/runtime-contracts/expo
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isClipboardTextWithinLimit } from '@sniptale/runtime-contracts/validation/text';
 import { captureBrowserAnnotationsExportText } from '../../../parser/page-preparation/annotations/format';
+import { createDesignReviewReportExporter } from '../../../application/design-review-report';
+import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
+import { printReviewReport } from '../../../parser/page-preparation/annotations/format/print';
+import { flushPendingPageStyleHistory } from '../../design-review/runtime/actions';
+import { translate } from '../../../../platform/i18n';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import {
   attachContentActionIntent,
   type ContentPrivilegedActionIntentSource,
 } from '../../../application/privileged-action-intent';
 
+const exportReviewReport = createDesignReviewReportExporter({
+  annotations: browserAnnotationSession,
+  services: getContentRuntimeServices,
+  print: printReviewReport,
+});
+
 export type ToolbarAnnotationExportAction =
   | 'configure-export'
   | 'copy'
   | 'download'
+  | 'pdf'
   | 'export-page';
 
 async function copyBrowserAnnotations(
@@ -65,6 +77,15 @@ export function executeToolbarAnnotationExportAction(
   action: ToolbarAnnotationExportAction,
   contentIntentSource?: ContentPrivilegedActionIntentSource | null
 ): Promise<void> {
+  if (action === 'pdf') {
+    if (contentIntentSource?.kind !== 'trusted-content-event')
+      return Promise.reject(new Error('A trusted user event is required to print the report.'));
+    flushPendingPageStyleHistory();
+    return exportReviewReport(
+      translate('content.toolbar.annotationExportPdfTitle'),
+      contentIntentSource
+    );
+  }
   if (action === 'copy') {
     return copyBrowserAnnotations(contentIntentSource);
   }

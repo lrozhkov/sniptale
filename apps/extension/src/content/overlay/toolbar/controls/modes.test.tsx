@@ -15,6 +15,21 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+vi.mock('../../ai/text-rewrite/view', () => ({
+  TextRewriteControl: (props: {
+    visible: boolean;
+    active: boolean;
+    onActiveChange(active: boolean): void;
+  }) =>
+    props.visible ? (
+      <button
+        data-ui="content.toolbar.ai-text"
+        aria-pressed={props.active}
+        onClick={() => props.onActiveChange(!props.active)}
+      />
+    ) : null,
+}));
+
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
@@ -487,4 +502,24 @@ it('projects requested editing submodes before the previous runtime mode finishe
   const group = document.querySelector('.sniptale-page-editing-mode-group');
   expect(group).not.toBeNull();
   expect([...group!.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+});
+
+it('keeps the marker and the single-text AI picker mutually exclusive within Content Editing', () => {
+  const selectMode = vi.fn();
+  renderModeButtons({ onSelectPageEditingMode: selectMode, quickEditMode: true });
+  const marker = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.text-marker"]'
+  );
+  const textAI = document.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.ai-text"]');
+  const direct = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.page-editing-mode.direct-text"]'
+  );
+  act(() => marker?.click());
+  expect(marker?.getAttribute('aria-pressed')).toBe('true');
+  act(() => textAI?.click());
+  expect(marker?.getAttribute('aria-pressed')).toBe('false');
+  expect(textAI?.getAttribute('aria-pressed')).toBe('true');
+  act(() => direct?.click());
+  expect(textAI?.getAttribute('aria-pressed')).toBe('false');
+  expect(selectMode).toHaveBeenLastCalledWith('direct-text');
 });

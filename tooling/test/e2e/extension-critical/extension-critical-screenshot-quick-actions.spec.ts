@@ -389,8 +389,49 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await toggle.click();
       await expect(sidebar).toBeHidden();
       await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      const restore = page.locator('[data-ui="content.scenario.sidebar.restore"]');
+      await expect(restore).toHaveCount(0);
       await toggle.click();
       await expect(sidebar).toBeVisible();
+      await page.locator('[data-ui="content.scenario.sidebar.project-button"]').click();
+      const picker = page.locator('[data-ui="content.scenario.sidebar.project-picker"]');
+      const projectName = `Close and reopen ${name}`;
+      await picker.getByRole('textbox').fill(projectName);
+      await picker.getByRole('button', { name: /Create project|Создать проект/u }).click();
+      await expect(sidebar).toContainText(projectName);
+      await page.locator('[data-ui="content.scenario.sidebar.capture-visible"]').click();
+      const steps = sidebar.locator('[data-ui="content.scenario.sidebar.step"]');
+      await expect(steps).toHaveCount(1);
+      await page.locator('[data-ui="content.scenario.sidebar.collapse"]').click();
+      await expect(restore).toBeVisible();
+      await restore.click();
+      await expect(steps).toHaveCount(1);
+      const close = page.locator('[data-ui="content.scenario.sidebar.close"]');
+      await close.focus();
+      await page.keyboard.press('Enter');
+      await expect(sidebar).toBeHidden();
+      await expect(restore).toHaveCount(0);
+      await expect(toggle).toBeFocused();
+      await toggle.click();
+      await expect(sidebar).toContainText(projectName);
+      await expect(steps).toHaveCount(1);
+      await page.screenshot({
+        path: info.outputPath('scenario-close-reopened.png'),
+        fullPage: false,
+      });
+      await toggle.click();
+      await expect(sidebar).toBeHidden();
+      await expect(restore).toHaveCount(0);
+      await toggle.click();
+      await expect(steps).toHaveCount(1);
+      await page.setViewportSize({ width: 1024, height: 560 });
+      const bounds = await close.boundingBox();
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1024);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(560);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true
+      );
+      await page.screenshot({ path: info.outputPath('scenario-close-short.png'), fullPage: false });
       await page.locator('[data-ui="content.toolbar.settings-button"]').click();
       await page.locator('[data-ui="content.toolbar.settings.customize-buttons"]').click();
       const visibility = page.locator('[data-ui="content.toolbar.visibility.scenario-panel"]');

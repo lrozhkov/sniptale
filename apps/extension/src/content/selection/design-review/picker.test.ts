@@ -397,7 +397,8 @@ it('opens the exact live DOM element near its trailing-edge marker', () => {
     expect.objectContaining({
       anchor: { x: 92, y: 54 },
       snapshot: expect.objectContaining({ element: target }),
-    })
+    }),
+    'tree'
   );
 });
 

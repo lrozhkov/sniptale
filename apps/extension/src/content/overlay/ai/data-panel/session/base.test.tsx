@@ -50,7 +50,7 @@ describe('useDataPanelBaseState', () => {
         copied: false,
         excludedColumns: new Map(),
         isDataResizing: false,
-        isDataSpoilerOpen: false,
+        isDataSpoilerOpen: true,
         isJsonResizing: false,
         showDataPreview: false,
         treeState: new Map(),

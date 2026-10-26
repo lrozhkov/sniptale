@@ -46,6 +46,9 @@ function Harness(props: { defaultValues: PageStyleDeclarationValueMap; target: H
 async function renderHarness(defaultValues: PageStyleDeclarationValueMap) {
   const target = document.createElement('p');
   target.id = 'target';
+  Object.defineProperty(target, 'getClientRects', {
+    value: () => [DOMRect.fromRect({ width: 100, height: 40 })],
+  });
   document.body.append(target);
   host = document.createElement('div');
   document.body.append(host);
@@ -146,4 +149,20 @@ it('adds visible border styles when border width changes from computed none', as
       },
     })
   );
+});
+
+it('restores the accepted field value and exposes failure when a mutation is refused', async () => {
+  await renderHarness({ color: 'rgb(17, 17, 17)' });
+  document.querySelector('p')!.style.color = 'rgb(17, 17, 17)';
+  mocks.applyPageStylePatchWithHistory.mockRejectedValueOnce(new Error('Mutation refused'));
+  await act(async () => {
+    latest?.updateValue('color', 'rgb(255, 0, 0)');
+  });
+  expect(latestValues.color).toBe('rgb(17, 17, 17)');
+  expect(latest).toMatchObject({ error: true });
+  await act(async () => {
+    latest?.updateValue('color', 'rgb(0, 0, 255)');
+  });
+  expect(latestValues.color).toBe('rgb(0, 0, 255)');
+  expect(latest).toMatchObject({ error: false });
 });

@@ -213,6 +213,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await mode(page, 'design-review');
         await expect(ui(page, 'customize-done')).toBeVisible();
         for (const control of [
+          'review-comment',
+          'review-inspect',
+          'review-compare',
+          'review-move',
+          'review-check',
           'review-panel',
           'review-measurements',
           'review-layout-guides',
@@ -274,8 +279,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(ui(page, 'page-editing-mode.block-selection')).toBeVisible();
         await expect(ui(page, 'page-editing-mode.block-selection')).toBeDisabled();
         await hide(page, 'editing-direct-text');
+        await hide(page, 'editing-marker');
+        await hide(page, 'editing-ai-text');
         await ui(page, 'customize-done').click();
         await expect(ui(page, 'page-editing-mode.direct-text')).toHaveCount(0);
+        await expect(ui(page, 'text-marker')).toHaveCount(0);
+        await expect(ui(page, 'ai-text')).toHaveCount(0);
         await expect(ui(page, 'page-editing-mode.block-selection')).toBeVisible();
         await mode(page, 'cursor');
         await expect(ui(page, 'navigation.pin-to-tab')).toBeVisible();

@@ -303,7 +303,7 @@ function formatDomHeading(record: BrowserDomAnnotationRecord): string {
   if (record.comment || record.designReview?.action || record.propertyChanges.length > 0) {
     return `## Design review feedback ${record.creationOrder}`;
   }
-  return record.propertyChanges.length > 0 || record.textChange
+  return record.propertyChanges.length > 0 || record.textChange || record.textMarkers?.length
     ? `## Requested annotation ${record.creationOrder}`
     : `## Comment ${record.creationOrder}`;
 }
@@ -336,7 +336,7 @@ function formatDomRecord(record: BrowserDomAnnotationRecord): string {
     lines.push(`Design review action: ${record.designReview?.action ?? 'refine'}`);
   }
 
-  if (record.propertyChanges.length > 0 || record.textChange) {
+  if (record.propertyChanges.length > 0 || record.textChange || record.textMarkers?.length) {
     lines.push(
       'Browser annotation:',
       `Visible viewport at edit time: ${evidence.viewport.width}x${evidence.viewport.height} CSS px`
@@ -357,6 +357,17 @@ function formatDomRecord(record: BrowserDomAnnotationRecord): string {
       'After:',
       formatBlockValue(record.textChange.after)
     );
+  }
+  if (record.textMarkers?.length) {
+    lines.push('Text markers:');
+    for (const marker of record.textMarkers) {
+      lines.push(
+        [
+          `- ${formatQuoted(marker.source.slice(marker.start, marker.end))}:`,
+          `${escapeInline(marker.color)} (text offsets ${marker.start}–${marker.end})`,
+        ].join(' ')
+      );
+    }
   }
   if (record.comment !== undefined) {
     lines.push('Comment:', formatBlockValue(record.comment));

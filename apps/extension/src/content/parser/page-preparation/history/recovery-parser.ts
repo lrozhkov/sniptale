@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { parseColor } from '@sniptale/foundation/color';
+import { PAGE_STYLE_ALLOWED_PROPERTIES } from '@sniptale/runtime-contracts/page-style';
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type {
   CalloutVisualStyle,
@@ -53,6 +55,18 @@ const evidence = z
   })
   .transform(definedFields);
 const declaration = z.object({ priority: z.enum(['', 'important']), value: text });
+const textMarker = z
+  .object({
+    id,
+    source: text,
+    start: count,
+    end: count,
+    color: z
+      .string()
+      .max(256)
+      .refine((value) => parseColor(value) !== null),
+  })
+  .refine((value) => value.start < value.end && value.end <= value.source.length);
 const domRecord = z
   .object({
     annotationId: count,
@@ -74,6 +88,7 @@ const domRecord = z
       )
       .max(2000),
     textChange: z.object({ before: text, after: text }).optional(),
+    textMarkers: z.array(textMarker).max(2000).optional(),
   })
   .transform(definedFields);
 const frameRecord = z
@@ -188,6 +203,23 @@ const elementState = z.object({
     ),
 });
 const drawing = ownerParser(parseDrawingDocument);
+const style = z.object({
+  selector,
+  declarations: z
+    .array(
+      z.object({
+        property: z.enum(PAGE_STYLE_ALLOWED_PROPERTIES),
+        order: count,
+        before: declaration,
+        after: declaration,
+        beforePolicy: z.object({ source: z.literal('inspector') }),
+        afterPolicy: z.object({ source: z.literal('inspector') }),
+      })
+    )
+    .min(1)
+    .max(PAGE_STYLE_ALLOWED_PROPERTIES.length)
+    .refine((values) => unique(values, (value) => value.property)),
+});
 const packetSchema = z
   .object({
     version: z.literal(1),
@@ -203,12 +235,15 @@ const packetSchema = z
               .max(2000)
               .refine((values) => unique(values, (value) => value.selector)),
             drawing: z.object({ before: drawing, after: drawing }).nullable(),
+            style: style.nullable().optional(),
           })
           .refine((value) =>
             value.scope === 'drawing'
-              ? value.drawing !== null && value.patches.length === 0
-              : value.drawing === null
+              ? value.drawing !== null && value.patches.length === 0 && !value.style
+              : value.drawing === null &&
+                (!value.style || (value.scope === 'design-review' && value.patches.length === 0))
           )
+          .transform(definedFields)
       )
       .min(1)
       .max(2000),

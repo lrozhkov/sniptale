@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { handleAiPickContentStart } from './mode';
 import { createAiSubmitRequestGate } from './submit/gate';
 import type { AiPickControllerContext } from './types';
 
@@ -94,7 +95,6 @@ beforeEach(() => {
 });
 
 it('ignores stale ai-pick selection callbacks after the enable epoch changes', async () => {
-  const { handleAiPickContentStart } = await import('./mode');
   const context = createContext();
   const tree = {
     context: 'test',

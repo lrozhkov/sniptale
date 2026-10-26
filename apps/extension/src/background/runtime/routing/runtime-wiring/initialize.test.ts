@@ -4,6 +4,8 @@ import { expect, it, vi } from 'vitest';
 
 const {
   configureDownloadPort,
+  configureAudioJobPrivacyErasurePort,
+  registerContentTextPorts,
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
   executeDownloadBlob,
@@ -19,6 +21,8 @@ const {
   subscribeToLocaleChanges,
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
+  configureAudioJobPrivacyErasurePort: vi.fn(),
+  registerContentTextPorts: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort: vi.fn(),
   configureScreenshotPrivacyErasureCleanupPort: vi.fn(),
   executeDownloadBlob: vi.fn(),
@@ -33,6 +37,7 @@ const {
   initializeNativeAppPermissionLifecycle: vi.fn(),
   subscribeToLocaleChanges: vi.fn(() => vi.fn()),
 }));
+vi.mock('../../../ai/llm/content-text-port', () => ({ registerContentTextPorts }));
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   subscribeToLocaleChanges,
@@ -53,7 +58,7 @@ vi.mock('../../../application/privacy-erasure/composition', () => ({
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
   eraseLocalExtensionDataFromBackground: vi.fn(),
-  configureAudioJobPrivacyErasurePort: vi.fn(),
+  configureAudioJobPrivacyErasurePort,
 }));
 vi.mock('../../native-app/privacy-erasure', () => ({
   nativeIngestionPrivacyErasureCleanupAdapter: nativeIngestionCleanupAdapter,
@@ -121,6 +126,13 @@ it('registers all background listeners through the runtime-wiring owner', () => 
   expect(configureDownloadPort).toHaveBeenCalledWith({ executeDownloadBlob });
   expect(configureDownloadPort).toHaveBeenCalledBefore(registerInstallListener);
   expect(registerInstallListener).toHaveBeenCalledBefore(initializeBackgroundContextMenus);
+  expect(registerContentTextPorts).toHaveBeenCalledOnce();
+  const contentTextJobs = registerContentTextPorts.mock.calls[0]?.[0];
+  expect(configureAudioJobPrivacyErasurePort).toHaveBeenCalledWith(
+    expect.any(Object),
+    expect.any(Object),
+    contentTextJobs
+  );
   expect(registerWindowBoundsListener).toHaveBeenCalledOnce();
   expect(registerVoiceInputPorts).toHaveBeenCalledOnce();
   expect(registerVoiceInputTelemetryPorts).toHaveBeenCalledOnce();

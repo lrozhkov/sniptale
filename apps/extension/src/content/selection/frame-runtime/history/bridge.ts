@@ -10,6 +10,8 @@ import { useFrameUIStore } from '../state/frame-ui.store';
 import { getFrameSessionBorderPreset, setFrameSessionBorderPreset } from '../session/border-preset';
 import { resolveRecoveryLocator } from '../../../parser/page-preparation/history/recovery-locators';
 import { cloneCalloutStyle } from '../../../../features/highlighter/frame-annotation/callout/model';
+import { createRecoveredPageStyleHistoryEffect } from '../../design-review/style/mutation';
+import { isPageStyleRestorationElement } from '../../design-review/style/element';
 
 export function applyHistorySnapshotToFrameManager(args: {
   refs: FrameManagerRefs;
@@ -58,6 +60,12 @@ export function createPagePreparationHistoryBridge(args: {
   setFrameStates: FrameStateSetter;
 }): PagePreparationHistoryBridge {
   return {
+    createRecoveryStyleEffect: (selector, value) => {
+      const target = resolveRecoveryLocator(selector);
+      return target && isPageStyleRestorationElement(target)
+        ? createRecoveredPageStyleHistoryEffect(target, value)
+        : null;
+    },
     resolveRecoveryAnnotationTarget: browserAnnotationSession.getRecoveryTarget,
     resolveRecoveryFrameTarget: (frameId) =>
       args.refs.hostLayoutServiceRef.current.getNode(frameId),

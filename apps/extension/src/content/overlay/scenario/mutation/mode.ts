@@ -23,7 +23,13 @@ export async function applyScenarioRecorderPanelVisibility(args: {
   screenshotMode: boolean;
   visible: boolean;
 }): Promise<boolean> {
-  if (args.currentSession.enabled || !args.visible) {
+  if (!args.visible) {
+    return applyScenarioEnabledState({
+      applyScenarioResponse: args.applyScenarioResponse,
+      enabled: false,
+    });
+  }
+  if (args.currentSession.enabled) {
     return applyScenarioSidebarVisibility({
       applyScenarioResponse: args.applyScenarioResponse,
       sidebarVisible: args.visible,

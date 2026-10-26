@@ -9,5 +9,7 @@ export interface AiPickSourceAdapter {
 export type AiPickSourceResolver = () => AiPickSourceAdapter | null;
 
 export interface AiPickEnableOptions {
+  /** Opens the parsed catalog without waiting for a page selection. */
+  openTable?: boolean;
   source?: AiPickSourceResolver;
 }

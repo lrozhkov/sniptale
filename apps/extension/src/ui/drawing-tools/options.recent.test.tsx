@@ -89,49 +89,54 @@ it('forwards picker preview and rollback without selecting a quick color', async
   act(() => root.unmount());
 });
 
-it('shows alpha and preserves it for quick RGB swatches while picker commits exact alpha', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  persistence.pickerColor = '#abcdef';
-  const host = document.createElement('div');
-  const root = createRoot(host);
-  const onSelect = vi.fn();
-  await act(async () =>
-    root.render(
-      <DrawingColorOptions
-        allowAlpha
-        colors={palette}
-        floatingBoundaryRef={{ current: null }}
-        floatingPlacement="auto"
-        label="Line color"
-        value="#12345680"
-        onSelect={onSelect}
-      />
-    )
-  );
-  expect(
-    host.querySelector('[data-ui="test.color-picker"]')?.getAttribute('data-allow-alpha')
-  ).toBe('true');
-  act(() => host.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
-  expect(onSelect).toHaveBeenLastCalledWith('#60a5fa80');
-  act(() => host.querySelector<HTMLButtonElement>('[data-ui="test.color-picker"]')?.click());
-  expect(onSelect).toHaveBeenLastCalledWith('#abcdef');
-  await act(async () =>
-    root.render(
-      <DrawingColorOptions
-        allowAlpha
-        colors={palette}
-        floatingBoundaryRef={{ current: null }}
-        floatingPlacement="auto"
-        label="Line color"
-        value="#12345600"
-        onSelect={onSelect}
-      />
-    )
-  );
-  act(() => host.querySelector<HTMLButtonElement>('button[title="#22c55e"]')?.click());
-  expect(onSelect).toHaveBeenLastCalledWith('#22c55e00');
-  act(() => root.unmount());
-});
+it.each([false, true])(
+  'uses explicit palette alpha=%s while picker commits exact alpha',
+  async (preservePaletteAlpha) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    persistence.pickerColor = '#abcdef';
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const onSelect = vi.fn();
+    await act(async () =>
+      root.render(
+        <DrawingColorOptions
+          allowAlpha
+          preservePaletteAlpha={preservePaletteAlpha}
+          colors={palette}
+          floatingBoundaryRef={{ current: null }}
+          floatingPlacement="auto"
+          label="Line color"
+          value="#12345680"
+          onSelect={onSelect}
+        />
+      )
+    );
+    expect(
+      host.querySelector('[data-ui="test.color-picker"]')?.getAttribute('data-allow-alpha')
+    ).toBe('true');
+    act(() => host.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
+    expect(onSelect).toHaveBeenLastCalledWith(preservePaletteAlpha ? '#60a5fa' : '#60a5fa80');
+    act(() => host.querySelector<HTMLButtonElement>('[data-ui="test.color-picker"]')?.click());
+    expect(onSelect).toHaveBeenLastCalledWith('#abcdef');
+    await act(async () =>
+      root.render(
+        <DrawingColorOptions
+          allowAlpha
+          preservePaletteAlpha={preservePaletteAlpha}
+          colors={palette}
+          floatingBoundaryRef={{ current: null }}
+          floatingPlacement="auto"
+          label="Line color"
+          value="#12345600"
+          onSelect={onSelect}
+        />
+      )
+    );
+    act(() => host.querySelector<HTMLButtonElement>('button[title="#22c55e"]')?.click());
+    expect(onSelect).toHaveBeenLastCalledWith(preservePaletteAlpha ? '#22c55e' : '#22c55e00');
+    act(() => root.unmount());
+  }
+);
 
 beforeEach(() => {
   persistence.pickerColor = '#123456';

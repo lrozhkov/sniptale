@@ -12,6 +12,7 @@ function getTemplatePreview(content: string): string {
 }
 
 export function AIModalPromptTemplatePicker(props: {
+  placement?: 'field' | 'inline';
   disabled: boolean;
   isLoading: boolean;
   onSelectTemplate: (template: PromptTemplate) => Promise<void>;
@@ -20,10 +21,15 @@ export function AIModalPromptTemplatePicker(props: {
   const enabledTemplates = props.templates.filter((template) => template.enabled !== false);
 
   return (
-    <div className="sniptale-ai-modal-template-picker">
+    <div
+      className="sniptale-ai-modal-template-picker"
+      style={props.placement === 'inline' ? { position: 'static', maxWidth: 'none' } : undefined}
+    >
       <ProductSelect
         aria-label={translate('aiModal.templatesLabel')}
-        containerClassName="sniptale-ai-modal-template-select"
+        containerClassName={
+          props.placement === 'inline' ? 'min-w-0 flex-1' : 'sniptale-ai-modal-template-select'
+        }
         controlSize="sm"
         dataUi="ai-modal.template-picker"
         disabled={props.disabled || props.isLoading || enabledTemplates.length === 0}

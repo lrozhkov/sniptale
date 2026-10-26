@@ -1,4 +1,5 @@
 import type { DrawingDocumentV1 } from '../../../../features/drawing/model';
+import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import type {
   AppliedBorderSettings,
   BlurSettings,
@@ -70,9 +71,23 @@ export interface DrawingRecoveryEffect {
   after: DrawingDocumentV1;
 }
 
+/** Exact declaration endpoints; the style owner validates and applies these values. */
+export interface PageStyleRecoveryEffect {
+  selector: string;
+  declarations: Array<{
+    property: PageStyleProperty;
+    order: number;
+    before: { value: string; priority: '' | 'important' };
+    after: { value: string; priority: '' | 'important' };
+    beforePolicy: { source: 'inspector' };
+    afterPolicy: { source: 'inspector' };
+  }>;
+}
+
 export interface PagePreparationHistoryDomEffect {
   /** Data-only drawing versions for an explicit reload recovery; never executable code. */
   recovery?: DrawingRecoveryEffect;
+  styleRecovery?: PageStyleRecoveryEffect;
   /** Exact live targets whose identity must survive foreign HTML replacement. */
   targets?: readonly PagePreparationDomElement[];
   apply: (direction: 'undo' | 'redo') => PagePreparationHistoryDomEffectResult;
@@ -108,6 +123,10 @@ export interface PagePreparationHistoryBridge {
   resolveRecoveryAnnotationTarget?: (annotationId: number) => Element | null;
   resolveRecoveryFrameTarget?: (frameId: string) => Element | null;
   onRecoveryApplied?: () => void;
+  createRecoveryStyleEffect?: (
+    selector: string,
+    value: PageStyleRecoveryEffect
+  ) => PagePreparationHistoryDomEffect | null;
   onHistoryCleared?: () => void;
   onHistoryReachabilityChanged?: (frameIds: readonly string[]) => void;
 }
@@ -127,5 +146,7 @@ export interface PagePreparationRecovery {
     after: PagePreparationSessionSnapshot;
     patches: Array<{ selector: string; before: PageDomElementState; after: PageDomElementState }>;
     drawing: DrawingRecoveryEffect | null;
+    /** Absent in packets produced before declaration recovery was supported. */
+    style?: PageStyleRecoveryEffect | null;
   }>;
 }

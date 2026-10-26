@@ -141,6 +141,7 @@ export function ScenarioRecorderSidebarSurface(
     onMoveStep: (stepId: string, toIndex: number) => void;
     onFinish: () => void;
     onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
+    onClose: (event: MouseEvent<HTMLButtonElement>) => void;
     onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
     captureBusy: boolean;
     finishBusy: boolean;
@@ -168,6 +169,7 @@ export function ScenarioRecorderSidebarSurface(
         <ScenarioRecorderSidebarHeader
           dragging={props.dragging}
           onCollapse={props.onCollapse}
+          onClose={props.onClose}
           onMouseDown={props.onSidebarHeaderMouseDown}
           onProjectMenuToggle={props.onProjectMenuToggle}
           projectMenuOpen={props.projectMenuOpen}

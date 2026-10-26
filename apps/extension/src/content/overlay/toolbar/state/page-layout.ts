@@ -47,8 +47,24 @@ const MODE_ITEMS: Record<PageToolbarMode, PageToolbarLayoutItem[]> = {
     'separator:annotation',
     'auto-blur',
   ],
-  'quick-edit': ['editing-block-selection', 'editing-direct-text', 'editing-ai'],
-  'design-review': ['review-panel', 'review-measurements', 'review-layout-guides', 'review-export'],
+  'quick-edit': [
+    'editing-block-selection',
+    'editing-direct-text',
+    'editing-ai',
+    'editing-marker',
+    'editing-ai-text',
+  ],
+  'design-review': [
+    'review-comment',
+    'review-inspect',
+    'review-compare',
+    'review-move',
+    'review-check',
+    'review-panel',
+    'review-measurements',
+    'review-layout-guides',
+    'review-export',
+  ],
 };
 
 /** Canonical page-mode order. Missing saved buttons join at their canonical neighbor. */

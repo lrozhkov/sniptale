@@ -1,6 +1,8 @@
+import type { DesignReviewMeasureState } from '../../selection/design-review/measure';
 import type { PageStylePatch, PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import type { VoiceInputErrorCode } from '@sniptale/runtime-contracts/voice-input';
 import type { BrowserDesignReviewAction } from '../../parser/page-preparation/annotations';
+import type { useDesignReviewTools } from './session/tools';
 import type {
   PageStyleDeclarationValueMap,
   PageStyleSelectionSnapshot,
@@ -8,6 +10,8 @@ import type {
 
 export interface DesignReviewViewState {
   action: BrowserDesignReviewAction;
+  valueError?: boolean;
+  measure?: DesignReviewMeasureState;
   anchor: { x: number; y: number } | null;
   comment: DesignReviewCommentViewState;
   defaultValues: PageStyleDeclarationValueMap;
@@ -16,7 +20,7 @@ export interface DesignReviewViewState {
   selection: PageStyleSelectionSnapshot | null;
   settingsOpen: boolean;
   text: DesignReviewTextViewState;
-  treeNavigation: { parent: Element | null; child: Element | null };
+  treeNavigation: { parent: Element | null; child: Element | null; children?: Element[] };
   sideFieldLinks?: Record<string, boolean>;
   values: PageStyleDeclarationValueMap;
   voice: DesignReviewCommentVoiceViewState;
@@ -29,6 +33,7 @@ interface DesignReviewCommentViewState {
 }
 
 export interface DesignReviewActions {
+  tools?: ReturnType<typeof useDesignReviewTools>;
   close: () => void;
   comment: DesignReviewCommentActions;
   copyElement: () => Promise<boolean>;

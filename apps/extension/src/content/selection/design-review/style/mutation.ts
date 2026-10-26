@@ -2,6 +2,8 @@ import type {
   PagePreparationHistoryDomEffect,
   PagePreparationHistoryDomEffectResult,
 } from '../../../parser/page-preparation/history';
+import type { PageStyleRecoveryEffect } from '../../../parser/page-preparation/history/types';
+import { createRecoveryLocator } from '../../../parser/page-preparation/history/recovery-locators';
 import type {
   CssDeclarationDelta,
   CssDeclarationPolicy,
@@ -398,6 +400,10 @@ export function createPageStyleHistoryEffect(
     return createRecoveryHistoryEffect(batch, options.onRecovery);
   }
   return {
+    styleRecovery: {
+      selector: createRecoveryLocator(batch.target),
+      declarations: structuredClone(batch.declarations),
+    },
     apply: (direction) => {
       const result = applyPageStyleMutationBatch(batch, direction);
       if (!result.success && result.recoveryBatch && batchHasChanges(result.recoveryBatch)) {
@@ -415,4 +421,14 @@ export function createPageStyleHistoryEffect(
     targets: [batch.target],
     hasChanges: batchHasChanges(batch),
   };
+}
+
+/** Recreates only validated declaration deltas; live page state remains the replay admission gate. */
+export function createRecoveredPageStyleHistoryEffect(
+  target: PageStyleMutationElement,
+  value: PageStyleRecoveryEffect
+): PagePreparationHistoryDomEffect | null {
+  const batch = { target, declarations: structuredClone(value.declarations) };
+  if (!target.isConnected || !validateBatchDeclarations(batch)) return null;
+  return createPageStyleHistoryEffect(batch);
 }

@@ -1,6 +1,14 @@
 import { PageToolbarGroup } from './page-layout';
 import { useContext, useSyncExternalStore } from 'react';
-import { Ruler, ScanLine } from 'lucide-react';
+import {
+  Ruler,
+  ScanLine,
+  MessageSquare,
+  ScanSearch,
+  BetweenHorizontalStart,
+  Move,
+  Accessibility,
+} from 'lucide-react';
 import { PageControlVisibility } from './control-visibility';
 import { PageToolbarControlsContext } from '../state/page-controls';
 import {
@@ -8,12 +16,22 @@ import {
   subscribeToDesignReviewMode,
   toggleDesignReviewMeasurementDetails,
   toggleDesignReviewMeasurements,
+  setDesignReviewTool,
+  openDesignReviewChecks,
+  type DesignReviewTool,
 } from '../../../selection/design-review';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FeedbackCollectionIcon } from '../../design-review/icons';
-import { translate } from '../../../../platform/i18n';
+import { translate, type TranslationKey } from '../../../../platform/i18n';
 import { AnnotationExportMenu } from '../design-review/export-menu';
 import type { ToolbarMenuState } from '../state/menu';
+
+const REVIEW_TOOLS: Array<{ tool: DesignReviewTool; icon: typeof Ruler; label: TranslationKey }> = [
+  { tool: 'comment', icon: MessageSquare, label: 'content.designReview.toolComment' },
+  { tool: 'inspect', icon: ScanSearch, label: 'content.designReview.toolInspect' },
+  { tool: 'compare', icon: Ruler, label: 'content.designReview.toolCompare' },
+  { tool: 'move', icon: Move, label: 'content.designReview.toolMove' },
+];
 
 export function ToolbarDesignReviewControls(props: {
   compactMenus: boolean;
@@ -31,12 +49,57 @@ export function ToolbarDesignReviewControls(props: {
   if (
     visibility &&
     !(
-      ['review-panel', 'review-measurements', 'review-layout-guides', 'review-export'] as const
+      [
+        'review-comment',
+        'review-inspect',
+        'review-compare',
+        'review-move',
+        'review-check',
+        'review-panel',
+        'review-measurements',
+        'review-layout-guides',
+        'review-export',
+      ] as const
     ).some(visibility.isVisible)
   )
     return null;
   return (
     <PageToolbarGroup dataUi="content.toolbar.design-review-controls" utilities>
+      {REVIEW_TOOLS.map(({ tool, icon: Icon, label }) => (
+        <PageControlVisibility key={tool} control={`review-${tool}`} label={translate(label)}>
+          <ContentToolbarButton
+            data-content-tool="true"
+            active={mode.enabled && mode.tool === tool}
+            aria-pressed={mode.enabled && mode.tool === tool}
+            disabled={!mode.enabled}
+            dataUi={`content.toolbar.review-tool.${tool}`}
+            title={translate(label)}
+            aria-label={translate(label)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setDesignReviewTool(tool);
+            }}
+          >
+            <Icon size={20} strokeWidth={2} />
+          </ContentToolbarButton>
+        </PageControlVisibility>
+      ))}
+      <PageControlVisibility
+        control="review-check"
+        label={translate('content.designReview.checkTitle')}
+      >
+        <ContentToolbarButton
+          tone="property"
+          disabled={!mode.enabled}
+          aria-expanded={mode.checkOpen}
+          dataUi="content.toolbar.review-check"
+          title={translate('content.designReview.checkTitle')}
+          aria-label={translate('content.designReview.checkTitle')}
+          onClick={() => openDesignReviewChecks()}
+        >
+          <Accessibility size={20} strokeWidth={2} />
+        </ContentToolbarButton>
+      </PageControlVisibility>
       <PageControlVisibility
         control="review-panel"
         label={translate('content.designReview.showFeedbackPanel')}
@@ -79,7 +142,7 @@ export function ToolbarDesignReviewControls(props: {
               : 'content.designReview.showDistances'
           )}
         >
-          <Ruler size={20} strokeWidth={2} />
+          <BetweenHorizontalStart size={20} strokeWidth={2} />
         </ContentToolbarButton>
       </PageControlVisibility>
       <PageControlVisibility

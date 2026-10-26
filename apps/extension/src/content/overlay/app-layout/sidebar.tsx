@@ -114,6 +114,16 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
         if (event.detail === 0) focusRestorePending.current = true;
         args.scenario.actions.setSidebarVisible(false);
       }}
+      onClose={async (event) => {
+        const restoreFocus = event.detail === 0;
+        if (!(await args.scenario.actions.setRecorderPanelVisible(false))) return;
+        focusRestorePending.current = false;
+        if (restoreFocus) {
+          queryContentUiElement<HTMLButtonElement>(
+            '[data-ui="content.toolbar.scenario-panel-button"]'
+          )?.focus();
+        }
+      }}
       highlightToken={args.scenario.state.recentStepHighlightToken}
       forcedHighlightStepId={forcedHighlightStepId}
       forcedHighlightVersion={forcedHighlightVersion}

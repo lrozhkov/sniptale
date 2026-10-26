@@ -206,9 +206,15 @@ The Scenario page explicitly saves the source before generation without changing
 
 `background/ai/llm/review-text-job` and its typed `sniptale-gallery-review-text` Port own Gallery AI text editing. They use the existing one-shot LLM capability authority with purpose `review-text`. It does not masquerade as a DOM, scenario or audio operation. Consume the exact top-level Gallery document and disclosed context/destination binding once. Recheck committed workspace text and result-time projection before POST.
 
-A connection owns cancellation before any authorization await. Disconnect/deadline/erasure stop the same one-shot flight. Worker interruption never resumes it. Runtime wiring composes audio and text jobs behind the existing erasure holder, reserving both before cancellation and draining both before storage erasure. The existing LLM transport and metadata-only history remain the provider and diagnostic owners.
+A connection owns cancellation before authorization starts. Disconnect, deadline, and erasure cancel the same request. Worker interruption does not resume a request. Runtime wiring reserves the audio, Gallery text, and content text services before erasure cancellation. Erasure waits for their active requests and metadata writes before it removes stored data. The existing LLM transport and metadata history remain the provider and diagnostic owners.
 
 Gallery alone owns the disposable editable proposal and explicit text-only durable Apply through the current review session.
+
+`background/ai/llm/content-text-job` owns the `sniptale-content-text-rewrite` Port for page text replacement. It uses the existing `content-ai-pick` capability and privacy normalization. The capability binds the selected text to the content document. The service checks the approved provider destination before POST. It returns plain text through the existing LLM transport.
+
+Content checks the original target, text, markup, and current frame ancestry before it applies a response. QuickEdit owns the synchronous DOM mutation, annotation evidence, and Undo/Redo history. The response enters `textContent` only. Stop, Close, mode exit, and stale targets preserve the accepted source. Chrome AI uses a cancellable browser session and the same text bounds.
+
+Prompt dictation uses the public content voice session and transcript insertion.
 
 Gallery caption appearance belongs to the authored scene and individual text fragments. `features/video/review/caption-plan` owns disposable cue projection and stable overlap slots. `workflows/video-review/render-captions` uses the existing bundled font and canonical output geometry for manual preview and both final render paths. Text visibility on the timeline is independent from burn-in. Fragment export receives the full edit time map from export lifecycle and samples global main time.
 

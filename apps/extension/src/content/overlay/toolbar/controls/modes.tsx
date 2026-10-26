@@ -1,6 +1,6 @@
 import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from './page-layout';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import React, { useRef } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import cursorTextIcon from '@iconify-icons/tabler/cursor-text';
 import {
@@ -21,6 +21,8 @@ import {
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
+import { TextMarkerControl } from './text-marker';
+import { TextRewriteControl } from '../../ai/text-rewrite/view';
 import type { ToolbarModeButtonsProps } from './mode-types';
 import {
   resolveToolbarMenuPlacement,
@@ -299,8 +301,8 @@ function getPageEditingModeCopy(mode: ToolbarPageEditingMode) {
       };
     case 'ai':
       return {
-        label: translate('content.toolbar.aiLabel'),
-        title: translate('content.toolbar.aiEnable'),
+        label: translate('content.toolbar.aiTableLabel'),
+        title: translate('content.toolbar.aiTableHint'),
       };
     case 'block-selection':
     default:
@@ -372,7 +374,9 @@ function PageEditingModeButton(props: {
   );
 }
 
-function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
+function ToolbarQuickEditModeButtons(
+  props: ToolbarModeButtonsProps & { selectionToolActive?: boolean }
+) {
   if (getSelectedMode(props) !== 'quick-edit') {
     return null;
   }
@@ -389,7 +393,7 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
       {(['block-selection', 'direct-text', 'ai'] as ToolbarPageEditingMode[]).map((mode) => (
         <PageEditingModeButton
           key={mode}
-          active={selectedMode === mode}
+          active={!props.selectionToolActive && selectedMode === mode}
           disabled={pending}
           mode={mode}
           onSelect={props.onSelectPageEditingMode}
@@ -400,6 +404,33 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
 }
 
 export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
+  const { onSelectPageEditingMode } = props;
+  const [selectionTool, setSelectionTool] = useState<'marker' | 'ai-text' | null>(null);
+  useEffect(() => {
+    if (!props.quickEditMode || props.aiPickMode || props.quickEditDocumentMode)
+      setSelectionTool(null);
+  }, [props.quickEditMode, props.aiPickMode, props.quickEditDocumentMode]);
+  const changeMarkerActive = useCallback(
+    (active: boolean) => {
+      if (active) onSelectPageEditingMode('block-selection');
+      setSelectionTool((current) => (active ? 'marker' : current === 'marker' ? null : current));
+    },
+    [onSelectPageEditingMode]
+  );
+  const changeAITextActive = useCallback(
+    (active: boolean) => {
+      if (active) onSelectPageEditingMode('block-selection');
+      setSelectionTool((current) => (active ? 'ai-text' : current === 'ai-text' ? null : current));
+    },
+    [onSelectPageEditingMode]
+  );
+  const selectEditingMode = (mode: ToolbarPageEditingMode) => {
+    setSelectionTool(null);
+    props.onSelectPageEditingMode(mode);
+  };
+  const canSelectText = Boolean(
+    props.quickEditMode && !props.quickEditDocumentMode && !props.aiPickMode
+  );
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuSide = useToolbarMenuDirection(() =>
     resolveModeMenuLayout({ triggerProps: props, triggerRef })
@@ -455,7 +486,23 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
           dataUi="content.toolbar.mode-leading-divider"
         />
       )}
-      <ToolbarQuickEditModeButtons {...props} />
+      <ToolbarQuickEditModeButtons
+        {...props}
+        selectionToolActive={canSelectText && selectionTool !== null}
+        onSelectPageEditingMode={selectEditingMode}
+      />
+      <TextMarkerControl
+        displayMode={props.displayMode ?? 'horizontal'}
+        active={selectionTool === 'marker' && canSelectText}
+        visible={getSelectedMode(props) === 'quick-edit'}
+        onActiveChange={changeMarkerActive}
+      />
+      <TextRewriteControl
+        visible={getSelectedMode(props) === 'quick-edit'}
+        active={canSelectText && selectionTool === 'ai-text'}
+        disabled={pending}
+        onActiveChange={changeAITextActive}
+      />
     </>
   );
 }

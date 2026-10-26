@@ -2,28 +2,21 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  loggerErrorMock,
-  resizeElementMock,
-  saveSpoilerStateMock,
-  showToastMock,
-  translateMock,
-  writeTextMock,
-} = vi.hoisted(() => ({
-  loggerErrorMock: vi.fn(),
-  resizeElementMock: vi.fn(),
-  saveSpoilerStateMock: vi.fn(),
-  showToastMock: vi.fn(),
-  translateMock: vi.fn((key: string) => {
-    const messages: Record<string, string> = {
-      'aiModal.dataSummaryAllPrefix': 'All ',
-      'aiModal.dataSummaryNone': 'None selected',
-      'content.runtime.copyTextFailed': 'Copy failed',
-    };
-    return messages[key] ?? key;
-  }),
-  writeTextMock: vi.fn(() => Promise.resolve()),
-}));
+const { loggerErrorMock, resizeElementMock, showToastMock, translateMock, writeTextMock } =
+  vi.hoisted(() => ({
+    loggerErrorMock: vi.fn(),
+    resizeElementMock: vi.fn(),
+    showToastMock: vi.fn(),
+    translateMock: vi.fn((key: string) => {
+      const messages: Record<string, string> = {
+        'aiModal.dataSummaryAllPrefix': 'All ',
+        'aiModal.dataSummaryNone': 'None selected',
+        'content.runtime.copyTextFailed': 'Copy failed',
+      };
+      return messages[key] ?? key;
+    }),
+    writeTextMock: vi.fn(() => Promise.resolve()),
+  }));
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -35,11 +28,6 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   createLogger: () => ({
     error: loggerErrorMock,
   }),
-}));
-
-vi.mock('../../persistence/spoiler-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../persistence/spoiler-state')>()),
-  saveSpoilerState: saveSpoilerStateMock,
 }));
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
@@ -67,7 +55,6 @@ import {
 beforeEach(() => {
   vi.useFakeTimers();
   resizeElementMock.mockReset();
-  saveSpoilerStateMock.mockReset();
   showToastMock.mockReset();
   translateMock.mockClear();
   loggerErrorMock.mockReset();
@@ -85,24 +72,12 @@ afterEach(() => {
 });
 
 describe('createToggleSpoilerHandler', () => {
-  it('toggles spoiler state and persists the new preference', () => {
+  it('toggles the local spoiler state', () => {
     const setIsDataSpoilerOpen = vi.fn();
 
     createToggleSpoilerHandler(false, setIsDataSpoilerOpen)();
 
     expect(setIsDataSpoilerOpen).toHaveBeenCalledWith(true);
-    expect(saveSpoilerStateMock).toHaveBeenCalledWith(true);
-  });
-
-  it('keeps the local spoiler toggle even when advisory persistence rejects', async () => {
-    const setIsDataSpoilerOpen = vi.fn();
-    saveSpoilerStateMock.mockRejectedValueOnce(new Error('storage offline'));
-
-    createToggleSpoilerHandler(false, setIsDataSpoilerOpen)();
-    await saveSpoilerStateMock.mock.results[0]?.value?.catch(() => undefined);
-
-    expect(setIsDataSpoilerOpen).toHaveBeenCalledWith(true);
-    expect(saveSpoilerStateMock).toHaveBeenCalledWith(true);
   });
 });
 
