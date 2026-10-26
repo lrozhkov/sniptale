@@ -182,7 +182,7 @@ export async function renderQuickActionAppearance(
       const dataUrl = await options.renderHeader({
         header,
         source: { width: source.width, height: source.height },
-        ...(faviconWebsite ? { faviconWebsite } : {}),
+        ...(faviconWebsite && faviconWebsite.length <= 2048 ? { faviconWebsite } : {}),
       });
       options.assertCurrent();
       headerBitmap = await createImageBitmap(await dataUrlToBlob(dataUrl));

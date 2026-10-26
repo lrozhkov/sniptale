@@ -7,13 +7,27 @@ import type { QuickActionHeaderRasterInput } from '../../contracts/messaging/con
 export async function renderQuickActionHeader(
   input: QuickActionHeaderRasterInput
 ): Promise<{ dataUrl: string }> {
-  const signal = AbortSignal.timeout(15_000);
   let header = input.header;
   if (header.faviconEnabled && !header.faviconDataUrl && input.faviconWebsite) {
-    const icon = await acquireWindowHeaderFavicon(input.faviconWebsite, signal).catch(() => null);
-    if (icon) header = { ...header, faviconDataUrl: icon, faviconSource: 'site' };
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const icon = await Promise.race([
+        acquireWindowHeaderFavicon(input.faviconWebsite, controller.signal).catch(() => null),
+        new Promise<null>((resolve) => {
+          timeout = setTimeout(() => {
+            resolve(null);
+            controller.abort();
+          }, 2000);
+        }),
+      ]);
+      if (icon) header = { ...header, faviconDataUrl: icon, faviconSource: 'site' };
+    } finally {
+      clearTimeout(timeout);
+      controller.abort();
+    }
   }
-  signal.throwIfAborted();
+  const signal = AbortSignal.timeout(15_000);
   const height = Math.ceil(windowHeaderGeometry(header, input.source).height);
   if (input.source.width * height > 16_000_000)
     throw new Error('Quick-action header exceeds raster limits');

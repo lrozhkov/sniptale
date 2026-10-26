@@ -177,3 +177,18 @@ it('closes a source with mismatched decoded dimensions and refuses unsupported o
   await expect(renderQuickActionAppearance(options())).rejects.toThrow('encoding');
   expect(canvases.at(-1)).toEqual({ width: 0, height: 0 });
 });
+
+it('omits an overlong optional favicon address while rendering the bounded page header', async () => {
+  const input = options();
+  input.appearance.header = { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true };
+  input.metadata.url = `https://example.test/?query=${'a'.repeat(2200)}`;
+  const source = bitmap();
+  const header = { ...bitmap(), height: 1 };
+  decode.mockResolvedValueOnce(source).mockResolvedValueOnce(header);
+  await renderQuickActionAppearance(input);
+  expect(input.renderHeader).toHaveBeenCalledWith({
+    header: expect.objectContaining({ url: input.metadata.url.slice(0, 2048) }),
+    source: { width: 2, height: 3 },
+  });
+  expect(encode).toHaveBeenCalledOnce();
+});

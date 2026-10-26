@@ -121,7 +121,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   });
 }
 
-test('styles native visible, full and selection output before download', async ({}, info) => {
+test('styles native visible, full and selection output with all captions and an overlong page address', async ({}, info) => {
   const size = { width: 1280, height: 560 };
   const browser = await launchExtensionBrowser({ viewport: size });
   const host = await startHostServer();
@@ -131,7 +131,7 @@ test('styles native visible, full and selection output before download', async (
   await downloadSession.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath });
   try {
     const page = await browser.context.newPage();
-    await page.goto(host.origin);
+    await page.goto(`${host.origin}/?query=${'a'.repeat(2200)}`);
     await page.evaluate(() => {
       document.body.style.minHeight = '1400px';
       document.body.style.background = '#f97316';
@@ -177,7 +177,13 @@ test('styles native visible, full and selection output before download', async (
     );
     expect(registered).toMatchObject({ success: true });
     const appearance = createQuickActionAppearance();
-    appearance.header = { ...DEFAULT_WINDOW_HEADER, theme: 'dark', title: 'Quick action proof' };
+    appearance.header = {
+      ...DEFAULT_WINDOW_HEADER,
+      theme: 'dark',
+      title: 'Quick action proof',
+      faviconEnabled: true,
+    };
+    appearance.faviconMode = 'page';
     appearance.titleSource = 'static';
     appearance.background = {
       ...appearance.background,
@@ -190,7 +196,10 @@ test('styles native visible, full and selection output before download', async (
     appearance.information = {
       ...appearance.information,
       enabled: true,
-      title: false,
+      title: true,
+      url: true,
+      date: true,
+      dimensions: true,
       text: 'Appearance proof',
     };
     for (const { mode, format } of [
