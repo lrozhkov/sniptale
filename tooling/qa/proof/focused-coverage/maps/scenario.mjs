@@ -12,7 +12,8 @@ export const SCENARIO_OWNER_MAPPINGS = [
     owner: 'scenario-tour-persistence-consumers',
     productionFile: 'packages/runtime-contracts/src/scenario/tour-parser.ts',
     reason:
-      'Tour admission controls persisted current/history payloads and portable restore. These consumers prove CAS, parallel writers, retry, opening journal recovery and nested action media references.',
+      'Tour admission controls persisted current/history payloads and portable restore. These ' +
+      'consumers prove CAS, parallel writers, retry, opening journal recovery and nested action media references.',
     testFiles: [
       'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
       'apps/extension/src/composition/persistence/scenario/store/project-records/store.test.ts',

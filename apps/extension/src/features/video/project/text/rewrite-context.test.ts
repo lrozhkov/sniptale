@@ -260,6 +260,18 @@ describe('captureVideoProjectTextRewriteContext', () => {
     ).toThrow('invalid-request');
   });
 
+  it('retains invalid-request for a non-budget context error without changing project input', () => {
+    const { project, entry } = fixture();
+    const before = structuredClone(project);
+    expect(() =>
+      captureVideoProjectTextRewriteContext(project, entry.id, ['phrase'], {
+        ...options,
+        prompt: '   ',
+      })
+    ).toThrow(new Error('invalid-request'));
+    expect(project).toEqual(before);
+  });
+
   it('refuses output-budget and serialized-context overflow without truncation', () => {
     const { project, clip, entry, fragment } = fixture();
     fragment.text = 'x'.repeat(1_200);

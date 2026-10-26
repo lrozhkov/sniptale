@@ -1163,7 +1163,9 @@ for (const width of [1280, 1920]) {
       await context.route(`${origin}/**`, (route) =>
         route.fulfill({
           contentType: 'text/html',
-          body: '<!doctype html><html><body style="margin:0;background:#808080"><p>Toolbar contrast backdrop</p></body></html>',
+          body:
+            '<!doctype html><html><body style="margin:0;background:#808080"><p>Toolbar ' +
+            'contrast backdrop</p></body></html>',
         })
       );
       const { page, popup } = await activateHost(context, extensionId, origin, composition);
@@ -1198,7 +1200,10 @@ for (const width of [1280, 1920]) {
                 style.dataset['indicatorProof'] = 'true';
                 chrome.append(style);
               }
-              style.textContent = `.sniptale-content-toolbar-adopted { --sniptale-toolbar-button-size: ${buttonSize}px !important; transition: none !important; }`;
+              style.textContent =
+                `.sniptale-content-toolbar-adopted { ` +
+                `--sniptale-toolbar-button-size: ${buttonSize}px !important; transition: none ` +
+                `!important; }`;
             }, size);
             await pencil.hover();
             await capture(page, info, `inside-indicators-${orientation}-${size}`);

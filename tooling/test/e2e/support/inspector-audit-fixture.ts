@@ -130,7 +130,8 @@ export function createInspectorAuditFixture() {
   if (!added.ok) throw new Error('Inspector audit document creation failed');
   project = added.project;
   added.entry.document.fragments[0]!.text =
-    'A deliberately long phrase for the actual inspector, with English and русский текст, that must retain its complete native title.';
+    'A deliberately long phrase for the actual inspector, with English and русский ' +
+    'текст, that must retain its complete native title.';
   if (added.entry.captions) added.entry.captions.enabled = true;
   project.duration = Math.max(...project.clips.map((clip) => clip.startTime + clip.duration));
   project = syncProjectTransitions(project);

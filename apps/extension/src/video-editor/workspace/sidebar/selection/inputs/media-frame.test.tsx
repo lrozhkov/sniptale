@@ -1,5 +1,5 @@
-import { translate } from '../../../../../platform/i18n';
 // @vitest-environment jsdom
+import { translate } from '../../../../../platform/i18n';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

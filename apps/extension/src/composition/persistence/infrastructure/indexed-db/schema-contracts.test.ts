@@ -2,7 +2,7 @@ import { SUPPORTED_BETA_DATABASE_FIXTURES } from './fixtures';
 import { openDB } from 'idb';
 import { describe, expect, it, vi } from 'vitest';
 import { DB_VERSION, EXPECTED_STORES, SCHEMA_CONTRACTS_STORE } from './core.stores.ts';
-import { handleDatabaseUpgrade } from './upgrade/core';
+import { executeDatabaseUpgrade, handleDatabaseUpgrade } from './upgrade/core';
 import { betaV4Fixture } from './fixtures/beta-v4';
 import { betaV14Fixture } from './fixtures/beta-v14';
 import { betaV16Fixture } from './fixtures/beta-v16';
@@ -406,3 +406,49 @@ it('admits interaction authoring and rhythm without rewriting released media or 
   names.delete('recording_telemetry');
   expect(() => step.validate(db, transaction)).toThrow('unavailable');
 });
+
+it.each([
+  [21, 'PCM speech workspace stores are unavailable.'],
+  [22, 'Action audio workspace stores are unavailable.'],
+  [28, 'Review project metadata stores are unavailable.'],
+  [29, 'Source crop workspace stores are unavailable.'],
+  [30, 'Workspace color stores are unavailable.'],
+  [31, 'Track control stores are unavailable.'],
+  [35, 'Quick project stores are unavailable.'],
+  [36, 'Camera project stores are unavailable.'],
+  [37, 'Camera project stores are unavailable.'],
+  [38, 'Camera project stores are unavailable.'],
+] as const)(
+  'preserves released migration %i admission and its exact missing-store diagnostic',
+  (from, diagnostic) => {
+    const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === from)!;
+    const names = new Set<string>(migration.stores);
+    const db = {
+      objectStoreNames: { contains: (name: string) => names.has(name) },
+      createObjectStore: vi.fn(() => ({ createIndex: vi.fn(), put: vi.fn() })),
+      deleteObjectStore: vi.fn(),
+    };
+    const transaction = {
+      abort: vi.fn(),
+      objectStore: vi.fn(),
+    };
+    expect(migration.toDatabaseVersion).toBe(from + 1);
+    expect(migration.risk).toBe('additive');
+    expect(migration.backupCoverage).toBe('none');
+    expect(migration.validate(db, transaction)).toBeUndefined();
+    for (const name of migration.stores) {
+      names.delete(name);
+      transaction.abort.mockClear();
+      expect(() => migration.validate(db, transaction)).toThrow(new Error(diagnostic));
+      expect(() => executeDatabaseUpgrade(db, from, from + 1, transaction, [migration])).toThrow(
+        new Error(diagnostic)
+      );
+      expect(transaction.abort).toHaveBeenCalledOnce();
+      expect(transaction.objectStore).not.toHaveBeenCalled();
+      expect(db.createObjectStore).not.toHaveBeenCalled();
+      expect(db.deleteObjectStore).not.toHaveBeenCalled();
+      names.add(name);
+    }
+    expect(migration.validate(db, transaction)).toBeUndefined();
+  }
+);

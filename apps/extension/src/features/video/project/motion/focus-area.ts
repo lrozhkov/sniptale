@@ -1,3 +1,4 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import {
   isRect,
   isRecord,
@@ -98,14 +99,7 @@ export function motionFocusAreaBounds(area: VideoProjectMotionArea) {
     [1, 1],
     [0, 1],
   ].map(([x, y]) => motionFocusAreaPoint(area, x!, y!));
-  const x = Math.min(...points.map((point) => point.x)),
-    y = Math.min(...points.map((point) => point.y));
-  return {
-    x,
-    y,
-    width: Math.max(...points.map((point) => point.x)) - x,
-    height: Math.max(...points.map((point) => point.y)) - y,
-  };
+  return getCanvasPointsBounds(points);
 }
 
 /** Fit the selected shape to the camera's existing axis-aligned viewport. */

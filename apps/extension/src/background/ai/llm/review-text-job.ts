@@ -1,10 +1,10 @@
+import { createTextJobLifecycle } from './text-job-lifecycle';
 import {
   REVIEW_TEXT_FAILURE_CODES,
   REVIEW_TEXT_TIMEOUT_MS,
   REVIEW_TEXT_RESPONSE_MAX_BYTES,
   REVIEW_TEXT_SYSTEM_PROMPT,
   parseReviewTextProposal,
-  type ReviewTextClientMessage,
   type ReviewTextFailureCode,
   type ReviewTextServerMessage,
   type ReviewTextStart,
@@ -21,12 +21,6 @@ interface Dependencies {
   history: typeof saveRequestHistory;
   assertScope: typeof assertReviewTextJobScope;
 }
-interface Job {
-  controller: AbortController;
-  flight: Promise<void>;
-  cancel(): void;
-}
-
 /** Every one-shot Port owns cancellation before authorization awaits; erasure drains that same flight. */
 export function createReviewTextJobService(overrides: Partial<Dependencies> = {}) {
   const deps: Dependencies = {
@@ -37,110 +31,23 @@ export function createReviewTextJobService(overrides: Partial<Dependencies> = {}
     assertScope: assertReviewTextJobScope,
     ...overrides,
   };
-  const jobs = new Set<Job>();
-  let reservations = 0;
-  return {
-    reserveErasureExclusion() {
-      reservations++;
-      let released = false;
-      return {
-        release() {
-          if (!released) {
-            released = true;
-            reservations--;
-          }
-        },
-        async waitForActiveMutations() {
-          await Promise.allSettled([...jobs].map((job) => job.flight));
-        },
-      };
-    },
-    async cancelActiveJob() {
-      const active = [...jobs];
-      active.forEach((job) => job.cancel());
-      await Promise.allSettled(active.map((job) => job.flight));
-    },
-    connect(
-      sender: chrome.runtime.MessageSender,
-      send: (message: ReviewTextServerMessage) => void
-    ) {
-      let started = false;
-      let disconnected = false;
-      let job: Job | undefined;
-      let activeId: string | undefined;
-      const emit = (message: ReviewTextServerMessage) => {
-        if (!disconnected) send(message);
-      };
-      return {
-        receive(message: ReviewTextClientMessage) {
-          if (disconnected) return;
-          if (message.type === 'keepalive') return;
-          if (message.type === 'cancel') {
-            if (message.requestId === activeId) job?.cancel();
-            return;
-          }
-          if (started || reservations > 0) {
-            emit({ type: 'failure', requestId: message.requestId, code: 'invalid-request' });
-            return;
-          }
-          started = true;
-          activeId = message.requestId;
-          const controller = new AbortController();
-          let done = false;
-          let timedOut = false;
-          const timer = setTimeout(() => {
-            timedOut = true;
-            job?.cancel();
-          }, REVIEW_TEXT_TIMEOUT_MS);
-          const finish = (result: ReviewTextServerMessage) => {
-            if (done) return;
-            done = true;
-            clearTimeout(timer);
-            emit(result);
-          };
-          job = {
-            controller,
-            flight: Promise.resolve(),
-            cancel() {
-              controller.abort();
-              finish({
-                type: 'failure',
-                requestId: message.requestId,
-                code: timedOut ? 'timeout' : 'cancelled',
-              });
-            },
-          };
-          jobs.add(job);
-          emit({ type: 'progress', requestId: message.requestId, phase: 'authorizing' });
-          const current = job;
-          current.flight = run(message, sender, controller.signal, deps, emit)
-            .then((proposal) => {
-              controller.signal.throwIfAborted();
-              finish({ type: 'proposal', requestId: message.requestId, proposal });
-            })
-            .catch((error: unknown) => {
-              const code: ReviewTextFailureCode = controller.signal.aborted
-                ? timedOut
-                  ? 'timeout'
-                  : 'cancelled'
-                : (error instanceof Error &&
-                    REVIEW_TEXT_FAILURE_CODES.find((entry) => entry === error.message)) ||
-                  'provider-failed';
-              finish({ type: 'failure', requestId: message.requestId, code });
-            })
-            .finally(() => {
-              clearTimeout(timer);
-              jobs.delete(current);
-            });
-        },
-        async disconnect() {
-          disconnected = true;
-          job?.cancel();
-          await job?.flight;
-        },
-      };
-    },
-  };
+  return createTextJobLifecycle<
+    ReviewTextStart,
+    ReviewTextServerMessage,
+    Awaited<ReturnType<typeof run>>,
+    ReviewTextFailureCode
+  >({
+    timeoutMs: REVIEW_TEXT_TIMEOUT_MS,
+    failureCodes: REVIEW_TEXT_FAILURE_CODES,
+    run: (request, sender, signal, emit) => run(request, sender, signal, deps, emit),
+    progress: (request) => ({
+      type: 'progress',
+      requestId: request.requestId,
+      phase: 'authorizing',
+    }),
+    result: (request, proposal) => ({ type: 'proposal', requestId: request.requestId, proposal }),
+    failure: (request, code) => ({ type: 'failure', requestId: request.requestId, code }),
+  });
 }
 
 async function run(

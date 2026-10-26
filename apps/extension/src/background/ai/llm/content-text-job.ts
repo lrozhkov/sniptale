@@ -1,9 +1,9 @@
+import { createTextJobLifecycle } from './text-job-lifecycle';
 import {
   CONTENT_TEXT_FAILURE_CODES,
   CONTENT_TEXT_TIMEOUT_MS,
   CONTENT_TEXT_MAX_CHARS,
   CONTENT_TEXT_SYSTEM_PROMPT,
-  type ContentTextClientMessage,
   type ContentTextServerMessage,
   type ContentTextStart,
   type ContentTextFailureCode,
@@ -21,11 +21,6 @@ interface Dependencies {
   request: typeof requestChatCompletion;
   history: typeof saveRequestHistory;
 }
-interface Job {
-  flight: Promise<void>;
-  cancel(): void;
-}
-
 /** Owns each content request from admission through cancellation and metadata settlement. */
 export function createContentTextJobService(overrides: Partial<Dependencies> = {}) {
   const deps: Dependencies = {
@@ -36,108 +31,19 @@ export function createContentTextJobService(overrides: Partial<Dependencies> = {
     history: saveRequestHistory,
     ...overrides,
   };
-  const jobs = new Set<Job>();
-  let reservations = 0;
-  return {
-    reserveErasureExclusion() {
-      reservations++;
-      let released = false;
-      return {
-        release() {
-          if (!released) {
-            released = true;
-            reservations--;
-          }
-        },
-        async waitForActiveMutations() {
-          await Promise.allSettled([...jobs].map((job) => job.flight));
-        },
-      };
-    },
-    async cancelActiveJob() {
-      const active = [...jobs];
-      active.forEach((job) => job.cancel());
-      await Promise.allSettled(active.map((job) => job.flight));
-    },
-    connect(
-      sender: chrome.runtime.MessageSender,
-      send: (message: ContentTextServerMessage) => void
-    ) {
-      let started = false;
-      let disconnected = false;
-      let activeId: string | undefined;
-      let job: Job | undefined;
-      const emit = (message: ContentTextServerMessage) => {
-        if (!disconnected) send(message);
-      };
-      return {
-        receive(message: ContentTextClientMessage) {
-          if (disconnected || message.type === 'keepalive') return;
-          if (message.type === 'cancel') {
-            if (message.requestId === activeId) job?.cancel();
-            return;
-          }
-          if (started || reservations > 0) {
-            emit({ type: 'failure', requestId: message.requestId, code: 'invalid-request' });
-            return;
-          }
-          started = true;
-          activeId = message.requestId;
-          const controller = new AbortController();
-          let done = false;
-          let timedOut = false;
-          const timer = setTimeout(() => {
-            timedOut = true;
-            job?.cancel();
-          }, CONTENT_TEXT_TIMEOUT_MS);
-          const finish = (result: ContentTextServerMessage) => {
-            if (done) return;
-            done = true;
-            clearTimeout(timer);
-            emit(result);
-          };
-          job = {
-            flight: Promise.resolve(),
-            cancel() {
-              controller.abort();
-              finish({
-                type: 'failure',
-                requestId: message.requestId,
-                code: timedOut ? 'timeout' : 'cancelled',
-              });
-            },
-          };
-          const current = job;
-          jobs.add(current);
-          emit({ type: 'progress', requestId: message.requestId });
-          current.flight = runContentTextRequest(message, sender, controller.signal, deps)
-            .then((text) => {
-              controller.signal.throwIfAborted();
-              finish({ type: 'result', requestId: message.requestId, text });
-            })
-            .catch((error: unknown) => {
-              const code: ContentTextFailureCode = controller.signal.aborted
-                ? timedOut
-                  ? 'timeout'
-                  : 'cancelled'
-                : (error instanceof Error &&
-                    CONTENT_TEXT_FAILURE_CODES.find((entry) => entry === error.message)) ||
-                  'provider-failed';
-              finish({ type: 'failure', requestId: message.requestId, code });
-            })
-            .finally(() => {
-              clearTimeout(timer);
-              jobs.delete(current);
-            });
-        },
-        async disconnect() {
-          disconnected = true;
-          job?.cancel();
-          await job?.flight;
-        },
-      };
-    },
-  };
+  return createTextJobLifecycle<
+    ContentTextStart,
+    ContentTextServerMessage,
+    string,
+    ContentTextFailureCode
+  >({
+    timeoutMs: CONTENT_TEXT_TIMEOUT_MS,
+    failureCodes: CONTENT_TEXT_FAILURE_CODES,
+    run: (request, sender, signal) => runContentTextRequest(request, sender, signal, deps),
+    progress: (request) => ({ type: 'progress', requestId: request.requestId }),
+    result: (request, text) => ({ type: 'result', requestId: request.requestId, text }),
+    failure: (request, code) => ({ type: 'failure', requestId: request.requestId, code }),
+  });
 }
 
 async function runContentTextRequest(

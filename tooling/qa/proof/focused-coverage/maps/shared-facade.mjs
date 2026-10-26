@@ -1,5 +1,17 @@
 export const SHARED_FACADE_OWNER_MAPPINGS = [
   {
+    owner: 'shared-video-text-rewrite-controls',
+    productionFile: 'apps/extension/src/ui/video-text/rewrite/controls.tsx',
+    reason:
+      'Rewrite settings and proposal controls retain numeric cancellation, authored commits and \
+command locks through the shared numeric control.',
+    testFiles: [
+      'apps/extension/src/ui/video-text/rewrite/settings.test.tsx',
+      'apps/extension/src/ui/video-text/rewrite/proposal.test.tsx',
+      'apps/extension/src/ui/compact-inspector-controls/numeric-preview.test.tsx',
+    ],
+  },
+  {
     owner: 'shared-audio-jobs-client',
     productionFile: 'apps/extension/src/workflows/audio-jobs/client.ts',
     reason:
@@ -22,9 +34,11 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
   {
     owner: 'shared-audio-jobs-port-helper',
     productionFile: 'apps/extension/src/workflows/audio-jobs/remote-job-port.ts',
-    reason: 'Both audio and review-text transports consume the relocated Port lifetime helper.',
+    reason:
+      'Audio and shared text request transports consume the existing Port cancellation and keepalive helper.',
     testFiles: [
       'apps/extension/src/workflows/audio-jobs/client.test.ts',
+      'apps/extension/src/workflows/ai-session/content-text.test.ts',
       'apps/extension/src/workflows/video-review/text-rewrite-client.test.ts',
     ],
   },

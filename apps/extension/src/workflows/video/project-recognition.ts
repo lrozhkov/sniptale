@@ -7,9 +7,11 @@ import { getVideoProject } from '../../composition/persistence/projects';
 import { readVideoProjectAudioSource } from '../../composition/persistence/projects/audio-source';
 import type { VideoProject } from '../../features/video/project/types/model';
 import type { VideoProjectTextDocument } from '../../features/video/project/text/types';
-import { createVideoProjectAudioScope } from '../../features/video/project/text/audio-scope';
+import {
+  createVideoProjectAudioScope,
+  getVideoProjectNativeAudioWindow,
+} from '../../features/video/project/text/audio-scope';
 import { applyVideoProjectRecognition } from '../../features/video/project/text/recognition';
-import { getMediaClipSourceTime } from '../../features/video/project/timeline/rate';
 import { parseVideoProjectTextDocuments } from '../../features/video/project/text/validation';
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
 import { parseReviewTextDocument } from '../../features/video/review/text-validation';
@@ -65,13 +67,7 @@ export function projectRecognitionRange(project: VideoProject, clipId: string) {
   if (!clip || (clip.type !== 'VIDEO' && clip.type !== 'AUDIO')) return null;
   const asset = project.assets.find((entry) => entry.id === clip.assetId);
   if (!asset?.metadata.hasAudio) return null;
-  const offset = clip.type === 'VIDEO' ? (clip.cameraTiming?.offsetSeconds ?? 0) : 0;
-  const start = Math.max(getMediaClipSourceTime(clip, clip.startTime) + offset, offset);
-  const end = Math.min(
-    clip.sourceStart + clip.sourceDuration,
-    getMediaClipSourceTime(clip, clip.startTime + clip.duration) + offset,
-    (asset.metadata.duration ?? Infinity) + offset
-  );
+  const { start, end } = getVideoProjectNativeAudioWindow(clip, asset);
   return end > start ? { start, end } : null;
 }
 

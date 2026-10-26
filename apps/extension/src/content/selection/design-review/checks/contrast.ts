@@ -1,3 +1,4 @@
+import { getComposedParent } from './composed-parent';
 import { parseColor, type RgbaColor } from '@sniptale/foundation/color';
 
 type ReadStyle = (element: Element) => CSSStyleDeclaration | null;
@@ -5,13 +6,6 @@ type CheckContrast =
   | { kind: 'measured'; ratio: number; required: number; foreground: string; background: string }
   | { kind: 'unknown' | 'inapplicable' };
 
-function parent(element: Element): Element | null {
-  if (element.assignedSlot) return element.assignedSlot;
-  if (element.parentElement) return element.parentElement;
-  const root = element.getRootNode(),
-    view = element.ownerDocument.defaultView;
-  return view && root instanceof view.ShadowRoot ? root.host : null;
-}
 function luminance(color: RgbaColor): number {
   const channel = (value: number) => {
     const srgb = value / 255;
@@ -69,7 +63,7 @@ export function readCheckContrast(
         backgroundValue = style.backgroundColor;
       } else if (color.alpha !== 0) return { kind: 'unknown' };
     }
-    current = parent(current);
+    current = getComposedParent(current);
   }
   if (!background) return { kind: 'unknown' };
   const size = Number.parseFloat(styles.fontSize),

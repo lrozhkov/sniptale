@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, type ReactNode } from 'react';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot, type Root } from 'react-dom/client';
@@ -28,7 +29,11 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await act(async () => root.unmount());
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -188,7 +193,10 @@ it('commits pending text when the editor unmounts', async () => {
     );
   });
   await act(async () => typeValue(host.querySelector('textarea') as HTMLTextAreaElement, 'Draft'));
-  await act(async () => root.unmount());
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
   expect(onPatch).toHaveBeenCalledWith({ text: 'Draft' });
 });
 

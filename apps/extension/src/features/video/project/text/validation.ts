@@ -1,3 +1,4 @@
+import { parseVideoProjectPlacementBinding } from '../validation/placement-binding';
 import { MAX_VIDEO_PROJECT_DURATION_SECONDS } from '../validation/primitives';
 import { isVideoProjectDurationMode } from '../types/layout';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -13,20 +14,7 @@ function identity(value: unknown): value is string {
 
 /** Parses descriptive placement identity without requiring a current source reference. */
 export function parseVideoProjectTextBinding(value: unknown): VideoProjectTextBinding | null {
-  if (!isRecord(value)) return null;
-  if (value['kind'] === 'project' && Object.keys(value).length === 1) return { kind: 'project' };
-  if (
-    value['kind'] === 'source' &&
-    Object.keys(value).length === 3 &&
-    identity(value['assetId']) &&
-    identity(value['sourceInstanceId'])
-  )
-    return {
-      kind: 'source',
-      assetId: value['assetId'],
-      sourceInstanceId: value['sourceInstanceId'],
-    };
-  return null;
+  return parseVideoProjectPlacementBinding(value);
 }
 
 function withinTextBudget(value: unknown[]): boolean {

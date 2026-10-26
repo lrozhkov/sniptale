@@ -15,7 +15,7 @@ import {
 } from '../../../../features/video/project/types/index';
 import type { VideoProject } from '../../../../features/video/project/types/index';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
-import { applyProjectUpdate } from '../helpers';
+import { applyProjectUpdate, getVideoProjectTrackInsertionOrder } from '../helpers';
 import { deleteProjectTrack, resolveSelectionAfterTrackDelete } from './delete';
 import {
   createUtilityLaneClearAction,
@@ -39,9 +39,7 @@ function addTrackToProject(
     camera
       ? `${translate('videoEditor.timeline.addCameraTrack')} ${sequence}`
       : getDefaultTrackName(kind, sequence),
-    kind === VideoTrackKind.PRIMARY || kind === VideoTrackKind.SUBTITLE
-      ? Math.min(0, ...project.tracks.map((item) => item.order)) - 1
-      : Math.max(0, ...project.tracks.map((item) => item.order)) + 1,
+    getVideoProjectTrackInsertionOrder(project, kind),
     kind
   );
 

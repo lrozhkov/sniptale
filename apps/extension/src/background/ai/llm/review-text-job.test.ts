@@ -217,3 +217,37 @@ describe('one-shot cancellable text editing jobs', () => {
     }
   );
 });
+
+it('ignores another cancellation and admits only one review start on a connection', async () => {
+  const h = setup();
+  const pending = deferred();
+  h.deps.authorize.mockReturnValueOnce(pending.promise);
+  h.connection.receive(start);
+  h.connection.receive({ type: 'keepalive', requestId: start.requestId });
+  h.connection.receive({ type: 'cancel', requestId: 'another-request' });
+  expect(h.deps.authorize.mock.calls[0]?.[2]?.aborted).toBe(false);
+  h.connection.receive(start);
+  expect(h.messages.at(-1)).toMatchObject({ type: 'failure', code: 'invalid-request' });
+  pending.resolve();
+  await h.service.reserveErasureExclusion().waitForActiveMutations();
+  expect(h.deps.request).toHaveBeenCalledOnce();
+  expect(h.messages.at(-1)?.type).toBe('proposal');
+});
+
+it('keeps review erasure reservations local to a service and releases each only once', async () => {
+  const first = setup();
+  const second = setup();
+  const released = first.service.reserveErasureExclusion();
+  released.release();
+  released.release();
+  const held = first.service.reserveErasureExclusion();
+  first.connection.receive(start);
+  second.connection.receive(start);
+  await second.service.reserveErasureExclusion().waitForActiveMutations();
+  expect(first.messages.at(-1)).toMatchObject({ type: 'failure', code: 'invalid-request' });
+  expect(second.messages.at(-1)?.type).toBe('proposal');
+  held.release();
+  first.connection.receive(start);
+  await first.service.reserveErasureExclusion().waitForActiveMutations();
+  expect(first.messages.at(-1)?.type).toBe('proposal');
+});

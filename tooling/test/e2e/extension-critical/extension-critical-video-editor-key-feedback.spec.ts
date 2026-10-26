@@ -1270,7 +1270,8 @@ async function composeKeyFixture(project: VideoProject) {
   ] as const) {
     const source = await readFile(
       new URL(
-        `../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/${effect.filename}.sniptale-effect.json`,
+        `../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/` +
+          `${effect.filename}.sniptale-effect.json`,
         import.meta.url
       ),
       'utf8'
@@ -1463,7 +1464,8 @@ for (const format of ['WEBM', 'MP4'] as const) {
           for (const id of [original.id, 'late-key']) {
             await page
               .locator(
-                `[data-ui="video-editor.timeline.history-event"][data-action-id="${id}"][data-action-clip-id="${main.id}"]`
+                `[data-ui="video-editor.timeline.history-event"][data-action-id="${id}` +
+                  `"][data-action-clip-id="${main.id}"]`
               )
               .click();
             const owner = page.locator('[data-ui="video-editor.inspector.history-event"]');

@@ -452,6 +452,14 @@ function TourImageObjectSettings({
   t,
 }: ImageSettingsProps) {
   const entry = slide.actions.find((entry) => entry.object.id === objectId);
+  const updateAction = (
+    id: string,
+    update: (action: TourImageSlide['actions'][number]) => TourImageSlide['actions'][number]
+  ) =>
+    onChange({
+      ...slide,
+      actions: slide.actions.map((item) => (item.object.id === id ? update(item) : item)),
+    });
   const timing = entry ? (
     <TourTimingSettings
       tour={tour}
@@ -460,16 +468,11 @@ function TourImageObjectSettings({
       disabled={disabled}
       t={t}
       onChange={(next) =>
-        onChange({
-          ...slide,
-          actions: slide.actions.map((item) =>
-            item.object.id !== objectId
-              ? item
-              : item.type === 'hotspot'
-                ? { type: 'hotspot', object: { ...item.object, timing: next.timing } }
-                : { type: 'annotation', object: { ...item.object, timing: next.timing } }
-          ),
-        })
+        updateAction(entry.object.id, (item) =>
+          item.type === 'hotspot'
+            ? { type: 'hotspot', object: { ...item.object, timing: next.timing } }
+            : { type: 'annotation', object: { ...item.object, timing: next.timing } }
+        )
       }
     />
   ) : undefined;
@@ -480,16 +483,11 @@ function TourImageObjectSettings({
       disabled={disabled}
       t={t}
       onChange={(next) =>
-        onChange({
-          ...slide,
-          actions: slide.actions.map((item) =>
-            item.object.id !== objectId
-              ? item
-              : item.type === 'hotspot'
-                ? { type: 'hotspot', object: { ...item.object, camera: next.camera } }
-                : { type: 'annotation', object: { ...item.object, camera: next.camera } }
-          ),
-        })
+        updateAction(entry.object.id, (item) =>
+          item.type === 'hotspot'
+            ? { type: 'hotspot', object: { ...item.object, camera: next.camera } }
+            : { type: 'annotation', object: { ...item.object, camera: next.camera } }
+        )
       }
     />
   ) : undefined;
@@ -514,14 +512,7 @@ function TourImageObjectSettings({
           tour={tour}
           disabled={disabled}
           t={t}
-          onChange={(value) =>
-            onChange({
-              ...slide,
-              actions: slide.actions.map((item) =>
-                item.object.id === value.id ? { type: 'hotspot', object: value } : item
-              ),
-            })
-          }
+          onChange={(value) => updateAction(value.id, () => ({ type: 'hotspot', object: value }))}
         />
       )}
       {entry?.type === 'annotation' && (
@@ -535,12 +526,7 @@ function TourImageObjectSettings({
           disabled={disabled}
           t={t}
           onChange={(value) =>
-            onChange({
-              ...slide,
-              actions: slide.actions.map((item) =>
-                item.object.id === value.id ? { type: 'annotation', object: value } : item
-              ),
-            })
+            updateAction(value.id, () => ({ type: 'annotation', object: value }))
           }
         />
       )}

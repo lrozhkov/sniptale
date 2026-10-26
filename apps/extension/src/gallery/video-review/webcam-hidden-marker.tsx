@@ -83,6 +83,12 @@ export function ReviewWebcamHiddenMarker(props: {
       ? { start: Math.max(left, Math.min(original.end - minimum, time)), end: original.end }
       : { start: original.start, end: Math.max(original.start + minimum, Math.min(right, time)) };
   };
+  const dragPosition = (current: Drag, clientX: number) =>
+    bounded(
+      current.range,
+      current.edge,
+      current.range[current.edge] + ((clientX - current.x) / Math.max(1, current.width)) * duration
+    );
   const metrics = reviewTrackMetrics(props.compact);
   const visible = preview ?? range;
   const selected = editor.selection.kind === 'webcam-hidden' && editor.selection.id === id;
@@ -153,24 +159,14 @@ export function ReviewWebcamHiddenMarker(props: {
             event.stopPropagation();
             const current = drag.current;
             if (!current || current.pointerId !== event.pointerId) return;
-            current.next = bounded(
-              current.range,
-              current.edge,
-              current.range[current.edge] +
-                ((event.clientX - current.x) / Math.max(1, current.width)) * duration
-            );
+            current.next = dragPosition(current, event.clientX);
             setPreview(current.next);
           }}
           onPointerUp={(event) => {
             event.stopPropagation();
             const current = drag.current;
             if (!current || current.pointerId !== event.pointerId) return;
-            current.next = bounded(
-              current.range,
-              current.edge,
-              current.range[current.edge] +
-                ((event.clientX - current.x) / Math.max(1, current.width)) * duration
-            );
+            current.next = dragPosition(current, event.clientX);
             drag.current = null;
             if (current.node.hasPointerCapture(current.pointerId))
               current.node.releasePointerCapture(current.pointerId);

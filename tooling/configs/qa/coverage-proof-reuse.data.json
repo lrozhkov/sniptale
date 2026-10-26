@@ -28,6 +28,8 @@
     "tooling/test/harness/vitest.setup.ts",
     "tooling/configs/qa/coverage-proof-reuse.data.json",
     "tooling/qa/proof/coverage/audit-coverage-step.mjs",
+    "tooling/qa/proof/coverage/coverage-timeout-retry.mjs",
+    "tooling/qa/proof/unit/unit-timeout-reporter.mjs",
     "tooling/qa/proof/coverage/coverage-audit-report.mjs",
     "tooling/qa/proof/coverage/coverage-proof.mjs",
     "tooling/qa/proof/unit/verify-unit-tests.mjs",
@@ -39,7 +41,8 @@
     "coverage-final.json",
     "coverage-summary.json",
     "lcov.info",
-    "html/index.html"
+    "html/index.html",
+    "html/unit-attempts.json"
   ],
   "owners": {
     "decision": "tooling/qa/proof/coverage/coverage-proof.mjs",

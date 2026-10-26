@@ -204,13 +204,22 @@ async function expectWithinViewport(page: Page, element: Locator) {
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  const small = viewport.name === '1280x560';
+  const locale: AppLocale = small ? 'ru' : 'en';
+  const modelTitlePattern = small ? /Plain text model 1280x560/ : /Plain text model 1920x900/;
+  const disclosureDataPattern =
+    locale === 'ru'
+      ? /инструкция и текст выбранного элемента страницы/
+      : /the instruction and text of the selected page element/;
+  const disclosureHistoryPattern =
+    locale === 'ru'
+      ? /В истории сохраняются только метаданные запроса./
+      : /Only request metadata is retained in history./;
   test(`single text AI applies, stops and restores source at ${viewport.name}`, async ({
     context,
     extensionId,
     hostOrigin,
   }, info) => {
-    const small = viewport.name === '1280x560';
-    const locale: AppLocale = small ? 'ru' : 'en';
     const setup = await context.newPage();
     await setup.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`);
     await setup.evaluate(
@@ -246,7 +255,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.evaluate(() => {
         const section = document.createElement('section');
         section.style.cssText =
-          'position:absolute;left:32px;top:70px;width:560px;max-width:calc(100vw - 64px);z-index:1;background:white;color:#111;font:20px/28px Georgia,serif';
+          'position:absolute;left:32px;top:70px;width:560px;max-width:calc(100vw - 64px);' +
+          'z-index:1;background:white;color:#111;font:20px/28px Georgia,serif';
         const text = document.createElement('p');
         text.id = 'ai-text-source';
         text.style.margin = '0 0 12px';
@@ -327,15 +337,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       ).toHaveCount(0);
       await popover.locator('.sniptale-ai-model-selector-trigger').click();
       await page.getByRole('button', { name: modelName, exact: true }).click();
-      await expect(submit).toHaveAttribute('title', new RegExp(modelName));
-      await expect(submit).toHaveAttribute(
-        'title',
-        new RegExp(translate('content.toolbar.aiTextDisclosureData', locale))
-      );
-      await expect(submit).toHaveAttribute(
-        'title',
-        new RegExp(translate('aiModal.disclosureHistory', locale))
-      );
+      await expect(submit).toHaveAttribute('title', modelTitlePattern);
+      await expect(submit).toHaveAttribute('title', disclosureDataPattern);
+      await expect(submit).toHaveAttribute('title', disclosureHistoryPattern);
       const beforeDrag = (await popover.boundingBox())!;
       const handle = (await ui(page, 'content.ai-text.drag').boundingBox())!;
       await page.mouse.move(handle.x + 20, handle.y + handle.height / 2);

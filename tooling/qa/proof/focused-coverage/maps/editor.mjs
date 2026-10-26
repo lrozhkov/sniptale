@@ -1,5 +1,29 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'video-preview-canvas-region-gestures',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/editor-region/gesture.ts',
+    reason:
+      'Region and anchor consumers retain shared arrow decoding, pointer preview, single commit \
+and cancellation behavior.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
+      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/canvas/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'local-voice-selected-source-admission',
+    productionFile: 'apps/extension/src/workflows/video/local-voice-source.ts',
+    allowCrossOwner: true,
+    reason:
+      'Review and project consumers share local file or auditioned Library source identity and inspection.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/text-voice-local.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.test.ts',
+    ],
+  },
+  {
     owner: 'scene-spotlight-sampling',
     productionFile: 'apps/extension/src/features/video/composition/scene-spotlight.ts',
     allowCrossOwner: true,
@@ -198,7 +222,8 @@ export const EDITOR_OWNER_MAPPINGS = [
       'Sound, captured gestures and ordinary clicks use the same current project update port.',
     testFiles: [
       'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-fields.test.tsx',
-      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-click-fields.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/\
+action-feedback-click-fields.test.tsx',
     ],
   },
   {

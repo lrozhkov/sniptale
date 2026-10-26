@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, useRef, useState, type MutableRefObject } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -127,8 +128,12 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
 });
-afterEach(() => {
-  act(() => root.unmount());
+afterEach(async () => {
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   host.remove();
   vi.useRealTimers();
 });

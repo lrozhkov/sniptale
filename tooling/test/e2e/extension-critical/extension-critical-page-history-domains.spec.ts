@@ -61,7 +61,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         paragraph.id = 'history-page-text';
         paragraph.textContent = 'Original page text';
         paragraph.style.cssText =
-          'position:absolute;left:620px;top:170px;width:280px;height:56px;margin:0;padding:8px;background:#dbeafe;color:#172554;text-align:left';
+          'position:absolute;left:620px;top:170px;width:280px;height:56px;margin:0;' +
+          'padding:8px;background:#dbeafe;color:#172554;text-align:left';
         document.body.append(paragraph);
       });
       const text = page.locator('#history-page-text');

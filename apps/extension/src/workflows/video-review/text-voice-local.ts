@@ -1,10 +1,10 @@
+import { inspectLocalVoiceSource } from '../video/local-voice-source';
 import {
   assertLibraryAudioBindingSource,
   prepareLibraryAudioBinding,
-  readLibraryAudioBindingSource,
+  type readLibraryAudioBindingSource,
 } from '../../composition/persistence/projects/library-asset-binding';
 import type { createVideoReviewSession } from './session';
-import { inspectReviewAudio } from './audio-import';
 import {
   applyReviewTextTake,
   assertReviewTextTakeBasis,
@@ -44,15 +44,7 @@ export async function prepareReviewLocalTextVoice(args: {
     throw new Error('invalid-request');
   const offset = args.trimOffset ?? 0;
   if (!Number.isFinite(offset) || offset < 0) throw new Error('duration');
-  const source =
-    selection.kind === 'library'
-      ? (selection.auditionedSource ?? (await readLibraryAudioBindingSource(selection.id)))
-      : null;
-  if (selection.kind === 'library' && source?.mediaId !== selection.id)
-    throw new Error('invalid-request');
-  const file = source?.file ?? (selection.kind === 'file' ? selection.file : null);
-  if (!file) throw new Error('invalid-request');
-  const duration = await inspectReviewAudio(file, signal);
+  const { source, file, duration } = await inspectLocalVoiceSource(selection, signal);
   const fragment = basis.fragment;
   const preview: ReviewLocalTextVoicePreview = {
     clipId: `audio-${crypto.randomUUID()}`,

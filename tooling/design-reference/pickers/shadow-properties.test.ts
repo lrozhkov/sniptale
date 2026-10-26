@@ -4,7 +4,9 @@ import { enableShadowPropertyDefaults } from './shadow-properties';
 
 it('retains canonical property defaults and removes only their direct browser condition', () => {
   const declarations = '--tw-border-style:solid;--tw-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000';
-  const source = `@layer properties{@supports (browser:fallback){*,::before,::after{${declarations}}}}@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}`;
+  const source =
+    `@layer properties{@supports (browser:fallback){*,::before,::after{` +
+    `${declarations}}}}@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}`;
   const result = enableShadowPropertyDefaults(source);
   expect(result).toContain(`*,::before,::after{${declarations}}`);
   expect(result).toContain(

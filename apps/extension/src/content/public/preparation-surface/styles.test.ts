@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { parse } from 'postcss';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { runtimeInfoGetUrlMock } = vi.hoisted(() => ({
@@ -33,6 +34,16 @@ vi.mock('../../../ui/compact-inspector-controls/disclosure.css?inline', async ()
   };
 });
 
+vi.mock('../../../composition/frame-annotation-controls/popover/styles.css?inline', async () => {
+  const { readFileSync } = await import('node:fs');
+  return {
+    default: readFileSync(
+      new URL('../../../composition/frame-annotation-controls/popover/styles.css', import.meta.url),
+      'utf8'
+    ),
+  };
+});
+
 import {
   createContentEntrypointStyles,
   normalizeContentEntrypointRemUnits,
@@ -51,6 +62,16 @@ const CALLOUT_SETTINGS_STYLES_PATH = fileURLToPath(
 const SETTINGS_POPOVER_STYLES_PATH = fileURLToPath(
   new URL('../../../composition/frame-annotation-controls/popover/styles.css', import.meta.url)
 );
+
+function styleDeclarations(styles: string, selector: string) {
+  const rule = parse(styles).nodes.find(
+    (node) => node.type === 'rule' && node.selectors.includes(selector)
+  );
+  if (!rule || rule.type !== 'rule') throw new Error(`Missing style rule: ${selector}`);
+  return Object.fromEntries(
+    rule.nodes.flatMap((node) => (node.type === 'decl' ? [[node.prop, node.value]] : []))
+  );
+}
 
 afterEach(() => {
   runtimeInfoGetUrlMock.mockClear();
@@ -103,9 +124,11 @@ describe('content entrypoint styles', () => {
     expect(calloutSettingsStyles).toContain('scroll-padding-block: 4px;');
     expect(calloutSettingsStyles).toContain('flex: 0 0 auto;');
     expect(calloutSettingsStyles).not.toContain('data-callout-settings-mode-switch');
-    expect(calloutSettingsStyles).toContain(
-      '.sniptale-callout-preset-row:hover .sniptale-glass-preset-check,'
-    );
+    for (const interaction of [':hover', ':focus-within']) {
+      const selector = `.sniptale-callout-preset-row${interaction} .sniptale-glass-preset-check`;
+      expect(styleDeclarations(settingsPopoverStyles, selector)).toMatchObject({ opacity: '0' });
+      expect(styleDeclarations(styles, selector)).toMatchObject({ opacity: '0' });
+    }
     expect(calloutSettingsStyles).not.toContain(
       '.sniptale-callout-preset-row .sniptale-glass-preset-item--active {'
     );
@@ -258,15 +281,18 @@ it('isolates host-page text stroke at the content shadow boundary', () => {
 
 it('keeps embedded settings header commands neutral and aligned', () => {
   const styles = readFileSync(SETTINGS_POPOVER_STYLES_PATH, 'utf8');
-  const selector = '.sniptale-settings-popover-header .sniptale-settings-popover-icon-action {';
-  const block = styles.slice(styles.indexOf(selector)).split('}')[0];
-  expect(block).toContain('background: transparent');
-  expect(block).toContain('border: 0');
-  expect(block).toContain('width: 28px');
-  expect(block).toContain('align-items: center');
-  const header = styles.split('}')[0];
-  expect(header).toContain('min-height: 32px');
-  expect(header).toContain('align-items: center');
+  const block = styleDeclarations(
+    styles,
+    '.sniptale-settings-popover-header .sniptale-settings-popover-icon-action'
+  );
+  expect(block).toMatchObject({
+    background: 'transparent',
+    border: '0',
+    width: '28px',
+    'align-items': 'center',
+  });
+  const header = styleDeclarations(styles, '.sniptale-settings-popover-header');
+  expect(header).toMatchObject({ 'min-height': '32px', 'align-items': 'center' });
 });
 
 it('includes the shared disclosure geometry in isolated content UI styles', () => {

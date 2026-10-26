@@ -1,3 +1,5 @@
+import { bindTourAuthoringEscape } from './authoring.js';
+
 /** Resizes a source-coordinate rectangle, keeping its opposite edge fixed and inside the image. */
 export function resizeTourRect(rect, edge, dx, dy, aspect = null) {
   const min = 0.001;
@@ -89,16 +91,7 @@ export function bindTourRectResize(node, object, box, callbacks, lifetime, label
       );
       handle.addEventListener('pointercancel', cancel, { signal: gesture.signal });
       handle.addEventListener('lostpointercapture', cancel, { signal: gesture.signal });
-      node.ownerDocument.addEventListener(
-        'keydown',
-        (key) => {
-          if (key.key !== 'Escape') return;
-          key.preventDefault();
-          key.stopPropagation();
-          cancel();
-        },
-        { capture: true, signal: gesture.signal }
-      );
+      bindTourAuthoringEscape(node.ownerDocument, gesture.signal, cancel);
       lifetime.addEventListener('abort', cancel, { once: true });
       handle.setPointerCapture?.(pointerId);
     });

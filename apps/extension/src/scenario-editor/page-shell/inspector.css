@@ -662,7 +662,11 @@
 .guide-page
   .guide-inspector-panel
   [data-ui='shared.ui.compact-select']
-  > button:is([aria-expanded='true'], :focus) {
+  > button:is([aria-expanded='true'], :focus),
+.guide-page
+  .guide-inspector-panel
+  [data-ui='shared.ui.compact-select']
+  > button:hover:not(:disabled) {
   border-color: var(--sniptale-color-border-strong);
 }
 

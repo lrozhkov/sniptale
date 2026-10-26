@@ -675,130 +675,134 @@ for (const viewport of [
   { width: 1280, height: 560 },
   { width: 1920, height: 900 },
 ]) {
-  test(`annotation settings keep labels clear of contextual sliders and use opaque material at ${viewport.width}`, async ({
-    context,
-    extensionId,
-    hostOrigin,
-  }, info) => {
-    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
-    try {
-      await popup.evaluate(async () => {
-        await chrome.storage.local.set({ 'sniptale-locale-preference': 'ru' });
-      });
-      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
-      await page.locator('[data-ui="content.toolbar.mode-option.highlighter"]').click();
-      for (const menu of [
-        'future-frame-style',
-        'future-frame-step-badge',
-        'future-frame-callout',
-      ]) {
-        await page.locator(`[data-ui="content.toolbar.${menu}.menu"]`).click();
-        const popover = page.locator('.sniptale-content-appearance-surface:visible').last();
-        await expect(popover).toBeVisible();
-        const alpha = await popover.evaluate((element) => {
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          if (!context) throw new Error('Canvas unavailable');
-          context.fillStyle = getComputedStyle(element).backgroundColor;
-          context.fillRect(0, 0, 1, 1);
-          return context.getImageData(0, 0, 1, 1).data[3];
+  test(
+    `annotation settings keep labels clear of contextual sliders and use opaque material at ` +
+      `${viewport.width}`,
+    async ({ context, extensionId, hostOrigin }, info) => {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+      try {
+        await popup.evaluate(async () => {
+          await chrome.storage.local.set({ 'sniptale-locale-preference': 'ru' });
         });
-        expect.soft(alpha, `${menu} fully occludes page text`).toBe(255);
-        const fork = popover.locator('[data-template-fork-source]').first();
-        await fork.focus();
-        await fork.press('Enter');
-        if (menu === 'future-frame-step-badge') {
-          await popover.getByRole('button', { name: /^(Size|Размер)$/u, exact: true }).click();
-          await popover.getByRole('button', { name: /^(Custom|Свой)$/u, exact: true }).click();
-        }
-        if (menu === 'future-frame-callout')
-          await popover
-            .getByRole('button', { name: /^(Size & spacing|Размер и отступы)$/u, exact: true })
-            .click();
-        const rows = popover.locator(
-          '[data-ui="shared.ui.compact-inspector.numeric-row"][data-has-scrub="true"]'
-        );
-        expect(await rows.count()).toBeGreaterThan(0);
-        for (const row of await rows.all()) {
-          await row.hover();
-          const gap = await row.evaluate((element) => {
-            const label = element.querySelector('.sniptale-parameter-name');
-            const track = element.querySelector(
-              '[data-ui="shared.ui.compact-inspector.numeric-range-track"]'
-            );
-            if (!label || !track) throw new Error('Numeric row geometry unavailable');
-            const range = document.createRange();
-            range.selectNodeContents(label);
-            return track.getBoundingClientRect().top - range.getBoundingClientRect().bottom;
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.highlighter"]').click();
+        for (const menu of [
+          'future-frame-style',
+          'future-frame-step-badge',
+          'future-frame-callout',
+        ]) {
+          await page.locator(`[data-ui="content.toolbar.${menu}.menu"]`).click();
+          const popover = page.locator('.sniptale-content-appearance-surface:visible').last();
+          await expect(popover).toBeVisible();
+          const alpha = await popover.evaluate((element) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Canvas unavailable');
+            context.fillStyle = getComputedStyle(element).backgroundColor;
+            context.fillRect(0, 0, 1, 1);
+            return context.getImageData(0, 0, 1, 1).data[3];
           });
-          expect
-            .soft(gap, 'Slider track leaves the complete parameter label readable')
-            .toBeGreaterThanOrEqual(2);
-        }
-        await page.screenshot({ path: info.outputPath(`${menu}-parameters.png`), fullPage: false });
-        const categories = popover.locator('nav button');
-        for (let index = 0; index < (await categories.count()); index += 1) {
-          const category = categories.nth(index);
-          await category.scrollIntoViewIfNeeded();
-          await category.click();
-          await expect(category).toHaveAttribute('aria-pressed', 'true');
-          if (menu === 'future-frame-callout') {
-            const enable = popover.locator(
-              '[data-ui="shared.categorized-inspector.section-heading"] .sniptale-glass-switch:not(.sniptale-glass-switch--on)'
-            );
-            if (await enable.count()) await enable.click();
+          expect.soft(alpha, `${menu} fully occludes page text`).toBe(255);
+          const fork = popover.locator('[data-template-fork-source]').first();
+          await fork.focus();
+          await fork.press('Enter');
+          if (menu === 'future-frame-step-badge') {
+            await popover.getByRole('button', { name: /^(Size|Размер)$/u, exact: true }).click();
+            await popover.getByRole('button', { name: /^(Custom|Свой)$/u, exact: true }).click();
           }
-          for (const disclosure of await popover.locator('details:not([open]) > summary').all())
-            await disclosure.click();
-          const escapedControls = await popover
-            .locator('.sniptale-parameter-value > *')
-            .evaluateAll((elements) =>
-              elements.flatMap((element) => {
-                const bounds = element.getBoundingClientRect();
-                const surface = element
-                  .closest('.sniptale-content-appearance-surface')
-                  ?.getBoundingClientRect();
-                if (!surface || bounds.width === 0 || bounds.height === 0) return [];
-                return bounds.right > surface.right - 4 || bounds.left < surface.left + 4
-                  ? [
-                      {
-                        label: element.closest('.sniptale-parameter-row')?.textContent,
-                        left: bounds.left,
-                        right: bounds.right,
-                        surfaceLeft: surface.left,
-                        surfaceRight: surface.right,
-                      },
-                    ]
-                  : [];
-              })
-            );
-          expect(
-            escapedControls,
-            'Visible value constructions remain inside the inspector material'
-          ).toEqual([]);
+          if (menu === 'future-frame-callout')
+            await popover
+              .getByRole('button', { name: /^(Size & spacing|Размер и отступы)$/u, exact: true })
+              .click();
+          const rows = popover.locator(
+            '[data-ui="shared.ui.compact-inspector.numeric-row"][data-has-scrub="true"]'
+          );
+          expect(await rows.count()).toBeGreaterThan(0);
+          for (const row of await rows.all()) {
+            await row.hover();
+            const gap = await row.evaluate((element) => {
+              const label = element.querySelector('.sniptale-parameter-name');
+              const track = element.querySelector(
+                '[data-ui="shared.ui.compact-inspector.numeric-range-track"]'
+              );
+              if (!label || !track) throw new Error('Numeric row geometry unavailable');
+              const range = document.createRange();
+              range.selectNodeContents(label);
+              return track.getBoundingClientRect().top - range.getBoundingClientRect().bottom;
+            });
+            expect
+              .soft(gap, 'Slider track leaves the complete parameter label readable')
+              .toBeGreaterThanOrEqual(2);
+          }
           await page.screenshot({
-            path: info.outputPath(`${menu}-category-${index}.png`),
+            path: info.outputPath(`${menu}-parameters.png`),
             fullPage: false,
           });
+          const categories = popover.locator('nav button');
+          for (let index = 0; index < (await categories.count()); index += 1) {
+            const category = categories.nth(index);
+            await category.scrollIntoViewIfNeeded();
+            await category.click();
+            await expect(category).toHaveAttribute('aria-pressed', 'true');
+            if (menu === 'future-frame-callout') {
+              const enable = popover.locator(
+                '[data-ui="shared.categorized-inspector.section-heading"] ' +
+                  '.sniptale-glass-switch:not(.sniptale-glass-switch--on)'
+              );
+              if (await enable.count()) await enable.click();
+            }
+            for (const disclosure of await popover.locator('details:not([open]) > summary').all())
+              await disclosure.click();
+            const escapedControls = await popover
+              .locator('.sniptale-parameter-value > *')
+              .evaluateAll((elements) =>
+                elements.flatMap((element) => {
+                  const bounds = element.getBoundingClientRect();
+                  const surface = element
+                    .closest('.sniptale-content-appearance-surface')
+                    ?.getBoundingClientRect();
+                  if (!surface || bounds.width === 0 || bounds.height === 0) return [];
+                  return bounds.right > surface.right - 4 || bounds.left < surface.left + 4
+                    ? [
+                        {
+                          label: element.closest('.sniptale-parameter-row')?.textContent,
+                          left: bounds.left,
+                          right: bounds.right,
+                          surfaceLeft: surface.left,
+                          surfaceRight: surface.right,
+                        },
+                      ]
+                    : [];
+                })
+              );
+            expect(
+              escapedControls,
+              'Visible value constructions remain inside the inspector material'
+            ).toEqual([]);
+            await page.screenshot({
+              path: info.outputPath(`${menu}-category-${index}.png`),
+              fullPage: false,
+            });
+          }
+          const saveCategory = popover.locator('nav button').last();
+          await saveCategory.scrollIntoViewIfNeeded();
+          await saveCategory.click();
+          await expect(saveCategory).toHaveAttribute('aria-pressed', 'true');
+          await page.screenshot({
+            path: info.outputPath(`${menu}-save-controls.png`),
+            fullPage: false,
+          });
+          await page.keyboard.press('Escape');
         }
-        const saveCategory = popover.locator('nav button').last();
-        await saveCategory.scrollIntoViewIfNeeded();
-        await saveCategory.click();
-        await expect(saveCategory).toHaveAttribute('aria-pressed', 'true');
-        await page.screenshot({
-          path: info.outputPath(`${menu}-save-controls.png`),
-          fullPage: false,
+      } finally {
+        await popup.evaluate(async () => {
+          await chrome.storage.local.set({ 'sniptale-locale-preference': 'en' });
         });
-        await page.keyboard.press('Escape');
+        await page.close();
+        await popup.close();
       }
-    } finally {
-      await popup.evaluate(async () => {
-        await chrome.storage.local.set({ 'sniptale-locale-preference': 'en' });
-      });
-      await page.close();
-      await popup.close();
     }
-  });
+  );
 }
 
 test('native comment handle hover has one soft halo', async ({
@@ -901,7 +905,8 @@ for (const opening of [
     const calloutPath = 'apps/extension/src/features/highlighter/frame-annotation/callout';
     const bundled = await build({
       stdin: {
-        contents: `
+        contents:
+          `
 import React,{useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {useFrameCalloutEditing} from ${JSON.stringify(resolve(calloutPath, 'editing.ts'))};
@@ -911,13 +916,26 @@ import {createFrameCalloutActions} from ${JSON.stringify(resolve(calloutPath, 'a
 const settings=createDefaultCalloutSettings();settings.content.bodyHtml=${JSON.stringify(opening.html)};
 const noop=()=>{};
 function Comment(){
- const editing=useFrameCalloutEditing({frameId:'probe',htmlContent:settings.content.bodyHtml,isEditing:${opening.editing},onContentChange:noop,onDelete:noop,onStartEditing:noop,onStopEditing:noop,settingsKey:'probe'});
- const actions=createFrameCalloutActions({apply:noop,callout:settings,onDelete:noop,onSettingsClick:noop,onStartEditing:noop,onStopEditing:noop});
- return <FrameCalloutInteractiveSurface {...actions} chrome="export" chromeScale={1} editing={editing} frameBorderWidth={0} frameId="probe" frameRect={{x:300,y:300,width:200,height:80}} isEditing={${opening.editing}} isFrameEditing={false} isSettingsOpen={false} portalTarget={document.body} portalTheme={null} settings={settings} settingsAnchorRef={{current:null}} showSettingsHandle={false} zIndex={10}/>;
+ const editing=useFrameCalloutEditing({frameId:'probe',htmlContent:settings.content.bodyHtml,` +
+          `isEditing:${opening.editing},onContentChange:noop,onDelete:noop,` +
+          `onStartEditing:noop,onStopEditing:noop,settingsKey:'probe'});
+ const actions=createFrameCalloutActions({apply:noop,callout:settings,onDelete:noop,` +
+          `onSettingsClick:noop,onStartEditing:noop,onStopEditing:noop});
+ return <FrameCalloutInteractiveSurface {...actions} chrome="export" chromeScale={1} ` +
+          `editing={editing} frameBorderWidth={0} frameId="probe" frameRect={{x:300,y:300,` +
+          `width:200,height:80}} isEditing={${opening.editing}} isFrameEditing={false} ` +
+          `isSettingsOpen={false} portalTarget={document.body} portalTheme={null} ` +
+          `settings={settings} settingsAnchorRef={{current:null}} showSettingsHandle={false} ` +
+          `zIndex={10}/>;
 }
-function App(){const[open,setOpen]=useState(false);return <><button id="open" onClick={()=>setOpen(true)}>Add</button>{open&&<Comment/>}</>}
+function App(){const[open,setOpen]=useState(false);return <><button id="open" onClick={()=>` +
+          `setOpen(true)}>Add</button>{open&&<Comment/>}</>}
 window.calloutOpeningFrames=[];
-function sample(){const s=document.querySelector('[data-ui="content.callout.surface-compositor"]');if(s){const r=s.getBoundingClientRect();window.calloutOpeningFrames.push({time:performance.now(),width:r.width,height:r.height});}requestAnimationFrame(sample)}requestAnimationFrame(sample);
+function sample(){const ` +
+          `s=document.querySelector('[data-ui="content.callout.surface-compositor"]');` +
+          `if(s){const r=s.getBoundingClientRect();` +
+          `window.calloutOpeningFrames.push({time:performance.now(),width:r.width,` +
+          `height:r.height});}requestAnimationFrame(sample)}requestAnimationFrame(sample);
 createRoot(document.getElementById('root')).render(<App/>);
 `,
         resolveDir: process.cwd(),

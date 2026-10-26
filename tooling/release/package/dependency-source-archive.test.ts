@@ -16,7 +16,7 @@ afterEach(async () => {
 it('distributes complete deterministic source independently of the installer', async () => {
   const archive = await createDependencySourceArchive();
   const repeated = await createDependencySourceArchive();
-  expect(repeated.contents).toEqual(archive.contents);
+  expect(repeated.contents.equals(archive.contents)).toBe(true);
   const zip = await JSZip.loadAsync(archive.contents);
   const names = Object.keys(zip.files);
   expect(names).toHaveLength(5);

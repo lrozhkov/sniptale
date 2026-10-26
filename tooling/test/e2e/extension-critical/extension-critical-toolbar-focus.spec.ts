@@ -83,7 +83,9 @@ for (const appearance of [
       });
     }
     await page.addStyleTag({
-      content: `body { background: ${appearance.theme === 'dark' ? '#222' : '#fff'}; } * { -webkit-text-stroke: 0.35px !important; }`,
+      content:
+        `body { background: ${appearance.theme === 'dark' ? '#222' : '#fff'}; } * { ` +
+        `-webkit-text-stroke: 0.35px !important; }`,
     });
     await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
     await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();

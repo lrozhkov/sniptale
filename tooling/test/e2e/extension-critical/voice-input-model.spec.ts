@@ -492,7 +492,7 @@ test('native content field keeps click recording and applies the saved correctio
         await ui(page, 'content.toolbar.mode-selector-button').click();
         await ui(page, 'content.toolbar.mode-option.quick-edit').click();
         await ui(page, 'content.toolbar.page-editing-mode.ai').click();
-        await page.locator('h1').first().click();
+        await expect(page.locator('.sniptale-ai-modal-root')).toBeVisible();
         const field = page.locator('#ai-prompt');
         const microphone = ui(page, 'content.ai-modal.prompt-voice-input');
         await expect(field).toBeVisible();

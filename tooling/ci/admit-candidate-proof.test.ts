@@ -153,6 +153,7 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     'coverage-final.json',
     'coverage-summary.json',
     'html/index.html',
+    'html/unit-attempts.json',
     'lcov.info',
   ];
   for (const file of coverageReportFiles) {

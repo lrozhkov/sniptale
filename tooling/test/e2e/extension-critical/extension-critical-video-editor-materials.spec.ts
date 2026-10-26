@@ -481,11 +481,46 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await page.mouse.down();
       await page.mouse.move(box.x + (box.width * 4) / duration, box.y + 12, { steps: 8 });
       await page.mouse.up();
+      // Requested endpoints allow one CSS pixel of pointer quantization; safe cut boundaries may snap.
+      const pointerTolerance = duration / box.width;
       await expect
-        .poll(async () => (await readNativeReviewWorkspace(page, aggregateId))?.project?.name)
-        .toBeTruthy();
+        .poll(async () => {
+          const saved = await readNativeReviewWorkspace(page, aggregateId);
+          if (!saved) return false;
+          const cuts = replayReviewHistory(
+            saved.history,
+            saved.cursor,
+            saved.source,
+            reviewDocumentBaseline(saved)
+          ).edits.filter((edit) => edit.kind === 'cut');
+          const cut = cuts[0];
+          return (
+            cuts.length === 1 &&
+            cut !== undefined &&
+            Math.abs(cut.requestedStart - 2) <= pointerTolerance &&
+            Math.abs(cut.requestedEnd - 4) <= pointerTolerance &&
+            cut.start < 3 &&
+            cut.end > 3
+          );
+        })
+        .toBe(true);
+      const savedWorkspace = (await readNativeReviewWorkspace(page, aggregateId))!;
+      const savedCuts = replayReviewHistory(
+        savedWorkspace.history,
+        savedWorkspace.cursor,
+        savedWorkspace.source,
+        reviewDocumentBaseline(savedWorkspace)
+      ).edits.filter((edit) => edit.kind === 'cut');
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
       const legacyWorkspace = (await readNativeReviewWorkspace(page, aggregateId))!;
+      expect(
+        replayReviewHistory(
+          legacyWorkspace.history,
+          legacyWorkspace.cursor,
+          legacyWorkspace.source,
+          reviewDocumentBaseline(legacyWorkspace)
+        ).edits.filter((edit) => edit.kind === 'cut')
+      ).toEqual(savedCuts);
       const legacyContent = replayReviewHistory(
         legacyWorkspace.history,
         legacyWorkspace.cursor,

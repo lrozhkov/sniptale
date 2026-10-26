@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { REVIEW_CLICK_DEFAULT } from '../../../../../features/video/project/action-feedback/validation';
 import { ReviewActionAudioUnavailable } from '../../../../../features/video/review/action-audio';
-// @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
 import { createSharedUiTestMock } from './index.test-support';
 
 const { aiModelSelectorMock } = vi.hoisted(() => ({
@@ -43,15 +44,43 @@ import {
   cleanupBodyHarness,
   dispatchBodyModalEscape,
   dispatchBodyTextareaSubmitShortcut,
-  expandBodyDataPanel,
   readBodyJsonPreview,
   readTokenCounter,
   renderBodyHarness,
   selectFirstBodyModel,
   toggleBodyJsonPreview,
-  toggleBodyCheckboxAt,
   unsetBodyModel,
 } from './body.test-support';
+import { getBodyHarnessContainer } from './body.test-support.harness';
+
+function expectBodyDataPanelOpen() {
+  expect(
+    getBodyHarnessContainer()
+      ?.querySelector('.sniptale-ai-spoiler-toggle')
+      ?.getAttribute('aria-expanded')
+  ).toBe('true');
+}
+
+async function uncheckBodySelection(target: 'section' | 'row' | 'column') {
+  const container = getBodyHarnessContainer();
+  expect(container).not.toBeNull();
+  const checkbox = Array.from(
+    container!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+  ).find((input) => {
+    if (target === 'section') return input.getAttribute('aria-label') === 'Section';
+    if (target === 'column') return input.closest('label')?.textContent?.trim() === 'Assignee';
+    const labelId = input.getAttribute('aria-labelledby');
+    return (
+      labelId !== null && document.getElementById(labelId)?.textContent?.includes('Alice Example')
+    );
+  });
+  expect(checkbox).toBeDefined();
+  expect(checkbox!.checked).toBe(true);
+  await act(async () => {
+    checkbox!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  expect(checkbox!.checked).toBe(false);
+}
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -65,44 +94,45 @@ afterEach(() => {
 describe('AIModalContent token counter', () => {
   it('recomputes the token counter when a section checkbox changes', async () => {
     await renderBodyHarness();
-    await expandBodyDataPanel();
+    expectBodyDataPanelOpen();
 
     const initialTokens = readTokenCounter();
-    await toggleBodyCheckboxAt(0);
+    await uncheckBodySelection('section');
 
     expect(readTokenCounter()).not.toBe(initialTokens);
   });
 
   it('recomputes the token counter when a row checkbox changes', async () => {
     await renderBodyHarness();
-    await expandBodyDataPanel();
+    expectBodyDataPanelOpen();
 
     const initialTokens = readTokenCounter();
-    await toggleBodyCheckboxAt(2);
+    await uncheckBodySelection('row');
 
     expect(readTokenCounter()).not.toBe(initialTokens);
   });
 
   it('recomputes the token counter when a column checkbox changes', async () => {
     await renderBodyHarness();
-    await expandBodyDataPanel();
+    expectBodyDataPanelOpen();
 
     const initialTokens = readTokenCounter();
-    await toggleBodyCheckboxAt(3);
+    await uncheckBodySelection('column');
 
     expect(readTokenCounter()).not.toBe(initialTokens);
   });
 
   it('updates the visible JSON preview when a row checkbox changes', async () => {
     await renderBodyHarness();
-    await expandBodyDataPanel();
+    expectBodyDataPanelOpen();
     await toggleBodyJsonPreview();
 
     expect(readBodyJsonPreview()).toContain('Alice Example');
 
-    await toggleBodyCheckboxAt(2);
+    await uncheckBodySelection('row');
 
     expect(readBodyJsonPreview()).not.toContain('Alice Example');
+    expect(readBodyJsonPreview()).toContain('Bob Example');
   });
 });
 

@@ -1,5 +1,5 @@
-import { projectQuickEditPoint } from '../motion/spatial-geometry';
 // @vitest-environment jsdom
+import { projectQuickEditPoint } from '../motion/spatial-geometry';
 import { expect, it, vi } from 'vitest';
 import { drawSpatialCameraGroup } from './spatial-group';
 import { createDefaultCameraState } from '../motion/defaults';

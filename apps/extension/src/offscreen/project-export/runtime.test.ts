@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import { getProjectExportWatermarkRenderer } from './runtime';
-// @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 

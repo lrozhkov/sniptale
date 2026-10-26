@@ -216,8 +216,13 @@ it('keeps full product coverage in the audit profile only', () => {
   );
 
   expect(source).toContain('collectFullCoverageAuditStep');
-  expect(coverageSource).toContain("createOkStep('Full product coverage'");
-  expect(coverageSource).toContain("coverageMode: 'manual'");
+  expect(coverageSource).toMatch(/createOkStep\(\s*'Full product coverage'/u);
+  expect(coverageSource).toContain('runCoverageWithTimeoutRetry');
+  const retrySource = fs.readFileSync(
+    'tooling/qa/proof/coverage/coverage-timeout-retry.mjs',
+    'utf8'
+  );
+  expect(retrySource).toContain("coverageMode: 'manual'");
   expect(coverageSource).toContain('formatCoverageAuditReport');
   expect(releaseSource).toContain('coverageEnabled: false');
 });

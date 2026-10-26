@@ -61,7 +61,10 @@ vi.mock('../../../composition/audio-recording/trim-file', () => ({
 vi.mock('../../../composition/audio-recording/dialog/waveform', () => ({
   useRecordedAudioPeaks: () => [0.1],
 }));
-vi.mock('./save-readiness', () => ({ waitForVideoEditorSave: vi.fn() }));
+vi.mock('./save-readiness', async (original) => ({
+  ...(await original<typeof import('./save-readiness')>()),
+  waitForVideoEditorSave: vi.fn(),
+}));
 
 function gate<T>() {
   let resolve!: (value: T) => void;

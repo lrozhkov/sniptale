@@ -1,3 +1,4 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import {
   getTourHotspots,
   getTourAnnotations,
@@ -41,14 +42,7 @@ function mapRect(rect: TourRect, matrix: TourImageTransform): TourRect | null {
   ];
   if (corners.some((point) => point === null)) return null;
   const points = corners.filter((point) => point !== null);
-  const x = Math.min(...points.map((point) => point.x));
-  const y = Math.min(...points.map((point) => point.y));
-  return {
-    x,
-    y,
-    width: Math.max(...points.map((point) => point.x)) - x,
-    height: Math.max(...points.map((point) => point.y)) - y,
-  };
+  return getCanvasPointsBounds(points);
 }
 function hasPositions(slide: TourImageSlide): boolean {
   return (

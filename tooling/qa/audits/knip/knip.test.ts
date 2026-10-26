@@ -13,6 +13,7 @@ describe('Knip configured integrity owner', () => {
       'codeql',
       'flock',
       'gcc',
+      'import',
       'mkfifo',
       'printf',
       'xwininfo',

@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import * as canvasSurface from './canvas';
 import { InspectorGroupedPanel } from '../sidebar/selection/grouped-inspector';
 import type { ComponentProps } from 'react';
-// @vitest-environment jsdom
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';

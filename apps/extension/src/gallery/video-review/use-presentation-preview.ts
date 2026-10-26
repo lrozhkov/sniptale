@@ -1,3 +1,4 @@
+import { previewKeyValue } from './preview-key';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
@@ -47,12 +48,7 @@ export function usePresentationPreview(
               settings: input.renderSettings,
               preferences,
             },
-            (_key, value: unknown) =>
-              value !== null && typeof value === 'object' && !Array.isArray(value)
-                ? Object.fromEntries(
-                    Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
-                  )
-                : value
+            previewKeyValue
           )
         : '',
     [input, preferences]

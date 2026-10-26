@@ -17,8 +17,78 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { SUPPORTED_LOCALES, translate, usePageLocaleMetadata } from '../../../platform/i18n';
-import { useWelcomeSetup, type WelcomeDependencies } from '../../runtime/welcome';
+import {
+  SUPPORTED_LOCALES,
+  setLocalePreference,
+  translate,
+  usePageLocaleMetadata,
+} from '../../../platform/i18n';
+import {
+  useWelcomeSetup,
+  type WelcomeDependencies,
+  type WelcomeAccess,
+} from '../../runtime/welcome';
+import { requestMicrophoneAccess } from '@sniptale/platform/browser/user-media';
+import { setAppThemePreference } from '../../../ui/theme';
+import {
+  initialPermissions,
+  readPermissionsSnapshot,
+  requestCameraAccess,
+  subscribeToPermissionChanges,
+} from '../../sections/system/access-data/permissions/permissions-lib';
+import { requestSettingsOriginAccess } from '../../sections/system/access-data/permissions/useSettingsPermissions';
+
+async function observeAccess(): Promise<WelcomeAccess> {
+  const snapshot = await readPermissionsSnapshot(
+    initialPermissions.filter(
+      (item) => item.id === 'microphone' || item.id === 'camera' || item.id === 'origins'
+    )
+  );
+  return {
+    microphone: snapshot.find((item) => item.id === 'microphone')?.state ?? 'unknown',
+    camera: snapshot.find((item) => item.id === 'camera')?.state ?? 'unknown',
+    origins: snapshot.find((item) => item.id === 'origins')?.state ?? 'unknown',
+  };
+}
+function subscribeAccess(listener: () => void): () => void {
+  const unsubscribe = subscribeToPermissionChanges(listener);
+  let disposed = false;
+  const statuses: PermissionStatus[] = [];
+  window.addEventListener('focus', listener);
+  for (const name of ['microphone', 'camera'] as const) {
+    void navigator.permissions
+      ?.query({ name: name as PermissionName })
+      .then((status) => {
+        if (disposed) return;
+        statuses.push(status);
+        status.addEventListener('change', listener);
+      })
+      .catch(() => undefined);
+  }
+  return () => {
+    disposed = true;
+    unsubscribe();
+    window.removeEventListener('focus', listener);
+    for (const status of statuses) status.removeEventListener('change', listener);
+  };
+}
+const defaultDependencies: WelcomeDependencies = {
+  observe: observeAccess,
+  subscribe: subscribeAccess,
+  request: async (kind) => {
+    if (kind === 'microphone') return requestMicrophoneAccess();
+    if (kind === 'camera') return requestCameraAccess();
+    const permission = initialPermissions.find((item) => item.id === 'origins');
+    if (!permission) return 'error';
+    try {
+      return (await requestSettingsOriginAccess(permission)) ? 'granted' : 'denied';
+    } catch {
+      return 'error';
+    }
+  },
+  locale: setLocalePreference,
+  theme: setAppThemePreference,
+};
 
 type Setup = ReturnType<typeof useWelcomeSetup>;
 const deviceCopy = {
@@ -244,7 +314,7 @@ export function WelcomePage({
   dependencies,
   onFinish = finishWelcome,
 }: { dependencies?: WelcomeDependencies; onFinish?(): void } = {}) {
-  const setup = useWelcomeSetup(dependencies);
+  const setup = useWelcomeSetup(dependencies ?? defaultDependencies);
   const body = useRef<HTMLElement>(null);
   const completed = useRef(false);
   usePageLocaleMetadata('settings.welcome.documentTitle');

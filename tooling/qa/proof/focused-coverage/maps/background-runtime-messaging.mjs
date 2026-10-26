@@ -31,7 +31,8 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
     owner: 'background-video-surface-commands',
     productionFile: 'apps/extension/src/background/media/video/content-surface/commands.ts',
     reason:
-      'Surface command proof includes direct permission and settings cases plus lease-authorized lifecycle and durable rollback routing.',
+      'Surface command proof includes direct permission and settings cases plus lease-authorized ' +
+      'lifecycle and durable rollback routing.',
     testFiles: [
       'apps/extension/src/background/media/video/content-surface/commands.test.ts',
       'apps/extension/src/background/media/video/content-surface/route.test.ts',

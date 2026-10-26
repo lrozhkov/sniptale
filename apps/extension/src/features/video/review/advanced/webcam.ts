@@ -213,6 +213,17 @@ export function createQuickEditWebcam(
   };
 }
 
+function webcamPositionProgress(
+  current: QuickEditWebcamPosition,
+  next: QuickEditWebcamPosition | undefined,
+  sourceTime: number
+): number {
+  const duration = Math.min(current.transition.duration, (next?.time ?? Infinity) - current.time);
+  return current.transition.type === 'none' || duration === 0
+    ? 1
+    : Math.min(1, Math.max(0, (sourceTime - current.time) / duration));
+}
+
 /** Evaluates authored layout without camera coverage, so hidden positions remain editable. */
 export function quickEditWebcamPlacementAt(webcam: QuickEditWebcam, sourceTime: number) {
   const index = webcam.positions.findLastIndex((position) => position.time <= sourceTime);
@@ -227,14 +238,7 @@ export function quickEditWebcamPlacementAt(webcam: QuickEditWebcam, sourceTime: 
       ? cameraSplitPanels(webcam.split).camera
       : webcam.placement;
   const destination = current.split ? cameraSplitPanels(current.split).camera : current.placement;
-  const duration = Math.min(
-    current.transition.duration,
-    (webcam.positions[index + 1]?.time ?? Infinity) - current.time
-  );
-  const progress =
-    current.transition.type === 'none' || duration === 0
-      ? 1
-      : Math.min(1, Math.max(0, (sourceTime - current.time) / duration));
+  const progress = webcamPositionProgress(current, webcam.positions[index + 1], sourceTime);
   if (progress === 1) return destination;
   if (progress === 0) return previous;
   const eased = progress * progress * (3 - 2 * progress);
@@ -273,14 +277,7 @@ export function quickEditWebcamScreenPlacementAt(
   const to = current.split
     ? cameraSplitPanels(current.split, current.screenBehavior).screen
     : FULL_CAMERA_PANEL;
-  const duration = Math.min(
-    current.transition.duration,
-    (webcam.positions[index + 1]?.time ?? Infinity) - current.time
-  );
-  const progress =
-    current.transition.type === 'none' || duration === 0
-      ? 1
-      : Math.min(1, Math.max(0, (sourceTime - current.time) / duration));
+  const progress = webcamPositionProgress(current, webcam.positions[index + 1], sourceTime);
   const eased = progress * progress * (3 - 2 * progress);
   return interpolateCameraScreen(from, to, eased);
 }

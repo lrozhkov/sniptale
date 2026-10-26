@@ -235,11 +235,9 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`editor chrome follows panel surface in ${theme}`, async ({ page, hostOrigin }) => {
+  test(`editor chrome follows document paper in ${theme}`, async ({ page, hostOrigin }) => {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1600, height: 1000 });
-    const panelColor = await page
-      .locator('.guide-center-panel')
-      .evaluate((node) => getComputedStyle(node).backgroundColor);
+    await page.mouse.move(0, 0);
     const colors = await page
       .locator(
         [
@@ -251,25 +249,43 @@ for (const theme of ['light', 'dark'] as const) {
           '.guide-voice-control > [data-ui="scenario.voice-input"]',
         ].join(', ')
       )
-      .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
+      .evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const transparent = Boolean(
+            node.closest('.guide-insertion-chrome, .guide-voice-control')
+          );
+          const probe = document.createElement('span');
+          probe.style.backgroundColor = transparent
+            ? 'transparent'
+            : 'rgb(from var(--guide-paper) r g b / 0.94)';
+          node.append(probe);
+          const expected = getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          return { actual: getComputedStyle(node).backgroundColor, expected };
+        })
+      );
     expect(colors.length).toBeGreaterThan(3);
-    expect([...new Set(colors)]).toEqual([panelColor]);
+    for (const color of colors) expect(color.actual).toBe(color.expected);
   });
 }
 
 for (const theme of ['light', 'dark'] as const) {
   test(`guide text selectors keep neutral selection in ${theme}`, async ({ page, hostOrigin }) => {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1600, height: 1000 });
-    const hint = page
-      .locator('#guide-inspector-panel .guide-inspector-hint')
+    const details = page
+      .locator('#guide-inspector-panel [data-ui="shared.information-disclosure"]')
       .filter({ hasText: 'Layouts change block widths' });
+    await expect(details).not.toHaveAttribute('open', '');
     check(
-      await hint.evaluate(
+      await details.evaluate(
         (node) =>
           node.getBoundingClientRect().top -
           node.previousElementSibling!.getBoundingClientRect().bottom
       )
     ).toBeGreaterThanOrEqual(8);
+    await details.locator(':scope > summary').click();
+    await expect(details).toHaveAttribute('open', '');
+    await expect(details.getByText('Layouts change block widths', { exact: false })).toBeVisible();
     const dropdown = page
       .locator('#guide-inspector-panel [data-ui="shared.ui.compact-select"] > button')
       .first();
@@ -277,7 +293,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.mouse.move(500, 20);
     const openBorder = await dropdown.evaluate((node) => {
       const probe = document.createElement('span');
-      probe.style.color = 'var(--sniptale-color-border-accent-strong)';
+      probe.style.color = 'var(--sniptale-color-border-strong)';
       node.append(probe);
       const color = getComputedStyle(probe).color;
       probe.remove();
@@ -304,24 +320,43 @@ for (const theme of ['light', 'dark'] as const) {
       .first()
       .boundingBox();
     check(sectionBounds!.y - backBounds!.y - backBounds!.height).toBeGreaterThanOrEqual(8);
-    const resets = panel.locator('.guide-block-inspector button:has(> svg.lucide-rotate-ccw)');
-    check(
-      new Set(
-        await resets.evaluateAll((nodes) =>
-          nodes.map((node) => getComputedStyle(node).justifyContent)
-        )
-      ).size
-    ).toBe(1);
-    const selected = panel.locator(
-      '[data-ui="shared.ui.compact-inspector.segmented-row"] button[aria-pressed="true"]'
+    const blockInspector = panel.locator('.guide-block-inspector');
+    const categories = blockInspector.locator(
+      '[data-ui="scenario-editor.inspector-categories"] > nav'
     );
-    expect(await selected.count()).toBe(3);
-    for (const button of await selected.all()) {
-      await button.hover();
-      await check(button).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
-      await check(button).toHaveCSS('box-shadow', 'none');
-      await check(button).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    }
+    const resetAlignments: string[] = [];
+    const checkSelected = async (groupName: string, optionName: string) => {
+      const selected = blockInspector
+        .getByRole('group', { name: groupName, exact: true })
+        .locator('button[aria-pressed="true"]');
+      await expect(selected).toHaveCount(1);
+      await expect(selected).toHaveAccessibleName(optionName);
+      await selected.hover();
+      await check(selected).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await check(selected).toHaveCSS('box-shadow', 'none');
+      await check(selected).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    };
+    await categories.getByRole('button', { name: 'Placement', exact: true }).click();
+    await checkSelected('Block width', 'Full width');
+    const automaticHeight = blockInspector.getByRole('button', {
+      name: 'Automatic height',
+      exact: true,
+    });
+    await expect(automaticHeight).toBeVisible();
+    resetAlignments.push(
+      await automaticHeight.evaluate((node) => getComputedStyle(node).justifyContent)
+    );
+    await categories.getByRole('button', { name: 'Text', exact: true }).click();
+    await checkSelected('Text size', 'Normal');
+    await checkSelected('Alignment', 'Start');
+    const resetText = blockInspector.getByRole('button', {
+      name: 'Reset text appearance',
+      exact: true,
+    });
+    await expect(resetText).toBeVisible();
+    resetAlignments.push(await resetText.evaluate((node) => getComputedStyle(node).justifyContent));
+    expect(resetAlignments).toHaveLength(2);
+    check(new Set(resetAlignments).size).toBe(1);
   });
 }
 
@@ -423,11 +458,12 @@ for (const theme of ['light', 'dark'] as const) {
         name: locale === 'ru' ? 'Применить' : 'Apply',
         exact: true,
       });
-      expect((await cancel.boundingBox())!.height).toBeLessThanOrEqual(28);
-      expect((await apply.boundingBox())!.height).toBeLessThanOrEqual(28);
+      expect((await cancel.boundingBox())!.height).toBe(32);
+      expect((await apply.boundingBox())!.height).toBe(32);
       expect(await field.boundingBox()).toEqual(before);
-      await page.screenshot({ path: info.outputPath('color-picker.png') });
-      await picker.getByRole('textbox', { name: 'RGB', exact: true }).fill('#123456');
+      await page.screenshot({ path: info.outputPath('color-picker.png'), fullPage: false });
+      await picker.getByRole('button', { name: 'HEX', exact: true }).click();
+      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill('#123456');
       await cancel.click();
       await expect(value).toHaveText('#ABCDEF');
       await expect(swatch).toBeFocused();
@@ -439,7 +475,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(valueBounds!.width).toBeGreaterThan(20);
       expect(valueBounds!.x + valueBounds!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width);
       await info.attach(`backlog6-${locale}-${theme}`, {
-        body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
+        body: await panel.screenshot({ path: info.outputPath('color-panel.png'), fullPage: false }),
         contentType: 'image/png',
       });
     });
@@ -456,15 +492,16 @@ for (const theme of ['light', 'dark'] as const) {
     const options = page.locator('[data-ui="editor.drawing.options"]');
     const swatch = options.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').first();
     await expect(swatch.locator('span')).toBeVisible();
-    expect((await swatch.locator('span').boundingBox())!.width).toBe(16);
+    expect((await swatch.locator('span').boundingBox())!.width).toBe(20);
     await expect(
       options.locator('[data-ui="shared.ui.color-selector.value-trigger"]').first()
     ).toBeHidden();
     await swatch.click();
     const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
     await expect(picker).toBeVisible();
-    await expect(picker.getByRole('textbox', { name: 'RGB', exact: true })).toBeVisible();
-    await page.screenshot({ path: info.outputPath('drawing-color-picker.png') });
+    await picker.getByRole('button', { name: 'HEX', exact: true }).click();
+    await expect(picker.getByRole('textbox', { name: 'HEX', exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('drawing-color-picker.png'), fullPage: false });
     await page.keyboard.press('Escape');
     await expect(swatch).toBeFocused();
   });
@@ -504,7 +541,10 @@ for (const theme of ['light', 'dark'] as const) {
       await input.fill('#123456');
       await input.press('Enter');
       await expect(values.first()).toHaveText('#123456');
-      await page.screenshot({ path: info.outputPath('fixed-palette-settings.png') });
+      await page.screenshot({
+        path: info.outputPath('fixed-palette-settings.png'),
+        fullPage: false,
+      });
       const saved = await page.evaluate(
         async () =>
           (await chrome.storage.local.get('sniptale_drawing_palette')).sniptale_drawing_palette
@@ -528,10 +568,14 @@ for (const theme of ['light', 'dark'] as const) {
       expect(await colors()).toEqual(saved.colors.slice(0, 5));
       await options.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
       const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
-      await picker.getByRole('textbox', { name: 'RGB', exact: true }).fill('#abcdef');
+      await picker.getByRole('button', { name: 'HEX', exact: true }).click();
+      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill('#abcdef');
       await picker.getByRole('button', { name: /^(Apply|Применить)$/ }).click();
       expect(await colors()).toEqual(saved.colors.slice(0, 5));
-      await page.screenshot({ path: info.outputPath('fixed-palette-drawing.png') });
+      await page.screenshot({
+        path: info.outputPath('fixed-palette-drawing.png'),
+        fullPage: false,
+      });
       await page.reload();
       await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
       await expect(quick).toHaveCount(5);

@@ -358,7 +358,7 @@ describe('ToolbarPrimaryControls quick-edit document mode', () => {
       'Редактировать текст прямо на странице'
     );
     expect(queryPageEditingModeButton('ai')?.getAttribute('title')).toBe(
-      'Выберите элемент на странице и опишите изменение'
+      'Выбрать элементы в таблице'
     );
   });
 

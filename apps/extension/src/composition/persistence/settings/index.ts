@@ -405,9 +405,8 @@ export async function loadSettings(): Promise<NormalizedSettings> {
   return normalizeLoadedSettings(parsedSettings.value);
 }
 
-/** Observe the normalized settings authority, including key removal, across extension pages. */
-export function subscribeToSettingsChanges(
-  listener: (settings: NormalizedSettings) => void
+function subscribeToNormalizedSettingsChange(
+  listener: (previous: NormalizedSettings, next: NormalizedSettings) => void
 ): () => void {
   if (typeof chrome === 'undefined') return () => undefined;
   return browserStorage.subscribeToChanges((changes, areaName) => {
@@ -415,6 +414,15 @@ export function subscribeToSettingsChanges(
     const change = changes[STORAGE_KEY];
     const previous = normalizeLoadedSettings(parseStoredSettings(change?.oldValue).value);
     const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value);
+    listener(previous, next);
+  });
+}
+
+/** Observe the normalized settings authority, including key removal, across extension pages. */
+export function subscribeToSettingsChanges(
+  listener: (settings: NormalizedSettings) => void
+): () => void {
+  return subscribeToNormalizedSettingsChange((previous, next) => {
     if (
       Object.keys(next.localStoragePolicy).every(
         (key) =>
@@ -431,12 +439,7 @@ export function subscribeToSettingsChanges(
 export function subscribeToImagePreferencesChanges(
   listener: (preferences: Pick<NormalizedSettings, 'imageFormat' | 'imageQuality'>) => void
 ): () => void {
-  if (typeof chrome === 'undefined') return () => undefined;
-  return browserStorage.subscribeToChanges((changes, areaName) => {
-    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
-    const change = changes[STORAGE_KEY];
-    const previous = normalizeLoadedSettings(parseStoredSettings(change?.oldValue).value);
-    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value);
+  return subscribeToNormalizedSettingsChange((previous, next) => {
     if (previous.imageFormat === next.imageFormat && previous.imageQuality === next.imageQuality)
       return;
     listener({ imageFormat: next.imageFormat, imageQuality: next.imageQuality });
@@ -447,14 +450,9 @@ export function subscribeToImagePreferencesChanges(
 export function subscribeToVoiceInputPreferencesChanges(
   listener: (preferences: VoiceInputPreferences) => void
 ): () => void {
-  if (typeof chrome === 'undefined') return () => undefined;
-  return browserStorage.subscribeToChanges((changes, areaName) => {
-    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
-    const change = changes[STORAGE_KEY];
-    const previous = normalizeLoadedSettings(
-      parseStoredSettings(change?.oldValue).value
-    ).voiceInput;
-    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value).voiceInput;
+  return subscribeToNormalizedSettingsChange((oldSettings, newSettings) => {
+    const previous = oldSettings.voiceInput;
+    const next = newSettings.voiceInput;
     if (JSON.stringify(previous) === JSON.stringify(next)) return;
     listener(next ?? { ...DEFAULT_VOICE_INPUT_SETTINGS });
   });

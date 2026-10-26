@@ -959,7 +959,8 @@ async function composeGestureFixture(project: VideoProject) {
   ] as const) {
     const source = await readFile(
       new URL(
-        `../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/${effect.filename}.sniptale-effect.json`,
+        `../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/` +
+          `${effect.filename}.sniptale-effect.json`,
         import.meta.url
       ),
       'utf8'

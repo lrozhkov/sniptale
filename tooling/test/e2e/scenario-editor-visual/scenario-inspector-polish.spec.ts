@@ -74,7 +74,8 @@ async function capture(page: Page, panel: Locator, info: TestInfo, name: string)
         tag: element.tagName.toLowerCase(),
         font: getComputedStyle(element).fontFamily,
         fontRole: element.matches(
-          'textarea,input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"])'
+          'textarea,input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):' +
+            'not([type="file"]):not([type="hidden"])'
         )
           ? 'Sniptale Text'
           : 'Sniptale Interface',

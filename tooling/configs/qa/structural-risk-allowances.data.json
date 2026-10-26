@@ -1590,10 +1590,10 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx",
       "symbol": "<file>",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: Fresh project, selection, React root and admission flags feed one style inspector fixture. Accepted mutations use applyTourCommands. Teardown unmounts the root and clears toast hosts. Camera, duration and placement segments extend this same contract. Values and disabled controls use the existing command route. Test dependencies do not establish independent mutable authorities. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: One project, selection, React root and admission fixture exercises the style inspector. The correction opens Gradient before Linear through the current UI. Accepted mutations still use applyTourCommands. Setup and cleanup remain unchanged. There is no new writer, effect or state authority. Score6 delta0 and cohesion1.00 retain the same fixture. Main inspected the exact diff. Independent architecture review must validate this record.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
-      "reviewDate": "2026-10-19",
-      "astHash": "05a68493a2d04fe9574a2b220e8671b55c566351923f99b83c24c719ea1d4460",
+      "reviewDate": "2026-10-26",
+      "astHash": "3d16eb3d9d59f491f90ca6f965a0baf49ede340858356aa4ce4bb9902f695423",
       "signatureHash": "1c89184a1ca603cfe93341d4186021ad16124afdc6e2454b3a2a73ce17a356b7"
     },
     {
@@ -1601,22 +1601,22 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/inspector.test.tsx",
       "symbol": "<file>",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: This file mounts one inspector for each isolated test. The fixture command receiver owns accepted project changes. URL drafts, radio keys, and deletion assertions exercise that same receiver. Per-test setup resets project, selection, and refusal flags. Score6 delta2 counts fixture owners and state, not new runtime authorities. The independent architecture reviewer must check this exact record.",
-      "removalCondition": "Remove this record when the AST or signature changes. Reassess each new production authority, effect lifetime, or writer. Remove this record when the analyzer distinguishes isolated test fixtures.",
-      "reviewDate": "2026-10-19",
-      "astHash": "34d3486b273d516056dc640f3de1ff6b37c1dabc212f8634ba1f3a212aadee78",
-      "signatureHash": "eb766e6590bfb60c2d8cd97c4df301f9a6e4b3aff6eacc5566291a3689e76a9d"
+      "reason": "tool-noise: One isolated inspector fixture owns the project command receiver and mounted React root. Timing assertions retain sibling annotation values through the same accepted command path. Teardown now awaits React act, unmounts the existing root, disposes existing independent toast roots, and checks zero toast hosts. This adds no writer, receiver, timer, or root constructor. Score6 delta0 retains one fixture. Main inspected the exact diff. Independent read-only lifecycle diagnosis recommends Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess each independent receiver, writer, resource constructor, or cleanup lifetime. Remove when the analyzer distinguishes isolated test fixtures. Fresh independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-26",
+      "astHash": "cab5b3821dd6237b6e4d1d0ca94c7f743d27cf210dc7df31b53c33c568af4715",
+      "signatureHash": "14831f8e1f3ac5838996170925c313faf9bac4ca82921ef8ce702c6a9075a815"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/scenario-editor/page-shell/tour/workspace.test.tsx",
       "symbol": "<file>",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: Probe owns one React project receiver and panel instance. Workspace changes converge on setProject. Tests create roots and reset callback mocks. Teardown unmounts and removes the host. Text-first header assertions extend this integration fixture. Batch and single AI forms use the same mounted root for context and focus recovery. They issue no generation or persistence call. This classification does not assert that every existing spy resets. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
-      "reviewDate": "2026-10-19",
-      "astHash": "1f24ed10f34036a22e465b6498c1c401c533f9e5a482c82fcd70aab31030b1b8",
-      "signatureHash": "e8d2292bd758d541207b979f8980ea514634509f038977ff45c27df0824f4eff"
+      "reason": "tool-noise: Probe owns one React project receiver and panel instance. Workspace changes converge on setProject. Tests reset callback mocks. Teardown now awaits React act, unmounts the existing root, disposes existing independent toast roots, and checks zero toast hosts before removing the host. The extra product-feedback import names the existing disposal owner. It adds no writer, receiver, timer, or root constructor. Score6 delta2 retains one fixture. Main inspected the exact diff. Independent read-only lifecycle diagnosis recommends Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess each independent receiver, writer, resource constructor, or cleanup lifetime. Remove when the analyzer distinguishes isolated test fixtures. Fresh independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-26",
+      "astHash": "eb3481b133a0a3ba59ff075ff24ab33a83367d3a16d1739e2d647cb1370111f4",
+      "signatureHash": "0af1d235a0493f7a7630ce35724abb5f18b0fe8ec3eb542c49a1feb5ba327d30"
     },
     {
       "rule": "structural-function-risk",
@@ -1634,11 +1634,11 @@
       "file": "apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.image-framing.test.tsx",
       "symbol": "<file>",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: This file mounts one page per isolated test. Its state counts describe separate fixture cases, not concurrent production authorities. The change updates shared range events, adaptive camera selection, a supported narration destination, and preview titles. Page commands retain geometry, autosave, and selection authority. Score2 delta0 and cohesion1.00 match that fixture structure. The independent architecture reviewer must check this exact record.",
+      "reason": "tool-noise: One page fixture owns each isolated test. Dialog method stubs have matching setup and restoration. Text controls use the mounted category. A distinct uncached prior asset forces the existing delayed Undo read. Assertions establish that request before stale-result release and detach-before-revoke checks. Teardown awaits page unmount and disposal of existing independent toast roots. It checks zero toast hosts before DOM, timer, and global restoration. These changes introduce no resource creation, independent receiver, production writer, or production authority. Score4 delta2 retains one fixture. Main inspected the exact diff. Independent read-only lifecycle diagnosis recommends Keep. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove this record when the AST or signature changes. Reassess each new production authority, effect lifetime, or writer. Remove this record when the analyzer distinguishes isolated test fixtures.",
-      "reviewDate": "2026-10-19",
-      "astHash": "30bdbcd0153eec21c3877828bf7c3e55e20dd18663fba6b521d658ce735d863c",
-      "signatureHash": "7beef1b7353b6b79108cc3c806636666b8e4d1cd5cc6ac16f000ccd4910b8e3d"
+      "reviewDate": "2026-10-26",
+      "astHash": "c8e93e78ab37c7b054e161301431cf4d7f4b733d3f32ad28da0f8eb0e7721ece",
+      "signatureHash": "21a3d86f44cf4cf778024f1089d96ba1ab3cd2853bee3656599310fd02a56464"
     },
     {
       "rule": "structural-function-risk",

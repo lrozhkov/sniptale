@@ -100,6 +100,23 @@ function drawOuterMediaFrameShadow(
     return;
   }
 
+  const fillMaskFrame = () => {
+    if (appearance) {
+      traceCameraShape(maskContext, { ...frame, x: bleed, y: bleed }, appearance);
+      maskContext.fill();
+    } else if (cornerRadius > 0) {
+      maskContext.beginPath();
+      maskContext.roundRect(
+        bleed,
+        bleed,
+        frame.width,
+        frame.height,
+        roundedWindowRadius(frame.width, frame.height, cornerRadius)
+      );
+      maskContext.fill();
+    } else maskContext.fillRect(bleed, bleed, frame.width, frame.height);
+  };
+
   try {
     maskContext.reset?.();
     maskContext.save();
@@ -111,39 +128,13 @@ function drawOuterMediaFrameShadow(
     maskContext.shadowOffsetX = shadow.offsetX;
     maskContext.shadowOffsetY = shadow.offsetY;
     maskContext.fillStyle = shadow.paint.color;
-    if (appearance) {
-      traceCameraShape(maskContext, { ...frame, x: bleed, y: bleed }, appearance);
-      maskContext.fill();
-    } else if (cornerRadius > 0) {
-      maskContext.beginPath();
-      maskContext.roundRect(
-        bleed,
-        bleed,
-        frame.width,
-        frame.height,
-        roundedWindowRadius(frame.width, frame.height, cornerRadius)
-      );
-      maskContext.fill();
-    } else maskContext.fillRect(bleed, bleed, frame.width, frame.height);
+    fillMaskFrame();
     maskContext.globalCompositeOperation = 'destination-out';
     maskContext.shadowBlur = 0;
     maskContext.shadowOffsetX = 0;
     maskContext.shadowOffsetY = 0;
     maskContext.fillStyle = 'rgba(0, 0, 0, 1)';
-    if (appearance) {
-      traceCameraShape(maskContext, { ...frame, x: bleed, y: bleed }, appearance);
-      maskContext.fill();
-    } else if (cornerRadius > 0) {
-      maskContext.beginPath();
-      maskContext.roundRect(
-        bleed,
-        bleed,
-        frame.width,
-        frame.height,
-        roundedWindowRadius(frame.width, frame.height, cornerRadius)
-      );
-      maskContext.fill();
-    } else maskContext.fillRect(bleed, bleed, frame.width, frame.height);
+    fillMaskFrame();
     context.drawImage(maskCanvas, frame.x - bleed, frame.y - bleed);
   } finally {
     maskContext.restore();

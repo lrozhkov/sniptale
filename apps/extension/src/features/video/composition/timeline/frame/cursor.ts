@@ -18,6 +18,21 @@ import { VideoCursorCaptureMode, VideoTemporalEasing } from '../../../project/ty
 import { applyTemporalEasing } from '../../motion/math';
 import type { VideoCompositionActionState, VideoCompositionCursorState } from '../../types';
 
+function interpolateRecordingPoint(
+  previous: VideoProjectCursorSample['recordingPoint'],
+  next: VideoProjectCursorSample['recordingPoint'],
+  progress: number
+) {
+  return previous && next
+    ? {
+        recordingPoint: {
+          x: previous.x + (next.x - previous.x) * progress,
+          y: previous.y + (next.y - previous.y) * progress,
+        },
+      }
+    : {};
+}
+
 /** Evaluates the retained easing curve between two cursor keys. */
 export function interpolateCursorSample(
   previousSample: VideoProjectCursorSample,
@@ -45,18 +60,11 @@ export function interpolateCursorSample(
     visible: previousSample.visible,
     x: previousSample.x + (nextSample.x - previousSample.x) * progress,
     y: previousSample.y + (nextSample.y - previousSample.y) * progress,
-    ...(previousSample.recordingPoint && nextSample.recordingPoint
-      ? {
-          recordingPoint: {
-            x:
-              previousSample.recordingPoint.x +
-              (nextSample.recordingPoint.x - previousSample.recordingPoint.x) * progress,
-            y:
-              previousSample.recordingPoint.y +
-              (nextSample.recordingPoint.y - previousSample.recordingPoint.y) * progress,
-          },
-        }
-      : {}),
+    ...interpolateRecordingPoint(
+      previousSample.recordingPoint,
+      nextSample.recordingPoint,
+      progress
+    ),
   };
 }
 
@@ -380,17 +388,10 @@ export function resolveObservedCursorPosition(
   const progress = (time - previousSample.time) / (nextSample.time - previousSample.time);
   return {
     ...point,
-    ...(previousSample.recordingPoint && nextSample.recordingPoint
-      ? {
-          recordingPoint: {
-            x:
-              previousSample.recordingPoint.x +
-              (nextSample.recordingPoint.x - previousSample.recordingPoint.x) * progress,
-            y:
-              previousSample.recordingPoint.y +
-              (nextSample.recordingPoint.y - previousSample.recordingPoint.y) * progress,
-          },
-        }
-      : {}),
+    ...interpolateRecordingPoint(
+      previousSample.recordingPoint,
+      nextSample.recordingPoint,
+      progress
+    ),
   };
 }

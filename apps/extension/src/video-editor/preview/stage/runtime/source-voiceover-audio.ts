@@ -39,7 +39,7 @@ class ProjectSourceVoiceoverAudioRuntime {
   private desiredTime = 0;
   private anchor: { time: number; clock: number } | null = null;
   private readonly buffers = new Map<string, ReviewAudioClipBuffer>();
-  private readonly decoding = new Map<string, Promise<ReviewAudioClipBuffer>>();
+  private readonly decoding = new Map<string, { request: Promise<ReviewAudioClipBuffer> }>();
   private readonly prepared = new Map<string, ReviewAudioClipBuffer>();
   private readonly pending = new Map<string, Promise<void>>();
   private readonly failures = new Map<string, unknown>();
@@ -191,7 +191,7 @@ class ProjectSourceVoiceoverAudioRuntime {
     const buffer = this.buffers.get(url);
     if (buffer) return buffer;
     const existing = this.decoding.get(url);
-    if (existing) return existing;
+    if (existing) return existing.request;
     const generation = this.generation;
     const loading = (async () => {
       const response = await this.fetchBytes(url, { signal });
@@ -203,11 +203,12 @@ class ProjectSourceVoiceoverAudioRuntime {
       if (!this.closed && generation === this.generation) this.buffers.set(url, result);
       return result;
     })();
-    this.decoding.set(url, loading);
+    const ownedDecode = { request: loading };
+    this.decoding.set(url, ownedDecode);
     try {
-      return await loading;
+      return await ownedDecode.request;
     } finally {
-      if (this.decoding.get(url) === loading) this.decoding.delete(url);
+      if (this.decoding.get(url) === ownedDecode) this.decoding.delete(url);
     }
   }
 

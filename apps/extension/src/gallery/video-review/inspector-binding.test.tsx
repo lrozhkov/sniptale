@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import type { ReviewTextDocumentPanel } from './text-panel';
 import type { ReviewTextFragment } from '../../features/video/review/text-types';
-// @vitest-environment jsdom
 import { act, type ComponentProps, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

@@ -1,5 +1,5 @@
-import { beginPageRecoveryTeardown } from './lifecycle';
 // @vitest-environment jsdom
+import { beginPageRecoveryTeardown } from './lifecycle';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

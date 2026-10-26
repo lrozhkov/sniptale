@@ -1,5 +1,5 @@
-import type { VideoProject } from '../../../../../features/video/project/types/model';
 // @vitest-environment jsdom
+import type { VideoProject } from '../../../../../features/video/project/types/model';
 import { WorkspaceSidebarSelectionBody } from './body';
 
 import { act } from 'react';

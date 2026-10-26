@@ -39,7 +39,7 @@ for (const viewport of [
         .click();
       const signal = dialog
         .getByRole('button', {
-          name: new RegExp(label('gallery.videoReview.eventCursorIdle')),
+          name: /Cursor idle/,
         })
         .first();
       await signal.focus();

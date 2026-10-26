@@ -11,6 +11,7 @@ import {
   resolveQuickEditLensArea,
   authorQuickEditLensArea,
   areQuickEditSpotlightAreasEqual,
+  resizeQuickEditAspectLockedArea,
   type QuickEditSpotlight,
 } from '../../../../features/video/project/scene/focus-appearance';
 import { resolveVideoCompositionVisualLayers } from '../../../../features/video/composition/timeline/frame/layers';
@@ -258,15 +259,7 @@ function resizeFocusArea(area: Area, corner: Corner, dx: number, dy: number, rat
   const right = area.x + area.width,
     bottom = area.y + area.height;
   if (ratio) {
-    const west = corner.endsWith('w'),
-      north = corner.startsWith('n');
-    const horizontal = area.width + (west ? -dx : dx);
-    const vertical = (area.height + (north ? -dy : dy)) * ratio;
-    const preferred = Math.abs(dx) >= Math.abs(dy * ratio) ? horizontal : vertical;
-    const maximum = Math.min(west ? right : 1 - area.x, (north ? bottom : 1 - area.y) * ratio);
-    const width = Math.min(maximum, Math.max(0.01 * Math.min(1, ratio), preferred));
-    const height = width / ratio;
-    return { x: west ? right - width : area.x, y: north ? bottom - height : area.y, width, height };
+    return resizeQuickEditAspectLockedArea(area, corner, dx, dy, ratio, 0.01 * Math.min(1, ratio));
   }
   const x = corner.endsWith('w') ? Math.max(0, Math.min(right - 0.01, area.x + dx)) : area.x;
   const y = corner.startsWith('n') ? Math.max(0, Math.min(bottom - 0.01, area.y + dy)) : area.y;

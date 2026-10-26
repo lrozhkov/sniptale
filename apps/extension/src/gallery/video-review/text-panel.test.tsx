@@ -1,5 +1,5 @@
-import type { ReviewSelection } from '../../features/video/review/types';
 // @vitest-environment jsdom
+import type { ReviewSelection } from '../../features/video/review/types';
 
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { act, useRef, useState } from 'react';

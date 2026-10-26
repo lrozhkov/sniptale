@@ -570,6 +570,14 @@ it.each([false, true])(
     expect(editor.duration).toBe(12);
   }
 );
+it('commits the released hidden edge position even without a final move event', () => {
+  renderHidden();
+  const handle = hiddenHandle('end');
+  pointer(handle, 'pointerdown', 400);
+  pointer(handle, 'pointermove', 450);
+  pointer(handle, 'pointerup', 480);
+  expect(editor.resizeHidden).toHaveBeenCalledExactlyOnceWith('hidden', { start: 2, end: 4.8 });
+});
 it.each(['escape', 'cancel', 'blur', 'lost', 'disabled', 'unmount', 'deleted', 'lane'])(
   'cancels the hidden edge gesture on %s without a mutation',
   (reason) => {

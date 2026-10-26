@@ -2,6 +2,7 @@
 
 import { InspectorLayout } from '../../compact-inspector-controls/layout';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -199,8 +200,12 @@ beforeEach(async () => {
   await act(async () => root.render(<Harness />));
 });
 
-afterEach(() => {
-  act(() => root.unmount());
+afterEach(async () => {
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   container.remove();
   document.body.replaceChildren();
   vi.unstubAllGlobals();

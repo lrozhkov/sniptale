@@ -174,7 +174,9 @@ for (const variant of [variants[0], { ...variants[2], theme: 'light' }] as const
     const inventory: unknown[] = [];
     await page
       .getByRole('button', {
-        name: `${translate('videoEditor.sidebar.commentNote', variant.locale)} · ${formatPreciseTime(2)} · Inspector audit note`,
+        name:
+          `${translate('videoEditor.sidebar.commentNote', variant.locale)} · ` +
+          `${formatPreciseTime(2)} · Inspector audit note`,
         exact: true,
       })
       .click();
@@ -374,7 +376,10 @@ async function saveAuditInventory(
         scope,
         inspectorWidth: 320,
         coverage:
-          'Every supported fixture selection, available category, and expanded disclosure. Retired SUBTITLE timeline capability is excluded; document captions remain covered. Dedicated flow specs cover AI request/proposal/retry states.',
+          'Every supported fixture selection, available category, and expanded ' +
+          'disclosure. Retired SUBTITLE timeline capability is excluded; document ' +
+          'captions remain covered. Dedicated flow specs cover AI request/proposal/retry ' +
+          'states.',
         inventory,
       },
       null,

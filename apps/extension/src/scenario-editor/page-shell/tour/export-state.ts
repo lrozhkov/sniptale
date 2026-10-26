@@ -1,3 +1,4 @@
+import { guideProjectContentIdentity } from '../runtime/content-identity';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../../platform/i18n';
@@ -18,17 +19,7 @@ export function useTourHtmlExport(
   t: Translate
 ) {
   // Autosave acknowledgment changes object identity and timestamps without changing export content.
-  const content = useMemo(
-    () =>
-      JSON.stringify({ ...project, updatedAt: 0 }, (_key, value: unknown) =>
-        value !== null && typeof value === 'object' && !Array.isArray(value)
-          ? Object.fromEntries(
-              Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
-            )
-          : value
-      ),
-    [project]
-  );
+  const content = useMemo(() => guideProjectContentIdentity(project), [project]);
   const [prepared, setPrepared] = useState<{
     artifact: PreparedTourHtml;
     content: string;

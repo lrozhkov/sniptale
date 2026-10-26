@@ -1,5 +1,45 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'background-text-job-lifecycle',
+    productionFile: 'apps/extension/src/background/ai/llm/text-job-lifecycle.ts',
+    reason:
+      'Both typed text services retain admission, deadline, cancellation and erasure drain \
+through their existing consumer tests.',
+    testFiles: [
+      'apps/extension/src/background/ai/llm/content-text-job.test.ts',
+      'apps/extension/src/background/ai/llm/review-text-job.test.ts',
+      'apps/extension/src/background/ai/llm/review-text-job.project.test.ts',
+      'apps/extension/src/background/ai/llm/review-text-job.project-integrity.test.ts',
+      'apps/extension/src/background/application/privacy-erasure/composition.test.ts',
+    ],
+  },
+  {
+    owner: 'background-text-job-port',
+    productionFile: 'apps/extension/src/background/ai/llm/text-job-port.ts',
+    reason:
+      'Both text Port adapters retain sender validation, strict parsing and connection disposal.',
+    testFiles: [
+      'apps/extension/src/background/ai/llm/content-text-port.test.ts',
+      'apps/extension/src/background/ai/llm/review-text-port.test.ts',
+      'apps/extension/src/background/runtime/routing/runtime-wiring/initialize.test.ts',
+    ],
+  },
+  {
+    owner: 'text-request-port',
+    productionFile: 'apps/extension/src/workflows/ai-session/text-request-port.ts',
+    reason:
+      'Content and review text callers retain typed results, cancellation and terminal Port cleanup without retry.',
+    testFiles: [
+      'apps/extension/src/workflows/ai-session/content-text.test.ts',
+      'apps/extension/src/workflows/video-review/text-rewrite-client.test.ts',
+      'apps/extension/src/content/overlay/ai/text-rewrite/request.test.ts',
+      'apps/extension/src/workflows/video-review/text-rewrite.test.ts',
+      'apps/extension/src/workflows/video/project-text-rewrite.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-rewrite.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-rewrite.test.tsx',
+    ],
+  },
+  {
     owner: 'content-ai-preview-icons',
     productionFile: 'apps/extension/src/content/overlay/ai/data-panel/preview/icons.tsx',
     reason:

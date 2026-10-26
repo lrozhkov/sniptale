@@ -1,5 +1,5 @@
-import { useVideoEditorStore } from '../../state/store';
 // @vitest-environment jsdom
+import { useVideoEditorStore } from '../../state/store';
 
 import { createAudioClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 import { act } from 'react';

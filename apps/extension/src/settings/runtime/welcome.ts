@@ -1,26 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { THEME_PREFERENCE_CHANGE_EVENT } from '@sniptale/ui/branding';
-import {
-  requestMicrophoneAccess,
-  type MicrophoneAccessState,
-} from '@sniptale/platform/browser/user-media';
-import { useAppLocale, setLocalePreference, type AppLocale } from '../../platform/i18n';
-import {
-  getStoredThemePreference,
-  setAppThemePreference,
-  type AppThemePreference,
-} from '../../ui/theme';
-import {
-  initialPermissions,
-  readPermissionsSnapshot,
-  requestCameraAccess,
-  subscribeToPermissionChanges,
-  type PermissionState,
-} from '../sections/system/access-data/permissions/permissions-lib';
-import { requestSettingsOriginAccess } from '../sections/system/access-data/permissions/useSettingsPermissions';
+import type { MicrophoneAccessState } from '@sniptale/platform/browser/user-media';
+import { useAppLocale, type AppLocale } from '../../platform/i18n';
+import { getStoredThemePreference, type AppThemePreference } from '../../ui/theme';
 
 type PermissionKind = 'microphone' | 'camera' | 'origins';
-type Access = MicrophoneAccessState | PermissionState;
+type Access = MicrophoneAccessState | 'error';
 export type WelcomeAccess = Record<PermissionKind, Access>;
 export interface WelcomeDependencies {
   observe(): Promise<WelcomeAccess>;
@@ -30,62 +15,11 @@ export interface WelcomeDependencies {
   theme(theme: AppThemePreference): Promise<unknown>;
 }
 
-async function observeAccess(): Promise<WelcomeAccess> {
-  const snapshot = await readPermissionsSnapshot(
-    initialPermissions.filter(
-      (item) => item.id === 'microphone' || item.id === 'camera' || item.id === 'origins'
-    )
-  );
-  return {
-    microphone: snapshot.find((item) => item.id === 'microphone')?.state ?? 'unknown',
-    camera: snapshot.find((item) => item.id === 'camera')?.state ?? 'unknown',
-    origins: snapshot.find((item) => item.id === 'origins')?.state ?? 'unknown',
-  };
-}
-function subscribeAccess(listener: () => void): () => void {
-  const unsubscribe = subscribeToPermissionChanges(listener);
-  let disposed = false;
-  const statuses: PermissionStatus[] = [];
-  window.addEventListener('focus', listener);
-  for (const name of ['microphone', 'camera'] as const) {
-    void navigator.permissions
-      ?.query({ name: name as PermissionName })
-      .then((status) => {
-        if (disposed) return;
-        statuses.push(status);
-        status.addEventListener('change', listener);
-      })
-      .catch(() => undefined);
-  }
-  return () => {
-    disposed = true;
-    unsubscribe();
-    window.removeEventListener('focus', listener);
-    for (const status of statuses) status.removeEventListener('change', listener);
-  };
-}
-const defaultDependencies: WelcomeDependencies = {
-  observe: observeAccess,
-  subscribe: subscribeAccess,
-  request: async (kind) => {
-    if (kind === 'microphone') return requestMicrophoneAccess();
-    if (kind === 'camera') return requestCameraAccess();
-    const permission = initialPermissions.find((item) => item.id === 'origins');
-    if (!permission) return 'error';
-    try {
-      return (await requestSettingsOriginAccess(permission)) ? 'granted' : 'denied';
-    } catch {
-      return 'error';
-    }
-  },
-  locale: setLocalePreference,
-  theme: setAppThemePreference,
-};
 const emptyAccess: WelcomeAccess = { microphone: 'unknown', camera: 'unknown', origins: 'unknown' };
 
 /** Owns disposable welcome state and calls existing preference and permission owners. */
-export function useWelcomeSetup(dependencies?: WelcomeDependencies) {
-  const [deps] = useState(() => dependencies ?? defaultDependencies);
+export function useWelcomeSetup(dependencies: WelcomeDependencies) {
+  const [deps] = useState(() => dependencies);
   const locale = useAppLocale();
   const [theme, setTheme] = useState<AppThemePreference>(
     () => getStoredThemePreference() ?? 'system'

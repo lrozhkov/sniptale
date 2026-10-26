@@ -228,7 +228,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             evaluateInTarget(
               context,
               reopenedTarget,
-              'Array.from(document.querySelectorAll("[role=option]")).filter(option => option.textContent?.trim()).length'
+              'Array.from(document.querySelectorAll("[role=option]")).filter(option => ' +
+                'option.textContent?.trim()).length'
             )
           )
           .toBeGreaterThan(0);
@@ -287,7 +288,9 @@ async function clickPopupControl(
       await evaluateInTarget(
         context,
         popupTarget,
-        `(()=>{const element=document.querySelector(${JSON.stringify(selector)});element.scrollIntoView({block:'center'});const rect=element.getBoundingClientRect();return{x:rect.x+rect.width/2,y:rect.y+rect.height/2}})()`
+        `(()=>{const element=document.querySelector(${JSON.stringify(selector)});` +
+          `element.scrollIntoView({block:'center'});const ` +
+          `rect=element.getBoundingClientRect();return{x:rect.x+rect.width/2,y:rect.y+rect.height/2}})()`
       )
     );
   const attached = await session.send('Target.attachToTarget', {

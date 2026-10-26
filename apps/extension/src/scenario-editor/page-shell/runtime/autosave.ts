@@ -1,3 +1,4 @@
+import { guideProjectContentIdentity as guideDraftContent } from './content-identity';
 import type { ScenarioProjectSnapshot } from '../../../composition/persistence/scenario/contracts';
 import { useEffect, useRef } from 'react';
 import { createAutosaveCoordinator } from '@sniptale/platform/data/autosave';
@@ -342,16 +343,5 @@ function isTimestampRebase(previous: GuideProject | null | undefined, next: Guid
     Object.entries(previous).every(
       ([key, value]) => key === 'updatedAt' || Reflect.get(next, key) === value
     )
-  );
-}
-
-/** Persistence reorders object keys; only the aggregate timestamp is outside draft content. */
-function guideDraftContent(project: GuideProject): string {
-  return JSON.stringify({ ...project, updatedAt: 0 }, (_key, value: unknown) =>
-    value !== null && typeof value === 'object' && !Array.isArray(value)
-      ? Object.fromEntries(
-          Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
-        )
-      : value
   );
 }

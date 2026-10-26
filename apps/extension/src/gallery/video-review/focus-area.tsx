@@ -2,6 +2,7 @@ import {
   type QuickEditSpotlight,
   clampQuickEditSpotlightArea,
   areQuickEditSpotlightAreasEqual,
+  resizeQuickEditAspectLockedArea,
 } from '../../features/video/project/scene/focus-appearance';
 import { captureReviewSpatialPointer } from './spatial-pointer';
 import type { QuickEditHomography } from '../../features/video/composition/motion/spatial-geometry';
@@ -225,16 +226,14 @@ function resizeSpotlightArea(
   const right = area.x + area.width,
     bottom = area.y + area.height;
   if (ratio) {
-    const horizontal = area.width + (west ? -dx : dx);
-    const vertical = (area.height + (north ? -dy : dy)) * ratio;
-    const preferred = Math.abs(dx) >= Math.abs(dy * ratio) ? horizontal : vertical;
-    const maximum = Math.min(west ? right : 1 - area.x, (north ? bottom : 1 - area.y) * ratio);
-    const width = Math.min(
-      maximum,
-      Math.max(minimumWidth ?? Math.max(0.01, 0.01 * ratio), preferred)
+    return resizeQuickEditAspectLockedArea(
+      area,
+      corner,
+      dx,
+      dy,
+      ratio,
+      minimumWidth ?? Math.max(0.01, 0.01 * ratio)
     );
-    const height = width / ratio;
-    return { x: west ? right - width : area.x, y: north ? bottom - height : area.y, width, height };
   }
   const x = west ? Math.max(0, Math.min(right - 0.01, area.x + dx)) : area.x;
   const y = north ? Math.max(0, Math.min(bottom - 0.01, area.y + dy)) : area.y;

@@ -3,7 +3,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'review-inspector-section-consumers',
     productionFile: 'apps/extension/src/gallery/video-review/inspector-sections.tsx',
     reason:
-      'The shared section presentation and remembered disclosure owner serves scene, selection, history, speech, note and camera inspector consumers.',
+      'The shared section presentation and remembered disclosure owner serves scene, selection, \
+history, speech, note and camera inspector consumers.',
     testFiles: [
       'apps/extension/src/gallery/video-review/inspector.test.tsx',
       'apps/extension/src/gallery/video-review/annotation-effects-inspector.test.tsx',
@@ -44,7 +45,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'review-webcam-hidden-marker-gestures',
     productionFile: 'apps/extension/src/gallery/video-review/webcam-hidden-marker.tsx',
     reason:
-      'The camera UI proves source-axis hidden ranges, delayed keyboard admission, stale gesture refusal, unmount cancellation and retry.',
+      'The camera UI proves source-axis hidden ranges, delayed keyboard admission, stale gesture \
+refusal, unmount cancellation and retry.',
     testFiles: [
       'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
       'apps/extension/src/gallery/video-review/webcam-ui.test.tsx',
@@ -56,7 +58,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'review-webcam-track-gestures',
     productionFile: 'apps/extension/src/gallery/video-review/webcam-track.tsx',
     reason:
-      'The camera track consumer proves source-axis placement, source selection, admitted drag cancellation and keyboard movement.',
+      'The camera track consumer proves source-axis placement, source selection, admitted drag \
+cancellation and keyboard movement.',
     testFiles: [
       'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
       'apps/extension/src/gallery/video-review/webcam-ui.test.tsx',
@@ -69,7 +72,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/gallery/video-review/use-advanced-content.ts',
     allowCrossOwner: true,
     reason:
-      'The content writer preserves closed gesture groups, failed-capture retry, concurrent rebasing, reset generations and the existing autosave session boundary.',
+      'The content writer preserves closed gesture groups, failed-capture retry, concurrent \
+rebasing, reset generations and the existing autosave session boundary.',
     testFiles: [
       'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
       'apps/extension/src/gallery/video-review/use-advanced.test.tsx',
@@ -135,7 +139,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/video-editor/project/operations/workspace.ts',
     allowCrossOwner: true,
     reason:
-      'Saved review transfer preserves raw intake, resource preparation and exact source admission in the actual destination transaction.',
+      'Saved review transfer preserves raw intake, resource preparation and exact source admission \
+in the actual destination transaction.',
     testFiles: [
       'apps/extension/src/video-editor/project/operations/workspace.test.ts',
       'apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts',
@@ -148,7 +153,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionPrefix: 'apps/extension/src/features/video/project/scene/bookend-',
     allowCrossOwner: true,
     reason:
-      'Shared media settings preserve both editor forms, ordinary instance edits and all retained source references through save, copy and restore.',
+      'Shared media settings preserve both editor forms, ordinary instance edits and all retained \
+source references through save, copy and restore.',
     testFiles: [
       'apps/extension/src/features/video/project/scene/bookend-media.test.ts',
       'apps/extension/src/features/video/project/scene/bookend-presets.test.ts',
@@ -242,7 +248,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/features/video/project/timeline/composition-prefix.ts',
     allowCrossOwner: true,
     reason:
-      'Whole-composition translation must preserve source clocks through Native reconciliation, history and persistence.',
+      'Whole-composition translation must preserve source clocks through Native reconciliation, \
+history and persistence.',
     testFiles: [
       'apps/extension/src/features/video/project/timeline/composition-prefix.test.ts',
       'apps/extension/src/video-editor/project/state/insertion/bookend.test.ts',
@@ -624,7 +631,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     allowCrossOwner: true,
     productionFile: 'apps/extension/src/features/video/project/timeline/presentation.gain.ts',
     reason:
-      'Canonical gain drives preview, scene response, offline mixing and realtime export after unchanged project admission.',
+      'Canonical gain drives preview, scene response, offline mixing and realtime export after \
+unchanged project admission.',
     testFiles: [
       'apps/extension/src/features/video/project/timeline/audio.test.ts',
       'apps/extension/src/features/video/project/timeline/track-audio.test.ts',
@@ -1161,7 +1169,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-screenshot-surface-binding',
     productionFile: 'apps/extension/src/content/overlay/viewport-selector/capability.ts',
     reason:
-      'Toolbar status and session tests cover binding replacement, delayed responses, cancellation, and operation generations.',
+      'Toolbar status and session tests cover binding replacement, delayed responses, cancellation, \
+and operation generations.',
     testFiles: [
       'apps/extension/src/content/overlay/toolbar/shell/viewport-status.test.tsx',
       'apps/extension/src/content/overlay/toolbar/shell/surface-session.test.ts',

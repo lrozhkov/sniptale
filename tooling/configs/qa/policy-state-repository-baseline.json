@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 317,
-  "findingDigest": "sha256:0e9bb68d2430aef669310e125066637c6bebbc5a3aec20931b7c3662d5e33d59",
+  "findingCount": 322,
+  "findingDigest": "sha256:7c34737e4b9c44eb2e240d7ffa86d66a1447e5b11c47a4ae908054535db2306d",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -135,6 +135,48 @@
       "owner": "apps/extension/src/workflows/video-review/speech-publication.ts",
       "reason": "This WeakMap holds disposable attachment handles for retries. Session and persistence owners control publication acceptance and recovery.",
       "removalCondition": "Remove when the signal disappears or this bookkeeping acquires publication authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.teleprompter-scroll-key-catalog",
+      "owner": "apps/extension/src/camera-recorder/shell/teleprompter-reader.tsx",
+      "reason": "MANUAL_SCROLL_KEYS is a private fixed keyboard catalog. Its only consumer calls has(event.key) to pause local reading. No caller mutates or receives the Set, and it grants no capability.",
+      "removalCondition": "Remove if the catalog becomes mutable authority, escapes its owner, or the detector recognizes fixed membership catalogs.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.toolbar-preference-write-completion",
+      "owner": "apps/extension/src/content/overlay/toolbar/shell/drag-position.effects.ts",
+      "reason": "pendingToolbarPreferenceSave retains only completion of patchSettings so a remount reads after the preceding save. Composition settings owns accepted values and mutation ordering. This document-local promise grants no capability or persistence admission.",
+      "removalCondition": "Remove if the promise starts owning accepted settings or mutation admission, or this exact detector signal disappears.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.review-text-scope-schema",
+      "owner": "apps/extension/src/contracts/ai/review-text.ts",
+      "reason": "The jobs substring matches reviewTextJobScopeSchema. This declaration is an immutable Zod union schema used to parse message scope. It contains no pending job ledger, mutable session state, or capability authority.",
+      "removalCondition": "Remove if this declaration becomes mutable job authority or the detector distinguishes schema declarations from job state.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.popup-media-device-ui-coordination",
+      "owner": "apps/extension/src/popup/recording/media-device-flow/index.ts",
+      "reason": "mediaDeviceRefreshSequences rejects stale popup list responses. pendingMediaPermissionHandoffs coalesces Settings navigation per setter and removes completed handoffs. Each enable flow rereads native permission; these collections grant no browser access.",
+      "removalCondition": "Remove if these collections retain permission grants or authorize capture, or their exact detector signals disappear.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.popup-media-permission-request-coalescing",
+      "owner": "apps/extension/src/popup/recording/media-devices/index.ts",
+      "reason": "pendingMediaPermissionRequests joins one native request per permission and selected device, then deletes it in finally. Native permission APIs remain authoritative, and acquired temporary tracks stop. The map retains no accepted permission grant.",
+      "removalCondition": "Remove if the map starts storing permission grants or bypassing native admission, or its exact detector signals disappear.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.settings-pending-control-css",
+      "owner": "apps/extension/src/settings/section-surface/classes.ts",
+      "reason": "settingsPendingControlClassName is the immutable CSS string disabled:!opacity-100. The pending substring is presentation terminology and represents no queue, runtime state, or capability authority.",
+      "removalCondition": "Remove if this declaration becomes mutable authority or the detector distinguishes string constants from queues.",
       "classification": "tool-noise"
     }
   ],
@@ -572,6 +614,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/camera-recorder/shell/teleprompter-reader.tsx",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.teleprompter-scroll-key-catalog"
+    },
+    {
       "file": "apps/extension/src/composition/archive-transfer/path.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -908,6 +956,12 @@
       "noiseId": "noise.policy-state-descriptor.content.overlay.design-review.session.comment-draft-finalization"
     },
     {
+      "file": "apps/extension/src/content/overlay/toolbar/shell/drag-position.effects.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.toolbar-preference-write-completion"
+    },
+    {
       "file": "apps/extension/src/content/overlay/video-recording/transport/snapshot-channel.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1068,6 +1122,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/contracts/ai/review-text.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.review-text-scope-schema"
     },
     {
       "file": "apps/extension/src/contracts/effect-runtime/result-boundary.ts",
@@ -1653,9 +1713,15 @@
     },
     {
       "file": "apps/extension/src/popup/recording/media-device-flow/index.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+      "noiseId": "noise.policy-state-descriptor.popup-media-device-ui-coordination"
+    },
+    {
+      "file": "apps/extension/src/popup/recording/media-devices/index.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.popup-media-permission-request-coalescing"
     },
     {
       "file": "apps/extension/src/popup/runtime-services/index.ts",
@@ -1704,6 +1770,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/settings/section-surface/classes.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.settings-pending-control-css"
     },
     {
       "file": "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-draft-recovery.ts",

@@ -169,7 +169,7 @@ function InlineCurtainSelectPanels({
         onClose={() => setOpenPanel(null)}
         title={label}
       >
-        {optionsPanel}
+        <div>{optionsPanel}</div>
       </InlineCurtainCustomOptionsPanel>
     );
   }
@@ -215,7 +215,7 @@ function InlineCurtainCustomOptionsPanel({
         onAction={onClose}
         title={title}
       />
-      <div>{children}</div>
+      {children}
     </div>
   );
 }
@@ -389,14 +389,12 @@ function InlineCurtainPanel({
   title: string;
 }) {
   return (
-    <div id={id} role="dialog" aria-modal="false" className={INLINE_CURTAIN_PANEL_CLASS_NAME}>
-      <InlineCurtainPanelHeader
-        action="back"
-        actionAriaLabel={translate('popup.common.curtainBack')}
-        description={description}
-        onAction={onClose}
-        title={title}
-      />
+    <InlineCurtainCustomOptionsPanel
+      description={description}
+      id={id}
+      onClose={onClose}
+      title={title}
+    >
       <InlineCurtainNotice {...(notice === undefined ? {} : { notice })} />
       <div role="listbox">
         <InlineCurtainOptionList
@@ -411,6 +409,6 @@ function InlineCurtainPanel({
           {optionsFooter}
         </div>
       )}
-    </div>
+    </InlineCurtainCustomOptionsPanel>
   );
 }

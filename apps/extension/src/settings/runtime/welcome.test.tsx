@@ -7,11 +7,6 @@ import { useWelcomeSetup, type WelcomeDependencies, type WelcomeAccess } from '.
 
 const owners = vi.hoisted(() => ({
   theme: vi.fn(() => 'system'),
-  permissions: vi.fn(),
-  camera: vi.fn(),
-  microphone: vi.fn(),
-  origins: vi.fn(),
-  permissionChanges: vi.fn<(listener: () => void) => () => void>(() => vi.fn()),
 }));
 vi.mock('../../ui/theme', () => ({
   getStoredThemePreference: owners.theme,
@@ -20,21 +15,6 @@ vi.mock('../../ui/theme', () => ({
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
   useAppLocale: () => 'en',
-}));
-vi.mock('../sections/system/access-data/permissions/permissions-lib', async (original) => ({
-  ...(await original<
-    typeof import('../sections/system/access-data/permissions/permissions-lib')
-  >()),
-  readPermissionsSnapshot: owners.permissions,
-  requestCameraAccess: owners.camera,
-  subscribeToPermissionChanges: owners.permissionChanges,
-}));
-vi.mock('../sections/system/access-data/permissions/useSettingsPermissions', () => ({
-  requestSettingsOriginAccess: owners.origins,
-}));
-vi.mock('@sniptale/platform/browser/user-media', async (original) => ({
-  ...(await original<typeof import('@sniptale/platform/browser/user-media')>()),
-  requestMicrophoneAccess: owners.microphone,
 }));
 const access: WelcomeAccess = { microphone: 'prompt', camera: 'prompt', origins: 'prompt' };
 function deferred<T>() {
@@ -55,19 +35,16 @@ function fixture() {
 }
 let root: Root;
 let setup: ReturnType<typeof useWelcomeSetup>;
-function Harness({ deps }: { deps: WelcomeDependencies | undefined }) {
+function Harness({ deps }: { deps: WelcomeDependencies }) {
   setup = useWelcomeSetup(deps);
   return null;
 }
-async function mount(deps?: WelcomeDependencies) {
+async function mount(deps: WelcomeDependencies) {
   await act(async () => root.render(<Harness deps={deps} />));
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   owners.theme.mockReset().mockReturnValue('system');
-  owners.origins.mockReset();
-  owners.microphone.mockReset();
-  owners.camera.mockReset();
   root = createRoot(document.createElement('div'));
 });
 afterEach(() => {
@@ -189,49 +166,4 @@ it('saves appearance through existing owners and retains a valid theme after ref
   await act(async () => setup.setTheme('light'));
   expect(setup.theme).toBe('dark');
   expect(setup.error).toBe('save');
-});
-it('uses default media probes and the existing optional origin transaction only on explicit requests', async () => {
-  owners.permissions.mockResolvedValue([{ id: 'origins', state: 'prompt' }]);
-  owners.microphone.mockResolvedValue('granted');
-  owners.camera.mockResolvedValue('granted');
-  await mount();
-  expect(owners.origins).not.toHaveBeenCalled();
-  expect(owners.microphone).not.toHaveBeenCalled();
-  await act(async () => setup.request('microphone'));
-  expect(owners.microphone).toHaveBeenCalledExactlyOnceWith();
-  await act(async () => setup.request('camera'));
-  expect(owners.camera).toHaveBeenCalledExactlyOnceWith();
-  owners.origins.mockResolvedValueOnce(false);
-  await act(async () => setup.request('origins'));
-  expect(setup.access.origins).toBe('denied');
-  expect(owners.origins).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'origins', originPatterns: ['<all_urls>'] })
-  );
-  owners.origins.mockRejectedValueOnce(new Error('registration failed'));
-  await act(async () => setup.request('origins'));
-  expect(setup.access.origins).toBe('error');
-  expect(setup.error).toBeNull();
-  owners.origins.mockResolvedValueOnce(true);
-  owners.permissions.mockResolvedValue([{ id: 'origins', state: 'granted' }]);
-  await act(async () => setup.request('origins'));
-  expect(setup.access.origins).toBe('granted');
-  owners.permissions.mockResolvedValue([{ id: 'origins', state: 'prompt' }]);
-  await act(async () => owners.permissionChanges.mock.calls.at(-1)![0]());
-  expect(setup.access.origins).toBe('prompt');
-});
-
-it('preserves actual camera absence through the production permission adapter', async () => {
-  const actual = await vi.importActual<
-    typeof import('../sections/system/access-data/permissions/permissions-lib')
-  >('../sections/system/access-data/permissions/permissions-lib');
-  vi.stubGlobal('navigator', {
-    mediaDevices: {
-      getUserMedia: vi.fn().mockRejectedValue(new DOMException('No camera', 'NotFoundError')),
-    },
-  });
-  owners.permissions.mockResolvedValue([{ id: 'camera', state: 'prompt' }]);
-  owners.camera.mockImplementationOnce(actual.requestCameraAccess);
-  await mount();
-  await act(async () => setup.request('camera'));
-  expect(setup.access.camera).toBe('no-device');
 });

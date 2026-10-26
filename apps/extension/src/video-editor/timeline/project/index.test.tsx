@@ -1,9 +1,9 @@
+// @vitest-environment jsdom
 import {
   createVideoProjectTrack,
   createVideoProjectAsset,
 } from '../../../features/video/project/factories/creation';
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
-// @vitest-environment jsdom
 
 import { act, useState, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

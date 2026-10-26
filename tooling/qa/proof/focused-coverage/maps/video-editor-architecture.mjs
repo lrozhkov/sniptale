@@ -46,7 +46,8 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/composition/motion/spatial-projection-bounds.ts',
     allowCrossOwner: true,
     reason:
-      'Shared interval rotation serves Gallery raster projection and Native independent scene-plane reference with source clipping retained by the adapter.',
+      'Shared interval rotation serves Gallery raster projection and Native independent scene-plane ' +
+      'reference with source clipping retained by the adapter.',
     testFiles: [
       'apps/extension/src/features/video/composition/motion/camera-geometry.test.ts',
       'apps/extension/src/features/video/composition/motion/spatial-projection-bounds.test.ts',
@@ -68,7 +69,8 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/video-editor/interaction/pointer-session.ts',
     allowCrossOwner: true,
     reason:
-      'Final pointer coordinates must reach the EffectV1 inverse without changing existing timeline, canvas, and workspace session consumers.',
+      'Final pointer coordinates must reach the EffectV1 inverse without changing existing timeline, ' +
+      'canvas, and workspace session consumers.',
     testFiles: [
       'apps/extension/src/video-editor/interaction/pointer-session.test.ts',
       'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
@@ -98,7 +100,8 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.tsx',
     allowCrossOwner: true,
     reason:
-      'Projected EffectV1 controls use shared point geometry and must remain selectable through the native FX timeline scroll owner.',
+      'Projected EffectV1 controls use shared point geometry and must remain selectable through the ' +
+      'native FX timeline scroll owner.',
     testFiles: [
       'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
       'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
@@ -140,7 +143,8 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/ui/compact-inspector-controls/numeric-preview.tsx',
     allowCrossOwner: true,
     reason:
-      'The shared numeric draft and preview transaction serves Gallery and the accepted full-editor spatial inspector; runtime-specific draft placement remains in its host.',
+      'The shared numeric draft and preview transaction serves Gallery and the accepted full-editor ' +
+      'spatial inspector; runtime-specific draft placement remains in its host.',
     testFiles: [
       'apps/extension/src/video-editor/workspace/sidebar/selection/motion/spatial.test.tsx',
       'apps/extension/src/gallery/video-review/audio-editor.test.tsx',

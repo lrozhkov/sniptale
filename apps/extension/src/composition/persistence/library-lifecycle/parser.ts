@@ -1,12 +1,8 @@
+import {
+  isPlainRecord as isRecord,
+  isNumber as isFiniteNumber,
+} from '@sniptale/runtime-contracts/validation/primitives';
 import type { LibraryLifecycle, LibraryStorageClass } from './contracts';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
 
 export function parseLibraryLifecycle(
   value: unknown,

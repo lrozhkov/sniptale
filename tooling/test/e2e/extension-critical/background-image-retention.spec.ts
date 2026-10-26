@@ -141,7 +141,7 @@ test('custom background survives paint switches and reopening without duplicate 
     await page.reload();
     await page
       .getByRole('button', {
-        name: new RegExp(`^${translate('gallery.preview.folderRecording', 'en')} \\d+$`),
+        name: /^Videos \d+$/,
       })
       .click();
     const recording = page.getByRole('group', { name: 'beta-v1.webm', exact: true });

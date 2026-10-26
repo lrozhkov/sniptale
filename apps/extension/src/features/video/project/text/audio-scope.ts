@@ -4,7 +4,7 @@ import {
   type ProjectAudioSourceJobScope,
 } from '../../../../contracts/ai/audio';
 import { getMediaClipSourceTime } from '../timeline/rate';
-import type { VideoProject } from '../types/model';
+import type { VideoProject, VideoProjectAsset, VideoProjectClip } from '../types/model';
 
 /** Resolves only an audible source owned by the exact saved project snapshot and clip span. */
 export function resolveVideoProjectAudioTarget(
@@ -29,6 +29,16 @@ export function resolveVideoProjectAudioTarget(
     !asset.metadata.hasAudio
   )
     return null;
+  const { start, end } = getVideoProjectNativeAudioWindow(clip, asset);
+  if (scope.nativeStart < start || scope.nativeEnd > end) return null;
+  return { clip, asset };
+}
+
+/** Computes native source bounds after the caller admits the clip and asset. */
+export function getVideoProjectNativeAudioWindow(
+  clip: Extract<VideoProjectClip, { type: 'VIDEO' | 'AUDIO' }>,
+  asset: VideoProjectAsset
+) {
   const offset = clip.type === 'VIDEO' ? (clip.cameraTiming?.offsetSeconds ?? 0) : 0;
   const start = Math.max(getMediaClipSourceTime(clip, clip.startTime) + offset, offset);
   const end = Math.min(
@@ -36,8 +46,7 @@ export function resolveVideoProjectAudioTarget(
     getMediaClipSourceTime(clip, clip.startTime + clip.duration) + offset,
     (asset.metadata.duration ?? Infinity) + offset
   );
-  if (scope.nativeStart < start || scope.nativeEnd > end) return null;
-  return { clip, asset };
+  return { start, end };
 }
 
 /** Freezes a native selection after the existing montage save barrier has acknowledged its revision. */

@@ -455,7 +455,10 @@ for (const variant of [
         ] as const) {
           await dialog
             .locator(
-              `[data-review-header-track="${tool === 'gallery.videoReview.originalAudioRange' ? 'originalAudio' : 'source'}"] [data-review-track-select]`
+              `[data-review-header-track="` +
+                `${
+                  tool === 'gallery.videoReview.originalAudioRange' ? 'originalAudio' : 'source'
+                }"] [data-review-track-select]`
             )
             .click();
           if (await button('gallery.videoReview.clearPlaybackRange').count())

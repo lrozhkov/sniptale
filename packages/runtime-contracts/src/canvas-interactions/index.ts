@@ -7,6 +7,7 @@ export {
   createProportionalCanvasFrameFromPoints,
   doesCanvasFrameIntersect,
   getCanvasPointFromClient,
+  getCanvasPointsBounds,
   resizeCanvasFrameFromHandle,
   resolveCanvasPointerDelta,
   translateCanvasFrame,

@@ -11,5 +11,18 @@
     "reason": "Allowed composition: document import composes the frame-annotation validator; the validator reads immutable document serialization keys. These exact two owner edges have no module cycle, controller back-dependency, persistence authority or runtime authority cycle.",
     "removalCondition": "Remove when either exact owner edge disappears; reassess any added edge, module cycle or changed state/runtime authority before retaining this composition.",
     "debtId": "accepted.scc.editor-document-annotation-import"
+  },
+  {
+    "owners": ["apps/extension/src/content/overlay", "apps/extension/src/content/selection"],
+    "edges": [
+      ["apps/extension/src/content/overlay", "apps/extension/src/content/selection"],
+      ["apps/extension/src/content/selection", "apps/extension/src/content/overlay"]
+    ],
+    "id": "content-crop-drawing-controls",
+    "owner": "apps/extension/src/content",
+    "classification": "accepted-architecture",
+    "reason": "Allowed composition: overlay composes selection workflows. Crop selection UI reuses toolbar drawing controls through ToolbarDrawingControlsOwner and borrows floating menu geometry. These exact two owner edges have no module cycle and introduce no second mode, persistence, or runtime authority.",
+    "removalCondition": "Remove when either exact owner edge disappears. Reassess added owner edges, module cycles, or changed interaction and state authority before retaining this composition.",
+    "debtId": "accepted.scc.content-crop-drawing-controls"
   }
 ]

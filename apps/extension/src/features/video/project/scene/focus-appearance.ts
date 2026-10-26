@@ -93,6 +93,28 @@ export function createQuickEditSpotlight(): QuickEditSpotlight {
   };
 }
 
+/** Resizes a normalized opening at its opposite corner with the caller's minimum width. */
+export function resizeQuickEditAspectLockedArea(
+  area: QuickEditSpotlight['area'],
+  corner: 'nw' | 'ne' | 'sw' | 'se',
+  dx: number,
+  dy: number,
+  ratio: number,
+  minimumWidth: number
+): QuickEditSpotlight['area'] {
+  const west = corner.endsWith('w'),
+    north = corner.startsWith('n');
+  const right = area.x + area.width,
+    bottom = area.y + area.height;
+  const horizontal = area.width + (west ? -dx : dx);
+  const vertical = (area.height + (north ? -dy : dy)) * ratio;
+  const preferred = Math.abs(dx) >= Math.abs(dy * ratio) ? horizontal : vertical;
+  const maximum = Math.min(west ? right : 1 - area.x, (north ? bottom : 1 - area.y) * ratio);
+  const width = Math.min(maximum, Math.max(minimumWidth, preferred));
+  const height = width / ratio;
+  return { x: west ? right - width : area.x, y: north ? bottom - height : area.y, width, height };
+}
+
 /** Clamp a dragged or numerically edited opening within the decorated window. */
 export function clampQuickEditSpotlightArea(
   area: QuickEditSpotlight['area']

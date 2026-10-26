@@ -1,5 +1,5 @@
-import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 // @vitest-environment jsdom
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

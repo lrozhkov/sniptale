@@ -32,10 +32,19 @@ async function paintText(
         }
         throw new Error('Native marker character is unavailable');
       };
-      return { first: position(start, false), last: position(end - 1, true) };
+      const first = position(start, false);
+      const last = position(end - 1, true);
+      return {
+        first,
+        last,
+        unobstructed: [first, last].every((point) =>
+          root.contains(document.elementFromPoint(point.x, point.y))
+        ),
+      };
     },
     { id, start, end }
   );
+  expect(points.unobstructed).toBe(true);
   await page.mouse.move(points.first.x, points.first.y);
   await page.mouse.down();
   await page.mouse.move(points.last.x, points.last.y, { steps: 10 });
@@ -71,18 +80,22 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     }
     await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
     await page.locator('[data-ui="content.toolbar.mode-option.quick-edit"]').click();
-    await page.evaluate(() => {
-      const text = document.createElement('p');
-      text.id = 'marker-proof';
-      text.style.cssText =
-        'position:absolute;left:100px;top:170px;width:250px;font:24px/36px Arial;color:#111;background:white';
-      text.append(
-        'Marker ',
-        Object.assign(document.createElement('strong'), { textContent: 'across inline' }),
-        ' text on multiple lines for selection.'
-      );
-      document.body.append(text);
-    });
+    await page.evaluate(
+      (left) => {
+        const text = document.createElement('p');
+        text.id = 'marker-proof';
+        text.style.cssText =
+          `position:absolute;left:${left}px;top:170px;width:250px;font:24px/` +
+          `36px Arial;color:#111;background:white`;
+        text.append(
+          'Marker ',
+          Object.assign(document.createElement('strong'), { textContent: 'across inline' }),
+          ' text on multiple lines for selection.'
+        );
+        document.body.append(text);
+      },
+      viewport.name === '1280x560' ? 500 : 100
+    );
     const source = await page.locator('#marker-proof').evaluate((node) => node.innerHTML);
     await expect(page.locator('[data-ui="content.toolbar.text-marker"]')).toHaveAccessibleName(
       viewport.name === '1280x560' ? 'Текстовый маркер' : 'Text marker'

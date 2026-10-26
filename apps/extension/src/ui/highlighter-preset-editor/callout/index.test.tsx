@@ -2,6 +2,7 @@
 
 import { InspectorLayout } from '../../compact-inspector-controls/layout';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -17,7 +18,9 @@ vi.mock('../../color-selector', async (importOriginal) => ({
   ),
 }));
 
-afterEach(() => {
+afterEach(async () => {
+  await act(async () => hideAllToasts());
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   document.body.replaceChildren();
   vi.unstubAllGlobals();
 });

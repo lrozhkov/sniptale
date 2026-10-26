@@ -1284,7 +1284,8 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
         const label = element.firstElementChild!.getBoundingClientRect();
         const control = element
           .querySelector<HTMLElement>(
-            'input[type="text"], button[role="switch"], button[aria-haspopup="listbox"], [data-ui="shared.ui.color-selector.value-trigger"]'
+            'input[type="text"], button[role="switch"], button[aria-haspopup="listbox"], ' +
+              '[data-ui="shared.ui.color-selector.value-trigger"]'
           )!
           .getBoundingClientRect();
         return {

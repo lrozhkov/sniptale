@@ -32,7 +32,7 @@ import {
   useVideoEditorTimelineEditingPort,
 } from '../controller/store';
 import { useProjectTextVoiceRecording } from './text-voice-recording';
-import { waitForVideoEditorSave } from './save-readiness';
+import { saveVideoEditorTextSession, waitForVideoEditorSave } from './save-readiness';
 
 type VoicePreview = ProjectVoiceTakePreview;
 type VoiceQueue = Awaited<ReturnType<typeof captureProjectTextVoiceQueue>>;
@@ -122,15 +122,8 @@ function createVoiceAccess(
         ? value
         : null;
     },
-    save: async () => {
-      if (!access.getProject()) throw new Error('stale');
-      try {
-        await waitForVideoEditorSave(lifetime.projectId);
-      } catch {
-        throw new Error(access.getProject() ? 'storage-failed' : 'stale');
-      }
-      if (!access.getProject()) throw new Error('stale');
-    },
+    save: () =>
+      saveVideoEditorTextSession(lifetime.projectId, access.getProject, waitForVideoEditorSave),
     update: (updater) => {
       if (!access.getProject()) throw new Error('stale');
       const lease = ports.current.history.begin({ onlyIfIdle: true });

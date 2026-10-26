@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { createTourDocument, createTourImageSlide } from '../../features/scenario/project/public';
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -82,10 +83,13 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
 import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { ScenarioEditorPage } from './ScenarioEditorPage';
+import { stubTourPreviewDialog } from './tour/preview.test-support';
 
 let root: Root;
 let container: HTMLDivElement;
+let restoreDialog: () => void;
 beforeEach(() => {
+  restoreDialog = stubTourPreviewDialog();
   vi.useFakeTimers();
   vi.clearAllMocks();
   io.previous.mockReturnValue([]);
@@ -113,8 +117,13 @@ beforeEach(() => {
   }));
   io.remove.mockResolvedValue(undefined);
 });
-afterEach(() => {
-  act(() => root.unmount());
+afterEach(async () => {
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
+  restoreDialog();
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   container.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -274,7 +283,8 @@ it('selects text and note settings from focus, preserves edits and returns to st
   await act(async () =>
     container.querySelector<HTMLTextAreaElement>('[data-block-id="note"] textarea')!.focus()
   );
-  expect(inspector.textContent).toContain('Note type');
+  await click('Text', inspector.querySelector('nav')!);
+  expect(inspector.querySelector('button[aria-label="Note type"]')).not.toBeNull();
   await click('Note type', inspector);
   await click('Warning', document.body);
   expect(container.querySelector('[data-block-id="note"] aside')?.getAttribute('data-tone')).toBe(
@@ -770,7 +780,7 @@ it('detaches old media URLs before revocation across undo, redo and a delayed as
   const previous = {
     ...project,
     updatedAt: 90,
-    items: [{ ...step, blocks: blocks.map((block) => ({ ...block, assetId: 'original' })) }],
+    items: [{ ...step, blocks: blocks.map((block) => ({ ...block, assetId: 'prior-original' })) }],
   };
   io.load.mockResolvedValue(project);
   io.previous.mockReturnValue([{ project: previous, revision: 0, savedAt: 90 }]);
@@ -793,6 +803,7 @@ it('detaches old media URLs before revocation across undo, redo and a delayed as
   );
   await render();
   expect(sources()).toHaveLength(2);
+  expect(io.asset.mock.calls.map(([id]) => id).sort()).toEqual(['edited', 'original']);
   let finishStale!: (blob: Blob) => void;
   io.asset.mockImplementationOnce(
     () =>
@@ -801,6 +812,8 @@ it('detaches old media URLs before revocation across undo, redo and a delayed as
       })
   );
   await click('Undo');
+  expect(io.asset).toHaveBeenLastCalledWith('prior-original');
+  expect(finishStale).toBeTypeOf('function');
   expect(container.querySelectorAll('article img')).toHaveLength(0);
   await click('Redo');
   const restoredSources = sources();

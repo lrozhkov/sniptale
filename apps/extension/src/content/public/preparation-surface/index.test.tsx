@@ -9,6 +9,7 @@ import type { ContentAppModeState } from '../../../content/overlay/app/mode';
 import { createModeState } from './mode-state.test-support';
 import { PreparationSurface, type PreparationHostPorts } from '.';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
+import * as modeSession from '../../application/mode-session';
 
 type PortListener = (command: {
   type: string;
@@ -370,5 +371,24 @@ it('binds drawing to preparation history and releases the subscription on teardo
     expect(unsubscribe).toHaveBeenCalledOnce();
   } finally {
     subscription.mockRestore();
+  }
+});
+
+it('registers drawing with the existing mode authority through stable composition callbacks', () => {
+  const register = vi.spyOn(modeSession, 'registerContentMode');
+  const enable = vi.spyOn(modeSession, 'setContentModeEnabled');
+  const setDrawingMode = vi.fn();
+  runtimeMocks.modeState!.setDrawingMode = setDrawingMode;
+  try {
+    renderSurface();
+    expect(register).toHaveBeenCalledWith('drawing', expect.any(Function));
+    expect(enable).toHaveBeenCalledWith('drawing', false);
+    const disable = register.mock.calls.find(([mode]) => mode === 'drawing')![1];
+    act(() => disable());
+    expect(setDrawingMode).toHaveBeenCalledWith(false);
+    expect(runtimeMocks.modeState?.setNavigationLockEnabled).toHaveBeenCalledWith(false);
+  } finally {
+    register.mockRestore();
+    enable.mockRestore();
   }
 });

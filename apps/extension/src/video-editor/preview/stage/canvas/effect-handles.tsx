@@ -7,6 +7,7 @@ import {
   mapClientPointToCompositionPoint,
   shouldLockPreviewClipToViewport,
 } from './geometry';
+import { canvasArrowDelta } from './editor-region/gesture';
 import type { PreviewStageCanvasProps } from '../types';
 
 type Props = Pick<
@@ -87,28 +88,22 @@ export function PreviewEffectHandles(props: Props) {
             }}
             onClick={(event) => event.stopPropagation()}
             onKeyDown={(event) => {
-              const delta = {
-                ArrowLeft: [-1, 0],
-                ArrowRight: [1, 0],
-                ArrowUp: [0, -1],
-                ArrowDown: [0, 1],
-              }[event.key];
+              const delta = canvasArrowDelta(event);
               if (!delta) return;
               event.preventDefault();
               event.stopPropagation();
-              const step = event.shiftKey ? 10 : 1;
               props.onUpdateEffectInstance?.(instance.id, {
                 sceneAnchors: {
                   ...instance.sceneAnchors,
                   [handle.id]: {
                     x:
                       clip.attachment?.kind === 'source'
-                        ? anchor.x + delta[0]! * step
-                        : Math.max(0, Math.min(props.project.width, anchor.x + delta[0]! * step)),
+                        ? anchor.x + delta.x
+                        : Math.max(0, Math.min(props.project.width, anchor.x + delta.x)),
                     y:
                       clip.attachment?.kind === 'source'
-                        ? anchor.y + delta[1]! * step
-                        : Math.max(0, Math.min(props.project.height, anchor.y + delta[1]! * step)),
+                        ? anchor.y + delta.y
+                        : Math.max(0, Math.min(props.project.height, anchor.y + delta.y)),
                   },
                 },
               });

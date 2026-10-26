@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import type { drawCompositionSceneSpotlights } from '../../draw/project-spotlight';
 import {
   createEffectRuntimeCompositionResourceLedger,
@@ -7,7 +8,6 @@ import {
   createQuickEditBorder,
   createQuickEditSpotlight,
 } from '../../../project/scene/focus-appearance';
-// @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 

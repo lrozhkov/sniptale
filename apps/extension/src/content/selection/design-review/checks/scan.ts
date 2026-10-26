@@ -1,3 +1,4 @@
+import { getComposedParent } from './composed-parent';
 import { isContentOwnedElement } from '../../../platform/dom-host';
 import { readCheckName } from './name';
 import { readCheckContrast } from './contrast';
@@ -44,13 +45,6 @@ function reviewCheckTargetLabel(element: Element): string {
   const id = element.id.slice(0, 80);
   return `${element.localName}${id ? `#${id}` : ''}`;
 }
-function parent(element: Element): Element | null {
-  if (element.assignedSlot) return element.assignedSlot;
-  if (element.parentElement) return element.parentElement;
-  const root = element.getRootNode(),
-    view = element.ownerDocument.defaultView;
-  return view && root instanceof view.ShadowRoot ? root.host : null;
-}
 export function isReviewCheckRootAvailable(root: Element): boolean {
   try {
     if (
@@ -72,7 +66,7 @@ export function isReviewCheckRootAvailable(root: Element): boolean {
       const style = ancestor.ownerDocument.defaultView?.getComputedStyle(ancestor);
       if (!style || style.display === 'none' || ['hidden', 'collapse'].includes(style.visibility))
         return false;
-      ancestor = parent(ancestor);
+      ancestor = getComposedParent(ancestor);
     }
     let doc = root.ownerDocument;
     for (let depth = 0; doc !== document; depth += 1) {
@@ -117,7 +111,7 @@ function ownTextOutside(
       !['', '1', 'normal'].includes(style.getPropertyValue('zoom'))
     )
       return false;
-    ancestor = parent(ancestor);
+    ancestor = getComposedParent(ancestor);
   }
   const rect = element.getBoundingClientRect(),
     style = readStyle(element);
@@ -233,7 +227,7 @@ function createScanContext(result: ReviewCheckResult): ScanContext {
 }
 
 function hasScrollContext(element: Element, readStyle: ReadStyle): boolean {
-  let ancestor = parent(element);
+  let ancestor = getComposedParent(element);
   for (let depth = 0; ancestor; depth += 1) {
     if (depth >= 32) return true;
     const style = readStyle(ancestor);
@@ -243,7 +237,7 @@ function hasScrollContext(element: Element, readStyle: ReadStyle): boolean {
       ['fixed', 'sticky'].includes(style.position)
     )
       return true;
-    ancestor = parent(ancestor);
+    ancestor = getComposedParent(ancestor);
   }
   return false;
 }

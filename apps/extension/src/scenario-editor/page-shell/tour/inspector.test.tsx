@@ -3,6 +3,7 @@ import {
   getTourHotspots,
   getTourAnnotations,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -82,8 +83,12 @@ beforeEach(() => {
   presentation = 'all';
   draw();
 });
-afterEach(() => {
-  act(() => root.unmount());
+afterEach(async () => {
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   host.remove();
   vi.unstubAllGlobals();
 });
@@ -531,9 +536,19 @@ it('edits camera entrance percentage and timing without cropping image source', 
 });
 
 it('edits action timing independently from document playback defaults', async () => {
+  await click('Text action');
+  await fill('Text', 'Retained annotation');
+  const annotation = structuredClone(current().actions[0]!);
+  await click('Back to slide settings');
+  await click('Add');
   await click('Hotspot');
+  const hotspotId = getTourHotspots(current())[0]!.id;
   await choose('Duration', 'Set duration');
   await fill('Hold', '6');
+  expect(current().actions.find((action) => action.object.id === annotation.object.id)).toEqual(
+    annotation
+  );
+  expect(current().actions.find((action) => action.object.id === hotspotId)?.type).toBe('hotspot');
   expect(getTourHotspots(current())[0]!.timing).toMatchObject({ mode: 'manual', holdSeconds: 6 });
   expect(project.tour!.playback.minimumHoldSeconds).toBe(4);
   expect(host.querySelector('[aria-label="Automatic transition"]')).toBeNull();

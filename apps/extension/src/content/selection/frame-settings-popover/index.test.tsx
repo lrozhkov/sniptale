@@ -3,6 +3,7 @@
 import React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HighlighterSettings } from '../../../features/highlighter/contracts';
 
@@ -224,15 +225,17 @@ beforeEach(() => {
   root = createRoot(container);
 });
 
-afterEach(() => {
-  act(() => {
+afterEach(async () => {
+  await act(async () => {
     root?.unmount();
+    hideAllToasts();
   });
   root = null;
   container?.remove();
   anchorEl?.remove();
   container = null;
   anchorEl = null;
+  expect(document.querySelector('[data-ui="shared.toast.host"]')).toBeNull();
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

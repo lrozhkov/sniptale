@@ -295,13 +295,7 @@ function parseProjectAudioJobScope(
     Object.keys(target).length !== 2 ||
     !identifier(target['clipId']) ||
     !identifier(value['assetId']) ||
-    typeof value['nativeStart'] !== 'number' ||
-    !Number.isFinite(value['nativeStart']) ||
-    value['nativeStart'] < 0 ||
-    typeof value['nativeEnd'] !== 'number' ||
-    !Number.isFinite(value['nativeEnd']) ||
-    value['nativeEnd'] <= value['nativeStart'] ||
-    !validAudioInputDuration(value['nativeEnd'] - value['nativeStart'])
+    !hasValidNativeAudioInterval(value)
   )
     return null;
   return {
@@ -418,13 +412,7 @@ export function parseAudioJobScope(value: unknown): AudioJobScope | null {
     'clipId' in value ||
     !identifier(value['assetId']) ||
     !revision(value['workspaceRevision']) ||
-    typeof value['nativeStart'] !== 'number' ||
-    !Number.isFinite(value['nativeStart']) ||
-    value['nativeStart'] < 0 ||
-    typeof value['nativeEnd'] !== 'number' ||
-    !Number.isFinite(value['nativeEnd']) ||
-    value['nativeEnd'] <= value['nativeStart'] ||
-    !validAudioInputDuration(value['nativeEnd'] - value['nativeStart'])
+    !hasValidNativeAudioInterval(value)
   )
     return null;
   const target = parseReviewSpeechTarget(value['target']);
@@ -683,4 +671,20 @@ export function readAudioTranscriptHeader(
   if (!record(value) || typeof value['text'] !== 'string' || value['text'].length > 100000)
     return null;
   return { value, result: { text: value['text'] } };
+}
+
+function hasValidNativeAudioInterval(
+  value: Record<string, unknown>
+): value is Record<string, unknown> & { nativeStart: number; nativeEnd: number } {
+  const start = value['nativeStart'];
+  const end = value['nativeEnd'];
+  return (
+    typeof start === 'number' &&
+    Number.isFinite(start) &&
+    start >= 0 &&
+    typeof end === 'number' &&
+    Number.isFinite(end) &&
+    end > start &&
+    validAudioInputDuration(end - start)
+  );
 }

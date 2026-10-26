@@ -21,7 +21,8 @@ async function settled(page: Page) {
 
 async function route(page: Page, extensionId: string, section: string, view?: string) {
   await page.goto(
-    `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=${section}${view ? `&view=${view}` : ''}`
+    `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=${section}` +
+      `${view ? `&view=${view}` : ''}`
   );
   const content = page.locator('[data-ui="settings.page.content-scroll"]');
   await expect.poll(async () => (await content.innerText()).trim().length).toBeGreaterThan(0);

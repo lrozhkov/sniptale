@@ -264,7 +264,7 @@ test('styles native visible, full and selection output before download', async (
         .not.toBe('');
       const bytes = await readFile(filename);
       expect(filename, `${mode}/${format} encoded output filename`).toMatch(
-        format === 'jpeg' ? /\.jpe?g$/u : new RegExp(`\\.${format}$`, 'u')
+        { jpeg: /\.jpe?g$/u, png: /\.png$/u, webp: /\.webp$/u }[format]
       );
       const dataUrl = `data:image/${format};base64,${bytes.toString('base64')}`;
       const dimensions = readImageDataUrlDimensions(dataUrl)!;

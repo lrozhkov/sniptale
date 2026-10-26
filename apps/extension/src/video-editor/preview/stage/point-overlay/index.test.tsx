@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
 } from '../../../../features/video/project/scene/focus-appearance';
-// @vitest-environment jsdom
 
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 

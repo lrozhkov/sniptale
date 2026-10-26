@@ -79,7 +79,8 @@ async function expectFloatingChrome(page: Page) {
         const toolbar = document.querySelector('.tour-toolbar')!.getBoundingClientRect();
         return [
           ...document.querySelectorAll<HTMLElement>(
-            '[data-tour-hint-text], [data-tour-object-id], [data-tour-hint-close], [data-tour-hint-previous], [data-tour-hint-next]'
+            '[data-tour-hint-text], [data-tour-object-id], [data-tour-hint-close], ' +
+              '[data-tour-hint-previous], [data-tour-hint-next]'
           ),
         ]
           .filter((node) => {

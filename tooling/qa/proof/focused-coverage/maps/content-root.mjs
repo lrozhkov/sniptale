@@ -1,5 +1,15 @@
 export const CONTENT_ROOT_OWNER_MAPPINGS = [
   {
+    owner: 'content-toolbar-drag-position-effects',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/shell/drag-position.effects.ts',
+    reason:
+      'Toolbar drag, dock restoration and preference persistence retain cancellation and final geometry ordering.',
+    testFiles: [
+      'apps/extension/src/content/overlay/toolbar/shell/drag.test.tsx',
+      'apps/extension/src/content/overlay/toolbar/shell/drag-position.persistence.test.tsx',
+    ],
+  },
+  {
     owner: 'content-page-preparation-scoped-history',
     productionFile: 'apps/extension/src/content/parser/page-preparation/history/snapshot-delta.ts',
     reason: 'Scoped history replay must preserve other producers and restore text markers.',
@@ -15,7 +25,8 @@ export const CONTENT_ROOT_OWNER_MAPPINGS = [
     owner: 'content-toolbar-page-controls',
     productionFile: 'apps/extension/src/content/overlay/toolbar/state/page-controls.ts',
     reason:
-      'Visibility reset scope and delayed choices require state, keyed settings coordination, and erasure ordering proof.',
+      'Visibility reset scope and delayed choices require state, keyed settings coordination, \
+and erasure ordering proof.',
     testFiles: [
       'apps/extension/src/content/overlay/toolbar/state/page-controls.test.tsx',
       'apps/extension/src/composition/persistence/settings/coordination.test.ts',
@@ -37,10 +48,9 @@ export const CONTENT_ROOT_OWNER_MAPPINGS = [
   {
     owner: 'content-platform-dom-host',
     productionPrefix: 'apps/extension/src/content/platform/dom-host/',
-    reason: [
-      'Content-owned live DOM root, isolated style, event-path, and toast host authority',
-      'are covered by content platform dom-host tests.',
-    ].join(' '),
+    reason:
+      'Content-owned live DOM root, isolated style, event-path, and toast host authority are \
+covered by content platform dom-host tests.',
     testFiles: [
       'apps/extension/src/content/platform/dom-host/ui.test.ts',
       'apps/extension/src/content/platform/dom-host/isolated.test.ts',
@@ -50,10 +60,8 @@ export const CONTENT_ROOT_OWNER_MAPPINGS = [
   {
     owner: 'content-platform-dom-host-ui-roots',
     productionFile: 'apps/extension/src/content/platform/dom-host/ui-roots.ts',
-    reason: [
-      'Content-root surface creation is the platform DOM-host primitive',
-      'and is covered by its owner-local test.',
-    ].join(' '),
+    reason:
+      'Content-root surface creation is the platform DOM-host primitive and is covered by its owner-local test.',
     testFiles: ['apps/extension/src/content/platform/dom-host/ui-roots.test.ts'],
   },
   {

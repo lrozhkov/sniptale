@@ -155,6 +155,14 @@ describe('canonical QA control catalog', () => {
     ]);
     expect(full.find(({ lane }) => lane === 'typecheck')?.dependencies).toEqual(['lint']);
     expect(full.find(({ lane }) => lane === 'graph')?.dependencies).toEqual(['lint', 'typecheck']);
+    for (const lanes of [focused, full]) {
+      expect(lanes.find(({ lane }) => lane === 'graph')?.resources).toEqual({
+        cpuTokens: 1,
+        memoryMiB: 3072,
+      });
+    }
+    expect(focused.find(({ lane }) => lane === 'light')?.resources.memoryMiB).toBe(1024);
+    expect(full.find(({ lane }) => lane === 'light')?.resources.memoryMiB).toBe(3072);
     for (const profile of [...focused, ...full]) {
       expect(profile.controls.length, profile.lane).toBeGreaterThan(0);
       expect(profile.resources.memoryMiB, profile.lane).toBeGreaterThan(0);

@@ -94,3 +94,27 @@ it('refuses malformed server text before it can reach a DOM consumer', async () 
   await expect(promise).rejects.toThrow('invalid-response');
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it.each(['start', 'keepalive'] as const)(
+  'disposes content transport after a failed %s send without retry',
+  async (phase) => {
+    const port = fixture();
+    if (phase === 'start')
+      port.postMessage.mockImplementationOnce(() => {
+        throw new Error('closed');
+      });
+    const promise = runContentTextJob(start, new AbortController().signal);
+    const failed = expect(promise).rejects.toThrow('interrupted');
+    if (phase === 'keepalive') {
+      port.postMessage.mockImplementationOnce(() => {
+        throw new Error('closed');
+      });
+      await vi.advanceTimersByTimeAsync(CONTENT_TEXT_KEEPALIVE_MS);
+    }
+    await failed;
+    expect(port.disconnect).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    port.onMessage.emit({ type: 'result', requestId: start.requestId, text: 'Late' });
+    expect(port.connect).toHaveBeenCalledOnce();
+  }
+);

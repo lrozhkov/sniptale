@@ -6,6 +6,7 @@ import {
   type QuickEditSpotlight,
   createQuickEditSpotlight,
   parseQuickEditSpotlight,
+  resizeQuickEditAspectLockedArea,
 } from '../../project/scene/focus-appearance';
 
 import { expect, it } from 'vitest';
@@ -232,5 +233,24 @@ it.each([false, true])(
     expect(sceneSpotlightOpeningPath(sample(4))).toBe(
       sceneSpotlightOpeningPath(resolveSceneSpotlightTarget(b.spotlight, video, 1))
     );
+  }
+);
+
+it.each([
+  { ratio: 0.5, minimum: 0.01, width: 0.01, height: 0.02 },
+  { ratio: 0.5, minimum: 0.005, width: 0.005, height: 0.01 },
+  { ratio: 2, minimum: 0.02, width: 0.02, height: 0.01 },
+  { ratio: 2, minimum: 0.01, width: 0.01, height: 0.005 },
+])(
+  'retains the caller minimum and opposite corner for aspect $ratio, minimum $minimum',
+  ({ ratio, minimum, width, height }) => {
+    const area = { x: 0.25, y: 0.25, width: 0.2, height: 0.2 / ratio };
+    const southeast = resizeQuickEditAspectLockedArea(area, 'se', -10, -10, ratio, minimum);
+    expect(southeast).toEqual({ x: area.x, y: area.y, width, height });
+    const northwest = resizeQuickEditAspectLockedArea(area, 'nw', 10, 10, ratio, minimum);
+    expect(northwest.width).toBe(width);
+    expect(northwest.height).toBe(height);
+    expect(northwest.x + northwest.width).toBeCloseTo(area.x + area.width, 12);
+    expect(northwest.y + northwest.height).toBeCloseTo(area.y + area.height, 12);
   }
 );

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -34,10 +35,12 @@ beforeEach(() => {
   root = createRoot(container);
 });
 
-afterEach(() => {
-  act(() => {
+afterEach(async () => {
+  await act(async () => {
     root?.unmount();
+    hideAllToasts();
   });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   root = null;
   container?.remove();
   container = null;

@@ -206,3 +206,41 @@ it('includes pending authorization in the deadline without provider work', async
   await h.connection.disconnect();
   expect(h.requestProvider).not.toHaveBeenCalled();
 });
+
+it('ignores another cancellation and admits only one content start on a connection', async () => {
+  const h = await fixture();
+  const pending = deferred<void>();
+  h.authorize.mockReturnValueOnce(pending.promise);
+  h.connection.receive(h.request);
+  h.connection.receive({ type: 'keepalive', requestId: h.request.requestId });
+  h.connection.receive({ type: 'cancel', requestId: 'another-request' });
+  expect(h.authorize).toHaveBeenCalledWith(
+    h.request,
+    h.sender,
+    expect.objectContaining({ aborted: false })
+  );
+  h.connection.receive(h.request);
+  expect(h.events.at(-1)).toMatchObject({ type: 'failure', code: 'invalid-request' });
+  pending.resolve();
+  await h.service.reserveErasureExclusion().waitForActiveMutations();
+  expect(h.requestProvider).toHaveBeenCalledOnce();
+  expect(h.events.at(-1)?.type).toBe('result');
+});
+
+it('keeps content erasure reservations local to a service and releases each only once', async () => {
+  const first = await fixture();
+  const second = await fixture();
+  const released = first.service.reserveErasureExclusion();
+  released.release();
+  released.release();
+  const held = first.service.reserveErasureExclusion();
+  first.connection.receive(first.request);
+  second.connection.receive(second.request);
+  await second.service.reserveErasureExclusion().waitForActiveMutations();
+  expect(first.events.at(-1)).toMatchObject({ type: 'failure', code: 'invalid-request' });
+  expect(second.events.at(-1)?.type).toBe('result');
+  held.release();
+  first.connection.receive(first.request);
+  await first.service.reserveErasureExclusion().waitForActiveMutations();
+  expect(first.events.at(-1)?.type).toBe('result');
+});

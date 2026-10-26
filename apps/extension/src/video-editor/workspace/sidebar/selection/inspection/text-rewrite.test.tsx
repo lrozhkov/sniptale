@@ -32,7 +32,10 @@ vi.mock('../../../../../workflows/ai-session/llm-session', () => ({
 vi.mock('../../../../../workflows/video-review/text-rewrite-client', () => ({
   runReviewTextJob: vi.fn(),
 }));
-vi.mock('../../../../runtime/session/save-readiness', () => ({ waitForVideoEditorSave: vi.fn() }));
+vi.mock('../../../../runtime/session/save-readiness', async (original) => ({
+  ...(await original<typeof import('../../../../runtime/session/save-readiness')>()),
+  waitForVideoEditorSave: vi.fn(),
+}));
 vi.mock('../../../../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) =>
@@ -211,11 +214,14 @@ async function mount(source = false) {
   await fill(host.querySelector('textarea')!, 'Make the text clear');
 }
 async function generate() {
+  await click('textRewriteStart');
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  await requestEntered.promise;
   await act(async () => {
-    button('textRewriteStart').click();
-    await requestEntered.promise;
+    expect(runReviewTextJob).toHaveBeenCalledOnce();
   });
 }
+
 function proposalField() {
   return host.querySelector<HTMLTextAreaElement>(
     '[data-ui="video.text-rewrite.proposal"] textarea'
