@@ -1,4 +1,18 @@
 import { harnessReady } from './browser-mocks/browser-mocks';
+import { createVideoClipFromAsset } from '../../../apps/extension/src/features/video/project/factories/clip';
+import { applyPreparedVideoProjectRevision } from '../../../apps/extension/src/composition/persistence/sync-capture/apply-video-project';
+import {
+  captureRootKey,
+  type SyncCaptureRootState,
+} from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
+import { parseMediaLibraryEntry } from '../../../apps/extension/src/composition/persistence/media-library/read-guards';
+import { parseAssetRef } from '../../../apps/extension/src/composition/persistence/assets/guards';
+import { listMediaAssetProjectUsage } from '../../../apps/extension/src/composition/persistence/media-library/usage';
+import { buildMediaHubBackupExportPlanFromLibraryV6 } from '../../../apps/extension/src/workflows/media-hub-backup/v6/inventory';
+import { exportMediaHubBackupV6 } from '../../../apps/extension/src/workflows/media-hub-backup/v6/export';
+import { inspectMediaHubBackupV6 } from '../../../apps/extension/src/workflows/media-hub-backup/v6/inspect';
+import { createArchiveMemorySink } from '../../../apps/extension/src/composition/archive-transfer/test-support';
+import { openArchiveReader } from '../../../apps/extension/src/composition/archive-transfer';
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
@@ -10,7 +24,10 @@ import {
   saveVideoProject,
   deleteVideoProject,
 } from '../../../apps/extension/src/composition/persistence/projects';
-import { parseVideoProjectEntry } from '../../../apps/extension/src/composition/persistence/projects/read-guards';
+import {
+  parseVideoProjectEntry,
+  parseProjectAssetEntry,
+} from '../../../apps/extension/src/composition/persistence/projects/read-guards';
 import {
   initDB,
   SYNC_CAPTURE_STORE,
@@ -615,7 +632,282 @@ async function verifyFrozenPersistence(rootId: string) {
   return materialize(capture);
 }
 
+async function coloredSource(color: string): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = 24;
+  canvas.height = 24;
+  const context = canvas.getContext('2d');
+  check(context, 'The native source canvas is unavailable.');
+  context.fillStyle = color;
+  context.fillRect(0, 0, 24, 24);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Source encoding failed.'))),
+      'image/png'
+    )
+  );
+}
+
+async function applicationProof() {
+  await harnessReady;
+  const spaceId = 'native-application-space';
+  await installExperimentalCaptureProfile({
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: Date.now(),
+    enabled: true,
+    spaceId,
+    connectionGeneration: 1,
+  });
+  const privateFile = await coloredSource('rgb(240,80,20)');
+  const borrowedFile = await coloredSource('rgb(20,180,60)');
+  const prepared = await writeBlobToAsset(privateFile, { mimeType: privateFile.type });
+  const privateId = crypto.randomUUID();
+  const borrowedId = crypto.randomUUID();
+  await saveProjectAsset(borrowedId, borrowedFile, borrowedFile.type, 'borrowed.png');
+  const mediaId = `project-asset:${borrowedId}`;
+  const db = await initDB();
+  const media = parseMediaLibraryEntry(await db.get('media_library', mediaId));
+  const child = parseProjectAssetEntry(await db.get('project_assets', borrowedId));
+  check(media && typeof child?.assetId === 'string', 'The native borrowed source is missing.');
+  const borrowedRef = parseAssetRef(await db.get('asset_refs', child.assetId));
+  check(borrowedRef, 'The native borrowed source has no physical reference.');
+  // Fixture boundary: replica admission precedes this native apply proof, not a product ingress API.
+  const rootKey = captureRootKey(spaceId, 'media', mediaId);
+  const dependency: SyncCaptureRootState = {
+    version: 1,
+    kind: 'root-state',
+    key: JSON.stringify(['root-state', rootKey]),
+    createdAt: Date.now(),
+    spaceId,
+    rootKind: 'media',
+    rootId: mediaId,
+    rootKey,
+    generation: 1,
+    basis: ['accepted-native-source'],
+  };
+  await db.put(SYNC_CAPTURE_STORE, dependency);
+  const candidate = createEmptyVideoProject('Native applied project', 1280, 720);
+  const metadata = {
+    width: 24,
+    height: 24,
+    duration: null,
+    mimeType: 'image/png',
+    hasAudio: false,
+    audioPeaks: null,
+  };
+  const direct = createVideoProjectAsset(
+    'Private original',
+    VideoProjectAssetType.IMAGE,
+    { kind: 'project-asset', projectAssetId: privateId },
+    { ...metadata, size: privateFile.size }
+  );
+  const borrowed = createVideoProjectAsset(
+    'Borrowed original',
+    VideoProjectAssetType.IMAGE,
+    { kind: 'library-asset', mediaId },
+    { ...metadata, size: borrowedFile.size }
+  );
+  candidate.assets = [direct, borrowed];
+  const track = candidate.tracks[0]!;
+  const secondTrack = {
+    ...structuredClone(track),
+    id: crypto.randomUUID(),
+    isRoot: false,
+    name: 'Borrowed source',
+    order: 2,
+  };
+  candidate.tracks.push(secondTrack);
+  const clips = [direct, borrowed].map((asset, index) => {
+    const clip = createVideoClipFromAsset(
+      index === 0 ? track.id : secondTrack.id,
+      asset,
+      1280,
+      720
+    );
+    return {
+      ...clip,
+      duration: 2,
+      fadeInMs: 0,
+      fadeOutMs: 0,
+      transform: { ...clip.transform, x: index * 640, y: 0, width: 640, height: 720 },
+    };
+  });
+  candidate.clips = clips;
+  candidate.duration = 2;
+  const root = {
+    entry: {
+      id: candidate.id,
+      project: candidate,
+      createdAt: candidate.createdAt,
+      updatedAt: candidate.updatedAt,
+    },
+    assets: [
+      {
+        entry: {
+          id: privateId,
+          assetId: prepared.ref.assetId,
+          createdAt: Date.now(),
+          size: privateFile.size,
+          mimeType: privateFile.type,
+        },
+        ref: prepared.ref,
+        filename: 'private.png',
+        publishToLibrary: false,
+      },
+    ],
+  };
+  const input = {
+    root,
+    operationId: crypto.randomUUID(),
+    sourceDigest: await sha(new Blob([JSON.stringify(root)])),
+    connectionGeneration: 1,
+    expectedLocalGeneration: 0,
+    expectedWorkspaceRevision: null,
+    dependencies: [
+      { entry: media, ref: borrowedRef, expectedGeneration: 1, expectedBasis: dependency.basis },
+    ],
+  };
+  // A later admitted revision has the same bytes but cannot reuse the prepared causal identity.
+  const advancedDependency = {
+    ...dependency,
+    generation: 2,
+    basis: ['accepted-next-native-source'],
+  };
+  await db.put(SYNC_CAPTURE_STORE, advancedDependency);
+  await refused(() => applyPreparedVideoProjectRevision(input));
+  input.dependencies[0]!.expectedGeneration = 2;
+  input.dependencies[0]!.expectedBasis = advancedDependency.basis;
+  await withCaptureWriteFailure('applied-operation', 1, () =>
+    refused(() => applyPreparedVideoProjectRevision(input))
+  );
+  check(
+    (await db.get(VIDEO_PROJECTS_STORE, candidate.id)) === undefined,
+    'Receipt failure left a partial native project.'
+  );
+  check(
+    (await db.get('project_assets', privateId)) === undefined,
+    'Receipt failure left a private source.'
+  );
+  check(
+    (await sha(await readAssetFile(prepared.ref, 'retained.png'))) === (await sha(privateFile)),
+    'Failed apply lost staged bytes.'
+  );
+  const competing = { ...input, operationId: crypto.randomUUID() };
+  const attempts = await Promise.allSettled([
+    applyPreparedVideoProjectRevision(input),
+    applyPreparedVideoProjectRevision(competing),
+  ]);
+  check(
+    attempts.filter((attempt) => attempt.status === 'fulfilled').length === 1,
+    'Parallel native applications admitted the same predecessor twice.'
+  );
+  const acceptedInput = attempts[0]!.status === 'fulfilled' ? input : competing;
+  check(
+    (await applyPreparedVideoProjectRevision(acceptedInput)).status === 'duplicate',
+    'Native application retry duplicated the revision.'
+  );
+  check((await changes(candidate.id)).length === 0, 'Native application emitted an outgoing echo.');
+  const accepted = await project(candidate.id);
+  check(
+    JSON.stringify(accepted.project.assets.map((asset) => asset.source)) ===
+      JSON.stringify(candidate.assets.map((asset) => asset.source)),
+    'Native application rewrote the logical sources.'
+  );
+  await releaseAssetReadyProtection([prepared.ref.assetId]);
+  return {
+    projectId: candidate.id,
+    mediaId,
+    privateId,
+    clipId: clips[0]!.id,
+    rollback: true,
+    retry: true,
+    noEcho: true,
+    parallel: true,
+    causalFence: true,
+    expectedHashes: [await sha(privateFile), await sha(borrowedFile)],
+  };
+}
+
+async function applicationAfterEditorProof(projectId: string, mediaId: string) {
+  const edited = await project(projectId);
+  const captured = await changes(projectId);
+  check(captured.length > 0, 'The real editor did not capture a saved change.');
+  const usage = await listMediaAssetProjectUsage(mediaId);
+  check(
+    usage.some((item) => item.id === projectId),
+    'The applied project lost its Library usage edge.'
+  );
+  const plan = await buildMediaHubBackupExportPlanFromLibraryV6(
+    createMediaHubBackupExportOptions({
+      scope: 'selected',
+      selected: { mediaAssetIds: [], scenarioProjectIds: [], videoProjectIds: [projectId] },
+    })
+  );
+  const sink = createArchiveMemorySink();
+  await exportMediaHubBackupV6({ plan, sink: sink.sink });
+  const archive = sink.blob();
+  const inspected = await inspectMediaHubBackupV6(archive);
+  check(
+    inspected.descriptors.some((item) => item.rootKind === 'media' && item.rootId === mediaId),
+    'Backup omitted the borrowed source root.'
+  );
+  const reader = await openArchiveReader(archive);
+  const hashes = [];
+  try {
+    for (const entry of reader.entries().filter((item) => item.path.endsWith('.png'))) {
+      const source = reader.entry(entry.path);
+      check(source, 'The backup object is missing.');
+      const chunks: Uint8Array<ArrayBuffer>[] = [];
+      await source.pipeTo(
+        new WritableStream({
+          write(chunk) {
+            chunks.push(new Uint8Array(chunk));
+          },
+        })
+      );
+      hashes.push(await sha(new Blob(chunks)));
+    }
+  } finally {
+    await reader.close();
+  }
+  await deleteMediaAssetWithProjectCascade(mediaId, usage);
+  const afterDelete = await project(projectId);
+  check(
+    !afterDelete.project.assets.some(
+      (asset) => asset.source.kind === 'library-asset' && asset.source.mediaId === mediaId
+    ),
+    'Library deletion missed the applied project.'
+  );
+  await refused(() =>
+    saveVideoProject(
+      { ...edited.project, name: 'Delayed native editor' },
+      { expectedProject: edited.project, expectedWorkspaceRevision: edited.workspaceRevision ?? 0 }
+    )
+  );
+  return {
+    captured: true,
+    usage: true,
+    cascade: true,
+    delayedWriterRefused: true,
+    backupHashes: hashes,
+  };
+}
+
+async function verifyAppliedSourcePersistence(projectId: string) {
+  const capture = (await changes(projectId))[0];
+  check(capture?.change.kind === 'video-project', 'The applied source capture disappeared.');
+  const hashes = [];
+  for (const ref of capture.change.rows.refs)
+    hashes.push(await sha(await readAssetFile(ref, 'retained-source')));
+  return hashes;
+}
+
 export const syncCaptureHarness = {
+  verifyAppliedSourcePersistence,
+  applicationProof,
+  applicationAfterEditorProof,
   saveProof,
   exportProof,
   cascadeProof,

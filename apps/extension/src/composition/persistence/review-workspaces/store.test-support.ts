@@ -96,6 +96,7 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
                 indexName !== 'aggregateId' &&
                 indexName !== 'assetId' &&
                 indexName !== 'kind' &&
+                indexName !== 'rootKey' &&
                 indexName !== 'projectId'
               )
                 throw new Error('Unexpected test index');

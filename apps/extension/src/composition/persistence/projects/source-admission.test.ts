@@ -2,11 +2,13 @@ import { expect, it, vi } from 'vitest';
 import { createCameraFollowSettings } from '../../../features/video/project/camera/cursor-policy';
 import {
   assertMediaSourceReplaceable,
+  assertPreparedLibrarySource,
   assertPreparedProjectAssetSources,
 } from './source-admission';
 import {
   createMediaLibraryEntry,
   createProjectAssetEntry,
+  createProjectExportEntry,
   createVideoProjectEntryWithMediaClip,
 } from './index.test-support';
 const ref = {
@@ -192,5 +194,102 @@ it.each(['unrelated', 'related', 'future'] as const)(
     else await expect(replacement).rejects.toMatchObject({ reason: 'source-unavailable' });
     expect(project.project.version).toBe(4);
     expect(project.project.cameraFollowDefaults).toEqual(createCameraFollowSettings());
+  }
+);
+
+function preparedLibraryFixture() {
+  const media = createMediaLibraryEntry({
+    id: 'library-source',
+    source: { kind: 'stored-asset', assetId: ref.assetId },
+    size: ref.size,
+    mimeType: ref.mimeType,
+  });
+  return {
+    media,
+    stores: {
+      media: { get: vi.fn(async (): Promise<unknown> => media) },
+      assets: { get: vi.fn(async (): Promise<unknown> => undefined) },
+      exports: { get: vi.fn(async (): Promise<unknown> => undefined) },
+      refs: { get: vi.fn(async (): Promise<unknown> => ref) },
+    },
+  };
+}
+
+it('admits the exact prepared live Library source without file reads or publication', async () => {
+  const data = preparedLibraryFixture();
+  await expect(
+    assertPreparedLibrarySource({ entry: data.media, ref }, data.stores)
+  ).resolves.toBeUndefined();
+  expect(data.stores.assets.get).not.toHaveBeenCalled();
+  expect(data.stores.exports.get).not.toHaveBeenCalled();
+});
+
+it.each(['missing', 'metadata', 'identity', 'size', 'ref'] as const)(
+  'refuses a prepared Library source changed before consumer commit: %s',
+  async (state) => {
+    const data = preparedLibraryFixture();
+    if (state === 'missing') data.stores.media.get.mockResolvedValue(undefined);
+    if (state === 'metadata')
+      data.stores.media.get.mockResolvedValue({ ...data.media, updatedAt: 100 });
+    if (state === 'identity')
+      data.stores.media.get.mockResolvedValue({
+        ...data.media,
+        source: { kind: 'stored-asset', assetId: 'replacement' },
+      });
+    if (state === 'size') data.stores.media.get.mockResolvedValue({ ...data.media, size: 100 });
+    if (state === 'ref') data.stores.refs.get.mockResolvedValue({ ...ref, createdAt: 200 });
+    await expect(
+      assertPreparedLibrarySource({ entry: data.media, ref }, data.stores)
+    ).rejects.toThrow('changed after preparation');
+  }
+);
+
+it('checks the shared project child before admitting prepared Library bytes', async () => {
+  const data = preparedLibraryFixture();
+  data.media.source = { kind: 'project-asset', projectAssetId: entry.id };
+  data.stores.assets.get.mockResolvedValue(entry);
+  await expect(
+    assertPreparedLibrarySource({ entry: data.media, ref }, data.stores)
+  ).resolves.toBeUndefined();
+  data.stores.assets.get.mockResolvedValue({ ...entry, assetId: 'replaced-child' });
+  await expect(
+    assertPreparedLibrarySource({ entry: data.media, ref }, data.stores)
+  ).rejects.toThrow('changed after preparation');
+});
+
+it('checks export project membership even when physical bytes match', async () => {
+  const data = preparedLibraryFixture();
+  const exported = createProjectExportEntry({
+    id: 'export-source',
+    assetId: ref.assetId,
+    size: ref.size,
+    mimeType: ref.mimeType,
+  });
+  data.media.source = {
+    kind: 'project-export',
+    exportId: exported.id,
+    projectId: exported.projectId,
+  };
+  data.stores.exports.get.mockResolvedValue(exported);
+  await expect(
+    assertPreparedLibrarySource({ entry: data.media, ref }, data.stores)
+  ).resolves.toBeUndefined();
+  data.stores.exports.get.mockResolvedValue({ ...exported, projectId: 'different-project' });
+  await expect(
+    assertPreparedLibrarySource({ entry: data.media, ref }, data.stores)
+  ).rejects.toThrow('changed after preparation');
+});
+
+it.each(['trashed', 'inline', 'unsupported'] as const)(
+  'refuses an unavailable prepared Library source: %s',
+  async (state) => {
+    const data = preparedLibraryFixture();
+    if (state === 'trashed')
+      data.media.lifecycle = { storageClass: 'library', updatedAt: 1, savedAt: 1, trashedAt: 2 };
+    if (state === 'inline') data.media.blob = new Blob(['unverified']);
+    if (state === 'unsupported') data.media.source = { kind: 'screenshot' };
+    await expect(
+      assertPreparedLibrarySource({ entry: data.media, ref }, data.stores)
+    ).rejects.toThrow();
   }
 );

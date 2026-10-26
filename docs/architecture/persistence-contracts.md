@@ -731,3 +731,15 @@ An explicit experimental profile enables capture for a bounded Montage graph. Th
 The experiment accepts at most 32 rows in each captured collection and 1 MiB of metadata per snapshot. It retains at most 128 pending captures and refuses further capture mutations at that limit. These bounds apply to the experiment, not the planned release capacity. Missing dependencies or unsupported sidecars abort the enabled mutation. An absent or disabled profile does not read the project graph or append a capture.
 
 Pending captures retain physical assets through the existing asset retention authority. Invalid capture data refuses physical cleanup. No verified remote settlement exists in this experiment, so pending claims do not expire. Native media bytes remain in OPFS. The capture store contains metadata and references without media Blobs. The test-only frozen database adapter reuses the existing backup inventory and codecs. The test-only apply command reuses canonical restore and commits its provenance receipt with the native replacement. Neither test-only command provides a product runtime route.
+
+## Prepared Montage revision publication
+
+The project owner publishes accepted native revisions through two transaction phases. The first phase writes the project and prepared project assets. The second phase writes project sidecars with the assigned local revision. Callers retain admission, revision allocation, transaction completion and resource cleanup.
+
+Archive restoration retains its strategy, conflict checks and complete replacement policy. It publishes independent exports between the two project phases. Synchronization does not use archive replacement to apply a project revision. Saved exports remain independent unless the project uses them as editing sources.
+
+The bounded sync command requires an enabled experimental profile and the prepared native predecessor. It checks accepted dependency generations and causal predecessors inside the project transaction. It also checks current Library identities, child records and immutable physical references. Metadata and file preparation occur before this command under the existing resource protection.
+
+A dependency that lacks local bytes requires hydration before application. A tombstone, conflicting revision or different incarnation requires explicit resolution. Matching bytes alone do not authorize a different logical dependency. The command preserves Library relationships and refuses hidden source substitution.
+
+Project publication, detached private-resource release and the application receipt commit together. Failure preserves current roots and the prepared candidate. A repeated accepted operation returns its receipt before checking later dependency changes. Pending local project changes refuse incoming replacement. This bounded command adds no product network route or automatic historical binding.

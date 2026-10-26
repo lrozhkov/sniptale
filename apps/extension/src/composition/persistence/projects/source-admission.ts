@@ -6,7 +6,8 @@ import type { AssetRef } from '../assets';
 import { parseAssetRef } from '../assets';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { ProjectAssetEntry } from './contracts';
-import { parseProjectAssetEntry } from './read-guards';
+import type { MediaLibraryEntry } from '../media-library/contracts';
+import { parseProjectAssetEntry, parseProjectExportEntry } from './read-guards';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   mediaDependencyTarget,
@@ -148,4 +149,88 @@ async function assertSharedProjectAsset(
     ref.mimeType !== resource.ref.mimeType
   )
     throw new Error('Published project bytes changed after preparation.');
+}
+
+interface PreparedLibrarySourceStores {
+  media: ReadStore;
+  assets: ReadStore;
+  exports: ReadStore;
+  refs: ReadStore;
+}
+
+function changedLibrarySource(): never {
+  throw new Error('Prepared Library source changed after preparation.');
+}
+
+async function readProjectAssetSource(
+  media: MediaLibraryEntry,
+  id: string,
+  store: ReadStore
+): Promise<string> {
+  const asset = parseProjectAssetEntry(await store.get(id));
+  if (!asset || asset.id !== id || asset.size !== media.size || asset.mimeType !== media.mimeType)
+    return changedLibrarySource();
+  return asset.assetId;
+}
+
+async function readProjectExportSource(
+  media: MediaLibraryEntry,
+  source: Extract<MediaLibraryEntry['source'], { kind: 'project-export' }>,
+  store: ReadStore
+): Promise<string> {
+  const exported = parseProjectExportEntry(await store.get(source.exportId));
+  if (
+    !exported ||
+    exported.id !== source.exportId ||
+    exported.projectId !== source.projectId ||
+    exported.size !== media.size ||
+    (exported.mimeType ?? 'video/webm') !== media.mimeType
+  )
+    return changedLibrarySource();
+  return exported.assetId;
+}
+
+async function readLibrarySourceAssetId(
+  media: MediaLibraryEntry,
+  stores: PreparedLibrarySourceStores
+): Promise<string> {
+  const source = media.source;
+  switch (source.kind) {
+    case 'stored-asset':
+      return source.assetId;
+    case 'project-asset':
+      return readProjectAssetSource(media, source.projectAssetId, stores.assets);
+    case 'project-export':
+      return readProjectExportSource(media, source, stores.exports);
+    case 'recording':
+    case 'screenshot':
+    case 'web-snapshot':
+      throw new Error('Prepared Library source kind is outside the sync apply profile.');
+  }
+}
+
+/** Recheck a prepared live source in the consumer transaction without reading its bytes. */
+export async function assertPreparedLibrarySource(
+  resource: { entry: MediaLibraryEntry; ref: AssetRef },
+  stores: PreparedLibrarySourceStores
+): Promise<void> {
+  const expected = parseMediaLibraryEntry(resource.entry);
+  const current = parseMediaLibraryEntry(await stores.media.get(resource.entry.id));
+  const expectedRef = parseAssetRef(resource.ref);
+  if (
+    !expected ||
+    !current ||
+    !expectedRef ||
+    current.blob !== undefined ||
+    current.lifecycle?.trashedAt !== undefined ||
+    current.size !== expectedRef.size ||
+    current.mimeType !== expectedRef.mimeType ||
+    JSON.stringify(current) !== JSON.stringify(expected)
+  )
+    return changedLibrarySource();
+  const assetId = await readLibrarySourceAssetId(current, stores);
+  if (assetId !== expectedRef.assetId) return changedLibrarySource();
+  const actualRef = parseAssetRef(await stores.refs.get(assetId));
+  if (!actualRef || JSON.stringify(actualRef) !== JSON.stringify(expectedRef))
+    return changedLibrarySource();
 }
