@@ -65,7 +65,10 @@ export function ProjectTextRewritePanel(props: {
         wholeDocument={target.wholeDocument}
         windowFallback={context?.window}
         resultDuration={operation.resultDuration}
-        catalogError={operation.error === 'model-unavailable'}
+        catalogError={operation.catalogError}
+        selectionPending={operation.selectionPending}
+        selectionUnavailable={operation.selectionUnavailable}
+        selectionFailed={operation.selectionFailed}
         onOptionsChange={(change) => operation.setOptions((value) => ({ ...value, ...change }))}
         onModelChange={operation.setModelId}
         onReloadModels={operation.loadModels}
@@ -177,7 +180,7 @@ function RewriteRequestStatus({ operation }: { operation: VideoProjectTextRewrit
   return (
     <TextRewriteButton
       label={translate('gallery.videoReview.textRewriteStart')}
-      disabled={!operation.disclosure || !operation.modelId}
+      disabled={!operation.disclosure || !operation.modelId || operation.selectionPending}
       onClick={operation.start}
     />
   );

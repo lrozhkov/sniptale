@@ -9,10 +9,12 @@ import { speechModelResponse } from './voiceover-speech-fixture';
 
 export const textModelResponse = aiSettingsQueryResponseSchema.parse({
   ...speechModelResponse,
+  scenarioSelection: null,
   modelSelection: {
     ...speechModelResponse.modelSelection,
     providers: speechModelResponse.modelSelection!.providers.map((provider) => ({
       ...provider,
+      incarnation: 'fixture-provider-incarnation',
       destinationBinding: `sha256:${'a'.repeat(64)}`,
     })),
     models: [

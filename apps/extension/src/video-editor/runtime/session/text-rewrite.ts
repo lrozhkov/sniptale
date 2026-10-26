@@ -8,9 +8,9 @@ import {
   type SetStateAction,
 } from 'react';
 import type { ReviewTextProposal } from '../../../contracts/ai/review-text';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
+import type { HistoryPort } from '../../contracts/controller-store';
 import type { VideoProject } from '../../../features/video/project/types/model';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import { useAIScenarioModelSelection } from '../../../workflows/ai-settings/use-scenario-model-selection';
 import {
   applyProjectTextRewrite,
   captureProjectTextRewrite,
@@ -48,7 +48,6 @@ interface RewriteLifetime {
   active: { controller: AbortController; applying: boolean } | null;
   preview: ProjectTextRewritePreview | null;
   accepted: boolean;
-  catalogAttempt: number;
 }
 const initialState: RewriteState = {
   running: false,
@@ -79,51 +78,6 @@ function errorCode(error: unknown): string {
   ].includes(code)
     ? code
     : 'failed';
-}
-
-function useRewriteCatalog(owner: { current: RewriteLifetime }, setState: RewriteStateSetter) {
-  const [catalog, setCatalog] = useState<AIModelSelectionBootstrapPayload | null>(null);
-  const [modelId, setModelIdState] = useState('');
-  const lifetime = owner.current;
-  useEffect(() => {
-    setCatalog(null);
-    setModelIdState('');
-  }, [lifetime]);
-  const loadModels = useCallback(async () => {
-    const lifetime = owner.current;
-    const attempt = ++lifetime.catalogAttempt;
-    try {
-      const data = await requestAIModelSelectionBootstrap('text');
-      if (owner.current !== lifetime || !lifetime.mounted || attempt !== lifetime.catalogAttempt)
-        return;
-      const providers = data.providers.filter(
-        (provider) => provider.connectionType === 'openai-compatible' && provider.destinationBinding
-      );
-      const models = data.models.filter(
-        (model) =>
-          (model.operation === undefined || model.operation === 'text') &&
-          providers.some((provider) => provider.id === model.providerId)
-      );
-      setCatalog({ ...data, models, providers });
-      setModelIdState(
-        (current) =>
-          current ||
-          (models.some((model) => model.id === data.defaultModelId)
-            ? data.defaultModelId!
-            : (models[0]?.id ?? ''))
-      );
-    } catch {
-      if (owner.current === lifetime && lifetime.mounted && attempt === lifetime.catalogAttempt)
-        setState((value) => ({ ...value, error: 'model-unavailable' }));
-    }
-  }, [owner, setState]);
-  const setModelId = useCallback<typeof setModelIdState>(
-    (next) => {
-      if (!owner.current.active && !owner.current.preview) setModelIdState(next);
-    },
-    [owner]
-  );
-  return { catalog, modelId, setModelId, loadModels };
 }
 
 function createProjectTextRewriteAccess(
@@ -180,6 +134,11 @@ function runProjectTextRewriteAttempt(
   });
   void Promise.race([work(signal), cancelled])
     .catch((error: unknown) => {
+      if (
+        error instanceof Error &&
+        ['catalog-unavailable', 'selection-write-failed'].includes(error.message)
+      )
+        return;
       if (current() && !signal.aborted)
         setState((value) => ({ ...value, error: errorCode(error) }));
     })
@@ -212,12 +171,39 @@ function captureRewriteDisclosure(
   return { disclosure, disclosureError };
 }
 
+/** The apply operation owns its history lease and seals it before storage can admit another gesture. */
+async function applyProjectTextRewriteWithHistory(
+  access: ProjectTextRewriteAccess,
+  preview: ProjectTextRewritePreview,
+  signal: AbortSignal,
+  mode: 'replace' | 'variant',
+  history: Pick<HistoryPort, 'beginProjectHistoryTransaction' | 'endProjectHistoryTransaction'>
+) {
+  const lease = history.beginProjectHistoryTransaction({ onlyIfIdle: true });
+  if (!lease) throw new Error('stale');
+  const applyAccess: ProjectTextRewriteAccess = {
+    ...access,
+    update: (updater) => {
+      try {
+        access.update(updater);
+      } finally {
+        history.endProjectHistoryTransaction(lease);
+      }
+    },
+  };
+  try {
+    await applyProjectTextRewrite(applyAccess, preview, signal, mode);
+  } finally {
+    history.endProjectHistoryTransaction(lease);
+  }
+}
+
 /** The mounted inspector retains disposable settings and proposals across section navigation. */
 export function useVideoProjectTextRewrite(project: VideoProject) {
   const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
   const history = useVideoEditorHistoryPort((port) => ({
-    begin: port.beginProjectHistoryTransaction,
-    end: port.endProjectHistoryTransaction,
+    beginProjectHistoryTransaction: port.beginProjectHistoryTransaction,
+    endProjectHistoryTransaction: port.endProjectHistoryTransaction,
   }));
   const [state, setState] = useState<RewriteState>(initialState);
   const [target, setTarget] = useState<RewriteTarget | null>(null);
@@ -230,7 +216,6 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
       active: null,
       preview: null,
       accepted: false,
-      catalogAttempt: 0,
     }),
     [project.id, project.createdAt]
   );
@@ -248,7 +233,12 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
   }, [lifetime]);
   const currentLifetime = () => owner.current === lifetime && lifetime.mounted;
   const access = createProjectTextRewriteAccess(owner, lifetime, updateProject);
-  const { catalog, modelId, setModelId, loadModels } = useRewriteCatalog(owner, setState);
+  const selection = useAIScenarioModelSelection('video-text-edit');
+  const catalog = selection.configuration;
+  const modelId = selection.modelId ?? '';
+  const setModelId = (id: string) => {
+    if (!owner.current.active && !owner.current.preview) selection.chooseModel(id);
+  };
   const setOptions = useCallback<typeof setOptionsState>((next) => {
     if (!owner.current.active && !owner.current.preview) setOptionsState(next);
   }, []);
@@ -269,7 +259,11 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
     catalog,
     modelId,
     setModelId,
-    loadModels,
+    loadModels: selection.retryConfiguration,
+    selectionPending: selection.selectionPending,
+    selectionUnavailable: selection.selectionUnavailable,
+    selectionFailed: selection.selectionFailed,
+    catalogError: selection.configurationFailed,
     disclosure,
     disclosureError,
     resultDuration: project.duration,
@@ -298,13 +292,17 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
         return;
       }
       const captured = structuredClone(disclosure);
-      const selected = {
-        modelId: model.id,
-        approvedProviderId: provider.id,
-        approvedDestination: provider.destinationBinding,
-        approvedModelCode: model.modelCode,
-      };
       command(async (signal) => {
+        const prepared = await selection.prepareModelSelection(signal);
+        const model = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
+        const provider = prepared.catalog.providers.find((entry) => entry.id === model?.providerId);
+        if (!model || !provider?.destinationBinding) throw new Error('model-unavailable');
+        const selected = {
+          modelId: model.id,
+          approvedProviderId: provider.id,
+          approvedDestination: provider.destinationBinding,
+          approvedModelCode: model.modelCode,
+        };
         const preview = await generateProjectTextRewrite(access, captured, selected, signal);
         signal.throwIfAborted();
         remember(preview);
@@ -314,28 +312,11 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
       const preview = lifetime.preview;
       if (!currentLifetime() || lifetime.active || !preview || lifetime.accepted) return;
       command(async (signal) => {
-        const lease = history.begin({ onlyIfIdle: true });
-        if (!lease) throw new Error('stale');
-        const applyAccess: ProjectTextRewriteAccess = {
-          ...access,
-          update: (updater) => {
-            try {
-              access.update(updater);
-            } finally {
-              // Seal the local action before storage waits can admit unrelated gestures.
-              history.end(lease);
-            }
-          },
-        };
-        try {
-          await applyProjectTextRewrite(applyAccess, preview, signal, mode);
-          signal.throwIfAborted();
-          if (currentLifetime()) {
-            lifetime.accepted = true;
-            setState((value) => ({ ...value, accepted: true }));
-          }
-        } finally {
-          history.end(lease);
+        await applyProjectTextRewriteWithHistory(access, preview, signal, mode, history);
+        signal.throwIfAborted();
+        if (currentLifetime()) {
+          lifetime.accepted = true;
+          setState((value) => ({ ...value, accepted: true }));
         }
       }, true);
     },

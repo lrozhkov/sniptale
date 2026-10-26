@@ -10,6 +10,7 @@ import type { ReviewTextVoiceAccess } from './use-text-voice';
 import type { ReviewTextRewritePreview } from '../../workflows/video-review/text-rewrite';
 
 const catalog = vi.hoisted(() => vi.fn());
+const remember = vi.hoisted(() => vi.fn());
 const jobs = vi.hoisted(() => ({ generate: vi.fn(), apply: vi.fn(), wasApplied: vi.fn() }));
 vi.mock('../../workflows/video-review/text-rewrite', async (original) => ({
   ...(await original<typeof import('../../workflows/video-review/text-rewrite')>()),
@@ -17,7 +18,10 @@ vi.mock('../../workflows/video-review/text-rewrite', async (original) => ({
   applyReviewTextRewritePreview: jobs.apply,
   reviewTextRewriteWasApplied: jobs.wasApplied,
 }));
-vi.mock('../../workflows/ai-settings/query', () => ({ requestAIModelSelectionBootstrap: catalog }));
+vi.mock('../../workflows/ai-settings/query', () => ({
+  requestAIScenarioModelSelection: catalog,
+  rememberAIScenarioModelSelection: remember,
+}));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -89,10 +93,11 @@ beforeEach(() => {
   }));
   jobs.wasApplied.mockResolvedValue(false);
   jobs.apply.mockResolvedValue(undefined);
+  remember.mockResolvedValue(undefined);
   catalog.mockResolvedValue({
-    chromeAiEnabled: false,
-    defaultModelId: 'model',
-    globalSystemPrompt: '',
+    scenario: 'gallery-text-edit',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
     models: [
       {
         id: 'model',
@@ -105,7 +110,8 @@ beforeEach(() => {
       {
         id: 'provider',
         name: 'Disclosed provider',
-        connectionType: 'openai-compatible',
+        connectionType: 'neuraldeep',
+        incarnation: 'provider-incarnation',
         destinationKind: 'external',
         destinationBinding: `sha256:${'a'.repeat(64)}`,
         hasStoredApiKey: true,

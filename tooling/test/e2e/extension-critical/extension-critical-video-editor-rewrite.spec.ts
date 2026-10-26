@@ -72,7 +72,14 @@ async function openSceneText(page: Page, label: Label) {
       exact: true,
     })
   );
-  return page.locator('[data-ui="video-editor.text.panel"]');
+  const panel = page.locator('[data-ui="video-editor.text.panel"]');
+  await operate(
+    panel.getByRole('button', {
+      name: label('gallery.videoReview.textViewCards'),
+      exact: true,
+    })
+  );
+  return panel;
 }
 
 async function recognizeSource(page: Page, label: Label, clipId: string) {
@@ -217,10 +224,26 @@ async function inspectTextFit(page: Page, panel: Locator, outputPath: (name: str
     return changes;
   });
   try {
-    expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
-      true
-    );
+    await expect
+      .poll(() => panel.evaluate((element) => element.scrollWidth <= element.clientWidth))
+      .toBe(true);
+    const zoomBounds = await panel.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      overflow: [element, ...element.querySelectorAll<HTMLElement>('*')]
+        .filter((node) => node.getClientRects().length && node.scrollWidth > node.clientWidth)
+        .map((node) => ({
+          tag: node.tagName,
+          ui: node.getAttribute('data-ui'),
+          className: node.className,
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
+          text: node.textContent?.slice(0, 140),
+        })),
+    }));
+    await writeFile(outputPath('rewrite-text-zoom.json'), JSON.stringify(zoomBounds, null, 2));
     await page.screenshot({ path: outputPath('rewrite-text-zoom.png'), fullPage: false });
+    expect(zoomBounds.scrollWidth).toBeLessThanOrEqual(zoomBounds.clientWidth);
     await panel.getByRole('button').last().scrollIntoViewIfNeeded();
     await expect(panel.getByRole('button').last()).toBeInViewport();
   } finally {
@@ -281,6 +304,12 @@ async function checkIndependentVariant(
   const before = await savedProject(page);
   const source = before?.textDocuments?.[0];
   if (!before || !source) throw new Error('Source document unavailable');
+  await operate(
+    text.getByRole('button', {
+      name: label('gallery.videoReview.textViewCards'),
+      exact: true,
+    })
+  );
   await operate(text.locator('[data-project-text-rewrite="all"]'));
   await expect(form).toContainText(
     label('gallery.videoReview.textRewriteAllScope').replace(
@@ -374,6 +403,7 @@ async function prepareRecognizedProject(
     },
     runtimeResponses: {
       AI_SETTINGS_QUERY: textModelResponse,
+      AI_SETTINGS_MUTATION: { success: true },
       REQUEST_LLM_SESSION: { success: true, token: 'fixture-review-text-token' },
     },
   });

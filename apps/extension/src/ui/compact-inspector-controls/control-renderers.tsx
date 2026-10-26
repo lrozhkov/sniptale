@@ -54,7 +54,8 @@ function InspectorSegments<T extends string>(
         return;
       const context = document.createElement('canvas').getContext('2d');
       if (!context) return;
-      context.font = `500 13px ${getComputedStyle(element).fontFamily}`;
+      const style = getComputedStyle(element);
+      context.font = `500 ${style.fontSize} ${style.fontFamily}`;
       const width = props.options.reduce(
         (sum, option) => sum + context.measureText(option.label).width + 12,
         0
@@ -64,6 +65,9 @@ function InspectorSegments<T extends string>(
     fit();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
     observer?.observe(element);
+    element
+      .querySelectorAll('.sniptale-property-segments > button')
+      .forEach((button) => observer?.observe(button));
     let disposed = false;
     void document.fonts?.ready.then(() => {
       if (!disposed) fit();

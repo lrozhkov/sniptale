@@ -93,13 +93,13 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
         onClose();
       } else {
         if (!modelId || !instruction.trim()) return;
-        const selectedModelId = await prepareModelSelection(controller.signal);
+        const selected = await prepareModelSelection(controller.signal);
         controller.signal.throwIfAborted();
         const result = await requestGuideAiProposal({
           project: basis,
           scope,
           instruction,
-          modelId: selectedModelId,
+          modelId: selected.modelId,
           includeImages: includeImages && imageCount > 0,
           signal: controller.signal,
         });

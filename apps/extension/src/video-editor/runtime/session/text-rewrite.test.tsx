@@ -5,9 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getVideoProject } from '../../../composition/persistence/projects';
 import { isCurrentVideoProjectSnapshot } from '../../../composition/persistence/projects/revision';
 import type { ReviewTextProposal } from '../../../contracts/ai/review-text';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
+
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import {
+  requestAIScenarioModelSelection,
+  rememberAIScenarioModelSelection,
+} from '../../../workflows/ai-settings/query';
 import { requestLlmSessionToken } from '../../../workflows/ai-session/llm-session';
 import { runReviewTextJob } from '../../../workflows/video-review/text-rewrite-client';
 import { useVideoEditorStore } from '../../state/store';
@@ -19,7 +22,8 @@ vi.mock('../../../composition/persistence/projects/revision', () => ({
   isCurrentVideoProjectSnapshot: vi.fn(),
 }));
 vi.mock('../../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: vi.fn(),
+  requestAIScenarioModelSelection: vi.fn(),
+  rememberAIScenarioModelSelection: vi.fn(),
 }));
 vi.mock('../../../workflows/ai-session/llm-session', () => ({ requestLlmSessionToken: vi.fn() }));
 vi.mock('../../../workflows/video-review/text-rewrite-client', () => ({
@@ -30,15 +34,17 @@ vi.mock('./save-readiness', async (original) => ({
   waitForVideoEditorSave: vi.fn(),
 }));
 
-const catalog: AIModelSelectionBootstrapPayload = {
-  chromeAiEnabled: false,
-  defaultModelId: 'model',
-  globalSystemPrompt: '',
+type SelectionContext = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
+const catalog: SelectionContext = {
+  scenario: 'video-text-edit',
+  remembered: null,
+  resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
   providers: [
     {
       id: 'provider',
       name: 'Provider',
-      connectionType: 'openai-compatible',
+      connectionType: 'neuraldeep',
+      incarnation: 'provider-incarnation',
       hasStoredApiKey: true,
       createdAt: 1,
       destinationKind: 'external',
@@ -133,7 +139,8 @@ beforeEach(() => {
     if (JSON.stringify(durable) !== JSON.stringify(project)) revision++;
     durable = structuredClone(project);
   });
-  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValue(catalog);
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(catalog);
+  vi.mocked(rememberAIScenarioModelSelection).mockResolvedValue(undefined);
   vi.mocked(requestLlmSessionToken).mockResolvedValue('token');
   requestEntered = gate();
   vi.mocked(runReviewTextJob).mockImplementation(async () => {
@@ -353,43 +360,63 @@ it('refuses changes during generation and refuses resurrection after Undo before
   ).toHaveLength(1);
   expect(runReviewTextJob).toHaveBeenCalledTimes(2);
 });
-it('admits the first catalog from a remembered child section and filters unsupported models', async () => {
-  const unbound = { ...catalog.providers[0]!, id: 'unbound', destinationBinding: undefined };
-  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValueOnce({
-    ...catalog,
-    providers: [...catalog.providers, unbound],
-    models: [
-      ...catalog.models,
-      { ...catalog.models[0]!, id: 'speech', operation: 'speech' },
-      { ...catalog.models[0]!, id: 'unbound-model', providerId: 'unbound' },
-    ],
-  });
+it('admits the first catalog from a remembered child section and ignores unknown choices', async () => {
   await act(async () => root.render(<Harness autoLoad />));
   expect(current().catalog?.models.map((model) => model.id)).toEqual(['model']);
   expect(current().modelId).toBe('model');
   act(() => current().setModelId('speech'));
-  act(() => current().start());
-  expect(current().error).toBe('model-unavailable');
+  expect(current().modelId).toBe('model');
+  expect(rememberAIScenarioModelSelection).not.toHaveBeenCalled();
   expect(runReviewTextJob).not.toHaveBeenCalled();
 });
 it('keeps the latest catalog response and retains it after failed refresh', async () => {
   await mount();
-  const old = gate<AIModelSelectionBootstrapPayload>();
-  vi.mocked(requestAIModelSelectionBootstrap).mockImplementationOnce(() => old.promise);
+  const old = gate<SelectionContext>();
+  vi.mocked(requestAIScenarioModelSelection).mockImplementationOnce(() => old.promise);
   let first: Promise<void> | undefined;
   act(() => {
     first = current().loadModels();
   });
-  const latest = { ...catalog, globalSystemPrompt: 'Latest' };
-  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValueOnce(latest);
+  const latest = {
+    ...catalog,
+    models: [...catalog.models, { ...catalog.models[0]!, id: 'latest' }],
+  };
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValueOnce(latest);
   await act(async () => current().loadModels());
   await act(async () => {
     old.release(catalog);
     await first;
   });
   expect(current().catalog).toEqual(latest);
-  vi.mocked(requestAIModelSelectionBootstrap).mockRejectedValueOnce(new Error('Private details'));
+  vi.mocked(requestAIScenarioModelSelection).mockRejectedValueOnce(new Error('Private details'));
   await act(async () => current().loadModels());
   expect(current().catalog).toEqual(latest);
-  expect(current().error).toBe('model-unavailable');
+  expect(current().catalogError).toBe(true);
+  expect(current().error).toBeNull();
 });
+
+it.each(['catalog', 'preference', 'destination'] as const)(
+  'sends no video generation request or project edit after %s preparation refusal',
+  async (failure) => {
+    await mount();
+    const before = useVideoEditorStore.getState().project;
+    expect(rememberAIScenarioModelSelection).not.toHaveBeenCalled();
+    if (failure === 'catalog')
+      vi.mocked(requestAIScenarioModelSelection).mockRejectedValueOnce(new Error('Unavailable'));
+    if (failure === 'preference')
+      vi.mocked(rememberAIScenarioModelSelection).mockRejectedValueOnce(new Error('Unavailable'));
+    if (failure === 'destination') {
+      const next = structuredClone(catalog);
+      next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+      vi.mocked(requestAIScenarioModelSelection).mockResolvedValueOnce(next);
+    }
+    await act(async () => current().start());
+    expect(runReviewTextJob).not.toHaveBeenCalled();
+    expect(useVideoEditorStore.getState().project).toBe(before);
+    expect(current().preview).toBeNull();
+    expect(current().running).toBe(false);
+    expect(current().catalogError).toBe(failure === 'catalog');
+    expect(current().selectionFailed).toBe(failure === 'preference');
+    expect(current().selectionUnavailable).toBe(failure === 'destination');
+  }
+);

@@ -1,5 +1,18 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'ai-scenario-selection-consumers',
+    productionFile: 'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.ts',
+    allowCrossOwner: true,
+    reason:
+      'Mounted selection and query tests cover admission. Persistence participants cover concurrent choices, deletion, recreation, restore, and retry across IPC.',
+    testFiles: [
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
     owner: 'background-text-job-lifecycle',
     productionFile: 'apps/extension/src/background/ai/llm/text-job-lifecycle.ts',
     reason:

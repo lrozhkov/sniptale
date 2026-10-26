@@ -20,7 +20,8 @@ function hasSameModel(choice: Choice, context: Context): boolean {
     before.modelCode === after.modelCode &&
     before.providerId === after.providerId &&
     previousProvider.incarnation === currentProvider.incarnation &&
-    previousProvider.connectionType === currentProvider.connectionType
+    previousProvider.connectionType === currentProvider.connectionType &&
+    previousProvider.destinationBinding === currentProvider.destinationBinding
   );
 }
 
@@ -82,7 +83,7 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario) {
 
   const chooseModel = (id: string | null) => {
     const current = context.current;
-    if (!id || !current || busy.current) return;
+    if (!id || !current || busy.current || !current.models.some((model) => model.id === id)) return;
     busy.current = true;
     setSelectionPending(true);
     setSelectionFailed(false);
@@ -105,14 +106,25 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario) {
       });
   };
 
-  const prepareModelSelection = async (signal?: AbortSignal): Promise<string> => {
+  const prepareModelSelection = async (
+    signal?: AbortSignal
+  ): Promise<{ modelId: string; catalog: Context }> => {
     const selected = choice.current;
-    if (!selected || !modelId || busy.current) throw new Error('Select an available AI model.');
+    if (!selected || !modelId || busy.current) throw new Error('model-unavailable');
     busy.current = true;
     setSelectionPending(true);
+    setSelectionFailed(false);
+    setConfigurationFailed(false);
     try {
       signal?.throwIfAborted();
-      const next = await requestAIScenarioModelSelection(scenario);
+      let next: Context;
+      try {
+        next = await requestAIScenarioModelSelection(scenario);
+      } catch {
+        signal?.throwIfAborted();
+        if (active.current) setConfigurationFailed(true);
+        throw new Error('catalog-unavailable');
+      }
       signal?.throwIfAborted();
       if (!active.current || context.current?.scenario !== scenario)
         throw new Error('AI interface is closed.');
@@ -121,11 +133,17 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario) {
         setSelectionUnavailable(true);
         context.current = next;
         setConfiguration(next);
-        throw new Error('The selected AI model is unavailable. Select another model.');
+        throw new Error('model-unavailable');
       }
-      await rememberAIScenarioModelSelection(next, scenario, selected.modelId, selected.source);
+      try {
+        await rememberAIScenarioModelSelection(next, scenario, selected.modelId, selected.source);
+      } catch {
+        signal?.throwIfAborted();
+        if (active.current) setSelectionFailed(true);
+        throw new Error('selection-write-failed');
+      }
       signal?.throwIfAborted();
-      return selected.modelId;
+      return { modelId: selected.modelId, catalog: next };
     } finally {
       busy.current = false;
       if (active.current) setSelectionPending(false);
@@ -141,6 +159,6 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario) {
     selectionPending,
     chooseModel,
     prepareModelSelection,
-    retryConfiguration: () => void reload(),
+    retryConfiguration: reload,
   };
 }

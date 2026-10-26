@@ -10,12 +10,14 @@ import type { ReviewTextVoiceAccess } from './use-text-voice';
 
 const mocks = vi.hoisted(() => ({
   catalog: vi.fn(),
+  remember: vi.fn(),
   generate: vi.fn(),
   apply: vi.fn(),
   wasApplied: vi.fn(),
 }));
 vi.mock('../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: mocks.catalog,
+  requestAIScenarioModelSelection: mocks.catalog,
+  rememberAIScenarioModelSelection: mocks.remember,
 }));
 vi.mock('../../workflows/video-review/text-rewrite', async (original) => ({
   ...(await original<typeof import('../../workflows/video-review/text-rewrite')>()),
@@ -87,9 +89,9 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   mocks.catalog.mockResolvedValue({
-    chromeAiEnabled: false,
-    defaultModelId: 'model',
-    globalSystemPrompt: '',
+    scenario: 'gallery-text-edit',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
     models: [{ id: 'model', providerId: 'provider', displayName: 'Model', modelCode: 'code' }],
     providers: [
       {
@@ -97,12 +99,14 @@ beforeEach(() => {
         name: 'Provider',
         hasStoredApiKey: true,
         createdAt: 1,
-        connectionType: 'openai-compatible',
+        connectionType: 'neuraldeep',
+        incarnation: 'provider-incarnation',
         destinationKind: 'external',
         destinationBinding: `sha256:${'a'.repeat(64)}`,
       },
     ],
   });
+  mocks.remember.mockResolvedValue(undefined);
   mocks.generate.mockImplementation(async (_session, captured: ReviewTextRewritePreview) => ({
     ...captured,
     proposal: { version: 1, fragments: [{ fromIds: ['text'], text: 'Edited' }] },
@@ -120,7 +124,7 @@ afterEach(async () => {
 describe('inline text rewrite operation lifetime', () => {
   it('loads only connected text models, freezes the disclosure and owns one request at a time', async () => {
     const source = await mount();
-    expect(mocks.catalog).toHaveBeenCalledExactlyOnceWith('text');
+    expect(mocks.catalog).toHaveBeenCalledExactlyOnceWith('gallery-text-edit');
     expect(operation.options.changeIntervals).toBe(false);
     expect(operation.options.resegment).toBe(false);
     expect(operation.disclosure?.context.fragments[0]?.text).toBe('Words');
@@ -218,18 +222,23 @@ it('keeps its known catalog and choice through delayed refresh and a discovery f
   const previous = operation.catalog!;
   const waiting = deferred<typeof previous>();
   mocks.catalog.mockReturnValueOnce(waiting.promise);
-  await act(async () => operation.reloadModels());
+  let refresh: Promise<void> | undefined;
+  act(() => {
+    refresh = operation.reloadModels();
+  });
   expect(operation.catalog).toBe(previous);
   expect(operation.modelId).toBe('model');
   const refreshed = {
     ...previous,
-    defaultModelId: 'new-default',
     models: [
       ...previous.models,
-      { ...previous.models[0]!, id: 'new-default', displayName: 'New default' },
+      { ...previous.models[0]!, id: 'another-model', displayName: 'Another model' },
     ],
   };
-  await act(async () => waiting.resolve(refreshed));
+  await act(async () => {
+    waiting.resolve(refreshed);
+    await refresh;
+  });
   expect(operation.catalog?.models).toHaveLength(2);
   expect(operation.modelId).toBe('model');
   const known = operation.catalog;
@@ -237,6 +246,30 @@ it('keeps its known catalog and choice through delayed refresh and a discovery f
   await act(async () => operation.reloadModels());
   expect(operation.catalog).toBe(known);
   expect(operation.modelId).toBe('model');
-  expect(operation.error).toBe('model-unavailable');
+  expect(operation.catalogError).toBe(true);
+  expect(operation.error).toBeNull();
   expect(mocks.generate).not.toHaveBeenCalled();
 });
+
+it.each(['catalog', 'preference', 'destination'] as const)(
+  'sends no Gallery generation request after %s preparation refusal',
+  async (failure) => {
+    const source = await mount();
+    const before = source.session.getSnapshot();
+    if (failure === 'catalog') mocks.catalog.mockRejectedValueOnce(new Error('Unavailable'));
+    if (failure === 'preference') mocks.remember.mockRejectedValueOnce(new Error('Unavailable'));
+    if (failure === 'destination') {
+      const next = structuredClone(operation.catalog!);
+      next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+      mocks.catalog.mockResolvedValueOnce(next);
+    }
+    await act(async () => operation.start());
+    expect(mocks.generate).not.toHaveBeenCalled();
+    expect(source.session.getSnapshot()).toBe(before);
+    expect(operation.preview).toBeNull();
+    expect(operation.running).toBe(false);
+    expect(operation.catalogError).toBe(failure === 'catalog');
+    expect(operation.selectionFailed).toBe(failure === 'preference');
+    expect(operation.selectionUnavailable).toBe(failure === 'destination');
+  }
+);

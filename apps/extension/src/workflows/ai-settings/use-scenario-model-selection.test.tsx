@@ -20,6 +20,7 @@ function context(): Context {
         connectionType: 'anthropic',
         destinationKind: 'external',
         incarnation: 'first-incarnation',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
         hasStoredApiKey: true,
         createdAt: 1,
       },
@@ -68,7 +69,7 @@ it('presents a native provider candidate without writing on open or reload', asy
 it('persists a first-use candidate only when the user requests its use', async () => {
   await open();
   await act(async () => {
-    expect(await selection.prepareModelSelection()).toBe('first');
+    expect((await selection.prepareModelSelection()).modelId).toBe('first');
   });
   expect(io.remember).toHaveBeenCalledWith(
     expect.objectContaining({ scenario: 'scenario-edit' }),
@@ -128,7 +129,7 @@ it('does not write when the user cancels while the current catalog is loading', 
     })
   );
   const controller = new AbortController();
-  let pending!: Promise<string>;
+  let pending!: ReturnType<typeof selection.prepareModelSelection>;
   await act(async () => {
     pending = selection.prepareModelSelection(controller.signal);
   });
@@ -145,4 +146,65 @@ it('keeps the previous visible choice when preference storage refuses a new choi
   await act(async () => selection.chooseModel('second'));
   expect(selection.modelId).toBe('first');
   expect(selection.selectionFailed).toBe(true);
+});
+
+it('requires reselection when the provider destination changes without an identity change', async () => {
+  await open();
+  const next = context();
+  next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+  io.read.mockResolvedValue(next);
+  await act(async () => {
+    await expect(selection.prepareModelSelection()).rejects.toThrow('model-unavailable');
+  });
+  expect(selection.modelId).toBeNull();
+  expect(selection.selectionUnavailable).toBe(true);
+  expect(io.remember).not.toHaveBeenCalled();
+  await act(async () => selection.chooseModel('first'));
+  expect(selection.modelId).toBe('first');
+  expect(io.remember).toHaveBeenCalledWith(next, 'scenario-edit', 'first', 'explicit');
+});
+it('blocks duplicate choices and request preparation until the explicit choice is saved', async () => {
+  await open();
+  let release!: () => void;
+  io.remember.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      release = resolve;
+    })
+  );
+  act(() => selection.chooseModel('second'));
+  expect(selection.selectionPending).toBe(true);
+  act(() => selection.chooseModel('first'));
+  await expect(selection.prepareModelSelection()).rejects.toThrow('model-unavailable');
+  expect(io.remember).toHaveBeenCalledTimes(1);
+  expect(io.read).toHaveBeenCalledTimes(1);
+  await act(async () => release());
+  expect(selection.selectionPending).toBe(false);
+  expect(selection.modelId).toBe('second');
+});
+it('preserves the visible choice and permits retry after preparation discovery fails', async () => {
+  await open();
+  io.read.mockRejectedValueOnce(new Error('Discovery refused'));
+  await act(async () => {
+    await expect(selection.prepareModelSelection()).rejects.toThrow('catalog-unavailable');
+  });
+  expect(selection.modelId).toBe('first');
+  expect(selection.configurationFailed).toBe(true);
+  expect(selection.selectionPending).toBe(false);
+  expect(io.remember).not.toHaveBeenCalled();
+  await act(async () => {
+    const prepared = await selection.prepareModelSelection();
+    expect(prepared.catalog).toEqual(context());
+    expect(prepared.modelId).toBe('first');
+  });
+  expect(selection.configurationFailed).toBe(false);
+});
+it('refuses preparation after a preference failure and keeps the previous visible choice', async () => {
+  await open();
+  io.remember.mockRejectedValueOnce(new Error('Storage refused'));
+  await act(async () => {
+    await expect(selection.prepareModelSelection()).rejects.toThrow('selection-write-failed');
+  });
+  expect(selection.modelId).toBe('first');
+  expect(selection.selectionFailed).toBe(true);
+  expect(selection.selectionPending).toBe(false);
 });

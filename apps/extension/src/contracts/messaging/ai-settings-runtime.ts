@@ -24,12 +24,15 @@ export type AIProviderSelectorEntry = Pick<
   destinationBinding?: string | undefined;
 };
 
-export type AIModelSelectionBootstrapPayload = {
+export type AIModelCatalogPayload = {
+  models: AIModel[];
+  providers: AIProviderSelectorEntry[];
+};
+
+export type AIModelSelectionBootstrapPayload = AIModelCatalogPayload & {
   chromeAiEnabled: boolean;
   defaultModelId: string | null;
   globalSystemPrompt: string;
-  models: AIModel[];
-  providers: AIProviderSelectorEntry[];
 };
 
 export type AISettingsPageModelSelectionBootstrapPayload = Omit<

@@ -23,9 +23,15 @@ const initial: TextRewriteOptions = {
 function Settings({
   locked = false,
   wholeDocument = true,
+  pending = false,
+  unavailable = false,
+  failed = false,
 }: {
   locked?: boolean;
   wholeDocument?: boolean;
+  pending?: boolean;
+  unavailable?: boolean;
+  failed?: boolean;
 }) {
   const [options, setOptions] = useState(initial);
   return (
@@ -39,6 +45,9 @@ function Settings({
         windowFallback={{ start: 1, end: 5 }}
         resultDuration={10}
         catalogError
+        selectionPending={pending}
+        selectionUnavailable={unavailable}
+        selectionFailed={failed}
         onModelChange={vi.fn()}
         onReloadModels={reload}
         onOptionsChange={(patch) => {
@@ -125,4 +134,17 @@ it('chooses editing context through measured segments and resets incompatible se
   expect(change).toHaveBeenLastCalledWith({ mode: 'phrases', resegment: false });
   expect(button('textRewriteStructure')).toBeNull();
   expect(button('textRewritePhrases').getAttribute('aria-pressed')).toBe('true');
+});
+
+it('locks pending choices and exposes distinct localized selection recovery messages', async () => {
+  await act(async () => root.render(<Settings pending />));
+  expect(host.querySelector('fieldset')?.disabled).toBe(true);
+  expect(host.querySelector('[role="status"]')?.textContent).toBe('common.states.saving');
+  await act(async () => root.render(<Settings unavailable failed />));
+  expect(host.querySelector('fieldset')?.disabled).toBe(false);
+  expect(host.textContent).toContain('aiModal.modelSelectionUnavailable');
+  expect(host.textContent).toContain('aiModal.modelSelectionSaveFailed');
+  expect(host.textContent).toContain('aiModal.modelCatalogFailed');
+  await act(async () => button('speechReloadModels').click());
+  expect(reload).toHaveBeenCalledOnce();
 });

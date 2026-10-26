@@ -65,7 +65,10 @@ export function ReviewTextRewriteForm(props: {
         wholeDocument={props.wholeDocument}
         windowFallback={(preview?.context ?? operation.disclosure?.context)?.window}
         resultDuration={operation.resultDuration}
-        catalogError={!!operation.error}
+        catalogError={operation.catalogError}
+        selectionPending={operation.selectionPending}
+        selectionUnavailable={operation.selectionUnavailable}
+        selectionFailed={operation.selectionFailed}
         onOptionsChange={(change) => operation.setOptions((current) => ({ ...current, ...change }))}
         onModelChange={operation.setModelId}
         onReloadModels={operation.reloadModels}
@@ -101,7 +104,12 @@ export function ReviewTextRewriteForm(props: {
           <ReviewButton
             label={translate('gallery.videoReview.textRewriteStart')}
             className={buttonClass}
-            disabled={!!props.disabled || !operation.disclosure || !operation.modelId}
+            disabled={
+              !!props.disabled ||
+              !operation.disclosure ||
+              !operation.modelId ||
+              operation.selectionPending
+            }
             onClick={operation.start}
           >
             {translate('gallery.videoReview.textRewriteStart')}

@@ -5,13 +5,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getVideoProject } from '../../../../../composition/persistence/projects';
 import { isCurrentVideoProjectSnapshot } from '../../../../../composition/persistence/projects/revision';
 import type { ReviewTextProposal } from '../../../../../contracts/ai/review-text';
-import type { AIModelSelectionBootstrapPayload } from '../../../../../contracts/messaging/ai-settings-runtime';
+
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
 } from '../../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
-import { requestAIModelSelectionBootstrap } from '../../../../../workflows/ai-settings/query';
+import {
+  requestAIScenarioModelSelection,
+  rememberAIScenarioModelSelection,
+} from '../../../../../workflows/ai-settings/query';
 import { requestLlmSessionToken } from '../../../../../workflows/ai-session/llm-session';
 import { runReviewTextJob } from '../../../../../workflows/video-review/text-rewrite-client';
 import { useVideoEditorStore } from '../../../../state/store';
@@ -24,7 +27,8 @@ vi.mock('../../../../../composition/persistence/projects/revision', () => ({
   isCurrentVideoProjectSnapshot: vi.fn(),
 }));
 vi.mock('../../../../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: vi.fn(),
+  requestAIScenarioModelSelection: vi.fn(),
+  rememberAIScenarioModelSelection: vi.fn(),
 }));
 vi.mock('../../../../../workflows/ai-session/llm-session', () => ({
   requestLlmSessionToken: vi.fn(),
@@ -44,15 +48,17 @@ vi.mock('../../../../../platform/i18n', async (original) => ({
   getCurrentLocale: () => 'en',
 }));
 
-const catalog: AIModelSelectionBootstrapPayload = {
-  chromeAiEnabled: false,
-  defaultModelId: 'model',
-  globalSystemPrompt: '',
+type SelectionContext = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
+const catalog: SelectionContext = {
+  scenario: 'video-text-edit',
+  remembered: null,
+  resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
   providers: [
     {
       id: 'provider',
       name: 'Approved provider',
-      connectionType: 'openai-compatible',
+      connectionType: 'neuraldeep',
+      incarnation: 'provider-incarnation',
       hasStoredApiKey: true,
       createdAt: 1,
       destinationKind: 'external',
@@ -144,7 +150,8 @@ beforeEach(() => {
   initial = useVideoEditorStore.getState();
   revision = 1;
   requestEntered = gate();
-  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValue(catalog);
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(catalog);
+  vi.mocked(rememberAIScenarioModelSelection).mockResolvedValue(undefined);
   vi.mocked(requestLlmSessionToken).mockResolvedValue('token');
   vi.mocked(getVideoProject).mockImplementation(async () => ({
     status: 'ready',

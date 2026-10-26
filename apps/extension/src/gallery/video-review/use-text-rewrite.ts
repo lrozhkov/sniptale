@@ -6,10 +6,10 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import type { AIModelSelectionBootstrapPayload } from '../../contracts/messaging/ai-settings-runtime';
+import type { AIModelCatalogPayload } from '../../contracts/messaging/ai-settings-runtime';
 import type { ReviewTextProposal } from '../../contracts/ai/review-text';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
-import { requestAIModelSelectionBootstrap } from '../../workflows/ai-settings/query';
+import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
 import {
   captureReviewTextRewrite,
   generateReviewTextRewrite,
@@ -20,6 +20,8 @@ import {
 } from '../../workflows/video-review/text-rewrite';
 import type { ReviewTextVoiceAccess } from './use-text-voice';
 
+type SelectionPreparation = ReturnType<typeof useAIScenarioModelSelection>['prepareModelSelection'];
+
 export function useReviewTextRewrite(props: {
   access: ReviewTextVoiceAccess;
   ids: readonly string[];
@@ -27,10 +29,9 @@ export function useReviewTextRewrite(props: {
 }) {
   const { access } = props;
   const snapshot = useSyncExternalStore(access.session.subscribe, access.session.getSnapshot);
-  const [catalog, setCatalog] = useState<AIModelSelectionBootstrapPayload | null>(null);
-  const [catalogRevision, setCatalogRevision] = useState(0);
-  const catalogInitialized = useRef(false);
-  const [modelId, setModelId] = useState('');
+  const selection = useAIScenarioModelSelection('gallery-text-edit');
+  const catalog = selection.configuration;
+  const modelId = selection.modelId ?? '';
   const [options, setOptions] = useState<ReviewTextRewriteOptions>({
     prompt: '',
     mode: 'phrases',
@@ -62,36 +63,6 @@ export function useReviewTextRewrite(props: {
       owner.active?.abort();
     };
   }, [access.session]);
-  useEffect(() => {
-    let current = true;
-    void requestAIModelSelectionBootstrap('text')
-      .then((data) => {
-        if (!current) return;
-        const providers = data.providers.filter(
-          (entry) => entry.connectionType === 'openai-compatible' && entry.destinationBinding
-        );
-        const models = data.models.filter((entry) =>
-          providers.some((provider) => provider.id === entry.providerId)
-        );
-        setCatalog({ ...data, models, providers });
-        if (!catalogInitialized.current) {
-          catalogInitialized.current = true;
-          setModelId(
-            (current) =>
-              current ||
-              (models.some((entry) => entry.id === data.defaultModelId)
-                ? data.defaultModelId!
-                : (models[0]?.id ?? ''))
-          );
-        }
-      })
-      .catch(() => {
-        if (current) setState((value) => ({ ...value, error: 'model-unavailable' }));
-      });
-    return () => {
-      current = false;
-    };
-  }, [catalogRevision]);
   useEffect(
     () =>
       access.context?.registerPending({
@@ -121,15 +92,18 @@ export function useReviewTextRewrite(props: {
     snapshot,
     catalog,
     modelId,
-    setModelId,
+    setModelId: (id: string) => {
+      if (!lifetime.current.active && !lifetime.current.preview) selection.chooseModel(id);
+    },
+    selectionPending: selection.selectionPending,
+    selectionUnavailable: selection.selectionUnavailable,
+    selectionFailed: selection.selectionFailed,
+    catalogError: selection.configurationFailed,
     options,
     setOptions,
     disclosure,
     disclosureError,
-    reloadModels: () => {
-      setState((value) => ({ ...value, error: null }));
-      setCatalogRevision((value) => value + 1);
-    },
+    reloadModels: selection.retryConfiguration,
     resultDuration:
       buildReviewTimeMap(snapshot.snapshot.workspace.source.duration, snapshot.document.edits).at(
         -1
@@ -142,6 +116,7 @@ export function useReviewTextRewrite(props: {
       disclosure,
       command,
       remember,
+      prepareSelection: selection.prepareModelSelection,
       markAccepted: () => setState((value) => ({ ...value, accepted: true })),
     }),
   };
@@ -157,6 +132,7 @@ function createRewriteActions({
   command,
   remember,
   markAccepted,
+  prepareSelection,
 }: {
   owner: {
     mounted: boolean;
@@ -166,12 +142,13 @@ function createRewriteActions({
     props: { access: ReviewTextVoiceAccess };
   };
   access: ReviewTextVoiceAccess;
-  catalog: AIModelSelectionBootstrapPayload | null;
+  catalog: AIModelCatalogPayload | null;
   modelId: string;
   disclosure: ReviewTextRewritePreview | null;
   command(work: (signal: AbortSignal) => Promise<void>, applying?: boolean): void;
   remember(preview: ReviewTextRewritePreview | null): void;
   markAccepted(): void;
+  prepareSelection: SelectionPreparation;
 }) {
   return {
     start() {
@@ -179,15 +156,19 @@ function createRewriteActions({
       const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
       if (!model || !provider?.destinationBinding || !disclosure || owner.preview) return;
       const captured = structuredClone(disclosure);
-      const selected = {
-        modelId: model.id,
-        approvedProviderId: provider.id,
-        approvedDestination: provider.destinationBinding,
-        approvedModelCode: model.modelCode,
-      };
       command(async (signal) => {
         await owner.props.access.beforeRequest();
         signal.throwIfAborted();
+        const prepared = await prepareSelection(signal);
+        const model = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
+        const provider = prepared.catalog.providers.find((entry) => entry.id === model?.providerId);
+        if (!model || !provider?.destinationBinding) throw new Error('model-unavailable');
+        const selected = {
+          modelId: model.id,
+          approvedProviderId: provider.id,
+          approvedDestination: provider.destinationBinding,
+          approvedModelCode: model.modelCode,
+        };
         const preview = await generateReviewTextRewrite(access.session, captured, selected, signal);
         signal.throwIfAborted();
         if (owner.mounted) remember(preview);
@@ -259,6 +240,11 @@ function runTextRewriteAttempt(
   void Promise.race([work(controller.signal), cancelled])
     .catch((error: unknown) => {
       if (owner.mounted && !controller.signal.aborted) {
+        if (
+          error instanceof Error &&
+          ['catalog-unavailable', 'selection-write-failed'].includes(error.message)
+        )
+          return;
         const code =
           error instanceof Error &&
           ['stale', 'too-large', 'model-unavailable', 'invalid', 'invalid-response'].includes(

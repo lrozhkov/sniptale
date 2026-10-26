@@ -767,6 +767,7 @@ for (const variant of [
         },
         runtimeResponses: {
           AI_SETTINGS_QUERY: textModelResponse,
+          AI_SETTINGS_MUTATION: { success: true },
           REQUEST_LLM_SESSION: { success: true, token: 'fixture-review-text-token' },
         },
       });
