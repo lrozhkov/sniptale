@@ -242,3 +242,49 @@ it('admits bounded correction prompts and rejects payloads on reset', () => {
     })
   ).toEqual({ type: message.type, operation: 'reset-voice-input-correction-prompt' });
 });
+
+it('accepts bounded scenario choices and rejects a second writable voice authority', () => {
+  const message = {
+    type: 'AI_SETTINGS_MUTATION',
+    operation: 'remember-scenario-selection',
+    selection: {
+      scenario: 'page-edit',
+      modelId: 'model',
+      providerId: 'provider',
+      modelCode: 'exact-id',
+      destinationBinding: 'sha256:' + 'a'.repeat(64),
+      source: 'explicit',
+    },
+  };
+  expect(aiSettingsMutationMessageSchema.safeParse(message).success).toBe(true);
+  expect(
+    aiSettingsMutationMessageSchema.safeParse({
+      ...message,
+      selection: { ...message.selection, scenario: 'voice-correction' },
+    }).success
+  ).toBe(false);
+  expect(
+    aiSettingsMutationMessageSchema.safeParse({
+      ...message,
+      selection: { ...message.selection, selectedAt: 1 },
+    }).success
+  ).toBe(false);
+});
+
+it('accepts identity-bound enabled changes without configuration replacement fields', () => {
+  const message = {
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'set-provider-enabled',
+    providerId: 'provider',
+    providerIncarnation: 'incarnation',
+    enabled: false,
+  };
+  expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
+  for (const invalid of [
+    { ...message, providerIncarnation: undefined },
+    { ...message, enabled: 'false' },
+    { ...message, baseUrl: 'https://stale.example.test/v1' },
+    { ...message, apiKey: 'fixture-key' },
+  ])
+    expect(aiSettingsMutationMessageSchema.safeParse(invalid).success).toBe(false);
+});

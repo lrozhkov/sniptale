@@ -1,3 +1,8 @@
+import {
+  getAIProviderDefinition,
+  type AIProviderType,
+  type AIModelManagement,
+} from '../../../../../contracts/settings/ai-provider';
 import type {
   AIModelOperation,
   AIModelAudioParameters,
@@ -44,7 +49,9 @@ function buildProviderSaveParams(args: ProviderFormSaveParams) {
 function createInitialProviderFormData(provider?: AIProvider | null): ProviderFormData {
   return {
     name: provider?.name || '',
-    connectionType: 'openai-compatible',
+    connectionType: provider?.connectionType ?? 'openai-compatible',
+    management: provider?.management ?? 'automatic',
+    enabled: provider?.enabled ?? true,
     baseUrl: provider?.baseUrl || '',
   };
 }
@@ -114,6 +121,23 @@ export function useProviderFormState(
       clearFieldError(errors, setErrors, field);
     };
 
+  const handleConnectionTypeChange = (connectionType: AIProviderType) => {
+    if (apiKeyInputRef.current) apiKeyInputRef.current.value = '';
+    const definition = getAIProviderDefinition(connectionType);
+    setFormData((previous) => ({
+      ...previous,
+      connectionType,
+      baseUrl: definition.baseUrl,
+      name:
+        !previous.name || previous.name === getAIProviderDefinition(previous.connectionType).label
+          ? definition.label
+          : previous.name,
+    }));
+    setErrors({});
+  };
+  const handleManagementChange = (management: AIModelManagement) =>
+    setFormData((previous) => ({ ...previous, management }));
+
   const handleApiKeyChange = (_event: React.ChangeEvent<HTMLInputElement>) => {
     clearFieldError(errors, setErrors, 'apiKey');
   };
@@ -139,6 +163,8 @@ export function useProviderFormState(
     errors,
     formData,
     handleApiKeyChange,
+    handleConnectionTypeChange,
+    handleManagementChange,
     handleChange,
     handleSubmit,
     isEditing,

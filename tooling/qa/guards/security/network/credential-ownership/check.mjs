@@ -1,5 +1,6 @@
 /** Enforces exact ownership for credentialed requests and secret-bearing headers. */
 
+import path from 'node:path';
 import ts from 'typescript';
 
 import { collectCodeFiles } from '../../../../analysis/repository/shared-files.mjs';
@@ -15,7 +16,9 @@ import { getSourceSnapshot } from '../../../../analysis/source/source-snapshot.m
 
 const POLICY_PATH = 'tooling/configs/qa/security-network-ownership.data.json';
 const ANALYZER_PATH = 'tooling/qa/guards/security/network/credential-ownership/check.mjs';
-const SECRET_HEADERS = new Set(['authorization', 'cookie', 'xapikey']);
+const SECRET_HEADERS = new Set(['authorization', 'cookie', 'xapikey', 'xgoogapikey', 'xiapikey']);
+const SDK_RUNTIME_PATH = 'apps/extension/src/background/ai/providers';
+const SDK_FETCH_PATH = 'apps/extension/src/background/ai/llm/transport/http';
 
 function callName(expression) {
   if (ts.isIdentifier(expression)) return expression.text;
@@ -30,17 +33,29 @@ function staticText(node, constants) {
   return null;
 }
 
-function collectBindings(sourceFile) {
+function collectBindings(sourceFile, relativePath) {
   const constants = new Map();
   const variables = new Map();
   const fetchBindings = new Set(['fetch']);
   const requestHelpers = new Set();
+  const sdkRuntimes = new Set();
+  const sdkFetchFactories = new Set();
   visitSourceNodes(sourceFile, (node) => {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const modulePath = node.moduleSpecifier.text.startsWith('.')
+        ? path.posix.normalize(
+            path.posix.join(path.posix.dirname(relativePath), node.moduleSpecifier.text)
+          )
+        : null;
       const named = node.importClause?.namedBindings;
       if (named && ts.isNamedImports(named)) {
         for (const element of named.elements) {
           const imported = element.propertyName?.text ?? element.name.text;
+          if (node.importClause.isTypeOnly || element.isTypeOnly) continue;
+          if (imported === 'createAIProviderRuntime' && modulePath === SDK_RUNTIME_PATH)
+            sdkRuntimes.add(element.name.text);
+          if (imported === 'createProviderSdkFetch' && modulePath === SDK_FETCH_PATH)
+            sdkFetchFactories.add(element.name.text);
           if (
             imported === 'postJsonWithTimeout' &&
             /(?:^|\/)http$/u.test(node.moduleSpecifier.text)
@@ -61,8 +76,10 @@ function collectBindings(sourceFile) {
     changed = false;
     for (const [name, initializer] of variables) {
       if (
-        ts.isIdentifier(initializer) &&
-        fetchBindings.has(initializer.text) &&
+        ((ts.isIdentifier(initializer) && fetchBindings.has(initializer.text)) ||
+          (ts.isCallExpression(initializer) &&
+            ts.isIdentifier(initializer.expression) &&
+            sdkFetchFactories.has(initializer.expression.text))) &&
         !fetchBindings.has(name)
       ) {
         fetchBindings.add(name);
@@ -70,7 +87,7 @@ function collectBindings(sourceFile) {
       }
     }
   }
-  return { constants, fetchBindings, requestHelpers, variables };
+  return { constants, fetchBindings, requestHelpers, sdkRuntimes, variables };
 }
 
 function resolveExpression(expression, variables) {
@@ -177,6 +194,22 @@ function requestConfig(node, context) {
 }
 
 function classifyRequest(node, sourceFile, context) {
+  if (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    context.sdkRuntimes.has(node.expression.text) &&
+    node.arguments[0]
+  ) {
+    const apiKey = findObjectProperty(node.arguments[0], 'apiKey', context);
+    const value = apiKey && resolveExpression(apiKey, context.variables);
+    if (
+      value &&
+      value.kind !== ts.SyntaxKind.NullKeyword &&
+      !(ts.isIdentifier(value) && value.text === 'undefined')
+    ) {
+      return { secretHeader: true, credentialed: false };
+    }
+  }
   const config = requestConfig(node, context);
   if (!config) return null;
   const headers = findObjectProperty(config, 'headers', context);
@@ -230,7 +263,7 @@ export function collectFetchOwnershipViolations(
     if (!/\.[cm]?[jt]sx?$/u.test(relativePath) || /\.(?:test|spec)\./u.test(relativePath)) continue;
     scanned.add(relativePath);
     const sourceFile = getSourceSnapshot({ filePath }).sourceFile;
-    const context = collectBindings(sourceFile);
+    const context = collectBindings(sourceFile, relativePath);
     visitSourceNodes(sourceFile, (node) => {
       if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return;
       const result = classifyRequest(node, sourceFile, context);
@@ -243,7 +276,7 @@ export function collectFetchOwnershipViolations(
             file: relativePath,
             line: getNodeLine(sourceFile, node),
             message:
-              'assembles secret-bearing request headers outside the approved transport owner',
+              'assembles secret-bearing request headers or hands credentials to the SDK outside the approved transport owner',
           });
         }
       }

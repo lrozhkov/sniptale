@@ -116,7 +116,7 @@ it('joins multimodal text parts from multimodal provider responses', async () =>
       providerErrorLabel: 'Ollama local',
       systemPrompt: 'Return JSON',
     })
-  ).resolves.toBe('{"steps":[\n]}');
+  ).resolves.toBe('{"steps":[]}');
 });
 
 it('maps unknown provider error payloads without exposing provider body text', async () => {

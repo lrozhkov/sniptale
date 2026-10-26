@@ -23,13 +23,11 @@ export function createMockAiProvidersSectionState(): AiProvidersSectionState {
       deleteModel: vi.fn().mockResolvedValue(undefined),
       deleteProvider: vi.fn().mockResolvedValue(undefined),
       moveModel: vi.fn().mockResolvedValue(undefined),
-      setDefaultModel: vi.fn().mockResolvedValue(undefined),
     },
     chromeAi: createMockChromeAiState(),
     secretProtection: createMockSecretProtectionState(),
     providers: [],
     models: [],
-    defaultModelId: null,
     isLoading: false,
     modelOptions: [],
     modals: {

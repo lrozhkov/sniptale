@@ -20,11 +20,6 @@ vi.mock('../../../model-options', () => ({
   buildAiProvidersModelOptions: dependencyMocks.buildAiProvidersModelOptionsMock,
 }));
 
-vi.mock('../../../save', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../save')>()),
-  saveAiProvidersDefaultModel: dependencyMocks.saveAiProvidersDefaultModelMock,
-}));
-
 vi.mock('../../../state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../state')>()),
   useAiProvidersDataState: dependencyMocks.useAiProvidersDataStateMock,
@@ -74,11 +69,9 @@ function createDataState() {
     chromeAiEnabled: false,
     providers: [PROVIDER],
     models: [MODEL],
-    defaultModelId: 'model-1',
     isLoading: false,
     selection: { models: [MODEL], providers: [PROVIDER] },
     setChromeAiEnabled: vi.fn(),
-    setDefaultModelId: vi.fn(),
     setIsLoading: vi.fn(),
     setModels: vi.fn(),
     setProviders: vi.fn(),
@@ -190,7 +183,6 @@ function expectControllerDependencyShape(
       status: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
     },
     dataState: {
-      defaultModelId: 'model-1',
       isLoading: false,
       providers: [PROVIDER],
       models: [MODEL],
@@ -212,11 +204,8 @@ function expectOwnerHookCalls() {
   );
   expect(dependencyMocks.useAiProvidersChromeAiStateMock).toHaveBeenCalledWith({
     chromeAiEnabled: false,
-    defaultModelId: 'model-1',
-    models: [MODEL],
     reloadData: expect.any(Function),
     setChromeAiEnabled: expect.any(Function),
-    setDefaultModelId: expect.any(Function),
   });
   expect(dependencyMocks.useAiProvidersModalStateMock).toHaveBeenCalled();
   expect(dependencyMocks.useAiProvidersDeleteHandlersMock).toHaveBeenCalledWith({
@@ -238,15 +227,4 @@ it('builds the controller dependencies from owner-local hooks', () => {
 
   expectControllerDependencyShape(deps);
   expectOwnerHookCalls();
-});
-
-it('normalizes an empty default-model value to null before saving', async () => {
-  const deps = useAiProvidersSectionControllerDependencies();
-
-  await deps.catalogActions.setDefaultModel('');
-
-  expect(dependencyMocks.saveAiProvidersDefaultModelMock).toHaveBeenCalledWith(
-    null,
-    expect.any(Function)
-  );
 });

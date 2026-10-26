@@ -79,9 +79,19 @@ async function run(
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
       modelCode: config.modelCode,
+      connectionType: config.connectionType,
+      ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
       systemPrompt: REVIEW_TEXT_SYSTEM_PROMPT,
       userPrompt: JSON.stringify(request.context),
       signal,
+      beforeSend: async () => {
+        signal.throwIfAborted();
+        const current = await deps.resolveModel(request.modelId, approved);
+        if (JSON.stringify(current) !== JSON.stringify(config))
+          throw new Error('model-unavailable');
+        await deps.assertScope(request, signal);
+        signal.throwIfAborted();
+      },
     });
     signal.throwIfAborted();
     send({ type: 'progress', requestId: request.requestId, phase: 'receiving' });

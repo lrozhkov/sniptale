@@ -8,6 +8,7 @@ import {
   sha256,
 } from '../../../../release/policy/oss-release-policy.mjs';
 import { validateLegalFiles } from './policy.mjs';
+import { validatePolicyEntries } from './policy-schema.mjs';
 
 it('includes exactly the declared modified-source closure in both canonical legal inventories', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'modified-legal-inventory-'));
@@ -56,5 +57,48 @@ it('includes exactly the declared modified-source closure in both canonical lega
     ).toHaveLength(2);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it('admits exact package-tag license sources and refuses mutable or incomplete identity', () => {
+  const source = {
+    kind: 'package-license',
+    packageName: '@ai-sdk/provider-utils',
+    packageVersion: '5.0.62',
+    packageResolved: 'https://registry.example.test/provider-utils.tgz',
+    packageIntegrity: 'sha512-Zml4dHVyZQ==',
+    upstreamRepository: 'vercel/ai',
+    upstreamVersion: '@ai-sdk/provider-utils@5.0.62',
+    originUrl:
+      'https://raw.githubusercontent.com/vercel/ai/%40ai-sdk%2Fprovider-utils%405.0.62/LICENSE',
+    license: 'Apache-2.0',
+    sourcePath: 'tooling/release/dependency-legal/sources/provider-utils.LICENSE',
+    sha256: 'a'.repeat(64),
+  };
+  const errors = (candidate: object) =>
+    validatePolicyEntries({
+      legalFiles: [],
+      bundledAssets: [],
+      workspacePackages: [],
+      contributorFiles: [],
+      releaseDocs: [],
+      forbiddenReleaseDocFragments: [],
+      dependencyLegal: {
+        canonicalLicenseAliases: [],
+        reviewedSelections: [],
+        pinnedSources: [candidate],
+      },
+    });
+  expect(errors(source)).toEqual([]);
+  for (const mutation of [
+    { originUrl: 'https://raw.githubusercontent.com/vercel/ai/main/LICENSE' },
+    { upstreamVersion: 'main' },
+    { packageIntegrity: '' },
+    { sha256: '' },
+    { upstreamRepository: '../ai' },
+  ]) {
+    expect(errors({ ...source, ...mutation })).toContain(
+      'OSS release pinned dependency license source is invalid'
+    );
   }
 });

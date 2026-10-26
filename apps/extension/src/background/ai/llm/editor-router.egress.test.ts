@@ -88,6 +88,8 @@ beforeEach(() => {
   resolveModelConfigMock.mockResolvedValue({
     apiKey: 'secret-key',
     baseUrl: 'https://api.openai.com/v1',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: 'fixture-destination-binding',
     effectiveSystemPrompt: 'unused here',
     modelCode: 'gpt-4.1',
     modelId: 'model-1',

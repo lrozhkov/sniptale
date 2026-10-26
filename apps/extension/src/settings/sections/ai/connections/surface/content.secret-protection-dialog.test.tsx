@@ -37,7 +37,6 @@ function createState(): AiProvidersSectionState {
       deleteModel: vi.fn().mockResolvedValue(undefined),
       deleteProvider: vi.fn().mockResolvedValue(undefined),
       moveModel: vi.fn().mockResolvedValue(undefined),
-      setDefaultModel: vi.fn().mockResolvedValue(undefined),
     },
     chromeAi: createMockChromeAiState(),
     secretProtection: {
@@ -47,7 +46,6 @@ function createState(): AiProvidersSectionState {
     },
     providers: [PROVIDER],
     models: [MODEL],
-    defaultModelId: 'model-1',
     isLoading: false,
     modelOptions: [],
     modals: {

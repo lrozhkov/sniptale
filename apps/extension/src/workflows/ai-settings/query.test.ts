@@ -20,6 +20,8 @@ vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => ({
 
 import {
   requestAIModelSelectionBootstrap,
+  requestAIScenarioModelSelection,
+  rememberAIScenarioModelSelection,
   requestAISettingsPageRuntimeData,
   requestChromeAiContentSystemPrompt,
   requestScenarioEditorSystemPrompt,
@@ -216,5 +218,111 @@ it('filters text and audio selectors before presentation and never adds Chrome A
   await expect(requestAIModelSelectionBootstrap('transcription')).resolves.toMatchObject({
     models: [],
     defaultModelId: null,
+  });
+});
+
+it('resolves a first-use scenario candidate without inheriting or writing the global default', async () => {
+  const models = ['a-model', 'b-model'].map((id) => ({
+    id,
+    modelCode: id,
+    displayName: id,
+    providerId: 'provider',
+  }));
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) =>
+    message.operation === 'read-scenario-selection'
+      ? { success: true, scenarioSelection: null }
+      : {
+          success: true,
+          modelSelection: {
+            chromeAiEnabled: false,
+            defaultModelId: 'b-model',
+            globalSystemPrompt: '',
+            models,
+            providers: [
+              {
+                id: 'provider',
+                name: 'Provider',
+                incarnation: 'incarnation',
+                createdAt: 1,
+                hasStoredApiKey: true,
+                connectionType: 'neuraldeep',
+                destinationKind: 'external',
+                destinationBinding: 'sha256:' + 'a'.repeat(64),
+              },
+            ],
+          },
+        }
+  );
+  const context = await requestAIScenarioModelSelection('page-edit');
+  expect(context.resolution).toMatchObject({ status: 'initial', modelId: 'a-model' });
+  expect(
+    queryMocks.sendRuntimeMessage.mock.calls.every(
+      ([message]) => message.type === MessageType.AI_SETTINGS_QUERY
+    )
+  ).toBe(true);
+  queryMocks.sendRuntimeMessage.mockResolvedValue({ success: false, error: 'Storage refused' });
+  await expect(rememberAIScenarioModelSelection(context, 'page-edit', 'b-model')).rejects.toThrow(
+    'Storage refused'
+  );
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      operation: 'remember-scenario-selection',
+      selection: expect.objectContaining({
+        scenario: 'page-edit',
+        modelId: 'b-model',
+        source: 'explicit',
+      }),
+    })
+  );
+});
+
+it('does not silently replace a retired remembered model in another scenario', async () => {
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) =>
+    message.operation === 'read-scenario-selection'
+      ? {
+          success: true,
+          scenarioSelection: {
+            modelId: 'old',
+            modelCode: 'old',
+            providerId: 'provider',
+            providerIncarnation: 'incarnation',
+            displayName: 'Previous model',
+            selectedAt: 1,
+            source: 'explicit',
+          },
+        }
+      : {
+          success: true,
+          modelSelection: {
+            chromeAiEnabled: false,
+            defaultModelId: 'replacement',
+            globalSystemPrompt: '',
+            models: [
+              {
+                id: 'replacement',
+                modelCode: 'replacement',
+                displayName: 'Replacement',
+                providerId: 'provider',
+              },
+            ],
+            providers: [
+              {
+                id: 'provider',
+                name: 'Provider',
+                incarnation: 'incarnation',
+                createdAt: 1,
+                hasStoredApiKey: true,
+                connectionType: 'neuraldeep',
+                destinationKind: 'external',
+              },
+            ],
+          },
+        }
+  );
+  const context = await requestAIScenarioModelSelection('scenario-edit');
+  expect(context.resolution).toMatchObject({
+    status: 'unavailable',
+    modelId: null,
+    previousSelection: { displayName: 'Previous model' },
   });
 });

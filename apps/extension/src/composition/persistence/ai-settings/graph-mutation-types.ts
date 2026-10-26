@@ -1,7 +1,15 @@
+import type { AIRememberScenarioSelectionInput } from '../../../contracts/settings/ai-catalog';
 import type { AIModel } from '../../../contracts/settings';
 import type { AIProviderUpsertInput } from './provider-secret-upsert-plan';
 
 export type AISettingsMutationCommand =
+  | {
+      operation: 'set-provider-enabled';
+      providerId: string;
+      providerIncarnation: string;
+      enabled: boolean;
+    }
+  | { operation: 'remember-scenario-selection'; selection: AIRememberScenarioSelectionInput }
   | {
       operation: 'add-provider' | 'update-provider';
       provider: AIProviderUpsertInput;

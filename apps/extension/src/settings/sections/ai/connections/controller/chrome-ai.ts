@@ -6,14 +6,10 @@ import {
   loadChromeAiAvailability,
   prepareChromeAiSession,
 } from '@sniptale/platform/browser/chrome-ai';
-import { isChromeAiModelId } from '../../../../../features/ai/chrome/constants';
-import { resolveSelectedAIModelId } from '../../../../../features/ai/selection';
 import { translate } from '../../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createUserFacingErrorMessage } from '../../../../../platform/i18n/user-facing-error';
 import { saveChromeAiEnabled } from '../../../../runtime/ai-settings/mutations';
-import type { AIModel } from '../../../../../contracts/settings';
-import { saveAiProvidersDefaultModel } from './save';
 
 const logger = createLogger({ namespace: 'SettingsAiProvidersChromeAi' });
 
@@ -33,11 +29,8 @@ function normalizeChromeAiToggleError(error: unknown): string {
 
 type ChromeAiToggleArgs = {
   chromeAiEnabled: boolean;
-  defaultModelId: string | null;
-  models: AIModel[];
   reloadData: () => Promise<void>;
   setChromeAiEnabled: (value: boolean) => void;
-  setDefaultModelId: (value: string | null) => void;
 };
 
 function useChromeAiAvailabilityState() {
@@ -77,15 +70,6 @@ function useChromeAiAvailabilityState() {
 async function disableChromeAi(args: ChromeAiToggleArgs): Promise<void> {
   await saveChromeAiEnabled(false);
   args.setChromeAiEnabled(false);
-
-  if (isChromeAiModelId(args.defaultModelId)) {
-    const nextDefaultModelId = resolveSelectedAIModelId(args.models, null);
-    const didSave = await saveAiProvidersDefaultModel(nextDefaultModelId, args.setDefaultModelId);
-
-    if (!didSave) {
-      return;
-    }
-  }
 
   await args.reloadData();
 }

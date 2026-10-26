@@ -34,6 +34,8 @@ const config = {
   baseUrl: 'https://provider.test/v1',
   apiKey: 'private-key',
   modelCode: 'code',
+  connectionType: 'openai-compatible' as const,
+  destinationBinding: 'fixture-destination-binding',
   effectiveSystemPrompt: 'hidden prompt must not be sent',
 };
 function setup() {
@@ -251,3 +253,53 @@ it('keeps review erasure reservations local to a service and releases each only 
   await first.service.reserveErasureExclusion().waitForActiveMutations();
   expect(first.messages.at(-1)?.type).toBe('proposal');
 });
+
+it('rechecks the current model and workspace at the transport send boundary', async () => {
+  const { connection, deps, service, messages } = setup();
+  deps.request.mockImplementationOnce(async ({ beforeSend }) => {
+    await beforeSend?.();
+    return JSON.stringify(proposal);
+  });
+  connection.receive(start);
+  const reservation = service.reserveErasureExclusion();
+  await reservation.waitForActiveMutations();
+  reservation.release();
+  expect(deps.resolveModel).toHaveBeenCalledTimes(3);
+  expect(deps.assertScope).toHaveBeenCalledTimes(3);
+  expect(messages.at(-1)).toEqual({ type: 'proposal', requestId: start.requestId, proposal });
+});
+
+it.each(['model-change', 'workspace-change'] as const)(
+  'refuses %s after transport preparation before sending review text',
+  async (change) => {
+    const { connection, deps, service, messages } = setup();
+    const send = vi.fn();
+    deps.request.mockImplementationOnce(async ({ beforeSend }) => {
+      if (change === 'model-change') {
+        deps.resolveModel.mockResolvedValueOnce({ ...config, modelCode: 'replacement' });
+      } else {
+        deps.assertScope.mockRejectedValueOnce(new Error('stale'));
+      }
+      await beforeSend?.();
+      send();
+      return JSON.stringify(proposal);
+    });
+    connection.receive(start);
+    const reservation = service.reserveErasureExclusion();
+    await reservation.waitForActiveMutations();
+    reservation.release();
+    expect(send).not.toHaveBeenCalled();
+    expect(messages.at(-1)).toEqual({
+      type: 'failure',
+      requestId: start.requestId,
+      code: change === 'model-change' ? 'model-unavailable' : 'stale',
+    });
+    expect(deps.history).toHaveBeenCalledExactlyOnceWith({
+      modelId: 'model',
+      requestKind: 'json',
+      resultCount: 0,
+      status: 'failure',
+      errorCode: 'provider-failure',
+    });
+  }
+);

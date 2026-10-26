@@ -56,3 +56,15 @@ it('routes correction prompt writes through the background authority', async () 
     operation: 'reset-voice-input-correction-prompt',
   });
 });
+
+it('sends an enabled patch with exact provider incarnation and no stale connection fields', async () => {
+  const { setAIProviderEnabled } = await import('./mutations');
+  await setAIProviderEnabled('provider', 'incarnation', false);
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'set-provider-enabled',
+    providerId: 'provider',
+    providerIncarnation: 'incarnation',
+    enabled: false,
+  });
+});

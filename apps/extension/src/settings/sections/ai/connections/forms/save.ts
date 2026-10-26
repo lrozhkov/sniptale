@@ -1,3 +1,5 @@
+import { browserPermissions } from '@sniptale/platform/browser/permissions';
+import { getAIProviderDefinition } from '../../../../../contracts/settings/ai-provider';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import type { AIProviderMutationInput } from '../../../../../contracts/messaging/ai-settings-runtime';
 import { isAllowedAIProviderBaseUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
@@ -24,7 +26,11 @@ function getProviderApiKeyError(
   formData: ProviderFormData,
   provider?: AIProvider | null
 ): Record<string, string> | null {
-  const requiresApiKey = !isEditing || provider?.hasStoredApiKey === false;
+  const requiresApiKey =
+    getAIProviderDefinition(formData.connectionType).credential !== 'none' &&
+    (!isEditing ||
+      provider?.hasStoredApiKey === false ||
+      provider?.connectionType !== formData.connectionType);
 
   if (!requiresApiKey || formData.apiKey) {
     return null;
@@ -49,6 +55,8 @@ async function persistProviderForm(args: {
     name: args.formData.name,
     connectionType: args.formData.connectionType,
     baseUrl: args.formData.baseUrl,
+    management: args.formData.management ?? 'automatic',
+    enabled: args.formData.enabled ?? true,
     createdAt: args.provider?.createdAt ?? Date.now(),
     ...(args.apiKey ? { apiKey: args.apiKey } : {}),
   };
@@ -115,11 +123,17 @@ export async function saveProviderForm(args: ProviderFormSaveParams): Promise<vo
 
   try {
     assertProviderBaseUrlPolicy(args.formData.baseUrl);
+    args.setIsSaving(true);
+    didStartSave = true;
+    if (browserPermissions.isAvailable()) {
+      // Start the optional host request in the submit gesture, before unlocking can yield to another dialog.
+      await browserPermissions
+        .request({ origins: [`${new URL(args.formData.baseUrl).origin}/*`] })
+        .catch(() => false);
+    }
     if (args.formData.apiKey) {
       await args.ensureUnlockedBeforeSecretSave?.();
     }
-    args.setIsSaving(true);
-    didStartSave = true;
     await persistProviderForm(
       args.provider === undefined
         ? {

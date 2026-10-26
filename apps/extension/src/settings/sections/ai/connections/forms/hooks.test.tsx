@@ -106,6 +106,8 @@ it('keeps provider secrets out of React form state and reads them from the input
   expect(latestProviderState?.formData).toEqual({
     name: 'OpenAI',
     connectionType: 'openai-compatible',
+    management: 'automatic',
+    enabled: true,
     baseUrl: 'https://api.openai.com/v1',
   });
   expect('apiKey' in (latestProviderState?.formData ?? {})).toBe(false);
@@ -136,6 +138,8 @@ it('keeps provider secrets out of React form state and reads them from the input
       formData: {
         name: 'OpenAI',
         connectionType: 'openai-compatible',
+        management: 'automatic',
+        enabled: true,
         baseUrl: 'https://api.openai.com/v1',
         apiKey: 'provider-secret',
       },
@@ -154,6 +158,8 @@ it('updates provider form fields in create mode without storing the API key in s
   expect(latestProviderState?.formData).toEqual({
     name: '',
     connectionType: 'openai-compatible',
+    management: 'automatic',
+    enabled: true,
     baseUrl: '',
   });
 
@@ -170,6 +176,8 @@ it('updates provider form fields in create mode without storing the API key in s
   expect(latestProviderState?.formData).toEqual({
     name: 'Local provider',
     connectionType: 'openai-compatible',
+    management: 'automatic',
+    enabled: true,
     baseUrl: 'http://127.0.0.1:11434/v1',
   });
   expect('apiKey' in (latestProviderState?.formData ?? {})).toBe(false);
@@ -277,4 +285,22 @@ it('switches purpose without keeping incompatible audio defaults', async () => {
     latestModelState?.handleOperationChange('text');
   });
   expect(latestModelState?.formData.audio).toBeUndefined();
+});
+
+it('selects a named provider with its endpoint and clears a credential from the previous destination', async () => {
+  await renderProviderHarness();
+  const password = document.createElement('input');
+  password.value = 'previous-provider-secret';
+  if (latestProviderState) latestProviderState.apiKeyInputRef.current = password;
+  await act(async () => latestProviderState?.handleConnectionTypeChange('neuraldeep'));
+  expect(latestProviderState?.formData).toMatchObject({
+    connectionType: 'neuraldeep',
+    name: 'neuraldeep.ru',
+    baseUrl: 'https://api.neuraldeep.ru/v1',
+    management: 'automatic',
+  });
+  expect(password.value).toBe('');
+  expect(latestProviderState?.formData).not.toHaveProperty('apiKey');
+  await act(async () => latestProviderState?.handleManagementChange('manual'));
+  expect(latestProviderState?.formData.management).toBe('manual');
 });

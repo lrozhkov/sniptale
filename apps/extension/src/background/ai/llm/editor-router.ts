@@ -10,7 +10,7 @@ import { extractJSON, requestMultimodalChatCompletion } from './transport/reques
 import { loadScenarioEditorSystemPrompt } from '../../../composition/persistence/ai-settings';
 import { processScenarioEditorWithLlmMessageSchema } from '../../../contracts/messaging/scenario/ai-schemas';
 import { scenarioAiOperationsResponseSchema } from '@sniptale/runtime-contracts/scenario-ai-operations';
-import { resolveModelConfig } from './model-config';
+import { assertResolvedLlmModelConfigCurrent, resolveModelConfig } from './model-config';
 import { respondAsyncLlmRoute, resolveRequiredLlmModelId } from './route-response';
 import { assertScenarioEditorLlmPayloadLimits } from '../../../contracts/ai/payload-limits';
 import {
@@ -139,6 +139,9 @@ async function processScenarioEditorRequest(
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
     modelCode: config.modelCode,
+    connectionType: config.connectionType,
+    beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
+    ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
     providerErrorLabel: config.providerId,
     systemPrompt: buildScenarioAiSystemPrompt(scenarioPrompt),
     userContent: buildScenarioEditorUserContent(message, canonicalPayload),

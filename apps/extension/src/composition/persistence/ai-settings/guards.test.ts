@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  cloneLegacyAiSettings,
-  parseLegacyStoredAIProviders,
   parseStoredAIModels,
   parseStoredChromeAiEnabled,
   parseStoredAIProviders,
@@ -79,22 +77,7 @@ describe('ai storage guards list parsing', () => {
 });
 
 describe('ai storage guards scalar parsing', () => {
-  it('parses legacy providers and scalar storage values', () => {
-    expect(
-      parseLegacyStoredAIProviders([
-        {
-          id: 'provider-1',
-          name: 'Provider',
-          connectionType: 'openai-compatible',
-          baseUrl: 'https://api.example.test',
-          apiKey: 'secret',
-          createdAt: 1,
-        },
-      ])
-    ).toMatchObject({
-      hasInvalidRoot: false,
-      invalidEntryCount: 0,
-    });
+  it('parses scalar storage values', () => {
     expect(parseStoredDefaultModelId('model-1')).toBe('model-1');
     expect(parseStoredDefaultModelId(42)).toBeNull();
     expect(parseStoredChromeAiEnabled(true)).toBe(true);
@@ -104,9 +87,7 @@ describe('ai storage guards scalar parsing', () => {
 });
 
 describe('ai storage guards secret parsing', () => {
-  it('clones legacy settings roots and filters valid provider secrets', () => {
-    expect(cloneLegacyAiSettings({ providers: [] })).toEqual({ providers: [] });
-    expect(cloneLegacyAiSettings('broken')).toBeNull();
+  it('filters valid provider secrets', () => {
     expect(
       parseStoredProviderSecretMap({
         valid: {

@@ -280,7 +280,7 @@ it('reloads the catalog before closing an edited audio model and keeps the dialo
   );
 });
 
-it('shows audio purposes while restricting the default action to text models', async () => {
+it('shows model purposes without a global-default action', async () => {
   const state = createMockAiProvidersSectionState();
   const transcription: AIModel = {
     ...speech,
@@ -311,14 +311,7 @@ it('shows audio purposes while restricting the default action to text models', a
   await act(async () =>
     required(row(legacy.id).querySelector<HTMLButtonElement>('[aria-expanded]')).click()
   );
-  await act(async () =>
-    required(
-      row(legacy.id).querySelector<HTMLButtonElement>(
-        '[data-collection-inline-action="set-default"]'
-      )
-    ).click()
-  );
-  expect(state.catalogActions.setDefaultModel).toHaveBeenCalledWith(legacy.id);
+  expect(row(legacy.id).querySelector('[data-collection-inline-action="set-default"]')).toBeNull();
   await act(async () =>
     required(
       row(speech.id).querySelector<HTMLButtonElement>(
@@ -336,7 +329,6 @@ it('shows audio purposes while restricting the default action to text models', a
     ).click()
   );
   expect(state.modals.setConfirmDelete).toHaveBeenCalledWith({ type: 'model', item: speech });
-  state.defaultModelId = legacy.id;
   await render(<AIProvidersModelsCard state={state} />);
   expect(row(legacy.id).querySelector('[data-collection-inline-action="set-default"]')).toBeNull();
 });

@@ -9,12 +9,20 @@ import {
   createGuideImageBlock,
 } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
-const io = vi.hoisted(() => ({ configuration: vi.fn(), request: vi.fn(), verify: vi.fn() }));
+const io = vi.hoisted(() => ({
+  configuration: vi.fn(),
+  request: vi.fn(),
+  verify: vi.fn(),
+  remember: vi.fn(),
+}));
 vi.mock('./runtime/ai-request', () => ({
-  loadGuideAiConfiguration: io.configuration,
   requestGuideAiProposal: io.request,
   verifyGuideAiBasis: io.verify,
   GuideAiStaleError: class extends Error {},
+}));
+vi.mock('../../workflows/ai-settings/query', () => ({
+  requestAIScenarioModelSelection: io.configuration,
+  rememberAIScenarioModelSelection: io.remember,
 }));
 vi.mock('../../features/prompt-templates/hooks/use-prompt-templates', () => ({
   usePromptTemplates: () => ({ templates: [], isLoading: false, isMutating: false, error: null }),
@@ -76,7 +84,24 @@ async function open(
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.resetAllMocks();
-  io.configuration.mockResolvedValue({ providers: [], models: [], defaultModelId: 'model' });
+  io.remember.mockResolvedValue(undefined);
+  io.configuration.mockResolvedValue({
+    scenario: 'scenario-edit',
+    providers: [
+      {
+        id: 'provider',
+        name: 'NeuralDeep',
+        connectionType: 'neuraldeep',
+        incarnation: 'one',
+        destinationKind: 'external',
+        createdAt: 1,
+        hasStoredApiKey: true,
+      },
+    ],
+    models: [{ id: 'model', providerId: 'provider', modelCode: 'model', displayName: 'Model' }],
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
+  });
   io.request.mockResolvedValue(proposal);
   io.verify.mockResolvedValue(1);
   host = document.createElement('div');
@@ -87,6 +112,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 it('requests only explicitly, previews and applies a selected subset once, then restores focus', async () => {
   await open();
@@ -468,4 +494,27 @@ it('rejects a late proposal when actual draft content changed during the request
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('changed');
   expect(change).not.toHaveBeenCalled();
   expect(document.body.textContent).not.toContain('After title');
+});
+
+it('explains a refused model preference write and preserves the previous visible choice', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    () => new DOMRect(10, 20, 200, 30)
+  );
+  await open();
+  io.remember.mockRejectedValue(new Error('Storage refused'));
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!.click()
+  );
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('button[title="Model"]')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  );
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+    'Could not save the model selection'
+  );
+  expect(document.querySelector('.sniptale-ai-model-selector-trigger')?.textContent).toContain(
+    'Model'
+  );
+  expect(io.request).not.toHaveBeenCalled();
 });

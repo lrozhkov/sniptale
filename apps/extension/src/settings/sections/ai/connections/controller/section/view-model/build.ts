@@ -3,7 +3,6 @@ import type { AiProvidersSectionState } from '../../types';
 
 export type AiProvidersSectionControllerBuildProps = {
   dataState: {
-    defaultModelId: string | null;
     isLoading: boolean;
     models: AiProvidersSectionState['models'];
     providers: AiProvidersSectionState['providers'];
@@ -27,7 +26,6 @@ export function buildAiProvidersSectionControllerState(
     catalogActions: props.catalogActions,
     chromeAi: props.chromeAi,
     secretProtection: props.secretProtection,
-    defaultModelId: props.dataState.defaultModelId,
     getProviderName: props.getProviderName,
     isLoading: props.dataState.isLoading,
     modelOptions: buildAiProvidersModelOptions({

@@ -14,7 +14,6 @@ vi.mock('./build', async (importOriginal) => {
       deleteModel: vi.fn(),
       deleteProvider: vi.fn(),
       moveModel: vi.fn(),
-      setDefaultModel: vi.fn(),
     },
     ...original,
     buildAiProvidersSectionControllerState:
@@ -32,7 +31,6 @@ import { useAiProvidersSectionController } from '.';
 function createControllerDependencies() {
   return {
     dataState: {
-      defaultModelId: 'model-1',
       isLoading: false,
       models: [],
       providers: [],

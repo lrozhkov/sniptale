@@ -15,7 +15,6 @@ import {
   createScenarioEditorEgressAuthority,
   canonicalizeScenarioEditorEgressPayload,
 } from '../../../features/ai/egress-authority';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
 import { requestLlmSessionToken } from '../../../workflows/ai-session/llm-session';
 import {
   createRuntimeMessagingTransport,
@@ -29,21 +28,6 @@ export class GuideAiStaleError extends Error {
     super('AI proposal basis is no longer current.');
     this.name = 'GuideAiStaleError';
   }
-}
-
-/** Reads sanitized selector metadata through the existing background-owned settings query. */
-export async function loadGuideAiConfiguration() {
-  const configuration = await requestAIModelSelectionBootstrap();
-  const providers = configuration.providers.filter(
-    (provider) => provider.connectionType === 'openai-compatible'
-  );
-  const models = configuration.models.filter((model) =>
-    providers.some((provider) => provider.id === model.providerId)
-  );
-  const defaultModelId = models.some((model) => model.id === configuration.defaultModelId)
-    ? configuration.defaultModelId
-    : (models[0]?.id ?? null);
-  return { providers, models, defaultModelId };
 }
 
 /** Reads the committed authority again before request dispatch or proposal acceptance. */

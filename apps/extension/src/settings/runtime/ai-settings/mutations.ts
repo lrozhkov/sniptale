@@ -52,6 +52,19 @@ export function updateAIProvider(provider: AIProviderMutationInput): Promise<voi
   return sendAiSettingsMutation({ operation: 'update-provider', provider }).then(() => undefined);
 }
 
+export function setAIProviderEnabled(
+  providerId: string,
+  providerIncarnation: string,
+  enabled: boolean
+): Promise<void> {
+  return sendAiSettingsMutation({
+    operation: 'set-provider-enabled',
+    providerId,
+    providerIncarnation,
+    enabled,
+  }).then(() => undefined);
+}
+
 export function clearAIProviderSecret(providerId: string): Promise<void> {
   return sendAiSettingsMutation({ operation: 'clear-provider-secret', providerId }).then(
     () => undefined
@@ -177,6 +190,13 @@ export function saveVoiceInputCorrectionSystemPrompt(prompt: string): Promise<vo
 }
 export function resetVoiceInputCorrectionSystemPrompt(): Promise<void> {
   return sendAiSettingsMutation({ operation: 'reset-voice-input-correction-prompt' }).then(
+    () => undefined
+  );
+}
+
+/** Runs a non-billable metadata check from an explicit Settings action. */
+export function refreshAIProviderCatalog(providerId: string): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'refresh-provider-catalog', providerId }).then(
     () => undefined
   );
 }

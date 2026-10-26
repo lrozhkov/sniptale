@@ -1,3 +1,12 @@
+import { AI_PROVIDER_TYPES } from '../../../contracts/settings/ai-provider';
+import {
+  isAIModelCapabilities,
+  isAICatalogFacts,
+  isAIConnectionObservation,
+  type AIModelCapabilities,
+  type AICatalogFacts,
+  type AIConnectionObservation,
+} from '../../../contracts/settings/ai-catalog';
 import {
   isValidAIModelOperationConfiguration,
   type AIModelAudioParameters,
@@ -32,9 +41,18 @@ export const AIProviderSchema = z.object({
     .string()
     .min(1, schemaMessageKey('validation.schemas.nameRequired'))
     .max(100, schemaMessageKey('validation.schemas.max100Characters')),
-  connectionType: z.enum(['openai-compatible']),
+  connectionType: z.enum(AI_PROVIDER_TYPES),
   baseUrl: createAIProviderBaseUrlSchema(),
   hasStoredApiKey: z.boolean(),
+  management: z.enum(['automatic', 'manual']).optional(),
+  enabled: z.boolean().optional(),
+  incarnation: z.string().min(1).max(200).optional(),
+  revision: z.number().int().nonnegative().optional(),
+  credentialRevision: z.number().int().nonnegative().optional(),
+  observation: z.custom<AIConnectionObservation>(isAIConnectionObservation).optional(),
+  catalogUpdatedAt: z.number().nonnegative().optional(),
+  lastRefreshAttemptAt: z.number().nonnegative().optional(),
+  refreshGeneration: z.string().min(1).max(200).optional(),
   createdAt: z.number(),
 });
 
@@ -53,6 +71,11 @@ const operationFields = {
 export const AIModelSchema = z
   .object({
     ...operationFields,
+    source: z.enum(['catalog', 'manual']).optional(),
+    enabled: z.boolean().optional(),
+    retirementOverride: z.boolean().optional(),
+    capabilities: z.custom<AIModelCapabilities>(isAIModelCapabilities).optional(),
+    catalog: z.custom<AICatalogFacts>(isAICatalogFacts).optional(),
     id: z.string().uuid(),
     providerId: z.string().uuid(schemaMessageKey('validation.schemas.selectProvider')),
     modelCode: z
@@ -88,11 +111,13 @@ export const AISettingsSchema = z.object({
 });
 
 export const ProviderFormSchema = z.object({
+  management: z.enum(['automatic', 'manual']).optional(),
+  enabled: z.boolean().optional(),
   name: z
     .string()
     .min(1, schemaMessageKey('validation.schemas.nameRequired'))
     .max(100, schemaMessageKey('validation.schemas.max100Characters')),
-  connectionType: z.enum(['openai-compatible']),
+  connectionType: z.enum(AI_PROVIDER_TYPES),
   baseUrl: createAIProviderBaseUrlSchema(),
 });
 

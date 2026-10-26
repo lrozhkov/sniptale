@@ -1,3 +1,6 @@
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { isAvailable: () => false },
+}));
 import type { SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../../../platform/i18n';

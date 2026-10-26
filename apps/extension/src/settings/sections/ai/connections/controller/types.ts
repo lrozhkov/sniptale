@@ -70,13 +70,11 @@ export interface AiProvidersSectionState {
     deleteModel: () => Promise<void>;
     deleteProvider: () => Promise<void>;
     moveModel: (modelId: string, beforeModelId: string | null) => Promise<boolean>;
-    setDefaultModel: (value: string) => Promise<void>;
   };
   chromeAi: AiProvidersChromeAiState;
   secretProtection: AiSecretProtectionState;
   providers: AIProvider[];
   models: AIModel[];
-  defaultModelId: string | null;
   isLoading: boolean;
   modelOptions: { value: string; label: string }[];
   modals: AiProvidersModalsState;

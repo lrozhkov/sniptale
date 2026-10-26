@@ -30,6 +30,7 @@ vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
       remove: localRemoveMock,
       set: localSetMock,
     },
+    session: { get: vi.fn(async () => ({})), remove: vi.fn() },
     sync: {
       get: syncGetMock,
       remove: syncRemoveMock,
@@ -136,32 +137,17 @@ function installLegacyAiStorageState() {
   });
 }
 function expectLegacyAiStorageCleanup() {
-  expect(localRemoveMock).toHaveBeenCalledTimes(2);
-  expect(localRemoveMock).toHaveBeenNthCalledWith(1, ['sniptale_master_key_material']);
-  expect(localRemoveMock).toHaveBeenNthCalledWith(2, [AI_STORAGE_MIGRATION_PHASE_KEY]);
-  expect(syncRemoveMock).toHaveBeenCalledTimes(1);
-  expect(syncRemoveMock).toHaveBeenCalledWith([
-    'sniptale_ai_default_model',
-    'sniptale_ai_global_prompt',
-    'sniptale_ai_scenario_editor_prompt',
-  ]);
-  expect(syncSetMock).toHaveBeenCalledWith({
-    sniptale_settings: {
-      captureAction: 'download_default',
-    },
-  });
+  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeUndefined();
+  expect(localState[AI_PROVIDER_SECRETS_KEY]).toBeUndefined();
+  expect(localState[AI_STORAGE_MIGRATION_PHASE_KEY]).toBeUndefined();
+  expect(syncState['sniptale_settings']).toMatchObject({ captureAction: 'download_default' });
+  expect(syncState['sniptale_settings']).not.toHaveProperty('apiKey');
+  expect(syncState['sniptale_settings']).not.toHaveProperty('apiBaseUrl');
 }
 function expectLegacyAiStorageState() {
   expect(localState[AI_STORAGE_VERSION_KEY]).toBe(AI_STORAGE_VERSION);
-  expect(localState[AI_PROVIDERS_KEY]).toEqual([createStoredProvider('provider-1')]);
-  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual({
-    'provider-1': expect.objectContaining({
-      algorithm: 'AES-GCM',
-      version: 2,
-    }),
-  });
-  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toEqual(expect.any(String));
-  expect(localState[AI_STORAGE_MIGRATION_PHASE_KEY]).toBeUndefined();
+  expect(localState[AI_PROVIDERS_KEY]).toEqual([]);
+  expect(localState[AI_MODELS_KEY]).toEqual([]);
 }
 async function verifyOneTimeReset() {
   installLegacyAiStorageState();
@@ -170,13 +156,13 @@ async function verifyOneTimeReset() {
 
   await expect(readAiStorageReadiness()).resolves.toMatchObject({
     isReady: false,
-    requiresMigration: true,
+    requiresReset: true,
   });
   await expect(initializeAiStorageAccess()).resolves.toBeUndefined();
 
-  await expect(loadAIProviders()).resolves.toEqual([createStoredProvider('provider-1')]);
+  await expect(loadAIProviders()).resolves.toEqual([]);
   await expect(loadAIModels()).resolves.toEqual([]);
-  await expect(loadAIProviderSecret('provider-1')).resolves.toBe('provider-1-secret');
+  await expect(loadAIProviderSecret('provider-1')).resolves.toBeNull();
 
   expectLegacyAiStorageCleanup();
   expectLegacyAiStorageState();

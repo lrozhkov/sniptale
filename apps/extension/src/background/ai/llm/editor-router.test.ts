@@ -93,6 +93,8 @@ function createResolvedConfig() {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: 'secret-key',
     modelCode: 'gpt-4.1',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: 'fixture-destination-binding',
     effectiveSystemPrompt: 'unused here',
   };
 }
@@ -138,6 +140,8 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
     modelCode: 'gpt-4.1',
     providerErrorLabel: 'provider-1',
     systemPrompt: buildScenarioAiSystemPrompt('Scenario editor system prompt'),
+    beforeSend: expect.any(Function),
+    connectionType: 'openai-compatible',
     userContent: [
       {
         type: 'text',

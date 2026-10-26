@@ -1,4 +1,11 @@
 import {
+  getAIScenarioOperation,
+  type AIScenario,
+  type AIPersistedScenario,
+} from '../../contracts/settings/ai-catalog';
+import { supportsAIScenarioModel } from '../../contracts/settings/model-operation';
+import { resolveAIScenarioModel } from '../../features/ai/selection';
+import {
   filterAIModelsByOperation,
   type AIModelOperation,
 } from '../../contracts/settings/model-operation';
@@ -138,4 +145,66 @@ export async function requestChromeAiContentSystemPrompt(modelId: string): Promi
     throw new Error('Chrome AI content system prompt response missing payload');
   }
   return response.systemPrompt;
+}
+
+/** Reads scenario context without changing preferences or inheriting a global default. */
+export async function requestAIScenarioModelSelection(
+  scenario: AIScenario,
+  preferredProviderId?: string
+) {
+  const [catalog, remembered] = await Promise.all([
+    sendAISettingsQuery({ operation: 'read-model-selection-bootstrap' }),
+    sendAISettingsQuery({ operation: 'read-scenario-selection', scenario }),
+  ]);
+  if (!catalog.modelSelection || remembered.scenarioSelection === undefined)
+    throw new Error('AI scenario selection response missing payload');
+  const bootstrap = catalog.modelSelection;
+  const entries =
+    getAIScenarioOperation(scenario) === 'text' && (await canUseChromeAi(bootstrap.chromeAiEnabled))
+      ? mergeChromeAiProviderSelectorEntries(bootstrap)
+      : bootstrap;
+  const resolution = resolveAIScenarioModel({
+    scenario,
+    models: entries.models,
+    providers: entries.providers,
+    selection: remembered.scenarioSelection,
+    preferredProviderId,
+  });
+  const models = entries.models.filter((model) => {
+    const provider = entries.providers.find((entry) => entry.id === model.providerId);
+    return provider && supportsAIScenarioModel(model, provider, scenario);
+  });
+  return {
+    scenario,
+    models,
+    providers: entries.providers,
+    remembered: remembered.scenarioSelection,
+    resolution,
+  };
+}
+
+/** Persists only a visible explicit choice or the visible candidate the user elects to use. */
+export async function rememberAIScenarioModelSelection(
+  context: Awaited<ReturnType<typeof requestAIScenarioModelSelection>>,
+  scenario: AIPersistedScenario,
+  modelId: string,
+  source: 'explicit' | 'initial' = 'explicit'
+): Promise<void> {
+  if (context.scenario !== scenario) throw new Error('AI selection scenario changed');
+  const model = context.models.find((entry) => entry.id === modelId);
+  const provider = context.providers.find((entry) => entry.id === model?.providerId);
+  if (!model || !provider) throw new Error('AI model selection is unavailable');
+  const response = await sendRuntimeMessage({
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'remember-scenario-selection',
+    selection: {
+      scenario,
+      modelId,
+      modelCode: model.modelCode,
+      providerId: provider.id,
+      source,
+      ...(provider.destinationBinding ? { destinationBinding: provider.destinationBinding } : {}),
+    },
+  });
+  if (!response.success) throw new Error(response.error ?? 'AI model selection could not be saved');
 }

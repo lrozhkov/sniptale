@@ -93,6 +93,28 @@ async function readPinnedIconSetMetadata(record, source) {
   }
 }
 
+function assertPackageLicenseIdentity(record, selectedLicense, source) {
+  const repository = record.installedMetadata.repository;
+  const repositoryUrl = typeof repository === 'string' ? repository : repository?.url;
+  const expectedRef = `${record.packageName}@${record.version}`;
+  const upstreamRoot = `https://raw.githubusercontent.com/${source.upstreamRepository}`;
+  const expectedOrigin = `${upstreamRoot}/${encodeURIComponent(expectedRef)}/LICENSE`;
+  const matches =
+    record.packageName === source.packageName &&
+    record.version === source.packageVersion &&
+    record.resolved === source.packageResolved &&
+    record.integrity === source.packageIntegrity &&
+    selectedLicense === source.license &&
+    repositoryUrl === `https://github.com/${source.upstreamRepository}` &&
+    source.upstreamVersion === expectedRef &&
+    source.originUrl === expectedOrigin;
+  if (!matches) {
+    throw new Error(
+      `Pinned dependency license identity drift for ${record.packageName}@${record.version}.`
+    );
+  }
+}
+
 /** Reads a reviewed version-tagged, byte-pinned license source without network access. */
 export async function selectPinnedLicenseSource(record, selectedLicense, pinnedSources) {
   const source = pinnedSources.find(
@@ -101,9 +123,13 @@ export async function selectPinnedLicenseSource(record, selectedLicense, pinnedS
   );
   if (!source) return undefined;
   assertContainedSourcePath(source.sourcePath);
-  assertVersionedOrigin(source);
-  const iconSet = await readPinnedIconSetMetadata(record, source);
-  assertPinnedIdentity(record, selectedLicense, source, iconSet);
+  if (source.kind === 'package-license') {
+    assertPackageLicenseIdentity(record, selectedLicense, source);
+  } else {
+    assertVersionedOrigin(source);
+    const iconSet = await readPinnedIconSetMetadata(record, source);
+    assertPinnedIdentity(record, selectedLicense, source, iconSet);
+  }
   let contents;
   try {
     contents = await fs.readFile(path.resolve(record.repoRoot, source.sourcePath), 'utf8');

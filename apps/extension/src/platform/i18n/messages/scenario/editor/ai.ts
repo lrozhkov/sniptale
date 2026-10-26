@@ -1,4 +1,13 @@
 export const scenarioEditorAiMessages = {
+  guideAiSelectionFailed: {
+    ru: 'Не удалось сохранить выбор модели. Выберите модель ещё раз.',
+    en: 'Could not save the model selection. Select the model again.',
+  },
+  guideAiModelUnavailable: {
+    ru: 'Ранее выбранная модель недоступна. Выберите другую модель.',
+    en: 'The previous model is unavailable. Select another model.',
+  },
+
   aiEditorInstruction: {
     ru: 'Инструкция для AI-ассистента',
     en: 'Instruction for the AI assistant',

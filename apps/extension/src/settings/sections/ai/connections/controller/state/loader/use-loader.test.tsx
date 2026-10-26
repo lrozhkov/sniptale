@@ -21,10 +21,6 @@ vi.mock('./apply-loaded-data', () => ({
   applyLoadedAiProvidersRuntimeData: loaderMocks.applyLoadedAiProvidersRuntimeDataMock,
 }));
 
-vi.mock('./default-model', () => ({
-  ensureDefaultAiProvidersModel: loaderMocks.ensureDefaultAiProvidersModelMock,
-}));
-
 vi.mock('./error-handling', () => ({
   reportAiProvidersLoaderError: loaderMocks.reportAiProvidersLoaderErrorMock,
 }));
@@ -91,7 +87,6 @@ async function flushEffects() {
 function createLoaderSetters() {
   return {
     setChromeAiEnabled: vi.fn(),
-    setDefaultModelId: vi.fn(),
     setIsLoading: vi.fn(),
     setModels: vi.fn(),
     setProviders: vi.fn(),
@@ -121,7 +116,6 @@ beforeEach(() => {
     MODELS,
     [PROVIDER],
     MODELS,
-    null,
     'Shared global prompt',
     'Scenario editor prompt',
     false,
@@ -146,7 +140,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-it('loads runtime data on mount and applies the default-model fallback when needed', async () => {
+it('loads runtime data on mount without changing model preferences', async () => {
   const setters = createLoaderSetters();
   const secretSetters = createSecretProtectionSetters();
 
@@ -164,18 +158,13 @@ it('loads runtime data on mount and applies the default-model fallback when need
       MODELS,
       [PROVIDER],
       MODELS,
-      null,
       'Shared global prompt',
       'Scenario editor prompt',
       false,
       { isEnabled: false, isUnlocked: true, mode: 'transparent' },
     ]
   );
-  expect(loaderMocks.ensureDefaultAiProvidersModelMock).toHaveBeenCalledWith(
-    null,
-    MODELS,
-    setters.setDefaultModelId
-  );
+
   expect(setters.setIsLoading).toHaveBeenNthCalledWith(1, true);
   expect(setters.setIsLoading).toHaveBeenLastCalledWith(false);
   expect(latestReloadData?.reloadData).toEqual(expect.any(Function));

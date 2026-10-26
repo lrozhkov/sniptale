@@ -1,3 +1,5 @@
+import { AI_SCENARIOS, AI_PERSISTED_SCENARIOS } from '../../settings/ai-catalog';
+import { AI_PROVIDER_TYPES } from '../../../contracts/settings/ai-provider';
 import { z } from 'zod';
 import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
 
@@ -16,7 +18,15 @@ const defineAiSettingsMutationResponseSchema = defineZodSchema<AiSettingsMutatio
 const defineAiSettingsQueryMessageSchema = defineZodSchema<AiSettingsQueryMessage>();
 const defineAiSettingsQueryResponseSchema = defineZodSchema<AiSettingsQueryResponse>();
 
-const providerMutationSchema = AIProviderSchema.omit({ hasStoredApiKey: true })
+const providerMutationSchema = AIProviderSchema.pick({
+  id: true,
+  name: true,
+  connectionType: true,
+  baseUrl: true,
+  createdAt: true,
+  management: true,
+  enabled: true,
+})
   .extend({
     apiKey: z.string().max(10000).optional(),
   })
@@ -24,11 +34,34 @@ const providerMutationSchema = AIProviderSchema.omit({ hasStoredApiKey: true })
 
 const modelMutationSchema = AIModelSchema.strict();
 const aiRecordIdSchema = z.string().min(1);
+const scenarioSchema = z.enum(AI_SCENARIOS);
+const persistedScenarioSchema = z.enum(AI_PERSISTED_SCENARIOS);
+const scenarioSelectionSchema = z
+  .object({
+    modelId: aiRecordIdSchema,
+    providerId: aiRecordIdSchema,
+    modelCode: z.string().min(1).max(500),
+    providerIncarnation: z.string().min(1).max(500),
+    displayName: z.string().min(1).max(500),
+    source: z.enum(['explicit', 'initial']),
+    selectedAt: z.number().nonnegative(),
+  })
+  .strict();
+const rememberSelectionSchema = z
+  .object({
+    scenario: persistedScenarioSchema,
+    modelId: aiRecordIdSchema,
+    providerId: aiRecordIdSchema,
+    modelCode: z.string().min(1).max(500),
+    destinationBinding: z.string().regex(SHA256_DIGEST_PATTERN).optional(),
+    source: z.enum(['explicit', 'initial']),
+  })
+  .strict();
 const defaultModelIdSchema = aiRecordIdSchema.nullable();
 const passphraseSchema = z.string().min(1).max(10000);
 const aiProviderSelectorEntrySchema = AIProviderSchema.omit({ baseUrl: true })
   .extend({
-    connectionType: z.enum(['chrome-built-in', 'openai-compatible']),
+    connectionType: z.enum(AI_PROVIDER_TYPES),
     destinationKind: z.enum(['chrome-built-in', 'external', 'local-custom']),
     destinationBinding: z.string().regex(SHA256_DIGEST_PATTERN).optional(),
   })
@@ -64,6 +97,9 @@ const secretProtectionStatusSchema = z
 export const aiSettingsQueryMessageSchema = defineAiSettingsQueryMessageSchema(
   z.discriminatedUnion('operation', [
     baseQuerySchema.extend({ operation: z.literal('read-model-selection-bootstrap') }).strict(),
+    baseQuerySchema
+      .extend({ operation: z.literal('read-scenario-selection'), scenario: scenarioSchema })
+      .strict(),
     baseQuerySchema.extend({ operation: z.literal('read-settings-page-runtime-data') }).strict(),
     baseQuerySchema.extend({ operation: z.literal('read-scenario-editor-system-prompt') }).strict(),
     baseQuerySchema
@@ -79,10 +115,28 @@ export const aiSettingsMutationMessageSchema = defineAiSettingsMutationMessageSc
   z.discriminatedUnion('operation', [
     baseMutationSchema.extend({ operation: z.literal('read-secret-protection-status') }).strict(),
     baseMutationSchema
+      .extend({
+        operation: z.literal('remember-scenario-selection'),
+        selection: rememberSelectionSchema,
+      })
+      .strict(),
+    baseMutationSchema
+      .extend({ operation: z.literal('refresh-provider-catalog'), providerId: aiRecordIdSchema })
+      .strict(),
+    baseMutationSchema.extend({ operation: z.literal('refresh-managed-catalogs') }).strict(),
+    baseMutationSchema
       .extend({ operation: z.literal('add-provider'), provider: providerMutationSchema })
       .strict(),
     baseMutationSchema
       .extend({ operation: z.literal('update-provider'), provider: providerMutationSchema })
+      .strict(),
+    baseMutationSchema
+      .extend({
+        operation: z.literal('set-provider-enabled'),
+        providerId: aiRecordIdSchema,
+        providerIncarnation: aiRecordIdSchema,
+        enabled: z.boolean(),
+      })
       .strict(),
     baseMutationSchema
       .extend({ operation: z.literal('clear-provider-secret'), providerId: aiRecordIdSchema })
@@ -198,6 +252,7 @@ export const aiSettingsQueryResponseSchema = defineAiSettingsQueryResponseSchema
     .object({
       error: z.string().optional(),
       modelSelection: aiModelSelectionBootstrapSchema.optional(),
+      scenarioSelection: scenarioSelectionSchema.nullable().optional(),
       scenarioEditorSystemPrompt: z.string().optional(),
       settingsRuntimeData: z
         .object({

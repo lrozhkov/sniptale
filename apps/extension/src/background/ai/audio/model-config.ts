@@ -1,3 +1,4 @@
+import { supportsAIModelOperation } from '../../../contracts/settings/model-operation';
 import {
   initializeAiStorageAccess,
   loadAIModels,
@@ -43,11 +44,19 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   const [models, providers] = await Promise.all([loadAIModels(), loadAIProviders()]);
   args.signal?.throwIfAborted();
   const model = models.find((entry) => entry.id === args.modelId);
-  if (!model || model.operation !== args.operation || !isValidAIModelOperationConfiguration(model))
+  if (
+    !model ||
+    !supportsAIModelOperation(model, args.operation) ||
+    model.operation !== args.operation ||
+    !isValidAIModelOperationConfiguration(model)
+  )
     throw new Error('model-unavailable');
   if (args.approvedProviderId !== undefined && args.approvedProviderId !== model.providerId)
     throw new Error('model-unavailable');
   const provider = providers.find((entry) => entry.id === model.providerId);
+  // Native audio execution is admitted by the separate SDK audio stage.
+  if (!provider || provider.enabled === false || provider.connectionType !== 'openai-compatible')
+    throw new Error('model-unavailable');
   const chat =
     args.operation === 'transcription' && model.audio?.transcription?.transport === 'audio-chat';
   if (chat && !args.approvedProviderId) throw new Error('model-unavailable');

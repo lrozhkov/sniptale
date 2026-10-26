@@ -41,8 +41,8 @@ function createRecordedRequest(input: RequestInfo | URL, init?: RequestInit): Re
   return {
     body: init?.body ? JSON.parse(String(init.body)) : null,
     headers: {
-      authorization: String((init?.headers as Record<string, string>)?.['Authorization'] ?? ''),
-      'content-type': String((init?.headers as Record<string, string>)?.['Content-Type'] ?? ''),
+      authorization: new Headers(init?.headers).get('Authorization') ?? '',
+      'content-type': new Headers(init?.headers).get('Content-Type') ?? '',
     },
     method: init?.method ?? 'GET',
     url: String(input),
@@ -108,17 +108,12 @@ async function verifySuccessfulChatRequest() {
   expect(request.headers['authorization']).toBe('Bearer secret-key');
   expect(request.headers['content-type']).toContain('application/json');
   expect(request.body).toEqual({
-    max_tokens: 4000,
+    max_tokens: 3000,
     messages: [
       { role: 'system', content: 'Return JSON' },
       { role: 'user', content: 'Summarize this page' },
     ],
     model: 'llama3.2',
-    temperature: 0.7,
-  });
-  expect(loggerDebugMock).toHaveBeenCalledWith('Received chat completion response', {
-    apiUrl: 'https://ollama.local/chat/completions',
-    status: 200,
   });
   expect(loggerDebugMock).toHaveBeenCalledWith('Parsed chat completion content', {
     contentLength: response.length,
@@ -249,7 +244,7 @@ async function verifyMultimodalChatRequest() {
 
   expect(response).toBe('{"steps":[]}');
   expect(getOnlyRecordedRequest(requests).body).toEqual({
-    max_tokens: 6000,
+    max_tokens: 3000,
     messages: [
       { role: 'system', content: 'Return JSON' },
       {
@@ -261,7 +256,6 @@ async function verifyMultimodalChatRequest() {
       },
     ],
     model: 'gpt-4.1',
-    temperature: 0.7,
   });
 }
 
@@ -388,15 +382,15 @@ describe('transport/request', () => {
     verifyFenceExtractionContracts
   );
   it.each([
-    ['GPT-5-mini', 8_000],
-    ['o1-preview', 8_000],
-    ['claude-3', 6_000],
-    ['gemini-2', 6_000],
-    ['mistral-small', 4_000],
-    ['qwen-2', 4_000],
-    ['deepseek-r1', 4_000],
+    ['GPT-5-mini', 3_000],
+    ['o1-preview', 3_000],
+    ['claude-3', 3_000],
+    ['gemini-2', 3_000],
+    ['mistral-small', 3_000],
+    ['qwen-2', 3_000],
+    ['deepseek-r1', 3_000],
     ['custom-model', 3_000],
-  ])('sets the bounded token budget for %s', async (modelCode, expected) => {
+  ])('does not infer token limits from the name %s', async (modelCode, expected) => {
     await expect(readMaxTokensForModel(modelCode)).resolves.toBe(expected);
   });
   it(

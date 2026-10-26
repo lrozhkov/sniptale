@@ -92,6 +92,8 @@ function createResolvedConfig() {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: 'secret-key',
     modelCode: 'gpt-4.1',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: 'fixture-destination-binding',
     effectiveSystemPrompt: 'unused here',
   };
 }

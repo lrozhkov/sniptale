@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  AI_PROVIDER_STORAGE_MIGRATION_PHASE,
-  AI_STORAGE_MIGRATION_PHASE_KEY,
+  AI_STORAGE_RESET_PHASE_KEY,
   AI_STORAGE_VERSION,
   AI_STORAGE_VERSION_KEY,
 } from './constants';
+const AI_RESET_PHASE = 'reset-ai-settings-v4';
 
 const {
   localGetMock,
-  migrateAiProviderStorageToV3Mock,
+  resetIncompatibleAISettingsMock,
   recoverStoredAISecretPassphraseProtectionTransitionMock,
 } = vi.hoisted(() => ({
   localGetMock: vi.fn(),
-  migrateAiProviderStorageToV3Mock: vi.fn(),
+  resetIncompatibleAISettingsMock: vi.fn(),
   recoverStoredAISecretPassphraseProtectionTransitionMock: vi.fn(),
 }));
 
@@ -26,8 +26,8 @@ vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
   },
 }));
 
-vi.mock('./provider-secrets.migration.ts', () => ({
-  migrateAiProviderStorageToV3: migrateAiProviderStorageToV3Mock,
+vi.mock('./alpha-reset', () => ({
+  resetIncompatibleAISettings: resetIncompatibleAISettingsMock,
 }));
 
 vi.mock('./secret-protection-transition.store.ts', async (importOriginal) => ({
@@ -39,16 +39,16 @@ vi.mock('./secret-protection-transition.store.ts', async (importOriginal) => ({
 function resetInitMocks() {
   vi.clearAllMocks();
   vi.resetModules();
-  migrateAiProviderStorageToV3Mock.mockResolvedValue(undefined);
+  resetIncompatibleAISettingsMock.mockResolvedValue(undefined);
   recoverStoredAISecretPassphraseProtectionTransitionMock.mockResolvedValue(undefined);
 }
 
 describe('ai/init', () => {
   beforeEach(resetInitMocks);
 
-  it('reads readiness without triggering migration authority', async () => {
+  it('reads readiness without triggering reset authority', async () => {
     localGetMock.mockResolvedValue({
-      [AI_STORAGE_MIGRATION_PHASE_KEY]: AI_PROVIDER_STORAGE_MIGRATION_PHASE,
+      [AI_STORAGE_RESET_PHASE_KEY]: AI_RESET_PHASE,
       [AI_STORAGE_VERSION_KEY]: null,
     });
 
@@ -56,28 +56,28 @@ describe('ai/init', () => {
 
     await expect(readAiStorageReadiness()).resolves.toEqual({
       isReady: false,
-      migrationPhase: AI_PROVIDER_STORAGE_MIGRATION_PHASE,
-      requiresMigration: true,
+      resetPhase: AI_RESET_PHASE,
+      requiresReset: true,
       version: null,
     });
-    expect(migrateAiProviderStorageToV3Mock).not.toHaveBeenCalled();
+    expect(resetIncompatibleAISettingsMock).not.toHaveBeenCalled();
   });
 
-  it('runs migration and secret protection recovery once when the seam is not ready', async () => {
+  it('runs reset and secret protection recovery once when the seam is not ready', async () => {
     localGetMock.mockResolvedValue({
       [AI_STORAGE_VERSION_KEY]: null,
     });
-    migrateAiProviderStorageToV3Mock.mockResolvedValue(undefined);
+    resetIncompatibleAISettingsMock.mockResolvedValue(undefined);
 
     const { initializeAiStorageAccess } = await import('./init');
 
     await expect(initializeAiStorageAccess()).resolves.toBeUndefined();
     await expect(initializeAiStorageAccess()).resolves.toBeUndefined();
-    expect(migrateAiProviderStorageToV3Mock).toHaveBeenCalledTimes(1);
+    expect(resetIncompatibleAISettingsMock).toHaveBeenCalledTimes(1);
     expect(recoverStoredAISecretPassphraseProtectionTransitionMock).toHaveBeenCalledTimes(1);
   });
 
-  it('skips migration but still recovers secret protection transitions when already ready', async () => {
+  it('skips reset but still recovers secret protection transitions when already ready', async () => {
     localGetMock.mockResolvedValue({
       [AI_STORAGE_VERSION_KEY]: AI_STORAGE_VERSION,
     });
@@ -85,7 +85,7 @@ describe('ai/init', () => {
     const { initializeAiStorageAccess } = await import('./init');
 
     await expect(initializeAiStorageAccess()).resolves.toBeUndefined();
-    expect(migrateAiProviderStorageToV3Mock).not.toHaveBeenCalled();
+    expect(resetIncompatibleAISettingsMock).not.toHaveBeenCalled();
     expect(recoverStoredAISecretPassphraseProtectionTransitionMock).toHaveBeenCalledTimes(1);
   });
 });

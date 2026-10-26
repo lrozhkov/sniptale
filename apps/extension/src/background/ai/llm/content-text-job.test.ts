@@ -21,6 +21,8 @@ const config = {
   baseUrl: 'https://provider.test/v1',
   apiKey: 'synthetic-key',
   modelCode: 'code',
+  connectionType: 'openai-compatible' as const,
+  destinationBinding: 'fixture-destination-binding',
   effectiveSystemPrompt: 'Preserve meaning.',
 };
 async function fixture() {

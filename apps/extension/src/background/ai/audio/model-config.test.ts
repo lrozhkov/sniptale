@@ -190,6 +190,13 @@ describe('audio model operation and credential admission', () => {
     }
   );
 
+  it('refuses native provider kinds before entering the legacy audio transport', async () => {
+    vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, connectionType: 'elevenlabs' }]);
+    await expect(resolveAudioModelConfig(request)).rejects.toThrow('model-unavailable');
+    expect(permission).not.toHaveBeenCalled();
+    expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+  });
+
   it.each(['model', 'provider', 'secret-metadata'] as const)(
     'rejects deleted %s before key resolution',
     async (missing) => {

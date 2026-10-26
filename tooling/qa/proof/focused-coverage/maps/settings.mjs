@@ -1,5 +1,29 @@
 export const SETTINGS_OWNER_MAPPINGS = [
   {
+    owner: 'canonical-settings-persistence',
+    productionFile: 'apps/extension/src/composition/persistence/settings/index.ts',
+    reason:
+      'Settings readers, queued writers, subscriptions and reset consumers retain canonical preferences and reject stale approvals.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/settings/array.guards.test.ts',
+      'apps/extension/src/composition/persistence/settings/context-menu-layout-chunks.test.ts',
+      'apps/extension/src/composition/persistence/settings/coordination.test.ts',
+      'apps/extension/src/composition/persistence/settings/defaults.test.ts',
+      'apps/extension/src/composition/persistence/settings/file-scheme-consent.test.ts',
+      'apps/extension/src/composition/persistence/settings/filename-rules.test.ts',
+      'apps/extension/src/composition/persistence/settings/guards.coverage.test.ts',
+      'apps/extension/src/composition/persistence/settings/index.test.ts',
+      'apps/extension/src/composition/persistence/settings/mutations.test.ts',
+      'apps/extension/src/composition/persistence/settings/nested-patch.test.ts',
+      'apps/extension/src/composition/persistence/settings/page-launch.test.ts',
+      'apps/extension/src/composition/persistence/settings/patch.test.ts',
+      'apps/extension/src/composition/persistence/settings/read-purity.test.ts',
+      'apps/extension/src/composition/persistence/settings/recording-controls.test.ts',
+      'apps/extension/src/composition/persistence/settings/toolbar-placement.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/alpha-reset.test.ts',
+    ],
+  },
+  {
     exclusive: true,
     owner: 'settings-viewport-presets',
     productionPrefix: 'apps/extension/src/settings/sections/capture/screen-sizes/',

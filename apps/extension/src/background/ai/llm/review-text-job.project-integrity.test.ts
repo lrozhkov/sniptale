@@ -204,6 +204,8 @@ it.each([
       baseUrl: 'https://provider.test/v1',
       apiKey: 'key',
       modelCode: 'code',
+      connectionType: 'openai-compatible' as const,
+      destinationBinding: 'fixture-destination-binding',
       effectiveSystemPrompt: '',
     };
     const post = vi.fn(async () =>

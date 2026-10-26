@@ -44,6 +44,14 @@ export const settingsAiProvidersModelMessages = defineMessageSource({
     en: 'Check parameters: use an ISO language code, specify a voice, and keep speed between 0.25 and 4.',
   },
 
+  manualModelsEmptyTitle: {
+    ru: 'Нет моделей, добавленных вручную',
+    en: 'No manually added models',
+  },
+  modelsAutomaticDescription: {
+    ru: 'Автоматические подключения управляют своими моделями. Обновить каталог можно в карточке провайдера.',
+    en: 'Automatic connections manage their own models. Use the provider card to refresh the catalog.',
+  },
   modelsEmptyTitle: {
     ru: 'Нет моделей',
     en: 'No models',

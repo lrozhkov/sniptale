@@ -12,6 +12,9 @@ import {
   AI_LOCAL_SECRET_KEY_STORAGE_KEY,
   AI_PROVIDERS_KEY,
   AI_PROVIDER_SECRETS_KEY,
+  AI_STORAGE_VERSION_KEY,
+  AI_STORAGE_VERSION,
+  AI_STORAGE_RESET_PHASE_KEY,
 } from './constants';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { removeTransparentKeyIfUnused } from './provider-secret-keys.store.ts';
@@ -173,6 +176,38 @@ export async function saveStoredAIProviders(providers: AIProvider[]): Promise<vo
   logger.info(`AI providers saved: ${providers.length}`);
 }
 
+/** Patch only current metadata. A stale Settings page cannot replace connection fields or credentials. */
+export async function setStoredAIProviderEnabled(
+  command: { providerId: string; providerIncarnation: string; enabled: boolean },
+  permit: PersistenceMutationPermit
+): Promise<void> {
+  const stored = await browserStorage.local.get([
+    AI_PROVIDERS_KEY,
+    AI_STORAGE_VERSION_KEY,
+    AI_STORAGE_RESET_PHASE_KEY,
+  ]);
+  const parsed = parseStoredAIProviders(stored[AI_PROVIDERS_KEY]);
+  const provider = parsed.value.find((entry) => entry.id === command.providerId);
+  if (
+    stored[AI_STORAGE_VERSION_KEY] !== AI_STORAGE_VERSION ||
+    stored[AI_STORAGE_RESET_PHASE_KEY] !== undefined ||
+    parsed.hasInvalidRoot ||
+    parsed.invalidEntryCount > 0 ||
+    !provider ||
+    !provider.incarnation ||
+    provider.incarnation !== command.providerIncarnation
+  )
+    throw new Error('AI provider unavailable');
+  if ((provider.enabled !== false) === command.enabled) return;
+  const next = { ...provider, enabled: command.enabled, revision: (provider.revision ?? 0) + 1 };
+  await browserStorage.local.set(
+    {
+      [AI_PROVIDERS_KEY]: parsed.value.map((entry) => (entry.id === provider.id ? next : entry)),
+    },
+    permit
+  );
+}
+
 export async function upsertStoredAIProviderRecord(input: AIProviderUpsertInput): Promise<void> {
   const [providers, secrets] = await Promise.all([
     readStoredProviderMetadata(),
@@ -218,7 +253,20 @@ export async function clearStoredAIProviderSecret(providerId: string): Promise<v
     readStoredProviderSecrets(),
   ]);
   const nextProviders = providers.map((provider) =>
-    provider.id === providerId ? { ...provider, hasStoredApiKey: false } : provider
+    provider.id === providerId
+      ? {
+          ...provider,
+          hasStoredApiKey: false,
+          revision: (provider.revision ?? 0) + 1,
+          credentialRevision: (provider.credentialRevision ?? 0) + 1,
+          observation: {
+            status: 'unverified' as const,
+            scope: 'credentials' as const,
+            checkedAt: Date.now(),
+            revision: (provider.revision ?? 0) + 1,
+          },
+        }
+      : provider
   );
   const removal = createProviderSecretRemovalPayload({ nextProviders, providerId, secrets });
 

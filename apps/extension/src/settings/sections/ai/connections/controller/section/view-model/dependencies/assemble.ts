@@ -1,6 +1,5 @@
 import type { AiProvidersSectionControllerBuildProps } from '../build';
 import type { AiProvidersSectionState } from '../../../types';
-import { createAiProvidersDefaultModelChangeHandler } from '../default-model';
 import { getAiProvidersSectionProviderName } from '../../provider-name';
 import { createAiProvidersModelMoveHandler } from '../../../model-order';
 
@@ -9,9 +8,7 @@ export function buildAiProvidersSectionControllerDependencies(
     AiProvidersSectionControllerBuildProps,
     'chromeAi' | 'reloadData' | 'secretProtection'
   > & {
-    dataState: AiProvidersSectionControllerBuildProps['dataState'] & {
-      setDefaultModelId: (value: string | null) => void;
-    };
+    dataState: AiProvidersSectionControllerBuildProps['dataState'];
     deleteHandlers: {
       handleDeleteModel: AiProvidersSectionState['catalogActions']['deleteModel'];
       handleDeleteProvider: AiProvidersSectionState['catalogActions']['deleteProvider'];
@@ -38,12 +35,8 @@ export function buildAiProvidersSectionControllerDependencies(
       deleteModel: props.deleteHandlers.handleDeleteModel,
       deleteProvider: props.deleteHandlers.handleDeleteProvider,
       moveModel: createAiProvidersModelMoveHandler(props.reloadData),
-      setDefaultModel: createAiProvidersDefaultModelChangeHandler(
-        props.dataState.setDefaultModelId
-      ),
     },
     dataState: {
-      defaultModelId: props.dataState.defaultModelId,
       isLoading: props.dataState.isLoading,
       models: props.dataState.models,
       providers: props.dataState.providers,

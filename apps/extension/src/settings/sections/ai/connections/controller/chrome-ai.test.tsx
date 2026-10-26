@@ -41,12 +41,6 @@ vi.mock('../../../../runtime/ai-settings/mutations', async (importOriginal) => (
   saveChromeAiEnabled: chromeAiControllerMocks.saveChromeAiEnabledMock,
 }));
 
-vi.mock('./save', () => ({
-  saveAiProvidersDefaultModel: chromeAiControllerMocks.saveAiProvidersDefaultModelMock,
-  saveAiProvidersGlobalPrompt: vi.fn(),
-  saveAiProvidersScenarioEditorPrompt: vi.fn(),
-}));
-
 vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/ui/product-feedback/toast-service')>()),
   hideAllToasts: vi.fn(),
@@ -101,13 +95,8 @@ async function flushEffects() {
 function createArgs(overrides: Partial<HookArgs> = {}): HookArgs {
   return {
     chromeAiEnabled: false,
-    defaultModelId: null,
-    models: [
-      { id: 'remote-model', providerId: 'provider-1', modelCode: 'gpt', displayName: 'GPT' },
-    ],
     reloadData: vi.fn().mockResolvedValue(undefined),
     setChromeAiEnabled: vi.fn(),
-    setDefaultModelId: vi.fn(),
     ...overrides,
   };
 }
@@ -182,10 +171,9 @@ it('surfaces unsupported availability without starting setup', async () => {
   expect(latestState?.error).toBe(translate('settings.aiProviders.chromeAiUnsupported'));
 });
 
-it('disables chrome-ai and reconciles a chrome default model back to stored providers', async () => {
+it('disables Chrome AI without selecting a replacement model', async () => {
   const args = createArgs({
     chromeAiEnabled: true,
-    defaultModelId: 'chrome-ai-google-model',
   });
 
   await renderHarness(args);
@@ -196,10 +184,7 @@ it('disables chrome-ai and reconciles a chrome default model back to stored prov
 
   expect(chromeAiControllerMocks.saveChromeAiEnabledMock).toHaveBeenCalledWith(false);
   expect(args.setChromeAiEnabled).toHaveBeenCalledWith(false);
-  expect(chromeAiControllerMocks.saveAiProvidersDefaultModelMock).toHaveBeenCalledWith(
-    'remote-model',
-    args.setDefaultModelId
-  );
+
   expect(args.reloadData).toHaveBeenCalledTimes(1);
 });
 

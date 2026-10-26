@@ -70,6 +70,8 @@ function createResolvedConfig() {
     baseUrl: 'http://127.0.0.1:11434/v1',
     apiKey: 'secret-key',
     modelCode: 'llama3.2',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: 'fixture-destination-binding',
     effectiveSystemPrompt: 'Return valid JSON only',
   };
 }

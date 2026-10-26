@@ -1,7 +1,15 @@
-import { resolveAIProviderChatCompletionsUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
+import { generateText, type UserContent } from 'ai';
+import { APICallError, InvalidResponseDataError, TypeValidationError } from '@ai-sdk/provider';
+import { isAllowedAIProviderBaseUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
 import { translate } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { postJsonWithTimeout } from './http';
+import type { AIProviderType } from '../../../../contracts/settings/ai-provider';
+import {
+  AIProviderRequestError,
+  classifyAIProviderFailure,
+  createAIProviderRuntime,
+} from '../../providers';
+import { createProviderSdkFetch } from './http';
 
 const logger = createLogger({ namespace: 'BackgroundLlmHttp' });
 
@@ -41,224 +49,144 @@ export function extractJSON(content: string): string {
   return cleaned;
 }
 
-function buildChatPayload(
-  model: string,
-  systemPrompt: string,
-  userContent: string | ChatCompletionRequestContentPart[]
-) {
-  const maxTokens = resolveChatCompletionMaxTokens(model);
-
-  return {
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-    max_tokens: maxTokens,
-  };
-}
-
-function resolveChatCompletionMaxTokens(modelCode: string): number {
-  const normalizedModelCode = modelCode.toLowerCase();
-
-  if (normalizedModelCode.includes('gpt-5') || normalizedModelCode.includes('o1')) {
-    return 8_000;
-  }
-
-  if (
-    normalizedModelCode.includes('gpt-4') ||
-    normalizedModelCode.includes('claude') ||
-    normalizedModelCode.includes('gemini')
-  ) {
-    return 6_000;
-  }
-
-  if (
-    normalizedModelCode.includes('llama') ||
-    normalizedModelCode.includes('mistral') ||
-    normalizedModelCode.includes('qwen') ||
-    normalizedModelCode.includes('deepseek')
-  ) {
-    return 4_000;
-  }
-
-  return 3_000;
-}
-
-function createStatusHandler(providerLabel?: string) {
-  return (status: number, _errorData: unknown) => {
-    if (status === 401) {
-      throw new Error(translate('background.runtime.llmInvalidApiKey'));
-    }
-    if (status === 429) {
-      throw new Error(translate('background.runtime.llmRateLimitExceeded'));
-    }
-    if (status === 400) {
-      const prefix = translate('background.runtime.llmInvalidRequestPrefix');
-      const label = providerLabel ? ` (${providerLabel})` : '';
-      throw new Error(`${prefix}${label}`);
-    }
-    if (status === 500) {
-      throw new Error(translate('background.runtime.llmServerError'));
-    }
-
-    throw new Error(`API error (${status}): Unknown error`);
-  };
-}
-
-function throwSafeTransportError(): never {
-  throw new Error(translate('background.runtime.llmUnexpectedProcessingError'));
-}
-
-async function sendChatRequest(
-  apiUrl: string,
-  apiKey: string,
-  payload: object,
-  handleStatus: (status: number, errorData: unknown) => void,
-  signal?: AbortSignal,
-  rejectTruncated = false
-): Promise<string> {
-  let response: Awaited<ReturnType<typeof postJsonWithTimeout>>;
-  try {
-    response = await postJsonWithTimeout({
-      url: apiUrl,
-      body: payload,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      timeoutErrorMessage: translate('background.runtime.llmRequestTimeout'),
-      ...(signal ? { signal } : {}),
-    });
-  } catch (error) {
-    if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
-    if (
-      error instanceof Error &&
-      error.message === translate('background.runtime.llmRequestTimeout')
-    ) {
-      throw error;
-    }
-    throwSafeTransportError();
-  }
-
-  logger.debug('Received chat completion response', { apiUrl, status: response.status });
-
-  if (!response.ok) {
-    handleStatus(response.status, response.data);
-  }
-
-  const content = getChatCompletionContent(response.data, rejectTruncated);
-  if (!content) {
-    logger.error('Unexpected response structure from provider');
-    throw new Error(translate('background.runtime.llmUnexpectedResponse'));
-  }
-
-  logger.debug('Parsed chat completion content', { contentLength: content.length });
-  return content;
-}
-
-function getChatCompletionContent(result: unknown, rejectTruncated: boolean): string | null {
-  if (!isRecord(result)) {
-    return null;
-  }
-
-  const choice = getFirstArrayItem(result['choices']);
-  if (!isRecord(choice) || !isRecord(choice['message'])) {
-    return null;
-  }
-
-  if (
-    rejectTruncated &&
-    (choice['finish_reason'] === 'length' || choice['finish_reason'] === 'content_filter')
-  )
-    return null;
-  const content = choice['message']['content'];
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  if (isUnknownArray(content)) {
-    const textParts = content.filter(isTextContentPart).map((part) => part.text);
-
-    return textParts.length > 0 ? textParts.join('\n') : null;
-  }
-
-  return null;
-}
-
-function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isUnknownArray(value: unknown): value is readonly unknown[] {
-  return Array.isArray(value);
-}
-
-function getFirstArrayItem(value: unknown): unknown {
-  if (!isUnknownArray(value)) {
-    return null;
-  }
-
-  return value[0] ?? null;
-}
-
-function isTextContentPart(value: unknown): value is { text: string } {
-  return isRecord(value) && typeof value['text'] === 'string';
-}
-
-function buildChatCompletionsUrl(baseUrl: string): string {
-  const apiUrl = resolveAIProviderChatCompletionsUrl(baseUrl);
-  if (!apiUrl) {
-    throw new Error(translate('background.runtime.llmProviderBaseUrlHttpsRequired'));
-  }
-
-  return apiUrl;
-}
-
-export async function requestChatCompletion(options: {
+interface ChatRequestOptions {
   baseUrl: string;
   apiKey: string;
   modelCode: string;
+  connectionType?: AIProviderType;
+  maxOutputTokens?: number;
   systemPrompt: string;
-  userPrompt: string;
   providerErrorLabel?: string;
   signal?: AbortSignal;
-  /** Rechecks the caller scope and provider after preparing the request payload. */
   beforeSend?(): Promise<void>;
-  /** Refuses provider-declared partial text while retaining the caller source. */
   rejectTruncated?: boolean;
-}): Promise<string> {
-  const apiUrl = buildChatCompletionsUrl(options.baseUrl);
-  const payload = buildChatPayload(options.modelCode, options.systemPrompt, options.userPrompt);
-  if (options.beforeSend) await options.beforeSend();
-  options.signal?.throwIfAborted();
+}
 
-  return sendChatRequest(
-    apiUrl,
-    options.apiKey,
-    payload,
-    createStatusHandler(options.providerErrorLabel),
-    options.signal,
-    options.rejectTruncated
+function safeFailure(error: unknown, options: ChatRequestOptions): never {
+  if (options.signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
+  if (error instanceof AIProviderRequestError) throw error;
+  if (APICallError.isInstance(error) && error.statusCode === 400) {
+    const label = options.providerErrorLabel ? ` (${options.providerErrorLabel})` : '';
+    throw new AIProviderRequestError(
+      'unknown',
+      `${translate('background.runtime.llmInvalidRequestPrefix')}${label}`
+    );
+  }
+  if (
+    InvalidResponseDataError.isInstance(error) ||
+    TypeValidationError.isInstance(error) ||
+    (APICallError.isInstance(error) && error.statusCode === 200)
+  ) {
+    logger.error('Unexpected response structure from provider');
+    throw new AIProviderRequestError(
+      'unknown',
+      translate('background.runtime.llmUnexpectedResponse')
+    );
+  }
+  const reason = classifyAIProviderFailure(error);
+  if (reason === 'invalid-credential')
+    throw new AIProviderRequestError(reason, translate('background.runtime.llmInvalidApiKey'));
+  if (reason === 'rate-limited')
+    throw new AIProviderRequestError(reason, translate('background.runtime.llmRateLimitExceeded'));
+  if (reason === 'service-error')
+    throw new AIProviderRequestError(reason, translate('background.runtime.llmServerError'));
+  if (reason === 'timeout')
+    throw new AIProviderRequestError(reason, translate('background.runtime.llmRequestTimeout'));
+  if (APICallError.isInstance(error) && error.statusCode !== undefined)
+    throw new AIProviderRequestError(reason, `API error (${error.statusCode}): Unknown error`);
+  throw new AIProviderRequestError(
+    reason,
+    translate('background.runtime.llmUnexpectedProcessingError')
   );
 }
 
-export async function requestMultimodalChatCompletion(options: {
-  baseUrl: string;
-  apiKey: string;
-  modelCode: string;
-  providerErrorLabel?: string;
-  systemPrompt: string;
-  userContent: ChatCompletionRequestContentPart[];
-}): Promise<string> {
-  const apiUrl = buildChatCompletionsUrl(options.baseUrl);
-  const payload = buildChatPayload(options.modelCode, options.systemPrompt, options.userContent);
+async function sendChatRequest(options: ChatRequestOptions, content: UserContent): Promise<string> {
+  if (!isAllowedAIProviderBaseUrl(options.baseUrl)) {
+    throw new Error(translate('background.runtime.llmProviderBaseUrlHttpsRequired'));
+  }
+  let admissionFailed = false;
+  let admissionFailure: unknown;
+  try {
+    const transport = createProviderSdkFetch({
+      baseUrl: options.baseUrl,
+      ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.beforeSend
+        ? {
+            beforeSend: async () => {
+              try {
+                await options.beforeSend?.();
+              } catch (error) {
+                admissionFailed = true;
+                admissionFailure = error;
+                throw error;
+              }
+            },
+          }
+        : {}),
+    });
+    const provider = createAIProviderRuntime({
+      type: options.connectionType ?? 'openai-compatible',
+      baseUrl: options.baseUrl,
+      apiKey: options.apiKey,
+      fetch: transport,
+      operation: 'text',
+    });
+    const result = await generateText({
+      model: provider.languageModel(options.modelCode),
+      instructions: options.systemPrompt,
+      messages: [{ role: 'user', content }],
+      maxOutputTokens: options.maxOutputTokens ?? 3000,
+      maxRetries: 0,
+      timeout: 30000,
+      ...(options.signal ? { abortSignal: options.signal } : {}),
+      experimental_download: async (requests) => {
+        if (requests.length) throw new Error('provider-download-refused');
+        return [];
+      },
+    });
+    if (
+      options.rejectTruncated &&
+      (result.finalStep.finishReason === 'length' ||
+        result.finalStep.finishReason === 'content-filter')
+    ) {
+      throw new AIProviderRequestError(
+        'unknown',
+        translate('background.runtime.llmUnexpectedResponse')
+      );
+    }
+    const text = result.text;
+    if (!text)
+      throw new AIProviderRequestError(
+        'unknown',
+        translate('background.runtime.llmUnexpectedResponse')
+      );
+    logger.debug('Parsed chat completion content', { contentLength: text.length });
+    return text;
+  } catch (error) {
+    if (admissionFailed) throw admissionFailure;
+    return safeFailure(error, options);
+  }
+}
 
-  return sendChatRequest(
-    apiUrl,
-    options.apiKey,
-    payload,
-    createStatusHandler(options.providerErrorLabel)
-  );
+/** Runs one admitted SDK request. The application owns retries and proposal acceptance. */
+export function requestChatCompletion(
+  options: ChatRequestOptions & { userPrompt: string }
+): Promise<string> {
+  return sendChatRequest(options, options.userPrompt);
+}
+
+export function requestMultimodalChatCompletion(
+  options: ChatRequestOptions & { userContent: ChatCompletionRequestContentPart[] }
+): Promise<string> {
+  const content: UserContent = options.userContent.map((part) => {
+    if (part.type === 'text') return part;
+    if (!part.image_url.url.startsWith('data:image/'))
+      throw new AIProviderRequestError('unknown', 'unsupported-image-source');
+    return {
+      type: 'file',
+      data: part.image_url.url,
+      mediaType: part.image_url.url.slice(5, part.image_url.url.indexOf(';')),
+    };
+  });
+  return sendChatRequest(options, content);
 }

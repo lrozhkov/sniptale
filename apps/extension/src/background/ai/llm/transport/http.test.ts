@@ -245,3 +245,81 @@ it('returns an HTTP failure without consuming its oversized body and releases th
   expect(read).not.toHaveBeenCalled();
   expect(cancel).toHaveBeenCalledOnce();
 });
+
+it('contains SDK egress and checks authority immediately before dispatch', async () => {
+  const { createProviderSdkFetch } = await import('./http');
+  const beforeSend = vi.fn().mockResolvedValue(undefined);
+  const transport = vi
+    .fn()
+    .mockResolvedValue(
+      new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } })
+    );
+  const guarded = createProviderSdkFetch({
+    baseUrl: 'https://provider.test/v1',
+    beforeSend,
+    transport,
+  });
+  await expect(guarded('https://other.test/v1/models')).rejects.toThrow(
+    'provider-destination-changed'
+  );
+  await expect(guarded('https://provider.test/other')).rejects.toThrow(
+    'provider-destination-changed'
+  );
+  expect(transport).not.toHaveBeenCalled();
+  expect(
+    await (
+      await guarded('https://provider.test/v1/models', {
+        credentials: 'include',
+        redirect: 'follow',
+      })
+    ).json()
+  ).toEqual({ ok: true });
+  expect(beforeSend).toHaveBeenCalledTimes(1);
+  expect(transport).toHaveBeenCalledWith(
+    'https://provider.test/v1/models',
+    expect.objectContaining({
+      credentials: 'omit',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+      cache: 'no-store',
+    })
+  );
+});
+
+it('bounds SDK response streams without trusting the declared response length', async () => {
+  const { createProviderSdkFetch } = await import('./http');
+  const transport = vi.fn().mockResolvedValue(new Response('too many bytes'));
+  const guarded = createProviderSdkFetch({
+    baseUrl: 'https://provider.test/v1',
+    maxResponseBytes: 3,
+    transport,
+  });
+  await expect(
+    guarded('https://provider.test/v1/chat/completions', { method: 'POST' })
+  ).rejects.toThrow('provider-response-too-large');
+  expect(transport).toHaveBeenCalledTimes(1);
+});
+
+it('does not dispatch SDK requests after authorization refusal or cancellation', async () => {
+  const { createProviderSdkFetch } = await import('./http');
+  const transport = vi.fn();
+  const guarded = createProviderSdkFetch({
+    baseUrl: 'https://provider.test/v1',
+    transport,
+    beforeSend: async () => {
+      throw new Error('scope-changed');
+    },
+  });
+  await expect(guarded('https://provider.test/v1/models')).rejects.toThrow('scope-changed');
+  expect(transport).not.toHaveBeenCalled();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    createProviderSdkFetch({
+      baseUrl: 'https://provider.test/v1',
+      transport,
+      signal: controller.signal,
+    })('https://provider.test/v1/models')
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  expect(transport).not.toHaveBeenCalled();
+});

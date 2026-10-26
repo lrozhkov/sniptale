@@ -1,3 +1,4 @@
+import { loadAIScenarioSelection } from '../../../composition/persistence/ai-settings/scenario-selections';
 import {
   loadAudioTranscriptionSystemPrompt,
   loadVoiceInputCorrectionSystemPrompt,
@@ -37,6 +38,10 @@ function classifyProviderDestination(provider: AIProvider): AIProviderDestinatio
 async function createProviderSelectorEntry(provider: AIProvider): Promise<AIProviderSelectorEntry> {
   return {
     connectionType: provider.connectionType,
+    ...(provider.incarnation !== undefined ? { incarnation: provider.incarnation } : {}),
+    ...(provider.enabled !== undefined ? { enabled: provider.enabled } : {}),
+    ...(provider.management !== undefined ? { management: provider.management } : {}),
+    ...(provider.observation !== undefined ? { observation: provider.observation } : {}),
     createdAt: provider.createdAt,
     destinationKind: classifyProviderDestination(provider),
     destinationBinding: await createAIProviderDestinationBinding(provider),
@@ -117,6 +122,9 @@ export async function resolveAISettingsQueryResponse(
   message: AiSettingsQueryMessage
 ): Promise<AiSettingsQueryResponse> {
   switch (message.operation) {
+    case 'read-scenario-selection':
+      await initializeAiStorageAccess();
+      return { success: true, scenarioSelection: await loadAIScenarioSelection(message.scenario) };
     case 'read-chrome-ai-content-system-prompt':
       return {
         success: true,

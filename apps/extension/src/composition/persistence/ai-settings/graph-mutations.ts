@@ -1,9 +1,13 @@
+import { setStoredAIProviderEnabled } from './provider-secrets.store';
 import {
   getAIModelOperation,
   isValidAIModelOperationConfiguration,
 } from '../../../contracts/settings/model-operation';
 import type { AIModel } from '../../../contracts/settings';
-import { acquirePersistenceMutationTransition } from '../infrastructure/mutation-barrier';
+import {
+  runWithExclusivePersistenceMutationPermit,
+  acquirePersistenceMutationTransition,
+} from '../infrastructure/mutation-barrier';
 import type { AIProviderUpsertInput } from './core';
 import {
   changeAISecretPassphraseProtection,
@@ -34,6 +38,13 @@ import {
   type AISecretProtectionStatus,
 } from './core';
 import { initializeAiStorageAccess } from './init';
+import { rememberAIScenarioSelection } from './scenario-selections';
+import {
+  admitCatalogRefresh,
+  commitCatalogRefresh,
+  type AICatalogRefreshToken,
+  type AICatalogRefreshOutcome,
+} from './managed-catalog';
 import { assertAISettingsGraphInvariants } from './graph-invariants';
 import type { AISettingsMutationCommand } from './graph-mutation-types';
 
@@ -166,6 +177,14 @@ async function saveDefaultModel(defaultModelId: string | null): Promise<void> {
 
 async function applyAISettingsMutation(command: AISettingsMutationCommand): Promise<void> {
   switch (command.operation) {
+    case 'remember-scenario-selection':
+      return runWithExclusivePersistenceMutationPermit((permit) =>
+        rememberAIScenarioSelection(command.selection, Date.now(), permit)
+      );
+    case 'set-provider-enabled':
+      return runWithExclusivePersistenceMutationPermit((permit) =>
+        setStoredAIProviderEnabled(command, permit)
+      );
     case 'add-provider':
       return addProvider(command);
     case 'update-provider':
@@ -253,4 +272,31 @@ export function loadSerializedAISecretProtectionStatus(): Promise<AISecretProtec
 
 export function resetAISettingsMutationQueueForTests(): void {
   aiSettingsMutationQueue = Promise.resolve<void>(undefined);
+}
+
+/** Admit metadata fetch through the same queue as user settings mutations; fetch runs outside it. */
+export function admitStoredAICatalogRefresh(
+  providerId: string,
+  explicit: boolean,
+  now = Date.now()
+) {
+  return queueAISettingsMutation(async () => {
+    await initializeAiStorageAccess();
+    return runWithExclusivePersistenceMutationPermit((permit) =>
+      admitCatalogRefresh(providerId, explicit, now, permit)
+    );
+  });
+}
+
+/** Commit one admitted metadata result without replaying a failed network request. */
+export function commitStoredAICatalogRefresh(
+  token: AICatalogRefreshToken,
+  outcome: AICatalogRefreshOutcome,
+  now = Date.now()
+): Promise<boolean> {
+  return queueAISettingsMutation(() =>
+    runWithExclusivePersistenceMutationPermit((permit) =>
+      commitCatalogRefresh(token, outcome, now, permit)
+    )
+  );
 }

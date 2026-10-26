@@ -94,11 +94,14 @@ function createProps(
     formData: {
       baseUrl: 'https://api.openai.com/v1',
       name: 'OpenAI',
+      connectionType: 'openai-compatible',
     },
     hasStoredApiKey: false,
     isEditing: false,
     isSaving: false,
     onApiKeyChange: vi.fn(),
+    onConnectionTypeChange: vi.fn(),
+    onManagementChange: vi.fn(),
     onBaseUrlChange: vi.fn(),
     onClose: vi.fn(),
     onNameChange: vi.fn(),
@@ -151,7 +154,7 @@ it('renders create mode with a required API key label and default placeholder', 
       mode: 'provider',
     })
   );
-  expect(container?.querySelectorAll('label')).toHaveLength(3);
+  expect(container?.querySelectorAll('label')).toHaveLength(5);
   expect(container?.querySelector('input[disabled]')).toBeNull();
 });
 
@@ -257,4 +260,25 @@ it('clears ordinary provider text through its input owner and leaves the secret 
   expect(secret.value).toBe('');
   expect(secret.title).toBe('');
   expect(secret.parentElement!.querySelector('.sniptale-field-clear')).toBeNull();
+});
+
+it('offers provider and management controls and does not require a key for Ollama', async () => {
+  const props = createProps({
+    formData: {
+      connectionType: 'ollama',
+      baseUrl: 'http://localhost:11434/api',
+      name: 'Ollama',
+      management: 'automatic',
+    },
+  });
+  await render(<ProviderFormModalContent {...props} />);
+  expect(container?.querySelector('input[type="password"]')).toBeNull();
+  expect(container?.textContent).toContain(translate('settings.aiProviders.providerAutomaticHint'));
+  expect(container?.querySelectorAll('button[aria-haspopup="listbox"]')).toHaveLength(2);
+  expect(
+    container?.querySelector('button[aria-haspopup="listbox"]')?.getAttribute('aria-label')
+  ).toBe(translate('settings.aiProviders.providerTypeLabel'));
+  expect(container?.querySelector('input[type="text"]')?.getAttribute('aria-label')).toBe(
+    translate('settings.aiProviders.providerNameLabel')
+  );
 });

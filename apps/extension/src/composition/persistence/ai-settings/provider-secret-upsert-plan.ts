@@ -1,3 +1,4 @@
+import type { AIModelManagement } from '../../../contracts/settings/ai-provider';
 import type { AIProvider } from '../../../contracts/settings';
 import {
   encryptSecret,
@@ -11,6 +12,8 @@ import { resolveProviderSecretKeyForWrite } from './provider-secret-keys.store.t
 
 export interface AIProviderUpsertInput {
   apiKey?: string | undefined;
+  management?: AIModelManagement | undefined;
+  enabled?: boolean | undefined;
   baseUrl: string;
   connectionType: AIProvider['connectionType'];
   createdAt: number;
@@ -25,9 +28,24 @@ interface ProviderSecretUpsertPlan {
   remainingSecretCountAfterRemoval?: number | undefined;
 }
 
-function createNextProvider(input: AIProviderUpsertInput, hasStoredApiKey: boolean): AIProvider {
+function createNextProvider(
+  input: AIProviderUpsertInput,
+  hasStoredApiKey: boolean,
+  previous?: AIProvider
+): AIProvider {
   return {
     id: input.id,
+    management: input.management ?? previous?.management ?? 'automatic',
+    enabled: input.enabled ?? previous?.enabled ?? true,
+    incarnation: previous?.incarnation ?? crypto.randomUUID(),
+    revision: (previous?.revision ?? 0) + 1,
+    credentialRevision: (previous?.credentialRevision ?? 0) + (input.apiKey ? 1 : 0),
+    observation: {
+      status: 'unverified',
+      scope: 'credentials',
+      revision: (previous?.revision ?? 0) + 1,
+      checkedAt: Date.now(),
+    },
     name: input.name,
     connectionType: input.connectionType,
     baseUrl: input.baseUrl,
@@ -53,7 +71,7 @@ export async function createProviderSecretUpsertPlan(args: {
   let hasStoredApiKey = previousProvider?.hasStoredApiKey ?? false;
   let nextProvider = preserveStoredProviderFields(
     previousProvider,
-    createNextProvider(input, hasStoredApiKey)
+    createNextProvider(input, hasStoredApiKey, previousProvider)
   );
 
   if (typeof input.apiKey === 'string' && input.apiKey.length > 0) {
@@ -66,7 +84,7 @@ export async function createProviderSecretUpsertPlan(args: {
         createAIProviderSecretAdditionalData(nextProvider)
       ),
     };
-    nextProvider = preserveStoredProviderFields(previousProvider, createNextProvider(input, true));
+    nextProvider = { ...nextProvider, hasStoredApiKey: true };
     return {
       nextProvider,
       nextSecrets,
@@ -80,10 +98,7 @@ export async function createProviderSecretUpsertPlan(args: {
   ) {
     const { [input.id]: _removedSecret, ...remainingSecrets } = secrets;
     return {
-      nextProvider: preserveStoredProviderFields(
-        previousProvider,
-        createNextProvider(input, false)
-      ),
+      nextProvider: { ...nextProvider, hasStoredApiKey: false },
       nextSecrets: remainingSecrets,
       remainingSecretCountAfterRemoval: Object.keys(remainingSecrets).length,
     };

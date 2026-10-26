@@ -25,6 +25,8 @@ export function ProviderFormModal({
     errors,
     formData,
     handleApiKeyChange,
+    handleConnectionTypeChange,
+    handleManagementChange,
     handleChange,
     handleSubmit,
     isEditing,
@@ -35,11 +37,13 @@ export function ProviderFormModal({
     <ProviderFormModalContent
       apiKeyInputRef={apiKeyInputRef}
       errors={errors}
-      formData={{ baseUrl: formData.baseUrl, name: formData.name }}
+      formData={formData}
       hasStoredApiKey={provider?.hasStoredApiKey ?? false}
       isEditing={isEditing}
       isSaving={isSaving}
       onApiKeyChange={handleApiKeyChange}
+      onConnectionTypeChange={handleConnectionTypeChange}
+      onManagementChange={handleManagementChange}
       onBaseUrlChange={handleChange('baseUrl')}
       onClose={onClose}
       onNameChange={handleChange('name')}

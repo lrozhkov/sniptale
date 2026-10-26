@@ -1,11 +1,11 @@
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { useEffect, useRef, useState } from 'react';
+import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
 import type { GuideProject, GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { applyGuideAiProposal, type GuideAiScope } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import {
   GuideAiStaleError,
-  loadGuideAiConfiguration,
   requestGuideAiProposal,
   verifyGuideAiBasis,
 } from './runtime/ai-request';
@@ -33,8 +33,18 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
   const latest = useRef(project);
   latest.current = project;
   const job = useRef<AbortController | null>(null);
-  const { configuration, configurationFailed, modelId, setModelId, retryConfiguration } =
-    useAiConfiguration();
+  const modelSelection = useAIScenarioModelSelection('scenario-edit');
+  const {
+    configuration,
+    configurationFailed,
+    modelId,
+    chooseModel,
+    prepareModelSelection,
+    retryConfiguration,
+    selectionUnavailable,
+    selectionFailed,
+    selectionPending,
+  } = modelSelection;
   const [instruction, setInstruction] = useState(t('scenario.editor.guideAiClarifyInstruction'));
   const selection = useAiSelection({
     project,
@@ -56,7 +66,7 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
     []
   );
   const run = async (apply: boolean) => {
-    if (job.current) return;
+    if (job.current || selectionPending) return;
     const controller = new AbortController();
     job.current = controller;
     setPending(true);
@@ -83,11 +93,13 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
         onClose();
       } else {
         if (!modelId || !instruction.trim()) return;
+        const selectedModelId = await prepareModelSelection(controller.signal);
+        controller.signal.throwIfAborted();
         const result = await requestGuideAiProposal({
           project: basis,
           scope,
           instruction,
-          modelId,
+          modelId: selectedModelId,
           includeImages: includeImages && imageCount > 0,
           signal: controller.signal,
         });
@@ -133,7 +145,9 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
     modelId,
     instruction,
     includeImages,
-    pending,
+    pending: pending || selectionPending,
+    selectionUnavailable,
+    selectionFailed,
     failure,
     proposal,
     accepted,
@@ -142,7 +156,7 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
     chooseChange,
     editRequest,
     retryConfiguration,
-    chooseModel: (value: string | null) => setModelId(value),
+    chooseModel,
     writeInstruction: (value: string) => setInstruction(value),
     chooseImages: (value: boolean) => setIncludeImages(value),
   };
@@ -152,39 +166,6 @@ function guideAiContentIdentity(project: GuideProject): string {
   const parsed = parseGuideProject(project);
   if (parsed.status !== 'ok') throw new GuideAiStaleError();
   return JSON.stringify({ ...parsed.project, updatedAt: 0 });
-}
-
-function useAiConfiguration() {
-  const [configuration, setConfiguration] = useState<Awaited<
-    ReturnType<typeof loadGuideAiConfiguration>
-  > | null>(null);
-  const [configurationFailed, setConfigurationFailed] = useState(false);
-  const [reload, setReload] = useState(0);
-  const [modelId, setModelId] = useState<string | null>(null);
-  useEffect(() => {
-    let active = true;
-    setConfigurationFailed(false);
-    void loadGuideAiConfiguration()
-      .then((value) => {
-        if (active) {
-          setConfiguration(value);
-          setModelId(value.defaultModelId);
-        }
-      })
-      .catch(() => {
-        if (active) setConfigurationFailed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [reload]);
-  return {
-    configuration,
-    configurationFailed,
-    modelId,
-    setModelId,
-    retryConfiguration: () => setReload((value) => value + 1),
-  };
 }
 
 /** Resolves the explicit selection in document order before either counting images or dispatching. */

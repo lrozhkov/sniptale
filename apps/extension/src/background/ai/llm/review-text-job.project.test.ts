@@ -110,6 +110,8 @@ it.each(['deleted', 'revision', 'text', 'placement', 'trash', 'current'] as cons
       baseUrl: 'https://provider.test/v1',
       apiKey: 'key',
       modelCode: 'code',
+      connectionType: 'openai-compatible' as const,
+      destinationBinding: 'fixture-destination-binding',
       effectiveSystemPrompt: '',
     };
     let modelReads = 0;

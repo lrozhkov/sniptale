@@ -13,7 +13,6 @@ import { buildAiProvidersSectionControllerState } from './build';
 function createBuildDataState() {
   return {
     chromeAiEnabled: false,
-    defaultModelId: 'model-1',
     isLoading: false,
     models: [{ id: 'model-1', providerId: 'provider-1' }] as never,
     providers: [{ id: 'provider-1', name: 'OpenAI' }] as never,
@@ -46,7 +45,6 @@ function createBuildArgs() {
         deleteModel: actions.handleDeleteModel,
         deleteProvider: actions.handleDeleteProvider,
         moveModel: vi.fn(),
-        setDefaultModel: actions.handleDefaultModelChange,
       },
       chromeAi,
       secretProtection,
@@ -64,7 +62,6 @@ it('builds the ai providers controller state from owner-local props', () => {
   const {
     args,
     getProviderName,
-    handleDefaultModelChange,
     handleDeleteModel,
     handleDeleteProvider,
     handleClearProviderSecret,
@@ -84,12 +81,10 @@ it('builds the ai providers controller state from owner-local props', () => {
     secretProtection: expect.objectContaining({
       status: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
     }),
-    defaultModelId: 'model-1',
     catalogActions: {
       clearProviderSecret: handleClearProviderSecret,
       deleteModel: handleDeleteModel,
       deleteProvider: handleDeleteProvider,
-      setDefaultModel: handleDefaultModelChange,
     },
     isLoading: false,
     modelOptions: [{ label: 'OpenAI / GPT 4.1' }],

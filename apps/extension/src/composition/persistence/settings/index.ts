@@ -25,8 +25,10 @@ import {
   parseFullPageQualityPolicy,
 } from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
+import { assertVoiceModelSelections } from '../ai-settings/selection-authority';
 import {
   runWithPersistenceMutationPermit,
+  runWithExclusivePersistenceMutationPermit,
   type PersistenceMutationPermit,
 } from '../infrastructure/mutation-barrier';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
@@ -581,15 +583,22 @@ function applySettingsPatch(
  * Failed writes reject to the caller and the queue remains usable for later mutations.
  */
 export async function patchSettings(settingsPatch: SettingsPatch): Promise<NormalizedSettings> {
-  return queueSettingsMutation(() =>
-    withSettingsMutation(async (permit) => {
+  const changesModelSelection =
+    settingsPatch.voiceInput !== undefined &&
+    (Object.hasOwn(settingsPatch.voiceInput, 'transcription') ||
+      Object.hasOwn(settingsPatch.voiceInput, 'correction'));
+  return queueSettingsMutation(() => {
+    const apply = async (permit: PersistenceMutationPermit) => {
       const currentSettings = await loadSettings();
+      if (changesModelSelection) await assertVoiceModelSelections(settingsPatch.voiceInput!);
       const nextSettings = applySettingsPatch(currentSettings, settingsPatch);
-
       await writeSettings(nextSettings, permit);
       return nextSettings;
-    })
-  );
+    };
+    return changesModelSelection
+      ? runWithExclusivePersistenceMutationPermit((permit) => withSettingsLock(() => apply(permit)))
+      : withSettingsMutation(apply);
+  });
 }
 
 export class StaleLocalStoragePolicyError extends Error {
@@ -667,4 +676,25 @@ export function patchPageLaunchCorner(
       return next;
     })
   );
+}
+
+/** Clear obsolete AI references during explicit alpha reset under the caller's exclusive permit. */
+export function resetVoiceInputModelReferences(permit: PersistenceMutationPermit): Promise<void> {
+  return withSettingsLock(async () => {
+    const settings = await loadSettings();
+    const voice = settings.voiceInput;
+    await writeSettings(
+      {
+        ...settings,
+        voiceInput: {
+          ...DEFAULT_VOICE_INPUT_SETTINGS,
+          ...voice,
+          transcription: null,
+          correction: { enabled: false, model: null },
+          ...(voice?.backend === 'model' ? { enabled: false } : {}),
+        },
+      },
+      permit
+    );
+  });
 }

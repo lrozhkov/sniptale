@@ -52,6 +52,8 @@ function createConfig(): ResolvedLlmModelConfig {
     baseUrl: 'http://127.0.0.1:11434/v1',
     apiKey: 'secret-key',
     modelCode: 'llama3.2',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: 'fixture-destination-binding',
     effectiveSystemPrompt: 'Return valid JSON only',
   };
 }
@@ -96,6 +98,8 @@ async function verifyMarkdownProcessingSuccess() {
     baseUrl: 'http://127.0.0.1:11434/v1',
     modelCode: 'llama3.2',
     providerErrorLabel: translate('background.runtime.llmInvalidProviderApiKey'),
+    beforeSend: expect.any(Function),
+    connectionType: 'openai-compatible',
     systemPrompt: SYSTEM_PROMPT_TABLES,
     userPrompt: '| a |\n| - |\n\n### Instruction:\nSummarize the table',
   });
@@ -163,6 +167,8 @@ async function verifyJsonRetryInstructionFlow() {
     baseUrl: 'http://127.0.0.1:11434/v1',
     modelCode: 'llama3.2',
     providerErrorLabel: translate('background.runtime.llmInvalidProviderApiKey'),
+    beforeSend: expect.any(Function),
+    connectionType: 'openai-compatible',
     systemPrompt: 'Return valid JSON only',
     userPrompt: '{"fields":[]}\n\n### Instruction:\nReturn normalized config',
   });
@@ -171,6 +177,8 @@ async function verifyJsonRetryInstructionFlow() {
     baseUrl: 'http://127.0.0.1:11434/v1',
     modelCode: 'llama3.2',
     providerErrorLabel: translate('background.runtime.llmInvalidProviderApiKey'),
+    beforeSend: expect.any(Function),
+    connectionType: 'openai-compatible',
     systemPrompt: `Return valid JSON only\n\n${translate('background.runtime.llmRetryInstruction')}`,
     userPrompt: '{"fields":[]}\n\n### Instruction:\nReturn normalized config',
   });
@@ -204,6 +212,8 @@ async function verifyJsonValidationFailureAfterLastRetry() {
     baseUrl: 'http://127.0.0.1:11434/v1',
     modelCode: 'llama3.2',
     providerErrorLabel: translate('background.runtime.llmInvalidProviderApiKey'),
+    beforeSend: expect.any(Function),
+    connectionType: 'openai-compatible',
     systemPrompt: SYSTEM_PROMPT_JSON,
     userPrompt: '{"fields":[]}\n\n### Instruction:\nReturn normalized config',
   });
@@ -212,6 +222,8 @@ async function verifyJsonValidationFailureAfterLastRetry() {
     baseUrl: 'http://127.0.0.1:11434/v1',
     modelCode: 'llama3.2',
     providerErrorLabel: translate('background.runtime.llmInvalidProviderApiKey'),
+    beforeSend: expect.any(Function),
+    connectionType: 'openai-compatible',
     systemPrompt: `${SYSTEM_PROMPT_JSON}\n\n${translate('background.runtime.llmRetryInstruction')}`,
     userPrompt: '{"fields":[]}\n\n### Instruction:\nReturn normalized config',
   });
@@ -260,4 +272,13 @@ describe('transport', () => {
     'normalizes non-Error JSON transport failures into the shared fallback message',
     verifyJsonUnexpectedErrorNormalization
   );
+});
+
+it('does not replay a failed provider request during JSON validation retries', async () => {
+  resetLlmServiceTransportMocks();
+  requestChatCompletionMock.mockRejectedValue(new Error('provider denied request'));
+  await expect(processJsonConfigRequest(createJsonRequest(), createConfig(), 3)).rejects.toThrow(
+    'provider denied request'
+  );
+  expect(requestChatCompletionMock).toHaveBeenCalledOnce();
 });

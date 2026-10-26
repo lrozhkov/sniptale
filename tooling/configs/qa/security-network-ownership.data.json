@@ -12,14 +12,20 @@
     {
       "file": "apps/extension/src/background/ai/llm/transport/request.ts",
       "owner": "background-llm-transport",
-      "justification": "The background LLM transport is the only canonical outbound network seam that assembles Authorization headers from resolved model config.",
-      "reviewNote": "Secret-bearing headers must not drift into UI, hooks, storage, or orchestration modules."
+      "justification": "The background LLM transport passes resolved model credentials to the canonical SDK provider runtime with the guarded network transport.",
+      "reviewNote": "Keep SDK credential handoff in this owner. Require the guarded transport for destination checks, current admission, credentials omit, redirect refusal, bounded bodies, and deadlines. Keep secrets and secret-bearing headers outside UI, hooks, storage, and orchestration modules."
     },
     {
       "file": "apps/extension/src/background/ai/audio/request.ts",
       "owner": "background-gallery-audio-transport",
       "justification": "The canonical audio transport handles project transcription and speech, plus explicitly configured private voice transcription.",
       "reviewNote": "Only this owner constructs audio bearer headers. Bind editor jobs to their admitted source scope. Bind voice jobs to immutable private history audio and the configured provider, destination and model code. Recheck authority after upload preparation. Require host permission, credentials omit, redirect error, bounded bodies and a deadline. Never retry paid requests, log provider responses or send binary IPC."
+    },
+    {
+      "file": "apps/extension/src/background/ai/settings/managed-catalog.ts",
+      "owner": "background-ai-catalog-transport",
+      "justification": "The background catalog transport constructs documented provider authentication headers for bounded metadata discovery.",
+      "reviewNote": "Catalog calls require current provider admission, host permission, an already available secret, destination bounds, redirect refusal, a deadline, bounded pages and bytes. Never infer billing access from public catalogs or send user content."
     }
   ],
   "credentialedFetchOwners": [

@@ -1,3 +1,9 @@
+import { isAIProviderType } from '../../../contracts/settings/ai-provider';
+import {
+  isAIModelCapabilities,
+  isAICatalogFacts,
+  isAIConnectionObservation,
+} from '../../../contracts/settings/ai-catalog';
 import { isValidAIModelOperationConfiguration } from '../../../contracts/settings/model-operation';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
 import { isAllowedAIProviderBaseUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
@@ -13,37 +19,30 @@ interface ParsedStoredListValue<TValue> {
   value: TValue[];
 }
 
-interface LegacyAIProvider {
-  apiKey: string;
-  baseUrl: string;
-  connectionType: 'openai-compatible';
-  createdAt: number;
-  id: string;
-  name: string;
-}
-
 function isAIProvider(value: unknown): value is AIProvider {
   return (
     isRecord(value) &&
     isString(value['id']) &&
     isString(value['name']) &&
-    value['connectionType'] === 'openai-compatible' &&
+    isAIProviderType(value['connectionType']) &&
+    value['connectionType'] !== 'chrome-built-in' &&
     isString(value['baseUrl']) &&
     isAllowedAIProviderBaseUrl(value['baseUrl']) &&
     typeof value['hasStoredApiKey'] === 'boolean' &&
-    isNumber(value['createdAt'])
-  );
-}
-
-function isLegacyAIProvider(value: unknown): value is LegacyAIProvider {
-  return (
-    isRecord(value) &&
-    isString(value['id']) &&
-    isString(value['name']) &&
-    value['connectionType'] === 'openai-compatible' &&
-    isString(value['baseUrl']) &&
-    isAllowedAIProviderBaseUrl(value['baseUrl']) &&
-    isString(value['apiKey']) &&
+    (value['management'] === undefined ||
+      value['management'] === 'automatic' ||
+      value['management'] === 'manual') &&
+    (value['enabled'] === undefined || typeof value['enabled'] === 'boolean') &&
+    (value['incarnation'] === undefined || typeof value['incarnation'] === 'string') &&
+    (value['refreshGeneration'] === undefined ||
+      (typeof value['refreshGeneration'] === 'string' &&
+        value['refreshGeneration'].length <= 200)) &&
+    ['revision', 'credentialRevision', 'catalogUpdatedAt', 'lastRefreshAttemptAt'].every(
+      (key) =>
+        value[key] === undefined ||
+        (typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] >= 0)
+    ) &&
+    (value['observation'] === undefined || isAIConnectionObservation(value['observation'])) &&
     isNumber(value['createdAt'])
   );
 }
@@ -56,6 +55,14 @@ function isAIModel(value: unknown): value is AIModel {
     isString(value['modelCode']) &&
     isString(value['displayName']) &&
     isValidAIModelOperationConfiguration(value) &&
+    (value['source'] === undefined ||
+      value['source'] === 'manual' ||
+      value['source'] === 'catalog') &&
+    (value['enabled'] === undefined || typeof value['enabled'] === 'boolean') &&
+    (value['retirementOverride'] === undefined ||
+      typeof value['retirementOverride'] === 'boolean') &&
+    (value['capabilities'] === undefined || isAIModelCapabilities(value['capabilities'])) &&
+    (value['catalog'] === undefined || isAICatalogFacts(value['catalog'])) &&
     (value['systemPrompt'] === undefined || isString(value['systemPrompt']))
   );
 }
@@ -84,12 +91,6 @@ export function parseStoredAIProviders(value: unknown): ParsedStoredListValue<AI
   return parseStoredList(value, isAIProvider);
 }
 
-export function parseLegacyStoredAIProviders(
-  value: unknown
-): ParsedStoredListValue<LegacyAIProvider> {
-  return parseStoredList(value, isLegacyAIProvider);
-}
-
 export function parseStoredAIModels(value: unknown): ParsedStoredListValue<AIModel> {
   return parseStoredList(value, isAIModel);
 }
@@ -104,14 +105,6 @@ export function parseStoredChromeAiEnabled(value: unknown): boolean {
 
 export function parseStoredSystemPrompt(value: unknown, fallback: string): string {
   return isString(value) ? value : fallback;
-}
-
-export function cloneLegacyAiSettings(value: unknown): Record<string, unknown> | null {
-  if (!isRecord(value) || Array.isArray(value)) {
-    return null;
-  }
-
-  return { ...value };
 }
 
 export function parseStoredProviderSecretMap(

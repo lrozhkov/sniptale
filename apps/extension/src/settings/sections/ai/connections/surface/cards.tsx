@@ -1,39 +1,88 @@
+import { useProviderCardActions } from '../controller/provider-card-actions';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { getAIProviderDefinition } from '../../../../../contracts/settings/ai-provider';
+import { formatDateTime } from '../../../../../platform/i18n';
+import { providerStatus } from './provider-status';
 import { translate } from '../../../../../platform/i18n';
-import {
-  SettingsCollection,
-  type SettingsCollectionAction,
-  type SettingsCollectionItem,
-} from '../../../../section-surface';
+import { SettingsCollection, type SettingsCollectionItem } from '../../../../section-surface';
 import type { AiProvidersSectionState } from '../controller/types';
 
 export function AIProvidersProvidersCard(props: { state: AiProvidersSectionState }) {
+  const { refreshing, errors, check, onAction } = useProviderCardActions(props.state);
   const items: readonly SettingsCollectionItem[] = props.state.providers.map((provider) => ({
     id: provider.id,
     title: provider.name,
-    meta: `${provider.connectionType} · ${provider.baseUrl}`,
+    meta: `${getAIProviderDefinition(provider.connectionType).label} · ${provider.baseUrl}`,
+    enabled: provider.enabled !== false,
+    supplement: (
+      <div className="space-y-1">
+        {provider.observation && (
+          <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+            {formatDateTime(provider.observation.checkedAt, {
+              dateStyle: 'short',
+              timeStyle: 'short',
+            })}
+          </p>
+        )}
+        <ProductActionButton
+          compact
+          tone="secondary"
+          disabled={refreshing.has(provider.id) || provider.enabled === false}
+          onClick={() => void check(provider)}
+        >
+          {translate(
+            refreshing.has(provider.id)
+              ? 'settings.aiProviders.providerCheckPending'
+              : 'settings.aiProviders.providerCheckAction'
+          )}
+        </ProductActionButton>
+        {errors[provider.id] && (
+          <p role="alert" className="text-xs">
+            {errors[provider.id]}
+          </p>
+        )}
+      </div>
+    ),
     badges: [
+      {
+        id: 'management',
+        label: translate(
+          provider.management === 'manual'
+            ? 'settings.aiProviders.providerModeManual'
+            : 'settings.aiProviders.providerModeAutomatic'
+        ),
+        tone: 'neutral',
+      },
+      {
+        id: 'status',
+        label: providerStatus(provider),
+        tone:
+          provider.observation?.status === 'available'
+            ? 'success'
+            : provider.observation?.status === 'unavailable'
+              ? 'warning'
+              : 'neutral',
+      },
       {
         id: 'api-key',
         label: translate(
-          provider.hasStoredApiKey
-            ? 'settings.aiProviders.providerApiKeySet'
-            : 'settings.aiProviders.providerApiKeyMissing'
+          getAIProviderDefinition(provider.connectionType).credential === 'none' &&
+            !provider.hasStoredApiKey
+            ? 'settings.aiProviders.providerLocalNoKey'
+            : provider.hasStoredApiKey
+              ? 'settings.aiProviders.providerApiKeySet'
+              : 'settings.aiProviders.providerApiKeyMissing'
         ),
-        tone: provider.hasStoredApiKey ? 'success' : 'warning',
+        tone: provider.hasStoredApiKey
+          ? 'success'
+          : getAIProviderDefinition(provider.connectionType).credential === 'none'
+            ? 'neutral'
+            : 'warning',
       },
     ],
-    capabilities: { edit: true, reset: provider.hasStoredApiKey, delete: true },
+    capabilities: { edit: true, toggle: true, reset: provider.hasStoredApiKey, delete: true },
     actionLabels: { reset: translate('settings.aiProviders.providerSecretClearAction') },
   }));
-  const byId = new Map(props.state.providers.map((provider) => [provider.id, provider]));
-  const onAction = (action: SettingsCollectionAction) => {
-    const provider = byId.get(action.itemId);
-    if (!provider) return;
-    if (action.type === 'edit') props.state.modals.openProviderModal(provider);
-    if (action.type === 'reset') void props.state.catalogActions.clearProviderSecret(provider.id);
-    if (action.type === 'delete')
-      props.state.modals.setConfirmDelete({ type: 'provider', item: provider });
-  };
   return (
     <SettingsCollection
       ariaLabel={translate('settings.aiProviders.providersTitle')}
