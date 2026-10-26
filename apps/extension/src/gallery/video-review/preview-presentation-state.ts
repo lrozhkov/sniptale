@@ -1,3 +1,4 @@
+import { previewKeyValue } from './preview-key';
 import type { RefObject } from 'react';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import { resolveQuickPreviewRasterSize } from '../../features/video/preview/raster';
@@ -98,12 +99,7 @@ export function resolvePresentationDescription(
       input.webcam?.editor.crop,
       input.webcam?.editor.placement,
     ],
-    (_key, value: unknown) =>
-      value !== null && typeof value === 'object' && !Array.isArray(value)
-        ? Object.fromEntries(
-            Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
-          )
-        : value
+    previewKeyValue
   );
   if (previous?.key !== key) {
     const backing = resolveQuickPreviewRasterSize({

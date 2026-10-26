@@ -178,7 +178,9 @@ it('retains independent Gallery edge variants in schema41 and through exact medi
   expect(changed.version).toBe(41);
   expect(isExportReadyVideoProject(changed)).toBe(true);
   expect(isHydratableVideoProject({ ...changed, version: 40 })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 46 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 46 })).toBe(true);
+  expect(isHydratableVideoProject({ ...changed, version: 48 })).toBe(true);
+  expect(isHydratableVideoProject({ ...changed, version: Number.MAX_SAFE_INTEGER })).toBe(false);
   const reopened = hydrateVideoProject(changed);
   expect(reopened.bookendPresets?.intro.edgeControl).toEqual(edgeControl);
   expect(

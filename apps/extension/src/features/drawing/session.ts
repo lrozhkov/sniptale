@@ -25,6 +25,10 @@ export interface DrawingDocumentCommit {
 
 export interface DrawingSession {
   getSnapshot(): DrawingSessionSnapshot;
+  /** Reads accepted geometry in the current layout without including an in-progress preview. */
+  getCommittedDocument(): DrawingDocumentV1;
+  /** Replays an admitted recovery version without creating a second history entry. */
+  restoreDocument(document: DrawingDocumentV1): boolean;
   subscribe(listener: () => void): () => void;
   setActiveTool(tool: DrawingTool): void;
   setDefaults(defaults: DrawingToolDefaults): void;
@@ -169,15 +173,28 @@ class DrawingSessionOwner implements DrawingSession {
     if (this.revision === revisionBeforeCommit) this.emit();
   }
 
-  getSnapshot(): DrawingSessionSnapshot {
-    const source = this.previewDocument ?? this.document;
+  restoreDocument(document: DrawingDocumentV1): boolean {
+    if (this.disposed) return false;
+    this.captureObjects(document.objects);
+    return this.replayDocument(document);
+  }
+
+  private projectDocument(source: DrawingDocumentV1): DrawingDocumentV1 {
     const objects = this.options.objectProjection
       ? source.objects.map((object) => this.options.objectProjection!.resolve(object))
       : source.objects;
+    return objects.every((object, index) => object === source.objects[index])
+      ? source
+      : { version: 1, objects };
+  }
+
+  getCommittedDocument(): DrawingDocumentV1 {
+    return this.projectDocument(this.document);
+  }
+
+  getSnapshot(): DrawingSessionSnapshot {
     return {
-      document: objects.every((object, index) => object === source.objects[index])
-        ? source
-        : { version: 1, objects },
+      document: this.projectDocument(this.previewDocument ?? this.document),
       activeTool: this.activeTool,
       selectedObjectIds: this.selectedObjectIds,
       selectedObjectId: this.selectedObjectIds.at(-1) ?? null,

@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Locator, Page, TestInfo } from '@playwright/test';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { expect, test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
@@ -259,6 +259,56 @@ async function checkDrawingPlacement(page: Page, editor: boolean) {
   return bounds;
 }
 
+async function verifySelectionDisclosure(
+  page: Page,
+  editor: boolean,
+  point: { x: number; y: number },
+  info: TestInfo
+) {
+  const actions = page.locator('[data-ui="drawing.selection.actions"]');
+  const reveal = actions.locator('[data-ui="drawing.selection.actions.reveal"]');
+  const front = actions.locator('[data-ui="drawing.selection.actions.front"]');
+  await expect(actions.locator('button')).toHaveCount(3);
+  const order = await actions
+    .locator('button')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('data-ui')));
+  expect(order).toEqual([
+    'drawing.selection.actions.reveal',
+    'drawing.selection.actions.delete',
+    'content.toolbar.drawing-options.deselect',
+  ]);
+  const half = (await reveal.boundingBox())!;
+  const full = (await actions
+    .locator('[data-ui="drawing.selection.actions.delete"]')
+    .boundingBox())!;
+  expect(Math.abs(half.width * 2 - full.width)).toBeLessThanOrEqual(1);
+  await page.screenshot({
+    path: info.outputPath(`${editor ? 'editor' : 'page'}-selection-compact.png`),
+    fullPage: false,
+  });
+  await reveal.focus();
+  await reveal.press('Enter');
+  await expect(front).toBeVisible();
+  await expect(reveal).toBeFocused();
+  await actions.locator('[data-ui="drawing.selection.actions.duplicate"]').click();
+  await expect(reveal).toHaveAttribute('aria-expanded', 'true');
+  await expect(front).toBeEnabled();
+  await page.screenshot({
+    path: info.outputPath(`${editor ? 'editor' : 'page'}-selection-expanded.png`),
+    fullPage: false,
+  });
+  await actions.locator('[data-ui="content.toolbar.drawing-options.deselect"]').click();
+  await expect(actions).toHaveCount(0);
+  await page
+    .locator(
+      `[data-ui="${editor ? 'editor.floating.tool-rail.select' : 'content.toolbar.drawing.select'}"]`
+    )
+    .click();
+  await page.mouse.click(point.x, point.y);
+  await expect(reveal).toHaveAttribute('aria-expanded', 'false');
+  await expect(front).toHaveCount(0);
+}
+
 for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
   test(`shared drawing surface placement ${name}`, async ({
     context,
@@ -283,6 +333,11 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
             'true'
           );
         }
+        await page.locator('[data-ui="content.toolbar.root"]').evaluate(async (toolbar) => {
+          await Promise.all(
+            toolbar.getAnimations().map((animation) => animation.finished.catch(() => undefined))
+          );
+        });
         for (const [edge, x, y] of [
           ['top', viewport.width / 2, 20],
           ['bottom', viewport.width / 2, viewport.height - 20],
@@ -301,10 +356,16 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
           await arrow.click();
           if ((await arrow.getAttribute('aria-expanded')) !== 'true') await arrow.click();
           const unselected = await checkDrawingPlacement(page, false);
-          await page.mouse.move(300, 160);
+          // Keep the drawing gesture outside the host iframe (x=24..328).
+          await page.mouse.move(450, 160);
           await page.mouse.down();
-          await page.mouse.move(420, 210, { steps: 4 });
+          await page.mouse.move(570, 210, { steps: 4 });
           await page.mouse.up();
+          if (mode === 'video-recording') {
+            // Recording drawings intentionally do not select a newly created object.
+            await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+            await page.mouse.click(510, 185);
+          }
           await expect(
             page.locator('[data-ui="content.toolbar.drawing-options.pair"]')
           ).toBeVisible();
@@ -317,6 +378,8 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
               .all())
               expect((await panel.boundingBox())!.height).toBeCloseTo(unselected.height, 0);
           }
+          if (mode === 'drawing' && edge === 'top')
+            await verifySelectionDisclosure(page, false, { x: 510, y: 185 }, info);
           await page.screenshot({
             path: info.outputPath(`${mode}-${edge}-pair.png`),
             fullPage: false,
@@ -344,6 +407,12 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
           (await editor.locator('[data-ui="editor.floating.selection-actions"]').boundingBox())!
             .height
         ).toBeCloseTo(unselected.height, 0);
+        await verifySelectionDisclosure(
+          editor,
+          true,
+          { x: box.x + box.width * 0.45, y: box.y + box.height * 0.575 },
+          info
+        );
         for (const width of [viewport.width, 960, 719, 720, 721]) {
           await editor.setViewportSize({ width, height: viewport.height });
           await checkDrawingPlacement(editor, true);
@@ -895,6 +964,14 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     scrollSnapshots.push({ stage: 'selection-before-scroll', ...(await readScroll()) });
     await actions.scrollIntoViewIfNeeded();
     scrollSnapshots.push({ stage: 'selection-after-scroll', ...(await readScroll()) });
+    await checkPairBounds();
+    await expect(actions.locator('button')).toHaveCount(3);
+    await page.screenshot({
+      path: info.outputPath('vertical-layer-actions-compact.png'),
+      fullPage: false,
+    });
+    await actions.locator('[data-ui="drawing.selection.actions.reveal"]').click();
+    await actions.scrollIntoViewIfNeeded();
     await checkPairBounds();
     const first = actions.locator('[data-ui="drawing.selection.actions.front"]');
     const second = actions.locator('[data-ui="drawing.selection.actions.forward"]');

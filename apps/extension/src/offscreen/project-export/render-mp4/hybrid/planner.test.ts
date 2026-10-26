@@ -1,10 +1,20 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
   VideoMediaFitMode,
   VideoTimelinePlacementMode,
+  VideoProjectAssetType,
+  VideoProjectClipType,
+  VideoSceneBackgroundKind,
+  VideoTrackKind,
   type VideoProject,
 } from '../../../../features/video/project/types';
 
@@ -20,54 +30,46 @@ vi.mock('../../../../features/video/composition/timeline/render', async (importO
 import { canUseHybridMp4VideoPipeline, planMp4VideoRenderSpans } from './planner';
 
 function createProject(overrides: Partial<VideoProject> = {}): VideoProject {
+  const project = createEmptyVideoProject('Project', 1280, 720);
+  const track = {
+    ...createVideoProjectTrack('Track', 0, VideoTrackKind.PRIMARY),
+    id: 'track-1',
+  };
+  const asset = {
+    ...createVideoProjectAsset(
+      'clip.mp4',
+      VideoProjectAssetType.VIDEO,
+      { kind: 'recording', recordingId: 'recording-1' },
+      {
+        duration: 4,
+        hasAudio: false,
+        height: 720,
+        mimeType: 'video/mp4',
+        width: 1280,
+        size: 1,
+        audioPeaks: null,
+      }
+    ),
+    id: 'asset-1',
+    createdAt: 1,
+  };
+  const clip = createVideoClipFromAsset(track.id, asset, project.width, project.height);
+  if (clip.type !== VideoProjectClipType.VIDEO) throw new Error('Expected video fixture');
   return {
-    version: 1,
+    ...project,
     id: 'project-1',
-    name: 'Project',
     source: { kind: 'recording', recordingId: 'recording-1' },
-    baseRecordingId: null,
-    width: 1280,
-    height: 720,
-    fps: 30,
     backgroundColor: '#000000',
+    sceneBackground: { kind: VideoSceneBackgroundKind.SOLID, color: '#000000' },
     timelinePlacementMode: VideoTimelinePlacementMode.ALLOW_OVERLAP,
     duration: 4,
     createdAt: 1,
     updatedAt: 1,
-    assets: [
-      {
-        id: 'asset-1',
-        name: 'clip.mp4',
-        source: { kind: 'recording', recordingId: 'recording-1' },
-        metadata: { duration: 4, hasAudio: false, height: 720, mimeType: 'video/mp4', width: 1280 },
-      },
-    ],
-    tracks: [
-      { id: 'track-1', name: 'Track', kind: 'PRIMARY', order: 0, visible: true, locked: false },
-    ],
-    clips: [
-      {
-        id: 'clip-1',
-        trackId: 'track-1',
-        type: 'VIDEO',
-        name: 'Clip',
-        assetId: 'asset-1',
-        startTime: 0,
-        duration: 4,
-        sourceStart: 0,
-        sourceDuration: 4,
-        fadeInMs: 0,
-        fadeOutMs: 0,
-        fitMode: VideoMediaFitMode.STRETCH,
-        transitionIn: 'NONE',
-        transitionOut: 'NONE',
-        transform: { height: 720, opacity: 1, rotation: 0, width: 1280, x: 0, y: 0 },
-      },
-    ],
-    cursorTrack: null,
-    actionEvents: [],
+    assets: [asset],
+    tracks: [track],
+    clips: [{ ...clip, id: 'clip-1', name: 'Clip', fitMode: VideoMediaFitMode.STRETCH }],
     ...overrides,
-  } as VideoProject;
+  };
 }
 
 function createSettings(overrides: Record<string, unknown> = {}) {

@@ -422,3 +422,21 @@
     box-shadow: none !important;
   }
 }
+
+[data-ui='gallery.videoReview.inspector'] .review-project-title {
+  min-height: 32px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  font: inherit;
+}
+[data-ui='gallery.videoReview.inspector'] .review-project-title:is(:hover, :focus) {
+  border-color: var(--sniptale-color-border-soft);
+  background: var(--sniptale-color-surface-hover);
+}
+[data-ui='gallery.videoReview.inspector'] .review-project-title:focus-visible {
+  outline: 1px solid var(--sniptale-color-border-strong);
+  outline-offset: -1px;
+}

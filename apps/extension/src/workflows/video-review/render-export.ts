@@ -1,3 +1,4 @@
+import { ownReviewOutputCancellation } from './render-output-lifetime';
 import { paintReviewExportScene, type ReviewRenderScene } from './render-export-scene';
 import type { ReviewFrameExportInput } from './render-export-input';
 import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
@@ -82,9 +83,10 @@ export async function writeReviewFrames(
     prepareReviewRender(args)
   );
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
+  let output: Output | null = null;
+  let outputLifetime: ReturnType<typeof ownReviewOutputCancellation> | undefined;
   const dispose = () => input.dispose();
   args.signal.addEventListener('abort', dispose, { once: true });
-  let output: Output | null = null;
   const adaptiveBudget = createAdaptiveComparisonBudget();
   let source: ReviewRenderSource | null = null;
   let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
@@ -121,6 +123,8 @@ export async function writeReviewFrames(
       })
     );
     output = tracks?.output ?? null;
+    if (output) outputLifetime = ownReviewOutputCancellation(output, args.signal);
+    args.signal.throwIfAborted();
     if (tracks && tracks.video.kind !== 'sample')
       throw new Error('Video output configuration changed.');
     const videoOut = args.frameProbe
@@ -246,7 +250,7 @@ export async function writeReviewFrames(
     args.onProgress?.(1);
     return receipt;
   } catch (error) {
-    return await cleanupReviewExportFailure(error, () => output?.cancel());
+    return await cleanupReviewExportFailure(error, () => outputLifetime?.cancel());
   } finally {
     args.onTimeEstimate?.(null);
     webcam?.dispose();
@@ -255,6 +259,7 @@ export async function writeReviewFrames(
     main?.dispose();
     source?.visual?.image?.close();
     source?.visual?.headerImage?.close();
+    outputLifetime?.dispose();
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
   }

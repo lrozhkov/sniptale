@@ -31,7 +31,13 @@ import {
 } from '../../project/types/index';
 import { isVideoProjectUtilityLaneVisible } from '../../project/utility-lanes';
 import { createDefaultCameraState } from './defaults';
-import { applyTemporalEasing, motionConnectionProgress, lerpNumber, lerpPoint } from './math';
+import {
+  applyTemporalEasing,
+  motionConnectionProgress,
+  lerpNumber,
+  lerpPoint,
+  rectCorners,
+} from './math';
 
 import { resolveCameraViewportFrame } from './viewport';
 import type { VideoCompositionActionState, VideoCompositionCameraState } from '../types';
@@ -221,6 +227,14 @@ function resolveConnectingCamera(
       destination,
       (params.currentTime - start) / (destination.startTime - start)
     );
+    const linkMotionBlurAmount = () =>
+      ['INSTANT', 'instant', 'none'].includes(destination.incomingConnection!.easing)
+        ? 0
+        : source.motionBlur === undefined
+          ? lerpNumber(source.motionBlurAmount ?? 0, destination.motionBlurAmount ?? 0, progress)
+          : motionBlurPhaseSetting(source.motionBlur, 'link').enabled
+            ? motionBlurPhaseSetting(source.motionBlur, 'link').strength
+            : 0;
     if (destination.sourceBinding?.coordinateSpace === 'source-window') {
       const clip = resolveMotionConnectionVideo(
         params.project,
@@ -289,15 +303,7 @@ function resolveConnectingCamera(
             }
           : {}),
         regionId: destination.id,
-        motionBlurAmount: ['INSTANT', 'instant', 'none'].includes(
-          destination.incomingConnection!.easing
-        )
-          ? 0
-          : source.motionBlur === undefined
-            ? lerpNumber(source.motionBlurAmount ?? 0, destination.motionBlurAmount ?? 0, progress)
-            : motionBlurPhaseSetting(source.motionBlur, 'link').enabled
-              ? motionBlurPhaseSetting(source.motionBlur, 'link').strength
-              : 0,
+        motionBlurAmount: linkMotionBlurAmount(),
         overlayZoomMode: resolveMotionOverlayZoomMode(destination.overlayZoomMode),
       };
     }
@@ -324,15 +330,7 @@ function resolveConnectingCamera(
       ...(spatial ? { spatial } : {}),
       ...resolveCameraViewportFrame(params.project, focusPoint, scale),
       regionId: destination.id,
-      motionBlurAmount: ['INSTANT', 'instant', 'none'].includes(
-        destination.incomingConnection!.easing
-      )
-        ? 0
-        : source.motionBlur === undefined
-          ? lerpNumber(source.motionBlurAmount ?? 0, destination.motionBlurAmount ?? 0, progress)
-          : motionBlurPhaseSetting(source.motionBlur, 'link').enabled
-            ? motionBlurPhaseSetting(source.motionBlur, 'link').strength
-            : 0,
+      motionBlurAmount: linkMotionBlurAmount(),
       overlayZoomMode: resolveMotionOverlayZoomMode(destination.overlayZoomMode),
     };
   }
@@ -365,12 +363,7 @@ export function mapCompositionRectThroughCamera(
   rect: { height: number; width: number; x: number; y: number },
   camera: VideoCompositionCameraState
 ) {
-  const points = [
-    { x: rect.x, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y + rect.height },
-    { x: rect.x, y: rect.y + rect.height },
-  ].map((point) => mapCompositionPointThroughCamera(point, camera));
+  const points = rectCorners(rect).map((point) => mapCompositionPointThroughCamera(point, camera));
   if (points.some((point) => !point)) return null;
   const xs = points.map((point) => point!.x),
     ys = points.map((point) => point!.y);

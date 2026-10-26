@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
 import { SceneBackgroundColorEditor } from './colors';
+import { SCENE_BACKGROUND_PALETTE } from './shared';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -79,8 +80,15 @@ describe('workspace-sidebar/selection/scene-background-colors', () => {
       getButton('videoEditor.sidebar.sceneBackgroundColorLabel')?.click();
     });
 
-    expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).not.toBeNull();
-    expect(document.body.textContent).toContain('shared.ui.colorSelectorPalette');
+    const popup = document.querySelector('[data-ui="shared.ui.paint-selector.popup"]');
+    expect(popup).not.toBeNull();
+    for (const color of SCENE_BACKGROUND_PALETTE) {
+      expect(
+        popup?.querySelectorAll(
+          `button[aria-label="videoEditor.sidebar.sceneBackgroundColorLabel: ${color}"]`
+        )
+      ).toHaveLength(1);
+    }
   });
 });
 

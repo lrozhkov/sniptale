@@ -22,7 +22,7 @@ async function fixture() {
   const packageRoot = path.join(root, 'node_modules/mediabunny');
   fs.mkdirSync(artifactRoot);
   fs.mkdirSync(path.join(packageRoot, 'src'), { recursive: true });
-  const packageJson = JSON.stringify({ name: 'mediabunny', version: '1.61.3' });
+  const packageJson = JSON.stringify({ name: 'mediabunny', version: '1.61.6' });
   const license = 'MPL test fixture';
   const source = 'reviewed source delta';
   fs.writeFileSync(path.join(packageRoot, 'package.json'), packageJson);
@@ -47,8 +47,8 @@ async function fixture() {
   const manifest = {
     schemaVersion: 1,
     package: 'mediabunny',
-    version: '1.61.3',
-    resolved: 'https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz',
+    version: '1.61.6',
+    resolved: 'https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.6.tgz',
     integrity: 'sha512-fixture',
     changes,
     packageJsonSha256: hash(packageJson),

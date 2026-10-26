@@ -24,7 +24,10 @@ for (const theme of ['light', 'dark'] as const) {
         .toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
       await expect
         .configure({ soft: true, timeout: 1000 })(selected)
-        .not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      expect(await selected.evaluate((node) => getComputedStyle(node, '::before').height)).toBe(
+        '2px'
+      );
       const appearance = page
         .locator('.guide-page-header')
         .getByRole('button', { name: t('scenario.editor.appearance'), exact: true });
@@ -56,12 +59,15 @@ for (const theme of ['light', 'dark'] as const) {
       const idleColor = await inactive.evaluate((node) => getComputedStyle(node).color);
       await inactive.hover();
       await expect(inactive).not.toHaveCSS('color', idleColor);
-      await expect(inactive).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(inactive).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const resourceTab = page
         .locator('.guide-left-navigation')
         .getByRole('button', { name: t('scenario.editor.guideResources'), exact: true });
+      await page.mouse.move(0, 0);
+      const resourceIdleColor = await resourceTab.evaluate((node) => getComputedStyle(node).color);
       await resourceTab.hover();
-      await expect(resourceTab).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(resourceTab).not.toHaveCSS('color', resourceIdleColor);
+      await expect(resourceTab).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(resourceTab).toHaveAttribute('aria-pressed', 'false');
       await expect(inactive).toHaveAttribute('aria-pressed', 'false');
       const rows = page.locator('.guide-outline-row');
@@ -87,11 +93,8 @@ for (const theme of ['light', 'dark'] as const) {
         .click();
       await expect(rows.first().locator('a')).toHaveAttribute('href', firstId!);
       for (const button of await panel.locator('.guide-panel-heading > button').all())
-        await checkInspectorUtility(page, button);
-      await info.attach('guide-navigation', {
-        body: await page.screenshot(),
-        contentType: 'image/png',
-      });
+        await checkInspectorUtility(page, button, '4px', 'secondary');
+      await page.screenshot({ path: info.outputPath('guide-navigation.png'), fullPage: false });
       await choices
         .getByRole('button', { name: t('scenario.editor.tourMode'), exact: true })
         .click();
@@ -123,10 +126,12 @@ for (const theme of ['light', 'dark'] as const) {
           .getByRole('button', { name: t('scenario.editor.tourSlideActions'), exact: true })
       ).toBeFocused();
       for (const button of await panel.locator('.guide-panel-heading > button').all())
-        await checkInspectorUtility(page, button);
+        await checkInspectorUtility(page, button, '4px', 'secondary');
       await checkInspectorUtility(
         page,
-        page.locator('#guide-library-panel .guide-panel-heading > button')
+        page.locator('#guide-library-panel .guide-panel-heading > button'),
+        '4px',
+        'secondary'
       );
       await appearance.click();
       await panel.locator('.guide-panel-heading > button').last().click();

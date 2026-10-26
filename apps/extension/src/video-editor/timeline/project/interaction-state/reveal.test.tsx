@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import { buildReviewTimeMap } from '../../../../features/video/review/timeline';
 import { projectSourceVoiceoverViews } from '../../../../features/video/project/source-voiceover-views';
 import type { TimelineRevealRequest } from '../types';
-// @vitest-environment jsdom
 import { act, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

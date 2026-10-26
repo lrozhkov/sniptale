@@ -1,6 +1,14 @@
 import { defineMessageSource } from '../source';
 
 export const contentRuntimeMessages = defineMessageSource({
+  quickActionAppearanceFailed: {
+    ru: 'Не удалось оформить снимок. Исходник сохранён в разделе временных файлов.',
+    en: 'Could not apply screenshot appearance. The original was saved to temporary files.',
+  },
+  quickActionAppearanceRetentionFailed: {
+    ru: 'Не удалось оформить и сохранить исходный снимок. Повторите захват.',
+    en: 'Could not apply appearance or retain the original screenshot. Capture again.',
+  },
   selectionSaved: {
     ru: 'Скриншот выделенной области сохранён',
     en: 'Selection screenshot saved',

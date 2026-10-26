@@ -45,8 +45,10 @@ export async function checkInspectorUtility(
   await expect(button).toHaveCSS('transform', 'none');
   await page.mouse.move(0, 0);
   await page.mouse.up();
-  await page.keyboard.press('Tab');
   await button.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(button).toBeFocused();
   await expect(button).toHaveCSS('outline-style', 'solid');
   await expect(button).toHaveCSS('outline-width', '2px');
   await button.evaluate((node: HTMLButtonElement) => node.blur());

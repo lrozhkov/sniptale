@@ -1,3 +1,4 @@
+import inspectorDisclosureStyles from '../../../ui/compact-inspector-controls/disclosure.css?inline';
 import inspectorSurfaceStyles from '../../../ui/compact-inspector-controls/inspector-surface.css?inline';
 import colorPickerStyles from '../../../ui/color-selector/picker.css?inline';
 import baseStyles from '@sniptale/ui/styles?inline';
@@ -290,6 +291,7 @@ export function createContentEntrypointStyles(): string {
       [
         contentHostStyles,
         inspectorSurfaceStyles,
+        inspectorDisclosureStyles,
         colorPickerStyles,
         baseStyles,
         aiModalStyles,

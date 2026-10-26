@@ -53,6 +53,7 @@ type BackgroundOwnedAuthorizationDispatcher = {
 };
 
 export const backgroundOwnedAuthorizationBindings = {
+  'page-launch-preferences': authorizePageLaunchPreferencesRoute,
   'aggregate-promotion': authorizeAggregatePromotionRoute,
   'ai-secret-unlock': authorizeAiSecretUnlockRoute,
   'ai-settings-mutation': authorizeAiSettingsMutationRoute,
@@ -337,5 +338,23 @@ function getBackgroundOwnedPolicyEntries(): Array<[string, string]> {
       messageType,
       entry.policyAuthorityFamily,
     ])
+  );
+}
+
+function authorizePageLaunchPreferencesRoute(
+  request: BackgroundOwnedAuthorizationRequest,
+  entry: BackgroundOwnedRouteInventoryEntry
+): IpcAuthorizationResult {
+  const decision = authorizeContentSender(request.sender, undefined, {
+    allowOwnedExtensionSender: true,
+  });
+  if (!decision.allowed) return reject('Unauthorized page-launch preferences sender');
+  return authorize(
+    createBackgroundOwnedRoutePreauthorization({
+      entry,
+      handle: { kind: 'background-owned-route-policy' },
+      message: request.message,
+      senderClassification: 'content-tab-runtime',
+    })
   );
 }

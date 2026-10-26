@@ -49,6 +49,10 @@ const idempotencyPolicyByType = {
     idempotent: false,
     reason: 'privacy erasure and verification are deliberately repeatable under the owner lock',
   },
+  [MessageType.OFFSCREEN_QUICK_ACTION_HEADER]: {
+    idempotent: false,
+    reason: 'bounded header rendering has no persistent effects and can be repeated',
+  },
   [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: {
     idempotent: true,
     reason: 'frame annotation rasterization is correlated by the staged immutable job reference',

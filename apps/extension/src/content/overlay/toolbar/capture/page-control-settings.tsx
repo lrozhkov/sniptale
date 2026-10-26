@@ -70,6 +70,19 @@ export function PageToolbarCustomizationSettings(props: {
           />
         </ProductToolbarMenuItem>
       ) : null}
+      <ProductToolbarMenuItem
+        dataUi="content.toolbar.settings.reset-page-toolbar"
+        disabled={!preferences.ready || preferences.pending || !preferences.hasCustomization}
+        onClick={() => void preferences.reset()}
+      >
+        <RefreshCw className="sniptale-popover-icon" />
+        <ProductToolbarMenuItemCopy
+          label={translate('content.toolbar.pageResetToolbar')}
+          {...(props.compactMenus
+            ? {}
+            : { hint: translate('content.toolbar.pageResetToolbarHint') })}
+        />
+      </ProductToolbarMenuItem>
       {preferences.error ? (
         <ProductToolbarMenuItem
           onClick={() => void preferences.reload()}
@@ -94,6 +107,7 @@ export function PageToolbarCustomizationDone(props: { onCloseMenus: () => void }
       type="button"
       tone="property"
       active
+      style={preferences.layoutActive ? { order: 2147483646 } : undefined}
       aria-pressed="true"
       dataUi="content.toolbar.customize-done"
       title={translate('content.toolbar.recordingCustomizeDone')}

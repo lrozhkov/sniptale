@@ -85,10 +85,16 @@ export function applyVideoProjectCameraLayout(
       ? {
           ...clip,
           cameraPositions: clip.cameraPositions!.map((item) =>
-            item.id === active.id ? { ...item, cameraSplit: side } : item
+            item.id === active.id
+              ? {
+                  ...item,
+                  cameraSplit: side,
+                  cameraScreenBehavior: item.cameraScreenBehavior ?? 'shrink',
+                }
+              : item
           ),
         }
-      : { ...clip, cameraSplit: side };
+      : { ...clip, cameraSplit: side, cameraScreenBehavior: clip.cameraScreenBehavior ?? 'shrink' };
     return applyVideoProjectClipsPatch(
       project,
       project.clips.map((item) =>

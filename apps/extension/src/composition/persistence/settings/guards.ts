@@ -1,9 +1,14 @@
+import { parsePageLaunchPreferences } from '../../../contracts/page-launch';
 import { normalizeConfigurableCaptureAction } from '../../../features/quick-actions-presets/policy';
 import {
   CONTENT_TOOLBAR_DOCK_EDGES,
   RECORDING_TOOLBAR_CONTROLS,
   PAGE_TOOLBAR_CONTROLS,
   PAGE_TOOLBAR_OVERRIDE_MODES,
+  PAGE_TOOLBAR_LAYOUT_MODES,
+  PAGE_TOOLBAR_LAYOUT_MAX_ITEMS,
+  PAGE_TOOLBAR_LAYOUT_MAX_DIVIDERS,
+  isPageToolbarLayoutItem,
 } from '../../../contracts/settings';
 import type {
   CaptureActionType,
@@ -130,6 +135,37 @@ function parseToolbarControls<Control extends string>(
   return parsed;
 }
 
+function parsePageLayouts(
+  value: unknown
+): ParsedFieldValue<ContentToolbarPreferences['pageLayouts']> {
+  if (value === undefined) return undefined;
+  if (
+    !isPlainRecord(value) ||
+    Object.keys(value).some((key) => !PAGE_TOOLBAR_LAYOUT_MODES.some((mode) => mode === key))
+  )
+    return INVALID_FIELD;
+  const parsed: NonNullable<ContentToolbarPreferences['pageLayouts']> = {};
+  for (const mode of PAGE_TOOLBAR_LAYOUT_MODES) {
+    const items = value[mode];
+    if (items === undefined) continue;
+    if (items === null) {
+      parsed[mode] = null;
+      continue;
+    }
+    if (
+      !Array.isArray(items) ||
+      items.length > PAGE_TOOLBAR_LAYOUT_MAX_ITEMS ||
+      !items.every(isPageToolbarLayoutItem) ||
+      new Set(items).size !== items.length ||
+      items.filter((item) => item.startsWith('separator:')).length >
+        PAGE_TOOLBAR_LAYOUT_MAX_DIVIDERS
+    )
+      return INVALID_FIELD;
+    parsed[mode] = [...items];
+  }
+  return parsed;
+}
+
 function parsePageControlOverrides(
   value: unknown
 ): ParsedFieldValue<ContentToolbarPreferences['pageControlOverrides']> {
@@ -177,6 +213,7 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   const freePlacement = value['freePlacement'];
   const fadeDuringRecording = value['fadeDuringRecording'];
   if (fadeDuringRecording !== undefined && !isBoolean(fadeDuringRecording)) return INVALID_FIELD;
+  const pageLayouts = parsePageLayouts(value['pageLayouts']);
   const pageControls = parseToolbarControls(value['pageControls'], PAGE_TOOLBAR_CONTROLS);
   const pageControlOverrides = parsePageControlOverrides(value['pageControlOverrides']);
   const recordingControls = parseToolbarControls(
@@ -184,6 +221,7 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
     RECORDING_TOOLBAR_CONTROLS
   );
   if (
+    pageLayouts === INVALID_FIELD ||
     pageControls === INVALID_FIELD ||
     recordingControls === INVALID_FIELD ||
     pageControlOverrides === INVALID_FIELD
@@ -214,6 +252,7 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
 
   return {
     ...(recordingControls === undefined ? {} : { recordingControls }),
+    ...(pageLayouts === undefined ? {} : { pageLayouts }),
     ...(pageControls === undefined ? {} : { pageControls }),
     ...(pageControlOverrides === undefined ? {} : { pageControlOverrides }),
     ...(fadeDuringRecording === undefined ? {} : { fadeDuringRecording }),
@@ -392,6 +431,13 @@ function parseScalarSettingsFields(
 ): Pick<ParsedSettingsStorageValue, 'invalidFieldCount' | 'value'> {
   const nextValue: Partial<Settings> = {};
   let invalidFieldCount = 0;
+  if (value['pageLaunch'] !== undefined) {
+    invalidFieldCount += assignParsedSettingsField(
+      nextValue,
+      'pageLaunch',
+      parsePageLaunchPreferences(value['pageLaunch']) ?? INVALID_FIELD
+    );
+  }
 
   invalidFieldCount += assignParsedSettingsField(
     nextValue,

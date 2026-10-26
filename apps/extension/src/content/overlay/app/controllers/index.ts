@@ -19,6 +19,7 @@ import {
   type ContentDrawingController,
 } from '../../../drawing/controller';
 import { useDrawingModeIntegration } from '../../../drawing/mode';
+import { registerContentMode, setContentModeEnabled } from '../../../application/mode-session';
 import { useVideoRecordingSurfaceController } from '../../video-recording/session/controller';
 
 function disableAiPickModeDeferred() {
@@ -215,6 +216,8 @@ export function useContentAppControllers(
     baseModeController,
     controller: drawingController,
     modeState,
+    registerMode: registerContentMode,
+    setModeEnabled: setContentModeEnabled,
   });
   const aiController = {
     ...baseAiController,

@@ -23,7 +23,9 @@ import { createRouteErrorResponse } from '../../../../routing-contracts/response
 
 type CameraCommand = CountdownCameraOfferMessage | CountdownCameraCloseMessage;
 let recordingId: string | null = null;
-const generations = new Map<string, { generation: number; closed: boolean }>();
+const generations = Object.assign(new Map<string, { generation: number; closed: boolean }>(), {
+  policyStateIds: ['video-recording-control-lease', 'video-camera-recorder-grant'],
+});
 
 function requireCapability(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
   const senderUrl = resolveTrustedPopupRuntimeSenderUrl(sender);

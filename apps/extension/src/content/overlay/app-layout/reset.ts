@@ -1,3 +1,4 @@
+import { finalizeDesignReviewTextEditing } from '../../selection/design-review';
 import { flushSync } from 'react-dom';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -75,11 +76,12 @@ export function canResetPagePreparation(
   );
 }
 
-function finalizePendingChanges(toolbar: ContentAppLayoutToolbarProps): void {
+export function finalizePagePreparationChanges(toolbar: ContentAppLayoutToolbarProps): void {
   toolbar.drawingController?.finalizeInteraction();
   if (toolbar.drawingController?.hasPendingTextChange?.()) {
     throw new Error('Drawing text could not finish');
   }
+  finalizeDesignReviewTextEditing();
   finalizeDesignReviewCommentDraft();
   if (hasPendingDesignReviewCommentDraft())
     throw new Error('Design Review comment could not finish');
@@ -98,9 +100,12 @@ function finalizePendingChanges(toolbar: ContentAppLayoutToolbarProps): void {
   pagePreparationHistory.flushDeferredCommits();
 }
 
-export function clearPagePreparation(toolbar: ContentAppLayoutToolbarProps): void {
+export function clearPagePreparation(
+  toolbar: ContentAppLayoutToolbarProps,
+  options: { finalized?: boolean } = {}
+): void {
   try {
-    finalizePendingChanges(toolbar);
+    if (!options.finalized) finalizePagePreparationChanges(toolbar);
   } catch (error) {
     logger.error('Failed to finalize page changes before reset', error);
     showToast(translate('content.toolbar.someChangesCouldNotBeCleared'), 'error');

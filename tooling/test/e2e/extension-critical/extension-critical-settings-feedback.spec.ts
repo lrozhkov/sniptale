@@ -105,7 +105,9 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(windowSection.getByRole('switch')).toHaveCount(0);
       await page
         .getByRole('button', {
-          name: `${text('settings.appearance.contextMenuExpand')}: ${text('settings.appearance.contextMenuGroupWindow')}`,
+          name:
+            `${text('settings.appearance.contextMenuExpand')}: ` +
+            `${text('settings.appearance.contextMenuGroupWindow')}`,
           exact: true,
         })
         .click();

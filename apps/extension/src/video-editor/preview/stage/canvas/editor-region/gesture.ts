@@ -5,6 +5,19 @@ import {
   type PreviewTransformResizeHandle,
 } from '../transform/geometry';
 
+/** Decode canvas arrow gestures; callers retain event and commit ownership. */
+export function canvasArrowDelta(event: { key: string; shiftKey: boolean }) {
+  const direction = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+  }[event.key];
+  if (!direction) return null;
+  const step = event.shiftKey ? 10 : 1;
+  return { x: direction[0]! * step, y: direction[1]! * step };
+}
+
 export function beginEditorRegionGesture(args: {
   model: EditorRegionModel;
   mode: 'move' | PreviewTransformResizeHandle;

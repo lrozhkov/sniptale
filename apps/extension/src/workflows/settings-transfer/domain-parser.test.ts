@@ -1,3 +1,4 @@
+import { createQuickActionAppearance } from '../../contracts/quick-action-appearance';
 import { expect, it } from 'vitest';
 import {
   createContextMenuLayout,
@@ -150,4 +151,63 @@ it('normalizes imported legacy scenario sinks and preserves quick-action identit
   expect(result['capture.quick-actions']?.data).toEqual({
     items: [{ ...action, afterCapture: 'download_default' }],
   });
+});
+
+it('refuses embedded quick-action artwork before the storage parser can admit it', () => {
+  const appearance = createQuickActionAppearance();
+  appearance.background = {
+    ...appearance.background,
+    kind: 'image',
+    imageDataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII=',
+  };
+  const action = {
+    id: 'styled',
+    status: true,
+    name: 'Styled',
+    icon: 'Camera',
+    screenshotMode: 'visible',
+    exitAfterCapture: false,
+    appearance,
+  };
+  expect(() =>
+    parseSettingsTransferDomains({
+      'capture.quick-actions': {
+        schemaVersion: 1,
+        data: JSON.parse(JSON.stringify({ items: [action] })),
+      },
+    })
+  ).toThrow();
+});
+
+it('round trips page-launch preferences and preserves legacy preference payloads', () => {
+  const pageLaunch = {
+    enabled: true,
+    hoverOnly: true,
+    corner: 'top-left',
+    quickActionsPopup: false,
+    quickActionsCorner: true,
+    quickActionsToolbar: true,
+  };
+  const input = { 'interface.preferences': { schemaVersion: 1, data: { pageLaunch } } };
+  expect(parseSettingsTransferDomains(input)).toEqual(input);
+  const legacy = { 'interface.preferences': { schemaVersion: 1, data: { theme: 'dark' } } };
+  expect(parseSettingsTransferDomains(legacy)).toEqual(legacy);
+});
+it.each([
+  null,
+  [],
+  { corner: 'middle' },
+  { enabled: 'yes' },
+  { hoverOnly: 1 },
+  { quickActionsPopup: 'false' },
+  { quickActionsCorner: null },
+  { quickActionsToolbar: 1 },
+  { enabled: true, private: 'not allowed' },
+])('rejects malformed page-launch transfer preferences %#', (pageLaunch) => {
+  expect(() =>
+    parseSettingsTransferDomains({
+      'interface.preferences': { schemaVersion: 1, data: { pageLaunch } },
+    })
+  ).toThrow();
 });

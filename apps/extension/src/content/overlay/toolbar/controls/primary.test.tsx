@@ -122,6 +122,7 @@ function createToolbarPrimaryViewModel(
       setAction: vi.fn(),
     },
     derivedState: {
+      commitLayout: () => ({ x: 24, y: 12 }),
       freePlacement: false,
       dockPreview: null,
       setFreePlacement: vi.fn(),
@@ -357,7 +358,7 @@ describe('ToolbarPrimaryControls quick-edit document mode', () => {
       'Редактировать текст прямо на странице'
     );
     expect(queryPageEditingModeButton('ai')?.getAttribute('title')).toBe(
-      'Выберите элемент на странице и опишите изменение'
+      'Выбрать элементы в таблице'
     );
   });
 

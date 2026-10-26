@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isImageDataUrl } from './data-url';
+import { isImageDataUrl, readImageDataUrlDimensions } from './data-url';
 
 function bytesToImageDataUrl(mimeType: string, bytes: number[]): string {
   return `data:${mimeType};base64,${Buffer.from(bytes).toString('base64')}`;
@@ -130,4 +130,72 @@ describe('isImageDataUrl', () => {
 
     expect(isImageDataUrl(`data:image/png;base64,${oversizedPayload}`)).toBe(false);
   });
+});
+
+const realRasterSamples = [
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAA' +
+    'D//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII=',
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCI' +
+    'FhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiW' +
+    'FlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjA' +
+    'AAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaI' +
+    'AAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAA' +
+    'ABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAMCAgICAgMCA' +
+    'gIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLE' +
+    'BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAADAAIDASIAAhEBAxEB/8QAFQABA' +
+    'QAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAB//EABQRAQAAAAAAAAAAA' +
+    'AAAAAAAAAD/2gAMAwEAAhEDEQA/AJPAIo3f/9k=',
+  'data:image/webp;base64,UklGRjQAAABXRUJQVlA4ICgAAACQAQCdASoCAAMAAUAmJZgCdLoAA5gA/vcNb/cFJ6Gzy/7jsDdd4' +
+    'gAA',
+  'data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvAYAAAAdQpGKUrfBiOh/AAA=',
+  'data:image/webp;base64,UklGRioCAABXRUJQVlA4WAoAAAAwAAAAAQAAAgAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCI' +
+    'FhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiW' +
+    'FlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjA' +
+    'AAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaI' +
+    'AAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAA' +
+    'ABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZBTFBIBwAAAAD/AAAAA' +
+    'AAAVlA4ICwAAAAwAgCdASoCAAMAAUAmJZQCdGuAwQD1/wU8AAD9w1pr8zQjhNYUbnIjeQAA==',
+];
+
+describe('raster dimensions before decoding', () => {
+  it.each(realRasterSamples)('reads complete encoded PNG, JPEG and WebP variants %#', (value) => {
+    expect(readImageDataUrlDimensions(value)).toEqual({ width: 2, height: 3 });
+  });
+  it.each(realRasterSamples)(
+    'refuses truncated headers without allocating a bitmap %#',
+    (value) => {
+      const prefix = value.slice(0, value.indexOf(',') + 1);
+      expect(
+        readImageDataUrlDimensions(
+          prefix + Buffer.from(value.split(',')[1]!, 'base64').subarray(0, 20).toString('base64')
+        )
+      ).toBeNull();
+    }
+  );
+  it('refuses oversized simple WebP dimensions while retaining the incumbent boolean behavior', () => {
+    const bytes = Buffer.from(realRasterSamples[2]!.split(',')[1]!, 'base64');
+    bytes[26] = 255;
+    bytes[27] = 63;
+    bytes[28] = 255;
+    bytes[29] = 63;
+    const value = `data:image/webp;base64,${bytes.toString('base64')}`;
+    expect(isImageDataUrl(value)).toBe(true);
+    expect(readImageDataUrlDimensions(value)).toBeNull();
+    expect(readImageDataUrlDimensions(createPngDataUrl(32769, 1))).toBeNull();
+  });
+  it('refuses unrecognized and malformed raster headers', () => {
+    expect(readImageDataUrlDimensions('data:image/png;base64,AA==')).toBeNull();
+    expect(readImageDataUrlDimensions('https://example.com/image.png')).toBeNull();
+  });
+});
+
+it('bounds explicit source byte budgets without changing the default boolean policy', () => {
+  expect(readImageDataUrlDimensions(realRasterSamples[0], 128 * 1024 * 1024)).toEqual({
+    width: 2,
+    height: 3,
+  });
+  for (const limit of [0, -1, Infinity, 129 * 1024 * 1024, 1])
+    expect(readImageDataUrlDimensions(realRasterSamples[0], limit)).toBeNull();
 });

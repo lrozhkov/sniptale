@@ -8,6 +8,7 @@ import {
   createProportionalCanvasFrameFromPoints,
   doesCanvasFrameIntersect,
   getCanvasPointFromClient,
+  getCanvasPointsBounds,
   resizeCanvasFrameFromHandle,
   resolveCanvasPointerDelta,
   translateCanvasFrame,
@@ -142,4 +143,15 @@ it('creates canvas frames and points from viewport coordinates', () => {
       { height: 60, width: 90, x: 410, y: 280 }
     )
   ).toBe(false);
+});
+
+it('bounds transformed points without rounding or requiring an axis-aligned input order', () => {
+  expect(
+    getCanvasPointsBounds([
+      { x: 14.25, y: -7.5 },
+      { x: -2.5, y: 10.25 },
+      { x: 8, y: 3 },
+      { x: 4.25, y: 6 },
+    ])
+  ).toEqual({ x: -2.5, y: -7.5, width: 16.75, height: 17.75 });
 });

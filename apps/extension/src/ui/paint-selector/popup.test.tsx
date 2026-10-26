@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act } from 'react';
 import { createRoot as createReactRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -18,10 +19,12 @@ function createRoot(container: Element) {
   };
   return root;
 }
-afterEach(() => {
-  act(() => {
+afterEach(async () => {
+  await act(async () => {
     for (const root of mountedRoots) root.unmount();
+    hideAllToasts();
   });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

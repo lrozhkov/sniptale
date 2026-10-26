@@ -1,5 +1,6 @@
+import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from './page-layout';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import React, { useRef } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import cursorTextIcon from '@iconify-icons/tabler/cursor-text';
 import {
@@ -14,16 +15,14 @@ import {
   Video,
 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
-import {
-  ContentToolbarButton,
-  ContentToolbarDivider,
-  ContentToolbarGroup,
-} from '@sniptale/ui/content-toolbar';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
+import { TextMarkerControl } from './text-marker';
+import { TextRewriteControl } from '../../ai/text-rewrite/view';
 import type { ToolbarModeButtonsProps } from './mode-types';
 import {
   resolveToolbarMenuPlacement,
@@ -302,8 +301,8 @@ function getPageEditingModeCopy(mode: ToolbarPageEditingMode) {
       };
     case 'ai':
       return {
-        label: translate('content.toolbar.aiLabel'),
-        title: translate('content.toolbar.aiEnable'),
+        label: translate('content.toolbar.aiTableLabel'),
+        title: translate('content.toolbar.aiTableHint'),
       };
     case 'block-selection':
     default:
@@ -362,7 +361,9 @@ function PageEditingModeButton(props: {
     </ContentToolbarButton>
   );
   return props.mode === 'block-selection' ? (
-    <PageProtectedControls>{control}</PageProtectedControls>
+    <PageToolbarSlot id="editing-block-selection" label={copy.label}>
+      <PageProtectedControls>{control}</PageProtectedControls>
+    </PageToolbarSlot>
   ) : (
     <PageControlVisibility
       control={props.mode === 'ai' ? 'editing-ai' : 'editing-direct-text'}
@@ -373,8 +374,10 @@ function PageEditingModeButton(props: {
   );
 }
 
-function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
-  if (!props.quickEditMode && !props.aiPickMode) {
+function ToolbarQuickEditModeButtons(
+  props: ToolbarModeButtonsProps & { selectionToolActive?: boolean }
+) {
+  if (getSelectedMode(props) !== 'quick-edit') {
     return null;
   }
 
@@ -386,21 +389,48 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
   const pending = props.pendingMode !== null && props.pendingMode !== undefined;
 
   return (
-    <ContentToolbarGroup className="sniptale-page-editing-mode-group">
+    <PageToolbarGroup className="sniptale-page-editing-mode-group">
       {(['block-selection', 'direct-text', 'ai'] as ToolbarPageEditingMode[]).map((mode) => (
         <PageEditingModeButton
           key={mode}
-          active={selectedMode === mode}
+          active={!props.selectionToolActive && selectedMode === mode}
           disabled={pending}
           mode={mode}
           onSelect={props.onSelectPageEditingMode}
         />
       ))}
-    </ContentToolbarGroup>
+    </PageToolbarGroup>
   );
 }
 
 export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
+  const { onSelectPageEditingMode } = props;
+  const [selectionTool, setSelectionTool] = useState<'marker' | 'ai-text' | null>(null);
+  useEffect(() => {
+    if (!props.quickEditMode || props.aiPickMode || props.quickEditDocumentMode)
+      setSelectionTool(null);
+  }, [props.quickEditMode, props.aiPickMode, props.quickEditDocumentMode]);
+  const changeMarkerActive = useCallback(
+    (active: boolean) => {
+      if (active) onSelectPageEditingMode('block-selection');
+      setSelectionTool((current) => (active ? 'marker' : current === 'marker' ? null : current));
+    },
+    [onSelectPageEditingMode]
+  );
+  const changeAITextActive = useCallback(
+    (active: boolean) => {
+      if (active) onSelectPageEditingMode('block-selection');
+      setSelectionTool((current) => (active ? 'ai-text' : current === 'ai-text' ? null : current));
+    },
+    [onSelectPageEditingMode]
+  );
+  const selectEditingMode = (mode: ToolbarPageEditingMode) => {
+    setSelectionTool(null);
+    props.onSelectPageEditingMode(mode);
+  };
+  const canSelectText = Boolean(
+    props.quickEditMode && !props.quickEditDocumentMode && !props.aiPickMode
+  );
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuSide = useToolbarMenuDirection(() =>
     resolveModeMenuLayout({ triggerProps: props, triggerRef })
@@ -420,41 +450,59 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
 
   return (
     <>
-      <ContentToolbarGroup className="sniptale-mode-selector-group">
-        <div className="sniptale-mode-wrapper" data-menu-side={menuSide}>
-          <ModeSelectorButton
-            label={buttonCopy.label}
-            title={
-              selectedMode === 'cursor'
-                ? translate('content.toolbar.cursorDefault')
-                : buttonCopy.label
-            }
-            disabled={pending}
-            menuIndicator
-            onToggle={() => props.toolbarMenuState.toggleMenu('mode')}
-            open={open}
-            triggerRef={triggerRef}
-          >
-            {getModeIcon(selectedMode)}
-          </ModeSelectorButton>
-
-          {open ? (
-            <ToolbarModeMenu
-              menuRef={menuRef}
-              onClose={() => props.toolbarMenuState.closeMenu('mode')}
-              triggerProps={props}
+      <PageToolbarGroup className="sniptale-mode-selector-group">
+        <PageToolbarSlot id="mode" label={buttonCopy.label} interactiveWhileEditing>
+          <div className="sniptale-mode-wrapper" data-menu-side={menuSide}>
+            <ModeSelectorButton
+              label={buttonCopy.label}
+              title={
+                selectedMode === 'cursor'
+                  ? translate('content.toolbar.cursorDefault')
+                  : buttonCopy.label
+              }
+              disabled={pending}
+              menuIndicator
+              onToggle={() => props.toolbarMenuState.toggleMenu('mode')}
+              open={open}
               triggerRef={triggerRef}
-            />
-          ) : null}
-        </div>
-      </ContentToolbarGroup>
+            >
+              {getModeIcon(selectedMode)}
+            </ModeSelectorButton>
+
+            {open ? (
+              <ToolbarModeMenu
+                menuRef={menuRef}
+                onClose={() => props.toolbarMenuState.closeMenu('mode')}
+                triggerProps={props}
+                triggerRef={triggerRef}
+              />
+            ) : null}
+          </div>
+        </PageToolbarSlot>
+      </PageToolbarGroup>
       {selectedMode === 'cursor' || selectedMode === 'video-recording' ? null : (
-        <ContentToolbarDivider
+        <PageToolbarDivider
           className="sniptale-mode-leading-divider"
           dataUi="content.toolbar.mode-leading-divider"
         />
       )}
-      <ToolbarQuickEditModeButtons {...props} />
+      <ToolbarQuickEditModeButtons
+        {...props}
+        selectionToolActive={canSelectText && selectionTool !== null}
+        onSelectPageEditingMode={selectEditingMode}
+      />
+      <TextMarkerControl
+        displayMode={props.displayMode ?? 'horizontal'}
+        active={selectionTool === 'marker' && canSelectText}
+        visible={getSelectedMode(props) === 'quick-edit'}
+        onActiveChange={changeMarkerActive}
+      />
+      <TextRewriteControl
+        visible={getSelectedMode(props) === 'quick-edit'}
+        active={canSelectText && selectionTool === 'ai-text'}
+        disabled={pending}
+        onActiveChange={changeAITextActive}
+      />
     </>
   );
 }

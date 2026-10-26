@@ -170,137 +170,141 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     const cancel = 'cancel' in scenario && scenario.cancel;
     const embedded = 'embedded' in scenario && scenario.embedded;
     const name = `actual action popup camera countdown ${captureMode} ${countdownSeconds}s`;
-    test(`${name} ${cameraDelay ?? 'native'}ms ${embedded ? 'embedded' : cancel ? 'cancel-restart' : reopen ? 'reopen' : 'record'} ${viewport.name}`, async ({}, info) => {
-      const server = await startHostServer();
-      const launched = await launchExtensionBrowser({
-        viewport: viewport.size,
-        fakeMediaDevices: cameraDelay === null,
-      });
-      try {
-        const { context, browser, extensionId } = launched;
-        const settings = {
-          ...DEFAULT_VIDEO_SETTINGS,
-          countdownSeconds,
-          webcamEnabled: true,
-          microphoneEnabled: false,
-          systemAudioEnabled: false,
-          warnWithoutMicrophone: false,
-          qualityProfileId: null,
-          webcamPresentation: {
-            ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
-            mode: embedded
-              ? WebcamPresentationMode.EMBEDDED
-              : WebcamPresentationMode.SEPARATE_TRACK,
-          },
-          outputProfile: {
-            ...DEFAULT_VIDEO_SETTINGS.outputProfile,
-            resolution: VideoResolutionPreset.P240,
-          },
-        };
-        const seed = await openRealPopup(context, extensionId);
-        if (embedded) {
-          await seed.evaluate(async (settings) => {
-            await chrome.storage.local.set({ sniptale_video_settings: settings });
-          }, settings);
-        }
-        await seed.evaluate(async () =>
-          chrome.storage.local.set({
-            'sniptale-locale-preference': 'en',
-          })
-        );
-        const gallery = await context.newPage();
-        await gallery.goto(
-          `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`
-        );
-        await gallery.getByText('Your Library is empty', { exact: true }).waitFor();
-        await gallery.close();
-        const offscreen =
-          cameraDelay === null
-            ? null
-            : await installControlledTabCamera(context, browser, cameraDelay);
-        const target = await context.newPage();
-        await target.goto(`${server.origin}/fixtures/host-page.html?actual-countdown=1`);
-        const tabId = await seed.evaluate(async (url) => {
-          const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
-          if (tab?.id === undefined) throw new Error('Countdown source tab is unavailable');
-          return tab.id;
-        }, target.url());
-        if (!embedded) await seed.close();
-        await target.bringToFront();
-        let action = await triggerExtensionAction(context, extensionId, target);
-        await expect
-          .poll(() =>
-            evaluateInTarget(
-              context,
-              action,
-              `Boolean(document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]'))`
-            )
-          )
-          .toBe(true);
-        if (embedded) {
-          expect(
-            await sendRuntimeMessageInTarget(context, action, {
-              type: 'PAGE_ACCESS',
-              operation: 'activate-current-tab',
+    test(
+      `${name} ${cameraDelay ?? 'native'}ms ` +
+        `${embedded ? 'embedded' : cancel ? 'cancel-restart' : reopen ? 'reopen' : 'record'} ` +
+        `${viewport.name}`,
+      async ({}, info) => {
+        const server = await startHostServer();
+        const launched = await launchExtensionBrowser({
+          viewport: viewport.size,
+          fakeMediaDevices: cameraDelay === null,
+        });
+        try {
+          const { context, browser, extensionId } = launched;
+          const settings = {
+            ...DEFAULT_VIDEO_SETTINGS,
+            countdownSeconds,
+            webcamEnabled: true,
+            microphoneEnabled: false,
+            systemAudioEnabled: false,
+            warnWithoutMicrophone: false,
+            qualityProfileId: null,
+            webcamPresentation: {
+              ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+              mode: embedded
+                ? WebcamPresentationMode.EMBEDDED
+                : WebcamPresentationMode.SEPARATE_TRACK,
+            },
+            outputProfile: {
+              ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+              resolution: VideoResolutionPreset.P240,
+            },
+          };
+          const seed = await openRealPopup(context, extensionId);
+          if (embedded) {
+            await seed.evaluate(async (settings) => {
+              await chrome.storage.local.set({ sniptale_video_settings: settings });
+            }, settings);
+          }
+          await seed.evaluate(async () =>
+            chrome.storage.local.set({
+              'sniptale-locale-preference': 'en',
             })
-          ).toMatchObject({ success: true });
-        }
-        await evaluateInTarget(
-          context,
-          action,
-          `document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]')?.click()`
-        );
-        const started = await sendRuntimeMessageInTarget(
-          context,
-          action,
-          {
-            type: VideoMessageType.START_RECORDING,
-            captureMode,
-            tabId,
-            viewportPresetId: null,
-            settings,
-          },
-          captureMode !== CaptureMode.TAB
-        );
-        if (captureMode !== CaptureMode.TAB)
-          expect(
-            z
-              .object({
-                success: z.boolean(),
-                error: z.string().optional(),
-                failureCode: z.string().optional(),
-              })
-              .parse(started)
-          ).toEqual({ success: true });
-        const inspect = async () => {
-          const session = await browser.newBrowserCDPSession();
-          try {
-            const { targetInfos } = await session.send('Target.getTargets');
-            if (!targetInfos.some((candidate) => candidate.targetId === action)) {
-              await target.bringToFront();
-              action = await triggerExtensionAction(context, extensionId, target);
-              await expect
-                .poll(() =>
-                  evaluateInTarget(
-                    context,
-                    action,
-                    `Boolean(document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]'))`
-                  )
-                )
-                .toBe(true);
-              await evaluateInTarget(
+          );
+          const gallery = await context.newPage();
+          await gallery.goto(
+            `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`
+          );
+          await gallery.getByText('Your Library is empty', { exact: true }).waitFor();
+          await gallery.close();
+          const offscreen =
+            cameraDelay === null
+              ? null
+              : await installControlledTabCamera(context, browser, cameraDelay);
+          const target = await context.newPage();
+          await target.goto(`${server.origin}/fixtures/host-page.html?actual-countdown=1`);
+          const tabId = await seed.evaluate(async (url) => {
+            const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+            if (tab?.id === undefined) throw new Error('Countdown source tab is unavailable');
+            return tab.id;
+          }, target.url());
+          if (!embedded) await seed.close();
+          await target.bringToFront();
+          let action = await triggerExtensionAction(context, extensionId, target);
+          await expect
+            .poll(() =>
+              evaluateInTarget(
                 context,
                 action,
-                `document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]')?.click()`
-              );
-            }
-          } finally {
-            await session.detach();
+                `Boolean(document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]'))`
+              )
+            )
+            .toBe(true);
+          if (embedded) {
+            expect(
+              await sendRuntimeMessageInTarget(context, action, {
+                type: 'PAGE_ACCESS',
+                operation: 'activate-current-tab',
+              })
+            ).toMatchObject({ success: true });
           }
-          return evaluateInTarget(
+          await evaluateInTarget(
             context,
             action,
-            `(() => {
+            `document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]')?.click()`
+          );
+          const started = await sendRuntimeMessageInTarget(
+            context,
+            action,
+            {
+              type: VideoMessageType.START_RECORDING,
+              captureMode,
+              tabId,
+              viewportPresetId: null,
+              settings,
+            },
+            captureMode !== CaptureMode.TAB
+          );
+          if (captureMode !== CaptureMode.TAB)
+            expect(
+              z
+                .object({
+                  success: z.boolean(),
+                  error: z.string().optional(),
+                  failureCode: z.string().optional(),
+                })
+                .parse(started)
+            ).toEqual({ success: true });
+          const inspect = async () => {
+            const session = await browser.newBrowserCDPSession();
+            try {
+              const { targetInfos } = await session.send('Target.getTargets');
+              if (!targetInfos.some((candidate) => candidate.targetId === action)) {
+                await target.bringToFront();
+                action = await triggerExtensionAction(context, extensionId, target);
+                await expect
+                  .poll(() =>
+                    evaluateInTarget(
+                      context,
+                      action,
+                      `Boolean(document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]'))`
+                    )
+                  )
+                  .toBe(true);
+                await evaluateInTarget(
+                  context,
+                  action,
+                  `document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]')?.click()`
+                );
+              }
+            } finally {
+              await session.detach();
+            }
+            return evaluateInTarget(
+              context,
+              action,
+              `(() => {
           const preview = document.querySelector('[data-ui="popup.video-active.countdown-camera-preview"]');
           const video = preview?.querySelector('video');
           const button = document.querySelector('[aria-label="Turn camera off"]');
@@ -313,82 +317,82 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             cameraDisabled: button?.disabled ?? false,
           };
         })()`
-          );
-        };
-        await expect.poll(inspect, { intervals: [50, 100], timeout: 7_000 }).toEqual({
-          hasFrames: true,
-          unavailable: false,
-          cameraIcons: 1,
-          cameraFirst: true,
-          cameraDisabled: true,
-        });
-        if (!embedded) {
-          await saveActionScreenshot(browser, action, info.outputPath('actual-countdown.png'));
-        }
-        const readStatus = async () => {
-          const response = parseRuntimeResponseForMessage(
-            VideoMessageType.GET_RECORDING_STATE,
-            embedded
-              ? await sendRuntimeMessage(seed, { type: VideoMessageType.GET_RECORDING_STATE })
-              : await sendRuntimeMessageInTarget(context, action, {
-                  type: VideoMessageType.GET_RECORDING_STATE,
-                })
-          );
-          return response.success ? response.state?.status : null;
-        };
-        if (reopen) {
-          const previous = action;
-          const session = await browser.newBrowserCDPSession();
-          try {
-            await session.send('Target.closeTarget', { targetId: previous });
-            await expect
-              .poll(async () => {
-                const { targetInfos } = await session.send('Target.getTargets');
-                return targetInfos.some((candidate) => candidate.targetId === previous);
-              })
-              .toBe(false);
-          } finally {
-            await session.detach();
+            );
+          };
+          await expect.poll(inspect, { intervals: [50, 100], timeout: 7_000 }).toEqual({
+            hasFrames: true,
+            unavailable: false,
+            cameraIcons: 1,
+            cameraFirst: true,
+            cameraDisabled: true,
+          });
+          if (!embedded) {
+            await saveActionScreenshot(browser, action, info.outputPath('actual-countdown.png'));
           }
-          await expect.poll(inspect, { intervals: [50, 100] }).toMatchObject({ hasFrames: true });
-          await expect.poll(readStatus).toBe(VideoRecordingStatus.COUNTDOWN);
-        }
-        if (cancel) {
-          for (const attempt of ['first', 'restarted']) {
-            if (attempt === 'restarted') {
-              await sendRuntimeMessageInTarget(
-                context,
-                action,
-                {
-                  type: VideoMessageType.START_RECORDING,
-                  captureMode,
-                  tabId,
-                  viewportPresetId: null,
-                  settings,
-                },
-                false
-              );
-              const previous = action;
-              const session = await browser.newBrowserCDPSession();
-              try {
-                await expect
-                  .poll(async () => {
-                    const { targetInfos } = await session.send('Target.getTargets');
-                    return targetInfos.some((candidate) => candidate.targetId === previous);
+          const readStatus = async () => {
+            const response = parseRuntimeResponseForMessage(
+              VideoMessageType.GET_RECORDING_STATE,
+              embedded
+                ? await sendRuntimeMessage(seed, { type: VideoMessageType.GET_RECORDING_STATE })
+                : await sendRuntimeMessageInTarget(context, action, {
+                    type: VideoMessageType.GET_RECORDING_STATE,
                   })
-                  .toBe(false);
-              } finally {
-                await session.detach();
-              }
-              await expect.poll(inspect).toMatchObject({ hasFrames: true });
-              await expect.poll(readStatus).toBe(VideoRecordingStatus.COUNTDOWN);
+            );
+            return response.success ? response.state?.status : null;
+          };
+          if (reopen) {
+            const previous = action;
+            const session = await browser.newBrowserCDPSession();
+            try {
+              await session.send('Target.closeTarget', { targetId: previous });
+              await expect
+                .poll(async () => {
+                  const { targetInfos } = await session.send('Target.getTargets');
+                  return targetInfos.some((candidate) => candidate.targetId === previous);
+                })
+                .toBe(false);
+            } finally {
+              await session.detach();
             }
-            await expect
-              .poll(() =>
-                evaluateInTarget(
+            await expect.poll(inspect, { intervals: [50, 100] }).toMatchObject({ hasFrames: true });
+            await expect.poll(readStatus).toBe(VideoRecordingStatus.COUNTDOWN);
+          }
+          if (cancel) {
+            for (const attempt of ['first', 'restarted']) {
+              if (attempt === 'restarted') {
+                await sendRuntimeMessageInTarget(
                   context,
                   action,
-                  `(() => {
+                  {
+                    type: VideoMessageType.START_RECORDING,
+                    captureMode,
+                    tabId,
+                    viewportPresetId: null,
+                    settings,
+                  },
+                  false
+                );
+                const previous = action;
+                const session = await browser.newBrowserCDPSession();
+                try {
+                  await expect
+                    .poll(async () => {
+                      const { targetInfos } = await session.send('Target.getTargets');
+                      return targetInfos.some((candidate) => candidate.targetId === previous);
+                    })
+                    .toBe(false);
+                } finally {
+                  await session.detach();
+                }
+                await expect.poll(inspect).toMatchObject({ hasFrames: true });
+                await expect.poll(readStatus).toBe(VideoRecordingStatus.COUNTDOWN);
+              }
+              await expect
+                .poll(() =>
+                  evaluateInTarget(
+                    context,
+                    action,
+                    `(() => {
                     const button = document.querySelector('[data-ui="popup.video-active.cancel-button"]');
                     if (!(button instanceof HTMLButtonElement) || button.disabled) return false;
                     button.scrollIntoView({ block: 'nearest' });
@@ -396,43 +400,47 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
                     return bounds.top >= 0 && bounds.bottom <= innerHeight &&
                       bounds.left >= 0 && bounds.right <= innerWidth;
                   })()`
+                  )
                 )
-              )
-              .toBe(true);
-            await saveActionScreenshot(
-              browser,
-              action,
-              info.outputPath(`cancel-${attempt}-countdown.png`)
-            );
-            await evaluateInTarget(
-              context,
-              action,
-              `document.querySelector('[data-ui="popup.video-active.cancel-button"]')?.click()`
-            );
-            await expect
-              .poll(readStatus)
-              .toBe(VideoRecordingStatus.IDLE)
-              .catch(async (error) => {
-                await saveActionScreenshot(browser, action, info.outputPath('cancel-failure.png'));
-                throw error;
+                .toBe(true);
+              await saveActionScreenshot(
+                browser,
+                action,
+                info.outputPath(`cancel-${attempt}-countdown.png`)
+              );
+              await evaluateInTarget(
+                context,
+                action,
+                `document.querySelector('[data-ui="popup.video-active.cancel-button"]')?.click()`
+              );
+              await expect
+                .poll(readStatus)
+                .toBe(VideoRecordingStatus.IDLE)
+                .catch(async (error) => {
+                  await saveActionScreenshot(
+                    browser,
+                    action,
+                    info.outputPath('cancel-failure.png')
+                  );
+                  throw error;
+                });
+              const stopped = parseRuntimeResponseForMessage(
+                VideoMessageType.GET_RECORDING_STATE,
+                await sendRuntimeMessageInTarget(context, action, {
+                  type: VideoMessageType.GET_RECORDING_STATE,
+                })
+              );
+              expect(stopped).toMatchObject({
+                success: true,
+                state: { status: VideoRecordingStatus.IDLE, error: null, completion: null },
               });
-            const stopped = parseRuntimeResponseForMessage(
-              VideoMessageType.GET_RECORDING_STATE,
-              await sendRuntimeMessageInTarget(context, action, {
-                type: VideoMessageType.GET_RECORDING_STATE,
-              })
-            );
-            expect(stopped).toMatchObject({
-              success: true,
-              state: { status: VideoRecordingStatus.IDLE, error: null, completion: null },
-            });
-            if (!offscreen) throw new Error('Cancellation track probe is unavailable');
-            await expect
-              .poll(() =>
-                evaluateInTarget(
-                  context,
-                  offscreen,
-                  `(() => {
+              if (!offscreen) throw new Error('Cancellation track probe is unavailable');
+              await expect
+                .poll(() =>
+                  evaluateInTarget(
+                    context,
+                    offscreen,
+                    `(() => {
                     const source = globalThis.__countdownCameraSource;
                     const streams = [...source.streams, ...source.captureStreams];
                     return {
@@ -442,104 +450,106 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
                         .filter(track => track.readyState === 'live').length,
                     };
                   })()`
-                )
-              )
-              .toEqual({
-                cameraRequests: attempt === 'first' ? 1 : 2,
-                hasCapture: true,
-                liveTracks: 0,
-              });
-            await saveActionScreenshot(
-              browser,
-              action,
-              info.outputPath(`cancel-${attempt}-idle.png`)
-            );
-          }
-          const library = await context.newPage();
-          await library.goto(
-            `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`
-          );
-          await expect(library.getByText('Your Library is empty', { exact: true })).toBeVisible();
-          return;
-        }
-        await expect
-          .poll(readStatus, { timeout: countdownSeconds * 1_000 + 10_000 })
-          .toBe(VideoRecordingStatus.RECORDING);
-        if (embedded) {
-          await expect
-            .poll(() =>
-              target
-                .locator('[data-ui="content.video-recording.embedded-camera"] video')
-                .evaluateAll((videos) =>
-                  videos.some(
-                    (video) =>
-                      video instanceof HTMLVideoElement &&
-                      video.readyState >= 2 &&
-                      video.videoWidth > 0
                   )
                 )
+                .toEqual({
+                  cameraRequests: attempt === 'first' ? 1 : 2,
+                  hasCapture: true,
+                  liveTracks: 0,
+                });
+              await saveActionScreenshot(
+                browser,
+                action,
+                info.outputPath(`cancel-${attempt}-idle.png`)
+              );
+            }
+            const library = await context.newPage();
+            await library.goto(
+              `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`
+            );
+            await expect(library.getByText('Your Library is empty', { exact: true })).toBeVisible();
+            return;
+          }
+          await expect
+            .poll(readStatus, { timeout: countdownSeconds * 1_000 + 10_000 })
+            .toBe(VideoRecordingStatus.RECORDING);
+          if (embedded) {
+            await expect
+              .poll(() =>
+                target
+                  .locator('[data-ui="content.video-recording.embedded-camera"] video')
+                  .evaluateAll((videos) =>
+                    videos.some(
+                      (video) =>
+                        video instanceof HTMLVideoElement &&
+                        video.readyState >= 2 &&
+                        video.videoWidth > 0
+                    )
+                  )
+              )
+              .toBe(true);
+            await inspect();
+          }
+          expect(
+            await evaluateInTarget(
+              context,
+              action,
+              `document.querySelectorAll('[data-ui="popup.video-active.countdown-camera-preview"]').length`
             )
-            .toBe(true);
-          await inspect();
-        }
-        expect(
-          await evaluateInTarget(
-            context,
-            action,
-            `document.querySelectorAll('[data-ui="popup.video-active.countdown-camera-preview"]').length`
-          )
-        ).toBe(0);
-        if (offscreen) {
-          const source = await evaluateInTarget(
-            context,
-            offscreen,
-            `(() => {
+          ).toBe(0);
+          if (offscreen) {
+            const source = await evaluateInTarget(
+              context,
+              offscreen,
+              `(() => {
             const source = globalThis.__countdownCameraSource;
             return { requests: source.requests, live: source.streams.every(stream =>
               stream.getVideoTracks().every(track => track.readyState === 'live')) };
           })()`
-          );
-          expect(source).toEqual({ requests: 1, live: true });
-        }
-        if (embedded) {
-          await target.screenshot({
-            path: info.outputPath('embedded-recording.png'),
-            fullPage: false,
-          });
-          await expect
-            .poll(async () => {
-              const response = parseRuntimeResponseForMessage(
-                VideoMessageType.GET_RECORDING_STATE,
-                await sendRuntimeMessage(seed, { type: VideoMessageType.GET_RECORDING_STATE })
-              );
-              return response.success ? response.state?.duration : 0;
-            })
-            .toBeGreaterThan(0);
-          await evaluateInTarget(
-            context,
-            action,
-            `document.querySelector('[data-ui="popup.video-active.stop-button"]')?.click()`
-          );
-          await expect.poll(readStatus, { timeout: 30_000 }).toBe(VideoRecordingStatus.IDLE);
-          if (!offscreen) throw new Error('Embedded camera track probe is unavailable');
-          await expect
-            .poll(() =>
-              evaluateInTarget(
-                context,
-                offscreen,
-                `globalThis.__countdownCameraSource.streams.every(stream => stream.getTracks().every(track => track.readyState === 'ended'))`
+            );
+            expect(source).toEqual({ requests: 1, live: true });
+          }
+          if (embedded) {
+            await target.screenshot({
+              path: info.outputPath('embedded-recording.png'),
+              fullPage: false,
+            });
+            await expect
+              .poll(async () => {
+                const response = parseRuntimeResponseForMessage(
+                  VideoMessageType.GET_RECORDING_STATE,
+                  await sendRuntimeMessage(seed, { type: VideoMessageType.GET_RECORDING_STATE })
+                );
+                return response.success ? response.state?.duration : 0;
+              })
+              .toBeGreaterThan(0);
+            await evaluateInTarget(
+              context,
+              action,
+              `document.querySelector('[data-ui="popup.video-active.stop-button"]')?.click()`
+            );
+            await expect.poll(readStatus, { timeout: 30_000 }).toBe(VideoRecordingStatus.IDLE);
+            if (!offscreen) throw new Error('Embedded camera track probe is unavailable');
+            await expect
+              .poll(() =>
+                evaluateInTarget(
+                  context,
+                  offscreen,
+                  `globalThis.__countdownCameraSource.streams.every(stream => ` +
+                    `stream.getTracks().every(track => track.readyState === 'ended'))`
+                )
               )
-            )
-            .toBe(true);
-          await expect(
-            target.locator('[data-ui="content.video-recording.embedded-camera"]')
-          ).toHaveCount(0);
+              .toBe(true);
+            await expect(
+              target.locator('[data-ui="content.video-recording.embedded-camera"]')
+            ).toHaveCount(0);
+          }
+        } finally {
+          await closeExtensionBrowser(launched);
+          server.server.closeAllConnections();
+          await new Promise<void>((resolve) => server.server.close(() => resolve()));
         }
-      } finally {
-        await closeExtensionBrowser(launched);
-        server.server.closeAllConnections();
-        await new Promise<void>((resolve) => server.server.close(() => resolve()));
       }
-    });
+    );
   }
 }

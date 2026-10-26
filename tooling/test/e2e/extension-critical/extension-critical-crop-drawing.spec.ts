@@ -354,7 +354,8 @@ for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
           const fixture = document.createElement('div');
           fixture.id = 'crop-drawing-fixture';
           fixture.style.cssText =
-            'position:fixed;inset:0;overflow:auto;pointer-events:none;z-index:1;background:repeating-linear-gradient(90deg,#000 0 8px,#fff 8px 16px)';
+            'position:fixed;inset:0;overflow:auto;pointer-events:none;z-index:1;' +
+            'background:repeating-linear-gradient(90deg,#000 0 8px,#fff 8px 16px)';
           const tall = document.createElement('div');
           tall.style.height = '2000px';
           fixture.append(tall);

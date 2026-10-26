@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { createEffectHostClip } from '../../../project/factories/overlay-clip';
 import { disposeEffectRuntimeComposition } from './rendered';
 import {
@@ -9,7 +10,6 @@ import { drawSceneBackground } from '../../../project/scene/background';
 import { createVideoProjectFromRecording } from '../../../project/factories/creation';
 import { resolveVideoCompositionFrame } from '../../timeline/frame';
 import { createQuickEditSpotlight } from '../../../project/scene/focus-appearance';
-// @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 

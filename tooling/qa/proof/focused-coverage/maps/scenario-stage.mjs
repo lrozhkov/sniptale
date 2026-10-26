@@ -31,7 +31,8 @@ export const SCENARIO_STAGE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/image-object-list.tsx',
     exclusive: true,
     reason:
-      'Real inspector and workspace tests exercise acquisition, global numbering, ordering, selection and removal through the action list.',
+      'Real inspector and workspace tests exercise acquisition, global numbering, ordering, \
+selection and removal through the action list.',
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/tour/inspector.test.tsx',
@@ -44,7 +45,8 @@ export const SCENARIO_STAGE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts',
     exclusive: true,
     reason:
-      'Hook fixtures exercise edit admission, publication, narration, templates and refusal. Mounted history proof verifies controls unlock after asynchronous copy recovery.',
+      'Hook fixtures exercise edit admission, publication, narration, templates and refusal. Mounted \
+history proof verifies controls unlock after asynchronous copy recovery.',
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage-history.test.tsx',

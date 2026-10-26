@@ -32,11 +32,20 @@ type AnnotationExportMenuProps = {
 };
 
 const ANNOTATION_EXPORT_OPTIONS: Array<{
-  action: Extract<ToolbarAnnotationExportAction, 'copy' | 'download'>;
-  hintKey: 'annotationExportCopyHint' | 'annotationExportDownloadHint';
-  labelKey: 'annotationExportCopyLabel' | 'annotationExportDownloadLabel';
+  action: Extract<ToolbarAnnotationExportAction, 'copy' | 'download' | 'pdf'>;
+  hintKey: 'annotationExportCopyHint' | 'annotationExportDownloadHint' | 'annotationExportPdfHint';
+  labelKey:
+    | 'annotationExportCopyLabel'
+    | 'annotationExportDownloadLabel'
+    | 'annotationExportPdfLabel';
   icon: typeof Copy;
 }> = [
+  {
+    action: 'pdf',
+    hintKey: 'annotationExportPdfHint',
+    icon: Download,
+    labelKey: 'annotationExportPdfLabel',
+  },
   {
     action: 'download',
     hintKey: 'annotationExportDownloadHint',
@@ -148,6 +157,7 @@ function AnnotationExportDropdown(
 }
 
 function getSuccessMessage(action: ToolbarAnnotationExportAction): string {
+  if (action === 'pdf') return translate('content.toolbar.annotationExportPdfOpened');
   if (action === 'copy') return translate('content.toolbar.annotationExportCopySuccess');
   if (action === 'download') return translate('content.toolbar.annotationExportDownloadSuccess');
   if (action === 'export-page') return translate('content.toolbar.annotationExportPageSuccess');
@@ -155,6 +165,7 @@ function getSuccessMessage(action: ToolbarAnnotationExportAction): string {
 }
 
 function getErrorMessage(action: ToolbarAnnotationExportAction): string {
+  if (action === 'pdf') return translate('content.toolbar.annotationExportPdfError');
   if (action === 'copy') return translate('content.toolbar.annotationExportCopyError');
   if (action === 'download') return translate('content.toolbar.annotationExportDownloadError');
   if (action === 'export-page') return translate('content.toolbar.annotationExportPageError');

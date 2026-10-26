@@ -1,5 +1,5 @@
-import { FRAME_ANNOTATION_Z_INDEX } from '../../../../features/highlighter/frame-annotation/interaction/z-index';
 // @vitest-environment jsdom
+import { FRAME_ANNOTATION_Z_INDEX } from '../../../../features/highlighter/frame-annotation/interaction/z-index';
 
 import { act, createElement, useEffect } from 'react';
 import { createPortal } from 'react-dom';

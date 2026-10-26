@@ -1,5 +1,5 @@
-import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
 // @vitest-environment jsdom
+import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
 import { act, type ComponentProps, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';

@@ -6,7 +6,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   // Step templates are scenario media aggregates covered by Media Hub backup.
   'scenario-layouts': ['action/status'],
   'interface-browser': ['interface.preferences'],
-  'quick-actions': ['capture.quick-actions'],
+  'quick-actions': ['capture.quick-actions', 'interface.preferences.page-launch'],
   'screen-sizes': ['capture.viewport-presets'],
   'media-quality': ['capture.image', 'capture.video', 'capture.pages'],
   saving: ['capture.after-capture', 'capture.saving', 'capture.retention'],
@@ -152,6 +152,11 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     'capture/media-quality/video/use-profiles.ts',
     ['mutateVideoSettings'],
     ['capture.video']
+  ),
+  transferable(
+    'capture/quick-actions/index.tsx',
+    ['updateSettings'],
+    ['interface.preferences.page-launch']
   ),
   transferable(
     'capture/quick-actions/crud/persistence.ts',

@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
 } from '../../features/video/project/scene/focus-appearance';
-// @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

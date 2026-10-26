@@ -35,7 +35,9 @@ import type { RecordingStartResult } from '../manager/start-delivery';
 
 const PREVIOUS_RECORDING_ERROR = 'Resolve the previous recording before starting another.';
 const logger = createLogger({ namespace: 'VideoRecordingContentSurfaceStart' });
-const pendingSavedStarts = new Map<number, { cancelled: boolean }>();
+const pendingSavedStarts = Object.assign(new Map<number, { cancelled: boolean }>(), {
+  policyStateId: 'video-recording-surface-lease',
+});
 
 /** Reports a pending saved-tab start before the runtime reaches PREPARING. */
 export function isSavedTabVideoRecordingStartPending(tabId: number): boolean {

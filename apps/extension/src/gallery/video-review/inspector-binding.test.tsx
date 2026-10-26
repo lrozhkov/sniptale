@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import type { ReviewTextDocumentPanel } from './text-panel';
+import type { ReviewTextFragment } from '../../features/video/review/text-types';
 import { act, type ComponentProps, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -7,10 +9,17 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import type { ReviewActionHistory } from './action-history';
 import type { ReviewOriginalSpeechPanel } from './speech-panel';
 import type { ReviewSelectedProperties } from './selected-properties';
-import { ReviewInspectorBinding } from './inspector-binding';
+import { ReviewInspectorBinding, backupReview } from './inspector-binding';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { translate } from '../../platform/i18n';
 
+const textProbe = vi.hoisted(() => ({ enabled: false, receive: vi.fn() }));
+vi.mock('./text-panel', () => ({
+  ReviewTextDocumentPanel: (props: ComponentProps<typeof ReviewTextDocumentPanel>) => {
+    textProbe.receive(props);
+    return null;
+  },
+}));
 const sceneProbe = vi.hoisted(() => ({ enabled: false, captionsLocked: false }));
 const backupExport = vi.hoisted(() => vi.fn());
 const openFullEditor = vi.hoisted(() => vi.fn());
@@ -31,21 +40,21 @@ vi.mock('./advanced-panels', () => ({
 }));
 vi.mock('./inspector', () => ({
   ReviewInspector: (props: {
-    onBackup(): void;
     onOpenVideoEditor(): void;
     message: string | null;
     scene: ReactNode;
     speech: ReactNode;
     actionHistory: ReactNode;
     children: ReactNode;
+    textDocument: ReactNode;
   }) => (
     <div>
-      <button onClick={props.onBackup}>Backup current work</button>
       <button onClick={props.onOpenVideoEditor}>Continue in full editor</button>
       <p role="status">{props.message}</p>
       {sceneProbe.enabled ? props.scene : null}
       {props.speech}
       {props.actionHistory}
+      {textProbe.enabled ? props.textDocument : null}
       {props.children}
     </div>
   ),
@@ -212,7 +221,9 @@ it('joins every editor buffer for either recognition source and guards related-t
     backupExport.mockImplementationOnce(async () => {
       order.push('export');
     });
-    await click('Backup current work');
+    await act(async () =>
+      backupProps.state.run(() => backupReview(backupProps.state, backupProps.canvasComments))
+    );
     expect(order.slice(-5)).toEqual(['notes', 'advanced', 'canvas', 'save', 'export']);
     expect(backupExport).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -226,10 +237,14 @@ it('joins every editor buffer for either recognition source and guards related-t
       { expectedReview, requireSelected: true }
     );
     save.mockRejectedValueOnce(new Error('Save refused'));
-    await click('Backup current work');
+    await act(async () =>
+      backupProps.state.run(() => backupReview(backupProps.state, backupProps.canvasComments))
+    );
     expect(failure).toHaveBeenCalledOnce();
     expect(backupExport).toHaveBeenCalledOnce();
-    await click('Backup current work');
+    await act(async () =>
+      backupProps.state.run(() => backupReview(backupProps.state, backupProps.canvasComments))
+    );
     expect(backupExport).toHaveBeenCalledTimes(2);
     openFullEditor.mockImplementationOnce(async () => {
       order.push('navigate');
@@ -337,6 +352,7 @@ it('joins every editor buffer for either recognition source and guards related-t
       host.querySelector<HTMLFieldSetElement>('[data-ui="cursorFocusPath.inspector"]')!.disabled
     ).toBe(true);
 
+    await checkTextTemporalActions(root, props);
     sceneProbe.enabled = true;
     const setPolicy = vi.fn();
     const sceneProps = {
@@ -375,3 +391,82 @@ it('joins every editor buffer for either recognition source and guards related-t
     vi.unstubAllGlobals();
   }
 });
+
+/** The binding delegates only a canonical contiguous compatible-clock selection to Cut. */
+async function checkTextTemporalActions(
+  root: ReturnType<typeof createRoot>,
+  props: ComponentProps<typeof ReviewInspectorBinding>
+) {
+  const fragments: ReviewTextFragment[] = ['a', 'b', 'c', 'd'].map((id, index) => ({
+    id,
+    text: id,
+    originalText: '',
+    start: index + 1,
+    end: index + 2,
+    timeDomain: index === 2 ? 'result' : 'source',
+    revision: 0,
+    timingRevision: 0,
+    alignment: 'manual',
+    showInVideo: true,
+  }));
+  let allowed = false,
+    admitted = true;
+  const apply = vi.fn(),
+    canApply = vi.fn(() => admitted),
+    order: string[] = [];
+  const current = {
+    ...props,
+    state: {
+      ...props.state,
+      text: {
+        ...props.state.text,
+        document: { version: 1 as const, fragments },
+        sourceInterval: (fragment: ReviewTextFragment) => ({
+          start: fragment.start,
+          end: fragment.end,
+        }),
+      },
+      editing: { ...props.state.editing, canApply, apply },
+      video: {
+        ...props.state.video,
+        current: { ...props.state.video.current!, pause: () => order.push('pause') },
+      },
+      seek: () => order.push('seek'),
+      play: async () => {
+        order.push('play');
+      },
+      beforeAction: (action: () => void) => {
+        if (allowed) action();
+      },
+    },
+  };
+  textProbe.enabled = true;
+  try {
+    await act(async () => root.render(<ReviewInspectorBinding {...current} />));
+    const panel: ComponentProps<typeof ReviewTextDocumentPanel> =
+      textProbe.receive.mock.lastCall![0];
+    expect(panel.canCut?.(['a', 'b'])).toBe(true);
+    expect(canApply).toHaveBeenLastCalledWith('cut', { kind: 'range', start: 1, end: 3 });
+    expect(panel.canCut?.(['a', 'd'])).toBe(false);
+    expect(panel.canCut?.(['b', 'c'])).toBe(false);
+    expect(panel.canCut?.(['missing'])).toBe(false);
+    panel.onCut?.(['a', 'b']);
+    panel.onPlay?.(fragments[0]!);
+    expect(apply).not.toHaveBeenCalled();
+    expect(order).toEqual([]);
+    allowed = true;
+    panel.onCut?.(['a', 'd']);
+    expect(apply).not.toHaveBeenCalled();
+    admitted = false;
+    panel.onCut?.(['a', 'b']);
+    expect(apply).not.toHaveBeenCalled();
+    admitted = true;
+    panel.onCut?.(['a', 'b']);
+    expect(apply).toHaveBeenCalledExactlyOnceWith('cut', { kind: 'range', start: 1, end: 3 });
+    panel.onPlay?.(fragments[0]!);
+    expect(order).toEqual(['pause', 'seek', 'play']);
+    expect(fragments.map((fragment) => fragment.text)).toEqual(['a', 'b', 'c', 'd']);
+  } finally {
+    textProbe.enabled = false;
+  }
+}

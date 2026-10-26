@@ -39,6 +39,11 @@ vi.mock('../view-state/hook', () => ({
 }));
 
 import { App } from '.';
+import {
+  registerContentRuntimeCleanup,
+  disposeExistingContentRuntime,
+} from '../../../runtime/entrypoint/lifecycle';
+import { requestFullContentRuntimeRelease } from '../../../runtime/entrypoint/markers';
 import { buildContentAppLayoutProps } from '../../app-layout/props';
 
 let container: HTMLDivElement | null = null;
@@ -72,6 +77,9 @@ function createModeController() {
 
 function createModeState() {
   return {
+    quickActionOverlayRef: { current: null },
+    pinToTabConfirmed: false,
+    designReviewMode: false,
     aiPickMode: false,
     captureAction: 'download_default' as const,
     currentViewport: null,
@@ -185,6 +193,7 @@ function useAppTestScope() {
     root = null;
     container?.remove();
     container = null;
+    disposeExistingContentRuntime();
     vi.unstubAllGlobals();
   });
 }
@@ -224,4 +233,117 @@ describe('App', () => {
   useAppTestScope();
 
   it('passes grouped layout props into ContentAppLayout', verifiesGroupedLayoutProps);
+});
+
+describe('App release decisions after React commits', () => {
+  useAppTestScope();
+  it('refuses active work then evaluates a queued close against committed state', async () => {
+    const model = createViewModel();
+    const cleanup = vi.fn();
+    registerContentRuntimeCleanup(cleanup);
+    useContentAppViewModelMock.mockReturnValue(model);
+    await renderApp();
+    let refused!: Promise<boolean>;
+    await act(async () => {
+      refused = requestFullContentRuntimeRelease();
+    });
+    expect(await refused).toBe(false);
+    model.modeState.screenshotMode = false;
+    model.modeState.videoRecordingMode = false;
+    model.frameManager.frames = [];
+    let accepted!: Promise<boolean>;
+    await act(async () => {
+      root?.render(<App />);
+      accepted = requestFullContentRuntimeRelease();
+    });
+    expect(await accepted).toBe(true);
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+  it('refuses retained frames, pin, capture, scenario and editing work', async () => {
+    const model = createViewModel();
+    model.modeState.screenshotMode = false;
+    model.modeState.videoRecordingMode = false;
+    model.frameManager.frames = [];
+    registerContentRuntimeCleanup(vi.fn());
+    useContentAppViewModelMock.mockReturnValue(model);
+    await renderApp();
+    for (const field of [
+      'pinToTab',
+      'pinToTabConfirmed',
+      'isCompletelyHidden',
+      'drawingMode',
+      'designReviewMode',
+      'screenshotMode',
+      'videoRecordingMode',
+      'highlighterMode',
+      'quickEditMode',
+      'quickEditDocumentMode',
+      'aiPickMode',
+    ] as const) {
+      model.modeState[field] = true;
+      let result!: Promise<boolean>;
+      await act(async () => {
+        root?.render(<App />);
+        result = requestFullContentRuntimeRelease();
+      });
+      expect(await result).toBe(false);
+      model.modeState[field] = false;
+    }
+    const blockers = [
+      () => {
+        model.scenarioController.scenarioEnabled = true;
+        return () => {
+          model.scenarioController.scenarioEnabled = false;
+        };
+      },
+      () => {
+        model.screenshotController.countdown = 2;
+        return () => {
+          model.screenshotController.countdown = null;
+        };
+      },
+      () => {
+        model.modeState.saveDialogState = {
+          dataUrl: 'data:image/png;base64,proof',
+          filename: 'proof.png',
+        };
+        return () => {
+          model.modeState.saveDialogState = null;
+        };
+      },
+      () => {
+        model.modeState.quickActionOverlayRef.current = {
+          afterCapture: 'copy',
+          imageFormat: 'png',
+          imageQuality: 100,
+          exitAfterCapture: true,
+        };
+        return () => {
+          model.modeState.quickActionOverlayRef.current = null;
+        };
+      },
+      () => {
+        model.aiController.isAIModalOpen = true;
+        return () => {
+          model.aiController.isAIModalOpen = false;
+        };
+      },
+      () => {
+        model.frameManager.frames = createViewModel().frameManager.frames;
+        return () => {
+          model.frameManager.frames = [];
+        };
+      },
+    ];
+    for (const block of blockers) {
+      const reset = block();
+      let result!: Promise<boolean>;
+      await act(async () => {
+        root?.render(<App />);
+        result = requestFullContentRuntimeRelease();
+      });
+      expect(await result).toBe(false);
+      reset();
+    }
+  });
 });

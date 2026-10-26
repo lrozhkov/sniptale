@@ -57,6 +57,15 @@ export interface BrowserDesignReviewMetadata {
   action: BrowserDesignReviewAction | null;
 }
 
+/** One text range; offsets refer to the exact captured source, not rendered geometry. */
+export interface BrowserTextMarker {
+  id: string;
+  start: number;
+  end: number;
+  source: string;
+  color: string;
+}
+
 export interface BrowserDomAnnotationRecord {
   annotationId: number;
   comment?: string;
@@ -66,6 +75,7 @@ export interface BrowserDomAnnotationRecord {
   markerNumber?: number;
   propertyChanges: BrowserAnnotationPropertyChange[];
   textChange?: BrowserAnnotationTextChange;
+  textMarkers?: BrowserTextMarker[];
 }
 
 export interface BrowserFrameAnnotationRect {

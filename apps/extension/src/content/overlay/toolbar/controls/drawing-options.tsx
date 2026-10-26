@@ -31,7 +31,10 @@ import {
   DrawingWidthOptions,
   MarkerOpacityOptions,
 } from '../../../../ui/drawing-tools/options';
-import { DrawingSelectionActions } from '../../../../ui/drawing-tools/selection-actions';
+import {
+  DrawingSelectionActions,
+  type DrawingSelectionDisclosure,
+} from '../../../../ui/drawing-tools/selection-actions';
 import type {
   DrawingQuickToolUpdate as QuickToolUpdate,
   SelectedQuickDrawingObject,
@@ -46,12 +49,13 @@ import type { useDrawingOptionsLayout, DrawingQuickOptionsTool } from './drawing
 
 type DrawingOptionsBodyProps = {
   children: ReactNode;
+  selectionDisclosure: DrawingSelectionDisclosure;
   displayMode: 'horizontal' | 'vertical';
   panelRef: RefObject<HTMLDivElement | null>;
   tool: DrawingQuickOptionsTool;
 };
 
-function DrawingOptionsBody(props: DrawingOptionsBodyProps) {
+function DrawingOptionsBody(props: Omit<DrawingOptionsBodyProps, 'selectionDisclosure'>) {
   return (
     <div
       ref={props.panelRef}
@@ -85,6 +89,7 @@ function DrawingOptionsPair(
   );
   const actions = (
     <DrawingSelectionActions
+      disclosure={props.selectionDisclosure}
       vertical={props.displayMode === 'vertical'}
       canReorder={props.selectedCount > 0 && props.totalCount > props.selectedCount}
       canDuplicate={props.selectedCount > 0}
@@ -536,6 +541,7 @@ function DrawingOptionsSurface(
   if (props.selected) {
     return (
       <DrawingOptionsPair
+        selectionDisclosure={props.selectionDisclosure}
         controller={props.controller}
         displayMode={props.displayMode}
         layout={props.layout}
@@ -568,6 +574,7 @@ function DrawingOptionsSurface(
 }
 
 export function ToolbarDrawingOptions(props: {
+  selectionDisclosure: DrawingSelectionDisclosure;
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
   snapshot: DrawingSessionSnapshot;
@@ -587,6 +594,7 @@ export function ToolbarDrawingOptions(props: {
     );
     return (
       <DrawingOptionsPair
+        selectionDisclosure={props.selectionDisclosure}
         controller={controller}
         displayMode={displayMode}
         layout={layout}
@@ -618,6 +626,7 @@ export function ToolbarDrawingOptions(props: {
     );
     return (
       <DrawingOptionsSurface
+        selectionDisclosure={props.selectionDisclosure}
         controller={controller}
         displayMode={displayMode}
         layout={layout}
@@ -666,6 +675,7 @@ export function ToolbarDrawingOptions(props: {
     );
   return (
     <DrawingOptionsSurface
+      selectionDisclosure={props.selectionDisclosure}
       controller={controller}
       displayMode={displayMode}
       layout={layout}

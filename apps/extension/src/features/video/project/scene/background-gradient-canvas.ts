@@ -94,7 +94,7 @@ function radialExtent(gradient: Extract<Gradient, { type: 'radial' }>) {
 
 /** Draws canonical product gradients in the preview and export Canvas2D pipeline. */
 export function drawSceneGradient(
-  context: CanvasRenderingContext2D,
+  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   gradient: Gradient,
   width: number,
   height: number,
@@ -179,7 +179,7 @@ function createPositionSampler(gradient: Gradient, width: number, height: number
 }
 
 function drawDenseGradient(
-  context: CanvasRenderingContext2D,
+  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   gradient: Gradient,
   width: number,
   height: number
@@ -206,7 +206,7 @@ function drawDenseGradient(
 
 /** Managed backing samples the canonical gradient, including anisotropic raster scaling. */
 function drawManagedDenseGradient(
-  context: CanvasRenderingContext2D,
+  context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   gradient: Gradient,
   width: number,
   height: number,

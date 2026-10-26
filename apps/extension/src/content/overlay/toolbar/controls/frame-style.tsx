@@ -11,6 +11,7 @@ import {
 import {
   FrameAnnotationCreationControls,
   type FrameAnnotationCreationMenu,
+  type FrameAnnotationCreationFramePopoverRenderArgs,
   type FrameAnnotationCreationSettings,
 } from '../../../../composition/frame-annotation-controls/creation-controls';
 import type { EffectMode } from '../../../../features/highlighter/contracts';
@@ -47,11 +48,23 @@ import {
 } from '../../../../composition/frame-annotation-controls/popover/surface';
 import { resolveMainToolbarFramePopoverDirection } from '../../../selection/interactive-frame/layout/popover-position';
 import { PageToolbarControlsContext } from '../state/page-controls';
+import { PageToolbarSlot } from './page-layout';
 import { PageControlVisibility } from './control-visibility';
 import { translate } from '../../../../platform/i18n';
 
 const FUTURE_FRAME_ID = 'future-frame-style';
 const EMPTY_FRAME_RECT = { x: 0, y: 0, width: 0, height: 0 };
+
+function renderFrameVisibility(control: ReactNode) {
+  return (
+    <PageToolbarSlot
+      id="annotation-effects"
+      label={translate('content.interactiveFrame.frameSettings')}
+    >
+      {control}
+    </PageToolbarSlot>
+  );
+}
 
 function renderAnnotationVisibility(menu: 'callout' | 'step-badge', control: ReactNode) {
   return (
@@ -163,6 +176,8 @@ export function FutureFrameStyleControls(props: {
       <InspectorLayout>
         <FrameAnnotationCreationControls
           disabled={visibility?.editing ?? false}
+          groupAnnotations={!visibility?.layoutActive}
+          renderFrameControl={renderFrameVisibility}
           renderAnnotationControl={renderAnnotationVisibility}
           activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
           context="content"
@@ -207,31 +222,39 @@ export function FutureFrameStyleControls(props: {
             onChange: (source) => setAnnotationTemplateSource('stepBadge', source),
             value: templateSources.stepBadge,
           }}
-          renderFramePopover={(popover) => (
-            <FrameSettingsPopover
-              anchorEl={popover.anchorEl}
-              blurSettings={popover.settings.blurSettings}
-              borderSettings={popover.settings.borderSettings}
-              compact={props.compactMenus ?? false}
-              effectMode={popover.settings.effectMode}
-              focusSettings={popover.settings.focusSettings}
-              frameId={FUTURE_FRAME_ID}
-              frameRect={EMPTY_FRAME_RECT}
-              isOpen={popover.isOpen}
-              onApplyToFrame={(patch) => popover.onChange({ ...popover.settings, ...patch })}
-              onClose={popover.onClose}
-              onEffectModeChange={(effectMode) =>
-                popover.onChange({ ...popover.settings, effectMode })
-              }
-              scope="session"
-            />
-          )}
+          renderFramePopover={(popover) =>
+            renderFutureFramePopover(popover, props.compactMenus ?? false)
+          }
           settings={creationSettings}
           showCallout={props.futureFrameCalloutActions !== undefined}
           showStepBadge={props.futureFrameStepBadgeActions !== undefined}
         />
       </InspectorLayout>
     </CommandPressScope>
+  );
+}
+
+/** Adapts the creation menu to the existing session-scoped frame inspector. */
+function renderFutureFramePopover(
+  popover: FrameAnnotationCreationFramePopoverRenderArgs,
+  compact: boolean
+) {
+  return (
+    <FrameSettingsPopover
+      anchorEl={popover.anchorEl}
+      blurSettings={popover.settings.blurSettings}
+      borderSettings={popover.settings.borderSettings}
+      compact={compact}
+      effectMode={popover.settings.effectMode}
+      focusSettings={popover.settings.focusSettings}
+      frameId={FUTURE_FRAME_ID}
+      frameRect={EMPTY_FRAME_RECT}
+      isOpen={popover.isOpen}
+      onApplyToFrame={(patch) => popover.onChange({ ...popover.settings, ...patch })}
+      onClose={popover.onClose}
+      onEffectModeChange={(effectMode) => popover.onChange({ ...popover.settings, effectMode })}
+      scope="session"
+    />
   );
 }
 

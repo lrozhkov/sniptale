@@ -80,6 +80,28 @@ it('wraps linear directions and supports precise and accelerated keyboard geomet
   expect(test.changed.mock.lastCall?.[0].angle).toBe(75);
   pointer(direction, 'pointerup', 140, 50);
 });
+it.each(['linear', 'conic'] as const)(
+  'aligns %s direction guides with their handles on a rectangular canvas',
+  (type) => {
+    const test = mount(
+      type === 'linear'
+        ? { ...base, type, angle: 45 }
+        : { ...base, type, center: { x: 0.3, y: 0.7 }, startAngle: 45 }
+    );
+    const svg = test.host.querySelector('svg')!;
+    const [, , width, height] = svg.getAttribute('viewBox')!.split(' ').map(Number);
+    expect(width).not.toBe(height);
+    const line = svg.querySelector('line')!;
+    const direction = test.handle('direction');
+    const percent = (value: string) => Number(value.match(/([\d.]+)%/)![1]);
+    expect(Number(line.getAttribute('x2'))).toBeCloseTo(
+      (percent(direction.style.left) * width!) / 100
+    );
+    expect(Number(line.getAttribute('y2'))).toBeCloseTo(
+      (percent(direction.style.top) * height!) / 100
+    );
+  }
+);
 it('hides the pointer only during a geometry drag and restores it on cancel, blur, Escape and unmount', () => {
   const test = mount({ ...base, type: 'conic', center: { x: 0.5, y: 0.5 }, startAngle: 0 });
   const center = test.handle('center');

@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
 } from '../../features/video/project/scene/focus-appearance';
-// @vitest-environment jsdom
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { act } from 'react';

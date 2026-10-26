@@ -24,3 +24,5 @@ export function useSettingsPermissions() {
 
   return { permissions, refreshPermissions, requestPermission, revokePermission };
 }
+
+export { requestSettingsOriginAccess } from './requests/request-actions/request-origin';

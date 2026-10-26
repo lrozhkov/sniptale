@@ -1,3 +1,4 @@
+import { renderQuickActionHeader } from '../quick-action-appearance/header';
 import { offscreenDataReadiness, prepareOffscreenRecordingData } from './data-readiness';
 import { answerRecordingCameraOffer, closeRecordingCameraPeer } from '../recording/camera-preview';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -112,6 +113,7 @@ export function resolveOffscreenErrorPhase(
   switch (type) {
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.GET_DESKTOP_MEDIA:
+    case MessageType.OFFSCREEN_QUICK_ACTION_HEADER:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
@@ -153,6 +155,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
       return 'deferred-ack';
     case VideoMessageType.GET_DESKTOP_MEDIA:
+    case MessageType.OFFSCREEN_QUICK_ACTION_HEADER:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
@@ -233,6 +236,7 @@ export async function handleOffscreenRuntimeMessage(
 ): Promise<
   | void
   | RecordingStopOutcome
+  | { dataUrl: string }
   | DesktopFrameResult
   | CameraSourcePeerAnswer
   | { mediaDevices: VideoRecordingMediaDevice[] }
@@ -273,6 +277,8 @@ export async function handleOffscreenRuntimeMessage(
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
       handlePageStoragePrivacyErasure(message, sendResponse);
       return;
+    case MessageType.OFFSCREEN_QUICK_ACTION_HEADER:
+      return renderQuickActionHeader(message);
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE: {
       if (message.operation === 'prepare') {
         await offscreenDataReadiness.ensureAdmission();

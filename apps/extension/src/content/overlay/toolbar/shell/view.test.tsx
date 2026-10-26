@@ -6,6 +6,8 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ToolbarShellContent } from './view';
+import { useToolbarModeTransition } from './mode-transition';
+import { useRef } from 'react';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { useContext } from 'react';
 import { installContentUiActivationBridge } from '../../../runtime/ui-activation-bridge';
@@ -147,6 +149,7 @@ describe('ToolbarShellContent recording crop', () => {
                   displayMode: 'horizontal',
                   position: { x: 24, y: 12 },
                   positionReady: true,
+                  commitLayout: () => ({ x: 24, y: 12 }),
                   handleMouseDown: vi.fn(),
                 },
                 toolbarMenuState: { activeMenuType: null },
@@ -206,6 +209,7 @@ describe('ToolbarShellContent recording crop', () => {
                   displayMode: 'horizontal',
                   position: { x: clientBounds.x / 2, y: clientBounds.y / 2 },
                   positionReady: true,
+                  commitLayout: () => ({ x: 24, y: 12 }),
                   handleMouseDown: vi.fn(),
                 },
                 toolbarMenuState: { activeMenuType: menuOpen ? 'settings' : null },
@@ -292,6 +296,7 @@ describe('ToolbarShellContent', () => {
                 displayMode: 'horizontal',
                 position: { x: 24, y: 12 },
                 positionReady: true,
+                commitLayout: () => ({ x: 24, y: 12 }),
                 handleMouseDown: vi.fn(),
               },
               toolbarMenuState: { activeMenuType: null },
@@ -387,6 +392,7 @@ describe('ToolbarShellContent', () => {
                 displayMode: 'horizontal',
                 position: { x: 24, y: 12 },
                 positionReady: true,
+                commitLayout: () => ({ x: 24, y: 12 }),
                 handleMouseDown,
               },
               toolbarMenuState: { activeMenuType: null },
@@ -492,6 +498,7 @@ it.each([false, true])(
                   displayMode: 'horizontal',
                   position: { x: 24, y: 12 },
                   positionReady: true,
+                  commitLayout: () => ({ x: 24, y: 12 }),
                   handleMouseDown: vi.fn(),
                 },
                 toolbarMenuState: { activeMenuType: null },
@@ -545,3 +552,62 @@ it.each([false, true])(
     }
   }
 );
+
+it('retargets mode geometry from the painted size and origin and releases its animation', () => {
+  let width = 300;
+  let naturalWidth = 600;
+  let originX = 700;
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(() => width);
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(50);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    () => new DOMRect(originX, 16, width * 2, 100)
+  );
+  const cancel = vi.fn(() => {
+    width = naturalWidth;
+  });
+  const animate = vi.fn((_frames: Keyframe[], _options: KeyframeAnimationOptions) => ({
+    cancel,
+    finished: new Promise<void>(() => {}),
+  }));
+  const previousAnimate = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate');
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+  function Geometry({ mode }: { mode: string }) {
+    const toolbarRef = useRef<HTMLDivElement>(null);
+    useToolbarModeTransition({
+      toolbarRef,
+      mode,
+      orientation: 'horizontal',
+      ready: true,
+      uiScale: 2,
+      recording: false,
+      commitLayout: () => ({ x: 200, y: 8 }),
+    });
+    return <div ref={toolbarRef} />;
+  }
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    act(() => root.render(<Geometry mode="cursor" />));
+    width = 600;
+    act(() => root.render(<Geometry mode="drawing" />));
+    expect(animate.mock.calls[0]?.[0]).toEqual([
+      { inlineSize: '300px', blockSize: '50px', translate: '150px 0px' },
+      { inlineSize: '600px', blockSize: '50px', translate: '0px 0px' },
+    ]);
+    width = 450;
+    naturalWidth = 700;
+    originX = 520;
+    act(() => root.render(<Geometry mode="highlighter" />));
+    expect(animate.mock.calls[1]?.[0]).toEqual([
+      { inlineSize: '450px', blockSize: '50px', translate: '60px 0px' },
+      { inlineSize: '700px', blockSize: '50px', translate: '0px 0px' },
+    ]);
+    expect(host.firstElementChild?.getAttribute('data-mode-transition')).toBe('true');
+  } finally {
+    act(() => root.unmount());
+    expect(cancel).toHaveBeenCalledTimes(2);
+    vi.restoreAllMocks();
+    if (previousAnimate) Object.defineProperty(HTMLElement.prototype, 'animate', previousAnimate);
+    else Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+  }
+});

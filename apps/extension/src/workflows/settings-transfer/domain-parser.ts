@@ -1,3 +1,5 @@
+import { DEFAULT_PAGE_LAUNCH_PREFERENCES } from '../../contracts/page-launch';
+import { hasQuickActionArtwork } from '../../contracts/quick-action-appearance';
 import { normalizeConfigurableCaptureAction } from '../../features/quick-actions-presets/policy';
 import { getAIModelOperation } from '../../contracts/settings/model-operation';
 import { z } from 'zod';
@@ -36,6 +38,7 @@ const interfaceSchema = z
     locale: z.enum(['en', 'ru']).optional(),
     popupStartup: z.unknown().optional(),
     contextMenu: z.unknown().optional(),
+    pageLaunch: z.unknown().optional(),
   })
   .strict();
 
@@ -119,11 +122,30 @@ function parseCoreDomain(
           failSettingsTransferDomain(domainId);
         result['contextMenu'] = settings.value.contextMenu;
       }
+      if (parsed.data.pageLaunch !== undefined) {
+        if (
+          !isPlainRecord(parsed.data.pageLaunch) ||
+          Object.keys(parsed.data.pageLaunch).some(
+            (key) => !Object.hasOwn(DEFAULT_PAGE_LAUNCH_PREFERENCES, key)
+          )
+        )
+          failSettingsTransferDomain(domainId);
+        const settings = parseStoredSettings({ pageLaunch: parsed.data.pageLaunch });
+        if (settings.invalidFieldCount > 0 || settings.hasInvalidRoot)
+          failSettingsTransferDomain(domainId);
+        assignDefined(result, 'pageLaunch', settings.value.pageLaunch);
+      }
       return json(result);
     }
     case 'capture.quick-actions': {
       const parsed = parseStoredQuickActions(value['items']);
-      if (parsed.hasInvalidRoot || parsed.invalidEntryCount > 0)
+      if (
+        parsed.hasInvalidRoot ||
+        parsed.invalidEntryCount > 0 ||
+        parsed.actions.some(
+          (action) => action.appearance && hasQuickActionArtwork(action.appearance)
+        )
+      )
         failSettingsTransferDomain(domainId);
       return json({
         items: (parsed.actions ?? []).map((action) =>

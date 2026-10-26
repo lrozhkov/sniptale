@@ -2,6 +2,12 @@
 export type CameraSplitSide = 'left' | 'right' | 'top' | 'bottom';
 
 export type CameraPanel = { x: number; y: number; width: number; height: number };
+export type CameraScreenBehavior = 'shrink' | 'shift' | 'overlay';
+export type CameraScreenPanel = CameraPanel & { clip?: CameraPanel; cameraOverlay?: boolean };
+
+export function isCameraScreenBehavior(value: unknown): value is CameraScreenBehavior {
+  return value === 'shrink' || value === 'shift' || value === 'overlay';
+}
 
 export const FULL_CAMERA_PANEL: CameraPanel = { x: 0, y: 0, width: 1, height: 1 };
 
@@ -10,7 +16,7 @@ export function isCameraSplitSide(value: unknown): value is CameraSplitSide {
 }
 
 /** Both editors use the same 2% gutter and equal-size panels. */
-export function cameraSplitPanels(side: CameraSplitSide): {
+function legacyCameraSplitPanels(side: CameraSplitSide): {
   screen: CameraPanel;
   camera: CameraPanel;
 } {
@@ -39,11 +45,55 @@ export function cameraSplitPanels(side: CameraSplitSide): {
   }
 }
 
-export function interpolateCameraPanel(
-  from: CameraPanel,
-  to: CameraPanel,
+/** Absent behavior retains the released split projection. */
+export function cameraSplitPanels(
+  side: CameraSplitSide,
+  behavior?: CameraScreenBehavior
+): {
+  screen: CameraScreenPanel;
+  camera: CameraPanel;
+} {
+  const panels = legacyCameraSplitPanels(side);
+  if (!behavior) return panels;
+  if (behavior === 'overlay')
+    return { ...panels, screen: { ...FULL_CAMERA_PANEL, cameraOverlay: true } };
+  const pane = panels.screen;
+  const scale = behavior === 'shift' ? 1 : Math.min(pane.width, pane.height);
+  return {
+    ...panels,
+    screen: {
+      x: pane.x + (pane.width - scale) / 2,
+      y: pane.y + (pane.height - scale) / 2,
+      width: scale,
+      height: scale,
+      ...(behavior === 'shift' ? { clip: pane } : {}),
+    },
+  };
+}
+
+export function interpolateCameraScreen(
+  from: CameraScreenPanel,
+  to: CameraScreenPanel,
   weight: number
-): CameraPanel {
+): CameraScreenPanel {
+  return {
+    ...interpolateCameraPanel(from, to, weight),
+    ...((weight < 1 && from.cameraOverlay) || (weight > 0 && to.cameraOverlay)
+      ? { cameraOverlay: true }
+      : {}),
+    ...((weight < 1 && from.clip) || (weight > 0 && to.clip)
+      ? {
+          clip: interpolateCameraPanel(
+            from.clip ?? FULL_CAMERA_PANEL,
+            to.clip ?? FULL_CAMERA_PANEL,
+            weight
+          ),
+        }
+      : {}),
+  };
+}
+
+function interpolateCameraPanel(from: CameraPanel, to: CameraPanel, weight: number): CameraPanel {
   const mix = (a: number, b: number) => a + (b - a) * weight;
   return {
     x: mix(from.x, to.x),
@@ -65,10 +115,12 @@ interface CameraSplitPresentationInput {
   playbackRate?: number;
   transform: VideoProjectTransform;
   cameraSplit?: CameraSplitSide | undefined;
+  cameraScreenBehavior?: CameraScreenBehavior | undefined;
   cameraTiming?: { transitions: 'bounded' };
   cameraPositions?: readonly {
     sourceTime: number;
     cameraSplit?: CameraSplitSide | null;
+    cameraScreenBehavior?: CameraScreenBehavior | undefined;
     transform: VideoProjectTransform;
     transition: { kind: 'instant' | 'smooth' | 'shrink'; duration: number };
   }[];
@@ -79,7 +131,7 @@ export function resolveCameraSplitPresentation(
   scene: SceneSize,
   clip: CameraSplitPresentationInput,
   time: number
-): { screen: CameraPanel; camera: VideoProjectTransform } | null {
+): { screen: CameraScreenPanel; camera: VideoProjectTransform } | null {
   const sourceTime =
     clip.sourceStart +
     Math.max(0, Math.min(clip.duration, time - clip.startTime)) * (clip.playbackRate ?? 1);
@@ -100,8 +152,16 @@ export function resolveCameraSplitPresentation(
   });
   const fromCamera = fromSide ? cameraSplitPanels(fromSide).camera : normalize(fromTransform);
   const toCamera = toSide ? cameraSplitPanels(toSide).camera : normalize(toTransform);
-  const fromScreen = fromSide ? cameraSplitPanels(fromSide).screen : FULL_CAMERA_PANEL;
-  const toScreen = toSide ? cameraSplitPanels(toSide).screen : FULL_CAMERA_PANEL;
+  const fromScreen = fromSide
+    ? cameraSplitPanels(
+        fromSide,
+        previous?.cameraScreenBehavior ?? (index === 0 ? clip.cameraScreenBehavior : undefined)
+      ).screen
+    : FULL_CAMERA_PANEL;
+  const toScreen = toSide
+    ? cameraSplitPanels(toSide, current ? current.cameraScreenBehavior : clip.cameraScreenBehavior)
+        .screen
+    : FULL_CAMERA_PANEL;
   const duration =
     current && current.transition.kind !== 'instant'
       ? Math.min(
@@ -122,7 +182,7 @@ export function resolveCameraSplitPresentation(
   const width = panel.width * scene.width * scale;
   const height = panel.height * scene.height * scale;
   return {
-    screen: interpolateCameraPanel(fromScreen, toScreen, eased),
+    screen: interpolateCameraScreen(fromScreen, toScreen, eased),
     camera: {
       x: (panel.x + panel.width / 2) * scene.width - width / 2,
       y: (panel.y + panel.height / 2) * scene.height - height / 2,

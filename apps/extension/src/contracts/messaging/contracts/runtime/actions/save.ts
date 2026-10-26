@@ -18,13 +18,18 @@ import {
 const isSaveAssetResponseShape = createRuntimeResponseGuard<SaveAssetResponse>({
   optional: {
     assetId: isString,
+    dataUrl: isImageDataUrl,
+    filename: isString,
     editorAssetCapability: isRecentCaptureEditorAssetCapability,
   },
 });
 
 function isSaveAssetResponse(value: unknown): value is SaveAssetResponse {
   if (!isSaveAssetResponseShape(value)) return false;
-  return !('editorAssetCapability' in value) || 'assetId' in value;
+  return (
+    (!('editorAssetCapability' in value) || 'assetId' in value) &&
+    'dataUrl' in value === 'filename' in value
+  );
 }
 
 export const runtimeActionSaveMessageContracts = {
@@ -37,6 +42,8 @@ export const runtimeActionSaveMessageContracts = {
         optional: {
           actionType: isCaptureActionType,
           contentIntent: isContentPrivilegedActionCapability,
+          quickActionTransactionId: (value) =>
+            isString(value) && value.length > 0 && value.length <= 128,
           presetId: isString,
         },
       })
@@ -54,6 +61,8 @@ export const runtimeActionSaveMessageContracts = {
         required: { dataUrl: isImageDataUrl, filename: isString },
         optional: {
           contentIntent: isContentPrivilegedActionCapability,
+          quickActionTransactionId: (value) =>
+            isString(value) && value.length > 0 && value.length <= 128,
         },
       })
     ),

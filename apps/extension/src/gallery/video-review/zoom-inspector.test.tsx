@@ -1,5 +1,5 @@
-import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
+import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { act, useContext } from 'react';
 import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';

@@ -579,7 +579,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         info.annotations.push({
           type: 'capture-entry',
           description:
-            'Dispatch the capture route from the native action popup. The separate extension page controls permissions and reads downloads; it cannot act as the popup route sender because its sender.tab identifies itself.',
+            'Dispatch the capture route from the native action popup. The separate ' +
+            'extension page controls permissions and reads downloads; it cannot act as the ' +
+            'popup route sender because its sender.tab identifies itself.',
         });
         const messages: string[] = [];
         context.on('console', (message) => {

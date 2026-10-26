@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  admitReviewTextContext,
   parseReviewTextClientMessage,
   parseReviewTextProposal,
   parseReviewTextServerMessage,
@@ -230,4 +231,64 @@ it('admits a strict montage document scope separately from a Gallery workspace',
     expect(parseReviewTextClientMessage({ ...start, scope: { ...scope, ...patch } })).toBeNull();
   const { documentId: _documentId, ...missing } = scope;
   expect(parseReviewTextClientMessage({ ...start, scope: missing })).toBeNull();
+});
+
+describe('review text context admission', () => {
+  it('constructs only the admitted context and leaves the disclosed inputs unchanged', () => {
+    const options = { ...context, prompt: '  Shorten  ' };
+    const before = structuredClone(options);
+    const result = admitReviewTextContext(options, context.window, context.fragments, 'invalid');
+    expect(result).toEqual({ ...context, prompt: 'Shorten' });
+    expect(options).toEqual(before);
+    expect(result.fragments).not.toBe(context.fragments);
+  });
+
+  it.each(['invalid-request', 'invalid'] as const)(
+    'preserves the exact %s policy for non-budget failures',
+    (invalidError) => {
+      expect(() =>
+        admitReviewTextContext(
+          { ...context, prompt: '   ' },
+          context.window,
+          context.fragments,
+          invalidError
+        )
+      ).toThrow(new Error(invalidError));
+      const privateOptions = { ...context, assetId: 'private' };
+      expect(() =>
+        admitReviewTextContext(privateOptions, context.window, context.fragments, invalidError)
+      ).toThrow(new Error(invalidError));
+    }
+  );
+
+  it.each(['invalid-request', 'invalid'] as const)(
+    'classifies all budget failures as too-large under %s policy',
+    (invalidError) => {
+      expect(() =>
+        admitReviewTextContext(
+          { ...context, prompt: 'x'.repeat(4_001) },
+          context.window,
+          context.fragments,
+          invalidError
+        )
+      ).toThrow(new Error('too-large'));
+      expect(() =>
+        admitReviewTextContext(
+          context,
+          context.window,
+          [{ id: 'long', text: 'x'.repeat(1_200), start: 1, end: 2 }],
+          invalidError
+        )
+      ).toThrow(new Error('too-large'));
+      const ranges = Array.from({ length: 1_000 }, () => ({ start: 1, end: 2 }));
+      expect(() =>
+        admitReviewTextContext(
+          context,
+          context.window,
+          [{ id: 'ranged', text: 'Words', start: 1, end: 2, ranges }],
+          invalidError
+        )
+      ).toThrow(new Error('too-large'));
+    }
+  );
 });

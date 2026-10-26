@@ -1,5 +1,5 @@
-import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
+import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

@@ -1,3 +1,5 @@
+import { isHydratableVideoProject } from '../../../features/video/project/validation/root';
+import type { VideoEditorBookendPresetUpdateResult } from '../../contracts/insertion';
 import { reconcileVideoProjectCompositionJoins } from '../../../features/video/project/scene/joins';
 import { reconcileMotionSourceBindings } from '../../../features/video/project/motion/source-binding';
 import {
@@ -26,7 +28,7 @@ import {
   reconcileRecordingInteractionAnchors,
   updateSourceTimedClipTiming,
 } from '../operations/source-timed-clips';
-import type { VideoEditorProjectState } from './contracts';
+import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from './contracts';
 import {
   resolveSelectedTrackIdFromSelection,
   resolveSelectionAfterProjectUpdate,
@@ -40,6 +42,13 @@ interface EditableClipOperation<TClip extends VideoProjectClip = VideoProjectCli
   clipIds: string[];
   clipIdSet: Set<string>;
   affectedClips: VideoProjectClip[];
+}
+
+/** Places primary and subtitle tracks before existing rows, and other kinds after them. */
+export function getVideoProjectTrackInsertionOrder(project: VideoProject, kind: VideoTrackKind) {
+  return kind === VideoTrackKind.PRIMARY || kind === VideoTrackKind.SUBTITLE
+    ? Math.min(0, ...project.tracks.map((item) => item.order)) - 1
+    : Math.max(0, ...project.tracks.map((item) => item.order)) + 1;
 }
 
 export function ensureTrackForKind(
@@ -64,9 +73,7 @@ export function ensureTrackForKind(
   const sequence = project.tracks.filter((track) => track.kind === kind).length + 1;
   const track = createVideoProjectTrack(
     getDefaultTrackName(kind, sequence),
-    kind === VideoTrackKind.PRIMARY || kind === VideoTrackKind.SUBTITLE
-      ? Math.min(0, ...project.tracks.map((item) => item.order)) - 1
-      : Math.max(0, ...project.tracks.map((item) => item.order)) + 1,
+    getVideoProjectTrackInsertionOrder(project, kind),
     kind
   );
   return {
@@ -75,6 +82,38 @@ export function ensureTrackForKind(
     }),
     trackId: track.id,
   };
+}
+
+/** Publishes a prepared root only inside the existing exact-root and history admission. */
+export function applyGuardedProjectRootMutation(
+  set: VideoEditorProjectSliceSet,
+  expectedProject: VideoProject,
+  prepare: (project: VideoProject) => VideoProject | null
+): VideoEditorBookendPresetUpdateResult {
+  let outcome: VideoEditorBookendPresetUpdateResult = { status: 'rejected', reason: 'no-project' };
+  set((state) => {
+    const refuse = (reason: Extract<typeof outcome, { status: 'rejected' }>['reason']) => {
+      outcome = { status: 'rejected', reason };
+      return state;
+    };
+    const project = state.project;
+    if (!project) return state;
+    if (project !== expectedProject) return refuse('stale-project');
+    if (state.projectHistory.transaction) return refuse('history-busy');
+    const proposed = prepare(project);
+    if (!proposed) return refuse('invalid-project');
+    if (proposed === project) {
+      outcome = { status: 'unchanged' };
+      return state;
+    }
+    const update = applyProjectUpdate(state, () => proposed);
+    if (!update.project || !isHydratableVideoProject(update.project))
+      return refuse('invalid-project');
+    if (update.projectHistory?.error) return refuse('history-unavailable');
+    outcome = { status: 'updated' };
+    return update;
+  });
+  return outcome;
 }
 
 export function applyProjectUpdate(

@@ -28,6 +28,14 @@ import { hideDesignReviewFrame, removeDesignReviewFrame, showDesignReviewFrame }
 import { addInaccessibleIframeSelectionListener } from './inaccessible-iframe';
 import { readPageStyleSelectionSnapshot, type PageStyleSelectionSnapshot } from './snapshot';
 
+export type DesignReviewSelectionOrigin =
+  | 'page'
+  | 'tree'
+  | 'feedback'
+  | 'draft'
+  | 'finding'
+  | 'tool';
+
 export interface DesignReviewSelection {
   anchor: { x: number; y: number };
   snapshot: PageStyleSelectionSnapshot;
@@ -39,13 +47,22 @@ export interface DesignReviewPickerRuntime {
   setMeasurementsExpanded: (expanded: boolean) => void;
   dismissSelection: () => void;
   dispose: () => void;
-  selectElement: (element: Element) => boolean;
+  selectElement: (element: Element, origin?: DesignReviewSelectionOrigin) => boolean;
+  refreshFrame(): void;
 }
 
 interface DesignReviewPickerArgs {
   onDisableRequested: () => void;
-  onInspectorDismissRequested: () => boolean;
-  onSelection: (selection: DesignReviewSelection) => void;
+  onInspectorDismissRequested: (event?: KeyboardEvent) => boolean;
+  hasInspector?: () => boolean;
+  onSelection: (
+    selection: DesignReviewSelection,
+    origin?: DesignReviewSelectionOrigin
+  ) => boolean | void;
+  onHover?: (element: Element | null) => void;
+  trackHover?: () => boolean;
+  isFrameSuppressed?: () => boolean;
+  replaceSelectionOnClick?: () => boolean;
 }
 
 interface DesignReviewPickerInteractionState {
@@ -56,7 +73,9 @@ interface DesignReviewPickerInteractionState {
 }
 
 const DESIGN_REVIEW_INTERACTION_ROOT_SELECTOR = [
+  '[data-ui="content.toolbar.root"]',
   '[data-ui="content.design-review.popover"]',
+  '[data-ui="content.design-review.tool-panel"]',
   '[data-ui="content.design-review.feedback-panel"]',
   '[data-ui="content.annotation-marker"]',
 ].join(',');
@@ -111,9 +130,13 @@ function claimPageClick(event: MouseEvent): void {
   event.stopImmediatePropagation();
 }
 
-function refreshPickerFrame(state: DesignReviewPickerInteractionState): void {
-  if (!state.editingText && state.framedElement?.isConnected) {
-    showDesignReviewFrame(state.framedElement);
+function refreshPickerFrame(
+  state: DesignReviewPickerInteractionState,
+  args: DesignReviewPickerArgs
+): void {
+  const target = state.selectedElement ?? state.framedElement;
+  if (!state.editingText && !args.isFrameSuppressed?.() && target?.isConnected) {
+    showDesignReviewFrame(target, target === state.selectedElement, false, state.framedElement);
   } else {
     hideDesignReviewFrame();
   }
@@ -129,43 +152,50 @@ function dismissPickerSelection(state: DesignReviewPickerInteractionState): void
 function selectPickerSelection(
   state: DesignReviewPickerInteractionState,
   args: DesignReviewPickerArgs,
-  selection: DesignReviewSelection
-): void {
+  selection: DesignReviewSelection,
+  origin: DesignReviewSelectionOrigin = 'page'
+): boolean {
+  if (args.onSelection(selection, origin) === false) return false;
   state.inspectorPointerGestureStarted = false;
   state.selectedElement = selection.snapshot.element;
   state.framedElement = state.selectedElement;
-  refreshPickerFrame(state);
-  args.onSelection(selection);
+  refreshPickerFrame(state, args);
+  return true;
 }
 
 function selectPickerElement(
   state: DesignReviewPickerInteractionState,
   args: DesignReviewPickerArgs,
-  element: Element
+  element: Element,
+  origin: DesignReviewSelectionOrigin = 'tree'
 ): boolean {
   const selection = resolveElementSelection(element);
   if (!selection) return false;
-  selectPickerSelection(state, args, selection);
-  return true;
+  return selectPickerSelection(state, args, selection, origin);
 }
 
 function handlePickerMouseMove(
   state: DesignReviewPickerInteractionState,
   event: MouseEvent,
+  args: DesignReviewPickerArgs,
   iframe?: HTMLIFrameElement
 ): void {
   if (!isTrustedMouseEvent(event)) return;
-  if (state.selectedElement) {
-    state.framedElement = state.selectedElement;
-  } else {
-    state.framedElement = resolveSelection(event, iframe)?.snapshot.element ?? null;
-  }
-  refreshPickerFrame(state);
+  if (args.trackHover?.() && !isInspectorInteractionEvent(event))
+    args.onHover?.(resolveSelectablePageElement(event, iframe));
+  state.framedElement = isInspectorInteractionEvent(event)
+    ? null
+    : (resolveSelection(event, iframe)?.snapshot.element ?? null);
+  refreshPickerFrame(state, args);
 }
 
-function handlePickerMouseLeave(state: DesignReviewPickerInteractionState): void {
+function handlePickerMouseLeave(
+  state: DesignReviewPickerInteractionState,
+  args: DesignReviewPickerArgs
+): void {
+  args.onHover?.(null);
   state.framedElement = state.selectedElement;
-  refreshPickerFrame(state);
+  refreshPickerFrame(state, args);
 }
 
 function handlePickerClick(
@@ -190,6 +220,14 @@ function handlePickerClick(
     return;
   }
 
+  if (args.replaceSelectionOnClick?.()) {
+    const selection = resolveSelection(event, iframe);
+    if (selection) {
+      selectPickerSelection(state, args, selection);
+      claimPageClick(event);
+      return;
+    }
+  }
   const contentOwned = isContentOwnedEvent(event);
   const dismissed = args.onInspectorDismissRequested();
   if (dismissed) {
@@ -197,7 +235,7 @@ function handlePickerClick(
     state.framedElement = contentOwned
       ? null
       : (resolveSelection(event, iframe)?.snapshot.element ?? null);
-    refreshPickerFrame(state);
+    refreshPickerFrame(state, args);
   }
   if (!contentOwned || !dismissed) claimPageClick(event);
 }
@@ -224,7 +262,7 @@ function handleInaccessibleIframeSelection(
   if (args.onInspectorDismissRequested()) {
     dismissPickerSelection(state);
     state.framedElement = iframe;
-    refreshPickerFrame(state);
+    refreshPickerFrame(state, args);
   }
 }
 
@@ -242,7 +280,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     'mousemove',
     (event, iframe) => {
       if (state.editingText) return;
-      handlePickerMouseMove(state, event, iframe);
+      handlePickerMouseMove(state, event, args, iframe);
       if (isTrustedMouseEvent(event) && !state.inspectorPointerGestureStarted)
         measurements.hover(state.selectedElement ?? resolveSelectablePageElement(event, iframe));
     },
@@ -252,7 +290,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     'mouseleave',
     () => {
       if (state.editingText) return;
-      handlePickerMouseLeave(state);
+      handlePickerMouseLeave(state, args);
       measurements.hover(state.selectedElement);
     },
     { capture: true }
@@ -275,11 +313,11 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   );
   const cleanupScroll = addEventListenerToAllWindowsDynamic<Event>(
     'scroll',
-    () => refreshPickerFrame(state),
+    () => refreshPickerFrame(state, args),
     { capture: true }
   );
   const cleanupResize = addWindowEventListenerToAllWindowsDynamic<Event>('resize', () =>
-    refreshPickerFrame(state)
+    refreshPickerFrame(state, args)
   );
   const cleanupKeydown = addWindowEventListenerToAllWindowsDynamic<KeyboardEvent>(
     'keydown',
@@ -299,10 +337,20 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
       ) {
         return;
       }
+      const contentRoot = resolveContentShadowRoot();
+      if (
+        contentRoot &&
+        queryAllContentUiElements(DESIGN_REVIEW_INTERACTION_ROOT_SELECTOR).some((owner) =>
+          getOwnedFloatingInteractionLayers(owner, contentRoot).some(
+            (layer) => layer.getClientRects().length > 0
+          )
+        )
+      )
+        return;
       event.preventDefault();
       event.stopPropagation();
-      if (state.selectedElement) {
-        args.onInspectorDismissRequested();
+      if (state.selectedElement || args.hasInspector?.()) {
+        args.onInspectorDismissRequested(event);
         return;
       }
       args.onDisableRequested();
@@ -319,11 +367,12 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     setTextEditing: (editing) => {
       if (state.editingText === editing) return;
       state.editingText = editing;
+      state.framedElement = state.selectedElement;
       state.inspectorPointerGestureStarted = false;
       cleanupCursor();
       cleanupCursor = editing ? () => undefined : mountDesignReviewCursor();
       measurements.hover(editing ? null : state.selectedElement);
-      refreshPickerFrame(state);
+      refreshPickerFrame(state, args);
     },
     dismissSelection: () => {
       dismissPickerSelection(state);
@@ -344,8 +393,9 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
       cleanupCursor();
       removeDesignReviewFrame();
     },
-    selectElement: (element) => {
-      const selected = selectPickerElement(state, args, element);
+    refreshFrame: () => refreshPickerFrame(state, args),
+    selectElement: (element, origin = 'tree') => {
+      const selected = selectPickerElement(state, args, element, origin);
       if (selected) measurements.hover(state.selectedElement);
       return selected;
     },

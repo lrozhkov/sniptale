@@ -1,5 +1,5 @@
-import { REVIEW_CLICK_DEFAULT } from '../../../../../../features/video/project/action-feedback/validation';
 // @vitest-environment jsdom
+import { REVIEW_CLICK_DEFAULT } from '../../../../../../features/video/project/action-feedback/validation';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';

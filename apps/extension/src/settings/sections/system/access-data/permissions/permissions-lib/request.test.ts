@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   readPermissionsSnapshot,
+  requestCameraAccess,
   requestCameraPermission,
   requestChromePermission,
   requestMicrophonePermission,
@@ -188,4 +189,30 @@ it('keeps camera access retryable when permission inspection fails', async () =>
     query: vi.fn().mockRejectedValue(new Error('unsupported')),
   });
   await expect(requestCameraPermission()).resolves.toBe('prompt');
+});
+
+it.each([
+  ['NotFoundError', 'no-device'],
+  ['OverconstrainedError', 'no-device'],
+  ['NotReadableError', 'device-busy'],
+  ['AbortError', 'device-busy'],
+  ['SecurityError', 'unavailable'],
+] as const)(
+  'reports %s acquisition failure while preserving the permission-only contract',
+  async (name, state) => {
+    defineNavigatorValue('mediaDevices', {
+      getUserMedia: vi.fn().mockRejectedValue(new DOMException('camera-failed', name)),
+    });
+    await expect(requestCameraAccess()).resolves.toBe(state);
+    await expect(requestCameraPermission()).resolves.toBe('prompt');
+  }
+);
+
+it('reports camera acquisition unavailable when the native API is absent or returns an unknown error', async () => {
+  defineNavigatorValue('mediaDevices', undefined);
+  await expect(requestCameraAccess()).resolves.toBe('unavailable');
+  defineNavigatorValue('mediaDevices', {
+    getUserMedia: vi.fn().mockRejectedValue(new Error('failed')),
+  });
+  await expect(requestCameraAccess()).resolves.toBe('unavailable');
 });

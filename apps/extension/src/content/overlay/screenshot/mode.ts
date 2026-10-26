@@ -1,3 +1,4 @@
+import { requestFullContentRuntimeRelease } from '../../runtime/entrypoint/markers';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { MutableRefObject } from 'react';
 
@@ -173,6 +174,7 @@ export async function closeQuickActionCapture(
     if (response?.success === false || response?.error) {
       throw new Error(response.error || 'Screenshot surface cleanup failed');
     }
+    await requestFullContentRuntimeRelease();
   } catch (error) {
     logger.error('Failed to release quick-action screenshot surface', error);
     throw error;

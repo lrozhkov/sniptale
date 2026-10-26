@@ -145,6 +145,48 @@ it('ignores delayed old failure, reports current failure, and retries with a fre
   expect(engine.dispose).toHaveBeenCalledOnce();
 });
 
+it.each(['success', 'failure'] as const)(
+  'keeps a new same-URL decode after the old decode settles with %s following reset',
+  async (settlement) => {
+    const { runtime, engine, read } = fixture();
+    const old = gate<ReviewAudioClipBuffer>();
+    const current = gate<ReviewAudioClipBuffer>();
+    const oldStarted = gate<void>();
+    const currentStarted = gate<void>();
+    engine.decode
+      .mockImplementationOnce(() => {
+        oldStarted.resolve();
+        return old.promise;
+      })
+      .mockImplementationOnce(() => {
+        currentStarted.resolve();
+        return current.promise;
+      });
+    const oldPreparation = runtime.prepare(input(), new AbortController().signal);
+    await oldStarted.promise;
+    runtime.reset();
+    const currentPreparation = runtime.prepare(input(), new AbortController().signal);
+    await currentStarted.promise;
+    if (settlement === 'success') old.resolve({ duration: 10 });
+    else old.reject(new Error('Old decode failed'));
+    await oldPreparation;
+
+    const duplicatePreparation = runtime.prepare(input(), new AbortController().signal);
+    await engine.resume.mock.results[2]!.value;
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(engine.decode).toHaveBeenCalledTimes(2);
+    const currentBuffer = { duration: 30 };
+    current.resolve(currentBuffer);
+    await Promise.all([currentPreparation, duplicatePreparation]);
+    expect(engine.prepareClip).toHaveBeenCalled();
+    for (const [buffer] of engine.prepareClip.mock.calls) expect(buffer).toBe(currentBuffer);
+    await runtime.sync(input());
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(engine.scheduleClip).toHaveBeenCalledOnce();
+    runtime.close();
+  }
+);
+
 it('does not create a graph for paused, silent or ended plans', async () => {
   const { runtime, createEngine } = fixture();
   await runtime.sync({ ...input(), isPlaying: false });

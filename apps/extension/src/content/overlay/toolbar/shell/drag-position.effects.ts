@@ -1,6 +1,8 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   type Dispatch,
   type RefObject,
@@ -25,6 +27,9 @@ const TOOLBAR_POSITION_PERSIST_DELAY_MS = 150;
 const PASSIVE_POINTER_LISTENER_OPTIONS: AddEventListenerOptions = { capture: true, passive: true };
 
 const logger = createLogger({ namespace: 'ContentToolbarDragPosition' });
+
+// A remounted toolbar must read after the previous instance finishes its settings mutation.
+let pendingToolbarPreferenceSave: Promise<void> = Promise.resolve();
 
 function resolveDefaultToolbarPosition(
   toolbarEl: HTMLElement,
@@ -70,7 +75,8 @@ export function useToolbarPreferencesState() {
   useEffect(() => {
     let cancelled = false;
 
-    loadSettings()
+    pendingToolbarPreferenceSave
+      .then(() => loadSettings())
       .then((settings) => {
         if (cancelled) {
           return;
@@ -144,14 +150,32 @@ export function useToolbarPositionInitialization(params: {
   return isInitialized;
 }
 
+/** Fits natural vertical geometry; mode animation retains its prepared density until completion. */
 function fitVerticalToolbar(toolbar: HTMLElement, uiScale: number): void {
+  if (
+    toolbar
+      .getAnimations?.()
+      .some(
+        (animation) =>
+          animation.id === 'sniptale-toolbar-mode-transition' && animation.playState !== 'finished'
+      )
+  )
+    return;
   const sizeProperty = '--sniptale-toolbar-button-size';
   const gapProperty = '--sniptale-toolbar-gap';
   toolbar.style.removeProperty(sizeProperty);
   toolbar.style.removeProperty(gapProperty);
   if (toolbar.dataset['displayMode'] !== 'vertical') return;
   const availableHeight = resolveToolbarDockViewport(uiScale).height - 16;
-  if (toolbar.offsetHeight <= availableHeight) return;
+  const readNaturalHeight = () => {
+    if (toolbar.dataset['pageControls'] !== 'true' || toolbar.dataset['pageCustomizing'] === 'true')
+      return toolbar.offsetHeight;
+    return Math.max(
+      toolbar.offsetHeight,
+      toolbar.scrollHeight + toolbar.offsetHeight - toolbar.clientHeight
+    );
+  };
+  if (readNaturalHeight() <= availableHeight) return;
   const buttons = [...toolbar.querySelectorAll('.sniptale-btn')].filter(
     (button) => !button.closest('.sniptale-popover-menu, .sniptale-drawing-options-popover')
   );
@@ -160,11 +184,11 @@ function fitVerticalToolbar(toolbar: HTMLElement, uiScale: number): void {
   if (!Number.isFinite(defaultSize)) return;
   const fittedSize = Math.max(
     24,
-    Math.floor(defaultSize - (toolbar.offsetHeight - availableHeight) / buttons.length)
+    Math.floor(defaultSize - (readNaturalHeight() - availableHeight) / buttons.length)
   );
   toolbar.style.setProperty(sizeProperty, `${fittedSize}px`);
-  if (toolbar.offsetHeight > availableHeight) toolbar.style.setProperty(gapProperty, '2px');
-  if (toolbar.offsetHeight > availableHeight) toolbar.style.setProperty(gapProperty, '1px');
+  if (readNaturalHeight() > availableHeight) toolbar.style.setProperty(gapProperty, '2px');
+  if (readNaturalHeight() > availableHeight) toolbar.style.setProperty(gapProperty, '1px');
 }
 
 export function useToolbarViewportClamping(params: {
@@ -172,6 +196,7 @@ export function useToolbarViewportClamping(params: {
   currentViewport: { width: number; height: number } | null;
   displayMode: ContentToolbarDisplayMode;
   isInitialized: boolean;
+  position: ContentToolbarPosition;
   setPosition: Dispatch<SetStateAction<ContentToolbarPosition>>;
   toolbarRef: RefObject<HTMLDivElement | null>;
   uiScale: number;
@@ -203,7 +228,7 @@ export function useToolbarViewportClamping(params: {
     }
 
     const syncClampedPosition = () => {
-      if (!toolbarRef.current) {
+      if (!toolbarRef.current || toolbarRef.current.dataset['modeTransition'] === 'true') {
         return;
       }
 
@@ -236,6 +261,15 @@ export function useToolbarViewportClamping(params: {
       resizeObserver?.disconnect();
     };
   }, [displayMode, isInitialized, params.dockEdge, params.uiScale, setPosition, toolbarRef]);
+
+  return useCallback((): ContentToolbarPosition => {
+    const toolbar = toolbarRef.current;
+    if (!isInitialized || !toolbar) return params.position;
+    fitVerticalToolbar(toolbar, params.uiScale);
+    const next = clampToolbarPosition(params.position, toolbar, params.uiScale, params.dockEdge);
+    setPosition((current) => (current.x === next.x && current.y === next.y ? current : next));
+    return next;
+  }, [isInitialized, params.position, params.uiScale, params.dockEdge, setPosition, toolbarRef]);
 }
 
 export function useToolbarPreferencePersistence(params: {
@@ -249,14 +283,25 @@ export function useToolbarPreferencePersistence(params: {
   preferencesReady: boolean;
 }) {
   const { compactMenus, displayMode, isInitialized, position, preferencesReady } = params;
+  const pendingSave = useRef<(() => void) | null>(null);
+
+  useEffect(
+    () => () => {
+      // Crop Selection temporarily unmounts the toolbar before its debounce can finish.
+      pendingSave.current?.();
+      pendingSave.current = null;
+    },
+    []
+  );
 
   useEffect(() => {
     if (!preferencesReady || !isInitialized || params.isDragging) {
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      patchSettings({
+    const persist = () => {
+      pendingSave.current = null;
+      pendingToolbarPreferenceSave = patchSettings({
         contentToolbar: {
           ...(params.freePlacement === undefined ? {} : { freePlacement: params.freePlacement }),
           ...(params.dockEdge === undefined ? {} : { dockEdge: params.dockEdge }),
@@ -264,13 +309,18 @@ export function useToolbarPreferencePersistence(params: {
           displayMode,
           position,
         },
-      }).catch((error) => {
-        logger.error('Failed to persist content toolbar preferences', error);
-      });
-    }, TOOLBAR_POSITION_PERSIST_DELAY_MS);
+      })
+        .then(() => undefined)
+        .catch((error) => {
+          logger.error('Failed to persist content toolbar preferences', error);
+        });
+    };
+    pendingSave.current = persist;
+    const timer = window.setTimeout(persist, TOOLBAR_POSITION_PERSIST_DELAY_MS);
 
     return () => {
       window.clearTimeout(timer);
+      if (pendingSave.current === persist) pendingSave.current = null;
     };
   }, [
     compactMenus,

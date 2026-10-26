@@ -15,6 +15,7 @@ function installChromeShim(payload: Record<string, unknown>) {
       runtime: { lastError: undefined },
       storage: {
         local: { get },
+        sync: { get },
         onChanged: { addListener, removeListener },
       },
     },
@@ -48,4 +49,17 @@ it('subscribes to shim storage changes through a deterministic unsubscribe', () 
 
   expect(addListener).toHaveBeenCalledWith(listener);
   expect(removeListener).toHaveBeenCalledWith(listener);
+});
+
+it('reads launcher settings from sync through the same narrow native adapter', async () => {
+  const { get } = installChromeShim({ sniptale_settings: { pageLaunch: { enabled: true } } });
+  await expect(contentRuntimeShimBrowser.getSyncStorage(['sniptale_settings'])).resolves.toEqual({
+    sniptale_settings: { pageLaunch: { enabled: true } },
+  });
+  expect(get).toHaveBeenCalledWith(['sniptale_settings'], expect.any(Function));
+});
+it('refuses a read after the native storage area becomes unavailable', async () => {
+  Reflect.deleteProperty(globalThis, 'chrome');
+  await expect(contentRuntimeShimBrowser.getSyncStorage(['key'])).rejects.toThrow('unavailable');
+  await expect(contentRuntimeShimBrowser.getLocalStorage(['key'])).rejects.toThrow('unavailable');
 });

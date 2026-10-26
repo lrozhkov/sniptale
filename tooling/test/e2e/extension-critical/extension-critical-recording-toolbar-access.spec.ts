@@ -356,87 +356,94 @@ test('live microphone permission moves to recording ownership and retires on sto
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   for (const kind of ['microphone', 'camera'] as const) {
     for (const entry of ['toggle', 'menu'] as const) {
-      test(`real toolbar ${kind} ${entry} requests access and shows real devices ${viewport.name}`, async ({}, info) => {
-        const host = await startHostServer();
-        const launched = await launchExtensionBrowser({
-          viewport: viewport.size,
-          fakeMediaDevices: true,
-          autoGrantMediaPermissions: false,
-        });
-        const { context, extensionId } = launched;
-        try {
-          const { page, popup } = await openToolbar(context, extensionId, host.origin);
-          const toggle = page.locator(`[data-ui="content.toolbar.video-recording.${kind}.toggle"]`);
-          await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-          if (nativePermissions) test.setTimeout(180_000);
-          else await gatePermissionRequest(context);
-          const pagesBeforeRequest = context.pages().map((candidate) => candidate.url());
-          const originalUrl = page.url();
-          await page
-            .locator(`[data-ui="content.toolbar.video-recording.${kind}.${entry}"]`)
-            .click();
-          const request = await permissionFrame(page);
-          const exposedUrl = await page
-            .locator(permissionFrameSelector)
-            .evaluate((element) => (element instanceof HTMLIFrameElement ? element.src : ''));
-          expect(new URL(exposedUrl).host).not.toBe(extensionId);
-          expect(new URL(request.url()).host).toBe(extensionId);
-          if (nativePermissions)
-            console.log(`NATIVE_PERMISSION ${kind} DISPLAY=${process.env.DISPLAY}`);
-          else await resolvePermissionRequest(launched, page, request, kind, 'granted');
-          const dropdown = page.locator(
-            `[data-ui="content.toolbar.video-recording.${kind}.dropdown"]`
-          );
-          if (entry === 'toggle') {
-            await expect(toggle).toHaveAttribute('aria-pressed', 'true', {
-              timeout: nativePermissions ? 150_000 : 20_000,
-            });
-          } else {
-            await expect(dropdown.locator('button:not(:disabled)').first()).toBeVisible({
-              timeout: nativePermissions ? 150_000 : 20_000,
-            });
-          }
-          expect(
-            await request.evaluate(
-              async (kind) =>
-                (await navigator.permissions.query({ name: kind as PermissionName })).state,
-              kind
-            )
-          ).toBe('granted');
-          if (nativePermissions) {
+      test(
+        `real toolbar ${kind} ${entry} requests access and shows real devices ` +
+          `${viewport.name}`,
+        async ({}, info) => {
+          const host = await startHostServer();
+          const launched = await launchExtensionBrowser({
+            viewport: viewport.size,
+            fakeMediaDevices: true,
+            autoGrantMediaPermissions: false,
+          });
+          const { context, extensionId } = launched;
+          try {
+            const { page, popup } = await openToolbar(context, extensionId, host.origin);
+            const toggle = page.locator(
+              `[data-ui="content.toolbar.video-recording.${kind}.toggle"]`
+            );
+            await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+            if (nativePermissions) test.setTimeout(180_000);
+            else await gatePermissionRequest(context);
+            const pagesBeforeRequest = context.pages().map((candidate) => candidate.url());
+            const originalUrl = page.url();
+            await page
+              .locator(`[data-ui="content.toolbar.video-recording.${kind}.${entry}"]`)
+              .click();
+            const request = await permissionFrame(page);
+            const exposedUrl = await page
+              .locator(permissionFrameSelector)
+              .evaluate((element) => (element instanceof HTMLIFrameElement ? element.src : ''));
+            expect(new URL(exposedUrl).host).not.toBe(extensionId);
+            expect(new URL(request.url()).host).toBe(extensionId);
+            if (nativePermissions)
+              console.log(`NATIVE_PERMISSION ${kind} DISPLAY=${process.env.DISPLAY}`);
+            else await resolvePermissionRequest(launched, page, request, kind, 'granted');
+            const dropdown = page.locator(
+              `[data-ui="content.toolbar.video-recording.${kind}.dropdown"]`
+            );
+            if (entry === 'toggle') {
+              await expect(toggle).toHaveAttribute('aria-pressed', 'true', {
+                timeout: nativePermissions ? 150_000 : 20_000,
+              });
+            } else {
+              await expect(dropdown.locator('button:not(:disabled)').first()).toBeVisible({
+                timeout: nativePermissions ? 150_000 : 20_000,
+              });
+            }
             expect(
-              await page.evaluate(
+              await request.evaluate(
                 async (kind) =>
                   (await navigator.permissions.query({ name: kind as PermissionName })).state,
                 kind
               )
-            ).toBe('prompt');
-          }
-          expect(page.url()).toBe(originalUrl);
-          expect(context.pages().map((candidate) => candidate.url())).toEqual(pagesBeforeRequest);
-          await expect
-            .poll(() =>
-              popup.evaluate(
-                async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.url
+            ).toBe('granted');
+            if (nativePermissions) {
+              expect(
+                await page.evaluate(
+                  async (kind) =>
+                    (await navigator.permissions.query({ name: kind as PermissionName })).state,
+                  kind
+                )
+              ).toBe('prompt');
+            }
+            expect(page.url()).toBe(originalUrl);
+            expect(context.pages().map((candidate) => candidate.url())).toEqual(pagesBeforeRequest);
+            await expect
+              .poll(() =>
+                popup.evaluate(
+                  async () =>
+                    (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.url
+                )
               )
-            )
-            .toBe(page.url());
-          await expectRecordingNotStarted(page);
-          const menu = page.locator(`[data-ui="content.toolbar.video-recording.${kind}.menu"]`);
-          if ((await menu.getAttribute('aria-expanded')) !== 'true') await menu.click();
-          await expect(dropdown.locator('button:not(:disabled)').first()).toBeVisible();
-          await expect(dropdown).not.toContainText(/^(Microphone|Camera) 1$/m);
-          await expect(dropdown).toContainText(/Fake|fake|default|Default/);
-          await settled(page);
-          await page.screenshot({
-            path: info.outputPath('granted-device-menu.png'),
-            fullPage: false,
-          });
-        } finally {
-          await closeExtensionBrowser(launched);
-          await new Promise<void>((resolve) => host.server.close(() => resolve()));
+              .toBe(page.url());
+            await expectRecordingNotStarted(page);
+            const menu = page.locator(`[data-ui="content.toolbar.video-recording.${kind}.menu"]`);
+            if ((await menu.getAttribute('aria-expanded')) !== 'true') await menu.click();
+            await expect(dropdown.locator('button:not(:disabled)').first()).toBeVisible();
+            await expect(dropdown).not.toContainText(/^(Microphone|Camera) 1$/m);
+            await expect(dropdown).toContainText(/Fake|fake|default|Default/);
+            await settled(page);
+            await page.screenshot({
+              path: info.outputPath('granted-device-menu.png'),
+              fullPage: false,
+            });
+          } finally {
+            await closeExtensionBrowser(launched);
+            await new Promise<void>((resolve) => host.server.close(() => resolve()));
+          }
         }
-      });
+      );
     }
   }
 
@@ -444,49 +451,56 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     { locale: 'ru', theme: 'light' },
     { locale: 'en', theme: 'dark' },
   ] as const) {
-    test(`real toolbar microphone confirmation stays compact ${viewport.name} ${appearance.locale}-${appearance.theme}`, async ({}, info) => {
-      const host = await startHostServer();
-      const launched = await launchExtensionBrowser({
-        viewport: viewport.size,
-        fakeMediaDevices: true,
-        autoGrantMediaPermissions: false,
-      });
-      try {
-        const { page } = await openToolbar(
-          launched.context,
-          launched.extensionId,
-          host.origin,
-          appearance
-        );
-        await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
-        const dialog = page.getByRole('alertdialog');
-        await expect(dialog).toBeVisible();
-        await expect(dialog).toBeFocused();
-        const checkbox = dialog.getByRole('checkbox');
-        await expect(checkbox).toHaveCSS('appearance', 'none');
-        expect(
-          await checkbox.evaluate((element) => getComputedStyle(element, '::before').borderRadius)
-        ).toBe('50%');
-        await settled(page);
-        await page.screenshot({ path: info.outputPath('without-microphone.png'), fullPage: false });
-        const box = (await dialog.boundingBox())!;
-        expect(box.y).toBeGreaterThanOrEqual(0);
-        expect(box.y + box.height).toBeLessThanOrEqual(viewport.size.height);
-        await dialog
-          .getByRole('button', {
-            name: appearance.locale === 'ru' ? 'Отмена' : 'Cancel',
-            exact: true,
-          })
-          .click();
-        await expect(dialog).toHaveCount(0);
-        await expect(page.locator('[data-ui="content.toolbar.video-recording.pause"]')).toHaveCount(
-          0
-        );
-      } finally {
-        await closeExtensionBrowser(launched);
-        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    test(
+      `real toolbar microphone confirmation stays compact ${viewport.name} ` +
+        `${appearance.locale}-${appearance.theme}`,
+      async ({}, info) => {
+        const host = await startHostServer();
+        const launched = await launchExtensionBrowser({
+          viewport: viewport.size,
+          fakeMediaDevices: true,
+          autoGrantMediaPermissions: false,
+        });
+        try {
+          const { page } = await openToolbar(
+            launched.context,
+            launched.extensionId,
+            host.origin,
+            appearance
+          );
+          await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
+          const dialog = page.getByRole('alertdialog');
+          await expect(dialog).toBeVisible();
+          await expect(dialog).toBeFocused();
+          const checkbox = dialog.getByRole('checkbox');
+          await expect(checkbox).toHaveCSS('appearance', 'none');
+          expect(
+            await checkbox.evaluate((element) => getComputedStyle(element, '::before').borderRadius)
+          ).toBe('50%');
+          await settled(page);
+          await page.screenshot({
+            path: info.outputPath('without-microphone.png'),
+            fullPage: false,
+          });
+          const box = (await dialog.boundingBox())!;
+          expect(box.y).toBeGreaterThanOrEqual(0);
+          expect(box.y + box.height).toBeLessThanOrEqual(viewport.size.height);
+          await dialog
+            .getByRole('button', {
+              name: appearance.locale === 'ru' ? 'Отмена' : 'Cancel',
+              exact: true,
+            })
+            .click();
+          await expect(dialog).toHaveCount(0);
+          await expect(
+            page.locator('[data-ui="content.toolbar.video-recording.pause"]')
+          ).toHaveCount(0);
+        } finally {
+          await closeExtensionBrowser(launched);
+          await new Promise<void>((resolve) => host.server.close(() => resolve()));
+        }
       }
-    });
+    );
   }
 
   for (const kind of ['microphone', 'camera'] as const) {
@@ -545,9 +559,11 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(
           settings.getByRole('heading', { name: 'Permissions', exact: true })
         ).toBeVisible();
-        await expect(
-          settings.getByRole('heading', { name: new RegExp(launched.extensionId) })
-        ).toBeVisible();
+        const extensionHeading = settings.getByRole('heading').filter({
+          hasText: launched.extensionId,
+        });
+        await expect(extensionHeading).toBeVisible();
+        await expect(extensionHeading).toContainText(launched.extensionId, { ignoreCase: false });
         await settings.screenshot({
           path: info.outputPath('extension-permissions-settings.png'),
           fullPage: false,

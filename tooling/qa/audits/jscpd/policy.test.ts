@@ -40,7 +40,16 @@ it('preserves status-one jscpd operational errors', async () => {
 it('pins the complete native platform closure and resolves the selected binary', () => {
   const closure = readJscpdPlatformClosure();
   expect(closure.engineVersion).toBe(JSCPD_ENGINE_VERSION);
-  expect(closure.platformPackages).toHaveLength(6);
+  expect(closure.platformPackages.map(({ name }) => name)).toEqual([
+    'jscpd-darwin-arm64',
+    'jscpd-darwin-x64',
+    'jscpd-linux-arm64-gnu',
+    'jscpd-linux-arm64-musl',
+    'jscpd-linux-x64-gnu',
+    'jscpd-linux-x64-musl',
+    'jscpd-windows-arm64-msvc',
+    'jscpd-windows-x64-msvc',
+  ]);
   expect(closure.platformPackages.every((entry) => entry.version === JSCPD_ENGINE_VERSION)).toBe(
     true
   );
@@ -81,7 +90,7 @@ it('makes all relied-on detector defaults and resource policy explicit', async (
     'css',
     'scss',
     'less',
-    'html',
+    'markup',
     'bash',
     'yaml',
   ]);

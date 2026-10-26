@@ -204,7 +204,12 @@ async function contentHost(
   await context.route(`${origin}/**`, (route) =>
     route.fulfill({
       contentType: 'text/html',
-      body: '<!doctype html><html><head><title>Annotation header host</title><style>body{margin:0;background:#283646;color:white;font:20px Georgia}#target{position:absolute;left:140px;top:270px;width:160px;height:70px}</style></head><body><button id="target">Annotation target</button></body></html>',
+      body:
+        '<!doctype html><html><head><title>Annotation header host</title><style>' +
+        'body{margin:0;background:#283646;color:white;font:20px ' +
+        'Georgia}#target{position:absolute;left:140px;top:270px;width:160px;' +
+        'height:70px}</style></head><body><button id="target">Annotation target</' +
+        'button></body></html>',
     })
   );
   const popup = await context.newPage();

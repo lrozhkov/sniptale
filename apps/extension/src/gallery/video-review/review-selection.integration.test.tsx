@@ -259,10 +259,24 @@ it('preserves a selected speed range when toolbar preferences and tools change',
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
     expect(input.isConnected).toBe(true);
     expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('true');
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="zoom"] [data-review-track-select]'
+        )!
+        .click()
+    );
     await fixture.click('focusRangeTool');
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
     expect(input.isConnected).toBe(true);
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="source"] [data-review-track-select]'
+        )!
+        .click()
+    );
     await fixture.click('cutMode');
     expect(input.isConnected).toBe(true);
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);

@@ -23,7 +23,7 @@
     "./history/retention": "./src/history/retention.ts"
   },
   "devDependencies": {
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/foundation/src",

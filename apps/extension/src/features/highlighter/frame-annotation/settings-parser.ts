@@ -1,10 +1,7 @@
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
+import {
+  isPlainRecord as isRecord,
+  isNumber as isFiniteNumber,
+} from '@sniptale/runtime-contracts/validation/primitives';
 
 function isSafeFrameCss(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > 20_000) return false;

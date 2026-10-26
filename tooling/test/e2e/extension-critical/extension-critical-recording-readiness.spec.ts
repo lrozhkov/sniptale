@@ -118,13 +118,15 @@ async function installMicrophoneSignal(context: BrowserContext, targetId: string
   await evaluateInTarget(context, targetId, `(${install.toString()})()`, true);
 }
 
-const READ_SIGNAL = `(() => {
+const READ_SIGNAL =
+  `(() => {
   const probe = globalThis.__sniptaleReadinessSignal;
   return {
     microphoneRequests: probe.microphoneRequests,
     cameraRequests: probe.cameraRequests,
     microphoneLive: probe.destination.stream.getAudioTracks().every(track => track.readyState === 'live'),
-    cameraLive: probe.cameraStreams.length > 0 && probe.cameraStreams.every(stream => stream.getVideoTracks().every(track => track.readyState === 'live')),
+    cameraLive: probe.cameraStreams.length > 0 && probe.cameraStreams.every(stream => ` +
+  `stream.getVideoTracks().every(track => track.readyState === 'live')),
     audioState: probe.audio.state,
   };
 })()`;
@@ -179,7 +181,8 @@ test('native context-menu recording handoff keeps the explicit source tab throug
     const handoff = await context.newPage();
     await handoff.setViewportSize(PRIMARY_BROWSER_VIEWPORTS[0].size);
     await handoff.goto(
-      `chrome-extension://${extensionId}/apps/extension/src/popup/index.html?videoLaunchMode=TAB&videoLaunchTabId=${tabId}`
+      `chrome-extension://${extensionId}/apps/extension/src/popup/` +
+        `index.html?videoLaunchMode=TAB&videoLaunchTabId=${tabId}`
     );
     await expect(handoff.locator(START)).toBeEnabled();
     await handoff.evaluate(() => {
@@ -568,246 +571,251 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     }
   });
 
-  test(`native recording readiness confirmation, countdown and microphone recovery ${viewport.name}`, async ({}, info) => {
-    test.setTimeout(150_000);
-    const host = await startHostServer();
-    const launched = await launchExtensionBrowser({
-      viewport: viewport.size,
-      fakeMediaDevices: true,
-    });
-    try {
-      const { context, extensionId } = launched;
-      let popup = await openRealPopup(context, extensionId);
-      const settings = {
-        ...DEFAULT_VIDEO_SETTINGS,
-        countdownSeconds: 0,
-        microphoneEnabled: false,
-        systemAudioEnabled: false,
-        webcamEnabled: true,
-        warnWithoutMicrophone: true,
-        qualityProfileId: null,
-        outputProfile: {
-          ...DEFAULT_VIDEO_SETTINGS.outputProfile,
-          resolution: VideoResolutionPreset.P240,
-        },
-      };
-      await popup.evaluate(async (videoSettings) => {
-        await chrome.storage.local.set({
-          sniptale_video_settings: videoSettings,
-          sniptale_video_ui_state: { captureMode: 'CAMERA', viewportPresetId: null },
-          'sniptale-locale-preference': 'en',
-        });
-      }, settings);
-      await popup.close();
-      popup = await openVideoSetup(context, extensionId);
-      await popup.locator(START).click();
-      await expect(
-        popup.getByText('Start recording without a microphone?', { exact: true })
-      ).toBeVisible();
-      await popup.screenshot({
-        path: info.outputPath('without-microphone-confirmation.png'),
-        fullPage: false,
+  test(
+    `native recording readiness confirmation, countdown and microphone recovery ` +
+      `${viewport.name}`,
+    async ({}, info) => {
+      test.setTimeout(150_000);
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({
+        viewport: viewport.size,
+        fakeMediaDevices: true,
       });
-      await popup.getByRole('button', { name: 'Cancel', exact: true }).click();
-      expect((await readState(popup)).state.status).toBe(VideoRecordingStatus.IDLE);
-      await expect(popup.locator(START)).toBeEnabled();
-      await popup.locator(START).click();
-      await popup.getByRole('checkbox', { name: 'Don’t ask again', exact: true }).check();
-      await popup.getByRole('button', { name: 'Continue', exact: true }).click();
-      await expect
-        .poll(async () => (await readState(popup)).state.status, { timeout: 30_000 })
-        .toBe(VideoRecordingStatus.RECORDING);
-      await expect
-        .poll(() =>
-          popup.evaluate(
-            async () =>
-              (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
-                ?.warnWithoutMicrophone
-          )
-        )
-        .toBe(false);
-      await discardRecording(popup);
-      await popup.close();
-      popup = await openVideoSetup(context, extensionId);
-      await popup.locator(START).click();
-      await expect
-        .poll(async () => (await readState(popup)).state.status, { timeout: 30_000 })
-        .toBe(VideoRecordingStatus.RECORDING);
-      await expect(
-        popup.getByText('Start recording without a microphone?', { exact: true })
-      ).toHaveCount(0);
-      await discardRecording(popup);
-
-      const offscreen = await findOffscreenTarget(context);
-      await installMicrophoneSignal(context, offscreen);
-      const devices = await popup.evaluate(async () => {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        return {
-          microphoneDeviceId:
-            devices.find((device) => device.kind === 'audioinput')?.deviceId ?? null,
-          webcamDeviceId: devices.find((device) => device.kind === 'videoinput')?.deviceId ?? null,
-        };
-      });
-      const target = await context.newPage();
-      await target.goto(`${host.origin}/fixtures/host-page.html?recording-readiness=1`);
-      await target.bringToFront();
-      const action = await triggerExtensionAction(context, extensionId, target);
-      await sendRuntimeMessageInTarget(
-        context,
-        action,
-        {
-          type: 'START_RECORDING',
-          captureMode: CaptureMode.CAMERA,
-          viewportPresetId: null,
-          settings: {
-            ...settings,
-            ...devices,
-            countdownSeconds: 10,
-            microphoneEnabled: true,
-            microphoneGain: 1,
-            warnWithoutMicrophone: false,
-          },
-        },
-        false
-      );
-      await popup.close();
-      popup = await openRealPopup(context, extensionId);
-      await popup.evaluate(
-        ({ startFailure, offscreenFailure }) => {
-          const failures: { type: string; error: string }[] = [];
-          Reflect.set(globalThis, '__sniptaleReadinessFailures', failures);
-          chrome.runtime.onMessage.addListener((message: unknown) => {
-            if (
-              typeof message !== 'object' ||
-              message === null ||
-              !('type' in message) ||
-              (message.type !== startFailure && message.type !== offscreenFailure) ||
-              !('error' in message) ||
-              typeof message.error !== 'string'
-            ) {
-              return;
-            }
-            if (failures.length < 20) {
-              failures.push({ type: message.type, error: message.error });
-            }
-          });
-        },
-        {
-          startFailure: VideoMessageType.RECORDING_START_FAILED,
-          offscreenFailure: VideoMessageType.OFFSCREEN_ERROR,
-        }
-      );
-      await expect
-        .poll(async () => (await readState(popup)).state.status)
-        .toBe(VideoRecordingStatus.COUNTDOWN);
-      await expect(popup.locator(METER)).toBeVisible();
-      await expect
-        .poll(async () => Number(await popup.locator(METER).getAttribute('aria-valuenow')))
-        .toBeGreaterThan(0);
-      await expect
-        .poll(() =>
-          popup
-            .locator(PREVIEW)
-            .evaluate(
-              (video: HTMLVideoElement) =>
-                video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0
-            )
-        )
-        .toBe(true);
-      expect((await readState(popup)).state.duration).toBe(0);
-      await popup.screenshot({ path: info.outputPath('countdown-devices.png'), fullPage: false });
-      await expect
-        .poll(async () => (await readState(popup)).state.status, { timeout: 20_000 })
-        .toBe(VideoRecordingStatus.RECORDING);
-      await expect(popup.locator(PREVIEW)).toHaveCount(0);
-      await expect.poll(async () => (await readState(popup)).state.duration).toBeGreaterThan(1);
-      expect(await evaluateInTarget(context, offscreen, READ_SIGNAL)).toEqual({
-        microphoneRequests: 1,
-        cameraRequests: 1,
-        microphoneLive: true,
-        cameraLive: true,
-        audioState: 'running',
-      });
-      const quietStartedAt = Date.now();
-      await evaluateInTarget(
-        context,
-        offscreen,
-        'globalThis.__sniptaleReadinessSignal.gain.gain.value = 0'
-      );
-      let lastQuietState: Awaited<ReturnType<typeof readState>> | undefined;
       try {
+        const { context, extensionId } = launched;
+        let popup = await openRealPopup(context, extensionId);
+        const settings = {
+          ...DEFAULT_VIDEO_SETTINGS,
+          countdownSeconds: 0,
+          microphoneEnabled: false,
+          systemAudioEnabled: false,
+          webcamEnabled: true,
+          warnWithoutMicrophone: true,
+          qualityProfileId: null,
+          outputProfile: {
+            ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+            resolution: VideoResolutionPreset.P240,
+          },
+        };
+        await popup.evaluate(async (videoSettings) => {
+          await chrome.storage.local.set({
+            sniptale_video_settings: videoSettings,
+            sniptale_video_ui_state: { captureMode: 'CAMERA', viewportPresetId: null },
+            'sniptale-locale-preference': 'en',
+          });
+        }, settings);
+        await popup.close();
+        popup = await openVideoSetup(context, extensionId);
+        await popup.locator(START).click();
+        await expect(
+          popup.getByText('Start recording without a microphone?', { exact: true })
+        ).toBeVisible();
+        await popup.screenshot({
+          path: info.outputPath('without-microphone-confirmation.png'),
+          fullPage: false,
+        });
+        await popup.getByRole('button', { name: 'Cancel', exact: true }).click();
+        expect((await readState(popup)).state.status).toBe(VideoRecordingStatus.IDLE);
+        await expect(popup.locator(START)).toBeEnabled();
+        await popup.locator(START).click();
+        await popup.getByRole('checkbox', { name: 'Don’t ask again', exact: true }).check();
+        await popup.getByRole('button', { name: 'Continue', exact: true }).click();
         await expect
-          .poll(
-            async () => {
-              lastQuietState = await readState(popup);
-              return lastQuietState.state.microphoneActivity?.warning;
+          .poll(async () => (await readState(popup)).state.status, { timeout: 30_000 })
+          .toBe(VideoRecordingStatus.RECORDING);
+        await expect
+          .poll(() =>
+            popup.evaluate(
+              async () =>
+                (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
+                  ?.warnWithoutMicrophone
+            )
+          )
+          .toBe(false);
+        await discardRecording(popup);
+        await popup.close();
+        popup = await openVideoSetup(context, extensionId);
+        await popup.locator(START).click();
+        await expect
+          .poll(async () => (await readState(popup)).state.status, { timeout: 30_000 })
+          .toBe(VideoRecordingStatus.RECORDING);
+        await expect(
+          popup.getByText('Start recording without a microphone?', { exact: true })
+        ).toHaveCount(0);
+        await discardRecording(popup);
+
+        const offscreen = await findOffscreenTarget(context);
+        await installMicrophoneSignal(context, offscreen);
+        const devices = await popup.evaluate(async () => {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          return {
+            microphoneDeviceId:
+              devices.find((device) => device.kind === 'audioinput')?.deviceId ?? null,
+            webcamDeviceId:
+              devices.find((device) => device.kind === 'videoinput')?.deviceId ?? null,
+          };
+        });
+        const target = await context.newPage();
+        await target.goto(`${host.origin}/fixtures/host-page.html?recording-readiness=1`);
+        await target.bringToFront();
+        const action = await triggerExtensionAction(context, extensionId, target);
+        await sendRuntimeMessageInTarget(
+          context,
+          action,
+          {
+            type: 'START_RECORDING',
+            captureMode: CaptureMode.CAMERA,
+            viewportPresetId: null,
+            settings: {
+              ...settings,
+              ...devices,
+              countdownSeconds: 10,
+              microphoneEnabled: true,
+              microphoneGain: 1,
+              warnWithoutMicrophone: false,
             },
-            { timeout: 27_000 }
+          },
+          false
+        );
+        await popup.close();
+        popup = await openRealPopup(context, extensionId);
+        await popup.evaluate(
+          ({ startFailure, offscreenFailure }) => {
+            const failures: { type: string; error: string }[] = [];
+            Reflect.set(globalThis, '__sniptaleReadinessFailures', failures);
+            chrome.runtime.onMessage.addListener((message: unknown) => {
+              if (
+                typeof message !== 'object' ||
+                message === null ||
+                !('type' in message) ||
+                (message.type !== startFailure && message.type !== offscreenFailure) ||
+                !('error' in message) ||
+                typeof message.error !== 'string'
+              ) {
+                return;
+              }
+              if (failures.length < 20) {
+                failures.push({ type: message.type, error: message.error });
+              }
+            });
+          },
+          {
+            startFailure: VideoMessageType.RECORDING_START_FAILED,
+            offscreenFailure: VideoMessageType.OFFSCREEN_ERROR,
+          }
+        );
+        await expect
+          .poll(async () => (await readState(popup)).state.status)
+          .toBe(VideoRecordingStatus.COUNTDOWN);
+        await expect(popup.locator(METER)).toBeVisible();
+        await expect
+          .poll(async () => Number(await popup.locator(METER).getAttribute('aria-valuenow')))
+          .toBeGreaterThan(0);
+        await expect
+          .poll(() =>
+            popup
+              .locator(PREVIEW)
+              .evaluate(
+                (video: HTMLVideoElement) =>
+                  video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0
+              )
           )
           .toBe(true);
-      } catch (error) {
-        await info.attach('microphone-warning-failure-state', {
-          body: JSON.stringify({
-            lastQuietState,
-            finalState: await readState(popup).catch(() => null),
-            signal: await evaluateInTarget(context, offscreen, READ_SIGNAL).catch(() => null),
-            recordingFailures: await popup
-              .evaluate(() => Reflect.get(globalThis, '__sniptaleReadinessFailures'))
-              .catch(() => null),
-          }),
-          contentType: 'application/json',
+        expect((await readState(popup)).state.duration).toBe(0);
+        await popup.screenshot({ path: info.outputPath('countdown-devices.png'), fullPage: false });
+        await expect
+          .poll(async () => (await readState(popup)).state.status, { timeout: 20_000 })
+          .toBe(VideoRecordingStatus.RECORDING);
+        await expect(popup.locator(PREVIEW)).toHaveCount(0);
+        await expect.poll(async () => (await readState(popup)).state.duration).toBeGreaterThan(1);
+        expect(await evaluateInTarget(context, offscreen, READ_SIGNAL)).toEqual({
+          microphoneRequests: 1,
+          cameraRequests: 1,
+          microphoneLive: true,
+          cameraLive: true,
+          audioState: 'running',
         });
-        throw error;
+        const quietStartedAt = Date.now();
+        await evaluateInTarget(
+          context,
+          offscreen,
+          'globalThis.__sniptaleReadinessSignal.gain.gain.value = 0'
+        );
+        let lastQuietState: Awaited<ReturnType<typeof readState>> | undefined;
+        try {
+          await expect
+            .poll(
+              async () => {
+                lastQuietState = await readState(popup);
+                return lastQuietState.state.microphoneActivity?.warning;
+              },
+              { timeout: 27_000 }
+            )
+            .toBe(true);
+        } catch (error) {
+          await info.attach('microphone-warning-failure-state', {
+            body: JSON.stringify({
+              lastQuietState,
+              finalState: await readState(popup).catch(() => null),
+              signal: await evaluateInTarget(context, offscreen, READ_SIGNAL).catch(() => null),
+              recordingFailures: await popup
+                .evaluate(() => Reflect.get(globalThis, '__sniptaleReadinessFailures'))
+                .catch(() => null),
+            }),
+            contentType: 'application/json',
+          });
+          throw error;
+        }
+        expect(Date.now() - quietStartedAt).toBeGreaterThanOrEqual(19_000);
+        await expect(popup.locator(WARNING)).toBeVisible();
+        const warningBadge = await popup.evaluate(() => chrome.action.getBadgeBackgroundColor({}));
+        expect(warningBadge).toEqual([234, 179, 8, 255]);
+        await popup.close();
+        popup = await openRealPopup(context, extensionId);
+        await expect(popup.locator(WARNING)).toBeVisible();
+        await popup.screenshot({
+          path: info.outputPath('microphone-quiet-warning.png'),
+          fullPage: false,
+        });
+        await popup.setViewportSize({ width: 1100, height: viewport.size.height });
+        expect(
+          await popup.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+        ).toBe(true);
+        await popup.screenshot({
+          path: info.outputPath('microphone-quiet-below-1280.png'),
+          fullPage: false,
+        });
+        await popup.setViewportSize(viewport.size);
+        await evaluateInTarget(
+          context,
+          offscreen,
+          'globalThis.__sniptaleReadinessSignal.gain.gain.value = 0.1'
+        );
+        await expect(popup.locator(WARNING)).toHaveCount(0, { timeout: 5_000 });
+        await expect
+          .poll(async () => (await readState(popup)).state.microphoneActivity?.warning)
+          .toBe(false);
+        expect(await popup.evaluate(() => chrome.action.getBadgeBackgroundColor({}))).not.toEqual(
+          warningBadge
+        );
+        expect((await readState(popup)).state.status).toBe(VideoRecordingStatus.RECORDING);
+        expect(await evaluateInTarget(context, offscreen, READ_SIGNAL)).toEqual({
+          microphoneRequests: 1,
+          cameraRequests: 1,
+          microphoneLive: true,
+          cameraLive: true,
+          audioState: 'running',
+        });
+        await popup.screenshot({
+          path: info.outputPath('microphone-recovered.png'),
+          fullPage: false,
+        });
+        await discardRecording(popup);
+      } finally {
+        await closeExtensionBrowser(launched);
+        host.server.closeAllConnections();
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
       }
-      expect(Date.now() - quietStartedAt).toBeGreaterThanOrEqual(19_000);
-      await expect(popup.locator(WARNING)).toBeVisible();
-      const warningBadge = await popup.evaluate(() => chrome.action.getBadgeBackgroundColor({}));
-      expect(warningBadge).toEqual([234, 179, 8, 255]);
-      await popup.close();
-      popup = await openRealPopup(context, extensionId);
-      await expect(popup.locator(WARNING)).toBeVisible();
-      await popup.screenshot({
-        path: info.outputPath('microphone-quiet-warning.png'),
-        fullPage: false,
-      });
-      await popup.setViewportSize({ width: 1100, height: viewport.size.height });
-      expect(
-        await popup.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-      ).toBe(true);
-      await popup.screenshot({
-        path: info.outputPath('microphone-quiet-below-1280.png'),
-        fullPage: false,
-      });
-      await popup.setViewportSize(viewport.size);
-      await evaluateInTarget(
-        context,
-        offscreen,
-        'globalThis.__sniptaleReadinessSignal.gain.gain.value = 0.1'
-      );
-      await expect(popup.locator(WARNING)).toHaveCount(0, { timeout: 5_000 });
-      await expect
-        .poll(async () => (await readState(popup)).state.microphoneActivity?.warning)
-        .toBe(false);
-      expect(await popup.evaluate(() => chrome.action.getBadgeBackgroundColor({}))).not.toEqual(
-        warningBadge
-      );
-      expect((await readState(popup)).state.status).toBe(VideoRecordingStatus.RECORDING);
-      expect(await evaluateInTarget(context, offscreen, READ_SIGNAL)).toEqual({
-        microphoneRequests: 1,
-        cameraRequests: 1,
-        microphoneLive: true,
-        cameraLive: true,
-        audioState: 'running',
-      });
-      await popup.screenshot({
-        path: info.outputPath('microphone-recovered.png'),
-        fullPage: false,
-      });
-      await discardRecording(popup);
-    } finally {
-      await closeExtensionBrowser(launched);
-      host.server.closeAllConnections();
-      await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
-  });
+  );
 }

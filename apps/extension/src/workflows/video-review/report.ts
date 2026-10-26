@@ -181,7 +181,7 @@ export function createVideoReviewReport(args: {
       : {}),
     ...(args.provenance ? { sourceProvenance: args.provenance } : {}),
     source: {
-      mediaId: workspace.aggregateId,
+      mediaId: workspace.sourceMediaId ?? workspace.aggregateId,
       filename: args.filename,
       durationUs: microseconds(workspace.source.duration),
       width: workspace.source.width,

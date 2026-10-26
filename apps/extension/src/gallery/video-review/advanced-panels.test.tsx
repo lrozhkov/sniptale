@@ -1,10 +1,11 @@
-import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
+import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { ReviewDetails } from './controls';
 import { createInspectorDisclosureStore } from '../../composition/persistence/inspector-disclosures/store';
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, useContext, useState } from 'react';
 import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
@@ -68,10 +69,14 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await act(async () => root.unmount());
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
   // Native details toggles use a DOM task; React passive work can span host turns.
   await settleHostTurn();
   await settleReactCallbacks();
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

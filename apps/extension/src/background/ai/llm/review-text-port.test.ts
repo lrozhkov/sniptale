@@ -89,3 +89,21 @@ it.each(['gallery', 'video-editor'])(
     expect(connection.receive).toHaveBeenCalledExactlyOnceWith(command);
   }
 );
+
+it('cancels the review connection when sending fails and detaches its listeners on disconnect', async () => {
+  const service = createReviewTextJobService();
+  const connection = { receive: vi.fn(), disconnect: vi.fn(async () => undefined) };
+  const connect = vi.spyOn(service, 'connect').mockReturnValue(connection);
+  registerReviewTextPorts(service);
+  const port = createRuntimePortFixture({ name: REVIEW_TEXT_PORT_NAME, sender });
+  browser.listener?.(port.port);
+  port.postMessage.mockImplementationOnce(() => {
+    throw new Error('disconnected');
+  });
+  connect.mock.calls[0]?.[1]({ type: 'progress', requestId: 'request', phase: 'authorizing' });
+  await Promise.resolve();
+  expect(connection.disconnect).toHaveBeenCalledOnce();
+  port.onDisconnect.emit(port.port);
+  port.onMessage.emit({ type: 'cancel', requestId: '1cbf949a-76e3-41e2-a37a-78179423eb29' });
+  expect(connection.receive).not.toHaveBeenCalled();
+});

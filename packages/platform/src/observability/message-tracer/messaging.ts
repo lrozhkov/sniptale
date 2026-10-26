@@ -1,3 +1,8 @@
+import {
+  isQuickActionAppearanceTraceMessageType,
+  sanitizeQuickActionAppearanceTracePayload,
+  QUICK_ACTION_APPEARANCE_TRACE_FAILURE_CODE,
+} from './quick-action-appearance-payload';
 import { getActiveTraceObserver } from './runtime';
 import type { TraceConfig, TraceContext, TraceEvent, TraceMessageEvent } from './types';
 import { sanitizeLlmTracePayload } from './llm-payload';
@@ -140,13 +145,16 @@ export function recordMessageFailure(error: unknown, tracker: SendTracker | null
   const start = tracker.sendTimestamps.get(correlationId);
   tracker.sendTimestamps.delete(correlationId);
   const isVoiceInputFailure = isVoiceInputTraceMessageType(messageType);
-  const traceError = isVoiceInputFailure
+  const failureCode = isVoiceInputFailure
     ? VOICE_INPUT_TRACE_FAILURE_CODE
-    : sanitizeTraceErrorText(error, config);
+    : isQuickActionAppearanceTraceMessageType(messageType)
+      ? QUICK_ACTION_APPEARANCE_TRACE_FAILURE_CODE
+      : undefined;
+  const traceError = failureCode ?? sanitizeTraceErrorText(error, config);
 
   const sanitizedPayload = sanitizeValue(
     sanitizeMessageTracePayload(messageType, {
-      error: isVoiceInputFailure ? VOICE_INPUT_TRACE_FAILURE_CODE : String(error),
+      error: failureCode ?? String(error),
     }),
     config
   );
@@ -175,7 +183,10 @@ function sanitizeMessageTracePayload(messageType: string, payload: unknown): unk
   return sanitizeSettingsTransferTracePayload(
     messageType,
     sanitizeRuntimeBlobTracePayload(
-      sanitizeLlmTracePayload(messageType, sanitizeVoiceInputTracePayload(messageType, payload))
+      sanitizeQuickActionAppearanceTracePayload(
+        messageType,
+        sanitizeLlmTracePayload(messageType, sanitizeVoiceInputTracePayload(messageType, payload))
+      )
     )
   );
 }

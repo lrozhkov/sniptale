@@ -113,7 +113,10 @@ export type ContentAppLayoutToolbarProps = {
   setCaptureAction: (action: CaptureActionType) => void;
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
   mutateViewport?: (viewport: ToolbarViewportSelection) => Promise<void>;
-  setPinToTab: (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => void;
+  setPinToTab: (
+    value: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void | Promise<boolean>;
   setPinnedToolbarVisible: (visible: boolean) => void;
   setTimerDelay: (delay: number) => void;
   setVideoRecordingMode?: (enabled: boolean) => void;

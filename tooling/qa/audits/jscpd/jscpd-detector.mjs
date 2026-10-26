@@ -6,9 +6,20 @@ import { createRequire } from 'node:module';
 
 import { repoRoot } from '../../analysis/repository/shared-paths.mjs';
 
-export const JSCPD_ENGINE_VERSION = '5.0.16';
+export const JSCPD_ENGINE_VERSION = '5.4.1';
 export const JSCPD_NORMALIZATION_SCHEMA_VERSION = 2;
 export const JSCPD_WORKERS = 2;
+
+const JSCPD_PLATFORM_PACKAGES = [
+  'jscpd-darwin-arm64',
+  'jscpd-darwin-x64',
+  'jscpd-linux-arm64-gnu',
+  'jscpd-linux-arm64-musl',
+  'jscpd-linux-x64-gnu',
+  'jscpd-linux-x64-musl',
+  'jscpd-windows-arm64-msvc',
+  'jscpd-windows-x64-msvc',
+];
 
 const require = createRequire(import.meta.url);
 const FORMAT_EXTENSIONS = new Set([
@@ -17,6 +28,12 @@ const FORMAT_EXTENSIONS = new Set([
   'css',
   'html',
   'htm',
+  'xml',
+  'xsl',
+  'xslt',
+  'svg',
+  'ejs',
+  'jsp',
   'js',
   'jsx',
   'less',
@@ -191,8 +208,15 @@ export function readJscpdPlatformClosure({ root = repoRoot } = {}) {
       return { name, version: locked.version, integrity: locked.integrity };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
-  if (platformPackages.length !== 6 || platformPackages.some((entry) => !entry.integrity)) {
-    throw new Error('jscpd platform closure must contain six integrity-pinned native packages');
+  if (
+    platformPackages.length !== JSCPD_PLATFORM_PACKAGES.length ||
+    platformPackages.some(
+      (entry, index) => !entry.integrity || entry.name !== JSCPD_PLATFORM_PACKAGES[index]
+    )
+  ) {
+    throw new Error(
+      'jscpd platform closure must contain the eight exact integrity-pinned native packages'
+    );
   }
   return {
     engineVersion: engine.version,
@@ -253,7 +277,7 @@ export function collectJscpdScanPopulation({ root = repoRoot, scanTargets }) {
   const output = execFileSync(
     'git',
     ['ls-files', '--cached', '--others', '--exclude-standard', '--', ...roots],
-    { cwd: root, encoding: 'utf8' }
+    { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }
   );
   const files = output
     .split(/\r?\n/u)

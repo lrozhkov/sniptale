@@ -289,12 +289,17 @@ function CanvasHandle({
   );
 }
 
-function CanvasGuides({ gradient, size }: { gradient: Gradient; size: CanvasSize }) {
+function guideGeometry(gradient: Gradient, size: CanvasSize) {
   const center = centerOf(gradient);
   const radians = (angleOf(gradient) * Math.PI) / 180;
   const arm = Math.min(size.width, size.height) * 0.36;
   const dx = (Math.sin(radians) * arm) / size.width;
   const dy = (Math.cos(radians) * arm) / size.height;
+  return { center, dx, dy };
+}
+
+function CanvasGuides({ gradient, size }: { gradient: Gradient; size: CanvasSize }) {
+  const { center, dx, dy } = guideGeometry(gradient, size);
   return gradient.type === 'radial' ? (
     <svg
       aria-hidden="true"
@@ -350,11 +355,7 @@ function CanvasGuides({ gradient, size }: { gradient: Gradient; size: CanvasSize
 }
 
 function canvasHandles(gradient: Gradient, size: CanvasSize) {
-  const center = centerOf(gradient);
-  const radians = (angleOf(gradient) * Math.PI) / 180;
-  const arm = Math.min(size.width, size.height) * 0.36;
-  const dx = (Math.sin(radians) * arm) / size.width;
-  const dy = (Math.cos(radians) * arm) / size.height;
+  const { center, dx, dy } = guideGeometry(gradient, size);
   const handles: { kind: Handle; x: number; y: number; label: string; value?: number }[] = [];
   if (gradient.type !== 'linear')
     handles.push({

@@ -101,6 +101,11 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Эти разрешения можно включать только тогда, когда вам нужны соответствующие функции.',
     en: 'You can turn these permissions on only when you need the related features.',
   },
+  requiredAlarmsName: { ru: 'Фоновая очистка', en: 'Scheduled cleanup' },
+  requiredAlarmsDescription: {
+    ru: 'Удаляет временные данные восстановления страницы по истечении срока хранения.',
+    en: 'Removes temporary page recovery data when its retention period expires.',
+  },
   requiredStorageName: {
     ru: 'Локальное хранение данных',
     en: 'Local data storage',

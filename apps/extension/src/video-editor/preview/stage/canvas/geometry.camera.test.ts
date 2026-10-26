@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import { getPreviewStageSelection } from '../runtime/surface-state';
 import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
 import { mapCompositionPointThroughCamera } from '../../../../features/video/composition/motion';
-// @vitest-environment jsdom
 import { expect, it } from 'vitest';
 import {
   createEmptyVideoProject,

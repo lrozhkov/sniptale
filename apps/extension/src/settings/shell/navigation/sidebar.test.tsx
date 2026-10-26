@@ -10,10 +10,10 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) =>
     (
-      ({
+      {
         'settings.navigation.sidebarEyebrow': 'Настройки',
         'settings.navigation.footerBrand': 'Sniptale',
-      }) as Record<string, string>
+      } as Record<string, string>
     )[key] ?? key,
 }));
 

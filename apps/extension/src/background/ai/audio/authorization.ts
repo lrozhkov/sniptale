@@ -71,7 +71,10 @@ async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSo
   if (workspace.aggregateId !== scope.workspaceId || workspace.sourceAssetId !== scope.assetId)
     throw new Error('unauthorized');
   try {
-    const source = await readLibrarySceneSource(workspace.aggregateId, 'video');
+    const source = await readLibrarySceneSource(
+      workspace.sourceMediaId ?? workspace.aggregateId,
+      'video'
+    );
     if (!sameReviewSourceIdentity(source.ref, workspace.sourceAssetId, workspace.source))
       throw new Error('unauthorized');
     await readAssetFile(source.ref, source.filename);

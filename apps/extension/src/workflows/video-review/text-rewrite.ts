@@ -1,6 +1,6 @@
 import { createReviewTextEgressAuthority } from '../../features/ai/egress-authority';
 import {
-  reviewTextContextSchema,
+  admitReviewTextContext,
   type ReviewTextContext,
   type ReviewTextProposal,
   type ReviewTextStart,
@@ -80,20 +80,9 @@ export function captureReviewTextRewrite(
     end: Math.max(...disclosed.map((entry) => entry.end)),
   };
   if (window.end > (segments.at(-1)?.resultEnd ?? 0)) throw new Error('invalid-request');
-  const parsed = reviewTextContextSchema.safeParse({
-    ...options,
-    version: 1,
-    window,
-    fragments: disclosed,
-  });
-  if (!parsed.success) {
-    const budget = parsed.error.issues.some(
-      (issue) => issue.code === 'too_big' || issue.message === 'Choose a smaller text scope'
-    );
-    throw new Error(budget ? 'too-large' : 'invalid');
-  }
+  const context = admitReviewTextContext(options, window, disclosed, 'invalid');
   return {
-    context: parsed.data,
+    context,
     fragments,
     geometry: reviewTextTakeGeometry(session),
     workspaceId: current.snapshot.workspace.aggregateId,

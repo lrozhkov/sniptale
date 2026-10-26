@@ -18,7 +18,13 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
     schemaVersion: 1,
     proofPath: '.tmp/qa/coverage-proof.json',
     reportDirectory: '.tmp/coverage/canonical',
-    reportFiles: ['coverage-final.json', 'coverage-summary.json', 'lcov.info', 'html/index.html'],
+    reportFiles: [
+      'coverage-final.json',
+      'coverage-summary.json',
+      'lcov.info',
+      'html/index.html',
+      'html/unit-attempts.json',
+    ],
     owners: {
       decision: 'tooling/qa/proof/coverage/coverage-proof.mjs',
       execution: 'tooling/qa/proof/coverage/audit-coverage-step.mjs',
@@ -65,6 +71,8 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
   expect(publisher).toContain("artifactKind: 'sniptale-release-qa-evidence'");
   expect(publisher).not.toContain('writeBadge');
   expect(publisher).not.toContain("'ci.svg'");
-  expect(publisher).toContain('releaseAssets.length !== 4');
+  expect(publisher).toContain('releaseAssets.length !== 5');
+  expect(publisher).toContain('createDependencySourceArchive');
+  expect(publisher).toContain('dependencySource:');
   expect(publisher).not.toContain('coverage-html.tar.gz');
 });

@@ -3,6 +3,7 @@ export { requiredManifestPermissionDisclosures } from './required-disclosures';
 export { type PermissionInfo, type PermissionState, initialPermissions } from './types';
 export {
   readPermissionsSnapshot,
+  requestCameraAccess,
   requestCameraPermission,
   requestChromePermission,
   requestMicrophonePermission,

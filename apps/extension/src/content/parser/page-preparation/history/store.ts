@@ -14,6 +14,7 @@ import {
   type HistoryStoreRuntimeState,
 } from './store-state';
 import { createHistoryStoreCommitApi } from './transactions';
+import { createHistoryRecoveryApi } from './recovery';
 import { resetHistoryScope } from './scoped-reset';
 import { applyScopedSnapshotDelta } from './snapshot-delta';
 import { hasDomMutationChanges } from './dom-delta';
@@ -232,5 +233,6 @@ export function createPagePreparationHistoryStore() {
     ...createHistoryStoreMutationApi(state),
     ...createHistoryStoreNavigationApi(state),
     ...createHistoryStoreSubscriptionApi(state),
+    ...createHistoryRecoveryApi(state, HISTORY_APPLIED_EVENT),
   };
 }

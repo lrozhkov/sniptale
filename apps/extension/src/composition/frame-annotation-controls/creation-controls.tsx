@@ -26,6 +26,9 @@ export type {
 } from './contracts';
 
 export function FrameAnnotationCreationControls(props: {
+  /** Presentation owner may place frame and annotation controls in independent toolbar slots. */
+  renderFrameControl?: ((control: ReactNode) => ReactNode) | undefined;
+  groupAnnotations?: boolean | undefined;
   renderAnnotationControl?:
     | ((menu: 'callout' | 'step-badge', control: ReactNode) => ReactNode)
     | undefined;
@@ -84,28 +87,10 @@ export function FrameAnnotationCreationControls(props: {
   const close = () => setActiveMenu(null);
   const createCallout = () => props.enableCallout?.() ?? createDefaultFrameCallout();
   const createStepBadge = () => props.enableStepBadge?.() ?? createDefaultFrameStepBadge();
-  const toggleCallout = () => {
-    const current = props.settings.callout;
-    update({
-      callout:
-        current && current.enabled !== false
-          ? null
-          : current
-            ? { ...current, enabled: true }
-            : createCallout(),
-    });
-  };
-  const toggleStepBadge = () => {
-    const current = props.settings.stepBadge;
-    update({
-      stepBadge:
-        current && current.enabled !== false
-          ? null
-          : current
-            ? { ...current, enabled: true }
-            : createStepBadge(),
-    });
-  };
+  const toggleCallout = () =>
+    update({ callout: toggleCreationAnnotation(props.settings.callout, createCallout) });
+  const toggleStepBadge = () =>
+    update({ stepBadge: toggleCreationAnnotation(props.settings.stepBadge, createStepBadge) });
   const openCalloutMenu = () => {
     if (!props.settings.callout) update({ callout: { ...createCallout(), enabled: false } });
     toggle('callout');
@@ -119,6 +104,7 @@ export function FrameAnnotationCreationControls(props: {
   const buttonGroups = (
     <>
       <FrameStyleCreationButton
+        renderControl={props.renderFrameControl}
         activeMenu={activeMenu}
         contentContext={contentContext}
         disabled={props.disabled ?? false}
@@ -132,6 +118,7 @@ export function FrameAnnotationCreationControls(props: {
         resolveMenuDirection={contentContext ? props.resolveMenuDirection : undefined}
       />
       <AnnotationCreationButtons
+        grouped={props.groupAnnotations}
         renderControl={props.renderAnnotationControl}
         activeMenu={activeMenu}
         calloutRef={calloutRef}
@@ -173,4 +160,13 @@ export function FrameAnnotationCreationControls(props: {
       />
     </FrameAnnotationPopoverMeasurementContext>
   );
+}
+
+/** Enabling preserves a configured annotation; disabling preserves the existing null reset. */
+function toggleCreationAnnotation<T extends { enabled?: boolean }>(
+  current: T | null,
+  create: () => T
+): T | null {
+  if (current && current.enabled !== false) return null;
+  return current ? { ...current, enabled: true } : create();
 }

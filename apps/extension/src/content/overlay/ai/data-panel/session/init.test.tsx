@@ -2,17 +2,8 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-
-const { loadSpoilerStateMock } = vi.hoisted(() => ({
-  loadSpoilerStateMock: vi.fn(),
-}));
-
-vi.mock('../../persistence/spoiler-state', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../persistence/spoiler-state')>()),
-  loadSpoilerState: loadSpoilerStateMock,
-}));
 
 import { useTreeDataInitialization } from './init';
 
@@ -73,11 +64,6 @@ beforeAll(() => {
   (
     globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
-});
-
-beforeEach(() => {
-  loadSpoilerStateMock.mockReset();
-  loadSpoilerStateMock.mockResolvedValue(true);
 });
 
 afterEach(() => {

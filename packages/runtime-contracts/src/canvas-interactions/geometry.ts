@@ -191,3 +191,15 @@ function clampCanvasSize(value: number, minSize: number): number {
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/** Bounds already admitted points in their existing coordinate units without rounding. */
+export function getCanvasPointsBounds(points: readonly CanvasPoint[]): CanvasFrame {
+  const x = Math.min(...points.map((point) => point.x));
+  const y = Math.min(...points.map((point) => point.y));
+  return {
+    x,
+    y,
+    width: Math.max(...points.map((point) => point.x)) - x,
+    height: Math.max(...points.map((point) => point.y)) - y,
+  };
+}

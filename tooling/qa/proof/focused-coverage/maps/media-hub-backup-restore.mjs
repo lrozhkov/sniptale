@@ -6,7 +6,8 @@ export const MEDIA_HUB_BACKUP_RESTORE_OWNER_MAPPINGS = [
       'apps/extension/src/workflows/media-hub-backup/v6/root-publication/effect-bundle.ts',
     allowCrossOwner: true,
     reason:
-      'Resource catalog restore must validate before its transaction, preserve fresh conflicts, detach bytes and commit its checkpoint atomically.',
+      'Resource catalog restore must validate before its transaction, preserve fresh conflicts, \
+detach bytes and commit its checkpoint atomically.',
     testFiles: [
       'apps/extension/src/workflows/media-hub-backup/v6/codec.test.ts',
       'apps/extension/src/workflows/media-hub-backup/v6/export.test.ts',
@@ -48,7 +49,8 @@ export const MEDIA_HUB_BACKUP_RESTORE_OWNER_MAPPINGS = [
       'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.ts',
     allowCrossOwner: true,
     reason:
-      'Native resource restore must preserve bytes and references through publication, concurrent saves, identity recreation and retry.',
+      'Native resource restore must preserve bytes and references through publication, concurrent \
+saves, identity recreation and retry.',
     testFiles: [
       'apps/extension/src/workflows/media-hub-backup/v6/codec.test.ts',
       'apps/extension/src/workflows/media-hub-backup/v6/export.test.ts',

@@ -1,3 +1,4 @@
+import { resolveCursorSourcePointMapping } from './cursor';
 import { getVideoClipPresentationTime } from '../../../project/timeline/rate';
 import { REVIEW_KEY_VIEWPORT_WIDTH } from '../../../project/action-feedback/key-animation';
 import {
@@ -5,14 +6,9 @@ import {
   getVideoProjectKeyStyle,
 } from '../../../project/action-feedback/projection';
 import { isCameraHiddenAt } from '../../../project/camera/visibility';
-import {
-  hasCameraMediaAt,
-  resolveCameraClip,
-  cameraSourceTime,
-} from '../../../project/camera/animation';
+import { hasCameraMediaAt, cameraSourceTime } from '../../../project/camera/animation';
 import { evaluateProjectGestureFeedback } from '../../../review/project-action-audio';
 import type { VideoProjectActionOccurrence } from '../../../project/action-occurrences';
-import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
 import type { VisualLayerSourcePointMapping } from '../../draw/fitted-media';
 import {
   resolveVideoProjectActionPresentations,
@@ -155,29 +151,10 @@ export function resolveVideoCompositionActionSourceMapping(
     anchor.sourceTime >= clip.sourceStart + clip.sourceDuration
   )
     return null;
-  const asset = project.assets.find((item) => item.id === clip.assetId);
-  if (!asset) return null;
-  const camera = project.tracks.some(
-    (track) => track.id === clip.trackId && track.role === 'CAMERA'
-  );
   if (
-    camera &&
+    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA') &&
     isCameraHiddenAt(clip.cameraHiddenRanges ?? [], cameraSourceTime(clip, currentTime))
   )
     return null;
-  const visual = camera ? resolveCameraClip(clip, currentTime) : clip;
-  return {
-    mirrored: camera && clip.cameraMirrored === true,
-    ...(camera && visual.cameraAppearance ? { cameraAppearance: visual.cameraAppearance } : {}),
-    frame: visual.transform,
-    fitMode: visual.fitMode,
-    ...(clip.windowHeader && !camera ? { windowHeader: clip.windowHeader } : {}),
-    ...(clip.sourceCrop ? { sourceCrop: clip.sourceCrop } : {}),
-    ...(!camera && clip.windowCornerRadius !== undefined
-      ? { windowCornerRadius: clip.windowCornerRadius }
-      : {}),
-    sourceWidth: asset.metadata.width,
-    sourceHeight: asset.metadata.height,
-    renderState: resolveClipTransitionVisualState(project, visual, currentTime),
-  };
+  return resolveCursorSourcePointMapping(project, clip.id, currentTime);
 }

@@ -1,9 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { setLocalePreference, initializeLocalePreference } = vi.hoisted(() => ({
+const { setLocalePreference, initializeLocalePreference, presentWelcomeOnce } = vi.hoisted(() => ({
+  presentWelcomeOnce: vi.fn().mockResolvedValue(true),
   setLocalePreference: vi.fn().mockResolvedValue(undefined),
   initializeLocalePreference: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock('../../../storage/onboarding', () => ({ presentWelcomeOnce }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -37,6 +40,7 @@ function createDeferredLocaleWrite() {
 }
 
 beforeEach(() => {
+  presentWelcomeOnce.mockReset().mockResolvedValue(true);
   setLocalePreference.mockResolvedValue(undefined);
   initializeLocalePreference.mockResolvedValue(undefined);
 });
@@ -79,6 +83,7 @@ it.each(['update', 'chrome_update', 'shared_module_update'] as const)(
     initializeBackgroundRuntimeWiringMocks.installedListenerRef.current?.({ reason });
 
     expect(setLocalePreference).not.toHaveBeenCalled();
+    expect(presentWelcomeOnce).not.toHaveBeenCalled();
     expect(rebuildBackgroundContextMenus).toHaveBeenCalledTimes(1);
   }
 );
@@ -126,4 +131,68 @@ it('does not replace a locale selected before the first-install callback', async
   expect(storedLocale).toBe('ru');
   expect(setLocalePreference).not.toHaveBeenCalled();
   expect(initializeLocalePreference).toHaveBeenCalledOnce();
+});
+
+it('opens welcome before locale initialization and preserves menus on failure', async () => {
+  const localeWrite = createDeferredLocaleWrite();
+  initializeLocalePreference.mockReturnValueOnce(localeWrite.promise);
+  presentWelcomeOnce.mockRejectedValueOnce(new Error('storage-unavailable'));
+  parseInstalledDetails.mockReturnValue({ reason: 'install' });
+  registerInstallListener(logger);
+  initializeBackgroundRuntimeWiringMocks.installedListenerRef.current?.({ reason: 'install' });
+  expect(presentWelcomeOnce).toHaveBeenCalledOnce();
+  localeWrite.resolve();
+  await flushMicrotasks();
+  expect(presentWelcomeOnce).toHaveBeenCalledOnce();
+  expect(logger.warn).toHaveBeenCalledWith('Failed to open first-install welcome');
+  expect(rebuildBackgroundContextMenus).toHaveBeenCalledOnce();
+});
+
+it('admits welcome before delayed locale initialization so erasure cannot be followed by a late marker', async () => {
+  const { presentWelcomeOnce: present } = await vi.importActual<
+    typeof import('../../../storage/onboarding')
+  >('../../../storage/onboarding');
+  const { installPersistenceLockManagerForTests, runWithPersistentDataErasureBarrier } =
+    await import('../../../../composition/persistence/infrastructure/mutation-barrier');
+  vi.stubGlobal('navigator', {});
+  installPersistenceLockManagerForTests(null);
+  try {
+    const localeWrite = createDeferredLocaleWrite();
+    initializeLocalePreference.mockReturnValueOnce(localeWrite.promise);
+    let shown = false;
+    const open = vi.fn(async () => undefined);
+    let presentation: Promise<boolean> | undefined;
+    presentWelcomeOnce.mockImplementationOnce(() => {
+      presentation = present({
+        read: async () => shown,
+        mark: async () => {
+          shown = true;
+        },
+        clear: async () => {
+          shown = false;
+        },
+        open,
+      });
+      return presentation;
+    });
+    parseInstalledDetails.mockReturnValue({ reason: 'install' });
+    registerInstallListener(logger);
+    vi.stubGlobal('chrome', undefined);
+    initializeBackgroundRuntimeWiringMocks.installedListenerRef.current?.({ reason: 'install' });
+    expect(presentWelcomeOnce).toHaveBeenCalledOnce();
+    await presentation;
+    expect(shown).toBe(true);
+    await runWithPersistentDataErasureBarrier(async () => {
+      shown = false;
+    });
+    localeWrite.resolve();
+    await flushMicrotasks();
+    expect(shown).toBe(false);
+    expect(open).toHaveBeenCalledOnce();
+    expect(presentWelcomeOnce).toHaveBeenCalledOnce();
+    expect(rebuildBackgroundContextMenus).toHaveBeenCalledOnce();
+  } finally {
+    installPersistenceLockManagerForTests(null);
+    vi.unstubAllGlobals();
+  }
 });

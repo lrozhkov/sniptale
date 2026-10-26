@@ -8,6 +8,7 @@ describe('settings transfer canonical node projection', () => {
   it.each([
     ['interface.preferences', 'popupStartup', 'popup-startup'],
     ['interface.preferences', 'contextMenu', 'context-menu'],
+    ['interface.preferences', 'pageLaunch', 'page-launch'],
     ['capture.viewport-presets', 'defaultId', 'default'],
     ['capture.video', 'qualityProfileId', 'selection'],
     ['capture.video', 'outputProfile', 'output'],

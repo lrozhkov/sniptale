@@ -80,13 +80,18 @@ async function respondWithEditor(
 
 async function respondWithInlineData(
   capturePromise: Promise<CaptureDeliveryPayload>,
-  context: { captureAction: string; sendResponse: (response?: unknown) => void },
+  context: { captureAction: string; filename: string; sendResponse: (response?: unknown) => void },
   state: { jobId?: string | undefined }
 ): Promise<void> {
   const { dataUrl, jobId } = readCaptureDeliveryPayload(await capturePromise);
   state.jobId = jobId;
   await markCaptureJobTerminal(jobId, 'completed');
-  context.sendResponse({ success: true, dataUrl, action: context.captureAction });
+  context.sendResponse({
+    success: true,
+    dataUrl,
+    action: context.captureAction,
+    ...(context.captureAction === 'ask_preset' ? { filename: context.filename } : {}),
+  });
 }
 
 async function respondWithDownload(

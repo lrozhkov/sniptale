@@ -21,9 +21,29 @@ import {
   startDesignReviewPicker,
   type DesignReviewPickerRuntime,
   type DesignReviewSelection,
+  type DesignReviewSelectionOrigin,
 } from './picker';
 
+import {
+  createDesignReviewMeasureState,
+  chooseMeasureTarget,
+  previewMeasureTarget,
+  replaceMeasureTarget,
+  cancelMeasurePreview,
+  clearMeasureB,
+  swapMeasureTargets,
+  escapeMeasureState,
+  type DesignReviewMeasureState,
+} from './measure';
+export type { DesignReviewSelectionOrigin } from './picker';
+
+export type DesignReviewTool = 'comment' | 'inspect' | 'compare' | 'move';
+
 export interface DesignReviewModeState {
+  tool: DesignReviewTool;
+  checkOpen: boolean;
+  selectionOrigin: DesignReviewSelectionOrigin | null;
+  measure: DesignReviewMeasureState;
   enabled: boolean;
   editingText: boolean;
   measurementsEnabled: boolean;
@@ -32,12 +52,16 @@ export interface DesignReviewModeState {
 }
 
 type DesignReviewModeListener = () => void;
-type DesignReviewInspectorDismissRequestHandler = () => boolean;
+type DesignReviewInspectorDismissRequestHandler = (event?: KeyboardEvent) => boolean;
 
 let pickerRuntime: DesignReviewPickerRuntime | null = null;
 let textSession: ReturnType<typeof createQuickEditTargetSession> | null = null;
 const logger = createLogger({ namespace: 'ContentDesignReview' });
 let state: DesignReviewModeState = {
+  tool: 'comment',
+  checkOpen: false,
+  selectionOrigin: null,
+  measure: createDesignReviewMeasureState(),
   enabled: false,
   editingText: false,
   measurementsEnabled: false,
@@ -46,18 +70,36 @@ let state: DesignReviewModeState = {
 };
 const listeners = new Set<DesignReviewModeListener>();
 let inspectorDismissRequestHandler: DesignReviewInspectorDismissRequestHandler | null = null;
+let toolSwitchRequestHandler: ((tool: DesignReviewTool) => boolean) | null = null;
 
 function publish(): void {
   listeners.forEach((listener) => listener());
 }
 
-function setSelection(selection: DesignReviewSelection): void {
-  state = { ...state, selection };
+function setSelection(
+  selection: DesignReviewSelection,
+  origin: DesignReviewSelectionOrigin = 'page'
+): boolean {
+  let measure = state.measure;
+  if (state.tool === 'compare' && origin === 'page') {
+    measure = chooseMeasureTarget(measure, selection.snapshot.element);
+    if (measure === state.measure && !state.checkOpen) return false;
+  } else if (state.tool === 'compare' && origin === 'tree') {
+    measure = previewMeasureTarget(measure, selection.snapshot.element);
+  }
+  state = {
+    ...state,
+    selection,
+    measure,
+    selectionOrigin: origin,
+    checkOpen: origin === 'page' || origin === 'tree' ? false : state.checkOpen,
+  };
   publish();
+  return true;
 }
 
-function requestInspectorDismiss(): boolean {
-  return inspectorDismissRequestHandler?.() ?? false;
+function requestInspectorDismiss(event?: KeyboardEvent): boolean {
+  return inspectorDismissRequestHandler?.(event) ?? false;
 }
 
 export function dismissDesignReviewSelection(): void {
@@ -81,6 +123,16 @@ export function registerDesignReviewInspectorDismissRequestHandler(
   };
 }
 
+/** Separates leaving an editor from dismissing the selected page object. */
+export function registerDesignReviewToolSwitchRequestHandler(
+  handler: (tool: DesignReviewTool) => boolean
+): () => void {
+  toolSwitchRequestHandler = handler;
+  return () => {
+    if (toolSwitchRequestHandler === handler) toolSwitchRequestHandler = null;
+  };
+}
+
 function disableDesignReviewModeInternal(dispatchDisabled: boolean): void {
   if (!state.enabled) {
     return;
@@ -89,6 +141,10 @@ function disableDesignReviewModeInternal(dispatchDisabled: boolean): void {
   pickerRuntime?.dispose();
   pickerRuntime = null;
   state = {
+    tool: 'comment',
+    checkOpen: false,
+    selectionOrigin: null,
+    measure: createDesignReviewMeasureState(),
     enabled: false,
     editingText: false,
     measurementsEnabled: false,
@@ -110,9 +166,25 @@ export function enableDesignReviewMode(): void {
   pickerRuntime = startDesignReviewPicker({
     onDisableRequested: () => disableDesignReviewModeInternal(true),
     onInspectorDismissRequested: requestInspectorDismiss,
+    hasInspector: () => state.checkOpen,
     onSelection: setSelection,
+    replaceSelectionOnClick: () => state.tool !== 'comment',
+    trackHover: () => !state.checkOpen && state.tool === 'compare',
+    isFrameSuppressed: () =>
+      !state.checkOpen && state.tool === 'compare' && Boolean(state.measure.a),
+    onHover: (element) => {
+      if (state.tool !== 'compare' || state.checkOpen) return;
+      const measure = previewMeasureTarget(state.measure, element);
+      if (measure === state.measure) return;
+      state = { ...state, measure };
+      publish();
+    },
   });
   state = {
+    tool: 'comment',
+    checkOpen: false,
+    selectionOrigin: null,
+    measure: createDesignReviewMeasureState(),
     enabled: true,
     editingText: false,
     measurementsEnabled: false,
@@ -124,7 +196,10 @@ export function enableDesignReviewMode(): void {
   dispatchContentModeEnabled({ mode: 'design-review' });
 }
 
-export function openDesignReviewTarget(target: Element): boolean {
+export function openDesignReviewTarget(
+  target: Element,
+  origin: DesignReviewSelectionOrigin = 'tree'
+): boolean {
   if (!state.enabled || state.editingText || !target.isConnected || !pickerRuntime) {
     return false;
   }
@@ -132,10 +207,13 @@ export function openDesignReviewTarget(target: Element): boolean {
   let attempts = 0;
   while (current && attempts < 10) {
     attempts += 1;
-    current.scrollIntoView({ block: 'center', inline: 'center' });
+    current.scrollIntoView({
+      block: origin === 'finding' || origin === 'feedback' ? 'center' : 'nearest',
+      inline: 'nearest',
+    });
     current = current.ownerDocument.defaultView?.frameElement ?? null;
   }
-  return pickerRuntime.selectElement(target);
+  return pickerRuntime.selectElement(target, origin);
 }
 
 export function disableDesignReviewMode(): void {
@@ -165,6 +243,11 @@ function finishTextSession(): void {
     pickerRuntime?.setTextEditing(false);
     state = { ...state, editingText: false };
   }
+}
+
+/** Commits the current inline text session before page capture or reset. */
+export function finalizeDesignReviewTextEditing(): void {
+  finishTextSession();
 }
 
 /** Reports whether the selected page target supports the Content Editing interaction. */
@@ -197,7 +280,7 @@ export function startDesignReviewTextEditing(): boolean {
         if (
           state.selection?.snapshot.element === target &&
           target.isConnected &&
-          picker.selectElement(target)
+          picker.selectElement(target, 'tool')
         )
           return;
         dismissDesignReviewSelection();
@@ -225,7 +308,7 @@ export function resetDesignReviewText(target: Element): boolean {
     return false;
   try {
     if (!resetQuickEditText(target)) return false;
-    pickerRuntime?.selectElement(target);
+    pickerRuntime?.selectElement(target, 'tool');
     return true;
   } catch (error) {
     reportTextEditFailure(error, true);
@@ -251,6 +334,94 @@ export function toggleDesignReviewMeasurementDetails(): void {
   publish();
 }
 
+/** Switches one page tool only after the existing comment owner accepts dismissal. */
+export function setDesignReviewTool(tool: DesignReviewTool): boolean {
+  if (!state.enabled) return false;
+  if (toolSwitchRequestHandler) {
+    if (!toolSwitchRequestHandler(tool)) return false;
+  } else if (state.selection && !requestInspectorDismiss()) return false;
+  const wasCheckOpen = state.checkOpen;
+  const originChanged = state.selectionOrigin !== 'tool';
+  state = { ...state, checkOpen: false, selectionOrigin: 'tool' };
+  if (state.tool === tool) {
+    if (tool === 'compare') {
+      const target = state.measure.b ?? state.measure.a;
+      if (target?.isConnected) pickerRuntime?.selectElement(target, 'tool');
+    }
+    if (wasCheckOpen || originChanged) {
+      pickerRuntime?.refreshFrame();
+      publish();
+    }
+    return true;
+  }
+  finishTextSession();
+  let measure = state.tool === 'compare' ? cancelMeasurePreview(state.measure) : state.measure;
+  if (tool === 'compare' && !measure.a && state.selection?.snapshot.element.isConnected)
+    measure = chooseMeasureTarget(measure, state.selection.snapshot.element);
+  state = { ...state, tool, measure };
+  if (tool === 'compare') {
+    const target = measure.b ?? measure.a;
+    if (target?.isConnected) pickerRuntime?.selectElement(target, 'tool');
+  }
+  pickerRuntime?.refreshFrame();
+  publish();
+  return true;
+}
+
+function publishMeasure(measure: DesignReviewMeasureState, restoreTarget = false): void {
+  state = { ...state, measure };
+  if (restoreTarget) {
+    const target = measure.b ?? measure.a;
+    if (target?.isConnected) pickerRuntime?.selectElement(target, 'tool');
+    else if (!target) {
+      pickerRuntime?.dismissSelection();
+      state = { ...state, selection: null };
+    }
+  }
+  pickerRuntime?.refreshFrame();
+  publish();
+}
+
+/** Chooses which accepted identity the next page click can replace. */
+export function beginDesignReviewMeasureSelection(slot: 'a' | 'b'): void {
+  if (state.enabled) publishMeasure(replaceMeasureTarget(state.measure, slot));
+}
+
+/** Keyboard/tree navigation previews a target; this action explicitly accepts it. */
+export function acceptDesignReviewMeasureSelection(): boolean {
+  const target = state.selection?.snapshot.element;
+  if (!state.enabled || state.tool !== 'compare' || !target) return false;
+  const measure = chooseMeasureTarget(state.measure, target);
+  if (measure === state.measure) return false;
+  publishMeasure(measure, true);
+  return true;
+}
+
+export function swapDesignReviewMeasureTargets(): void {
+  if (state.enabled) publishMeasure(swapMeasureTargets(state.measure), true);
+}
+
+export function clearDesignReviewMeasureB(): void {
+  if (state.enabled) publishMeasure(clearMeasureB(state.measure), true);
+}
+
+export function clearDesignReviewMeasure(): void {
+  if (state.enabled) publishMeasure(createDesignReviewMeasureState(), true);
+}
+
+/** Check/tool presentation can cancel a preview while retaining accepted A/B. */
+export function cancelTransientDesignReviewMeasure(): void {
+  if (state.enabled) publishMeasure(cancelMeasurePreview(state.measure));
+}
+
+export function dismissDesignReviewMeasureLayer(): boolean {
+  if (!state.enabled || state.checkOpen || state.tool !== 'compare') return false;
+  const measure = escapeMeasureState(state.measure);
+  if (!measure) return false;
+  publishMeasure(measure, true);
+  return true;
+}
+
 export function getDesignReviewModeState(): DesignReviewModeState {
   return state;
 }
@@ -261,3 +432,23 @@ export function subscribeToDesignReviewMode(listener: DesignReviewModeListener):
 }
 
 registerContentMode('design-review', disableDesignReviewMode);
+
+/** Opens a workspace command after the same guard used by page tool switches. */
+export function openDesignReviewChecks(): boolean {
+  if (!state.enabled || state.editingText) return false;
+  if (toolSwitchRequestHandler) {
+    if (!toolSwitchRequestHandler(state.tool)) return false;
+  } else if (state.selection && !requestInspectorDismiss()) return false;
+  state = { ...state, checkOpen: true, measure: cancelMeasurePreview(state.measure) };
+  pickerRuntime?.refreshFrame();
+  publish();
+  return true;
+}
+
+/** Closes Check presentation without replacing its selected identity or page tool. */
+export function closeDesignReviewChecks(): void {
+  if (!state.checkOpen) return;
+  state = { ...state, checkOpen: false };
+  pickerRuntime?.refreshFrame();
+  publish();
+}

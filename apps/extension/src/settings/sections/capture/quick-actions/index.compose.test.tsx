@@ -87,20 +87,24 @@ import {
   renderQuickActionsSection,
   setSelectValue,
   useQuickActionsControllerSpy,
+  useSettingsStoreSpy,
 } from './test-helpers';
 
 function updateEditorSelections(
   container: HTMLDivElement,
   state: ReturnType<typeof createSectionState>
 ) {
+  const navigate = (label: string) =>
+    act(() => container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!.click());
+  setSelectValue(container.querySelector<HTMLSelectElement>('select')!, 'copy');
+  navigate('settings.quickActions.appearanceCapture');
   const selects = Array.from(container.querySelectorAll<HTMLSelectElement>('select'));
-
   setSelectValue(selects[0]!, 'selection');
-  setSelectValue(selects[1]!, 'copy');
-  setSelectValue(selects[2]!, 'desktop-1440');
-  setSelectValue(selects[3]!, '5');
-  setSelectValue(selects[4]!, 'jpeg');
-  setSelectValue(selects[5]!, '90');
+  setSelectValue(selects[1]!, 'desktop-1440');
+  setSelectValue(selects[2]!, '5');
+  setSelectValue(selects[3]!, 'jpeg');
+  setSelectValue(selects[4]!, '90');
+  navigate('settings.quickActions.appearanceAction');
 
   expect(state.updateFormField).toHaveBeenCalledWith('screenshotMode', 'selection');
   expect(state.updateFormField).toHaveBeenCalledWith('afterCapture', 'copy');
@@ -118,7 +122,7 @@ function triggerQuickActionsButtons(container: HTMLDivElement) {
     [...container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'settings.collection.actions.delete')
       ?.click();
-    container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[0]?.click();
+    container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[3]?.click();
     container
       .querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
       .forEach((input) => input.click());
@@ -239,4 +243,50 @@ describe('QuickActionsSection compose tree', () => {
     act(() => reset?.click());
     expect(state.handleReset).toHaveBeenCalledWith('default-selection-download');
   });
+});
+
+it('keeps placement controls disabled until load and serializes writes with failure and explicit retry', async () => {
+  const state = createSectionState();
+  useQuickActionsControllerSpy.mockReturnValue(state);
+  const updateSettings = vi.fn();
+  const store = { settings: { viewportPresets: [] }, hasLoaded: false, updateSettings };
+  useSettingsStoreSpy.mockReturnValue(store);
+  await renderQuickActionsSection();
+  const container = getQuickActionsContainer();
+  if (!container) throw new Error('Missing quick-actions section harness');
+  const controls = () =>
+    [...container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')].slice(
+      0,
+      3
+    );
+  expect(controls().every((control) => control.disabled)).toBe(true);
+  store.hasLoaded = true;
+  await renderQuickActionsSection();
+  expect(controls().map((control) => control.dataset['checked'])).toEqual([
+    'true',
+    'false',
+    'false',
+  ]);
+  let reject!: (error: Error) => void;
+  updateSettings.mockImplementationOnce(
+    () =>
+      new Promise<void>((_, fail) => {
+        reject = fail;
+      })
+  );
+  await act(async () => controls()[1]!.click());
+  expect(controls().every((control) => control.disabled)).toBe(true);
+  controls()[2]!.click();
+  expect(updateSettings).toHaveBeenCalledOnce();
+  await act(async () => reject(new Error('write refused')));
+  expect(container.querySelector('[role="alert"]')).not.toBeNull();
+  expect(controls()[1]!.dataset['checked']).toBe('false');
+  updateSettings.mockResolvedValue(undefined);
+  await act(async () => controls()[1]!.click());
+  expect(updateSettings).toHaveBeenLastCalledWith({ pageLaunch: { quickActionsCorner: true } });
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  await act(async () => controls()[2]!.click());
+  expect(updateSettings).toHaveBeenLastCalledWith({ pageLaunch: { quickActionsToolbar: true } });
+  await act(async () => controls()[0]!.click());
+  expect(updateSettings).toHaveBeenLastCalledWith({ pageLaunch: { quickActionsPopup: false } });
 });

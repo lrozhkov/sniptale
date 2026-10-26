@@ -1,3 +1,4 @@
+import { routePageLaunchPreferencesMessage } from '../../page-access/page-launch-preferences';
 import {
   routeAISecretUnlockMessage,
   routeAiSettingsQueryMessage,
@@ -50,6 +51,7 @@ const keepOpen = (handled: boolean): ActionResult | null =>
   handled ? { handled: true, keepChannelOpen: true } : null;
 
 export const backgroundOwnedHandlerBindings = {
+  'page-launch-preferences': routePageLaunchPreferencesAction,
   'aggregate-promotion': routeAggregatePromotionAction,
   'ai-secret-unlock': routeAiSecretUnlockAction,
   'ai-settings-mutation': routeAiSettingsMutationAction,
@@ -291,4 +293,8 @@ function routeContentActionCapabilityIssuanceRequest(args: {
     );
 
   return handled ? { handled: true, keepChannelOpen: false } : null;
+}
+
+function routePageLaunchPreferencesAction(action: BackgroundOwnedAction): ActionResult | null {
+  return keepOpen(routePageLaunchPreferencesMessage(action.message, action.context.sendResponse));
 }

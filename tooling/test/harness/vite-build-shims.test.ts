@@ -26,9 +26,13 @@ const RELEASE_BUILD_SHIMS = [
 ];
 
 function collectGitVisibleFiles() {
-  return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
-    encoding: 'utf8',
-  })
+  return execFileSync(
+    'git',
+    ['ls-files', '--cached', '--others', '--exclude-standard', '--', ...RELEASE_BUILD_SHIMS],
+    {
+      encoding: 'utf8',
+    }
+  )
     .split(/\r?\n/u)
     .filter(Boolean);
 }

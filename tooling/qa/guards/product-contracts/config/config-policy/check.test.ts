@@ -4,11 +4,11 @@ import { createTempRoot, importFresh, writeFile } from '../../../../test-support
 
 function createPassingPackageJson() {
   return {
-    packageManager: 'npm@12.2.0',
+    packageManager: 'npm@12.2.1',
     engines: { node: '>=24.21.0 <25' },
     devEngines: {
       runtime: { name: 'node', version: '>=24.21.0 <25', onFail: 'error' },
-      packageManager: { name: 'npm', version: '12.2.0', onFail: 'error' },
+      packageManager: { name: 'npm', version: '12.2.1', onFail: 'error' },
     },
     dependencies: {
       react: '^19.3.0',

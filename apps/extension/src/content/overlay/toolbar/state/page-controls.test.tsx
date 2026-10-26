@@ -17,6 +17,7 @@ vi.mock('../../../../composition/persistence/settings', async (original) => ({
   patchSettings: persistence.patch,
 }));
 import { createDefaultSettings } from '../../../../composition/persistence/settings';
+import { getPageToolbarLayout } from './page-layout';
 import { PageToolbarControlsContext, usePageToolbarControls } from './page-controls';
 import { PageControlVisibility, PageProtectedControls } from '../controls/control-visibility';
 import {
@@ -120,7 +121,8 @@ it.each([
     await act(async () => controls.resetOverrides());
     const reset =
       persistence.patch.mock.calls.at(-1)![0].contentToolbar!.pageControlOverrides![mode]!;
-    expect(Object.keys(reset)).toHaveLength(8);
+    expect(Object.keys(reset)).toHaveLength(9);
+    expect(reset['quick-actions']).toBeNull();
     expect(reset['scenario-panel']).toBeNull();
     expect(reset[tool]).toBeUndefined();
     expect(reset['capture-full']).toBeNull();
@@ -456,4 +458,116 @@ it('operates customization, temporary reveal, Done and failure retry through the
   await act(async () => button('settings.visibility-retry')?.click());
   expect(controls.error).toBeNull();
   expect(button('settings.visibility-retry')).toBeNull();
+});
+
+it('preserves accepted layout after failure and permits retry', async () => {
+  const defaults = createDefaultSettings();
+  const initial = {
+    ...defaults,
+    contentToolbar: {
+      ...defaults.contentToolbar!,
+      pageLayouts: { cursor: ['settings', 'mode'] as const },
+    },
+  };
+  persistence.load.mockResolvedValueOnce({
+    ...initial,
+    contentToolbar: { ...initial.contentToolbar, pageLayouts: { cursor: ['settings', 'mode'] } },
+  });
+  await act(async () => root.render(<Harness enabled />));
+  const before = [...controls.layout];
+  persistence.patch.mockRejectedValueOnce(new Error('write refused'));
+  await act(async () => controls.moveItem('mode', 'settings', true));
+  expect(controls.layout).toEqual(before);
+  expect(controls.error).not.toBeNull();
+  expect(controls.pending).toBe(false);
+  persistence.patch.mockResolvedValueOnce({
+    ...defaults,
+    contentToolbar: { ...defaults.contentToolbar!, pageLayouts: { cursor: ['mode', 'settings'] } },
+  });
+  await act(async () => controls.moveItem('mode', 'settings', true));
+  expect(controls.layout.indexOf('mode')).toBeLessThan(controls.layout.indexOf('settings'));
+  expect(controls.error).toBeNull();
+});
+
+it('keeps custom order per mode and restores all page choices through one reset', async () => {
+  const defaults = createDefaultSettings();
+  persistence.load.mockResolvedValueOnce({
+    ...defaults,
+    contentToolbar: {
+      ...defaults.contentToolbar!,
+      pageLayouts: { cursor: ['settings', 'mode'], drawing: ['drawing-pencil', 'mode'] },
+      pageControls: { 'capture-full': false },
+    },
+  });
+  await act(async () => root.render(<Harness enabled />));
+  expect(controls.layoutActive).toBe(true);
+  expect(controls.layout.indexOf('settings')).toBeLessThan(controls.layout.indexOf('mode'));
+  await act(async () => root.render(<Harness enabled mode="drawing" />));
+  expect(controls.layout.indexOf('drawing-pencil')).toBeLessThan(controls.layout.indexOf('mode'));
+  persistence.patch.mockResolvedValueOnce(defaults);
+  await act(async () => controls.reset());
+  expect(persistence.patch.mock.calls.at(-1)![0].contentToolbar).toMatchObject({
+    pageLayouts: {
+      cursor: null,
+      drawing: null,
+      highlighter: null,
+      'quick-edit': null,
+      'design-review': null,
+    },
+    pageControls: { 'capture-full': true },
+    pageControlOverrides: { drawing: { 'capture-full': null } },
+  });
+  expect(controls.layoutActive).toBe(false);
+  expect(controls.layout[0]).toBe('mode');
+  expect(controls.isVisible('capture-full')).toBe(true);
+});
+
+function ResetSettingsHarness() {
+  controls = usePageToolbarControls(true);
+  return (
+    <PageToolbarControlsContext value={controls}>
+      <PageToolbarCustomizationSettings onClose={() => {}} />
+    </PageToolbarControlsContext>
+  );
+}
+it.each(['empty', 'explicit-defaults', 'canonical-layout', 'legacy-pencil'])(
+  'disables customization Reset for %s preferences',
+  async (kind) => {
+    const defaults = createDefaultSettings();
+    persistence.load.mockResolvedValueOnce({
+      ...defaults,
+      contentToolbar: {
+        ...defaults.contentToolbar!,
+        ...(kind === 'explicit-defaults' ? { pageControls: { 'capture-full': true } } : {}),
+        ...(kind === 'canonical-layout'
+          ? { pageLayouts: { cursor: getPageToolbarLayout('cursor') } }
+          : {}),
+        ...(kind === 'legacy-pencil' ? { pageControls: { 'drawing-pencil': false } } : {}),
+      },
+    });
+    await act(async () => root.render(<ResetSettingsHarness />));
+    expect(
+      host.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.settings.reset-page-toolbar"]'
+      )!.disabled
+    ).toBe(true);
+  }
+);
+it('enables Reset for another mode customization and disables it after acknowledged reset', async () => {
+  const defaults = createDefaultSettings();
+  persistence.load.mockResolvedValueOnce({
+    ...defaults,
+    contentToolbar: {
+      ...defaults.contentToolbar!,
+      pageControlOverrides: { drawing: { 'capture-full': true } },
+    },
+  });
+  persistence.patch.mockResolvedValueOnce(defaults);
+  await act(async () => root.render(<ResetSettingsHarness />));
+  const reset = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.settings.reset-page-toolbar"]'
+  )!;
+  expect(reset.disabled).toBe(false);
+  await act(async () => reset.click());
+  expect(reset.disabled).toBe(true);
 });

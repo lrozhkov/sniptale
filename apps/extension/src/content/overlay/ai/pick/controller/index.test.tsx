@@ -226,7 +226,8 @@ function expectAiPickStartFlow() {
   });
 }
 
-function expectAiPickDisableFlow() {
+function expectAiPickReopenFlow() {
+  enableAiPickModeDeferredMock.mockResolvedValueOnce(undefined);
   renderHarness({
     aiPickMode: true,
     setAiPickMode: vi.fn(),
@@ -238,6 +239,9 @@ function expectAiPickDisableFlow() {
   clickControl('[data-ui="test.ai-pick-trigger"]');
 
   expect(disableAiPickModeMock).toHaveBeenCalledTimes(1);
+  expect(enableAiPickModeDeferredMock).toHaveBeenCalledWith(expect.any(Function), {
+    openTable: true,
+  });
   expect(showToastMock).not.toHaveBeenCalled();
 }
 
@@ -264,8 +268,8 @@ function runUseAiPickControllerSuite() {
     await expectAiPickStartFlow();
   });
 
-  it('disables AI pick mode when the owner is already active', () => {
-    expectAiPickDisableFlow();
+  it('reopens the table when the owner is active without a modal', () => {
+    expectAiPickReopenFlow();
   });
 
   it('routes the dedicated disable control through the AI disable seam', () => {

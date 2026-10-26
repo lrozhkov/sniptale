@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createCameraFollowSettings } from '../../features/video/project/camera/cursor-policy';
 import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { act } from 'react';
@@ -191,4 +192,83 @@ it('publishes camera defaults through the existing native history writer and res
   });
   expect(session.getSnapshot().document.advancedContent.cameraFollowDefaults).toBeUndefined();
   expect(commit).toHaveBeenCalledTimes(2);
+});
+
+it('retains separate content operations for completed pointer gesture boundaries before debounce', async () => {
+  const { session, commit } = setup();
+  const region = createQuickEditZoomRegion({ id: 'gesture-focus', at: 0, duration: 1, endMax: 4 });
+  act(() => content.commands.setZoom((zoom) => ({ ...zoom, enabled: true, regions: [region] })));
+  await act(async () => content.flush());
+  expect(commit).toHaveBeenCalledOnce();
+  for (const centerX of [0.6, 0.7, 0.8]) {
+    act(() => {
+      content.endTyping();
+      content.commands.setZoom((zoom) => ({
+        ...zoom,
+        regions: zoom.regions.map((entry) => ({
+          ...entry,
+          transform: { ...entry.transform, centerX },
+        })),
+      }));
+    });
+  }
+  await act(async () => content.flush());
+  const operations = session.getSnapshot().snapshot.workspace.history.slice(1);
+  expect(operations).toHaveLength(3);
+  expect(
+    operations.map((operation) =>
+      operation.target === 'advancedContent'
+        ? [
+            operation.before.zoom.regions[0]?.transform.centerX,
+            operation.after.zoom.regions[0]?.transform.centerX,
+          ]
+        : null
+    )
+  ).toEqual([
+    [0.5, 0.6],
+    [0.6, 0.7],
+    [0.7, 0.8],
+  ]);
+  expect(commit).toHaveBeenCalledTimes(4);
+});
+
+it('retries an older failed capture before a later closed command group', async () => {
+  const { session, commit } = setup();
+  let rejectCapture!: (error: Error) => void;
+  commit.mockImplementationOnce(
+    async () =>
+      new Promise<VideoWorkspaceSnapshot>((_resolve, reject) => {
+        rejectCapture = reject;
+      })
+  );
+  act(() => content.commands.setActionsEnabled(false));
+  await act(async () => vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay));
+  act(() => {
+    content.endTyping();
+    content.commands.setZoom((zoom) => ({ ...zoom, enabled: true }));
+  });
+  await act(async () => {
+    rejectCapture(new Error('Controlled first capture failure'));
+    await Promise.resolve();
+  });
+  expect(content.saveFailed).toBe(true);
+  expect(content.content).toMatchObject({ actionsEnabled: false, zoom: { enabled: true } });
+  expect(content.pending).toBe(true);
+  await act(async () => content.flush());
+  const operations = session.getSnapshot().snapshot.workspace.history;
+  expect(operations).toHaveLength(2);
+  expect(operations[0]).toMatchObject({
+    target: 'advancedContent',
+    before: { zoom: { enabled: false } },
+    after: { actionsEnabled: false, zoom: { enabled: false } },
+  });
+  expect(operations[0]).not.toHaveProperty('before.actionsEnabled');
+  expect(operations[1]).toMatchObject({
+    target: 'advancedContent',
+    before: { actionsEnabled: false, zoom: { enabled: false } },
+    after: { actionsEnabled: false, zoom: { enabled: true } },
+  });
+  expect(content.pending).toBe(false);
+  expect(content.saveFailed).toBe(false);
+  expect(commit).toHaveBeenCalledTimes(3);
 });

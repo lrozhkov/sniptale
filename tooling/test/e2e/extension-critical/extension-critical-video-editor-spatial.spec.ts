@@ -254,7 +254,14 @@ async function openFixture(
     if (options.effectRegion) image.transform.rotation = 25;
     const source = await readFile(
       new URL(
-        `../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/${options.effectTransition ? 'sniptale-transition-dissolve' : options.sourceFx ? 'sniptale-video-warm' : 'sniptale-spotlight'}.sniptale-effect.json`,
+        `../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/` +
+          `${
+            options.effectTransition
+              ? 'sniptale-transition-dissolve'
+              : options.sourceFx
+                ? 'sniptale-video-warm'
+                : 'sniptale-spotlight'
+          }.sniptale-effect.json`,
         import.meta.url
       ),
       'utf8'
@@ -1307,7 +1314,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           ...owner.querySelectorAll<HTMLElement>('.sniptale-parameter-name, label'),
         ].map((node) => ({ node, original: node.textContent ?? '' }));
         for (const { node, original } of changes)
-          node.textContent = `⟦${original}${original.length <= 12 ? original : original.slice(0, Math.ceil(original.length / 2))}⟧`;
+          node.textContent =
+            `⟦${original}` +
+            `${original.length <= 12 ? original : original.slice(0, Math.ceil(original.length / 2))}⟧`;
         return changes;
       });
       try {
@@ -1746,19 +1755,109 @@ for (const scope of ['clip', 'track', 'video-group'] as const) {
 
 for (const effectTransition of [false, true])
   for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
-    test(`${effectTransition ? 'EffectV1 dissolve' : 'ordinary crossfade'} keeps two clip opacity contributions on the projected plane ${viewport.size.width}`, async ({
-      page,
-    }, info) => {
+    test(
+      `${effectTransition ? 'EffectV1 dissolve' : 'ordinary crossfade'} keeps two clip ` +
+        `opacity contributions on the projected plane ${viewport.size.width}`,
+      async ({ page }, info) => {
+        test.setTimeout(180000);
+        await page.setViewportSize({ ...viewport.size });
+        const host = await startHostServer();
+        const errors: string[] = [];
+        page.on('pageerror', (error) => errors.push(error.message));
+        try {
+          await openFixture(page, host.origin, 'en', 'dark', { crossfade: true, effectTransition });
+          const before = (await readNativeVideoProject(page))!;
+          expect(before.transitions).toHaveLength(1);
+          const slider = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+          const canvas = page.locator('[data-preview-stage-canvas]');
+          const sample = () =>
+            canvas.evaluate((node: HTMLCanvasElement) => {
+              const scale = Math.min(node.width / 320, node.height / 180);
+              return Array.from(
+                node
+                  .getContext('2d')!
+                  .getImageData(
+                    Math.round((node.width - 320 * scale) / 2 + 220 * scale),
+                    Math.round((node.height - 180 * scale) / 2 + 100 * scale),
+                    1,
+                    1
+                  ).data
+              );
+            });
+          const proof = [];
+          let frame = 0;
+          for (const [time, alpha] of [
+            [0.2, effectTransition ? 1 : 0.2],
+            [0.6, effectTransition ? 1 : 0.55],
+            [1, 1],
+          ] as const) {
+            const target = Math.round(time * before.fps);
+            while (frame < target) {
+              await slider.press('ArrowRight');
+              frame++;
+            }
+            await expect
+              .poll(async () => Number(await slider.getAttribute('aria-valuenow')))
+              .toBeCloseTo(time, 7);
+            // Independent source-over: midpoint alpha=.1+.5*(1-.1)=.55.
+            const expected = [18, 52, 86].map(
+              (channel, i) => channel + alpha * ([34, 211, 238][i]! - channel)
+            );
+            await expect
+              .poll(async () => {
+                const pixel = await sample();
+                return Math.max(...expected.map((channel, i) => Math.abs(channel - pixel[i]!)));
+              })
+              .toBeLessThan(3);
+            proof.push({ time, alpha, pixel: await sample(), expected });
+          }
+          expect(await readNativeVideoProject(page)).toEqual(before);
+          await writeFile(
+            info.outputPath('ordinary-transition-pixels.json'),
+            JSON.stringify(proof, null, 2)
+          );
+          await page.screenshot({
+            path: info.outputPath('ordinary-transition.png'),
+            fullPage: false,
+          });
+          expect(errors).toEqual([]);
+        } finally {
+          host.server.closeAllConnections();
+          await new Promise<void>((resolve) => host.server.close(() => resolve()));
+        }
+      }
+    );
+  }
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(
+    `lost spatial WebGL context retains the completed frame and retries through the existing ` +
+      `UI ${viewport.size.width}`,
+    async ({ page }, info) => {
       test.setTimeout(180000);
       await page.setViewportSize({ ...viewport.size });
+      await page.addInitScript(() => {
+        if (window !== window.top) return;
+        const contexts: WebGLRenderingContext[] = [];
+        Reflect.set(window, '__sniptaleTestSpatialContexts', contexts);
+        const original = HTMLCanvasElement.prototype.getContext;
+        Reflect.set(
+          HTMLCanvasElement.prototype,
+          'getContext',
+          function (this: HTMLCanvasElement, ...args: unknown[]) {
+            const result = Reflect.apply(original, this, args);
+            if (result instanceof WebGLRenderingContext && !contexts.includes(result))
+              contexts.push(result);
+            return result;
+          }
+        );
+      });
       const host = await startHostServer();
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
       try {
-        await openFixture(page, host.origin, 'en', 'dark', { crossfade: true, effectTransition });
-        const before = (await readNativeVideoProject(page))!;
-        expect(before.transitions).toHaveLength(1);
-        const slider = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+        await openFixture(page, host.origin);
+        const before = await readNativeVideoProject(page);
         const canvas = page.locator('[data-preview-stage-canvas]');
         const sample = () =>
           canvas.evaluate((node: HTMLCanvasElement) => {
@@ -1768,46 +1867,61 @@ for (const effectTransition of [false, true])
                 .getContext('2d')!
                 .getImageData(
                   Math.round((node.width - 320 * scale) / 2 + 220 * scale),
-                  Math.round((node.height - 180 * scale) / 2 + 100 * scale),
+                  Math.round((node.height - 180 * scale) / 2 + 90 * scale),
                   1,
                   1
                 ).data
             );
           });
-        const proof = [];
-        let frame = 0;
-        for (const [time, alpha] of [
-          [0.2, effectTransition ? 1 : 0.2],
-          [0.6, effectTransition ? 1 : 0.55],
-          [1, 1],
-        ] as const) {
-          const target = Math.round(time * before.fps);
-          while (frame < target) {
-            await slider.press('ArrowRight');
-            frame++;
-          }
-          await expect
-            .poll(async () => Number(await slider.getAttribute('aria-valuenow')))
-            .toBeCloseTo(time, 7);
-          // Independent source-over: midpoint alpha=.1+.5*(1-.1)=.55.
-          const expected = [18, 52, 86].map(
-            (channel, i) => channel + alpha * ([34, 211, 238][i]! - channel)
-          );
-          await expect
-            .poll(async () => {
-              const pixel = await sample();
-              return Math.max(...expected.map((channel, i) => Math.abs(channel - pixel[i]!)));
-            })
-            .toBeLessThan(3);
-          proof.push({ time, alpha, pixel: await sample(), expected });
-        }
-        expect(await readNativeVideoProject(page)).toEqual(before);
-        await writeFile(
-          info.outputPath('ordinary-transition-pixels.json'),
-          JSON.stringify(proof, null, 2)
+        const expected = [18, 52, 86].map(
+          (channel, i) => channel + 0.61 * ([34, 211, 238][i]! - channel)
         );
+        const correctFrame = async () => {
+          const pixel = await sample();
+          return Math.max(...expected.map((channel, i) => Math.abs(channel - pixel[i]!)));
+        };
+        await expect.poll(correctFrame).toBeLessThan(3);
+        const completed = await canvas.evaluate((node: HTMLCanvasElement) => node.toDataURL());
+        const contextCount = await page.evaluate(async () => {
+          const contexts: unknown = Reflect.get(window, '__sniptaleTestSpatialContexts');
+          if (!Array.isArray(contexts)) throw new Error('Missing captured WebGL contexts');
+          const context = contexts.find(
+            (value) => value instanceof WebGLRenderingContext && !value.isContextLost()
+          );
+          if (!(context instanceof WebGLRenderingContext))
+            throw new Error('Missing live spatial WebGL context');
+          const extension = context.getExtension('WEBGL_lose_context');
+          if (!extension) throw new Error('Required WebGL context loss extension is unavailable');
+          await new Promise<void>((resolve) => {
+            context.canvas.addEventListener('webglcontextlost', () => resolve(), { once: true });
+            extension.loseContext();
+          });
+          return contexts.length;
+        });
+        const failure = page.locator('[data-ui="video.preview.effect-runtime-error"]');
+        await expect(failure).toBeVisible();
+        expect(await canvas.evaluate((node: HTMLCanvasElement) => node.toDataURL())).toBe(
+          completed
+        );
+        expect(await readNativeVideoProject(page)).toEqual(before);
         await page.screenshot({
-          path: info.outputPath('ordinary-transition.png'),
+          path: info.outputPath('spatial-context-lost.png'),
+          fullPage: false,
+        });
+        await failure.getByRole('button').click();
+        await expect(failure).toBeHidden();
+        await expect
+          .poll(() =>
+            page.evaluate(() => {
+              const contexts: unknown = Reflect.get(window, '__sniptaleTestSpatialContexts');
+              return Array.isArray(contexts) ? contexts.length : 0;
+            })
+          )
+          .toBeGreaterThan(contextCount);
+        await expect.poll(correctFrame).toBeLessThan(3);
+        expect(await readNativeVideoProject(page)).toEqual(before);
+        await page.screenshot({
+          path: info.outputPath('spatial-context-recovered.png'),
           fullPage: false,
         });
         expect(errors).toEqual([]);
@@ -1815,104 +1929,8 @@ for (const effectTransition of [false, true])
         host.server.closeAllConnections();
         await new Promise<void>((resolve) => host.server.close(() => resolve()));
       }
-    });
-  }
-
-for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
-  test(`lost spatial WebGL context retains the completed frame and retries through the existing UI ${viewport.size.width}`, async ({
-    page,
-  }, info) => {
-    test.setTimeout(180000);
-    await page.setViewportSize({ ...viewport.size });
-    await page.addInitScript(() => {
-      if (window !== window.top) return;
-      const contexts: WebGLRenderingContext[] = [];
-      Reflect.set(window, '__sniptaleTestSpatialContexts', contexts);
-      const original = HTMLCanvasElement.prototype.getContext;
-      Reflect.set(
-        HTMLCanvasElement.prototype,
-        'getContext',
-        function (this: HTMLCanvasElement, ...args: unknown[]) {
-          const result = Reflect.apply(original, this, args);
-          if (result instanceof WebGLRenderingContext && !contexts.includes(result))
-            contexts.push(result);
-          return result;
-        }
-      );
-    });
-    const host = await startHostServer();
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    try {
-      await openFixture(page, host.origin);
-      const before = await readNativeVideoProject(page);
-      const canvas = page.locator('[data-preview-stage-canvas]');
-      const sample = () =>
-        canvas.evaluate((node: HTMLCanvasElement) => {
-          const scale = Math.min(node.width / 320, node.height / 180);
-          return Array.from(
-            node
-              .getContext('2d')!
-              .getImageData(
-                Math.round((node.width - 320 * scale) / 2 + 220 * scale),
-                Math.round((node.height - 180 * scale) / 2 + 90 * scale),
-                1,
-                1
-              ).data
-          );
-        });
-      const expected = [18, 52, 86].map(
-        (channel, i) => channel + 0.61 * ([34, 211, 238][i]! - channel)
-      );
-      const correctFrame = async () => {
-        const pixel = await sample();
-        return Math.max(...expected.map((channel, i) => Math.abs(channel - pixel[i]!)));
-      };
-      await expect.poll(correctFrame).toBeLessThan(3);
-      const completed = await canvas.evaluate((node: HTMLCanvasElement) => node.toDataURL());
-      const contextCount = await page.evaluate(async () => {
-        const contexts: unknown = Reflect.get(window, '__sniptaleTestSpatialContexts');
-        if (!Array.isArray(contexts)) throw new Error('Missing captured WebGL contexts');
-        const context = contexts.find(
-          (value) => value instanceof WebGLRenderingContext && !value.isContextLost()
-        );
-        if (!(context instanceof WebGLRenderingContext))
-          throw new Error('Missing live spatial WebGL context');
-        const extension = context.getExtension('WEBGL_lose_context');
-        if (!extension) throw new Error('Required WebGL context loss extension is unavailable');
-        await new Promise<void>((resolve) => {
-          context.canvas.addEventListener('webglcontextlost', () => resolve(), { once: true });
-          extension.loseContext();
-        });
-        return contexts.length;
-      });
-      const failure = page.locator('[data-ui="video.preview.effect-runtime-error"]');
-      await expect(failure).toBeVisible();
-      expect(await canvas.evaluate((node: HTMLCanvasElement) => node.toDataURL())).toBe(completed);
-      expect(await readNativeVideoProject(page)).toEqual(before);
-      await page.screenshot({ path: info.outputPath('spatial-context-lost.png'), fullPage: false });
-      await failure.getByRole('button').click();
-      await expect(failure).toBeHidden();
-      await expect
-        .poll(() =>
-          page.evaluate(() => {
-            const contexts: unknown = Reflect.get(window, '__sniptaleTestSpatialContexts');
-            return Array.isArray(contexts) ? contexts.length : 0;
-          })
-        )
-        .toBeGreaterThan(contextCount);
-      await expect.poll(correctFrame).toBeLessThan(3);
-      expect(await readNativeVideoProject(page)).toEqual(before);
-      await page.screenshot({
-        path: info.outputPath('spatial-context-recovered.png'),
-        fullPage: false,
-      });
-      expect(errors).toEqual([]);
-    } finally {
-      host.server.closeAllConnections();
-      await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
-  });
+  );
 }
 
 for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {

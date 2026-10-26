@@ -410,7 +410,8 @@ for (const size of [
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
       const bundle = await build({
         stdin: {
-          contents: `
+          contents:
+            `
             import React from 'react';
             import {createRoot} from 'react-dom/client';
             import {flushSync} from 'react-dom';
@@ -424,22 +425,28 @@ for (const size of [
               document.body.append(host);const root=createRoot(host);
               const source=document.createElement('canvas');source.width=400;source.height=200;
               const c=source.getContext('2d');c.fillStyle='#252628';c.fillRect(0,0,400,200);
-              c.fillStyle='white';c.font='18px Arial';for(let y=25;y<200;y+=25)c.fillText('Readable text · lens preview · 0123456789',10,y);
-              let region={...createQuickEditZoomRegion({id:'circle',at:0}),spotlight:{...createQuickEditSpotlight(),effect:'magnify',lensShape:'circle'}};
+              c.fillStyle='white';c.font='18px Arial';for(let y=25;y<200;` +
+            `y+=25)c.fillText('Readable text · lens preview · 0123456789',10,y);
+              let region={...createQuickEditZoomRegion({id:'circle',at:0}),` +
+            `spotlight:{...createQuickEditSpotlight(),effect:'magnify',lensShape:'circle'}};
               const rect={x:0,y:0,width:400,height:200};
               let stage=false;
-              const accept=patch=>{region={...region,...patch};host.dataset.saved=JSON.stringify(region.spotlight);render();};
+              const accept=patch=>{region={...region,...patch};` +
+            `host.dataset.saved=JSON.stringify(region.spotlight);render();};
               const layout={contentRect:rect,windowRect:rect,videoRect:rect,videoTransform:rect};
               function render(){flushSync(()=>{
                 const preview=React.createElement(ReviewSpotlightPreview,{
-                  region,camera:{scale:1,centerX:.5,centerY:.5},view:stage?'result':'area',frame:{image:source,width:400,height:200},
+                  region,camera:{scale:1,centerX:.5,centerY:.5},view:stage?'result':'area',` +
+            `frame:{image:source,width:400,height:200},
                   output:rect,layout,cornerRadius:0,scale:1,disabled:false,onChange:accept
                 });
-                root.render(stage?React.createElement(React.Fragment,null,preview,React.createElement(ReviewStageFocusControl,{
+                root.render(stage?React.createElement(React.Fragment,null,preview,` +
+            `React.createElement(ReviewStageFocusControl,{
                   focus:{region,onChange:accept,onPreview:()=>{},onInteract:()=>{}},layout,output:rect
                 })):preview);
               });}
-              host.addEventListener('circle-proof-stage',()=>{stage=true;host.dispatchEvent(new CustomEvent('circle-proof-size',{detail:50}));});
+              host.addEventListener('circle-proof-stage',()=>{stage=true;host.dispatchEvent(new ` +
+            `CustomEvent('circle-proof-size',{detail:50}));});
               host.addEventListener('circle-proof-size',event=>{
                 const d=event.detail/100;
                 region={...region,spotlight:{...region.spotlight,area:{x:.5-d/2,y:.5-d/2,width:d,height:d}}};

@@ -34,6 +34,7 @@ export class PrivacyErasureUseCase {
     const mediaExclusion = this.ports.media.reserveErasureExclusion();
     const diagnosticsExclusion = this.ports.diagnostics.reserveErasureExclusion();
     const nativeIngestionExclusion = this.ports.nativeIngestion.reserveErasureExclusion();
+    const pageRecoveryExclusion = this.ports.pageRecovery.reserveErasureExclusion();
     const popupExportExclusion = this.ports.popupExport.reserveErasureExclusion();
     const execution = this.executionQueue.then(async () => {
       try {
@@ -54,11 +55,13 @@ export class PrivacyErasureUseCase {
           diagnosticsExclusion.waitForActiveMutations(),
           nativeIngestionExclusion.waitForActiveMutations(),
           popupExportExclusion.waitForActiveMutations(),
+          pageRecoveryExclusion.waitForActiveMutations(),
         ]);
         return await this.executeWithMutationsExcluded(request);
       } finally {
         audioExclusion.release();
         popupExportExclusion.release();
+        pageRecoveryExclusion.release();
         nativeIngestionExclusion.release();
         diagnosticsExclusion.release();
         mediaExclusion.release();
@@ -109,6 +112,11 @@ function createCleanupSteps(
       () => ports.nativeIngestion.cleanup(),
       'native-ingestion-runtime-state',
       'native-ingestion-cleanup-failed'
+    ),
+    createCleanupStep(
+      () => ports.pageRecovery.cleanup(),
+      'page-recovery-runtime-state',
+      'page-recovery-cleanup-failed'
     ),
     createCleanupStep(
       () => ports.runtime.cleanup(state),

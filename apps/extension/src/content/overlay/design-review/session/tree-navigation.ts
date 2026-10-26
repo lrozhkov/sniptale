@@ -43,6 +43,7 @@ export function useDesignReviewTreeNavigation(target: Element | null) {
     const children = Array.from(target.children).filter(isSelectablePageElement);
     return {
       parent: findSelectableParent(target),
+      children,
       child: rememberedIsValid ? remembered : children.length === 1 ? children[0]! : null,
     };
   };

@@ -326,7 +326,7 @@ it('fences timing at schema 32 and admits video timing on compatible ordinary tr
     expect(isHydratableVideoProject({ ...project, version })).toBe(false);
   for (const version of [32, 33, 34, 35, 36, 37, 38, 39, 40])
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
-  expect(isHydratableVideoProject({ ...project, version: 46 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 49 })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -423,4 +423,98 @@ it('edits dormant timing-camera visibility in retained main-source bounds and pr
     transition: { kind: 'smooth', duration: 20 },
   });
   expect(changed.clips[0]).toMatchObject({ cameraPositions: [{ transition: { duration: 20 } }] });
+});
+
+it('edits one camera main-video behavior through the existing mutation and preserves no-op and locked history', () => {
+  const { project, clip } = fixture();
+  const dock = structuredClone(clip.transform);
+  const first = editCameraPosition(project, clip.id, 0, {
+    kind: 'screen-behavior',
+    behavior: 'shift',
+  });
+  expect(first.version).toBe(46);
+  const base = first.clips.find((item) => item.id === clip.id);
+  expect(base).toMatchObject({ cameraScreenBehavior: 'shift', transform: dock });
+  expect(
+    editCameraPosition(first, clip.id, 0, { kind: 'screen-behavior', behavior: 'shift' })
+  ).toBe(first);
+  const key = editCameraPosition(first, clip.id, 3, {
+    kind: 'screen-behavior',
+    behavior: 'overlay',
+  });
+  expect(key.clips[0]).toMatchObject({
+    cameraScreenBehavior: 'shift',
+    cameraPositions: [{ cameraScreenBehavior: 'overlay' }],
+  });
+  expect(
+    editCameraPosition(key, clip.id, 3, { kind: 'screen-behavior', behavior: 'overlay' })
+  ).toBe(key);
+  const locked = { ...key, tracks: key.tracks.map((track) => ({ ...track, locked: true })) };
+  expect(
+    editCameraPosition(locked, clip.id, 0, { kind: 'screen-behavior', behavior: 'shrink' })
+  ).toBe(locked);
+});
+
+it('restores Native dock appearance, shadow and fit at Shift transition endpoints on the source clock', () => {
+  const { project, clip } = fixture();
+  clip.cameraSplit = 'left';
+  clip.cameraScreenBehavior = 'shift';
+  clip.cameraAppearance = { shape: 'circle', roundness: 20, zoom: 1, panX: 0, panY: 0 };
+  clip.shadowIntensity = 40;
+  clip.fitMode = 'CONTAIN';
+  clip.playbackRate = 2;
+  clip.cameraPositions = [
+    {
+      id: 'dock',
+      sourceTime: 2,
+      cameraSplit: null,
+      transform: clip.transform,
+      fitMode: 'CONTAIN',
+      transition: { kind: 'smooth', duration: 1 },
+    },
+    {
+      id: 'shift',
+      sourceTime: 4,
+      cameraSplit: 'right',
+      cameraScreenBehavior: 'shift',
+      transform: clip.transform,
+      fitMode: 'CONTAIN',
+      transition: { kind: 'smooth', duration: 1 },
+    },
+  ];
+  for (const time of [1.5, 2]) {
+    expect(resolveCameraVisualClip(project, clip, time)).toMatchObject({
+      cameraAppearance: clip.cameraAppearance,
+      shadowIntensity: 40,
+      fitMode: 'CONTAIN',
+    });
+  }
+  expect(resolveCameraVisualClip(project, clip, 2.25)).toMatchObject({
+    cameraAppearance: { shape: 'rounded' },
+    shadowIntensity: 0,
+    fitMode: 'COVER',
+  });
+});
+
+it('edits camera shadow direction, retains angle and refuses unchanged or locked commands', () => {
+  const { project, clip } = fixture();
+  const first = editCameraPosition(project, clip.id, 3, {
+    kind: 'shadow-direction',
+    direction: { mode: 'angle', angle: 225 },
+  });
+  expect(first.version).toBe(47);
+  expect(first.clips[0]).toMatchObject({ cameraShadowDirection: { mode: 'angle', angle: 225 } });
+  expect(
+    editCameraPosition(first, clip.id, 3, {
+      kind: 'shadow-direction',
+      direction: { mode: 'angle', angle: 225 },
+    })
+  ).toBe(first);
+  const locked = { ...first, tracks: first.tracks.map((track) => ({ ...track, locked: true })) };
+  expect(
+    editCameraPosition(locked, clip.id, 3, {
+      kind: 'shadow-direction',
+      direction: { mode: 'center', angle: 225 },
+    })
+  ).toBe(locked);
 });

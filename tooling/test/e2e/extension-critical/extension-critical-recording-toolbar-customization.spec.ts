@@ -120,6 +120,8 @@ for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((vie
         const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
         const actions = page.locator('[data-ui="drawing.selection.actions"]');
         await expect(actions).toBeVisible();
+        await expect(actions.locator('[data-ui="drawing.selection.actions.front"]')).toHaveCount(0);
+        await actions.locator('[data-ui="drawing.selection.actions.reveal"]').click();
         await actions.locator('[data-ui="drawing.selection.actions.duplicate"]').click();
         await expect(actions.locator('[data-ui="drawing.selection.actions.front"]')).toBeEnabled();
         expect(await toolbar.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
@@ -1282,7 +1284,8 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
         const label = element.firstElementChild!.getBoundingClientRect();
         const control = element
           .querySelector<HTMLElement>(
-            'input[type="text"], button[role="switch"], button[aria-haspopup="listbox"], [data-ui="shared.ui.color-selector.value-trigger"]'
+            'input[type="text"], button[role="switch"], button[aria-haspopup="listbox"], ' +
+              '[data-ui="shared.ui.color-selector.value-trigger"]'
           )!
           .getBoundingClientRect();
         return {

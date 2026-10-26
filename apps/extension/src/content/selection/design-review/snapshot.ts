@@ -4,6 +4,7 @@ import {
   type PageStylePatch,
   type PageStyleProperty,
 } from '@sniptale/runtime-contracts/page-style';
+import { browserAnnotationSession } from '../../parser/page-preparation/annotations';
 import { isPageStyleMutationElement, type PageStyleMutationElement } from './style/element';
 
 type PageStyleElementKind = 'block' | 'image' | 'text';
@@ -39,13 +40,39 @@ function resolveElementKind(element: Element): PageStyleElementKind {
   return element.children.length > 0 ? 'block' : 'text';
 }
 
-function createComputedDeclaration(
+function readAcceptedInspectorDimensions(element: PageStyleMutationElement): Map<string, string> {
+  const accepted = new Map<string, string>();
+  const annotationId = browserAnnotationSession.getAnnotationId(element);
+  if (annotationId === null) return accepted;
+  const record = browserAnnotationSession
+    .captureSnapshot()
+    .domRecords.find((item) => item.annotationId === annotationId);
+  for (const change of record?.propertyChanges ?? []) {
+    if (
+      !/^(?:width|height|font-size|line-height|letter-spacing|margin-.+|padding-.+|border-.+-(?:width|radius))$/u.test(
+        change.property
+      )
+    )
+      continue;
+    if (
+      element.style.getPropertyValue(change.property) !== change.after.value ||
+      element.style.getPropertyPriority(change.property) !== change.after.priority
+    )
+      continue;
+    accepted.set(change.property, change.after.value);
+  }
+  return accepted;
+}
+
+function createInspectorDeclaration(
+  accepted: ReadonlyMap<string, string>,
   styles: CSSStyleDeclaration,
   property: PageStyleProperty
 ): PageStyleDeclaration {
   return {
     property,
-    value: normalizeComputedStyleValue(styles.getPropertyValue(property)),
+    // Only recorded edits retain authored dimension units; visual fields use computed values.
+    value: normalizeComputedStyleValue(accepted.get(property) ?? styles.getPropertyValue(property)),
   };
 }
 
@@ -136,6 +163,7 @@ export function readPageStyleSelectionSnapshot(
     return null;
   }
 
+  const accepted = readAcceptedInspectorDimensions(element);
   return {
     domPath: createReadableDomPath(element),
     element,
@@ -143,7 +171,7 @@ export function readPageStyleSelectionSnapshot(
     patch: {
       ...EMPTY_STYLE_PATCH,
       declarations: PAGE_STYLE_ALLOWED_PROPERTIES.map((property) =>
-        createComputedDeclaration(styles, property)
+        createInspectorDeclaration(accepted, styles, property)
       ),
     },
     selectorLabel: createElementCode(element),

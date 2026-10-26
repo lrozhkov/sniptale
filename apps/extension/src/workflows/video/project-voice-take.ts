@@ -1,3 +1,4 @@
+import { inspectLocalVoiceSource } from './local-voice-source';
 import type { AudioStagedHandle, ProjectAudioTextJobScope } from '../../contracts/ai/audio';
 import {
   getVideoProject,
@@ -9,7 +10,7 @@ import { isCurrentVideoProjectSnapshot } from '../../composition/persistence/pro
 import { discardAudioStaging } from '../../composition/persistence/assets/audio-staging';
 import {
   assertLibraryAudioBindingSource,
-  readLibraryAudioBindingSource,
+  type readLibraryAudioBindingSource,
 } from '../../composition/persistence/projects/library-asset-binding';
 import type { VideoProject } from '../../features/video/project/types/model';
 import { captureVideoProjectVoiceTextBasis } from '../../features/video/project/text/voice-scope';
@@ -23,7 +24,6 @@ import {
   type VideoProjectVoicePlacement,
 } from '../../features/video/project/text/authoring';
 import { applyVideoProjectMutationPatch } from '../../features/video/project/mutation';
-import { inspectReviewAudio } from '../video-review/audio-import';
 
 /** The mounted editor owns Save and aborts its operation signal when its session ends. */
 export interface ProjectVoiceReadAccess {
@@ -98,15 +98,7 @@ export async function prepareProjectLocalTextVoice(args: {
   if (!admitted || localProjectKey(admitted) !== initial) throw new Error('stale');
   if (args.recordingBasisHash !== undefined && args.recordingBasisHash !== captured.basisHash)
     throw new Error('stale');
-  const source =
-    selection.kind === 'library'
-      ? (selection.auditionedSource ?? (await readLibraryAudioBindingSource(selection.id)))
-      : null;
-  if (selection.kind === 'library' && source?.mediaId !== selection.id)
-    throw new Error('invalid-request');
-  const file = source?.file ?? (selection.kind === 'file' ? selection.file : null);
-  if (!file) throw new Error('invalid-request');
-  const duration = await inspectReviewAudio(file, signal);
+  const { source, file, duration } = await inspectLocalVoiceSource(selection, signal);
   signal.throwIfAborted();
   const current = access.getProject();
   if (!current || localProjectKey(current) !== initial) throw new Error('stale');

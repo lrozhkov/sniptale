@@ -397,7 +397,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       expect(await identity()).toEqual(before);
       await expect(
         hint.locator(
-          '[data-tour-hint-title], [data-tour-hint-action-title], [data-tour-narration-toggle], [data-tour-narration-replay]'
+          '[data-tour-hint-title], [data-tour-hint-action-title], ' +
+            '[data-tour-narration-toggle], [data-tour-narration-replay]'
         )
       ).toHaveCount(0);
       for (const [selector, name] of [

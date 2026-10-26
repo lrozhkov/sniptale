@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -64,6 +65,10 @@ it('keeps color previews local and leaves the document unchanged on cancel', asy
   await act(nextFrame);
   expect(host.querySelector('[data-testid="background-color"]')?.textContent).toBe('#ffffffff');
 
-  act(() => root.unmount());
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   host.remove();
 });

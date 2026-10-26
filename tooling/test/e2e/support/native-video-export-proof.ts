@@ -159,7 +159,9 @@ export async function encodedNativeVideoSamples(
               video.cancelVideoFrameCallback(callback);
               reject(
                 new Error(
-                  `Native export frame unavailable: requested=${time}, frame=${frameTime}, presented=${lastPresented}, current=${video.currentTime}, seeking=${video.seeking}, ready=${video.readyState}`
+                  `Native export frame unavailable: requested=${time}, frame=${frameTime}, ` +
+                    `presented=${lastPresented}, current=${video.currentTime}, seeking=` +
+                    `${video.seeking}, ready=${video.readyState}`
                 )
               );
             }, 15000);

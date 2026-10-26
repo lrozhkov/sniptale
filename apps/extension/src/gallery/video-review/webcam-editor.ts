@@ -9,7 +9,12 @@ import {
   type QuickEditWebcam,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
-import type { CameraSplitSide } from '../../features/video/project/camera/split';
+import {
+  isCameraScreenBehavior,
+  cameraSplitPanels,
+  type CameraScreenBehavior,
+  type CameraSplitSide,
+} from '../../features/video/project/camera/split';
 import type { ReviewSelection } from '../../features/video/review/types';
 import {
   attachReviewWebcam,
@@ -49,10 +54,18 @@ function setReviewWebcamSplit(
     return {
       ...camera,
       positions: camera.positions.map((position) =>
-        position.id === positionId ? { ...position, split } : position
+        position.id === positionId
+          ? {
+              ...position,
+              split,
+              ...(split ? { screenBehavior: position.screenBehavior ?? 'shrink' } : {}),
+            }
+          : position
       ),
     };
-  return split ? { ...camera, split } : { ...camera, split: undefined };
+  return split
+    ? { ...camera, split, screenBehavior: camera.screenBehavior ?? 'shrink' }
+    : { ...camera, split: undefined };
 }
 
 type WebcamEditorArgs = {
@@ -67,6 +80,26 @@ type WebcamEditorArgs = {
   seek(time: number): void;
   allowed(): boolean;
 };
+
+function canResizeHiddenCameraRange(
+  camera: QuickEditWebcam | undefined,
+  id: string,
+  range: { start: number; end: number },
+  duration: number
+) {
+  return (
+    !!camera?.enabled &&
+    camera.hiddenRanges.some((item) => item.id === id) &&
+    Number.isFinite(range.start) &&
+    Number.isFinite(range.end) &&
+    range.start >= 0 &&
+    range.end <= duration &&
+    range.end - range.start >= 0.001 &&
+    !camera.hiddenRanges.some(
+      (item) => item.id !== id && item.start < range.end && item.end > range.start
+    )
+  );
+}
 
 /** Authored camera edits use the existing history writer and selection authority. */
 export function useReviewWebcamEditor(args: WebcamEditorArgs) {
@@ -99,6 +132,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     (item) => args.selection.kind === 'webcam-hidden' && item.id === args.selection.id
   );
   const authoredPlacement = selectedPosition?.placement ?? camera?.placement;
+  const split = selectedPosition ? (selectedPosition.split ?? null) : (camera?.split ?? null);
   const placement =
     camera && authoredPlacement
       ? quickEditWebcamBounds(authoredPlacement, args.scene, camera.appearance.shape)
@@ -127,7 +161,22 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     selectedPosition,
     hidden,
     placement,
-    split: selectedPosition ? (selectedPosition.split ?? null) : (camera?.split ?? null),
+    cropPlacement: split ? cameraSplitPanels(split).camera : placement,
+    screenBehavior: selectedPosition ? selectedPosition.screenBehavior : camera?.screenBehavior,
+    setScreenBehavior: (behavior: CameraScreenBehavior) => {
+      if (!isCameraScreenBehavior(behavior)) return;
+      mutate((current) =>
+        selectedPosition
+          ? {
+              ...current,
+              positions: current.positions.map((item) =>
+                item.id === selectedPosition.id ? { ...item, screenBehavior: behavior } : item
+              ),
+            }
+          : { ...current, screenBehavior: behavior }
+      );
+    },
+    split,
     scene: args.scene,
     crop:
       selectedPosition?.crop ??
@@ -164,6 +213,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       const id = crypto.randomUUID();
       mutate((current) => {
         const previous = current.positions.findLast((item) => item.time <= time);
+        const behavior = previous ? previous.screenBehavior : current.screenBehavior;
         return {
           ...current,
           positions: [
@@ -173,6 +223,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
               time,
               placement: previous?.placement ?? current.placement,
               split: previous ? (previous.split ?? null) : (current.split ?? null),
+              ...(behavior ? { screenBehavior: behavior } : {}),
               crop: quickEditWebcamCropAt(current, time),
               transition: { type: 'ease-in-out' as const, duration: 0.5 },
             },
@@ -187,6 +238,35 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
       if (latest.current.allowed()) args.seek(target?.time ?? 0);
     },
     canHide,
+    canResizeHidden: (id: string, range: { start: number; end: number }) =>
+      latest.current.allowed() &&
+      !acquisition.busy() &&
+      canResizeHiddenCameraRange(
+        latest.current.advanced.advanced.webcam,
+        id,
+        range,
+        latest.current.sourceDuration
+      ),
+    resizeHidden: (id: string, range: { start: number; end: number }) => {
+      mutate((current) => {
+        if (!canResizeHiddenCameraRange(current, id, range, latest.current.sourceDuration))
+          return current;
+        if (
+          current.hiddenRanges.some(
+            (item) => item.id === id && item.start === range.start && item.end === range.end
+          )
+        )
+          return current;
+        return {
+          ...current,
+          hiddenRanges: current.hiddenRanges
+            .map((item) =>
+              item.id === id ? { ...item, start: range.start, end: range.end } : item
+            )
+            .sort((a, b) => a.start - b.start),
+        };
+      });
+    },
     hide: (range: { start: number; end: number }, replace = false) => {
       if (!canHide(range, replace)) return;
       const id = (replace ? hidden?.id : undefined) ?? crypto.randomUUID();
@@ -226,14 +306,22 @@ function useReviewWebcamAcquisition(
   const [pending, setPending] = useState(false);
   const [attempt, retry] = useState(0);
   const acquisition = useRef<AbortController | null>(null);
+  const discoveredSession = useRef<WebcamEditorArgs['session'] | null>(null);
+  const automatic = useRef({ session: args.session, attempted: false });
+  if (automatic.current.session !== args.session)
+    automatic.current = { session: args.session, attempted: false };
   const aggregateId = args.session.getSnapshot().snapshot.workspace.aggregateId;
   useEffect(() => {
     const abort = new AbortController();
     setFailed(false);
+    setCandidate(null);
     if (!assetId) {
       void findReviewWebcam(aggregateId, abort.signal).then(
         (value) => {
-          if (!abort.signal.aborted) setCandidate(value);
+          if (!abort.signal.aborted) {
+            discoveredSession.current = args.session;
+            setCandidate(value);
+          }
         },
         () => {
           if (!abort.signal.aborted) setFailed(true);
@@ -241,12 +329,19 @@ function useReviewWebcamAcquisition(
       );
     }
     return () => abort.abort();
-  }, [aggregateId, assetId, attempt]);
-  useEffect(() => () => acquisition.current?.abort(), []);
+  }, [args.session, aggregateId, assetId, attempt]);
+  useEffect(() => {
+    setPending(false);
+    return () => {
+      acquisition.current?.abort();
+      acquisition.current = null;
+    };
+  }, [args.session, aggregateId]);
 
-  const attach = async (recoverAssetId?: string) => {
+  const attach = async (recoverAssetId?: string, automatically = false) => {
     if (!latest.current.allowed() || acquisition.current) return;
-    if (!candidate && !recoverAssetId) return;
+    if ((!candidate || discoveredSession.current !== args.session) && !recoverAssetId) return;
+    automatic.current.attempted = true;
     const abort = new AbortController();
     acquisition.current = abort;
     setPending(true);
@@ -254,7 +349,12 @@ function useReviewWebcamAcquisition(
     latest.current.pause();
     const assertCurrentTarget = () => {
       abort.signal.throwIfAborted();
-      if (!latest.current.allowed() || latest.current.session !== args.session)
+      if (
+        !latest.current.allowed() ||
+        latest.current.session !== args.session ||
+        latest.current.session.getSnapshot().snapshot.workspace.aggregateId !== aggregateId ||
+        (automatically && !canAutomaticallyAttachWebcam(latest.current))
+      )
         throw new Error('Camera attachment target changed.');
     };
     try {
@@ -284,7 +384,7 @@ function useReviewWebcamAcquisition(
             });
           },
         });
-      if (!abort.signal.aborted && !recoverAssetId) {
+      if (!abort.signal.aborted && !recoverAssetId && !automatically) {
         if (latest.current.advanced.advanced.ui.tracks.webcam === false)
           await latest.current.advanced.setTrackVisibility('webcam', true);
         latest.current.select({ kind: 'webcam' });
@@ -292,10 +392,19 @@ function useReviewWebcamAcquisition(
     } catch {
       if (!abort.signal.aborted) setFailed(true);
     } finally {
-      acquisition.current = null;
+      if (acquisition.current === abort) acquisition.current = null;
       if (!abort.signal.aborted) setPending(false);
     }
   };
+  useEffect(() => {
+    if (
+      candidate &&
+      discoveredSession.current === args.session &&
+      !automatic.current.attempted &&
+      canAutomaticallyAttachWebcam(args)
+    )
+      void attach(undefined, true);
+  });
   return {
     candidate,
     failed,
@@ -305,10 +414,32 @@ function useReviewWebcamAcquisition(
     attach: () => attach(),
     retry: () => {
       if (assetId) return attach(assetId);
+      if (candidate) return attach();
+      automatic.current.attempted = false;
       setFailed(false);
       retry((value) => value + 1);
     },
   };
+}
+
+function canAutomaticallyAttachWebcam(
+  args: Pick<WebcamEditorArgs, 'session' | 'advanced' | 'allowed'>
+) {
+  const { webcam, ui } = args.advanced.advanced;
+  return (
+    args.allowed() &&
+    ui.mode === 'advanced' &&
+    !ui.modeSelectionPending &&
+    ui.tracks.webcam !== false &&
+    !webcam &&
+    !args.session
+      .getSnapshot()
+      .snapshot.workspace.history.some(
+        (operation) =>
+          operation.target === 'advancedContent' &&
+          (!!operation.before.webcam || !!operation.after.webcam)
+      )
+  );
 }
 
 /** Framing updates target one anchor or the base without rewriting timing or the other frame properties. */

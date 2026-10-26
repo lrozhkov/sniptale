@@ -65,44 +65,6 @@
   text-align: left;
 }
 
-.sniptale-callout-preset-actions {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-50%);
-  transition: opacity 120ms ease;
-}
-
-.sniptale-callout-preset-row:hover .sniptale-callout-preset-actions,
-.sniptale-callout-preset-row:focus-within .sniptale-callout-preset-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.sniptale-callout-preset-row:hover .sniptale-glass-preset-check,
-.sniptale-callout-preset-row:focus-within .sniptale-glass-preset-check {
-  opacity: 0;
-}
-
-.sniptale-callout-preset-action {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--sniptale-color-text-secondary);
-  cursor: pointer;
-}
-
 .sniptale-callout-preset-action:hover:not(:disabled),
 .sniptale-callout-preset-action:focus-visible {
   color: var(--sniptale-color-accent);

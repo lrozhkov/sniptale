@@ -176,8 +176,11 @@ async function enter(page: Page) {
   await ui(page, 'content.toolbar.mode-selector-button').click();
   await ui(page, 'content.toolbar.mode-option.quick-edit').click();
   await ui(page, 'content.toolbar.page-editing-mode.ai').click();
-  await page.locator('#synthetic-paragraph').click();
   await expect(modalRoot(page)).toBeVisible();
+  await expect(modalRoot(page).locator('.sniptale-ai-spoiler-toggle')).toHaveAttribute(
+    'aria-expanded',
+    'true'
+  );
 }
 
 async function localProvider() {
@@ -598,6 +601,11 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   const checked = await checkbox.isChecked();
   await checkbox.setChecked(!checked);
   await checkbox.setChecked(checked);
+  await modal
+    .locator('.sniptale-tree-row-field')
+    .filter({ hasText: 'Selected reference paragraph' })
+    .getByRole('checkbox')
+    .check();
   const jsonToggle = modal.locator('.sniptale-ai-data-preview-toggle');
   if ((await jsonToggle.getAttribute('aria-pressed')) === 'true') await jsonToggle.click();
   await expect(jsonToggle.locator('.lucide-eye')).toBeVisible();

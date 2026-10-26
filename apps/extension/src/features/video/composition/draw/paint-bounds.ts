@@ -1,3 +1,5 @@
+import { cameraShadowLocalOffset } from '../../project/camera/shadow-direction';
+import { MAX_VIDEO_PROJECT_DIMENSION } from '../../project/validation/primitives';
 import type { CameraSpatialRect as Rect } from '../../project/motion/spatial';
 import type { VideoCompositionVisualLayer } from '../types';
 import type {
@@ -115,7 +117,7 @@ export function resolveCompositionPaintBounds(args: {
         state.translateX * scale,
         state.translateY * scale
       );
-      let bounds = layerBounds(args.context, layer, frame, scale);
+      let bounds = layerBounds(args.context, layer, frame, scale, matrix);
       const effects = layerEffectBounds(layer.clipId, bounds, frame, scale, args.frames);
       bounds = effects.source;
       if (effects.viewport) result = union(result, effects.viewport);
@@ -142,7 +144,8 @@ function layerBounds(
   context: CanvasRenderingContext2D,
   layer: VideoCompositionVisualLayer,
   frame: Rect,
-  scale: number
+  scale: number,
+  matrix: Matrix
 ): Rect {
   if (layer.kind === 'video' || layer.kind === 'image') {
     const shadow =
@@ -153,6 +156,23 @@ function layerBounds(
         layer.clip.shadowMode,
         layer.kind === 'video' && layer.trackRole === 'CAMERA'
       );
+    if (shadow && layer.kind === 'video' && layer.cameraShadowVector) {
+      const offset = cameraShadowLocalOffset(
+        layer.cameraShadowVector,
+        (2 + (Math.max(0, Math.min(100, layer.clip.shadowIntensity ?? 0)) / 100) * 5) *
+          Math.max(0.1, scale),
+        { a: matrix[0], b: matrix[1], c: matrix[2], d: matrix[3] }
+      );
+      if (!offset) return frame;
+      shadow.offsetX = offset.x;
+      shadow.offsetY = offset.y;
+      const bleed = Math.ceil(shadow.blur + Math.abs(offset.x) + Math.abs(offset.y) + 2);
+      if (
+        frame.width + bleed * 2 > MAX_VIDEO_PROJECT_DIMENSION ||
+        frame.height + bleed * 2 > MAX_VIDEO_PROJECT_DIMENSION
+      )
+        return frame;
+    }
     return shadow
       ? pad(frame, Math.ceil(shadow.blur + Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY) + 2))
       : frame;

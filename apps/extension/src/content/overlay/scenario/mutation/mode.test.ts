@@ -291,15 +291,39 @@ it('preserves usable local UI when activation compensation also fails and permit
   await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(true);
 });
 
-it('changes only visibility for an already enabled recorder', async () => {
+it('closes an enabled recorder without changing the project or sidebar preference', async () => {
   resetModeActionMocks();
   const args = createPanelArgs();
   args.currentSession.enabled = true;
   args.visible = false;
+  const original = structuredClone(args.currentSession);
   await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(true);
-  expect(transportMocks.setScenarioSidebarVisibleMock).toHaveBeenCalledExactlyOnceWith(false);
-  expect(transportMocks.setScenarioEnabledMock).not.toHaveBeenCalled();
+  expect(transportMocks.setScenarioEnabledMock).toHaveBeenCalledExactlyOnceWith(false);
+  expect(transportMocks.setScenarioSidebarVisibleMock).not.toHaveBeenCalled();
   expect(transportMocks.updateScenarioSurfaceStateMock).not.toHaveBeenCalled();
+  expect(args.currentSession).toEqual(original);
+});
+
+it('retains accepted recorder state after close refusal and permits retry', async () => {
+  resetModeActionMocks();
+  const args = createPanelArgs();
+  args.currentSession.enabled = true;
+  args.visible = false;
+  transportMocks.setScenarioEnabledMock.mockResolvedValueOnce({ success: false });
+  await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(false);
+  expect(args.applyScenarioResponse).not.toHaveBeenCalled();
+  expect(args.currentSession.enabled).toBe(true);
+  await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(true);
+  expect(args.applyScenarioResponse).toHaveBeenCalledOnce();
+});
+
+it('expands an enabled recorder without restarting recording', async () => {
+  resetModeActionMocks();
+  const args = createPanelArgs();
+  args.currentSession.enabled = true;
+  await expect(applyScenarioRecorderPanelVisibility(args)).resolves.toBe(true);
+  expect(transportMocks.setScenarioSidebarVisibleMock).toHaveBeenCalledExactlyOnceWith(true);
+  expect(transportMocks.setScenarioEnabledMock).not.toHaveBeenCalled();
 });
 
 it.each(['surface', 'enable'] as const)(

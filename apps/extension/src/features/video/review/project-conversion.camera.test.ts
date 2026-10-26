@@ -345,3 +345,53 @@ it.each(['rounded', 'soft', 'ellipse', 'circle'] as const)(
     );
   }
 );
+
+it.each(['shrink', 'shift', 'overlay'] as const)(
+  'transfers %s geometry, crop and source-clock transitions without weakening schema',
+  (behavior) => {
+    const input = cameraFixture();
+    const webcam = input.document.advancedContent.webcam!;
+    webcam.split = 'left';
+    webcam.screenBehavior = behavior;
+    webcam.positions = [
+      {
+        id: 'split-move',
+        time: 1,
+        placement: webcam.placement,
+        split: 'top',
+        screenBehavior: behavior,
+        crop: { zoom: 2, panX: 0.5, panY: -0.5 },
+        transition: { type: 'ease-in-out', duration: 1 },
+      },
+    ];
+    const { project } = prepared(input);
+    expect(project.version).toBe(46);
+    expect(parseHydratableVideoProject({ ...project, version: 45 })).toBeNull();
+    const revived = parseHydratableVideoProject(project);
+    expect(revived).not.toBeNull();
+    for (const camera of cameras(project)) {
+      expect(camera.cameraScreenBehavior).toBe(behavior);
+      expect(camera.cameraPositions?.[0]?.cameraScreenBehavior).toBe(behavior);
+      for (const time of [camera.startTime, camera.startTime + camera.duration / 2]) {
+        const sourceTime = getMediaClipSourceTime(camera, time);
+        expect(resolveCameraSplitPresentation(project, camera, time)?.screen).toEqual(
+          quickEditWebcamScreenPlacementAt(webcam, sourceTime)
+        );
+      }
+    }
+  }
+);
+
+it.each(['classic', 'angle', 'center', 'nearest-edge'] as const)(
+  'transfers %s camera shadow direction with strict Native 47 admission',
+  (mode) => {
+    const input = cameraFixture();
+    input.document.advancedContent.webcam!.shadowDirection = { mode, angle: 225 };
+    const { project } = prepared(input);
+    expect(project.version).toBe(47);
+    for (const camera of cameras(project))
+      expect(camera.cameraShadowDirection).toEqual({ mode, angle: 225 });
+    expect(parseHydratableVideoProject(project)).not.toBeNull();
+    expect(parseHydratableVideoProject({ ...project, version: 46 })).toBeNull();
+  }
+);

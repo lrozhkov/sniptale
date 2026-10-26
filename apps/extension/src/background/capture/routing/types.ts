@@ -18,6 +18,7 @@ export type CaptureRouteContext = {
   message?: Partial<RouteCaptureMessage> &
     Record<string, unknown> & {
       actionType?: CaptureActionType;
+      quickActionTransactionId?: string;
       scenarioCapture?: ScenarioRuntimeCapturePayload;
     };
   resolvedTabId: number;

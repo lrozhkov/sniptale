@@ -15,7 +15,8 @@ test('perspective filters subpixel rules and depth blur without moving line copi
   const bundle = await build({
     stdin: {
       contents:
-        "export { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer';",
+        "export { createReviewSpatialRenderer } from './apps/extension/src/features/" +
+        "video/composition/canvas/spatial-renderer';",
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -195,8 +196,11 @@ test('visual focus contours bound the real WebGL sharp and fully blurred regions
   const bundle = await build({
     stdin: {
       contents:
-        "export { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer';\n        export { quickEditPlaneProjection, p" +
-        "rojectQuickEditPoint } from './apps/extension/src/features/video/composition/motion/spatial-geometry';\n        export { resolveReviewSpatialFocusGeometry, " +
+        "export { createReviewSpatialRenderer } from './apps/extension/src/features/" +
+        "video/composition/canvas/spatial-renderer';\n        export { " +
+        'quickEditPlaneProjection, p' +
+        ("rojectQuickEditPoint } from './apps/extension/src/features/video/composition/" +
+          "motion/spatial-geometry';\n        export { resolveReviewSpatialFocusGeometry, ") +
         "unprojectReviewSpatialPoint } from './apps/extension/src/gallery/video-revie" +
         "w/spatial-control-geometry'; export { measureSpatialFocusPixels } from '" +
         "./tooling/test/e2e/support/spatial-focus-probe';",
@@ -437,7 +441,9 @@ test('a straight faint rule keeps its center across a spatially varying depth bl
   const bundle = await build({
     stdin: {
       contents:
-        "export { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer'; export {quickEditPlaneProjection, projectQui" +
+        "export { createReviewSpatialRenderer } from './apps/extension/src/features/" +
+        "video/composition/canvas/spatial-renderer'; export {quickEditPlaneProjection, " +
+        'projectQui' +
         "ckEditPoint} from './apps/extension/src/features/video/composition/motion/spatial-geometry';",
       resolveDir: process.cwd(),
     },
@@ -654,8 +660,10 @@ test('rotated source-window perspective and local depth match the same GPU plane
   const bundle = await build({
     stdin: {
       contents:
-        "export { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer';" +
-        "export { drawSpatialCameraGroup } from './apps/extension/src/features/video/composition/canvas/spatial-group';" +
+        "export { createReviewSpatialRenderer } from './apps/extension/src/features/" +
+        "video/composition/canvas/spatial-renderer';" +
+        ("export { drawSpatialCameraGroup } from './apps/extension/src/features/video/" +
+          "composition/canvas/spatial-group';") +
         "export { resolveVideoCompositionCamera } from './apps/extension/src/features/video/composition/motion';",
       resolveDir: process.cwd(),
     },

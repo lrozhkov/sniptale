@@ -115,7 +115,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           target.id = 'content-edit-selection';
           target.textContent = 'First second third fourth';
           target.style.cssText =
-            'position:absolute;left:620px;top:170px;width:260px;height:56px;margin:0;padding:8px;background:#dbeafe;color:#172554';
+            'position:absolute;left:620px;top:170px;width:260px;height:56px;margin:0;' +
+            'padding:8px;background:#dbeafe;color:#172554';
           document.body.append(target);
         });
         await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
@@ -203,7 +204,8 @@ for (const { theme, locale } of [
           const target = document.createElement('p');
           target.id = 'review-inline-text';
           target.style.cssText =
-            'position:absolute;left:620px;top:170px;width:260px;height:56px;margin:0;padding:8px;background:#dbeafe;color:#172554';
+            'position:absolute;left:620px;top:170px;width:260px;height:56px;margin:0;' +
+            'padding:8px;background:#dbeafe;color:#172554';
           const strong = document.createElement('strong');
           strong.textContent = 'rich';
           target.append('Original ', strong, ' text');

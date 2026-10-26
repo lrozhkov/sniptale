@@ -1,6 +1,18 @@
 /** Narrow proof for the two camera editors and their shared compositor. */
 export const CAMERA_SPLIT_OWNER_MAPPINGS = [
   {
+    owner: 'review-camera-split-persistence',
+    productionFile: 'apps/extension/src/features/video/review/advanced/webcam.ts',
+    allowCrossOwner: true,
+    reason:
+      'Camera screen behavior uses canonical workspace history, stale-write refusal and restore admission.',
+    testFiles: [
+      'apps/extension/src/features/video/review/advanced/webcam.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-advanced.test.ts',
+    ],
+  },
+  {
     owner: 'review-camera-split-conversion',
     productionFile: 'apps/extension/src/features/video/review/project-camera.ts',
     reason: 'Gallery camera positions retain their panel geometry after native project conversion.',

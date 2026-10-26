@@ -97,7 +97,9 @@ export function resolveToolbarFloatingMenuStyle(params: {
 
   if (
     displayMode === 'vertical' &&
-    anchorEl.closest('.sniptale-toolbar[data-video-recording="true"]')
+    anchorEl.closest(
+      '.sniptale-toolbar[data-video-recording="true"], .sniptale-toolbar[data-page-controls="true"]'
+    )
   ) {
     return resolveToolbarDrawingMenuStyle({
       anchorEl,
@@ -170,7 +172,10 @@ export function resolveToolbarDrawingMenuStyle(params: {
     surfaceInset: params.surfaceInset ?? 0,
   });
   const toLeft = params.displayMode === 'vertical' && position.left < toolbarRect.x;
-  if (params.displayMode === 'vertical' && toolbar.dataset['videoRecording'] === 'true') {
+  if (
+    params.displayMode === 'vertical' &&
+    (toolbar.dataset['videoRecording'] === 'true' || toolbar.dataset['pageControls'] === 'true')
+  ) {
     return {
       ...position,
       position: 'fixed',

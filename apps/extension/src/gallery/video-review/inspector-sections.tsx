@@ -67,8 +67,11 @@ export function reviewInspectorActions(content: ReactNode): ReviewInspectorSecti
 /** One section definition drives both the vertical navigation and the collapsible list. */
 export function ReviewInspectorSections({
   sections,
+  leadingSectionColumn = false,
 }: {
   sections: readonly ReviewInspectorSection[];
+  /** Isolate a large leading group in All mode without changing category order. */
+  leadingSectionColumn?: boolean;
 }) {
   const context = useContext(PresentationContext);
   const presentation = context.value;
@@ -76,6 +79,14 @@ export function ReviewInspectorSections({
   const remembered = context.remembered ?? local;
   const remember = context.remember ?? setLocal;
   const initial = sections.find((section) => section.id === remembered)?.id ?? sections[0]?.id;
+  // Terminal commands follow the parameters without taking a parameter column of their own.
+  const parameterCount = sections.length - Number(sections.at(-1)?.id === 'actions');
+  const columnBreak =
+    parameterCount <= 1
+      ? sections.length
+      : leadingSectionColumn
+        ? 1
+        : Math.ceil(parameterCount / 2);
   if (!initial) return null;
   return (
     <div data-ui="gallery.videoReview.inspectorSections" data-presentation={presentation}>
@@ -94,10 +105,7 @@ export function ReviewInspectorSections({
           )}
         />
       ) : (
-        [
-          sections.slice(0, Math.ceil(sections.length / 2)),
-          sections.slice(Math.ceil(sections.length / 2)),
-        ]
+        [sections.slice(0, columnBreak), sections.slice(columnBreak)]
           .filter((column) => column.length > 0)
           .map((column, index) => (
             <div className="review-inspector-section-column" key={index}>

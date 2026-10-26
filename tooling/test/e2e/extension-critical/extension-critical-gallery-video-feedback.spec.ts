@@ -71,6 +71,9 @@ for (const variant of [
               .evaluate((video: HTMLVideoElement) => video.currentTime)
           )
           .toBeGreaterThan(4);
+        await dialog
+          .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+          .click();
         const audioTool = button('gallery.videoReview.originalAudioRange');
         const trigger = async () => {
           if ((await audioTool.getAttribute('aria-pressed')) !== 'true') await audioTool.click();

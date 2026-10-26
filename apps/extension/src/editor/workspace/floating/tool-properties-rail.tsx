@@ -6,7 +6,10 @@ import { type CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 import { useEditorController } from '../../application/controller-context';
 import { EditorDrawingOptions } from '../../drawing/options';
-import { DrawingSelectionActions } from '../../../ui/drawing-tools/selection-actions';
+import {
+  DrawingSelectionActions,
+  useDrawingSelectionDisclosure,
+} from '../../../ui/drawing-tools/selection-actions';
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   canDeleteLayerSelection,
@@ -167,6 +170,7 @@ export function EditorFloatingToolPropertiesRail({
   selection,
 }: EditorFloatingToolPropertiesRailProps) {
   const controller = useEditorController();
+  const selectionDisclosure = useDrawingSelectionDisclosure(selection.hasSelection);
   const layers = useEditorStore((state) => state.layers);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const groups = useToolPropertyGroups(documentController.compactCommandGroups);
@@ -261,6 +265,7 @@ export function EditorFloatingToolPropertiesRail({
         {showSelectionActions ? (
           <FloatingChromeToolbar dataUi="editor.floating.selection-actions" className="shrink-0">
             <DrawingSelectionActions
+              disclosure={selectionDisclosure}
               canReorder={canReorderLayerSelection(layers)}
               canDuplicate={canDuplicateLayerSelection(layers)}
               canDelete={canDeleteLayerSelection(layers)}

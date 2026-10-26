@@ -1,9 +1,9 @@
+// @vitest-environment jsdom
 import { presentWorkspaceSceneEdgesPreview } from './workspace-state';
 import { createVideoProjectSceneEdges } from '../../../features/video/project/scene/edge-fades';
 import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
 import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
 import { presentWorkspaceWatermarkPreview } from './workspace-state';
-// @vitest-environment jsdom
 import { DEFAULT_CAMERA_PERSPECTIVE } from '../../../features/video/project/motion/spatial';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { isHydratableVideoProject } from '../../../features/video/project/validation/root';

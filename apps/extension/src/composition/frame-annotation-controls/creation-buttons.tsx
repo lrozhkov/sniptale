@@ -94,6 +94,7 @@ function CreationSplitButton(props: {
 }
 
 export function FrameStyleCreationButton(props: {
+  renderControl?: ((control: ReactNode) => ReactNode) | undefined;
   activeMenu: FrameAnnotationCreationMenu | null;
   contentContext: boolean;
   dataUi?: string;
@@ -110,7 +111,7 @@ export function FrameStyleCreationButton(props: {
     ? 'content.toolbar.future-frame-style'
     : 'frame-annotation.creation.frame';
   const menuSide = useCreationMenuDirection('frame', props.frameRef, props.resolveMenuDirection);
-  return (
+  const control = (
     <div
       className="sniptale-toolbar-subgroup"
       data-ui={
@@ -145,9 +146,11 @@ export function FrameStyleCreationButton(props: {
       />
     </div>
   );
+  return props.renderControl ? props.renderControl(control) : control;
 }
 
 export function AnnotationCreationButtons(props: {
+  grouped?: boolean | undefined;
   renderControl?: ((menu: 'callout' | 'step-badge', control: ReactNode) => ReactNode) | undefined;
   activeMenu: FrameAnnotationCreationMenu | null;
   calloutRef: RefObject<HTMLButtonElement | null>;
@@ -167,15 +170,8 @@ export function AnnotationCreationButtons(props: {
   const stepBadgeActive =
     props.settings.stepBadge !== null && props.settings.stepBadge.enabled !== false;
   const renderControl = props.renderControl ?? ((_menu, control) => control);
-  return (
-    <div
-      className="sniptale-toolbar-subgroup sniptale-toolbar-annotation-group"
-      data-ui={
-        props.contentContext
-          ? 'content.toolbar.future-frame-annotations-group'
-          : 'frame-annotation.creation-annotations'
-      }
-    >
+  const buttons = (
+    <>
       {props.showCallout
         ? renderControl(
             'callout',
@@ -222,6 +218,20 @@ export function AnnotationCreationButtons(props: {
             </CreationSplitButton>
           )
         : null}
+    </>
+  );
+  return props.grouped === false ? (
+    buttons
+  ) : (
+    <div
+      className="sniptale-toolbar-subgroup sniptale-toolbar-annotation-group"
+      data-ui={
+        props.contentContext
+          ? 'content.toolbar.future-frame-annotations-group'
+          : 'frame-annotation.creation-annotations'
+      }
+    >
+      {buttons}
     </div>
   );
 }

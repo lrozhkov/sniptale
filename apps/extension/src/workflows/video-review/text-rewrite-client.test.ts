@@ -105,3 +105,27 @@ describe('review text page Port lifetime', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+it.each(['start', 'keepalive'] as const)(
+  'disposes review transport after a failed %s send without retry',
+  async (phase) => {
+    const port = fixture();
+    if (phase === 'start')
+      port.postMessage.mockImplementationOnce(() => {
+        throw new Error('closed');
+      });
+    const promise = runReviewTextJob(start, new AbortController().signal);
+    const failed = expect(promise).rejects.toThrow('interrupted');
+    if (phase === 'keepalive') {
+      port.postMessage.mockImplementationOnce(() => {
+        throw new Error('closed');
+      });
+      await vi.advanceTimersByTimeAsync(REVIEW_TEXT_KEEPALIVE_MS);
+    }
+    await failed;
+    expect(port.disconnect).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    port.onMessage.emit({ type: 'proposal', requestId: start.requestId, proposal });
+    expect(port.connect).toHaveBeenCalledOnce();
+  }
+);

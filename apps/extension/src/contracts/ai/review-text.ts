@@ -93,6 +93,31 @@ export const reviewTextContextSchema = z
   });
 export type ReviewTextContext = z.infer<typeof reviewTextContextSchema>;
 
+/** Builds the disclosed wire context and preserves each caller's invalid-input error policy. */
+export function admitReviewTextContext(
+  options: Pick<
+    ReviewTextContext,
+    'prompt' | 'mode' | 'wholeDocument' | 'changeIntervals' | 'resegment'
+  >,
+  window: ReviewTextContext['window'],
+  fragments: ReviewTextContext['fragments'],
+  invalidError: 'invalid-request' | 'invalid'
+): ReviewTextContext {
+  const parsed = reviewTextContextSchema.safeParse({
+    ...options,
+    version: 1,
+    window,
+    fragments,
+  });
+  if (!parsed.success) {
+    const budget = parsed.error.issues.some(
+      (issue) => issue.code === 'too_big' || issue.message === 'Choose a smaller text scope'
+    );
+    throw new Error(budget ? 'too-large' : invalidError);
+  }
+  return parsed.data;
+}
+
 const proposalFragmentSchema = z
   .object({
     fromIds: z.array(id).min(1).max(2_000),

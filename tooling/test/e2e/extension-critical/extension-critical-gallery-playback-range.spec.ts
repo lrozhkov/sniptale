@@ -172,14 +172,19 @@ for (const variant of [
       await expect(button('gallery.videoReview.undo')).toBeDisabled();
       await button('gallery.videoReview.advancedEditing').click();
       await rulerDrag(page, 0.5, 6.5);
+      await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
       await button('gallery.videoReview.focusRangeTool').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'focus');
       const focus = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       await expect(focus).toBeInViewport();
       await expect(focus).toHaveCSS('box-shadow', 'none');
-      await expect(
-        focus.locator('xpath=../..').locator('[data-ui="gallery.videoReview.trackHeader"]')
-      ).not.toHaveCSS('box-shadow', 'none');
+      const focusHeader = dialog.locator('[data-review-header-track="zoom"]');
+      await expect(focusHeader).toHaveAttribute('data-review-header-selected', 'true');
+      await expect(focusHeader.locator('[data-review-track-select]')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await expect(focusHeader).toHaveCSS('box-shadow', 'none');
       await page.screenshot({ path: info.outputPath('focus-tool-lane.png'), fullPage: false });
       await expect(summary).toBeVisible();
       await expect(focus.locator('[role="button"]')).toHaveCount(1);
@@ -202,19 +207,25 @@ for (const variant of [
           .getByRole('option', { name: label(`gallery.videoReview.${kind}`), exact: true })
           .click();
         await expect(button('gallery.videoReview.focusRangeTool')).toBeEnabled();
+        await dialog
+          .locator('[data-review-header-track="zoom"] [data-review-track-select]')
+          .click();
         await button('gallery.videoReview.focusRangeTool').click();
       }
       await expect(focus.locator('[role="button"]')).toHaveCount(3);
 
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
-      await expect(plane).toHaveAttribute('data-active-tool-lane', 'source');
-      await proveToolGroup(
-        page,
-        label('gallery.videoReview.speedRate'),
-        info.outputPath('speed-group.png')
+      await expect(dialog.locator('[data-review-header-track="source"]')).toHaveAttribute(
+        'data-review-header-selected',
+        'true'
       );
-      if (variant.locale === 'en' && !('viewport' in variant))
-        await proveToolbarBoundary(page, (name) => info.outputPath(`speed-${name}`));
+      await expect(plane).not.toHaveAttribute('data-active-tool-lane');
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.editBlock"] button[aria-pressed]')
+      ).toHaveAttribute('aria-pressed', 'true');
       const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
       await expect(source).toBeInViewport();
       await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(1);
@@ -243,11 +254,16 @@ for (const variant of [
       await remove.hover();
       await expect(remove).not.toHaveCSS('color', idleColor);
       await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(remove).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
       await expect
         .poll(() =>
           remove.evaluate((node) => {
-            const style = getComputedStyle(node);
-            return style.borderColor === style.color;
+            const probe = document.createElement('span');
+            probe.style.color = 'var(--sniptale-color-danger)';
+            node.append(probe);
+            const danger = getComputedStyle(probe).color;
+            probe.remove();
+            return getComputedStyle(node).color === danger;
           })
         )
         .toBe(true);
@@ -267,17 +283,21 @@ for (const variant of [
         'title',
         label('gallery.videoReview.placement_occupied')
       );
-      await source.hover({ position: { x: 10, y: 40 } });
-      await expect(plane).toHaveCSS('cursor', 'crosshair');
       await expect(
         toolbar.locator('[title="' + label('gallery.videoReview.resultDuration') + '"]')
       ).toHaveCount(0);
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await expect(button('gallery.videoReview.originalAudioRange')).toHaveAttribute(
         'title',
         variant.locale === 'ru'
           ? 'Выделите участок исходного аудио, чтобы создать изменение громкости'
           : 'Drag a range on the source audio to add a volume change'
       );
+      await dialog
+        .locator('[data-review-header-track="originalAudio"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.originalAudioRange').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'original');
       await proveToolGroup(
@@ -327,7 +347,20 @@ for (const variant of [
       await button('gallery.videoReview.fit').click();
       await button('gallery.videoReview.clearPlaybackRange').click();
       // Existing source-lane drawing still creates an edit.
+      await dialog
+        .locator('[data-review-header-track="source"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.speedMode').click();
+      await expect(plane).toHaveAttribute('data-active-tool-lane', 'source');
+      await proveToolGroup(
+        page,
+        label('gallery.videoReview.speedRate'),
+        info.outputPath('speed-group.png')
+      );
+      if (variant.locale === 'en' && !('viewport' in variant))
+        await proveToolbarBoundary(page, (name) => info.outputPath(`speed-${name}`));
+      await source.hover({ position: { x: 10, y: 40 } });
+      await expect(plane).toHaveCSS('cursor', /^url\("data:image\/svg\+xml,.*"\) 4 16, cell$/u);
       await source.scrollIntoViewIfNeeded();
       const sourceRect = (await source.boundingBox())!;
       // The sticky ruler can cover the upper part of a scrolled source row.
@@ -342,7 +375,15 @@ for (const variant of [
       await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(3);
       await expect(summary).toHaveCount(0);
       await rulerDrag(page, 10.8, 11.7);
-      for (const key of ['cutMode', 'speedMode', 'focusRangeTool', 'originalAudioRange'] as const) {
+      for (const [track, key] of [
+        ['source', 'cutMode'],
+        ['source', 'speedMode'],
+        ['zoom', 'focusRangeTool'],
+        ['originalAudio', 'originalAudioRange'],
+      ] as const) {
+        await dialog
+          .locator(`[data-review-header-track="${track}"] [data-review-track-select]`)
+          .click();
         await expect(button(`gallery.videoReview.${key}`)).toBeDisabled();
         await expect(button(`gallery.videoReview.${key}`)).toHaveAttribute(
           'title',
@@ -424,10 +465,23 @@ test('quick editor Space keeps transport priority after buttons and closed selec
     await expect(zoom).toHaveValue(value);
     await page.keyboard.press('Space');
     await expect(video).toHaveJSProperty('paused', true);
-    await button('gallery.keyboard.title').click();
+    const more = button('gallery.videoReview.moreActions');
+    await more.focus();
+    await page.keyboard.press('ArrowDown');
+    const menu = page.getByRole('menu', {
+      name: label('gallery.videoReview.moreActions'),
+      exact: true,
+    });
+    const keyboard = menu.getByRole('menuitem', {
+      name: label('gallery.keyboard.title'),
+      exact: true,
+    });
+    await keyboard.focus();
+    await page.keyboard.press('Enter');
     const help = dialog.locator('[data-ui="gallery.videoReview.keyboardHelp"]');
     await help.getByRole('button').press('Space');
     await expect(help).toHaveCount(0);
+    await expect(more).toBeFocused();
     await expect(video).toHaveJSProperty('paused', true);
     await button('common.actions.close').click();
     await expect(dialog).toHaveCount(0);

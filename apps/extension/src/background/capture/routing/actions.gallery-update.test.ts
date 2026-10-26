@@ -1,10 +1,13 @@
+vi.mock('../quick-actions/appearance', () => ({ beginPageAppearance: beginPageAppearanceMock }));
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
+  beginPageAppearanceMock,
   issueRecentCaptureEditorAssetCapabilityMock,
   loadSettingsMock,
   saveScreenshotToMediaHubFromDataUrlMock,
 } = vi.hoisted(() => ({
+  beginPageAppearanceMock: vi.fn(),
   issueRecentCaptureEditorAssetCapabilityMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
@@ -28,6 +31,7 @@ import { handleSaveScreenshotToGallery } from './actions.gallery-update';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  beginPageAppearanceMock.mockReturnValue({ assertCurrent() {}, release() {} });
   loadSettingsMock.mockResolvedValue({
     localStoragePolicy: { defaultDestination: 'temporary' },
   });
@@ -83,4 +87,67 @@ it('does not issue content-bound editor authority for a save without content pre
 
   expect(issueRecentCaptureEditorAssetCapabilityMock).not.toHaveBeenCalled();
   expect(sendResponse).toHaveBeenCalledWith({ assetId: 'asset-1', success: true });
+});
+
+it('publishes and returns the same prepared selection image and filename', async () => {
+  let resolve!: (value: { dataUrl: string; filename: string }) => void;
+  const prepare = vi.fn(
+    () =>
+      new Promise<{ dataUrl: string; filename: string }>((accept) => {
+        resolve = accept;
+      })
+  );
+  const release = vi.fn();
+  beginPageAppearanceMock.mockReturnValue({ prepare, assertCurrent() {}, release });
+  const sendResponse = vi.fn();
+  handleSaveScreenshotToGallery(
+    { dataUrl: 'raw', filename: 'raw.png', quickActionTransactionId: 'tx-1' },
+    7,
+    sendResponse
+  );
+  expect(beginPageAppearanceMock).toHaveBeenCalledWith(7, 'tx-1');
+  expect(saveScreenshotToMediaHubFromDataUrlMock).not.toHaveBeenCalled();
+  resolve({ dataUrl: 'styled', filename: 'styled.webp' });
+  await vi.waitFor(() => expect(release).toHaveBeenCalledOnce());
+  expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
+    'styled',
+    'styled.webp',
+    7,
+    'temporary'
+  );
+  expect(sendResponse).toHaveBeenCalledWith({
+    success: true,
+    assetId: 'asset-1',
+    dataUrl: 'styled',
+    filename: 'styled.webp',
+  });
+});
+it('refuses publication when erasure invalidates admission during settings load', async () => {
+  let resolve!: (value: { localStoragePolicy: { defaultDestination: 'temporary' } }) => void;
+  loadSettingsMock.mockReturnValue(
+    new Promise((accept) => {
+      resolve = accept;
+    })
+  );
+  let current = true;
+  const release = vi.fn();
+  beginPageAppearanceMock.mockReturnValue({
+    prepare: async () => ({ dataUrl: 'styled', filename: 'styled.png' }),
+    assertCurrent() {
+      if (!current) throw new Error('appearance cancelled');
+    },
+    release,
+  });
+  const sendResponse = vi.fn();
+  handleSaveScreenshotToGallery(
+    { dataUrl: 'raw', filename: 'raw.png', quickActionTransactionId: 'tx-1' },
+    7,
+    sendResponse
+  );
+  await vi.waitFor(() => expect(loadSettingsMock).toHaveBeenCalledOnce());
+  current = false;
+  resolve({ localStoragePolicy: { defaultDestination: 'temporary' } });
+  await vi.waitFor(() => expect(release).toHaveBeenCalledOnce());
+  expect(saveScreenshotToMediaHubFromDataUrlMock).not.toHaveBeenCalled();
+  expect(sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
 });

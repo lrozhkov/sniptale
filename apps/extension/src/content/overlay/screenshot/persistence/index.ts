@@ -34,6 +34,7 @@ type PersistenceResult = {
 };
 
 type BasePersistenceParams = {
+  quickActionTransactionId?: string | undefined;
   assertFresh?: FreshnessAssertion | undefined;
   mode: ScreenshotMode;
   sessionActivePresetId: string | null;
@@ -49,6 +50,7 @@ type PersistSelectionCaptureParams = BasePersistenceParams & {
 type PersistBackgroundCaptureParams = BasePersistenceParams & {
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   response: {
+    filename?: string;
     action?: CaptureActionType;
     dataUrl?: string;
   };
@@ -84,6 +86,17 @@ async function sendRuntimeMessageWithFreshness<TMessage extends ContentActionRun
   assertFresh(args.assertFresh);
   const response =
     await getContentRuntimeServices().messaging.sendRuntimeMessage(messageWithIntent);
+  if (
+    response &&
+    typeof response === 'object' &&
+    'success' in response &&
+    response.success === false
+  )
+    throw new Error(
+      'error' in response && typeof response.error === 'string'
+        ? response.error
+        : translate('content.runtime.quickActionAppearanceFailed')
+    );
   assertFresh(args.assertFresh);
   return response;
 }
@@ -194,6 +207,7 @@ async function persistDeferredSelectionAction(args: {
 }
 
 export async function persistSelectionCapture({
+  quickActionTransactionId,
   actionType,
   assertFresh: assertFreshness,
   contentIntentSource,
@@ -204,17 +218,24 @@ export async function persistSelectionCapture({
 }: PersistSelectionCaptureParams): Promise<PersistenceResult> {
   const settings = await loadSettings();
   assertFresh(assertFreshness);
-  const filename = await generateFilename(mode);
+  let filename = await generateFilename(mode);
   const saveResponse = await sendRuntimeMessageWithFreshness({
     assertFresh: assertFreshness,
     contentIntentSource,
     libraryDestinationRequested: actionType === 'save_to_library',
     message: {
       type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      ...(quickActionTransactionId ? { quickActionTransactionId } : {}),
       dataUrl,
       filename,
     },
   });
+  if (saveResponse && typeof saveResponse === 'object') {
+    if ('dataUrl' in saveResponse && typeof saveResponse.dataUrl === 'string')
+      dataUrl = saveResponse.dataUrl;
+    if ('filename' in saveResponse && typeof saveResponse.filename === 'string')
+      filename = saveResponse.filename;
+  }
   const assetId =
     saveResponse &&
     typeof saveResponse === 'object' &&
@@ -284,7 +305,7 @@ export async function persistBackgroundCapture({
   }
 
   if (response.action === 'ask_preset' && response.dataUrl) {
-    const filename = await generateFilename(mode);
+    const filename = response.filename ?? (await generateFilename(mode));
 
     if (sessionActivePresetId) {
       await executePresetSave({

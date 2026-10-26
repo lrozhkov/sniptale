@@ -4,6 +4,7 @@ import {
   getTourAnnotations,
   TOUR_HIGHLIGHT_ANIMATION_DEFAULTS,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -84,7 +85,11 @@ beforeEach(() => {
   root = createRoot(host);
 });
 afterEach(async () => {
-  await act(async () => root.unmount());
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   host.remove();
   restoreDialog();
   vi.unstubAllGlobals();

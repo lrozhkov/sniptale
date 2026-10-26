@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   export: vi.fn(),
   telemetry: vi.fn(),
   open: vi.fn(),
+  read: vi.fn(),
   publish: vi.fn(),
   dispose: vi.fn(),
   duration: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
     typeof import('../../composition/persistence/review-workspaces/store')
   >()),
   openVideoWorkspace: mocks.open,
+  readVideoWorkspace: mocks.read,
 }));
 vi.mock('../../features/media-hub/events', () => ({
   publishMediaHubLibraryChanged: mocks.publish,
@@ -66,6 +68,7 @@ import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.metadata.mockResolvedValue({});
+  mocks.read.mockResolvedValue(null);
   mocks.media.mockResolvedValue({
     filename: 'clip.webm',
     mimeType: 'video/webm',
@@ -280,4 +283,20 @@ it('publishes project admission only after commit, including cancellation after 
     loadVideoReviewSource('recording:r', new AbortController().signal)
   ).rejects.toThrow();
   expect(mocks.publish).not.toHaveBeenCalled();
+});
+
+it('opens an archived quick project from its original media without changing workspace identity', async () => {
+  mocks.read.mockResolvedValue({ workspace: { sourceMediaId: 'recording:r' }, draft: null });
+  mocks.open.mockResolvedValue({ workspace: { project: { name: 'Previous edit' } }, draft: null });
+  const loaded = await loadVideoReviewSource(
+    'quick-project:archived',
+    new AbortController().signal
+  );
+  expect(mocks.media).toHaveBeenCalledWith('recording:r');
+  expect(mocks.open).toHaveBeenCalledWith(
+    'quick-project:archived',
+    loaded.source,
+    'immutable-file'
+  );
+  expect(loaded.filename).toBe('Previous edit');
 });

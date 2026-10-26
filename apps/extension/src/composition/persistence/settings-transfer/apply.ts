@@ -1,3 +1,4 @@
+import { parsePageLaunchPreferences } from '../../../contracts/page-launch';
 import { parseFilenameRules } from '../../../features/file-naming/rules';
 import { parseStoredHighlighterSettings } from '../highlighter/guards';
 import { resolveLoadedHighlighterSettings } from '../highlighter/resolved';
@@ -211,6 +212,11 @@ function applySettingsWrites(context: WriteBuildContext): void {
       localWrites['sniptale-locale-preference'] = preferences['locale'];
     if (preferences['popupStartup'] !== undefined)
       localWrites['sniptale_popup_startup'] = preferences['popupStartup'];
+    if (preferences['pageLaunch'] !== undefined) {
+      const pageLaunch = parsePageLaunchPreferences(preferences['pageLaunch']);
+      if (!pageLaunch) throw new Error('Invalid page-launch transfer preferences');
+      nextSettings.pageLaunch = pageLaunch;
+    }
     if (preferences['contextMenu'] !== undefined)
       nextSettings.contextMenu = preferences['contextMenu'] as NormalizedSettings['contextMenu'];
   }

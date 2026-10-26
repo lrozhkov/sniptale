@@ -24,6 +24,7 @@ it('runs owner cleanup in the explicit order and merges the typed aggregate', as
     'media',
     'diagnostics',
     'native-ingestion',
+    'page-recovery',
     'runtime',
     'storage',
   ]);
@@ -36,6 +37,7 @@ it('runs owner cleanup in the explicit order and merges the typed aggregate', as
         verified('recording-runtime-state'),
         verified('diagnostics-runtime-state'),
         verified('native-ingestion-runtime-state'),
+        verified('page-recovery-runtime-state'),
         verified('background-runtime-state'),
         verified('indexed-db:core'),
       ],
@@ -360,5 +362,34 @@ it('reserves audio exclusion and cancels audio before persistent erasure', async
   );
   expect(ports.audioJobs.cancelActiveJob).toHaveBeenCalledBefore(vi.mocked(ports.storage.cleanup));
   expect(waitForActiveMutations).toHaveBeenCalledBefore(vi.mocked(ports.storage.cleanup));
+  expect(release).toHaveBeenCalledOnce();
+});
+
+it('excludes and drains page recovery before erasing private bytes', async () => {
+  const ports = createPorts();
+  let unblock!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    unblock = resolve;
+  });
+  const draining = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const release = vi.fn();
+  ports.pageRecovery.reserveErasureExclusion = vi.fn(() => ({
+    release,
+    async waitForActiveMutations() {
+      entered();
+      await gate;
+    },
+  }));
+  const operation = new PrivacyErasureUseCase(ports).execute(createErasureRequest());
+  expect(ports.pageRecovery.reserveErasureExclusion).toHaveBeenCalledOnce();
+  await draining;
+  expect(ports.storage.cleanup).not.toHaveBeenCalled();
+  unblock();
+  const result = await operation;
+  expect(result.success).toBe(true);
+  expect(ports.pageRecovery.cleanup).toHaveBeenCalledOnce();
   expect(release).toHaveBeenCalledOnce();
 });

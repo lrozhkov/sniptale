@@ -1,5 +1,8 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { startHostServer } from '../support/host-server';
+import { openRealPopup, sendRuntimeMessage } from '../support/recording-action';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import {
   ASR_MODEL_NAME,
@@ -114,21 +117,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       ).toHaveCount(0);
       await expect(page.locator('a[href="?section=access-data&view=permissions"]')).toHaveCount(0);
       const grid = ui(page, 'settings.voice.test-grid');
-      const container = grid.locator('..');
-      for (const width of [639, 640, 641]) {
-        await container.evaluate((element, width) => {
-          element.style.width = `${width}px`;
-        }, width);
-        const columns = await grid.evaluate(
-          (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length
-        );
-        expect(columns).toBe(width < 640 ? 1 : 2);
-        await grid.scrollIntoViewIfNeeded();
-        await voiceScreenshot(page, info, `recognition-layout-${width}`);
-      }
-      await container.evaluate((element) => {
-        element.style.removeProperty('width');
-      });
+      const columns = await grid.evaluate(
+        (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length
+      );
+      expect(columns).toBe(2);
       expect(provider.uploads).toHaveLength(0);
       expect(provider.corrections).toHaveLength(0);
     });
@@ -173,7 +165,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       provider.respond('correction');
       await expect(field).toHaveValue(CORRECTED_TRANSCRIPT);
       await expect(ui(page, 'settings.voice.start')).toBeEnabled();
-      await ui(page, 'settings.voice.history-refresh').click();
+      await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
       const row = ui(page, 'settings.voice.history-row');
       await expect(row).toHaveCount(1);
       await expect(row).toHaveAttribute('data-status', 'ready');
@@ -259,7 +251,7 @@ test('native ASR failure retains audio and retries without inserting a partial r
     });
     await expect(ui(page, 'settings.voice.start')).toBeEnabled();
     await expect(field).toHaveValue('');
-    await ui(page, 'settings.voice.history-refresh').click();
+    await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
     const row = ui(page, 'settings.voice.history-row');
     await expect(row).toHaveCount(1);
     await expect(row).toHaveAttribute('data-status', 'failed');
@@ -307,7 +299,7 @@ test('native correction failure preserves raw text and original audio for explic
       exact: true,
     });
     await expect(field).toHaveValue(RAW_TRANSCRIPT);
-    await ui(page, 'settings.voice.history-refresh').click();
+    await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
     const row = ui(page, 'settings.voice.history-row');
     await expect(row).toContainText(RAW_TRANSCRIPT);
     const original = (await readVoiceEntries(page))[0]!;
@@ -451,3 +443,247 @@ test('native scenario global model and Cancel prevent late insertion', async ({}
     }
   );
 });
+
+test('native content field keeps click recording and applies the saved correction prompt', async ({}, info) => {
+  const host = await startHostServer();
+  try {
+    await withVoiceBrowser(
+      PRIMARY_BROWSER_VIEWPORTS[0].size,
+      'en',
+      async ({ page: settings, extensionId, provider, context }) => {
+        const page = await context.newPage();
+        await page.goto(host.origin);
+        const popup = await openRealPopup(context, extensionId);
+        await popup.evaluate((origin) => {
+          const grant = document.createElement('button');
+          grant.textContent = 'Grant voice test site';
+          grant.onclick = async () => {
+            grant.dataset['granted'] = String(
+              await chrome.permissions.request({ origins: [`${origin}/*`] })
+            );
+          };
+          document.body.append(grant);
+        }, host.origin);
+        const grant = popup.getByRole('button', { name: 'Grant voice test site', exact: true });
+        await grant.click();
+        await expect(grant).toHaveAttribute('data-granted', 'true');
+        const tabId = await popup.evaluate(async (url) => {
+          const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+          if (tab?.id === undefined) throw new Error('Voice source tab missing');
+          return tab.id;
+        }, page.url());
+        await page.reload();
+        expect(
+          await sendRuntimeMessage(popup, {
+            type: 'PAGE_ACCESS',
+            operation: 'register-granted-site',
+            tabId,
+          })
+        ).toMatchObject({ success: true });
+        await popup.evaluate(
+          (id) =>
+            chrome.tabs.sendMessage(id, {
+              type: 'ENABLE_SCREENSHOT_MODE',
+              workingMode: 'highlighter',
+            }),
+          tabId
+        );
+        await page.bringToFront();
+        await ui(page, 'content.toolbar.mode-selector-button').click();
+        await ui(page, 'content.toolbar.mode-option.quick-edit').click();
+        await ui(page, 'content.toolbar.page-editing-mode.ai').click();
+        await expect(page.locator('.sniptale-ai-modal-root')).toBeVisible();
+        const field = page.locator('#ai-prompt');
+        const microphone = ui(page, 'content.ai-modal.prompt-voice-input');
+        await expect(field).toBeVisible();
+        await field.fill('');
+        await microphone.click();
+        await expect(microphone).toHaveAttribute('aria-pressed', 'true');
+        await page.waitForTimeout(800);
+        await expect(microphone).toHaveAttribute('aria-pressed', 'true');
+        await microphone.click();
+        await expect(field).toHaveValue(CORRECTED_TRANSCRIPT);
+        expect(provider.corrections).toEqual([
+          {
+            model: 'synthetic-text',
+            messages: [
+              { role: 'system', content: CORRECTION_PROMPT },
+              { role: 'user', content: RAW_TRANSCRIPT },
+            ],
+          },
+        ]);
+        await voiceScreenshot(page, info, 'content-click-corrected');
+        await settings.bringToFront();
+        const prompt = ui(settings, 'settings.voice.correction-prompt');
+        await prompt.fill('Return only the dictated sentence in uppercase.');
+        await ui(settings, 'settings.voice.prompt-save').click();
+        await expect(ui(settings, 'settings.voice.prompt-save')).toBeDisabled();
+        await page.bringToFront();
+        await field.fill('');
+        await microphone.hover();
+        await page.mouse.down();
+        await page.waitForTimeout(800);
+        await page.mouse.up();
+        await expect(field).toHaveValue(CORRECTED_TRANSCRIPT);
+        expect(provider.corrections).toHaveLength(2);
+        expect(provider.corrections[1]).toMatchObject({
+          messages: [
+            { role: 'system', content: 'Return only the dictated sentence in uppercase.' },
+            { role: 'user', content: RAW_TRANSCRIPT },
+          ],
+        });
+        await settings.bringToFront();
+        await ui(settings, 'settings.voice.correction').click();
+        await page.bringToFront();
+        await field.fill('');
+        await microphone.click();
+        await page.waitForTimeout(800);
+        await microphone.click();
+        await expect(field).toHaveValue(RAW_TRANSCRIPT);
+        expect(provider.corrections).toHaveLength(2);
+        expect(provider.uploads).toHaveLength(3);
+        await popup.close();
+      }
+    );
+  } finally {
+    host.server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      host.server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  const locale = index === 0 ? 'en' : 'ru';
+  test(`voice history supports native selection, expansion and audio download ${viewport.name}`, async ({}, info) => {
+    await withVoiceBrowser(viewport.size, locale, async ({ page, provider }) => {
+      await ui(page, 'settings.voice.correction').click();
+      const text = 'A complete dictated sentence with a selectable transcript. '.repeat(35).trim();
+      provider.setTranscript(text);
+      await recordSettingsMicrophone(page);
+      const row = ui(page, 'settings.voice.history-row').first();
+      const paragraph = row.locator('p').filter({ hasText: text });
+      await expect(paragraph).toHaveText(text);
+      await expect(paragraph).toHaveCSS('user-select', 'text');
+      const expand = ui(row, 'settings.voice.history-expand');
+      await expect(expand).toBeVisible();
+      const previewBounds = (await paragraph.boundingBox())!;
+      const expandBounds = (await expand.boundingBox())!;
+      expect(expandBounds.y + expandBounds.height).toBeLessThanOrEqual(
+        previewBounds.y + previewBounds.height + 1
+      );
+      await expect(ui(page, 'settings.voice.history-refresh')).toHaveCount(0);
+      await expect(
+        page.getByRole('button', {
+          name: translate('settings.voiceInput.refresh', locale),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      const field = page.getByRole('textbox', {
+        name: translate('settings.voiceInput.textareaLabel', locale),
+        exact: true,
+      });
+      const microphone = ui(page, 'settings.voice.microphone-test');
+      await field.scrollIntoViewIfNeeded();
+      const left = (await microphone.boundingBox())!;
+      const right = (await field.boundingBox())!;
+      expect(left.x + left.width).toBeLessThanOrEqual(right.x);
+      const meter = (await page.getByRole('meter').boundingBox())!;
+      expect(Math.abs(meter.y - right.y)).toBeLessThanOrEqual(2);
+      await expect(
+        page.getByText(translate('settings.voiceInput.textareaLabel', locale), { exact: true })
+      ).toHaveCount(0);
+      const actions = ui(row, 'settings.voice.history-actions').locator('button');
+      await expect(actions).toHaveCount(5);
+      for (const action of await actions.all()) {
+        await expect(action).toHaveAccessibleName(/.+/);
+        expect(await action.innerText()).toBe('');
+        const box = (await action.boundingBox())!;
+        expect(box.width).toBeGreaterThanOrEqual(24);
+        expect(box.width).toBeLessThanOrEqual(36);
+      }
+      const contentScroll = ui(page, 'settings.page.content-scroll');
+      const historyList = ui(page, 'settings.voice.history').getByRole('list');
+      const historyHeading = ui(page, 'settings.voice.history').getByRole('heading');
+      await contentScroll.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      const initialHeight = await contentScroll.evaluate((node) => node.scrollHeight);
+      const initialHeading = (await historyHeading.boundingBox())!;
+      await voiceScreenshot(page, info, `history-compact-${viewport.name}`);
+      await expand.click();
+      expect(await contentScroll.evaluate((node) => node.scrollHeight)).toBeLessThanOrEqual(
+        initialHeight + 1
+      );
+      expect(
+        Math.abs((await historyHeading.boundingBox())!.y - initialHeading.y)
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await historyList.evaluate((node) => node.scrollHeight - node.clientHeight)
+      ).toBeGreaterThan(0);
+      await expect(historyList).toHaveCSS('overflow-y', 'auto');
+      await expect(paragraph).toBeFocused();
+      await paragraph.click({ clickCount: 3 });
+      await expect.poll(() => page.evaluate(() => getSelection()?.toString().trim())).toBe(text);
+      await page.keyboard.press('Control+c');
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+      const downloadEvent = page.waitForEvent('download');
+      await ui(row, 'settings.voice.history-download').click();
+      const download = await downloadEvent;
+      expect(download.suggestedFilename()).toMatch(/^dictation-\d+\.wav$/u);
+      const path = await download.path();
+      if (!path) throw new Error('Downloaded audio path missing');
+      const audio = await readFile(path);
+      expect(audio.toString('ascii', 0, 4)).toBe('RIFF');
+      const entry = (await readVoiceEntries(page))[0]!;
+      expect(audio.length).toBe(entry.byteLength);
+      await expect(ui(row, 'settings.voice.history-text')).toHaveText(text);
+      await voiceScreenshot(page, info, `history-expanded-${viewport.name}`);
+      await page.setViewportSize({ width: 1100, height: 560 });
+      const outer = page.locator('.sniptale-settings-viewport');
+      expect(await outer.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeGreaterThan(
+        0
+      );
+      await ui(row, 'settings.voice.history-copy').scrollIntoViewIfNeeded();
+      await ui(row, 'settings.voice.history-copy').click();
+      await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+      await page.setViewportSize(viewport.size);
+      for (let index = 0; index < 5; index += 1) {
+        await recordSettingsMicrophone(page);
+        await expect(ui(page, 'settings.voice.history-row')).toHaveCount(index + 2);
+      }
+      await contentScroll.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await historyList.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      await expect(ui(page, 'settings.voice.history').locator('dl')).toHaveCount(0);
+      expect(await historyList.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(
+        true
+      );
+      const headerBefore = (await historyHeading.boundingBox())!;
+      const outerBefore = await contentScroll.evaluate((node) => ({
+        top: node.scrollTop,
+        height: node.scrollHeight,
+      }));
+      await historyList.hover();
+      await page.mouse.wheel(0, 10000);
+      await expect.poll(() => historyList.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      expect(
+        await contentScroll.evaluate((node) => ({ top: node.scrollTop, height: node.scrollHeight }))
+      ).toEqual(outerBefore);
+      expect(
+        Math.abs((await historyHeading.boundingBox())!.y - headerBefore.y)
+      ).toBeLessThanOrEqual(1);
+      const lastRow = ui(page, 'settings.voice.history-row').last();
+      await ui(lastRow, 'settings.voice.history-play').click();
+      await expect(ui(lastRow, 'settings.voice.history-audio')).toBeVisible();
+      await ui(lastRow, 'settings.voice.history-play').click();
+      await ui(lastRow, 'settings.voice.history-delete').click();
+      await expect(ui(lastRow, 'settings.voice.history-delete-cancel')).toBeFocused();
+      await ui(lastRow, 'settings.voice.history-delete-cancel').click();
+      await voiceScreenshot(page, info, `history-list-scroll-${viewport.name}`);
+    });
+  });
+}

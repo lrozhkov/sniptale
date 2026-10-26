@@ -1,9 +1,38 @@
 export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
   {
+    owner: 'background-page-launch-runtime-routing',
+    productionFile:
+      'apps/extension/src/background/runtime/routing/action-kernel/owned-route-handlers.ts',
+    reason: 'The corner command requires registered dispatch and rejected action-kind proof.',
+    testFiles: [
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.page-launch.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/background-owned-route-topology.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.content-action-capabilities.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.glue.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.project-export.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/index.test.ts',
+    ],
+  },
+  {
+    owner: 'background-page-launch-runtime-routing',
+    productionFile: 'apps/extension/src/background/runtime/routing/action-kernel/registry.ts',
+    reason: 'The corner command requires registered dispatch and rejected action-kind proof.',
+    testFiles: [
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.page-launch.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/background-owned-route-topology.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.content-action-capabilities.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.glue.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/handlers.project-export.test.ts',
+      'apps/extension/src/background/runtime/routing/action-kernel/index.test.ts',
+    ],
+  },
+
+  {
     owner: 'background-video-surface-commands',
     productionFile: 'apps/extension/src/background/media/video/content-surface/commands.ts',
     reason:
-      'Surface command proof includes direct permission and settings cases plus lease-authorized lifecycle and durable rollback routing.',
+      'Surface command proof includes direct permission and settings cases plus lease-authorized ' +
+      'lifecycle and durable rollback routing.',
     testFiles: [
       'apps/extension/src/background/media/video/content-surface/commands.test.ts',
       'apps/extension/src/background/media/video/content-surface/route.test.ts',
@@ -64,6 +93,10 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
       'Quick-action tab messaging, finalization, and notification flows are covered by owner suites.',
     testFiles: [
       'apps/extension/src/background/capture/quick-actions/notifications.test.ts',
+      'apps/extension/src/background/capture/quick-actions/appearance.test.ts',
+      'apps/extension/src/background/capture/quick-actions/appearance-render.test.ts',
+      'apps/extension/src/background/capture/quick-actions/desktop/workflow.test.ts',
+      'apps/extension/src/background/capture/quick-actions/flow/surface.test.ts',
       'apps/extension/src/background/capture/quick-actions/flow/flows.test.ts',
       'apps/extension/src/background/capture/quick-actions/flow/finalize.test.ts',
       'apps/extension/src/background/capture/quick-actions/flow/finalize.job.test.ts',

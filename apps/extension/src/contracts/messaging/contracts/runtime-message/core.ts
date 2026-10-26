@@ -1,3 +1,11 @@
+import type {
+  RuntimePageLaunchRequestByType,
+  RuntimePageLaunchResponseByType,
+} from './page-launch.types';
+import type {
+  RuntimeQuickActionAppearanceRequestByType,
+  RuntimeQuickActionAppearanceResponseByType,
+} from './quick-action-appearance.types';
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type {
   CaptureMessageType,
@@ -62,10 +70,12 @@ import type { SettingsTransferMessage, SettingsTransferResponse } from '../../..
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
-type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
+type RuntimeCoreBaseRequestByType = RuntimePageLaunchRequestByType &
+  RuntimeActionSaveRequestByType &
   RuntimeAiRequestByType &
   RuntimePrivacyErasureRequestByType &
   RuntimeFrameAnnotationRasterRequestByType &
+  RuntimeQuickActionAppearanceRequestByType &
   RuntimeDesktopFrameRequestByType &
   RuntimePagePackageDownloadLeaseRequestByType &
   RuntimePagePackageStagingRequestByType & {
@@ -182,12 +192,14 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
     [CaptureMessageType.CAPTURE_VISIBLE]: {
       type: typeof CaptureMessageType.CAPTURE_VISIBLE;
       actionType?: CaptureActionType;
+      quickActionTransactionId?: string;
       contentIntent?: ContentPrivilegedActionCapability;
       scenarioCapture?: ScenarioRuntimeCapturePayload;
     };
     [CaptureMessageType.CAPTURE_FULL]: {
       type: typeof CaptureMessageType.CAPTURE_FULL;
       actionType?: CaptureActionType;
+      quickActionTransactionId?: string;
       contentIntent?: ContentPrivilegedActionCapability;
       scenarioCapture?: ScenarioRuntimeCapturePayload;
     };
@@ -201,10 +213,12 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
     };
   };
 
-type RuntimeCoreBaseResponseByType = RuntimeActionSaveResponseByType &
+type RuntimeCoreBaseResponseByType = RuntimePageLaunchResponseByType &
+  RuntimeActionSaveResponseByType &
   RuntimeAiResponseByType &
   RuntimePrivacyErasureResponseByType &
   RuntimeFrameAnnotationRasterResponseByType &
+  RuntimeQuickActionAppearanceResponseByType &
   RuntimeDesktopFrameResponseByType &
   RuntimePagePackageDownloadLeaseResponseByType &
   RuntimePagePackageStagingResponseByType & {

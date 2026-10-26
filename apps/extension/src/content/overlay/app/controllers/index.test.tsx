@@ -115,6 +115,7 @@ vi.mock('../../video-recording/session/controller', () => ({
 
 import { useContentAppControllers } from '.';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import { registerContentMode, setContentModeEnabled } from '../../../application/mode-session';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -362,6 +363,8 @@ async function expectDrawingModeWiring() {
     baseModeController: { kind: 'mode-controller' },
     controller: mocks.drawingController,
     modeState,
+    registerMode: registerContentMode,
+    setModeEnabled: setContentModeEnabled,
   });
   expect(mocks.useScreenshotController).toHaveBeenCalledWith(
     expect.objectContaining({

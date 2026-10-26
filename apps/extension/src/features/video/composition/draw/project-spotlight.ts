@@ -1,3 +1,4 @@
+import { rectCorners } from '../motion/math';
 import { projectSourceContentRect } from '../motion/source-window';
 import type { VideoProject } from '../../project/types';
 import type {
@@ -340,14 +341,6 @@ function composeProjection(a: QuickEditHomography, b: QuickEditHomography): Quic
     cell(2, 0),
     cell(2, 1),
     cell(2, 2),
-  ];
-}
-function rectCorners(rect: Rect) {
-  return [
-    { x: rect.x, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y + rect.height },
-    { x: rect.x, y: rect.y + rect.height },
   ];
 }
 function projectionDensity(matrix: QuickEditHomography, rect: Rect): number {

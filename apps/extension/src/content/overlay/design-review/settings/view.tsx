@@ -1,3 +1,4 @@
+import { InspectorDisclosureView } from '../../../../ui/compact-inspector-controls/disclosure';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
 import { Droplets, Image, Maximize2, Square, Type } from 'lucide-react';
@@ -30,11 +31,12 @@ function SettingsContent(props: {
   actions: DesignReviewActions;
   disabled: boolean;
   section: SettingsSection;
+  compact?: boolean;
   state: DesignReviewViewState;
 }) {
   switch (props.section) {
     case 'text':
-      return <TextSection {...props} />;
+      return <TextSection {...props} compact={props.compact} />;
     case 'layout':
       return <BoxSection {...props} />;
     case 'appearance':
@@ -50,6 +52,7 @@ export function DesignReviewSettings(props: {
   actions: DesignReviewActions;
   disabled: boolean;
   state: DesignReviewViewState;
+  presentation?: 'comment' | 'workspace';
 }) {
   const modality = useDesignReviewInputModality();
   const imageSelected = props.state.selection?.kind === 'image';
@@ -59,11 +62,42 @@ export function DesignReviewSettings(props: {
         { icon: Image, key: 'image' as const, labelKey: 'content.designReview.sectionImage' },
       ]
     : BASE_SECTIONS;
-  const [section, setSection] = useState<SettingsSection>(imageSelected ? 'image' : 'text');
+  const [section, setSection] = useState<SettingsSection | null>(imageSelected ? 'image' : 'text');
 
   useLayoutEffect(() => {
-    setSection(imageSelected ? 'image' : 'text');
-  }, [imageSelected, props.state.selection?.element]);
+    if (props.presentation !== 'workspace') setSection(imageSelected ? 'image' : 'text');
+    else if (!imageSelected) setSection((current) => (current === 'image' ? 'text' : current));
+  }, [imageSelected, props.state.selection?.element, props.presentation]);
+
+  if (props.presentation === 'workspace')
+    return (
+      <InspectorLayout>
+        <div
+          data-ui="content.design-review.settings"
+          data-focus-modality={modality}
+          className="sniptale-inspector-surface min-w-0"
+        >
+          {sections.map((option) => (
+            <InspectorDisclosureView
+              key={option.key}
+              dataUi={`content.design-review.workspace-section.${option.key}`}
+              variant="structural"
+              level="section"
+              label={translate(option.labelKey)}
+              open={section === option.key}
+              onOpenChange={(open) =>
+                setSection((current) =>
+                  open ? option.key : current === option.key ? null : current
+                )
+              }
+              bodyClassName="px-2 pb-3 pt-2"
+            >
+              <SettingsContent {...props} section={option.key} compact />
+            </InspectorDisclosureView>
+          ))}
+        </div>
+      </InspectorLayout>
+    );
 
   return (
     <CommandPressScope value={true}>
@@ -108,7 +142,7 @@ export function DesignReviewSettings(props: {
             })}
           </nav>
           <div className="min-w-0 p-2">
-            <SettingsContent {...props} section={section} />
+            <SettingsContent {...props} section={section ?? 'text'} />
           </div>
         </div>
       </InspectorLayout>

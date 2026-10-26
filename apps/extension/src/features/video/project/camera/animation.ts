@@ -1,3 +1,4 @@
+import type { CameraShadowDirection } from './shadow-direction';
 import { getMediaClipSourceTime } from '../timeline/rate';
 import { isCameraHiddenAt } from './visibility';
 import {
@@ -9,11 +10,13 @@ import {
 import type { VideoProjectClip, VideoProjectVideoClip, VideoProject } from '../types';
 import type { VideoProjectTransform } from '../types/layout';
 import type { VideoMediaFitMode } from '../types/media';
-import { resolveCameraSplitPresentation } from './split';
+import { resolveCameraSplitPresentation, type CameraScreenBehavior } from './split';
 
 type CameraPosition = NonNullable<VideoProjectVideoClip['cameraPositions']>[number];
 
 export type CameraPositionEdit =
+  | { kind: 'shadow-direction'; direction: CameraShadowDirection }
+  | { kind: 'screen-behavior'; behavior: CameraScreenBehavior }
   | { kind: 'offset'; offsetSeconds: number }
   | { kind: 'mirror'; mirrored: boolean }
   | { kind: 'appearance'; appearance: CameraAppearance }
@@ -157,8 +160,16 @@ export function resolveCameraVisualClip(
         ...visual,
         transform: split.camera,
         fitMode:
-          split.screen.width < 1 || split.screen.height < 1 ? ('COVER' as const) : visual.fitMode,
-        ...(split.screen.width < 1 || split.screen.height < 1
+          split.screen.width < 1 ||
+          split.screen.height < 1 ||
+          !!split.screen.clip ||
+          !!split.screen.cameraOverlay
+            ? ('COVER' as const)
+            : visual.fitMode,
+        ...(split.screen.width < 1 ||
+        split.screen.height < 1 ||
+        !!split.screen.clip ||
+        !!split.screen.cameraOverlay
           ? {
               cameraAppearance: {
                 ...appearanceForSplit(visual),

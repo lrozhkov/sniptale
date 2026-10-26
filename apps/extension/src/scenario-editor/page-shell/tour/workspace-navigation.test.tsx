@@ -11,9 +11,11 @@ import {
 import { createTranslator } from '../../../platform/i18n';
 import { useGuidePanels } from '../panel-layout';
 import { TourWorkspace } from './workspace';
+import { stubTourPreviewDialog } from './preview.test-support';
 
 it('keeps scene, inspector and both navigation controls in sync without authoring a change', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const restoreDialog = stubTourPreviewDialog();
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -144,6 +146,7 @@ it('keeps scene, inspector and both navigation controls in sync without authorin
     expect(project).toEqual(before);
   } finally {
     act(() => root.unmount());
+    restoreDialog();
     host.remove();
     vi.unstubAllGlobals();
   }

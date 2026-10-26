@@ -4,7 +4,11 @@ import path from 'node:path';
 import { expect, it } from 'vitest';
 
 import { createTempRoot } from '../../../test-support/test-helpers';
-import { readOssReleasePolicy, sha256 } from '../../../../release/policy/oss-release-policy.mjs';
+import {
+  readOssReleasePolicy,
+  releaseLegalArchivePath,
+  sha256,
+} from '../../../../release/policy/oss-release-policy.mjs';
 import { formatThirdPartyNotices } from '../../../../release/dependency-legal/index.mjs';
 import { collectOssReleaseSurfaceErrors, runOssReleaseSurfaceCheck } from './check.mjs';
 import {
@@ -139,7 +143,7 @@ function seedLegalAndContributorFiles(root: string, font: Buffer) {
     ['LICENSE', readFileSync(path.resolve('LICENSE'), 'utf8')],
     ['LICENSES/OFL-1.1.txt', readFileSync(path.resolve('LICENSES/OFL-1.1.txt'), 'utf8')],
     [
-      'packages/ui/src/styles/golos-ui/LICENSE.txt',
+      releaseLegalArchivePath('packages/ui/src/styles/golos-ui/LICENSE.txt'),
       readFileSync(path.resolve('packages/ui/src/styles/golos-ui/LICENSE.txt'), 'utf8'),
     ],
     ['NOTICE', 'Copyright (C) 2026 Lev Rozhkov AGPL-3.0-or-later Golos UI\n'],
@@ -147,7 +151,11 @@ function seedLegalAndContributorFiles(root: string, font: Buffer) {
     ['THIRD_PARTY_DEPENDENCIES.json', '{"entries":[],"schemaVersion":1}\n'],
   ]);
   for (const [relativePath, contents] of legal) write(root, relativePath, contents);
-  seedInterfaceFontSources(root, font, legal.get('packages/ui/src/styles/golos-ui/LICENSE.txt')!);
+  seedInterfaceFontSources(
+    root,
+    font,
+    legal.get(releaseLegalArchivePath('packages/ui/src/styles/golos-ui/LICENSE.txt'))!
+  );
   write(root, 'README.md', 'Sniptale AGPL-3.0-or-later\n');
   write(
     root,
@@ -311,10 +319,13 @@ async function createDocumentFontFixture() {
   policy.legalFiles.find(
     (entry: { source: string }) => entry.source === 'THIRD_PARTY_NOTICES.md'
   ).sha256 = sha256(notices);
+  const releaseLicensePath = releaseLegalArchivePath(asset.licensePath);
+  const license = readFileSync(path.join(root, asset.licensePath));
+  write(root, releaseLicensePath, license);
   policy.legalFiles.push({
-    archivePath: asset.licensePath,
-    source: asset.licensePath,
-    sha256: sha256(readFileSync(path.join(root, asset.licensePath))),
+    archivePath: releaseLicensePath,
+    source: releaseLicensePath,
+    sha256: sha256(license),
   });
   write(root, policyPath, JSON.stringify(policy));
   return { root, asset, policy, policyPath };
@@ -368,18 +379,21 @@ it('rejects Text source mapping, asset export, missing license, and layout drift
 
 it('requires Text license in the release payload and pins its canonical bytes', async () => {
   const { root, asset, policy, policyPath } = await createDocumentFontFixture();
+  const releaseLicensePath = releaseLegalArchivePath(asset.licensePath);
   write(root, asset.licensePath, 'changed license');
-  policy.legalFiles.find((entry: { source: string }) => entry.source === asset.licensePath).sha256 =
-    sha256('changed license');
+  write(root, releaseLicensePath, 'changed license');
+  policy.legalFiles.find(
+    (entry: { source: string }) => entry.source === releaseLicensePath
+  ).sha256 = sha256('changed license');
   write(root, policyPath, JSON.stringify(policy));
   expect(collectOssReleaseSurfaceErrors(root)).toEqual(
     expect.arrayContaining([
-      `canonical license digest drift: ${asset.licensePath}`,
+      `canonical license digest drift: ${releaseLicensePath}`,
       'Golos Text license digest drift',
     ])
   );
   policy.legalFiles = policy.legalFiles.filter(
-    (entry: { source: string }) => entry.source !== asset.licensePath
+    (entry: { source: string }) => entry.source !== releaseLicensePath
   );
   write(root, policyPath, JSON.stringify(policy));
   expect(() => readOssReleasePolicy(root)).toThrow(

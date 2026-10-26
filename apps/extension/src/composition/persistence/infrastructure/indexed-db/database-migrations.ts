@@ -1,3 +1,4 @@
+import type { UpgradeDatabase } from './upgrade/types';
 import { estimateUsageIndexBytes } from './usage-index-migration';
 import type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
@@ -17,6 +18,16 @@ import {
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
 } from './core.stores.ts';
+
+/** Checks this released descriptor's required stores without reading or changing source data. */
+function requireMigrationStores(
+  db: UpgradeDatabase,
+  stores: readonly string[],
+  diagnostic: string
+): undefined {
+  if (!stores.every((name) => db.objectStoreNames.contains(name))) throw new Error(diagnostic);
+  return undefined;
+}
 
 // The beta baseline has no predecessor. Every future database version must append a complete,
 // contiguous descriptor and retain the fixtures for every released beta source version.
@@ -490,15 +501,11 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
     validate(db) {
-      if (
-        ![
-          VIDEO_WORKSPACES_STORE,
-          VIDEO_WORKSPACE_HISTORY_STORE,
-          VIDEO_WORKSPACE_DRAFTS_STORE,
-        ].every((name) => db.objectStoreNames.contains(name))
-      )
-        throw new Error('PCM speech workspace stores are unavailable.');
-      return undefined;
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+        'PCM speech workspace stores are unavailable.'
+      );
     },
   },
   {
@@ -513,15 +520,11 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
     validate(db) {
-      if (
-        ![
-          VIDEO_WORKSPACES_STORE,
-          VIDEO_WORKSPACE_HISTORY_STORE,
-          VIDEO_WORKSPACE_DRAFTS_STORE,
-        ].every((name) => db.objectStoreNames.contains(name))
-      )
-        throw new Error('Action audio workspace stores are unavailable.');
-      return undefined;
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+        'Action audio workspace stores are unavailable.'
+      );
     },
   },
   {
@@ -673,15 +676,11 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
     validate(db) {
-      if (
-        ![
-          VIDEO_WORKSPACES_STORE,
-          VIDEO_WORKSPACE_HISTORY_STORE,
-          VIDEO_WORKSPACE_DRAFTS_STORE,
-        ].every((name) => db.objectStoreNames.contains(name))
-      )
-        throw new Error('Review project metadata stores are unavailable.');
-      return undefined;
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+        'Review project metadata stores are unavailable.'
+      );
     },
   },
   {
@@ -696,15 +695,11 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
     validate(db) {
-      if (
-        ![
-          VIDEO_WORKSPACES_STORE,
-          VIDEO_WORKSPACE_HISTORY_STORE,
-          VIDEO_WORKSPACE_DRAFTS_STORE,
-        ].every((name) => db.objectStoreNames.contains(name))
-      )
-        throw new Error('Source crop workspace stores are unavailable.');
-      return undefined;
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+        'Source crop workspace stores are unavailable.'
+      );
     },
   },
   {
@@ -719,15 +714,11 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
     validate(db) {
-      if (
-        ![
-          VIDEO_WORKSPACES_STORE,
-          VIDEO_WORKSPACE_HISTORY_STORE,
-          VIDEO_WORKSPACE_DRAFTS_STORE,
-        ].every((name) => db.objectStoreNames.contains(name))
-      )
-        throw new Error('Workspace color stores are unavailable.');
-      return undefined;
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+        'Workspace color stores are unavailable.'
+      );
     },
   },
   {
@@ -742,15 +733,11 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
     validate(db) {
-      if (
-        ![
-          VIDEO_WORKSPACES_STORE,
-          VIDEO_WORKSPACE_HISTORY_STORE,
-          VIDEO_WORKSPACE_DRAFTS_STORE,
-        ].every((name) => db.objectStoreNames.contains(name))
-      )
-        throw new Error('Track control stores are unavailable.');
-      return undefined;
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+        'Track control stores are unavailable.'
+      );
     },
   },
   {
@@ -821,6 +808,91 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       if (!db.objectStoreNames.contains(VOICE_INPUT_HISTORY_STORE))
         throw new Error('Voice history store is unavailable.');
       return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 27, to: 28 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 35,
+    toDatabaseVersion: 36,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+        'Quick project stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 28, to: 29 },
+      { domainId: 'videoProjects', from: 5, to: 6 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 36,
+    toDatabaseVersion: 37,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
+        'Camera project stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 29, to: 30 },
+      { domainId: 'videoProjects', from: 6, to: 7 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 37,
+    toDatabaseVersion: 38,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
+        'Camera project stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 30, to: 31 },
+      { domainId: 'videoProjects', from: 7, to: 8 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 38,
+    toDatabaseVersion: 39,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
+        'Camera project stores are unavailable.'
+      );
     },
   },
 ];

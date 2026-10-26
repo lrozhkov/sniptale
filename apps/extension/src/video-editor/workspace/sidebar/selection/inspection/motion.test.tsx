@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { MotionFocusFields, MotionFocusAnimationFields } from '../motion/appearance';
 import {
   createProject,
@@ -10,7 +11,6 @@ import {
   createQuickEditBorder,
   createQuickEditSpotlight,
 } from '../../../../../features/video/project/scene/focus-appearance';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

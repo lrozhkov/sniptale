@@ -290,6 +290,37 @@ it('checks a different selected device after the preceding request releases its 
   expect(secondStop).toHaveBeenCalledOnce();
 });
 
+it('continues a queued device request after failure and permits a subsequent acquisition', async () => {
+  let rejectFirst!: (error: DOMException) => void;
+  const stop = vi.fn();
+  const getUserMedia = vi
+    .fn()
+    .mockReturnValueOnce(
+      new Promise<MediaStream>((_resolve, reject) => {
+        rejectFirst = reject;
+      })
+    )
+    .mockResolvedValue(createMockStream(stop));
+  installMediaDevicesMock({ getUserMedia });
+  const first = requestPopupMediaDevicePermission(cameraConfig, 'first-camera');
+  const failure = expect(first).rejects.toMatchObject({
+    permissionName: 'camera',
+    state: 'no-device',
+  });
+  const queued = requestPopupMediaDevicePermission(cameraConfig, 'second-camera');
+  expect(getUserMedia).toHaveBeenCalledOnce();
+  rejectFirst(new DOMException('missing', 'NotFoundError'));
+  await failure;
+  await queued;
+  expect(getUserMedia).toHaveBeenNthCalledWith(2, {
+    video: { deviceId: { exact: 'second-camera' } },
+    audio: false,
+  });
+  await requestPopupMediaDevicePermission(cameraConfig, 'second-camera');
+  expect(getUserMedia).toHaveBeenCalledTimes(3);
+  expect(stop).toHaveBeenCalledTimes(2);
+});
+
 it('reads and observes browser camera permission and disposes the observer', async () => {
   const status = Object.assign(new EventTarget(), { state: 'prompt' });
   Object.defineProperty(navigator, 'permissions', {

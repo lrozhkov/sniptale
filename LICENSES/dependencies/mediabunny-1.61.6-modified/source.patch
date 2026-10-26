@@ -1,0 +1,451 @@
+--- a/src/isobmff/isobmff-muxer.ts
++++ b/src/isobmff/isobmff-muxer.ts
+@@ -528,6 +528,10 @@
+ 		assert(meta.decoderConfig);
+ 
+ 		const decoderConfig = { ...meta.decoderConfig };
++		if (track.metadata.presentationWindow && decoderConfig.sampleRate !== 48000) {
++			throw new TypeError('presentationWindow requires a 48 kHz decoder configuration.');
++		}
++
+ 		let requiresAdtsStripping = false;
+ 
+ 		if (track.source._codec === 'aac' && !decoderConfig.description) {
+@@ -588,7 +592,7 @@
+ 				requiresAdtsStripping,
+ 				primingPacket: packet,
+ 			},
+-			timescale: decoderConfig.sampleRate,
++			timescale: track.metadata.presentationWindow ? 1000000 : decoderConfig.sampleRate,
+ 			samples: [],
+ 			sampleQueue: [],
+ 			timestampProcessingQueue: [],
+--- a/src/matroska/ebml.ts
++++ b/src/matroska/ebml.ts
+@@ -61,6 +61,7 @@
+ 
+ /** Defines some of the EBML IDs used by Matroska files. */
+ export enum EBMLId {
++	DiscardPadding = 0x75a2,
+ 	EBML = 0x1a45dfa3,
+ 	EBMLVersion = 0x4286,
+ 	EBMLReadVersion = 0x42f7,
+--- a/src/matroska/matroska-muxer.ts
++++ b/src/matroska/matroska-muxer.ts
+@@ -375,6 +375,9 @@
+ 				trackData.codecPrivate
+ 					? { id: EBMLId.CodecPrivate, data: toUint8Array(trackData.codecPrivate) }
+ 					: null,
++				trackData.track.isAudioTrack() && trackData.track.metadata.presentationWindow?.kind === 'opus-webm'
++					? { id: EBMLId.CodecDelay, data: Math.round(parseOpusIdentificationHeader(toUint8Array(trackData.codecPrivate!)).preSkip * 1e9 / 48000) }
++					: null,
+ 				seekPreRollNs > 0 ? { id: EBMLId.SeekPreRoll, data: seekPreRollNs } : null,
+ 				trackData.track.metadata.name !== undefined
+ 					? { id: EBMLId.Name, data: new EBMLUnicodeString(trackData.track.metadata.name) }
+@@ -889,6 +892,15 @@
+ 		assert(meta.decoderConfig);
+ 
+ 		const decoderConfig = { ...meta.decoderConfig };
++		const window = track.metadata.presentationWindow;
++		if (window?.kind === 'opus-webm') {
++			const head = decoderConfig.description ? toUint8Array(decoderConfig.description) : null;
++			if (decoderConfig.sampleRate !== 48000 || !head || head.length < 19
++				|| String.fromCharCode(...head.subarray(0, 8)) !== 'OpusHead') {
++				throw new TypeError('presentationWindow requires a 48 kHz OpusHead configuration.');
++			}
++		}
++
+ 		let requiresAdtsStripping = false;
+ 
+ 		if (track.source._codec === 'aac' && !decoderConfig.description) {
+@@ -1270,7 +1282,11 @@
+ 		const msDuration = Math.round(1000 * chunk.duration);
+ 
+ 		// Subtitle cues need an explicit BlockDuration (a SimpleBlock has none)
+-		const needsBlockGroup = !!chunk.additions || trackData.type === 'subtitle';
++		const window = trackData.track.isAudioTrack() ? trackData.track.metadata.presentationWindow : undefined;
++		const excessFrames = window?.kind === 'opus-webm'
++			? Math.max(0, Math.round((chunk.timestamp + chunk.duration) * 48000) - parseOpusIdentificationHeader(toUint8Array(trackData.codecPrivate!)).preSkip - window.frameCount) : 0;
++		const discardPaddingNs = Math.round(excessFrames * 1e9 / 48000);
++		const needsBlockGroup = !!chunk.additions || trackData.type === 'subtitle' || discardPaddingNs > 0;
+ 
+ 		if (!needsBlockGroup) {
+ 			// No additions, we can write out a SimpleBlock
+@@ -1302,12 +1318,13 @@
+ 						] }
+ 					: null,
+ 				msDuration > 0 ? { id: EBMLId.BlockDuration, data: msDuration } : null,
++				discardPaddingNs > 0 ? { id: EBMLId.DiscardPadding, data: new EBMLSignedInt(discardPaddingNs) } : null,
+ 			] };
+ 			this.ebmlWriter.writeEBML(blockGroup);
+ 		}
+ 
+ 		this.startTimestamp = Math.min(this.startTimestamp, msTimestamp);
+-		this.endTimestamp = Math.max(this.endTimestamp, msTimestamp + msDuration);
++		this.endTimestamp = Math.max(this.endTimestamp, window ? Math.min(msTimestamp + msDuration, 1000 * window.frameCount / 48000) : msTimestamp + msDuration);
+ 		trackData.lastWrittenMsTimestamp = msTimestamp;
+ 
+ 		if (!this.trackDatasInCurrentCluster.has(trackData)) {
+--- a/src/media-source.ts
++++ b/src/media-source.ts
+@@ -43,6 +43,7 @@
+ 	UnthrottledTimerHandle,
+ 	wait,
+ } from './misc';
++import { parseOpusIdentificationHeader } from './codec-data';
+ import { Muxer } from './muxer';
+ import { SubtitleParser } from './subtitles';
+ import { toAlaw, toUlaw } from './pcm';
+@@ -1986,6 +1987,16 @@
+  * @public
+  */
+ export class EncodedAudioPacketSource extends AudioSource {
++	private presentationEnd = 0;
++	private presentationPreSkip = 0;
++	private presentationConfig: string | null = null;
++	/** @internal */
++	override async _flushAndClose(forceClose: boolean) {
++		const window = this._connectedTrack?.metadata.presentationWindow;
++		if (!forceClose && window && this.presentationEnd < window.frameCount + this.presentationPreSkip) {
++			throw new Error('presentationWindow ended before all playable samples were supplied.');
++		}
++	}
+ 	/** Creates a new {@link EncodedAudioPacketSource} whose packets are encoded using `codec`. */
+ 	constructor(codec: AudioCodec) {
+ 		super(codec);
+@@ -2012,6 +2023,34 @@
+ 		}
+ 
+ 		this._ensureValidAdd();
++		const window = this._connectedTrack!.metadata.presentationWindow;
++		if (window) {
++			const config = meta?.decoderConfig ?? this._connectedTrack!.metadata.decoderConfig;
++			if (config) {
++				const bytes = config.description ? toUint8Array(config.description) : null;
++				const signature = JSON.stringify([config.codec, config.sampleRate, config.numberOfChannels, bytes ? Array.from(bytes) : null]);
++				if (this.presentationConfig !== null && this.presentationConfig !== signature) throw new TypeError('presentationWindow decoder configuration changed.');
++				if (window.kind === 'opus-webm') {
++					if (!bytes || bytes.length < 19 || String.fromCharCode(...bytes.subarray(0, 8)) !== 'OpusHead'
++						|| bytes[8] !== 1 || bytes[9] !== config.numberOfChannels || bytes[18] !== 0) throw new TypeError('presentationWindow requires a valid family-zero OpusHead.');
++					this.presentationPreSkip = parseOpusIdentificationHeader(bytes).preSkip;
++				}
++				this.presentationConfig = signature;
++			}
++			if (this.presentationConfig === null) throw new TypeError('presentationWindow requires initial decoder metadata.');
++			const start = Math.round(packet.timestamp * 48000);
++			const end = Math.round((packet.timestamp + packet.duration) * 48000);
++			const limit = window.frameCount + (this.presentationPreSkip);
++			if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start !== this.presentationEnd
++				|| start >= limit || end <= start || (window.kind === 'aac-mp4' && end > limit)) {
++				throw new TypeError('presentationWindow packets must be contiguous from zero and intersect its endpoint.');
++			}
++			if (meta?.decoderConfig && meta.decoderConfig.sampleRate !== 48000) {
++				throw new TypeError('presentationWindow requires a 48 kHz decoder configuration.');
++			}
++			this.presentationEnd = end;
++		}
++
+ 		return this._connectedTrack!.output._muxer.addEncodedAudioPacket(this._connectedTrack!, packet, meta);
+ 	}
+ }
+@@ -2056,11 +2095,17 @@
+ 
+ 	constructor(private source: AudioSource, private encodingConfig: AudioEncodingConfig) {}
+ 
+-	async add(audioSample: AudioSample, shouldClose: boolean) {
++	async add(audioSample: AudioSample, shouldClose: boolean, previous?: Promise<void>) {
+ 		try {
+ 			this.checkForEncoderError();
+ 			this.source._ensureValidAdd();
+ 
++			if (previous) {
++				await previous;
++				if (this.closed) return;
++				this.checkForEncoderError();
++			}
++
+ 			// Ensure audio parameters remain constant
+ 			if (this.lastNumberOfChannels !== null && this.lastSampleRate !== null) {
+ 				if (
+@@ -2817,6 +2862,28 @@
+ 	/** @internal */
+ 	private _abortController: AbortController | null = null;
+ 	/** @internal */
++	/** @internal */
++	private _resumeRequested = false;
++	/** @internal */
++	private _acceptingAudio = false;
++	/** @internal */
++	private _forceClosed = false;
++	/** @internal */
++	private _audioDrain: Promise<void> = Promise.resolve();
++	/** @internal */
++	private _admittedAudio = new Set<AudioSample>();
++	/** @internal */
++	private _admittedAudioDuration = 0;
++	/** @internal */
++	private _admittedAudioBytes = 0;
++	/** @internal */
++	private _nativeReader: ReadableStreamDefaultReader<AudioData> | null = null;
++	/** @internal */
++	private _nativePump: Promise<void> | null = null;
++	/** @internal */
++	private _nativeGeneration = 0;
++	/** @internal */
++	private _restartNativeCapture: (() => void) | null = null;
+ 	private _track: MediaStreamAudioTrack;
+ 	/** @internal */
+ 	private _audioContext: AudioContext | null = null;
+@@ -2872,11 +2939,13 @@
+ 		this._options = options;
+ 		this._encoder = new AudioEncoderWrapper(this, encodingConfig);
+ 		this._track = track;
++		this._acceptingAudio = true;
+ 	}
+ 
+ 	/** @internal */
+ 	override async _start() {
+ 		if (!this._errorPromiseAccessed) {
++
+ 			Logging._warn(
+ 				'Make sure not to ignore the `errorPromise` field on MediaStreamAudioTrackSource, so that any internal'
+ 				+ ' errors get bubbled up properly.',
+@@ -2889,16 +2958,28 @@
+ 		let errored = false;
+ 		let lastSampleTimestamp: number | null = null;
+ 		let timestampOffset = 0;
++		let restarted = false;
++		const fail = (error: unknown) => {
++			if (errored || this._forceClosed) return;
++			errored = true;
++			this._abortController?.abort();
++			this._promiseWithResolvers.reject(error);
++			void this._audioContext?.suspend();
++		};
++
++		const nativeBufferSize = 128;
++		// A full native backlog can arrive while one earlier sample awaits encoder or writer progress.
++		const nativeBurstCapacity = typeof MediaStreamTrackProcessor !== 'undefined' ? nativeBufferSize + 1 : 0;
+ 
+ 		const onAudioSample = (audioSample: AudioSample) => {
+-			if (errored) {
++			if (errored || !this._acceptingAudio) {
+ 				audioSample.close();
+ 				return;
+ 			}
+ 
+ 			const currentTimestamp = audioSample.timestamp;
+ 
+-			if (this._paused) {
++			if (this._paused || this._resumeRequested) {
+ 				const dataSeen = firstAudioDataTimestamp !== null;
+ 				if (dataSeen) {
+ 					if (lastSampleTimestamp !== null && this._options.timestampBase !== 'unix') {
+@@ -2915,6 +2996,11 @@
+ 				return;
+ 			}
+ 
++			if (restarted && lastSampleTimestamp !== null && this._options.timestampBase !== 'unix') {
++				timestampOffset -= currentTimestamp - lastSampleTimestamp - audioSample.duration;
++			}
++			restarted = false;
++
+ 			if (firstAudioDataTimestamp === null) {
+ 				firstAudioDataTimestamp = audioSample.timestamp;
+ 
+@@ -2939,39 +3025,68 @@
+ 
+ 			lastSampleTimestamp = currentTimestamp;
+ 
+-			if (this._encoder.getQueueSize() >= 8) {
+-				// Drop data if the encoder is overloaded
++			// Native packet quanta vary. Bound retained PCM, not the number of packet objects.
++			const duration = audioSample.duration;
++			const bytes = audioSample.allocationSize({ format: 'f32', planeIndex: 0 });
++			if ((this._admittedAudioDuration + duration > 1 + 1e-9
++				&& this._admittedAudio.size >= nativeBurstCapacity)
++				|| this._admittedAudioBytes + bytes > 4 * 1024 * 1024) {
+ 				audioSample.close();
++				fail(new Error('Live audio buffer exceeded its bounded capacity.'));
+ 				return;
+ 			}
+ 
+ 			audioSample.setTimestamp(currentTimestamp + timestampOffset);
+ 
+-			void this._encoder.add(audioSample, true)
+-				.catch((error) => {
+-					errored = true;
+-
+-					this._abortController?.abort();
+-					this._promiseWithResolvers.reject(error);
+-					void this._audioContext?.suspend();
++			this._admittedAudio.add(audioSample);
++			this._admittedAudioDuration += duration;
++			this._admittedAudioBytes += bytes;
++			this._audioDrain = this._encoder.add(audioSample, true, this._audioDrain)
++				.finally(() => {
++					if (!this._admittedAudio.delete(audioSample)) return;
++					this._admittedAudioDuration = Math.max(0, this._admittedAudioDuration - duration);
++					this._admittedAudioBytes -= bytes;
+ 				});
++			void this._audioDrain.catch(fail);
+ 		};
+ 
+ 		if (typeof MediaStreamTrackProcessor !== 'undefined') {
+-			// Great, MediaStreamTrackProcessor is supported, this is the preferred way of doing things
+-			const processor = new MediaStreamTrackProcessor({ track: this._track });
+-			const consumer = new WritableStream<AudioData>({
+-				write: audioData => onAudioSample(new AudioSample(audioData)),
+-			});
+-
+-			processor.readable.pipeTo(consumer, {
+-				signal: this._abortController.signal,
+-			}).catch((error) => {
+-				// Handle AbortError silently
+-				if (error instanceof DOMException && error.name === 'AbortError') return;
+-
+-				this._promiseWithResolvers.reject(error);
+-			});
++			const signal = this._abortController.signal;
++			this._restartNativeCapture = () => {
++				this._resumeRequested = true;
++				this._nativeGeneration++;
++				void this._nativeReader?.cancel().catch(fail);
++			};
++			this._nativePump = (async () => {
++				try {
++					while (!signal.aborted && this._acceptingAudio) {
++						const generation = this._nativeGeneration;
++						// A fresh subscription excludes native frames buffered during the pause.
++						const processor = new MediaStreamTrackProcessor({ track: this._track, maxBufferSize: nativeBufferSize });
++						const reader = processor.readable.getReader();
++						this._nativeReader = reader;
++						restarted = this._resumeRequested;
++						this._resumeRequested = false;
++						const cancel = () => { void reader.cancel().catch(fail); };
++						signal.addEventListener('abort', cancel, { once: true });
++						try {
++							while (!signal.aborted) {
++								const next = await reader.read();
++								if (next.done) break;
++								if (signal.aborted || !this._acceptingAudio) { next.value.close(); break; }
++								onAudioSample(new AudioSample(next.value));
++							}
++						} finally {
++							signal.removeEventListener('abort', cancel);
++							this._nativeReader = null;
++							reader.releaseLock();
++						}
++						if (generation === this._nativeGeneration) break;
++					}
++				} catch (error) {
++					if (!signal.aborted) fail(error);
++				}
++			})();
+ 		} else {
+ 			// Let's fall back to an AudioContext approach
+ 
+@@ -3012,21 +3127,37 @@
+ 	 */
+ 	pause() {
+ 		this._paused = true;
++		this._resumeRequested = false;
+ 	}
+ 
+ 	/** Resumes the capture of audio data after being paused. */
+ 	resume() {
++		if (!this._paused) return;
+ 		this._paused = false;
++		this._restartNativeCapture?.();
+ 	}
+ 
+ 	/** @internal */
+ 	override async _flushAndClose(forceClose: boolean) {
++		this._acceptingAudio = false;
++		this._resumeRequested = false;
++		this._forceClosed = forceClose;
++		this._restartNativeCapture = null;
++		if (forceClose) {
++			for (const sample of this._admittedAudio) sample.close();
++			this._admittedAudio.clear();
++			this._admittedAudioDuration = 0;
++			this._admittedAudioBytes = 0;
++		}
+ 		try {
+ 			if (this._abortController) {
+ 				this._abortController.abort();
+ 				this._abortController = null;
+ 			}
+ 
++			await this._nativePump;
++			if (!forceClose) await this._audioDrain;
++
+ 			if (this._audioContext) {
+ 				assert(this._scriptProcessorNode);
+ 
+--- a/src/output.ts
++++ b/src/output.ts
+@@ -19,8 +19,8 @@
+ } from './misc';
+ import { MetadataTags, TrackDisposition, validateMetadataTags, validateTrackDisposition } from './metadata';
+ import { Muxer } from './muxer';
+-import { OutputFormat } from './output-format';
+-import { AudioSource, MediaSource, SubtitleSource, VideoSource } from './media-source';
++import { OutputFormat, Mp4OutputFormat, WebMOutputFormat } from './output-format';
++import { AudioSource, EncodedAudioPacketSource, MediaSource, SubtitleSource, VideoSource } from './media-source';
+ import { PathedTarget, Target, TargetRequest } from './target';
+ import { Writer } from './writer';
+ import { Logging } from './logging';
+@@ -316,6 +316,13 @@
+  * @public
+  */
+ export type AudioTrackMetadata = BaseTrackMetadata & {
++	/** Opt-in 48 kHz processed-audio presentation window. Packets must start at zero.
++	 * AAC requires fragmented MP4; Opus requires WebM and decoder-config OpusHead pre-skip.
++	 * The caller must submit only packets intersecting this window (including Opus pre-skip).
++	 */
++	presentationWindow?:
++		| { kind: 'aac-mp4'; sampleRate: 48000; frameCount: number }
++		| { kind: 'opus-webm'; sampleRate: 48000; frameCount: number };
+ 	/**
+ 	 * The decoder config for this audio track, provided ahead of time. This is provided automatically when media data
+ 	 * added to the track, but by specifying it here, you give the muxer additional information that it can make use of.
+@@ -729,6 +736,29 @@
+ 			throw new TypeError('source must be an AudioSource.');
+ 		}
+ 		validateBaseTrackMetadata(metadata);
++		const window = metadata.presentationWindow;
++		if (window !== undefined) {
++			if (!(source instanceof EncodedAudioPacketSource)) throw new TypeError('presentationWindow requires an encoded audio packet source.');
++			if (!window || typeof window !== 'object' || Array.isArray(window)
++				|| Object.keys(window).some(key => !['kind', 'sampleRate', 'frameCount'].includes(key))
++				|| window.sampleRate !== 48000 || !Number.isSafeInteger(window.frameCount)
++				|| window.frameCount <= 0 || window.frameCount > 48000 * 93600) {
++				throw new TypeError('Invalid presentationWindow: expected a positive 48 kHz window of at most 26 hours.');
++			}
++			if (window.kind === 'aac-mp4') {
++				if (source._codec !== 'aac' || !(this.format instanceof Mp4OutputFormat)
++					|| this.format._options.fastStart !== 'fragmented') {
++					throw new TypeError('aac-mp4 presentationWindow requires AAC and fragmented MP4.');
++				}
++			} else if (window.kind === 'opus-webm') {
++				if (source._codec !== 'opus' || !(this.format instanceof WebMOutputFormat)) {
++					throw new TypeError('opus-webm presentationWindow requires Opus and WebM.');
++				}
++			} else {
++				throw new TypeError('Unsupported presentationWindow kind.');
++			}
++		}
++
+ 		if (metadata.decoderConfig !== undefined) {
+ 			validateAudioChunkMetadata({ decoderConfig: metadata.decoderConfig }, source._codec);
+ 		}
+@@ -741,7 +771,7 @@
+ 			}
+ 		}
+ 
+-		const metadataCopy = { ...metadata };
++		const metadataCopy = { ...metadata, ...(window ? { presentationWindow: Object.freeze({ ...window }) } : {}) };
+ 		metadataCopy.group ??= this.defaultTrackGroup;
+ 
+ 		return this._addTrack(new OutputAudioTrack(

@@ -45,19 +45,22 @@ function formatInterfaceFontSection(interfaceFont, family = 'Golos UI') {
       (artifact) => `| \`${artifact.path}\` | \`${artifact.sourcePath}\` | \`${artifact.sha256}\` |`
     )
     .join('\n');
-  return `## ${family} bundled font
+  return (
+    `## ${family} bundled font
 
 - Source package: \`${interfaceFont.sourcePackage}\`
 - Font version: \`${interfaceFont.version}\`
 - License: \`${interfaceFont.license}\`
 - Copyright: ${interfaceFont.copyright}
-- License text: [\`${releaseLegalArchivePath(interfaceFont.licensePath)}\`](${releaseLegalArchivePath(interfaceFont.licensePath)})
+- License text: [\`${releaseLegalArchivePath(interfaceFont.licensePath)}\`](` +
+    `${releaseLegalArchivePath(interfaceFont.licensePath)})
 
 | Bundled file | Source file | SHA-256 |
 | --- | --- | --- |
 ${artifactRows}
 
-The font files remain under ${interfaceFont.license}. The rest of Sniptale is not relicensed by the font license.`;
+The font files remain under ${interfaceFont.license}. The rest of Sniptale is not relicensed by the font license.`
+  );
 }
 
 function formatDependencySection(entry) {

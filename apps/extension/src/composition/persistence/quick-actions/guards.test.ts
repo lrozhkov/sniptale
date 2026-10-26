@@ -1,3 +1,4 @@
+import { createQuickActionAppearance } from '../../../contracts/quick-action-appearance';
 import { describe, expect, it } from 'vitest';
 
 import { parseStoredQuickActions } from './guards';
@@ -144,4 +145,27 @@ describe('quick-action storage guards', () => {
       });
     }
   );
+});
+
+it('admits canonical appearance without dropping legacy actions and refuses malformed present values', () => {
+  const action = {
+    id: 'styled',
+    status: true,
+    name: 'Styled',
+    icon: 'Camera',
+    screenshotMode: 'visible',
+    exitAfterCapture: false,
+  };
+  const appearance = createQuickActionAppearance();
+  expect(
+    parseStoredQuickActions([action, { ...action, id: 'appearance', appearance }]).actions
+  ).toHaveLength(2);
+  const result = parseStoredQuickActions([
+    {
+      ...action,
+      appearance: { ...appearance, background: { ...appearance.background, padding: Infinity } },
+    },
+  ]);
+  expect(result.invalidEntryCount).toBe(1);
+  expect(result.actions).toEqual([]);
 });

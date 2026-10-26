@@ -483,3 +483,19 @@ it('keeps concurrent project publication proof in root contract validation selec
     )
   ).toContain('apps/extension/src/composition/persistence/projects/index.stale-save.test.ts');
 });
+
+it('selects canonical scoped history and marker replay proof', async () => {
+  const module = await importOwnerMap();
+  const tests = module.resolveMappedCoverageOwnerTests(
+    'apps/extension/src/content/parser/page-preparation/history/snapshot-delta.ts'
+  );
+  expect(tests).toEqual(
+    expect.arrayContaining([
+      'apps/extension/src/content/parser/page-preparation/history/scoped-reset.test.ts',
+      'apps/extension/src/content/parser/page-preparation/history/domain-navigation.test.ts',
+      'apps/extension/src/content/parser/page-preparation/annotations/history.integration.test.ts',
+      'apps/extension/src/content/selection/quick-edit-runtime/annotation.history.integration.test.ts',
+      'apps/extension/src/content/selection/quick-edit-runtime/text-marker.test.ts',
+    ])
+  );
+});

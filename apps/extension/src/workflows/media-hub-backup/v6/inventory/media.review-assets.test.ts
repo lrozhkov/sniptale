@@ -1,6 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ readFile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ readFile: vi.fn(), readWorkspace: vi.fn() }));
+vi.mock('../../../../composition/persistence/review-workspaces/store', () => ({
+  readVideoWorkspace: mocks.readWorkspace,
+}));
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   readAssetFile: mocks.readFile,
@@ -15,6 +18,8 @@ import { createArchivePathAllocator } from '../../../../composition/archive-tran
 import { parsePortableMediaMetadata } from '../root-codecs/media';
 import { createMediaHubBackupExportOptions } from '../options';
 import { buildMediaRootInventory } from './media';
+import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
+import { prepareVideoReviewRestore } from '../../../../composition/persistence/review-workspaces/backup-restore';
 
 const assets = new Map([
   [
@@ -115,7 +120,7 @@ function mediaEntry(sourceKind: 'recording' | 'project-video'): MediaLibraryEntr
   };
 }
 
-function database(entry: MediaLibraryEntry, project = false) {
+function database(entry: MediaLibraryEntry, project = false, override?: unknown, draft?: unknown) {
   const workspace = {
     ...review(entry.id),
     ...(project
@@ -132,7 +137,12 @@ function database(entry: MediaLibraryEntry, project = false) {
     transaction: () => ({
       objectStore: (store: string) => ({
         index: () => ({ getAll: async () => [] }),
-        get: async () => (store === 'video_workspaces' ? workspace : undefined),
+        get: async () =>
+          store === 'video_workspaces'
+            ? (override ?? workspace)
+            : store === 'video_workspace_drafts'
+              ? draft
+              : undefined,
       }),
       done: Promise.resolve(),
     }),
@@ -193,6 +203,7 @@ function assetRef(assetId: string) {
 }
 
 beforeEach(() => {
+  mocks.readWorkspace.mockReset();
   mocks.readFile.mockImplementation(async (ref, filename: string) => {
     const size = (ref as { size: number }).size;
     return new File(['x'.repeat(size)], filename);
@@ -274,4 +285,110 @@ it('uses the same recording identity for review admission and original bytes aft
   });
   const videoReads = mocks.readFile.mock.calls.filter(([ref]) => ref.mimeType === 'video/webm');
   expect(videoReads.at(-1)?.[0].assetId).toBe('video-object');
+});
+
+it('backs up the selected archived quick project and restores its independent source binding', async () => {
+  const entry = mediaEntry('recording');
+  const archiveId = 'recording:quick-project:previous';
+  const workspace = parseVideoWorkspace({
+    ...review(archiveId),
+    formatVersion: 3,
+    sourceMediaId: entry.id,
+    project: {
+      name: 'Previous quick edit',
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    },
+  });
+  if (!workspace) throw new Error('Invalid archived fixture');
+  const draft = {
+    aggregateId: archiveId,
+    revision: 1,
+    annotation: {
+      id: 'recover',
+      text: 'Recovery',
+      anchor: { kind: 'point' as const, time: 1 },
+    },
+    before: null,
+    updatedAt: 1,
+  };
+  const { blob: _blob, ...metadata } = entry;
+  mocks.readWorkspace.mockResolvedValue({ workspace, draft });
+  const roots = await buildMediaRootInventory({
+    db: database(entry, false, workspace, draft),
+    items: [{ ...metadata, hasThumbnail: false }],
+    reviewWorkspaceHeads: [workspace],
+    options: createMediaHubBackupExportOptions({
+      scope: 'selected',
+      selected: {
+        mediaAssetIds: [archiveId],
+        videoProjectIds: [],
+        scenarioProjectIds: [],
+      },
+    }),
+    paths: createArchivePathAllocator(),
+  });
+  expect(roots).toHaveLength(1);
+  expect(roots[0]!.descriptor.rootId).toBe(archiveId);
+  const portable = parsePortableMediaMetadata((await roots[0]!.load()).metadata);
+  expect(portable.videoReview?.workspace).toMatchObject({
+    aggregateId: archiveId,
+    project: { name: 'Previous quick edit' },
+  });
+  expect(portable.videoReview?.workspace).not.toHaveProperty('sourceMediaId');
+  if (!portable.videoReview) throw new Error('Missing archived review');
+  const restored = prepareVideoReviewRestore({
+    review: portable.videoReview,
+    sourceAggregateId: archiveId,
+    targetAggregateId: 'recording:restored',
+    sourceAssetId: 'restored-object',
+    assetIdMap: new Map(['background', 'music', 'voice'].map((id) => [id, id])),
+  });
+  expect(restored.workspace.aggregateId).toBe('recording:restored');
+  expect(restored.workspace.history).toEqual(workspace.history);
+  expect(restored.workspace).not.toHaveProperty('sourceMediaId');
+  expect(restored.draft).toEqual({ ...draft, aggregateId: 'recording:restored' });
+});
+
+it('does not admit unrelated archived heads for a selected media backup', async () => {
+  mocks.readWorkspace.mockRejectedValue(new Error('Unrelated archive must not be read'));
+  const roots = await buildMediaRootInventory({
+    db: database(mediaEntry('recording')),
+    items: [],
+    reviewWorkspaceHeads: [
+      { aggregateId: 'recording:unrelated', sourceMediaId: 'recording:source' },
+    ],
+    options: createMediaHubBackupExportOptions({
+      scope: 'selected',
+      selected: {
+        mediaAssetIds: ['recording:selected'],
+        videoProjectIds: [],
+        scenarioProjectIds: [],
+      },
+    }),
+    paths: createArchivePathAllocator(),
+  });
+  expect(roots).toEqual([]);
+  expect(mocks.readWorkspace).not.toHaveBeenCalled();
+});
+
+it('refuses a selected archived project that disappears before source admission', async () => {
+  mocks.readWorkspace.mockResolvedValue(null);
+  await expect(
+    buildMediaRootInventory({
+      db: database(mediaEntry('recording')),
+      items: [],
+      reviewWorkspaceHeads: [
+        { aggregateId: 'recording:quick-project:missing', sourceMediaId: 'recording:source' },
+      ],
+      options: createMediaHubBackupExportOptions({
+        scope: 'selected',
+        selected: {
+          mediaAssetIds: ['recording:quick-project:missing'],
+          videoProjectIds: [],
+          scenarioProjectIds: [],
+        },
+      }),
+      paths: createArchivePathAllocator(),
+    })
+  ).rejects.toThrow('Quick project changed before backup.');
 });

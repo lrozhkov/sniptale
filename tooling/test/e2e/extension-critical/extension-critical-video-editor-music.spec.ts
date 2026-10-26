@@ -140,12 +140,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         })
         .toBe(0.7);
       await operate(
-        sections
-          .locator('nav')
-          .getByRole('button', {
-            name: label('videoEditor.sidebar.inspectorGroupTiming'),
-            exact: true,
-          })
+        sections.locator('nav').getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupTiming'),
+          exact: true,
+        })
       );
       const rate = sections.getByRole('textbox', {
         name: label('videoEditor.sidebar.playbackRateLabel'),
@@ -175,12 +173,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         fullPage: false,
       });
       await operate(
-        sections
-          .locator('nav')
-          .getByRole('button', {
-            name: label('videoEditor.sidebar.inspectorGroupAudio'),
-            exact: true,
-          })
+        sections.locator('nav').getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupAudio'),
+          exact: true,
+        })
       );
       const currentProject = await readProject(page);
       const musicTrack = currentProject?.tracks.find((track) => track.id === music.trackId);
@@ -192,12 +188,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           .first()
       );
       await operate(
-        sections
-          .locator('nav')
-          .getByRole('button', {
-            name: label('videoEditor.sidebar.inspectorGroupAudio'),
-            exact: true,
-          })
+        sections.locator('nav').getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupAudio'),
+          exact: true,
+        })
       );
       const master = page
         .locator('[data-ui="video-editor.inspector.track-audio"]')
@@ -222,12 +216,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         .locator(`[data-project-timeline-clip="${music.id}"]`)
         .click({ modifiers: ['Control'] });
       await operate(
-        sections
-          .locator('nav')
-          .getByRole('button', {
-            name: label('videoEditor.sidebar.inspectorGroupAudio'),
-            exact: true,
-          })
+        sections.locator('nav').getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupAudio'),
+          exact: true,
+        })
       );
       const closeMaterials = page.locator('[data-ui="video-editor.materials.close"]');
       if (await closeMaterials.isVisible()) await operate(closeMaterials);

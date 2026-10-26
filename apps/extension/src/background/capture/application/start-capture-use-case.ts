@@ -9,6 +9,7 @@ import { transitionCaptureJob } from '../jobs/state-machine';
 import { readCaptureDeliveryPayload, type CaptureDeliveryPayload } from './payload';
 import type {
   CaptureModeLabel,
+  CaptureImagePreparation,
   CapturePersistenceSettings,
   PreparedCaptureAction,
   StartCapturePorts,
@@ -34,6 +35,8 @@ export async function runStartCaptureUseCase(
     actionType?: CaptureActionType | undefined;
     capture: () => Promise<CaptureDeliveryPayload>;
     captureTarget: CaptureModeLabel;
+    prepareImage?: CaptureImagePreparation | undefined;
+    assertCurrent?: (() => void) | undefined;
     resolvedTabId: number;
     scenarioCapture: ScenarioRuntimeCapturePayload | undefined;
     scenarioSessionService: ScenarioSessionService;
@@ -41,12 +44,33 @@ export async function runStartCaptureUseCase(
   ports: StartCapturePorts = defaultStartCapturePorts
 ): Promise<PreparedCaptureAction & { payload: CaptureDeliveryPayload }> {
   const settings = await ports.loadSettings();
+  args.assertCurrent?.();
   const captureAction = args.actionType ?? settings.captureAction;
-  const filename = await ports.generateFilename(args.captureTarget, settings.imageFormat, settings);
-  const payload = await createCaptureDeliveryPromise(args.capture(), {
+  let filename = await ports.generateFilename(args.captureTarget, settings.imageFormat, settings);
+  args.assertCurrent?.();
+  const capturePromise = args.capture().then(async (payload) => {
+    if (!args.prepareImage) return payload;
+    const { dataUrl, jobId } = readCaptureDeliveryPayload(payload);
+    try {
+      const prepared = await args.prepareImage(dataUrl, filename);
+      filename = prepared.filename;
+      return jobId ? { dataUrl: prepared.dataUrl, jobId } : prepared.dataUrl;
+    } catch (error) {
+      if (jobId)
+        await ports
+          .transitionCaptureJob(jobId, 'failed', {
+            error: error instanceof Error ? error.message : 'Screenshot preparation failed',
+          })
+          .catch(() => undefined);
+      throw error;
+    }
+  });
+  const preparedPayload = await capturePromise;
+  const payload = await createCaptureDeliveryPromise(Promise.resolve(preparedPayload), {
     captureAction,
     filename,
     ports,
+    assertCurrent: args.assertCurrent,
     resolvedTabId: args.resolvedTabId,
     scenarioCapture: args.scenarioCapture,
     scenarioSessionService: args.scenarioSessionService,
@@ -87,6 +111,7 @@ export function createCaptureDeliveryPromise(
   capturePromise: Promise<CaptureDeliveryPayload>,
   args: {
     captureAction: CaptureActionType;
+    assertCurrent?: (() => void) | undefined;
     filename: string;
     ports?: Pick<
       StartCapturePorts,
@@ -114,6 +139,7 @@ export function createCaptureDeliveryPromise(
 async function persistCaptureDeliveryPayload(args: {
   dataUrl: string;
   filename: string;
+  assertCurrent?: (() => void) | undefined;
   jobId?: string | undefined;
   ports: Pick<
     StartCapturePorts,
@@ -128,6 +154,7 @@ async function persistCaptureDeliveryPayload(args: {
   settings: Pick<Settings, 'defaultImagePresetId' | 'localStoragePolicy'>;
 }): Promise<string | null> {
   try {
+    args.assertCurrent?.();
     const galleryAssetId = await maybePersistScreenshotInMediaHub(
       args.settings,
       args.dataUrl,
@@ -136,6 +163,7 @@ async function persistCaptureDeliveryPayload(args: {
       args.captureAction,
       args.ports
     );
+    args.assertCurrent?.();
     const scenarioCapture = resolveScenarioCaptureForAction({
       captureAction: args.captureAction,
       scenarioCapture: args.scenarioCapture,
@@ -148,6 +176,7 @@ async function persistCaptureDeliveryPayload(args: {
       tabId: args.resolvedTabId,
       scenarioSessionService: args.scenarioSessionService,
     });
+    args.assertCurrent?.();
     return galleryAssetId;
   } catch (error) {
     if (args.jobId) {

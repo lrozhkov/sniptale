@@ -4,6 +4,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { PageToolbarControl } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n';
 import { PageToolbarControlsContext } from '../state/page-controls';
+import { PageToolbarSlot } from './page-layout';
 
 /** Retains the real control beneath a non-executing customization choice. */
 export function PageControlVisibility(props: {
@@ -14,6 +15,12 @@ export function PageControlVisibility(props: {
   const preferences = useContext(PageToolbarControlsContext);
   if (!preferences) return props.children;
   if (!preferences.isVisible(props.control)) return null;
+  if (preferences.layoutActive)
+    return (
+      <PageToolbarSlot id={props.control} control={props.control} label={props.label}>
+        {props.children}
+      </PageToolbarSlot>
+    );
   if (!preferences.editing) return props.children;
   const visible = preferences.controls[props.control] !== false;
   const Indicator = visible ? Eye : EyeOff;

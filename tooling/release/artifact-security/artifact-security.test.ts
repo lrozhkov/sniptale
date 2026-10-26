@@ -55,6 +55,23 @@ const basePolicy = {
   ],
 };
 
+const recordingPermissionEntry = {
+  resources: ['apps/extension/src/media-permission/index.html'],
+  matches: ['http://*/*', 'https://*/*'],
+  use_dynamic_url: true,
+};
+const recordingPermissionPolicy = {
+  ...basePolicy,
+  webAccessibleResources: [
+    ...basePolicy.webAccessibleResources,
+    {
+      name:
+        'web_accessible_resources:{"resources":["apps/extension/src/media-permission/index.html"],' +
+        '"matches":["http://*/*","https://*/*"],"extensionIds":[],"useDynamicUrl":true}',
+    },
+  ],
+};
+
 afterEach(async () => {
   await Promise.all(
     tempRoots.splice(0).map((root) => fs.rm(root, { force: true, recursive: true }))
@@ -135,6 +152,46 @@ it('accepts a release artifact that matches manifest policy', async () => {
   await expect(
     verifyReleaseArtifactFiles({ files: createFiles(), repoRoot })
   ).resolves.toBeUndefined();
+});
+
+it('accepts the policy-owned dynamic recording permission frame', async () => {
+  const repoRoot = await createRepoRoot({ policy: recordingPermissionPolicy });
+  const manifest = {
+    ...baseManifest,
+    web_accessible_resources: [...baseManifest.web_accessible_resources, recordingPermissionEntry],
+  };
+  await expect(
+    verifyReleaseArtifactFiles({
+      files: createFiles({
+        manifest,
+        extraFiles: [
+          {
+            relativePath: 'apps/extension/src/media-permission/index.html',
+            text: '<!doctype html><main hidden></main>',
+          },
+        ],
+      }),
+      repoRoot,
+    })
+  ).resolves.toBeUndefined();
+});
+
+it.each([
+  { name: 'file-page access', entry: { ...recordingPermissionEntry, matches: ['file:///*'] } },
+  { name: 'static URL', entry: { ...recordingPermissionEntry, use_dynamic_url: false } },
+  {
+    name: 'foreign extension access',
+    entry: { ...recordingPermissionEntry, extension_ids: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'] },
+  },
+])('rejects recording permission frame policy drift: $name', async ({ entry }) => {
+  const repoRoot = await createRepoRoot({ policy: recordingPermissionPolicy });
+  const manifest = {
+    ...baseManifest,
+    web_accessible_resources: [...baseManifest.web_accessible_resources, entry],
+  };
+  await expect(
+    verifyReleaseArtifactFiles({ files: createFiles({ manifest }), repoRoot })
+  ).rejects.toThrow('web_accessible_resources drift');
 });
 
 it('accepts exact hashed generated bundles but rejects adjacent secret-like paths', async () => {
@@ -339,6 +396,9 @@ it.each([
   'assets/app.js.map',
   'assets/app.js',
   'viewer.html',
+  'apps/extension/src/media-permission/other.html',
+  'apps/extension/src/media-permission/index.js',
+  'apps/extension/src/media-permission/*',
   'assets/image.png',
   'assets/golos-ui-vf.woff2.js',
   'assets/golos-ui-other.woff2',

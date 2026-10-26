@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createVideoProjectFromRecording } from '../../../../../features/video/project/factories/creation';
 import { patchReviewKeys } from '../../../../../features/video/project/action-feedback/key-animation';
-// @vitest-environment jsdom
 import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
 import { VideoTemporalEasing } from '../../../../../features/video/project/types';
 

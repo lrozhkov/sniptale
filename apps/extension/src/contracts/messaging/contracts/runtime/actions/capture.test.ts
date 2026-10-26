@@ -112,3 +112,19 @@ describe('runtimeActionCaptureMessageContracts', () => {
     ).toThrow();
   });
 });
+
+it('admits only bounded quick-action transaction identities and prepared filenames', () => {
+  for (const type of [CaptureMessageType.CAPTURE_VISIBLE, CaptureMessageType.CAPTURE_FULL]) {
+    const contract = runtimeActionCaptureMessageContracts[type];
+    expect(contract.parseRequest({ type, quickActionTransactionId: 'tx-1' })).toMatchObject({
+      quickActionTransactionId: 'tx-1',
+    });
+    for (const quickActionTransactionId of ['', 'x'.repeat(129), 3]) {
+      expect(() => contract.parseRequest({ type, quickActionTransactionId })).toThrow();
+    }
+    expect(contract.parseResponse({ success: true, filename: 'styled.webp' })).toMatchObject({
+      filename: 'styled.webp',
+    });
+    expect(() => contract.parseResponse({ success: true, filename: 3 })).toThrow();
+  }
+});

@@ -27,6 +27,7 @@ type RegistryEntry = ActionRouteMetadata & { readonly handler: ActionHandler };
 type ActionRouteHandlerId = BackgroundIngressHandlerId | 'internal-signal' | 'unknown';
 
 export const actionRouteHandlerBindings = {
+  'page-launch-preferences': routeBackgroundOwnedAction,
   'aggregate-promotion': routeBackgroundOwnedAction,
   'ai-secret-unlock': routeBackgroundOwnedAction,
   'ai-settings-mutation': routeBackgroundOwnedAction,

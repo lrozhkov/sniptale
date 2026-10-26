@@ -143,9 +143,10 @@ describe('toolbar static tooltips', () => {
 
     expect(buttons.map((button) => button.getAttribute('title'))).toEqual([
       'Снимок видимой области',
-      'Выбрать область для снимка',
+      'Параметры снимка видимой области',
       'Снимок всей страницы',
       'Параметры снимка всей страницы',
+      'Выбрать область для снимка',
     ]);
     expect(
       document.querySelector('[data-ui="content.toolbar.annotation-export-button"]')

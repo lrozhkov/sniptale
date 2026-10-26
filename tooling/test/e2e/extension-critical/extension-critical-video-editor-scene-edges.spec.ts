@@ -305,7 +305,8 @@ for (const format of ['MP4', 'WEBM'] as const) {
       ];
       const source = await readFile(
         new URL(
-          '../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-video-warm.sniptale-effect.json',
+          '../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
+            'sniptale-video-warm.sniptale-effect.json',
           import.meta.url
         ),
         'utf8'

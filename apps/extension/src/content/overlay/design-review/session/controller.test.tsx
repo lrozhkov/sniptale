@@ -3,6 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import {
+  browserAnnotationSession,
+  createBrowserAnnotationTargetEvidence,
+} from '../../../parser/page-preparation/annotations';
+import type { DesignReviewTool } from '../../../selection/design-review';
 import type { PageStyleSelectionSnapshot } from '../../../selection/design-review/snapshot';
 
 const controllerMocks = vi.hoisted(() => ({
@@ -15,8 +20,8 @@ const controllerMocks = vi.hoisted(() => ({
   editText: vi.fn(() => true),
   resetText: vi.fn(() => true),
   dismissSelection: vi.fn(),
-  dismissRequestHandler: null as (() => boolean) | null,
-  registerDismissRequestHandler: vi.fn((handler: () => boolean) => {
+  dismissRequestHandler: null as ((event?: KeyboardEvent) => boolean) | null,
+  registerDismissRequestHandler: vi.fn((handler: (event?: KeyboardEvent) => boolean) => {
     controllerMocks.dismissRequestHandler = handler;
     return () => {
       if (controllerMocks.dismissRequestHandler === handler) {
@@ -25,6 +30,8 @@ const controllerMocks = vi.hoisted(() => ({
     };
   }),
   cancelVoiceInput: vi.fn(),
+  updateDraft: vi.fn(),
+  readComment: vi.fn(() => ({ comment: 'Existing feedback', marker: null })),
   voiceActive: false,
   voicePending: false,
 }));
@@ -42,6 +49,10 @@ const selection: PageStyleSelectionSnapshot = {
 const designReviewModeState = {
   enabled: true,
   editingText: false,
+  tool: 'comment' as DesignReviewTool,
+  checkOpen: false,
+  selectionOrigin: 'page' as 'page' | 'finding' | 'tool',
+  measure: { a: null, b: null, preview: null, slot: 'a' as const, replacing: false },
   selection: { anchor: { x: 20, y: 30 }, snapshot: selection },
 };
 
@@ -53,10 +64,20 @@ vi.mock('../../../selection/design-review', () => ({
   DesignReviewModeState: undefined,
   disableDesignReviewMode: vi.fn(),
   dismissDesignReviewSelection: controllerMocks.dismissSelection,
+  closeDesignReviewChecks: vi.fn(() => {
+    designReviewModeState.checkOpen = false;
+  }),
   enableDesignReviewMode: vi.fn(),
   getDesignReviewModeState: () => designReviewModeState,
   openDesignReviewTarget: controllerMocks.openTarget,
   registerDesignReviewInspectorDismissRequestHandler: controllerMocks.registerDismissRequestHandler,
+  setDesignReviewTool: vi.fn(() => {
+    designReviewModeState.checkOpen = false;
+    designReviewModeState.selectionOrigin = 'tool';
+    return true;
+  }),
+  dismissDesignReviewMeasureLayer: vi.fn(() => false),
+  registerDesignReviewToolSwitchRequestHandler: vi.fn(() => () => undefined),
   subscribeToDesignReviewMode: () => () => undefined,
 }));
 
@@ -69,7 +90,7 @@ vi.mock('./comment-draft', () => ({
     endCommentComposition: vi.fn(),
     markerNumber: null,
     startCommentComposition: vi.fn(),
-    updateCommentDraft: vi.fn(),
+    updateCommentDraft: controllerMocks.updateDraft,
   }),
 }));
 
@@ -116,6 +137,8 @@ vi.mock('../runtime/record', () => ({
   serializeDesignReviewRecord: vi.fn(() => ''),
 }));
 
+vi.mock('../runtime/comment', () => ({ readPropertiesComment: controllerMocks.readComment }));
+
 vi.mock('./clipboard', () => ({
   copyDesignReviewText: vi.fn(async () => true),
 }));
@@ -148,7 +171,10 @@ beforeEach(async () => {
   controllerMocks.flushHistory.mockReset();
   controllerMocks.voiceActive = false;
   controllerMocks.voicePending = false;
+  designReviewModeState.tool = 'comment';
   designReviewModeState.editingText = false;
+  designReviewModeState.checkOpen = false;
+  designReviewModeState.selectionOrigin = 'page';
   target.textContent = 'Save';
   host = document.createElement('div');
   document.body.append(host, target);
@@ -187,7 +213,10 @@ it('finishes the comment before text editing and hides only the inspector during
   expect(latest?.inspectorOpen).toBe(false);
   expect(latest?.enabled).toBe(true);
   target.textContent = 'Changed';
+  designReviewModeState.tool = 'comment';
   designReviewModeState.editingText = false;
+  designReviewModeState.checkOpen = false;
+  designReviewModeState.selectionOrigin = 'page';
   await act(async () => root?.render(<Harness />));
   expect(latest?.inspectorOpen).toBe(true);
   expect(latest?.viewState.text.preview).toBe('Changed');
@@ -284,3 +313,134 @@ it('cancels processing on dismissal before closing the comment', async () => {
   expect(controllerMocks.closeComment).not.toHaveBeenCalled();
   expect(latest?.inspectorOpen).toBe(true);
 });
+
+it('refuses finding navigation when the comment owner cannot close', () => {
+  controllerMocks.closeComment.mockReturnValue(false);
+  const finding = {
+    id: 'f',
+    target,
+    label: 'button',
+    kind: 'positive-tabindex' as const,
+    evidence: { value: 2 },
+  };
+  act(() => latest?.onFinding(finding, 'show'));
+  expect(controllerMocks.openTarget).not.toHaveBeenCalled();
+  expect(latest?.checks.navigationFailed).toBe(true);
+});
+
+it('shows a finding through its origin without selecting a page tool', () => {
+  const finding = {
+    id: 'f',
+    target,
+    label: 'button',
+    kind: 'positive-tabindex' as const,
+    evidence: { value: 2 },
+  };
+  act(() => latest?.onFinding(finding, 'show'));
+  expect(controllerMocks.openTarget).toHaveBeenCalledWith(target, 'finding');
+  expect(latest?.checks.navigationFailed).toBe(false);
+});
+
+it('appends a finding to existing feedback only after explicit Comment handoff', async () => {
+  designReviewModeState.checkOpen = true;
+  designReviewModeState.selectionOrigin = 'finding';
+  await act(async () => root?.render(<Harness />));
+  expect(latest?.inspectorOpen).toBe(false);
+  const finding = {
+    id: 'f',
+    target,
+    label: 'button',
+    kind: 'positive-tabindex' as const,
+    evidence: { value: 2 },
+  };
+  await act(async () => {
+    latest?.onFinding(finding, 'comment');
+    root?.render(<Harness />);
+  });
+  expect(controllerMocks.updateDraft).toHaveBeenCalledWith(
+    expect.stringMatching(/^Existing feedback\n\n.+/u)
+  );
+});
+
+it('keeps finding navigation out of the automatic Comment presentation after Check closes', async () => {
+  designReviewModeState.selectionOrigin = 'finding';
+  await act(async () => root?.render(<Harness />));
+  expect(latest?.inspectorOpen).toBe(false);
+});
+
+it('refreshes the selected source and its observation revision after canonical edits and replay', () => {
+  Object.defineProperty(target, 'getClientRects', {
+    configurable: true,
+    value: () => [new DOMRect(0, 0, 200, 40)],
+  });
+  const evidence = createBrowserAnnotationTargetEvidence(target);
+  const change = (value: string) => ({
+    property: 'width',
+    order: 1,
+    before: { value: '', priority: '' },
+    after: { value, priority: '' },
+  });
+  act(() => {
+    target.style.width = '50%';
+    browserAnnotationSession.recordPropertyChanges({ target, evidence, changes: [change('50%')] });
+  });
+  const accepted = browserAnnotationSession.captureSnapshot();
+  const revision = latest!.sessionRevision;
+  const width = () =>
+    latest!.viewState.selection!.patch.declarations.find((item) => item.property === 'width')
+      ?.value;
+  expect(width()).toBe('50%');
+  act(() => {
+    target.style.width = '25%';
+    browserAnnotationSession.recordPropertyChanges({ target, evidence, changes: [change('25%')] });
+  });
+  expect(latest!.sessionRevision).toBeGreaterThan(revision);
+  expect(width()).toBe('25%');
+  act(() => {
+    target.style.width = '50%';
+    browserAnnotationSession.applySnapshot(accepted);
+  });
+  expect(width()).toBe('50%');
+  Reflect.deleteProperty(target, 'getClientRects');
+  browserAnnotationSession.resetForDocument();
+});
+
+it.each([
+  { tool: 'inspect' as const, dismiss: 'close' },
+  { tool: 'compare' as const, dismiss: 'close' },
+  { tool: 'inspect' as const, dismiss: 'Escape' },
+  { tool: 'compare' as const, dismiss: 'Escape' },
+])(
+  'keeps $tool workspace closed after Check $dismiss while retaining the selected identity',
+  async ({ tool, dismiss }) => {
+    designReviewModeState.tool = tool;
+    designReviewModeState.checkOpen = true;
+    await act(async () => root?.render(<Harness />));
+    const selected = designReviewModeState.selection;
+    expect(latest?.toolPanelOpen).toBe(true);
+    await act(async () => {
+      if (dismiss === 'close') latest?.workspace.close();
+      else controllerMocks.dismissRequestHandler?.(new KeyboardEvent('keydown', { key: 'Escape' }));
+      root?.render(<Harness />);
+    });
+    expect(designReviewModeState.checkOpen).toBe(false);
+    expect(latest?.toolPanelOpen).toBe(false);
+    expect(latest?.tool).toBe(tool);
+    expect(designReviewModeState.selection).toBe(selected);
+  }
+);
+
+it.each(['inspect', 'compare'] as const)(
+  'resumes the existing %s workspace when Check presentation closes without a workspace dismissal',
+  async (tool) => {
+    designReviewModeState.tool = tool;
+    designReviewModeState.checkOpen = true;
+    await act(async () => root?.render(<Harness />));
+    await act(async () => {
+      designReviewModeState.checkOpen = false;
+      root?.render(<Harness />);
+    });
+    expect(latest?.toolPanelOpen).toBe(true);
+    expect(latest?.tool).toBe(tool);
+  }
+);

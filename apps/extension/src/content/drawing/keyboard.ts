@@ -116,6 +116,7 @@ function hasHigherContentKeyboardLayer(event: KeyboardEvent): boolean {
         Boolean(
           target.closest(
             [
+              '[data-page-customizing="true"]',
               '[aria-expanded="true"]',
               '[aria-modal="true"]',
               '[data-ui="shared.ui.color-selector"][data-open="true"]',

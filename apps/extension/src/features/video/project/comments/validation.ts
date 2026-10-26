@@ -1,9 +1,10 @@
+import { parseVideoProjectPlacementBinding as parseBinding } from '../validation/placement-binding';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { CANVAS_COMMENT_LIMITS } from '../../review/comments';
 import { parseCanvasComment, parseReviewAnnotation } from '../../review/validation';
 import type { VideoProject } from '../types/model';
 import { MAX_VIDEO_PROJECT_DURATION_SECONDS } from '../validation/primitives';
-import type { VideoProjectCommentBinding, VideoProjectCommentDocument } from './types';
+import type { VideoProjectCommentDocument } from './types';
 
 const MAX_COMMENT_DOCUMENTS = 2_000;
 const MAX_PROJECT_NOTES = 2_000;
@@ -12,23 +13,6 @@ function identity(value: unknown): value is string {
   return (
     typeof value === 'string' && value.length > 0 && value.length <= 256 && value.trim() === value
   );
-}
-
-function parseBinding(value: unknown): VideoProjectCommentBinding | null {
-  if (!isRecord(value)) return null;
-  if (value['kind'] === 'project' && Object.keys(value).length === 1) return { kind: 'project' };
-  if (
-    value['kind'] === 'source' &&
-    Object.keys(value).length === 3 &&
-    identity(value['assetId']) &&
-    identity(value['sourceInstanceId'])
-  )
-    return {
-      kind: 'source',
-      assetId: value['assetId'],
-      sourceInstanceId: value['sourceInstanceId'],
-    };
-  return null;
 }
 
 function parseDocument(value: unknown): VideoProjectCommentDocument | null {

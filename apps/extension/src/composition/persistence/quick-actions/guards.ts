@@ -1,3 +1,4 @@
+import { parseQuickActionAppearance } from '../../../contracts/quick-action-appearance';
 import type { QuickAction } from '../../../contracts/settings';
 import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 
@@ -110,6 +111,7 @@ function isStoredQuickAction(value: unknown): value is StoredQuickAction {
     isString(value['icon']) &&
     quickActionScreenshotModes.has(value['screenshotMode'] as QuickAction['screenshotMode']) &&
     isBoolean(value['exitAfterCapture']) &&
+    hasOptionalField(value, 'appearance', (field) => parseQuickActionAppearance(field) !== null) &&
     hasOptionalField(value, 'origin', isQuickActionOrigin) &&
     hasOptionalField(value, 'customized', isBoolean) &&
     hasOptionalField(
@@ -159,6 +161,9 @@ function normalizeStoredQuickAction(action: StoredQuickAction): QuickAction {
   return {
     ...rest,
     ...(normalizedAfterCapture === undefined ? {} : { afterCapture: normalizedAfterCapture }),
+    ...(action.appearance === undefined
+      ? {}
+      : { appearance: parseQuickActionAppearance(action.appearance)! }),
   };
 }
 

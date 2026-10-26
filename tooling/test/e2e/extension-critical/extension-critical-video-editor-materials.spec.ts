@@ -481,11 +481,46 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await page.mouse.down();
       await page.mouse.move(box.x + (box.width * 4) / duration, box.y + 12, { steps: 8 });
       await page.mouse.up();
+      // Requested endpoints allow one CSS pixel of pointer quantization; safe cut boundaries may snap.
+      const pointerTolerance = duration / box.width;
       await expect
-        .poll(async () => (await readNativeReviewWorkspace(page, aggregateId))?.project?.name)
-        .toBeTruthy();
+        .poll(async () => {
+          const saved = await readNativeReviewWorkspace(page, aggregateId);
+          if (!saved) return false;
+          const cuts = replayReviewHistory(
+            saved.history,
+            saved.cursor,
+            saved.source,
+            reviewDocumentBaseline(saved)
+          ).edits.filter((edit) => edit.kind === 'cut');
+          const cut = cuts[0];
+          return (
+            cuts.length === 1 &&
+            cut !== undefined &&
+            Math.abs(cut.requestedStart - 2) <= pointerTolerance &&
+            Math.abs(cut.requestedEnd - 4) <= pointerTolerance &&
+            cut.start < 3 &&
+            cut.end > 3
+          );
+        })
+        .toBe(true);
+      const savedWorkspace = (await readNativeReviewWorkspace(page, aggregateId))!;
+      const savedCuts = replayReviewHistory(
+        savedWorkspace.history,
+        savedWorkspace.cursor,
+        savedWorkspace.source,
+        reviewDocumentBaseline(savedWorkspace)
+      ).edits.filter((edit) => edit.kind === 'cut');
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
       const legacyWorkspace = (await readNativeReviewWorkspace(page, aggregateId))!;
+      expect(
+        replayReviewHistory(
+          legacyWorkspace.history,
+          legacyWorkspace.cursor,
+          legacyWorkspace.source,
+          reviewDocumentBaseline(legacyWorkspace)
+        ).edits.filter((edit) => edit.kind === 'cut')
+      ).toEqual(savedCuts);
       const legacyContent = replayReviewHistory(
         legacyWorkspace.history,
         legacyWorkspace.cursor,
@@ -592,7 +627,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       const webcamSwitch = dialog
         .locator('[data-review-header-track="webcam"]')
         .getByRole('switch');
-      await webcamSwitch.click();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.webcamTrack"]')).toBeVisible();
       await expect(webcamSwitch).toHaveAttribute('aria-checked', 'true');
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
@@ -1722,15 +1757,16 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await cameraPlayhead.press('Home');
       for (let step = 0; step < migrated.fps; step++) await cameraPlayhead.press('ArrowRight');
       await page.locator(`[data-project-timeline-clip="${cameraClips[0]!.id}"]`).click();
-      const cameraGroup = page.getByRole('button', {
-        name: label('videoEditor.sidebar.inspectorGroupCamera'),
+      const cameraTimingGroup = page.getByRole('button', {
+        name: label('videoEditor.sidebar.inspectorGroupTiming'),
         exact: true,
       });
-      await cameraGroup.scrollIntoViewIfNeeded();
-      await cameraGroup.click();
-      const nativeOffset = page
-        .locator('[data-ui="video-editor.camera-placement-controls"]')
-        .getByRole('textbox', { name: label('gallery.videoReview.webcamOffset'), exact: true });
+      await cameraTimingGroup.scrollIntoViewIfNeeded();
+      await cameraTimingGroup.click();
+      const nativeOffset = page.getByRole('textbox', {
+        name: label('gallery.videoReview.webcamOffset'),
+        exact: true,
+      });
       await expect(nativeOffset).toHaveValue(String(authoredOffset));
       const editedOffset = authoredOffset / 2;
       await nativeOffset.fill(String(editedOffset));
@@ -2184,7 +2220,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         );
       }
       const final = (await readNativeVideoProject(page))!;
-      expect(final.version).toBe(37);
+      expect(final.version).toBe(beforeCameraMode.version);
       expect(hydrateVideoProject(final).clips).toEqual(hydrateVideoProject(beforeCameraMode).clips);
       await page.screenshot({
         path: info.outputPath('migrated-project-content-camera.png'),

@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { TextDocument } from '../../ui/text-document';
+import { useReviewEditorShortcuts } from './use-review-shortcuts';
 import {
   focusReviewRegion,
   reviewKeyboardTarget,
@@ -108,6 +112,12 @@ it('reserves playback Space for command surfaces while preserving editing and op
   const toggle = document.createElement('button');
   toggle.setAttribute('role', 'switch');
   expect(reviewOwnsPlaybackKeys(toggle)).toBe(true);
+  const lane = document.createElement('button');
+  lane.dataset['reviewTrackSelect'] = '';
+  const label = document.createElement('span');
+  lane.append(label);
+  expect(reviewOwnsPlaybackKeys(label)).toBe(true);
+  expect(reviewOwnsKeys(label)).toBe(false);
   const slider = document.createElement('input');
   slider.type = 'range';
   expect(reviewOwnsPlaybackKeys(slider)).toBe(false);
@@ -117,4 +127,66 @@ it('reserves playback Space for command surfaces while preserving editing and op
   expect(reviewOwnsPlaybackKeys(trigger)).toBe(false);
   trigger.setAttribute('aria-expanded', 'true');
   expect(reviewOwnsPlaybackKeys(trigger)).toBe(true);
+});
+
+it('leaves phrase Space with its local receiver while retaining Gallery transport on other commands', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  host.dataset['ui'] = 'gallery.videoReview.dialog';
+  document.body.append(host);
+  const root = createRoot(host),
+    play = vi.fn(),
+    activate = vi.fn();
+  function Harness() {
+    useReviewEditorShortcuts({
+      time: 0,
+      navigation: { start: 0, end: 4 },
+      seek: vi.fn(),
+      play,
+      composerAnnotation: null,
+      busy: false,
+      exporterPhase: 'idle',
+      exporterAvailable: true,
+      boundaries: undefined,
+      run: async (action) => action(),
+      undo: async () => {},
+      redo: async () => {},
+      cancelDrawing: vi.fn(),
+      pointTool: vi.fn(),
+      remove: vi.fn(),
+      addComment: vi.fn(),
+      toggleCut: vi.fn(),
+    });
+    return createElement(TextDocument, {
+      label: 'Document',
+      phrases: [{ id: 'a', text: 'Phrase' }],
+      selectedIds: [],
+      onSelection: vi.fn(),
+      onActivate: activate,
+    });
+  }
+  try {
+    act(() => root.render(createElement(Harness)));
+    const phrase = host.querySelector<HTMLElement>('[data-text-phrase-id]')!;
+    act(() => {
+      phrase.focus();
+      phrase.dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true })
+      );
+    });
+    expect(activate).toHaveBeenCalledExactlyOnceWith('a');
+    expect(play).not.toHaveBeenCalled();
+    const command = document.createElement('button');
+    host.append(command);
+    act(() =>
+      command.dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true })
+      )
+    );
+    expect(play).toHaveBeenCalledOnce();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
 });

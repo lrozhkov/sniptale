@@ -247,3 +247,20 @@
 .sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-video-recording='true'] > * {
   flex-shrink: 0;
 }
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-page-controls='true']:not(
+    [data-page-customizing='true']
+  ) {
+  inline-size: max-content;
+  max-block-size: calc(100dvh / var(--sniptale-content-ui-scale, 1) - 16px);
+  flex-wrap: nowrap;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sniptale-color-border-strong) transparent;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-page-controls='true'] > * {
+  flex-shrink: 0;
+}

@@ -204,7 +204,7 @@ async function inspectMicrophone(page: Page, panel: Locator, locale: AppLocale, 
   });
   await expect(record).toBeEnabled();
   const processing = panel.getByRole('button', {
-    name: new RegExp(translate('popup.video.microphoneEchoCancellation', locale), 'u'),
+    name: locale === 'ru' ? /Подавление эха/u : /Echo cancellation/u,
   });
   await expect(processing).toBeEnabled();
   await processing.scrollIntoViewIfNeeded();

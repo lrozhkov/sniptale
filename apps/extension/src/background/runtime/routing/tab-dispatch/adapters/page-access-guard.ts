@@ -19,6 +19,21 @@ export function routeWithPageAccess(args: ResolvedTabRouteArgs, route: () => boo
   return true;
 }
 
+/** Status reads verify access without recreating a runtime after explicit Close. */
+export function routeWithReadOnlyPageAccess(
+  args: ResolvedTabRouteArgs,
+  route: () => boolean
+): boolean {
+  void verifyPageAccess(args.resolvedTabId)
+    .then(() => {
+      route();
+    })
+    .catch((error: unknown) => {
+      args.sendResponse(createRouteErrorResponse(error));
+    });
+  return true;
+}
+
 export function routeWithVerifiedPageAccess(
   args: ResolvedTabRouteArgs,
   authorize: () => boolean,

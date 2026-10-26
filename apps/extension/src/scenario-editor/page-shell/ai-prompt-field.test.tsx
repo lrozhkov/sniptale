@@ -9,6 +9,7 @@ const io = vi.hoisted(() => ({
   change: vi.fn(),
   start: vi.fn(),
   stop: vi.fn(),
+  cancel: vi.fn(),
   state: { isLoading: false, isMutating: false, error: null as string | null },
 }));
 vi.mock('../../features/prompt-templates/hooks/use-prompt-templates', () => ({
@@ -27,8 +28,8 @@ vi.mock('../../features/prompt-templates/hooks/use-prompt-templates', () => ({
 vi.mock('../../platform/navigation/extension-pages', () => ({ openSettingsPage: io.navigate }));
 vi.mock('../../composition/voice-input/session', () => ({
   useVoiceInputSession: () => ({
-    actions: { start: io.start, stop: io.stop },
-    state: { active: false, audioLevel: 0, phase: 'idle', errorCode: null },
+    actions: { start: io.start, stop: io.stop, cancel: io.cancel },
+    state: { active: false, pending: false, audioLevel: 0, phase: 'idle', errorCode: null },
   }),
 }));
 vi.mock('@sniptale/ui/product-form-controls', async (original) => ({
@@ -99,6 +100,7 @@ it('inserts only enabled scenario templates immediately without a late overwrite
 });
 it('disables field controls while pending and exposes template/settings failures', async () => {
   await render(true);
+  expect(io.cancel).toHaveBeenCalledOnce();
   expect(host.querySelector('textarea')?.disabled).toBe(true);
   expect(host.querySelector('select')?.disabled).toBe(true);
   expect([...host.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);

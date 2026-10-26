@@ -304,6 +304,8 @@ export function ArrowDrawDirectionOption(props: {
 }
 
 export function DrawingColorOptions(props: {
+  /** Apply each palette entry's alpha; otherwise opaque entries preserve the current alpha. */
+  preservePaletteAlpha?: boolean;
   allowAlpha?: boolean;
   colors: readonly string[];
   dataUi?: string;
@@ -323,7 +325,9 @@ export function DrawingColorOptions(props: {
   const selectedValue = props.selectedValue === undefined ? props.value : props.selectedValue;
   const previewReset = props.onPreviewReset ?? props.onPreview;
   const resolveQuickColor = (color: string) =>
-    getColorAlpha(color) === 1 ? (replaceColorChannels(props.value, color) ?? color) : color;
+    !props.preservePaletteAlpha && getColorAlpha(color) === 1
+      ? (replaceColorChannels(props.value, color) ?? color)
+      : color;
   return (
     <div
       role="group"

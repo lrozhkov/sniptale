@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { applyPageStylePatchWithHistory } from '../runtime/actions';
 import type {
@@ -8,6 +8,10 @@ import type {
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import type { DesignReviewActions } from '../types';
 import { normalizeInspectorValue } from './state';
+import {
+  createPageStyleValuesFromPatch,
+  readPageStyleSelectionSnapshot,
+} from '../../../selection/design-review/snapshot';
 
 const BORDER_VISIBLE_STYLE = 'solid';
 
@@ -94,11 +98,11 @@ function createPatchDeclarations(
   });
 }
 
-function applyValueUpdates(args: {
+async function applyValueUpdates(args: {
   declarations: ReturnType<typeof createPatchDeclarations>;
   selection: PageStyleSelectionSnapshot;
 }) {
-  void applyPageStylePatchWithHistory({
+  await applyPageStylePatchWithHistory({
     element: args.selection.element,
     patch: {
       declarations: args.declarations,
@@ -112,6 +116,32 @@ export function usePageStyleValueActions(args: {
   setValues: Dispatch<SetStateAction<PageStyleDeclarationValueMap>>;
 }) {
   const { defaultValues, selection, setValues } = args;
+  const [error, setError] = useState(false);
+  const selectedTarget = selection?.element ?? null;
+  const activeTarget = useRef(selectedTarget);
+  activeTarget.current = selectedTarget;
+  const requestRevision = useRef(0);
+  useEffect(() => {
+    requestRevision.current += 1;
+    setError(false);
+  }, [selectedTarget]);
+  const apply = useCallback(
+    (request: Parameters<typeof applyValueUpdates>[0]) => {
+      const revision = ++requestRevision.current;
+      setError(false);
+      void applyValueUpdates(request).catch(() => {
+        if (
+          activeTarget.current !== request.selection.element ||
+          revision !== requestRevision.current
+        )
+          return;
+        const accepted = readPageStyleSelectionSnapshot(request.selection.element);
+        if (accepted) setValues(createPageStyleValuesFromPatch(accepted.patch));
+        setError(true);
+      });
+    },
+    [setValues]
+  );
   const updateValue = useCallback<DesignReviewActions['updateValue']>(
     (property, value) => {
       if (!selection) {
@@ -124,12 +154,12 @@ export function usePageStyleValueActions(args: {
       ];
 
       updateLocalValues(setValues, updates);
-      applyValueUpdates({
+      apply({
         declarations: createSingleValueDeclarations({ defaultValues, property, updates, value }),
         selection,
       });
     },
-    [defaultValues, selection, setValues]
+    [defaultValues, selection, setValues, apply]
   );
 
   const updateValues = useCallback<DesignReviewActions['updateValues']>(
@@ -141,12 +171,12 @@ export function usePageStyleValueActions(args: {
       const expandedUpdates = [...updates, ...createBorderCompanionUpdates(defaultValues, updates)];
 
       updateLocalValues(setValues, expandedUpdates);
-      applyValueUpdates({
+      apply({
         declarations: createPatchDeclarations(defaultValues, expandedUpdates),
         selection,
       });
     },
-    [defaultValues, selection, setValues]
+    [defaultValues, selection, setValues, apply]
   );
 
   const resetValue = useCallback<DesignReviewActions['resetValue']>(
@@ -154,5 +184,5 @@ export function usePageStyleValueActions(args: {
     [defaultValues, updateValue]
   );
 
-  return { resetValue, updateValue, updateValues };
+  return { error, resetValue, updateValue, updateValues };
 }

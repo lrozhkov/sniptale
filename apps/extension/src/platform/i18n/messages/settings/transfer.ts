@@ -133,6 +133,10 @@ export const settingsTransferMessages = defineMessageSource({
     locale: message('Язык', 'Language'),
     popupStartup: message('Стартовая страница popup', 'Popup start page'),
     contextMenu: message('Контекстное меню', 'Context menu'),
+    pageLaunch: message(
+      'Панель страницы и места быстрых действий',
+      'Page launcher and quick-action placement'
+    ),
     items: message('Элементы', 'Items'),
     default: message('По умолчанию', 'Default'),
     format: message('Формат', 'Format'),

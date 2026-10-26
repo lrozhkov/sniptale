@@ -1,108 +1,234 @@
 // @vitest-environment jsdom
-
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-const shimDependencyMocks = vi.hoisted(() => ({
-  loadShimQuickActions: vi.fn(),
-  shimQuickActionStorage: {
-    canObserveChanges: vi.fn(() => false),
-    subscribeToChanges: vi.fn(),
-  },
-  triggerQuickActionFromShim: vi.fn(),
-  wakeContentRuntimeFromShim: vi.fn(),
-}));
-
-const markerMocks = vi.hoisted(() => ({
-  isFullContentRuntimeMounted: vi.fn(() => false),
-}));
-
-const hotkeyMocks = vi.hoisted(() => ({
-  createQuickActionHotkeyRuntime: vi.fn(),
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { normalizePageLaunchPreferences } from '../../../contracts/page-launch';
+const mocks = vi.hoisted(() => ({
+  full: vi.fn(() => false),
+  release: vi.fn(),
+  wake: vi.fn(),
+  load: vi.fn(),
+  actions: vi.fn(),
+  view: vi.fn(),
   start: vi.fn(),
   stop: vi.fn(),
+  hotkeys: vi.fn(),
+  subscribe: vi.fn(),
+  open: vi.fn(),
+  trigger: vi.fn(),
+  save: vi.fn(),
+  dispose: vi.fn(),
+  update: vi.fn(),
 }));
-
-vi.mock('./quick-actions', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./quick-actions')>()),
-  loadShimQuickActions: shimDependencyMocks.loadShimQuickActions,
-  shimQuickActionStorage: shimDependencyMocks.shimQuickActionStorage,
+vi.mock('@sniptale/platform/browser/content-runtime-shim', () => ({
+  contentRuntimeShimBrowser: {
+    canObserveStorageChanges: () => true,
+    subscribeToStorageChanges: mocks.subscribe,
+  },
 }));
-
-vi.mock('./transport/quick-action', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./transport/quick-action')>()),
-  triggerQuickActionFromShim: shimDependencyMocks.triggerQuickActionFromShim,
+vi.mock('./preferences', () => ({ createShimPreferencesLoader: () => mocks.load }));
+vi.mock('./launcher', () => ({ createShimLauncher: mocks.view }));
+vi.mock('../entrypoint/markers', () => ({
+  isFullContentRuntimeMounted: mocks.full,
+  requestFullContentRuntimeRelease: mocks.release,
 }));
-
-vi.mock('./transport/wakeup', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./transport/wakeup')>()),
-  wakeContentRuntimeFromShim: shimDependencyMocks.wakeContentRuntimeFromShim,
+vi.mock('./quick-actions', () => ({
+  loadShimQuickActions: mocks.actions,
+  shimQuickActionStorage: {},
 }));
-
-vi.mock('../entrypoint/markers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../entrypoint/markers')>()),
-  isFullContentRuntimeMounted: markerMocks.isFullContentRuntimeMounted,
+vi.mock('./transport/wakeup', () => ({ wakeContentRuntimeFromShim: mocks.wake }));
+vi.mock('./transport/launcher', () => ({
+  openPageToolbarFromShim: mocks.open,
+  savePageCornerFromShim: mocks.save,
 }));
-
-vi.mock('../../platform/quick-action-hotkeys', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../platform/quick-action-hotkeys')>()),
-  createQuickActionHotkeyRuntime: hotkeyMocks.createQuickActionHotkeyRuntime,
+vi.mock('./transport/quick-action', () => ({ triggerQuickActionFromShim: mocks.trigger }));
+vi.mock('../../platform/quick-action-hotkeys', () => ({
+  createQuickActionHotkeyRuntime: mocks.hotkeys,
 }));
-
-async function importShim(): Promise<void> {
-  await import('.');
+type ShimGlobal = typeof globalThis & { __sniptaleContentRuntimeShimCleanup?: () => void };
+const runtime = globalThis as ShimGlobal;
+async function flush() {
+  for (let index = 0; index < 8; index++) await Promise.resolve();
 }
-
+async function mutation() {
+  document.body.append(document.createElement('span'));
+  await flush();
+}
+function presentation() {
+  return {
+    preferences: { ...normalizePageLaunchPreferences(undefined), enabled: true },
+    locale: 'en',
+    theme: 'light',
+  };
+}
 beforeEach(() => {
+  runtime.__sniptaleContentRuntimeShimCleanup?.();
   vi.resetModules();
   vi.clearAllMocks();
-  markerMocks.isFullContentRuntimeMounted.mockReturnValue(false);
-  shimDependencyMocks.wakeContentRuntimeFromShim.mockResolvedValue({
-    restored: false,
-    success: true,
-  });
-  hotkeyMocks.createQuickActionHotkeyRuntime.mockReturnValue({
-    start: hotkeyMocks.start,
-    stop: hotkeyMocks.stop,
-  });
-  delete (globalThis as { __sniptaleContentRuntimeShimCleanup?: unknown })
-    .__sniptaleContentRuntimeShimCleanup;
+  mocks.full.mockReturnValue(false);
+  mocks.release.mockResolvedValue(false);
+  mocks.wake.mockResolvedValue({ success: true });
+  mocks.load.mockResolvedValue(presentation());
+  mocks.actions.mockResolvedValue([]);
+  mocks.subscribe.mockReturnValue(vi.fn());
+  mocks.view.mockReturnValue({ dispose: mocks.dispose, update: mocks.update });
+  mocks.hotkeys.mockReturnValue({ start: mocks.start, stop: mocks.stop });
+  mocks.open.mockResolvedValue(undefined);
 });
-
 afterEach(() => {
-  const cleanup = (globalThis as { __sniptaleContentRuntimeShimCleanup?: () => void })
-    .__sniptaleContentRuntimeShimCleanup;
-  cleanup?.();
-  delete (globalThis as { __sniptaleContentRuntimeShimCleanup?: unknown })
-    .__sniptaleContentRuntimeShimCleanup;
+  runtime.__sniptaleContentRuntimeShimCleanup?.();
+  document.body.replaceChildren();
+});
+it('waits for passive wakeup before showing launcher and gives restored full runtime priority', async () => {
+  let wake!: () => void;
+  mocks.wake.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        wake = resolve;
+      })
+  );
+  await import('.');
+  await flush();
+  expect(mocks.view).not.toHaveBeenCalled();
+  mocks.full.mockReturnValue(true);
+  wake();
+  await flush();
+  expect(mocks.view).not.toHaveBeenCalled();
+  expect(mocks.start).not.toHaveBeenCalled();
+});
+it('restarts one shim owner only after full cleanup without repeating passive wakeup', async () => {
+  await import('.');
+  await flush();
+  expect(mocks.start).toHaveBeenCalledOnce();
+  expect(mocks.view).toHaveBeenCalledOnce();
+  mocks.full.mockReturnValue(true);
+  await mutation();
+  expect(mocks.dispose).toHaveBeenCalledOnce();
+  expect(mocks.stop).toHaveBeenCalledOnce();
+  mocks.full.mockReturnValue(false);
+  await mutation();
+  expect(mocks.hotkeys).toHaveBeenCalledTimes(2);
+  expect(mocks.view).toHaveBeenCalledTimes(2);
+  expect(mocks.wake).toHaveBeenCalledOnce();
+  await mutation();
+  expect(mocks.view).toHaveBeenCalledTimes(2);
+});
+it('observes handback even when initialized with an existing full runtime', async () => {
+  mocks.full.mockReturnValue(true);
+  await import('.');
+  await flush();
+  expect(mocks.wake).not.toHaveBeenCalled();
+  expect(mocks.view).not.toHaveBeenCalled();
+  mocks.full.mockReturnValue(false);
+  await mutation();
+  expect(mocks.view).toHaveBeenCalledOnce();
+});
+it('coalesces opening and returns one retryable launcher after supported post-injection failure', async () => {
+  await import('.');
+  await flush();
+  let refuse!: (reason: Error) => void;
+  mocks.open.mockImplementationOnce(
+    () =>
+      new Promise<void>((_, reject) => {
+        refuse = reject;
+      })
+  );
+  const options = mocks.view.mock.calls[0]![0];
+  const first = options.open();
+  const duplicate = options.open();
+  mocks.full.mockReturnValue(true);
+  await mutation();
+  expect(mocks.dispose).toHaveBeenCalledOnce();
+  mocks.release.mockImplementationOnce(async () => {
+    mocks.full.mockReturnValue(false);
+    await mutation();
+    return true;
+  });
+  refuse(new Error('Native rollback completed'));
+  await expect(first).rejects.toThrow('Native rollback');
+  await duplicate;
+  expect(mocks.open).toHaveBeenCalledOnce();
+  expect(mocks.release).toHaveBeenCalledOnce();
+  expect(mocks.view).toHaveBeenCalledTimes(2);
+  expect(mocks.view.mock.calls[1]![0].failed).toBe(true);
+  await mocks.view.mock.calls[1]![0].open();
+  expect(mocks.open).toHaveBeenCalledTimes(2);
+});
+it('discards a late read after reinjection and never writes defaults while opening', async () => {
+  let old!: (value: ReturnType<typeof presentation>) => void;
+  mocks.load.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        old = resolve;
+      })
+  );
+  await import('.');
+  runtime.__sniptaleContentRuntimeShimCleanup?.();
+  old(presentation());
+  await flush();
+  expect(mocks.view).not.toHaveBeenCalled();
+  expect(mocks.save).not.toHaveBeenCalled();
+});
+it('latest storage reload wins over an older completed read', async () => {
+  await import('.');
+  await flush();
+  let old!: (value: ReturnType<typeof presentation>) => void;
+  mocks.load.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        old = resolve;
+      })
+  );
+  const changed = mocks.subscribe.mock.calls[0]![0];
+  changed();
+  const newest = presentation();
+  newest.preferences.corner = 'top-left';
+  mocks.load.mockResolvedValue(newest);
+  changed();
+  await flush();
+  old(presentation());
+  await flush();
+  expect(mocks.update.mock.calls.at(-1)![0].presentation.preferences.corner).toBe('top-left');
 });
 
-describe('content runtime shim', () => {
-  it('starts hotkey listening and asks background to restore lazy content runtime', async () => {
-    await importShim();
-
-    expect(hotkeyMocks.createQuickActionHotkeyRuntime).toHaveBeenCalled();
-    expect(hotkeyMocks.createQuickActionHotkeyRuntime).toHaveBeenCalledWith({
-      getActions: shimDependencyMocks.loadShimQuickActions,
-      storage: shimDependencyMocks.shimQuickActionStorage,
-      triggerQuickAction: expect.any(Function),
-    });
-    const triggerQuickAction = hotkeyMocks.createQuickActionHotkeyRuntime.mock.calls[0]?.[0]
-      .triggerQuickAction as ((action: { id: string }) => Promise<void>) | undefined;
-    await triggerQuickAction?.({ id: 'quick-action-1' });
-
-    expect(shimDependencyMocks.triggerQuickActionFromShim).toHaveBeenCalledWith({
-      id: 'quick-action-1',
-    });
-    expect(hotkeyMocks.start).toHaveBeenCalledOnce();
-    expect(shimDependencyMocks.wakeContentRuntimeFromShim).toHaveBeenCalledOnce();
+it('keeps the full runtime after quick-action startup until its capture owner completes', async () => {
+  await import('.');
+  await flush();
+  let finish!: () => void;
+  mocks.trigger.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const command = mocks.view.mock.calls[0]![0].trigger({
+    id: 'capture',
+    status: true,
+    hotkey: null,
   });
-
-  it('does nothing when the full content runtime is already mounted', async () => {
-    markerMocks.isFullContentRuntimeMounted.mockReturnValue(true);
-
-    await importShim();
-
-    expect(hotkeyMocks.createQuickActionHotkeyRuntime).not.toHaveBeenCalled();
-    expect(shimDependencyMocks.wakeContentRuntimeFromShim).not.toHaveBeenCalled();
+  mocks.full.mockReturnValue(true);
+  await mutation();
+  expect(mocks.release).not.toHaveBeenCalled();
+  finish();
+  await command;
+  expect(mocks.release).not.toHaveBeenCalled();
+  expect(mocks.full()).toBe(true);
+  expect(mocks.view).toHaveBeenCalledOnce();
+});
+it('returns a retryable group after failed quick action rollback', async () => {
+  await import('.');
+  await flush();
+  mocks.trigger.mockImplementationOnce(async () => {
+    mocks.full.mockReturnValue(true);
+    await mutation();
+    throw new Error('capture refused');
   });
+  mocks.release.mockImplementationOnce(async () => {
+    mocks.full.mockReturnValue(false);
+    return true;
+  });
+  await expect(
+    mocks.view.mock.calls[0]![0].trigger({ id: 'capture', status: true, hotkey: null })
+  ).rejects.toThrow('capture refused');
+  expect(mocks.release).toHaveBeenCalledOnce();
+  expect(mocks.view).toHaveBeenCalledTimes(2);
+  expect(mocks.view.mock.calls[1]![0].failed).toBe(true);
 });

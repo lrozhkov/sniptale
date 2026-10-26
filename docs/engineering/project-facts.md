@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.1` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `35` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `39` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -108,6 +108,12 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/contracts/full-page-capture`
 - `apps/extension/src/contracts/messaging`
 - `apps/extension/src/contracts/native-app`
+- `apps/extension/src/contracts/page-launch.test.ts`
+- `apps/extension/src/contracts/page-launch.ts`
+- `apps/extension/src/contracts/page-recovery.test.ts`
+- `apps/extension/src/contracts/page-recovery.ts`
+- `apps/extension/src/contracts/quick-action-appearance.test.ts`
+- `apps/extension/src/contracts/quick-action-appearance.ts`
 - `apps/extension/src/contracts/settings`
 - `apps/extension/src/contracts/settings-transfer`
 - `apps/extension/src/contracts/video`
@@ -182,6 +188,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/recording-icon.test.tsx`
 - `apps/extension/src/ui/recording-icon.tsx`
 - `apps/extension/src/ui/surface-style-selector`
+- `apps/extension/src/ui/text-document.test.tsx`
+- `apps/extension/src/ui/text-document.tsx`
 - `apps/extension/src/ui/theme`
 - `apps/extension/src/ui/video-export`
 - `apps/extension/src/ui/video-text`
@@ -211,6 +219,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 Required permissions:
 
 - `storage`
+- `alarms`
 - `contextMenus`
 - `unlimitedStorage`
 - `tabs`
@@ -286,6 +295,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/page-access/service.ts`
 - `apps/extension/src/background/routing-contracts/capabilities/content-action/route.ts`
 - `apps/extension/src/background/runtime/native-app/route.ts`
+- `apps/extension/src/background/runtime/page-access/page-launch-preferences.ts`
 - `apps/extension/src/background/runtime/page-access/wakeup-route.ts`
 - `apps/extension/src/background/runtime/routing/boundary/popup-export-routing.ts`
 - `apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities.ts`

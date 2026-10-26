@@ -42,3 +42,31 @@ it('requires filenames for screenshot gallery save runtime messages', () => {
     })
   ).toThrow('runtime SAVE_SCREENSHOT_TO_GALLERY response');
 });
+
+it('requires the transformed image and filename as one gallery response pair', () => {
+  const contract = runtimeActionSaveMessageContracts[MessageType.SAVE_SCREENSHOT_TO_GALLERY];
+  expect(() =>
+    contract.parseResponse({ success: true, dataUrl: 'data:image/png;base64,AA==' })
+  ).toThrow();
+  expect(() => contract.parseResponse({ success: true, filename: 'styled.png' })).toThrow();
+  expect(
+    contract.parseResponse({
+      success: true,
+      dataUrl: 'data:image/png;base64,AA==',
+      filename: 'styled.png',
+    })
+  ).toMatchObject({ filename: 'styled.png' });
+});
+
+it('bounds quick-action transaction identities for both save commands', () => {
+  for (const type of [MessageType.EXECUTE_SAVE, MessageType.SAVE_SCREENSHOT_TO_GALLERY]) {
+    const contract = runtimeActionSaveMessageContracts[type];
+    const request = { type, dataUrl: 'data:image/png;base64,AA==', filename: 'styled.png' };
+    expect(contract.parseRequest({ ...request, quickActionTransactionId: 'tx-1' })).toMatchObject({
+      quickActionTransactionId: 'tx-1',
+    });
+    for (const quickActionTransactionId of ['', 'x'.repeat(129), 3]) {
+      expect(() => contract.parseRequest({ ...request, quickActionTransactionId })).toThrow();
+    }
+  }
+});

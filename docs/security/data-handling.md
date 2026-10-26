@@ -231,3 +231,21 @@ A refused canonical deletion retains its recovery copy. Complete local-data eras
 Recovery preserves original blocks, including any suffix outside the playable prefix. Explicit raw download exports the original bytes in order. Failed recovery or download retains the source for another attempt. Recovery does not send media to a network service. Exclude recovery data from sync, diagnostics, traces, and automatic export.
 
 Explicit media backup v6 excludes pending recordings and retained safety copies. Recovery UI exports interrupted sources. Ordinary Library download exports successfully saved videos. A destructive migration requires complete backup coverage of recovery data first. This feature requires no new extension permissions.
+
+
+## Temporary page recovery
+
+Page recovery can retain drawings, frame annotations, text edits, styles, and design notes in private local storage. Each set expires 45 minutes after the last user change. Reading, restoring, or retrying a write does not extend that period. The receiver refuses expired sets before disclosure. A background alarm deletes expired bytes. Startup also deletes expired bytes after browser closure or delayed alarm delivery.
+
+A new edit without Restore replaces the previous set. Explicit Reset, Clear, and panel Close delete the set. Recovery never stores page data in host storage, sync, diagnostics, or automatic exports. Payloads contain bounded data only. The content history owner validates the complete set before applying its existing sanitized DOM operations.
+
+Loss of native session proof prevents Restore, including after a complete browser restart. The extension retains unclaimed bytes only until their original expiry. Complete local-data erasure excludes producers, drains admitted writes, revokes connections, and deletes both recovery keys. Old producers cannot recreate the deleted set.
+
+
+## Quick-action appearance preferences
+
+Quick-action presets can retain explicitly configured static text, website addresses, normalized icons, and raster backgrounds in the existing local preference list. A background is limited to 2 MiB. An icon is a bounded normalized PNG with sides at most 64 pixels. These values follow the existing preference lifetime. Preserving preferences during local-data erasure also preserves these configured values. Reset or action deletion removes its appearance. Automatic page metadata and captured pixels never enter the preset list.
+
+Settings transfer removes embedded background and icon bytes. The projected preset disables the removed image or icon and retains its other controls. Import refuses embedded artwork before storage admission. Preset artwork and text do not enter sync, diagnostics, or automatic exports.
+
+Favicon acquisition requires the configured option and an invoked capture. It uses the existing bounded anonymous public HTTPS policy with no redirects. Opening the Settings form does not fetch a favicon. Missing page data is omitted. Desktop decoration does not read a web page. Rendering checks encoded input, dimensions, and the combined raster budget before bitmap or canvas allocation.

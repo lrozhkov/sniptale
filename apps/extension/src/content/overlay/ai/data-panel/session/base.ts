@@ -6,7 +6,7 @@ export function useDataPanelBaseState() {
   const [copied, setCopied] = useState(false);
   const [treeState, setTreeState] = useState<Map<string, TreeNodeState>>(new Map());
   const [excludedColumns, setExcludedColumns] = useState<Map<string, string[]>>(new Map());
-  const [isDataSpoilerOpen, setIsDataSpoilerOpen] = useState(false);
+  const [isDataSpoilerOpen, setIsDataSpoilerOpen] = useState(true);
   const [isDataResizing, setIsDataResizing] = useState(false);
   const [isJsonResizing, setIsJsonResizing] = useState(false);
   const dataContainerRef = useRef<HTMLDivElement>(null);

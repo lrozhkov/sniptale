@@ -36,7 +36,7 @@ function warmAiPickSubmit(): void {
   });
 }
 
-function resumeAiPickSelectionRuntime(context: AiPickControllerContext) {
+function resumeAiPickSelectionRuntime(context: AiPickControllerContext, openTable = false) {
   const enableEpoch = context.beginAiPickEnableSession();
   const handleSelected = (
     tree: Parameters<typeof markSelectedInTree>[0],
@@ -53,9 +53,10 @@ function resumeAiPickSelectionRuntime(context: AiPickControllerContext) {
     warmAiPickSubmit();
     context.setIsAIModalOpen(true);
   };
-  const enablePromise = context.aiPickSource
-    ? enableAiPickModeDeferred(handleSelected, { source: context.aiPickSource })
-    : enableAiPickModeDeferred(handleSelected);
+  const enablePromise = enableAiPickModeDeferred(handleSelected, {
+    openTable,
+    ...(context.aiPickSource ? { source: context.aiPickSource } : {}),
+  });
 
   return enablePromise.catch((error) => {
     if (!context.isCurrentAiPickEnableSession(enableEpoch)) {
@@ -84,8 +85,8 @@ export function handleDisableAiPickMode(context: AiPickControllerContext) {
 
 export function handleAiPickContentStart(context: AiPickControllerContext) {
   if (context.aiPickMode) {
+    if (context.treeData) return;
     handleDisableAiPickMode(context);
-    return;
   }
 
   handleEnableAiPickMode(context);
@@ -103,7 +104,7 @@ export function handleEnableAiPickMode(context: AiPickControllerContext) {
   context.setAiPickMode(true);
   logger.log('Disabled highlighter and quick edit modes before enabling AI');
 
-  void resumeAiPickSelectionRuntime(context);
+  void resumeAiPickSelectionRuntime(context, true);
 }
 
 export function handleResumeAiPickMode(context: AiPickControllerContext) {

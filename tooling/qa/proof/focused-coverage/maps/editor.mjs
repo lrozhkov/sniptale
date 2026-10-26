@@ -1,5 +1,29 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'video-preview-canvas-region-gestures',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/editor-region/gesture.ts',
+    reason:
+      'Region and anchor consumers retain shared arrow decoding, pointer preview, single commit \
+and cancellation behavior.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
+      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/canvas/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'local-voice-selected-source-admission',
+    productionFile: 'apps/extension/src/workflows/video/local-voice-source.ts',
+    allowCrossOwner: true,
+    reason:
+      'Review and project consumers share local file or auditioned Library source identity and inspection.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/text-voice-local.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.test.ts',
+    ],
+  },
+  {
     owner: 'scene-spotlight-sampling',
     productionFile: 'apps/extension/src/features/video/composition/scene-spotlight.ts',
     allowCrossOwner: true,
@@ -152,8 +176,11 @@ export const EDITOR_OWNER_MAPPINGS = [
     reason:
       'Spotlight and border admission retain Gallery scene, edit, persistence and backup contracts.',
     testFiles: [
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-advanced.test.ts',
       'apps/extension/src/features/video/review/advanced/focus.test.ts',
       'apps/extension/src/features/video/review/advanced/border.test.ts',
+      'apps/extension/src/features/video/composition/scene-spotlight.test.ts',
       'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
       'apps/extension/src/features/video/review/advanced/migration.test.ts',
       'apps/extension/src/composition/persistence/review-workspaces/focus-compatibility.test.ts',
@@ -195,7 +222,8 @@ export const EDITOR_OWNER_MAPPINGS = [
       'Sound, captured gestures and ordinary clicks use the same current project update port.',
     testFiles: [
       'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-fields.test.tsx',
-      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-click-fields.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/\
+action-feedback-click-fields.test.tsx',
     ],
   },
   {
@@ -694,6 +722,16 @@ export const EDITOR_OWNER_MAPPINGS = [
     ],
   },
 
+  {
+    owner: 'content-drawing-history',
+    productionFile: 'apps/extension/src/content/drawing/history.ts',
+    reason:
+      'Canonical history integration and gesture consumers prove drawing commit, replay and reset.',
+    testFiles: [
+      'apps/extension/src/content/drawing/history.integration.test.ts',
+      'apps/extension/src/content/drawing/surface.gesture-parity.test.tsx',
+    ],
+  },
   {
     owner: 'content-drawing-preferences',
     productionFile: 'apps/extension/src/content/drawing/preferences.ts',

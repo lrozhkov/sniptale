@@ -1,3 +1,4 @@
+import { createQuickActionAppearance } from '../../../../contracts/quick-action-appearance';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import type { Settings, UserViewportPreset, ViewportPreset } from '../../../../contracts/settings';
@@ -40,6 +41,8 @@ vi.mock('../../../capture-surface/screenshot-session', async (importOriginal) =>
 
 import {
   applyQuickActionSurface,
+  getQuickActionAppearanceSnapshot,
+  assertQuickActionAppearanceTransaction,
   releaseQuickActionSurface,
   releaseQuickActionSurfaceAfterFailure,
   resetQuickActionSurfaceTransactionsForTests,
@@ -444,4 +447,25 @@ it('restores an absent borrowed viewport after scoped cleanup without ending the
   await releaseQuickActionSurface(7, args.viewportState, surface.transactionId);
   expect(args.viewportState.has(7)).toBe(false);
   expect(mocks.endSession).not.toHaveBeenCalled();
+});
+
+it('retains an immutable appearance snapshot and refuses a released or recreated transaction', async () => {
+  const args = createArgs({ viewportPresetId: null });
+  args.action.appearance = createQuickActionAppearance();
+  args.action.appearance.information.text = 'Accepted';
+  const first = await applyQuickActionSurface(args);
+  args.action.appearance.information.text = 'Changed';
+  const snapshot = getQuickActionAppearanceSnapshot(args.tabId, first.transactionId);
+  expect(snapshot.appearance?.information.text).toBe('Accepted');
+  snapshot.appearance!.information.text = 'Consumer mutation';
+  expect(
+    getQuickActionAppearanceSnapshot(args.tabId, first.transactionId).appearance?.information.text
+  ).toBe('Accepted');
+  await releaseQuickActionSurface(args.tabId);
+  expect(() => assertQuickActionAppearanceTransaction(args.tabId, first.transactionId)).toThrow(
+    'stale'
+  );
+  const replacement = await applyQuickActionSurface(args);
+  expect(replacement.transactionId).not.toBe(first.transactionId);
+  expect(() => getQuickActionAppearanceSnapshot(args.tabId, first.transactionId)).toThrow('stale');
 });

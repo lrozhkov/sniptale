@@ -136,6 +136,8 @@ function PhraseSummary({
 /** Standalone text uses the same phrase row and form controls without an audio controller. */
 export function ReviewTextPhrase(props: {
   fragment: ReviewTextFragment;
+  documentView?: boolean;
+  visible?: boolean;
   next?: ReviewTextFragment | undefined;
   editor: Pick<
     ReturnType<typeof useReviewText>,
@@ -148,6 +150,7 @@ export function ReviewTextPhrase(props: {
   busy: boolean;
   limit: number;
   focus?: boolean;
+  focusRevision?: number;
   onToggle?(): void;
   onSelect?(): void;
   onJump(): void;
@@ -167,7 +170,8 @@ export function ReviewTextPhrase(props: {
       textarea.current?.focus({ preventScroll: true });
       textarea.current?.scrollIntoView({ block: 'nearest' });
     }
-  }, [props.focus, props.expanded]);
+  }, [props.focus, props.expanded, props.focusRevision]);
+  if (props.visible === false && !props.expanded) return null;
   return (
     <article
       className={[
@@ -177,18 +181,20 @@ export function ReviewTextPhrase(props: {
       data-ui="gallery.videoReview.textPhrase"
       data-text-id={fragment.id}
     >
-      <PhraseSummary
-        phrase={fragment}
-        selected={props.selected ?? false}
-        onSelect={props.onSelect ?? (() => undefined)}
-        expanded={props.expanded}
-        batch={props.batch ?? false}
-        index={props.index}
-        onToggle={props.onToggle}
-        onJump={props.onJump}
-        playing={playhead >= fragment.start && playhead < fragment.end}
-        disabled={props.busy}
-      />
+      {!props.documentView && (
+        <PhraseSummary
+          phrase={fragment}
+          selected={props.selected ?? false}
+          onSelect={props.onSelect ?? (() => undefined)}
+          expanded={props.expanded}
+          batch={props.batch ?? false}
+          index={props.index}
+          onToggle={props.onToggle}
+          onJump={props.onJump}
+          playing={playhead >= fragment.start && playhead < fragment.end}
+          disabled={props.busy}
+        />
+      )}
       {props.expanded && (
         <>
           <TextareaField

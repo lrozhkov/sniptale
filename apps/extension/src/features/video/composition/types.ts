@@ -1,3 +1,4 @@
+import type { CameraShadowVector } from '../project/camera/shadow-direction';
 import type { QuickEditHomography } from './motion/spatial-geometry';
 import type { VisualLayerSourcePointMapping } from './draw/fitted-media';
 import type { QuickEditBorder, QuickEditSpotlight } from '../project/scene/focus-appearance';
@@ -109,6 +110,8 @@ export type VideoCompositionVisualLayer =
   | (VideoCompositionLayerBase<VideoProjectVideoClip, 'video'> & {
       /** Role of the source track, retained for independent camera composition. */
       trackRole?: VideoProjectTrackRole;
+      /** Evaluated scene-space shadow direction; never serialized into the clip. */
+      cameraShadowVector?: CameraShadowVector;
       /** Inner source exposure remains inside the decorated window mask. */
       sourceContentTransform?: QuickEditHomography;
       actions?: readonly VideoCompositionActionState[];

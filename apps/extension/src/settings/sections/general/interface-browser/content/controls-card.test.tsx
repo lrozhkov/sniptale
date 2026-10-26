@@ -55,6 +55,16 @@ let root: Root | null = null;
 
 function createState(overrides: Partial<AppearanceSectionState> = {}): AppearanceSectionState {
   return {
+    pageLaunch: {
+      enabled: false,
+      hoverOnly: false,
+      corner: 'bottom-right',
+      quickActionsPopup: true,
+      quickActionsCorner: false,
+      quickActionsToolbar: false,
+    },
+    pageLaunchReady: true,
+    updatePageLaunch: vi.fn(async () => undefined),
     contextMenu: {
       enabled: true,
       showExport: true,
@@ -148,4 +158,33 @@ it('renders appearance owners and routes locale controls', () => {
   );
   act(() => shortcutButton?.click());
   expect(mocks.openExtensionShortcutsPage).toHaveBeenCalledOnce();
+});
+
+it('keeps hover disabled until launcher is accepted and retains values after a failed save', async () => {
+  const state = createState();
+  renderCard(state);
+  const launcher = () =>
+    container!.querySelector<HTMLButtonElement>('[aria-label="settings.appearance.pageLauncher"]')!;
+  const hover = () =>
+    container!.querySelector<HTMLButtonElement>(
+      '[aria-label="settings.appearance.pageLauncherHover"]'
+    )!;
+  expect(hover().disabled).toBe(true);
+  state.updatePageLaunch = vi.fn(async () => {
+    throw new Error('Write refused');
+  });
+  renderCard(state);
+  await act(async () => launcher().click());
+  expect(state.updatePageLaunch).toHaveBeenCalledWith({ enabled: true });
+  expect(launcher().getAttribute('aria-checked')).toBe('false');
+  expect(hover().disabled).toBe(true);
+  expect(container!.querySelector('[role="alert"]')).not.toBeNull();
+  state.updatePageLaunch = vi.fn(async () => undefined);
+  renderCard(state);
+  await act(async () => launcher().click());
+  state.pageLaunch.enabled = true;
+  renderCard(state);
+  expect(hover().disabled).toBe(false);
+  await act(async () => hover().click());
+  expect(state.updatePageLaunch).toHaveBeenLastCalledWith({ hoverOnly: true });
 });

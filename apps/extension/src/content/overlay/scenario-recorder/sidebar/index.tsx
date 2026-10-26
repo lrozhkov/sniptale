@@ -91,6 +91,7 @@ export function ScenarioRecorderSidebar(
     onDeleteStep: (stepId: string) => void;
     onFinish: () => void;
     onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
+    onClose: (event: MouseEvent<HTMLButtonElement>) => void;
     onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
     captureBusy: boolean;
     finishBusy: boolean;

@@ -25,7 +25,10 @@ vi.mock('../../../workflows/ai-session/llm-session', () => ({ requestLlmSessionT
 vi.mock('../../../workflows/video-review/text-rewrite-client', () => ({
   runReviewTextJob: vi.fn(),
 }));
-vi.mock('./save-readiness', () => ({ waitForVideoEditorSave: vi.fn() }));
+vi.mock('./save-readiness', async (original) => ({
+  ...(await original<typeof import('./save-readiness')>()),
+  waitForVideoEditorSave: vi.fn(),
+}));
 
 const catalog: AIModelSelectionBootstrapPayload = {
   chromeAiEnabled: false,

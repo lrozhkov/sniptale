@@ -2,7 +2,7 @@ import { defineMessageSource } from '../../source';
 
 export const contentToolbarCaptureMessages = defineMessageSource({
   showScenarioPanel: { ru: 'Показать панель записи сценария', en: 'Show scenario recorder panel' },
-  hideScenarioPanel: { ru: 'Скрыть панель записи сценария', en: 'Hide scenario recorder panel' },
+  hideScenarioPanel: { ru: 'Закрыть панель записи сценария', en: 'Close scenario recorder panel' },
   visiblePageSettingsTitle: {
     ru: 'Параметры снимка видимой области',
     en: 'Visible-area screenshot options',

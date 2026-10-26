@@ -444,3 +444,45 @@ it.each([
     expect(createHash('sha256').update(JSON.stringify(outline)).digest('hex')).toBe(digest);
   }
 );
+
+it('replays a recovery document through the existing session without another commit', () => {
+  const commit = vi.fn(() => true);
+  const capture = vi.fn();
+  const session = createDrawingSession({
+    onDocumentCommit: commit,
+    objectProjection: { capture, resolve: (object) => object },
+  });
+  const object = {
+    id: 'restored',
+    kind: 'blur' as const,
+    bounds: { x: 1, y: 2, width: 30, height: 40 },
+  };
+  expect(session.restoreDocument({ version: 1, objects: [object] })).toBe(true);
+  expect(session.getSnapshot()).toMatchObject({
+    document: { objects: [object] },
+    selectedObjectIds: [],
+  });
+  expect(commit).not.toHaveBeenCalled();
+  expect(capture).toHaveBeenCalledWith(object, undefined);
+  session.dispose();
+  expect(session.restoreDocument({ version: 1, objects: [] })).toBe(false);
+});
+
+it('reads committed drawing geometry without publishing or replacing the live preview', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    id: 'stroke',
+    kind: 'blur',
+    bounds: { x: 1, y: 2, width: 20, height: 30 },
+  });
+  session.previewObjects([
+    { id: 'stroke', kind: 'blur', bounds: { x: 99, y: 2, width: 20, height: 30 } },
+  ]);
+  const revision = session.getSnapshot().revision;
+  expect(session.getCommittedDocument().objects[0]).toMatchObject({ bounds: { x: 1 } });
+  expect(session.getSnapshot()).toMatchObject({
+    revision,
+    document: { objects: [{ bounds: { x: 99 } }] },
+  });
+  session.dispose();
+});

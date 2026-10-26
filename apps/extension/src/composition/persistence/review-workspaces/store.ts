@@ -117,7 +117,7 @@ type WriteTransaction = ReturnType<typeof beginWriteTransaction>;
 function indexedWorkspace(workspace: VideoWorkspace) {
   const keys = new Set([
     USAGE_INDEX_MARKER,
-    usageReferenceKey('library-asset', workspace.aggregateId),
+    usageReferenceKey('library-asset', workspace.sourceMediaId ?? workspace.aggregateId),
   ]);
   for (const ref of collectReviewAssetReferences(workspace)) {
     if (ref.startsWith('project-asset:'))
@@ -181,7 +181,10 @@ async function readSnapshot(
   if (rawDraft !== undefined && (!draft || draft.aggregateId !== aggregateId)) {
     throw new VideoWorkspaceError('invalid', { check: 'draft', reason: 'invalid' });
   }
-  if (workspace.sourceAssetId !== (await readSourceAssetId(tx, aggregateId)))
+  if (
+    workspace.sourceAssetId !==
+    (await readSourceAssetId(tx, workspace.sourceMediaId ?? aggregateId))
+  )
     throw new VideoWorkspaceError('changed-source');
   return { snapshot: { workspace, draft }, document, storage };
 }
@@ -213,7 +216,8 @@ async function mutate<T>(
     tx: WriteTransaction,
     prepared: ReviewReadySources,
     physicalDelete: PhysicalDeleteAssetOperation,
-    media: MediaLibraryEntry
+    media: MediaLibraryEntry,
+    current: AdmittedWorkspaceSnapshot | null
   ) => Promise<T>,
   admitsSources = false,
   effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[]
@@ -226,20 +230,22 @@ async function mutate<T>(
     const committed = await runWithIndexedDbMutation(async (db) => {
       const tx = beginWriteTransaction(db);
       try {
+        const current = await readSnapshot(tx, aggregateId);
+        const sourceMediaId = current?.snapshot.workspace.sourceMediaId ?? aggregateId;
         const media = parseMediaLibraryEntry(
-          await tx.objectStore(MEDIA_LIBRARY_STORE).get(aggregateId)
+          await tx.objectStore(MEDIA_LIBRARY_STORE).get(sourceMediaId)
         );
         if (!media || !media.mimeType.startsWith('video/'))
           throw new VideoWorkspaceError('missing-media');
         await promoteReviewPrimarySourceLifecycles(
-          aggregateId,
+          sourceMediaId,
           {
             media: tx.objectStore(MEDIA_LIBRARY_STORE),
             recordings: tx.objectStore(STORE_NAME),
           },
           Date.now()
         );
-        const result = await operation(tx, prepared, physicalDelete, media);
+        const result = await operation(tx, prepared, physicalDelete, media, current);
         if (physicalDelete.assetIds.length || physicalDelete.privateSources?.length)
           await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
         await tx.done;
@@ -287,6 +293,37 @@ async function mutate<T>(
 
 type ReviewReadySources = Awaited<ReturnType<typeof readReviewReadySources>>;
 
+/** Creates an empty project with the same initial settings as an ordinary first open. */
+async function newVideoWorkspace(
+  tx: WriteTransaction,
+  aggregateId: string,
+  source: ReviewSource,
+  media: MediaLibraryEntry,
+  now: number,
+  revision = 1
+): Promise<VideoWorkspace> {
+  const advanced = createQuickEditAdvancedState();
+  const legacy = parseVideoWorkspace({
+    aggregateId,
+    formatVersion: 1,
+    source,
+    sourceAssetId: await readSourceAssetId(tx, aggregateId),
+    revision,
+    history: [],
+    cursor: 0,
+    advanced: {
+      ...advanced,
+      ui: { ...advanced.ui, modeSelectionPending: true },
+      background: { enabled: false, zoomBehavior: 'window' },
+      presentation: createNewWorkspacePresentationSettings(),
+    },
+    createdAt: now,
+    updatedAt: now,
+  });
+  if (!legacy) throw new VideoWorkspaceError('invalid');
+  return materializeVideoWorkspaceProject(legacy, media.filename);
+}
+
 /** Opens the single session, retaining its complete history and recovery field on re-entry. */
 export async function openVideoWorkspace(
   aggregateId: string,
@@ -295,13 +332,13 @@ export async function openVideoWorkspace(
 ): Promise<VideoWorkspaceSnapshot> {
   const source = parseReviewSource(sourceValue);
   if (!source) throw new VideoWorkspaceError('invalid');
-  return mutate(aggregateId, async (tx, prepared, _physicalDelete, media) => {
+  return mutate(aggregateId, async (tx, prepared, _physicalDelete, media, existing) => {
     if (
       expectedSourceAssetId !== undefined &&
-      expectedSourceAssetId !== (await readSourceAssetId(tx, aggregateId))
+      expectedSourceAssetId !==
+        (await readSourceAssetId(tx, existing?.snapshot.workspace.sourceMediaId ?? aggregateId))
     )
       throw new VideoWorkspaceError('changed-source');
-    const existing = await readSnapshot(tx, aggregateId);
     if (existing) {
       if (JSON.stringify(existing.snapshot.workspace.source) !== JSON.stringify(source))
         throw new VideoWorkspaceError('changed-source');
@@ -328,39 +365,93 @@ export async function openVideoWorkspace(
       return { ...existing.snapshot, workspace: updated };
     }
     if (media.lifecycle?.trashedAt !== undefined) throw new VideoWorkspaceError('missing-media');
-    const now = Date.now();
-    const advanced = createQuickEditAdvancedState();
-    const legacy = parseVideoWorkspace({
-      aggregateId,
-      formatVersion: 1,
-      source,
-      sourceAssetId: await readSourceAssetId(tx, aggregateId),
-      revision: 1,
-      history: [],
-      cursor: 0,
-      advanced: {
-        ...advanced,
-        ui: { ...advanced.ui, modeSelectionPending: true },
-        background: { enabled: false, zoomBehavior: 'window' },
-        presentation: createNewWorkspacePresentationSettings(),
-      },
-      createdAt: now,
-      updatedAt: now,
-    });
-    if (!legacy) throw new VideoWorkspaceError('invalid');
-    const workspace = materializeVideoWorkspaceProject(legacy, media.filename);
+    const workspace = await newVideoWorkspace(tx, aggregateId, source, media, Date.now());
     await replaceWorkspaceStorage(tx, workspace, indexedWorkspace(workspace).usageReferenceKeys);
     return { workspace, draft: null };
   });
 }
 
-async function requireSnapshot(
-  tx: Transaction,
-  aggregateId: string,
+/** Atomically preserves the current default and starts an independent empty project for its source. */
+export async function createVideoWorkspaceProject(args: {
+  aggregateId: string;
+  expectedRevision: number;
+  expectedSourceAssetId: string;
+  archiveId: string;
+}): Promise<VideoWorkspaceSnapshot> {
+  if (!args.archiveId || args.archiveId.length > 256 || args.archiveId === args.aggregateId)
+    throw new VideoWorkspaceError('invalid');
+  return mutate(args.aggregateId, async (tx, _prepared, _physicalDelete, media, opened) => {
+    if (!opened) throw new VideoWorkspaceError('conflict');
+    const sourceMediaId = opened.snapshot.workspace.sourceMediaId ?? args.aggregateId;
+    const sourceKind = media.source.kind === 'project-export' ? 'export' : media.source.kind;
+    const sourcePrefix = `${sourceKind}:`;
+    if (!args.archiveId.startsWith(sourcePrefix) || args.archiveId.length === sourcePrefix.length)
+      throw new VideoWorkspaceError('invalid');
+    if (
+      args.archiveId === sourceMediaId ||
+      (await tx.objectStore(MEDIA_LIBRARY_STORE).get(args.archiveId))
+    )
+      throw new VideoWorkspaceError('invalid');
+    const previousArchive = await readSnapshot(tx, args.archiveId);
+    const current =
+      sourceMediaId === args.aggregateId ? opened : await readSnapshot(tx, sourceMediaId);
+    if (
+      opened.snapshot.workspace.sourceAssetId !== args.expectedSourceAssetId ||
+      opened.snapshot.workspace.project?.lifecycle.trashedAt !== undefined ||
+      current?.snapshot.workspace.project?.lifecycle.trashedAt !== undefined ||
+      media.lifecycle?.trashedAt !== undefined
+    )
+      throw new VideoWorkspaceError('conflict');
+    if (previousArchive) {
+      // The stable command identity acknowledges a completed publication without resetting newer work.
+      if (
+        previousArchive.snapshot.workspace.sourceMediaId !== sourceMediaId ||
+        previousArchive.snapshot.workspace.sourceAssetId !== args.expectedSourceAssetId ||
+        !current
+      )
+        throw new VideoWorkspaceError('conflict');
+      return current.snapshot;
+    }
+    if (opened.snapshot.workspace.revision !== args.expectedRevision)
+      throw new VideoWorkspaceError('conflict');
+    const previous = current?.snapshot ?? opened.snapshot;
+    if (previous.workspace.sourceAssetId !== args.expectedSourceAssetId)
+      throw new VideoWorkspaceError('changed-source');
+    const archive = parseVideoWorkspace({
+      ...previous.workspace,
+      aggregateId: args.archiveId,
+      sourceMediaId,
+    });
+    if (!archive) throw new VideoWorkspaceError('invalid');
+    const now = Math.max(
+      Date.now(),
+      previous.workspace.createdAt + 1,
+      previous.workspace.updatedAt
+    );
+    const workspace = await newVideoWorkspace(
+      tx,
+      sourceMediaId,
+      previous.workspace.source,
+      media,
+      now,
+      current ? current.snapshot.workspace.revision + 1 : 1
+    );
+    await replaceWorkspaceStorage(tx, archive, indexedWorkspace(archive).usageReferenceKeys);
+    if (previous.draft)
+      await tx
+        .objectStore(VIDEO_WORKSPACE_DRAFTS_STORE)
+        .put({ ...previous.draft, aggregateId: args.archiveId });
+    await replaceWorkspaceStorage(tx, workspace, indexedWorkspace(workspace).usageReferenceKeys);
+    await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(sourceMediaId);
+    return { workspace, draft: null };
+  });
+}
+
+function requireSnapshot(
+  admitted: AdmittedWorkspaceSnapshot | null,
   expectedRevision: number,
   expectedSourceAssetId: string
-): Promise<AdmittedWorkspaceSnapshot> {
-  const admitted = await readSnapshot(tx, aggregateId);
+): AdmittedWorkspaceSnapshot {
   if (
     !admitted ||
     admitted.snapshot.workspace.revision !== expectedRevision ||
@@ -411,7 +502,7 @@ async function writePreparedWorkspace(
   prepared: ReviewReadySources
 ): Promise<VideoWorkspace> {
   const media = parseMediaLibraryEntry(
-    await tx.objectStore(MEDIA_LIBRARY_STORE).get(encoded.aggregateId)
+    await tx.objectStore(MEDIA_LIBRARY_STORE).get(encoded.sourceMediaId ?? encoded.aggregateId)
   );
   if (!media) throw new VideoWorkspaceError('missing-media');
   const retained: VideoWorkspace = {
@@ -552,10 +643,9 @@ export async function commitVideoWorkspaceWithProjection(args: CommitVideoWorksp
     throw new VideoWorkspaceError('invalid');
   return mutate(
     args.aggregateId,
-    async (tx, prepared, physicalDelete) => {
+    async (tx, prepared, physicalDelete, _media, current) => {
       const admitted = await requireSnapshot(
-        tx,
-        args.aggregateId,
+        current,
         args.expectedRevision,
         args.expectedSourceAssetId
       );
@@ -620,10 +710,9 @@ export async function saveVideoWorkspaceTyping(args: {
   if (!change) throw new VideoWorkspaceError('invalid');
   return mutate(
     args.aggregateId,
-    async (tx, prepared, physicalDelete) => {
+    async (tx, prepared, physicalDelete, _media, current) => {
       const { snapshot, document, storage } = await requireSnapshot(
-        tx,
-        args.aggregateId,
+        current,
         args.expectedRevision,
         args.expectedSourceAssetId
       );
@@ -657,10 +746,9 @@ export async function moveVideoWorkspaceHistory(args: {
   expectedSourceAssetId: string;
   direction: ReviewHistoryDirection;
 }): Promise<VideoWorkspaceSnapshot> {
-  return mutate(args.aggregateId, async (tx, _prepared, physicalDelete) => {
+  return mutate(args.aggregateId, async (tx, _prepared, physicalDelete, _media, current) => {
     const { snapshot, storage } = await requireSnapshot(
-      tx,
-      args.aggregateId,
+      current,
       args.expectedRevision,
       args.expectedSourceAssetId
     );
@@ -697,10 +785,9 @@ export async function saveVideoWorkspaceAdvanced(args: {
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(
     args.aggregateId,
-    async (tx, prepared, physicalDelete) => {
+    async (tx, prepared, physicalDelete, _media, current) => {
       const { snapshot, storage } = await requireSnapshot(
-        tx,
-        args.aggregateId,
+        current,
         args.expectedRevision,
         args.expectedSourceAssetId
       );
@@ -732,10 +819,9 @@ export async function saveVideoWorkspaceDraft(args: {
   annotation: unknown;
   before: unknown;
 }): Promise<VideoWorkspaceSnapshot> {
-  return mutate(args.aggregateId, async (tx, _prepared, physicalDelete) => {
+  return mutate(args.aggregateId, async (tx, _prepared, physicalDelete, _media, current) => {
     const { snapshot, storage } = await requireSnapshot(
-      tx,
-      args.aggregateId,
+      current,
       args.expectedRevision,
       args.expectedSourceAssetId
     );
@@ -798,10 +884,9 @@ export async function saveVideoWorkspaceSnapshot(args: {
   if (!captured) throw new VideoWorkspaceError('invalid');
   return mutate(
     args.aggregateId,
-    async (tx, prepared, physicalDelete) => {
+    async (tx, prepared, physicalDelete, _media, admitted) => {
       const { snapshot: current, storage } = await requireSnapshot(
-        tx,
-        args.aggregateId,
+        admitted,
         args.expectedRevision,
         args.expectedSourceAssetId
       );
@@ -812,6 +897,7 @@ export async function saveVideoWorkspaceSnapshot(args: {
         !workspace ||
         workspace.aggregateId !== args.aggregateId ||
         workspace.sourceAssetId !== current.workspace.sourceAssetId ||
+        workspace.sourceMediaId !== current.workspace.sourceMediaId ||
         JSON.stringify(workspace.source) !== JSON.stringify(current.workspace.source)
       )
         throw new VideoWorkspaceError('invalid');

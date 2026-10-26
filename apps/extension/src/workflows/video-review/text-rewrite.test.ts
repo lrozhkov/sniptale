@@ -355,6 +355,33 @@ describe('durable AI text workflow', () => {
     );
     expect(save.mock.calls.length).toBe(saves);
   });
+  it('retains invalid for a non-budget context error without changing review state or dispatching', () => {
+    const { session, save } = fixture();
+    const before = structuredClone(session.getSnapshot());
+    const saves = save.mock.calls.length;
+    expect(() =>
+      captureReviewTextRewrite(session, ['text'], { ...options, prompt: '   ' })
+    ).toThrow(new Error('invalid'));
+    expect(session.getSnapshot()).toEqual(before);
+    expect(save.mock.calls.length).toBe(saves);
+    expect(mocks.token).not.toHaveBeenCalled();
+    expect(mocks.job).not.toHaveBeenCalled();
+  });
+
+  it('refuses an excessive projected output before saving or dispatching the review request', async () => {
+    const { session, change, save } = fixture();
+    await change({ text: 'x'.repeat(1_200) });
+    const before = structuredClone(session.getSnapshot());
+    const saves = save.mock.calls.length;
+    expect(() => captureReviewTextRewrite(session, ['text'], options)).toThrow(
+      new Error('too-large')
+    );
+    expect(session.getSnapshot()).toEqual(before);
+    expect(save.mock.calls.length).toBe(saves);
+    expect(mocks.token).not.toHaveBeenCalled();
+    expect(mocks.job).not.toHaveBeenCalled();
+  });
+
   it('requires explicit full-document scope for restructuring and refuses a large context before Save or API', () => {
     const { session } = fixture();
     expect(() =>

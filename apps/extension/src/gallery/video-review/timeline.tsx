@@ -63,6 +63,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   selectedEditId?: string | undefined;
   zoomAnchor?: number | null | undefined;
   historyControls?: ReactNode;
+  utilityControls?: ReactNode;
   tools?: ReactNode;
   trackControls?: ReactNode;
   expandedTools?: boolean;

@@ -1,5 +1,5 @@
 import {
-  reviewTextContextSchema,
+  admitReviewTextContext,
   type ReviewTextContext,
 } from '../../../../contracts/ai/review-text';
 import type { VideoProject } from '../types/model';
@@ -49,17 +49,5 @@ export function captureVideoProjectTextRewriteContext(
     end: Math.max(...disclosed.map((fragment) => fragment.end)),
   };
   if (window.end > project.duration) throw new Error('invalid-request');
-  const parsed = reviewTextContextSchema.safeParse({
-    ...options,
-    version: 1,
-    window,
-    fragments: disclosed,
-  });
-  if (!parsed.success) {
-    const budget = parsed.error.issues.some(
-      (issue) => issue.code === 'too_big' || issue.message === 'Choose a smaller text scope'
-    );
-    throw new Error(budget ? 'too-large' : 'invalid-request');
-  }
-  return parsed.data;
+  return admitReviewTextContext(options, window, disclosed, 'invalid-request');
 }

@@ -6,6 +6,7 @@ import {
   applyPageStyleMutationBatch,
   capturePageStyleMutationResidual,
   createPageStyleHistoryEffect,
+  createRecoveredPageStyleHistoryEffect,
 } from './mutation';
 
 function appendVisible<T extends Element>(element: T, root: ParentNode = document.body): T {
@@ -31,6 +32,44 @@ afterEach(() => {
 function createTarget() {
   return appendVisible(document.createElement('div'));
 }
+
+it('exposes exact data-only style endpoints for reload recovery', () => {
+  const target = createTarget();
+  target.style.setProperty('color', 'red', 'important');
+  const result = applyPageStyleMutation({
+    target,
+    declarations: [{ property: 'color', value: 'blue' }],
+  });
+  if (result.status !== 'applied') throw new Error('Expected style change');
+  expect(createPageStyleHistoryEffect(result.batch)).toMatchObject({
+    styleRecovery: {
+      declarations: [
+        {
+          property: 'color',
+          before: { value: 'red', priority: 'important' },
+          after: { value: 'blue', priority: '' },
+        },
+      ],
+    },
+  });
+});
+
+it.each(['before', 'after'] as const)(
+  'rejects unsafe %s declaration recovery endpoints without mutation',
+  (side) => {
+    const target = createTarget();
+    const result = applyPageStyleMutation({
+      target,
+      declarations: [{ property: 'color', value: 'blue' }],
+    });
+    if (result.status !== 'applied') throw new Error('Expected style change');
+    const saved = createPageStyleHistoryEffect(result.batch).styleRecovery!;
+    saved.declarations[0]![side].value = 'url(https://example.test/private)';
+    const before = target.getAttribute('style');
+    expect(createRecoveredPageStyleHistoryEffect(target, saved)).toBeNull();
+    expect(target.getAttribute('style')).toBe(before);
+  }
+);
 
 it('replays a direct declaration batch through exact endpoints', () => {
   const target = createTarget();

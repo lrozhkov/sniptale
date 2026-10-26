@@ -382,6 +382,28 @@
         "rule": "js/missing-await"
       },
       "targetAction": "Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification."
+    },
+    {
+      "id": "accepted.scc.content-crop-drawing-controls",
+      "classification": "accepted-architecture",
+      "owner": "content-selection-overlay",
+      "risk": "A broad SCC allowance could conceal new controller back-dependencies or module and authority cycles. Only the exact two reviewed owner edges are accepted.",
+      "reason": "Allowed composition: overlay composes selection workflows. Crop selection UI reuses toolbar drawing controls through ToolbarDrawingControlsOwner and borrows floating menu geometry. These exact two owner edges have no module cycle and introduce no second mode, persistence, or runtime authority.",
+      "removalCondition": "Remove when either exact owner edge disappears. Reassess added owner edges, module cycles, or changed interaction and state authority before retaining this composition.",
+      "reviewBy": "2027-09-01",
+      "source": {
+        "kind": "scc",
+        "key": "content-crop-drawing-controls"
+      },
+      "scope": {
+        "edgeDigest": "34e380f5de3ff8a51bfde355d1b6ff3781b9acaea18604ade604cb159e5793f6",
+        "id": "content-crop-drawing-controls",
+        "owners": [
+          "apps/extension/src/content/overlay",
+          "apps/extension/src/content/selection"
+        ]
+      },
+      "targetAction": "Keep the shared crop drawing controls and caller-owned interaction contract. Remove or review the decision when these edges or their authority change."
     }
   ]
 }

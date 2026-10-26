@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { usePlaybackSpaceShortcut } from '../../../../../composition/library-preview/shortcuts';
+import { act, useEffect } from 'react';
+import { RuntimePlaybackContext } from '../../../../runtime/controller/composition/contexts';
+import {
+  useVideoEditorPlayback,
+  type VideoEditorPlaybackController,
+} from '../../../../runtime/session/playback';
+import type { PlaybackPreviewRuntime } from '../../../../interaction/playback/types';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -46,6 +53,10 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+  });
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -59,9 +70,13 @@ function Harness() {
 }
 function mount() {
   act(() => root.render(<Harness />));
+  click('gallery.videoReview.textViewCards');
 }
 function click(label: string) {
-  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+  const scope = label.startsWith('gallery.videoReview.textView')
+    ? host.querySelector('[data-ui="text-document.commands"]')!
+    : host;
+  const button = [...scope.querySelectorAll<HTMLButtonElement>('button')].find(
     (node) =>
       node.textContent?.includes(label) ||
       node.title === label ||
@@ -244,6 +259,7 @@ it('opens exact single, batch and whole-document scopes and restores the initiat
     host.querySelector<HTMLButtonElement>(`[data-project-text-rewrite="${scope}"]`)!;
   const close = async () => act(async () => click('gallery.videoReview.textVoiceBack'));
   await act(async () => root.render(<RewriteHarness />));
+  click('gallery.videoReview.textViewCards');
   await act(async () => {
     trigger('second').focus();
     trigger('second').click();
@@ -318,6 +334,7 @@ it('opens the selected speech scope without rewrite and restores the batch trigg
   click('videoEditor.sidebar.newProjectText');
   type('Second chosen phrase');
   await act(async () => root.render(<VoiceHarness />));
+  click('gallery.videoReview.textViewCards');
   click('gallery.videoReview.speechBatch');
   const checks = host.querySelectorAll<HTMLInputElement>('article input[type="checkbox"]');
   expect(checks).toHaveLength(2);
@@ -340,13 +357,14 @@ it('restores the single voice trigger after remount and leaves its phrase collap
   create();
   type('Single chosen phrase');
   await act(async () => root.render(<VoiceHarness />));
+  click('gallery.videoReview.textViewCards');
   const trigger = () => host.querySelector<HTMLButtonElement>('[data-project-text-voice]')!;
   act(() => trigger().click());
   await act(async () => root.render(<VoiceHarness visible={false} />));
   await act(async () => root.render(<VoiceHarness />));
   await act(async () => click('gallery.videoReview.textVoiceBack'));
   expect(document.activeElement).toBe(trigger());
-  expect(host.querySelector('article > button')?.getAttribute('aria-expanded')).toBe('false');
+  expect(host.querySelector('textarea')).toBeNull();
 });
 
 it('changes text duration through the actual store with one history step and retained text', () => {
@@ -373,3 +391,295 @@ it('changes text duration through the actual store with one history step and ret
   expect(useVideoEditorStore.getState().project!.duration).toBe(3);
   expect(fragment()).toEqual(before);
 });
+
+it('keeps focused phrase Space activation local under the real transport capture listener', () => {
+  create();
+  type('Phrase');
+  const toggle = vi.fn();
+  function CaptureHarness() {
+    usePlaybackSpaceShortcut(toggle);
+    return <Harness />;
+  }
+  act(() => root.render(<CaptureHarness />));
+  act(() => useVideoEditorStore.getState().setCurrentTime(1));
+  const phrase = host.querySelector<HTMLElement>('[data-text-phrase-id]')!;
+  act(() => {
+    phrase.focus();
+    phrase.dispatchEvent(
+      new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true })
+    );
+  });
+  expect(toggle).not.toHaveBeenCalled();
+  expect(useVideoEditorStore.getState().currentTime).toBe(0);
+});
+
+it('preserves the same refused editor receiver across Document and Cards before repair', () => {
+  create();
+  const field = host.querySelector('textarea')!;
+  type('x'.repeat(16_001));
+  click('gallery.videoReview.textViewDocument');
+  expect(
+    host.querySelector('[data-ui="text-document.actions"]')?.getAttribute('data-selected-count')
+  ).toBe('1');
+  expect(host.querySelector('textarea')).toBe(field);
+  expect(field.value).toHaveLength(16_001);
+  expect(field.getAttribute('aria-invalid')).toBe('true');
+  click('gallery.videoReview.textViewCards');
+  expect(host.querySelector('textarea')).toBe(field);
+  type('Repaired');
+  expect(fragment().text).toBe('Repaired');
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
+it('defaults to the whole document and reaches a late phrase editor', () => {
+  let project = useVideoEditorStore.getState().project!;
+  for (let index = 0; index < 56; index++) {
+    const added = addVideoProjectManualText(project, {
+      documentId: 'document',
+      fragmentId: `phrase-${index}`,
+      start: index * 3,
+      ...(project.textDocuments?.[0] ? { target: project.textDocuments[0] } : {}),
+    });
+    if (!added.ok) throw new Error('Missing phrase');
+    added.entry.document.fragments.find((fragment) => fragment.id === `phrase-${index}`)!.text =
+      `Phrase ${index}`;
+    project = added.project;
+  }
+  useVideoEditorStore.getState().setProject({ ...project, duration: 168 });
+  act(() => root.render(<Harness />));
+  expect(host.querySelectorAll('[data-text-phrase-id]')).toHaveLength(56);
+  const last = host.querySelector<HTMLElement>('[data-text-phrase-id="phrase-55"]')!;
+  act(() => last.click());
+  expect(useVideoEditorStore.getState().currentTime).toBe(165);
+  click('gallery.videoReview.textPhraseEdit');
+  expect(host.querySelector('textarea')!.value).toBe('Phrase 55');
+  expect(document.activeElement).toBe(host.querySelector('textarea'));
+  expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+});
+
+function PreparedTextHarness({
+  preview,
+  controls,
+  visible = true,
+}: {
+  visible?: boolean;
+  preview: PlaybackPreviewRuntime;
+  controls: { current: VideoEditorPlaybackController | null };
+}) {
+  const state = useVideoEditorStore();
+  const runtime = useVideoEditorPlayback(
+    state.project,
+    {
+      currentTime: state.currentTime,
+      isPlaying: state.isPlaying,
+      playbackRange: null,
+      selection: state.selection,
+      placementMode: null,
+      projectHistoryTransactionActive: false,
+      shortcutsEnabled: false,
+      selectedClipId: null,
+      selectedActionOccurrence: null,
+      selectedMotionRegion: null,
+    },
+    state
+  );
+  controls.current = runtime;
+  const registerPreviewRuntime = runtime.registerPreviewRuntime;
+  useEffect(() => {
+    registerPreviewRuntime(preview);
+    return () => registerPreviewRuntime(null);
+  }, [preview, registerPreviewRuntime]);
+  return (
+    <RuntimePlaybackContext.Provider value={runtime}>
+      {visible ? <Harness /> : null}
+    </RuntimePlaybackContext.Provider>
+  );
+}
+
+function preparePhrasePlayback() {
+  const added = addVideoProjectManualText(useVideoEditorStore.getState().project!, {
+    documentId: 'document',
+    fragmentId: 'late',
+    start: 3,
+  });
+  if (!added.ok) throw new Error('Missing phrase');
+  useVideoEditorStore.getState().setProject({ ...added.project, duration: 8 });
+  const ready = Promise.withResolvers<'live-ready'>();
+  const preview: PlaybackPreviewRuntime = {
+    prepare: vi.fn<PlaybackPreviewRuntime['prepare']>((request) =>
+      request.reason === 'play' ? ready.promise : Promise.resolve('live-ready')
+    ),
+    cancel: vi.fn(),
+    present: vi.fn(),
+    settle: vi.fn(),
+    subscribe: () => () => {},
+  };
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++frameId, callback);
+    return frameId;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+  const frame = () =>
+    act(() => {
+      const pending = [...frames.values()];
+      frames.clear();
+      pending.forEach((callback) => callback(performance.now()));
+    });
+  const controls = { current: null as VideoEditorPlaybackController | null };
+  act(() => root.render(<PreparedTextHarness preview={preview} controls={controls} />));
+  act(() => host.querySelector<HTMLElement>('[data-text-phrase-id="late"]')!.click());
+  return { ready, preview, controls, frame };
+}
+
+it('prepares phrase playback at the projected start before advancing the real runtime clock', async () => {
+  const { ready, preview, frame } = preparePhrasePlayback();
+  click('gallery.videoReview.textPlayFromHere');
+  expect(useVideoEditorStore.getState().isPlaying).toBe(false);
+  frame();
+  expect(preview.prepare).toHaveBeenCalledWith(
+    expect.objectContaining({ reason: 'play', time: 3 })
+  );
+  expect(useVideoEditorStore.getState().isPlaying).toBe(false);
+  await act(async () => {
+    ready.resolve('live-ready');
+    await ready.promise;
+  });
+  expect(useVideoEditorStore.getState().isPlaying).toBe(true);
+  expect(useVideoEditorStore.getState().currentTime).toBe(3);
+  const now = vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 500);
+  try {
+    frame();
+    expect(useVideoEditorStore.getState().currentTime).toBeGreaterThan(3.4);
+    expect(preview.present).toHaveBeenCalled();
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it.each(['navigation', 'selection', 'project', 'unmount', 'view', 'seek'] as const)(
+  'cancels delayed phrase Play after %s without changing source text',
+  async (trigger) => {
+    const { ready, preview, controls, frame } = preparePhrasePlayback();
+    const source = useVideoEditorStore.getState().project!.textDocuments;
+    click('gallery.videoReview.textPlayFromHere');
+    if (trigger === 'navigation')
+      act(() => host.querySelector<HTMLElement>('[data-text-phrase-id="late"]')!.click());
+    if (trigger === 'selection')
+      act(() =>
+        host
+          .querySelector<HTMLElement>('[data-text-phrase-id="late"]')!
+          .dispatchEvent(new MouseEvent('click', { ctrlKey: true, bubbles: true }))
+      );
+    if (trigger === 'project')
+      act(() => useVideoEditorStore.getState().setProject(createEmptyVideoProject('Other')));
+    if (trigger === 'unmount') act(() => root.render(null));
+    if (trigger === 'view') click('gallery.videoReview.textViewCards');
+    if (trigger === 'seek') act(() => controls.current!.seekTo(5));
+    frame();
+    await act(async () => {
+      ready.resolve('live-ready');
+      await ready.promise;
+    });
+    expect(preview.prepare).not.toHaveBeenCalledWith(expect.objectContaining({ reason: 'play' }));
+    expect(useVideoEditorStore.getState().isPlaying).toBe(false);
+    if (trigger !== 'project')
+      expect(useVideoEditorStore.getState().project!.textDocuments).toBe(source);
+  }
+);
+
+it('retains competing prepared transport intent instead of starting the pending phrase request', async () => {
+  const { ready, preview, controls, frame } = preparePhrasePlayback();
+  click('gallery.videoReview.textPlayFromHere');
+  act(() => controls.current!.togglePlayback());
+  frame();
+  expect(
+    vi.mocked(preview.prepare).mock.calls.filter(([request]) => request.reason === 'play')
+  ).toHaveLength(1);
+  await act(async () => {
+    ready.resolve('live-ready');
+    await ready.promise;
+  });
+  expect(useVideoEditorStore.getState().isPlaying).toBe(true);
+});
+
+it.each(['navigation', 'failure'] as const)(
+  'does not start late after prepared phrase playback %s',
+  async (trigger) => {
+    const { ready, frame } = preparePhrasePlayback();
+    const source = useVideoEditorStore.getState().project!.textDocuments;
+    click('gallery.videoReview.textPlayFromHere');
+    frame();
+    expect(useVideoEditorStore.getState().isPlaying).toBe(false);
+    if (trigger === 'navigation')
+      act(() => host.querySelector<HTMLElement>('[data-text-phrase-id="late"]')!.click());
+    await act(async () => {
+      if (trigger === 'failure') ready.reject(new Error('Playback unavailable'));
+      else ready.resolve('live-ready');
+      await ready.promise.catch(() => {});
+    });
+    frame();
+    expect(useVideoEditorStore.getState().isPlaying).toBe(false);
+    expect(useVideoEditorStore.getState().project!.textDocuments).toBe(source);
+  }
+);
+
+it.each(['cards', 'unmount'] as const)(
+  'preserves successor playback after %s while the older phrase preparation remains unresolved',
+  async (trigger) => {
+    const { ready, preview, controls, frame } = preparePhrasePlayback();
+    let starts = 0;
+    vi.mocked(preview.prepare).mockImplementation((request) =>
+      request.reason === 'play' && ++starts === 1 ? ready.promise : Promise.resolve('live-ready')
+    );
+    click('gallery.videoReview.textPlayFromHere');
+    frame();
+    expect(starts).toBe(1);
+    act(() => controls.current!.togglePlayback());
+    await act(async () => controls.current!.togglePlayback());
+    expect(starts).toBe(2);
+    expect(useVideoEditorStore.getState().isPlaying).toBe(true);
+    if (trigger === 'cards') click('gallery.videoReview.textViewCards');
+    else
+      act(() =>
+        root.render(<PreparedTextHarness preview={preview} controls={controls} visible={false} />)
+      );
+    expect(useVideoEditorStore.getState().isPlaying).toBe(true);
+    await act(async () => {
+      ready.resolve('live-ready');
+      await ready.promise;
+    });
+    expect(useVideoEditorStore.getState().isPlaying).toBe(true);
+    const now = vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 500);
+    try {
+      frame();
+      expect(useVideoEditorStore.getState().currentTime).toBeGreaterThan(3.4);
+    } finally {
+      now.mockRestore();
+    }
+  }
+);
+
+it.each(['cards', 'unmount'] as const)(
+  'keeps accepted phrase preparation owned by shared transport after %s',
+  async (trigger) => {
+    const { ready, preview, controls, frame } = preparePhrasePlayback();
+    const source = useVideoEditorStore.getState().project!.textDocuments;
+    click('gallery.videoReview.textPlayFromHere');
+    frame();
+    expect(useVideoEditorStore.getState().isPlaying).toBe(false);
+    if (trigger === 'cards') click('gallery.videoReview.textViewCards');
+    else
+      act(() =>
+        root.render(<PreparedTextHarness preview={preview} controls={controls} visible={false} />)
+      );
+    await act(async () => {
+      ready.resolve('live-ready');
+      await ready.promise;
+    });
+    expect(useVideoEditorStore.getState().isPlaying).toBe(true);
+    expect(useVideoEditorStore.getState().currentTime).toBe(3);
+    expect(useVideoEditorStore.getState().project!.textDocuments).toBe(source);
+  }
+);

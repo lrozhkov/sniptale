@@ -1,8 +1,9 @@
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
+import { ReviewWebcamHiddenMarker } from './webcam-hidden-marker';
 import { ReviewWebcamPositionMarker } from './webcam-position-marker';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Camera, Eye, EyeOff, Settings2 } from 'lucide-react';
+import { Camera, Eye, EyeOff, Scissors, Settings2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import {
   ReviewButton,
@@ -33,6 +34,7 @@ export function ReviewWebcamTrack(props: {
   const { editor, projection } = props;
   const camera = editor.camera;
   const compact = props.compact ?? false;
+  const metrics = reviewTrackMetrics(compact);
   const [preview, setPreview] = useState<Range | null>(null);
   const drag = useRef<Drag | null>(null);
   const clear = () => setPreview(null);
@@ -107,8 +109,8 @@ export function ReviewWebcamTrack(props: {
     >
       <div
         data-ui="gallery.videoReview.webcamTrack"
-        className="relative border-b border-[var(--sniptale-color-border-soft)]"
-        style={{ height: reviewTrackMetrics(compact).step, touchAction: 'none' }}
+        className="relative rounded bg-[var(--sniptale-color-surface-hover)]"
+        style={{ height: metrics.step, touchAction: 'none' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           if (
@@ -155,16 +157,26 @@ export function ReviewWebcamTrack(props: {
         onLostPointerCapture={cancel}
       >
         <ReviewTrackCuts projection={projection} />
-        <ReviewWebcamTrackMarkers editor={editor} duration={projection.duration} admit={admit} />
+        <ReviewWebcamTrackMarkers
+          editor={editor}
+          duration={projection.duration}
+          admit={admit}
+          compact={compact}
+        />
         {preview ? (
           <div
-            className="pointer-events-none absolute inset-y-0 z-30 border border-[var(--sniptale-color-accent)]"
+            className={`pointer-events-none absolute z-30 flex items-center justify-center
+              overflow-hidden rounded border ${reviewTimelineItemTone(false, 'cut')}`}
             style={{
+              top: metrics.inset,
+              height: metrics.body,
               left: `${(preview.start / projection.duration) * 100}%`,
               width: `${((preview.end - preview.start) / projection.duration) * 100}%`,
               opacity: editor.canHide(preview) ? 1 : 0.4,
             }}
-          />
+          >
+            <Scissors size={12} aria-hidden />
+          </div>
         ) : null}
       </div>
     </ReviewTrackRow>
@@ -176,6 +188,7 @@ function ReviewWebcamTrackMarkers({
   editor,
   duration,
   admit,
+  compact = false,
 }: {
   compact?: boolean;
   editor: ReturnType<typeof useReviewWebcamEditor>;
@@ -186,27 +199,14 @@ function ReviewWebcamTrackMarkers({
   return (
     <>
       {camera.hiddenRanges.map((range) => (
-        <button
-          type="button"
+        <ReviewWebcamHiddenMarker
           key={range.id}
-          title={translate('gallery.videoReview.webcamHidden')}
-          data-review-removal-key={`webcam-hidden:${range.id}`}
-          aria-label={`${translate('gallery.videoReview.webcamHidden')} ${range.start}–${range.end}`}
-          className={
-            'absolute inset-y-0.5 z-20 flex items-center justify-center overflow-hidden ' +
-            'border border-dashed rounded-sm ' +
-            reviewTimelineItemTone(
-              editor.selection.kind === 'webcam-hidden' && editor.selection.id === range.id
-            )
-          }
-          style={{
-            left: `${(range.start / duration) * 100}%`,
-            width: `${((range.end - range.start) / duration) * 100}%`,
-          }}
-          onClick={() => admit(() => editor.select({ kind: 'webcam-hidden', id: range.id }))}
-        >
-          <EyeOff size={12} aria-hidden />
-        </button>
+          editor={editor}
+          id={range.id}
+          duration={duration}
+          admit={admit}
+          compact={compact}
+        />
       ))}
       {camera.positions.map((position, index) => (
         <ReviewWebcamPositionMarker

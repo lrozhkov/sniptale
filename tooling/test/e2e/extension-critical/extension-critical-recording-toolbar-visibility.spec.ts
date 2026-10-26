@@ -73,7 +73,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await evaluateInTarget(context, action, 'window.close()').catch(() => undefined);
       const popup = await context.newPage();
       await popup.goto(
-        `chrome-extension://${extensionId}/apps/extension/src/popup/index.html?videoLaunchMode=TAB&videoLaunchTabId=${tabId}`
+        `chrome-extension://${extensionId}/apps/extension/src/popup/` +
+          `index.html?videoLaunchMode=TAB&videoLaunchTabId=${tabId}`
       );
       const toolbar = target.locator('[data-ui="content.toolbar.root"]');
       await expect(toolbar).toHaveCount(0);

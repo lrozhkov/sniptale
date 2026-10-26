@@ -1,3 +1,7 @@
+import {
+  isPlainRecord as isRecord,
+  isNumber as isFiniteNumber,
+} from '@sniptale/runtime-contracts/validation/primitives';
 // policyStateIds: [] - effect modes and parser limits are immutable validation policy, not authority state.
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
@@ -110,14 +114,6 @@ export function parseSerializedFrameAnnotationSnapshot(
   } catch {
     return null;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function isNonNegativeFinite(value: unknown): value is number {

@@ -1,3 +1,5 @@
+import { normalizePageLaunchPreferences } from '../../../contracts/page-launch';
+import { projectQuickActionAppearanceForTransfer } from '../../../contracts/quick-action-appearance';
 import {
   collectEffectCatalogPreferences,
   readEffectCatalogPreferences,
@@ -105,8 +107,16 @@ export async function readSettingsTransferSnapshot(
       locale: preferences[LOCALE_STORAGE_KEY] ?? 'ru',
       popupStartup,
       contextMenu: settings.contextMenu,
+      pageLaunch: normalizePageLaunchPreferences(settings.pageLaunch),
     }),
-    'capture.quick-actions': payload({ items: quickActions }),
+    'capture.quick-actions': payload({
+      items: quickActions.map((action) => ({
+        ...action,
+        ...(action.appearance
+          ? { appearance: projectQuickActionAppearanceForTransfer(action.appearance) }
+          : {}),
+      })),
+    }),
     'capture.viewport-presets': payload({
       items: settings.viewportPresets,
       defaultId: settings.defaultViewportPresetId,

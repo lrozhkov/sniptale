@@ -13,6 +13,17 @@
       "userFacingDisclosure": "settings.permissions.requiredStorageDescription"
     },
     {
+      "name": "alarms",
+      "owner": "apps/extension/src/background/page-recovery/ports.ts",
+      "feature": "Expiry of private page recovery data",
+      "runtimeRoute": "background recovery expiry alarm",
+      "capabilityPolicy": "One fixed alarm name schedules private ledger cleanup only; no caller-selected effect.",
+      "failureBehavior": "Restore refuses expired records even if native cleanup is delayed; startup retries cleanup.",
+      "justification": "Runs expiry cleanup after MV3 service worker suspension.",
+      "reviewNote": "No page payload, URL, nonce or lease is included in the alarm.",
+      "userFacingDisclosure": "settings.permissions.requiredAlarmsDescription"
+    },
+    {
       "name": "contextMenus",
       "owner": "apps/extension/src/background/runtime/context-menu/service.ts",
       "feature": "Background-owned context menu actions",

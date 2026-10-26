@@ -33,7 +33,9 @@ function registerPlaybackSpaceShortcut(
   const onKeyDown = (event: KeyboardEvent) => {
     const nativeDisclosure =
       event.target instanceof Element &&
-      event.target.closest('summary, [role="switch"], [data-ui="library-media-footer"]');
+      event.target.closest(
+        'summary, [role="switch"], [data-ui="library-media-footer"], [data-local-space-activation="true"]'
+      );
     if (
       event.code !== 'Space' ||
       (targetPolicy === 'native-controls' && (isEditableTarget(event.target) || nativeDisclosure))

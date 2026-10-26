@@ -60,7 +60,9 @@ for (const locale of ['en', 'ru'] as const) {
       await page.setViewportSize(size);
       await openEditor(page, hostOrigin, locale);
       const bars = page.locator(
-        '[data-ui="editor.floating.document-bar.surface"], [data-ui="editor.floating.tool-rail"], [data-ui="editor.floating.view-controls"]'
+        '[data-ui="editor.floating.document-bar.surface"], ' +
+          '[data-ui="editor.floating.tool-rail"], ' +
+          '[data-ui="editor.floating.view-controls"]'
       );
       await expect(bars).toHaveCount(3);
       const heights = await bars.evaluateAll((elements) =>
@@ -249,7 +251,9 @@ test('image refinements toolbar breakpoints and narrow outer scroll', async ({
     await page.setViewportSize({ width, height: 560 });
     const heights = await page
       .locator(
-        '[data-ui="editor.floating.document-bar.surface"], [data-ui="editor.floating.tool-rail"], [data-ui="editor.floating.view-controls"]'
+        '[data-ui="editor.floating.document-bar.surface"], ' +
+          '[data-ui="editor.floating.tool-rail"], ' +
+          '[data-ui="editor.floating.view-controls"]'
       )
       .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
     expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(1);

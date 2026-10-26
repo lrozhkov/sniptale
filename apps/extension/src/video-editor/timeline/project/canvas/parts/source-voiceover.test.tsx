@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { MAX_TIMELINE_PIXELS_PER_SECOND } from '../../../../contracts/timeline-scale';
 import { isExportReadyVideoProject } from '../../../../../features/video/project/validation/root';
-// @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

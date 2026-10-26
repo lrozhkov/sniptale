@@ -194,7 +194,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   const npmPackage = JSON.parse(fs.readFileSync('tooling/configs/ci/npm/package.json', 'utf8'));
   expect(npmPackage.dependencies.npm).toBe(lock.node.npmVersion);
   expect(npmPackage.dependencies['brace-expansion']).toBe('5.0.12');
-  expect(npmPackage.dependencies.undici).toBe('6.29.0');
+  expect(npmPackage.dependencies.undici).toBe('6.29.1');
   expect(npmPackage.dependencies['http-cache-semantics']).toBe('4.3.0');
   const canonicalNpmLock = JSON.parse(npmLock.toString());
   expect(canonicalNpmLock.packages).not.toHaveProperty(
@@ -235,13 +235,13 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
     'viteReact',
   ]);
   const expectedToolchainPackages = {
-    oxfmt: ['node_modules/oxfmt', '0.72.0'],
-    oxlint: ['node_modules/oxlint', '1.87.0'],
+    oxfmt: ['node_modules/oxfmt', '0.73.0'],
+    oxlint: ['node_modules/oxlint', '1.88.0'],
     oxlintTsgolint: ['node_modules/oxlint-tsgolint', '7.0.2004'],
     typescriptCompilerApi: ['node_modules/@typescript/old', '6.0.3'],
     typescriptCompilerApiShim: ['node_modules/typescript', '6.0.2'],
     typescriptNative: ['node_modules/@typescript/native', '7.0.2'],
-    viteReact: ['node_modules/@vitejs/plugin-react', '6.1.0'],
+    viteReact: ['node_modules/@vitejs/plugin-react', '6.1.2'],
   };
   for (const [toolId, tool] of Object.entries(lock.projectToolchain) as Array<
     [
@@ -257,7 +257,7 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   }
   expect(lock.dependencyGraph).toEqual({
     packagePath: 'node_modules/dependency-cruiser',
-    version: '18.5.0',
+    version: '18.6.0',
   });
   expect(projectLock.packages[lock.dependencyGraph.packagePath].version).toBe(
     lock.dependencyGraph.version
@@ -734,7 +734,8 @@ it('keeps host phase dispatch dependency-free and seals through trusted code in 
   expect(collectExternalHostImports('tooling/ci/seal-lane-in-container.mjs')).toEqual([]);
   for (const entry of collectWorkflowNodeEntrypoints()) {
     const allowed =
-      entry === 'tooling/ci/prepare-release-assets.mjs'
+      entry === 'tooling/ci/prepare-release-assets.mjs' ||
+      entry === 'tooling/ci/verify-release-assets.mjs'
         ? ['jszip']
         : entry === 'tooling/ci/advisory-artifacts.mjs'
           ? ['typescript']

@@ -1,6 +1,6 @@
 import type { MutableRefObject } from 'react';
 
-import type { CaptureActionType } from '../../../contracts/settings';
+import type { QuickActionOverlay, CaptureActionType } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ScreenshotControllerScenarioBridge } from './scenario';
 
@@ -61,6 +61,7 @@ export interface ScreenshotControllerRuntimeSession {
 }
 
 export interface ScreenshotControllerRuntime {
+  quickActionOverlayRef?: { readonly current: QuickActionOverlay | null };
   captureAdapter?: ScreenshotCaptureAdapter;
   capturePersistence: ScreenshotControllerCapturePersistenceBridge;
   captureActionRef: MutableRefObject<CaptureActionType>;

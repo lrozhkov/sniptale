@@ -15,6 +15,21 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+vi.mock('../../ai/text-rewrite/view', () => ({
+  TextRewriteControl: (props: {
+    visible: boolean;
+    active: boolean;
+    onActiveChange(active: boolean): void;
+  }) =>
+    props.visible ? (
+      <button
+        data-ui="content.toolbar.ai-text"
+        aria-pressed={props.active}
+        onClick={() => props.onActiveChange(!props.active)}
+      />
+    ) : null,
+}));
+
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
@@ -471,4 +486,40 @@ it('blocks conflicting Content Editing actions while the AI transition is pendin
   expect(onDisableAiPickMode).not.toHaveBeenCalled();
   expect(onSelectPageEditingMode).not.toHaveBeenCalled();
   expect(document.querySelector('[data-ui="content.toolbar.mode-option.quick-edit"]')).toBeNull();
+});
+
+it('removes old editing submodes during the requested annotation transition and restores on refusal', () => {
+  renderModeButtons({ quickEditMode: true });
+  expect(document.querySelector('.sniptale-page-editing-mode-group')).not.toBeNull();
+  renderModeButtons({ quickEditMode: true, pendingMode: 'highlighter' });
+  expect(document.querySelector('.sniptale-page-editing-mode-group')).toBeNull();
+  renderModeButtons({ quickEditMode: true });
+  expect(document.querySelector('.sniptale-page-editing-mode-group')).not.toBeNull();
+});
+
+it('projects requested editing submodes before the previous runtime mode finishes', () => {
+  renderModeButtons({ drawingMode: true, pendingMode: 'quick-edit' });
+  const group = document.querySelector('.sniptale-page-editing-mode-group');
+  expect(group).not.toBeNull();
+  expect([...group!.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+});
+
+it('keeps the marker and the single-text AI picker mutually exclusive within Content Editing', () => {
+  const selectMode = vi.fn();
+  renderModeButtons({ onSelectPageEditingMode: selectMode, quickEditMode: true });
+  const marker = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.text-marker"]'
+  );
+  const textAI = document.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.ai-text"]');
+  const direct = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.page-editing-mode.direct-text"]'
+  );
+  act(() => marker?.click());
+  expect(marker?.getAttribute('aria-pressed')).toBe('true');
+  act(() => textAI?.click());
+  expect(marker?.getAttribute('aria-pressed')).toBe('false');
+  expect(textAI?.getAttribute('aria-pressed')).toBe('true');
+  act(() => direct?.click());
+  expect(textAI?.getAttribute('aria-pressed')).toBe('false');
+  expect(selectMode).toHaveBeenLastCalledWith('direct-text');
 });

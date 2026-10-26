@@ -640,6 +640,7 @@ it('applies stage gradient and solid paint while clearing only the stage image b
   draw();
   await click('Appearance');
   await click('Stage background');
+  await click(translate('highlighter.paintPicker.gradient'));
   await click(translate('highlighter.paintPicker.linear'));
   await click(translate('shared.ui.colorSelectorApply'));
   expect(project.tour!.stage.paint?.kind).toBe('gradient');

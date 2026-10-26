@@ -44,6 +44,7 @@ export const LOCAL_EXTENSION_PAGE_STORAGE_PREFIXES = [
 ] as const;
 
 const localPreferenceKeys = [
+  'sniptale_welcome_shown',
   'sniptale-theme-preference',
   'sniptale-locale-preference',
   'sniptale_ai_modal_spoiler_open',
@@ -98,6 +99,7 @@ const aiProviderSecretKeys = [
 ] as const;
 
 const localSensitiveKeys = [
+  'sniptale_page_recovery',
   'sniptale_background_presets',
   ALPHA_RESET_JOURNAL_KEY,
   DATABASE_BACKUP_RECEIPT_KEY,
@@ -124,6 +126,7 @@ const localSensitiveKeys = [
 ] as const;
 
 const sessionSensitiveKeys = [
+  'sniptale_page_recovery_claims',
   'diagnostics-active-sessions',
   'interaction-diagnostics-active-sessions',
   'scenario-tab-sessions',

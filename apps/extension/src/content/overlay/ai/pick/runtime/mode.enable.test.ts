@@ -249,3 +249,41 @@ async function expectEnableAiPickModeFailure() {
   await expect(enable(vi.fn())).rejects.toThrow('parse failed');
   expect(deactivateOtherModes).not.toHaveBeenCalled();
 }
+
+it.each([false, true])(
+  'opens the table after snapshot and rejects stale startup=%s',
+  async (stale) => {
+    const state = createState();
+    const deferred = createDeferred<ParsedDOMTree>();
+    const tree = createParsedTree();
+    const onSelected = vi.fn();
+    const overlayController = {
+      createHoverOverlay: vi.fn(),
+      createOverlayContainer: vi.fn(),
+      hideHoverOverlay: vi.fn(),
+      removeOverlayContainer: vi.fn(),
+      showHoverOverlay: vi.fn(),
+    };
+    const enable = createEnableAiPickMode({
+      state,
+      parseDomTree: vi.fn(() => deferred.promise),
+      deactivateOtherModes: vi.fn(),
+      setModeEnabled: vi.fn(),
+      handleClick: vi.fn(),
+      handleKeyDown: vi.fn(),
+      handleMouseLeave: vi.fn(),
+      handleMouseMove: vi.fn(),
+      handlePointerDown: vi.fn(),
+      overlayController,
+    });
+    const opening = enable(onSelected, { openTable: true });
+    expect(onSelected).not.toHaveBeenCalled();
+    if (stale) state.enableSequence++;
+    deferred.resolve(tree);
+    await opening;
+    if (stale) expect(onSelected).not.toHaveBeenCalled();
+    else expect(onSelected).toHaveBeenCalledExactlyOnceWith(tree, new Set());
+    expect(attachAiPickListenersMock).not.toHaveBeenCalled();
+    expect(overlayController.createOverlayContainer).not.toHaveBeenCalled();
+  }
+);

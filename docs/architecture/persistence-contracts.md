@@ -46,6 +46,12 @@ Explicit media backup v6 excludes pending recordings and retained safety copies.
 
 ## Admission and migration
 
+Quick-edit projects can share one source video. The source media ID identifies its default workspace. An archived workspace retains its own aggregate ID and an explicit `sourceMediaId`. Source lookup, usage, retention, authorization, and transfer resolve that reference. History and draft writes retain the workspace aggregate ID.
+
+Creating a project copies the complete previous default into an independent archive. One transaction creates the archive and replaces the default. The default revision increases, so delayed writes cannot replace the new project. A stable archive ID identifies a repeated command. Failure preserves the previous default.
+
+Database version 36 changes the mediaLibrary contract to 28. The migration preserves existing rows, history, recovery, stores, and indexes. Earlier writers cannot admit this database. Portable backup gives each archived project an independent media root. Restore binds that project to its restored source.
+
 Quick-edit logical formats 3 and 4 require project names and permanent lifecycles, including independent Trash admission times. Format 3 uses the legacy advanced baseline. Format 4 retains the complete document baseline. Physical formats 4 and 5 store these logical formats.
 
 Formats 1 and 2 remain readable without project metadata. Their physical formats remain 2 and 3. Reading does not materialize project metadata.
@@ -676,3 +682,34 @@ Capture admission completes recovery before it creates a new token. Cleanup fail
 Raw transcript publication precedes optional correction. Correction failure retains that raw text. Deletion, eviction, erasure, and identity recreation invalidate old results. Complete local-data erasure deletes metadata and the private OPFS root even when preferences remain preserved. Its required participant verifies deletion without reopening the deleted database under the exclusive erasure barrier.
 
 Browser termination before a completed audio Blob has no crash recovery guarantee. Retained audio remains available after recognition failure. Voice history never becomes a project source or an AI provider authorization record.
+
+
+## Camera screen behavior
+
+Gallery advanced schema 24 admits optional `screenBehavior` on cameras and their positions. Montage schema 46 admits the corresponding `cameraScreenBehavior` fields. Valid values are `shrink`, `shift` and `overlay`. Earlier schemas refuse these fields. Readers refuse future schemas. Mutation retains the required schema after field removal.
+
+An absent field retains the previous split rendering. New split choices use `shrink`. New docked cameras retain their overlay layout. Shrink fits the complete main scene inside the free panel and preserves its aspect ratio. Shift preserves the scene scale, centers it in the free panel and clips outside that panel. Overlay leaves the main scene in place. The camera retains the selected panel in each mode. Existing source-time positions control transitions and retain the saved dock geometry and crop. Hidden or unavailable camera content does not reserve a main-scene panel.
+
+Database version 37 changes the mediaLibrary contract to 29 and the videoProjects contract to 6. This additive migration preserves all rows, history, stores, indexes and immutable media. Earlier writers cannot admit this database. Existing project mutation, history, CAS, save and resource owners retain authority. The change adds no writer, queue, store or resource reference.
+
+## Camera shadow direction
+
+Gallery advanced schema 25 admits optional `shadowDirection` on a camera. Montage schema 47 admits `cameraShadowDirection`. Each field contains a mode and an angle. Modes are `classic`, `angle`, `center` and `nearest-edge`. Angles are finite degrees from zero inclusive to 360 exclusive. Earlier schemas refuse these fields. Readers refuse future schemas. Mutation retains the required schema after field removal.
+
+An absent field retains the classic shadow. Angle mode uses clockwise degrees from the positive horizontal axis. The camera retains the angle across mode changes. Automatic modes use the current visible camera window in scene coordinates. Center mode points toward the scene center and reduces the offset to zero near that center. Nearest-edge mode blends outward directions near equal edge distances. Opposite directions can cancel. Both modes use a band equal to five percent of the shorter scene dimension. Evaluation uses no previous frame state.
+
+Explicit directions retain shadow intensity, color and blur. They use the existing camera shadow offset length, including for the glow style. Classic glow remains centered. Split layouts and crop previews retain their existing shadow suppression. Conversion retains the authored settings. Rendering evaluates automatic directions after camera position animation. A directional shadow retains its scene angle when the camera rotates or scales.
+
+Database version 38 changes the mediaLibrary contract to 30 and the videoProjects contract to 7. This additive migration preserves all rows, history, stores, indexes and immutable media. Earlier writers cannot admit this database. Existing mutation, history, CAS, save and resource owners retain authority.
+
+## Border origins and two-sided phases
+
+Gallery advanced schema 26 admits optional border `origin`, entrance `draw-both` and exit `erase-both`. Montage schema 48 admits the same values. Earlier declared schemas refuse these additions. Existing border values remain supported. Mutation retains the required schema after field removal.
+
+Origin values are `top-center`, `top-left`, `top-right`, `bottom-right` and `bottom-left`. An absent origin retains the previous top-center behavior. A corner origin lies halfway along that corner's rounded arc. A square corner uses the corner itself. Distances follow the actual contour rather than quadrant fractions. The path retains its previous starting point and dash phase. Patterned paths retain their existing chord approximation.
+
+Two-sided entrance reveals equal contour lengths in both directions from the origin. Two-sided exit contracts the current visible interval equally from both ends. A rotating partial segment therefore retains its interval when exit starts. Existing entrance, hold and exit clocks remain authoritative. Fade, clockwise and counterclockwise reveal, hold rotation, pulse, ripple, speed and segment settings remain available. The painter retains its rules for closed strokes and empty intervals.
+
+Both editors retain the origin across phase changes and preserve it through conversion, history, save and reopen. Sampling remains independent of previous frames. Existing source cuts, rates and retained phase clocks keep their semantics.
+
+Database version 39 changes the mediaLibrary contract to 31 and the videoProjects contract to 8. This additive migration preserves all rows, history, stores, indexes and immutable media. Earlier writers cannot admit this database. Existing mutation, history, CAS, save and resource owners retain authority.

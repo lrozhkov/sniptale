@@ -19,6 +19,7 @@ export async function persistLocalCaptureDataUrl(args: {
   assertCurrentScreenshotRun(args.runtime, args.runToken);
   const result = await persistSelectionCapture({
     actionType: args.actionType,
+    quickActionTransactionId: args.runtime.quickActionOverlayRef?.current?.transactionId,
     assertFresh: () => assertCurrentScreenshotRun(args.runtime, args.runToken),
     contentIntentSource: args.contentIntentSource,
     dataUrl: args.dataUrl,

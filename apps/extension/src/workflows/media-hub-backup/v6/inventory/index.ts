@@ -3,6 +3,7 @@ import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import {
   initDB,
   MEDIA_LIBRARY_STORE,
+  VIDEO_WORKSPACES_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
@@ -37,6 +38,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
   const media = await buildMediaRootInventory({
     coveredProjectMediaIds,
     expectedReview: admission.expectedReview,
+    reviewWorkspaceHeads: await db.getAll(VIDEO_WORKSPACES_STORE),
     db,
     items,
     options: effectiveOptions,

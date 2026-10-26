@@ -1,5 +1,5 @@
-import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 // @vitest-environment jsdom
+import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,

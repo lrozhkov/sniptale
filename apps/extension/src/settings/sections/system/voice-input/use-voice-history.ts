@@ -13,6 +13,19 @@ export interface VoiceHistoryDependencies {
   createObjectURL(blob: Blob): string;
   revokeObjectURL(url: string): void;
   copy(text: string): Promise<void>;
+  download?(file: File, filename: string): void | Promise<void>;
+}
+
+function downloadAudio(file: File, filename: string): void {
+  const url = URL.createObjectURL(file);
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+  } finally {
+    globalThis.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 }
 
 function defaultDependencies(): VoiceHistoryDependencies {
@@ -32,7 +45,12 @@ function useVoicePlayback(deps: VoiceHistoryDependencies, setError: (error: bool
     mounted: false,
     audio: null as AbortController | null,
     url: null as string | null,
+    downloads: new Set<AbortController>(),
   });
+  const cancelDownloads = useCallback(() => {
+    for (const controller of owner.current.downloads) controller.abort();
+    owner.current.downloads.clear();
+  }, []);
   const stop = useCallback(() => {
     owner.current.audio?.abort();
     owner.current.audio = null;
@@ -45,9 +63,10 @@ function useVoicePlayback(deps: VoiceHistoryDependencies, setError: (error: bool
     state.mounted = true;
     return () => {
       state.mounted = false;
+      cancelDownloads();
       stop();
     };
-  }, [stop]);
+  }, [cancelDownloads, stop]);
   async function play(entry: VoiceHistoryEntry): Promise<void> {
     stop();
     const controller = new AbortController();
@@ -63,7 +82,21 @@ function useVoicePlayback(deps: VoiceHistoryDependencies, setError: (error: bool
       if (!controller.signal.aborted && owner.current.mounted) setError(true);
     }
   }
-  return { playback, play, stop };
+  async function download(entry: VoiceHistoryEntry): Promise<void> {
+    const controller = new AbortController();
+    owner.current.downloads.add(controller);
+    setError(false);
+    try {
+      const file = await deps.readAudio(voiceHistoryScope(entry), controller.signal);
+      if (controller.signal.aborted || !owner.current.mounted) return;
+      await (deps.download ?? downloadAudio)(file, `dictation-${entry.sequence}.wav`);
+    } catch {
+      if (!controller.signal.aborted && owner.current.mounted) setError(true);
+    } finally {
+      owner.current.downloads.delete(controller);
+    }
+  }
+  return { playback, play, stop, download, cancelDownloads };
 }
 
 function mergeHistoryList(current: VoiceHistoryEntry[], incoming: VoiceHistoryEntry[]) {
@@ -191,6 +224,7 @@ export function useVoiceHistory(dependencies?: VoiceHistoryDependencies) {
     publishBusy();
     invalidateList();
     setError(false);
+    playback.cancelDownloads();
     playback.stop();
     try {
       await state.client.remove(voiceHistoryScope(entry));

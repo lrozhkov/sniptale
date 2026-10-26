@@ -243,3 +243,76 @@ it('passes screenshot freshness into background clipboard persistence', async ()
     })
   );
 });
+
+it.each(['copy', 'edit', 'download_default', 'ask_preset', 'save_to_library'] as const)(
+  'uses the stored appearance raster for the selection destination %s',
+  async (actionType) => {
+    const capability = { requestId: 'capture-1', token: 'editor-1' };
+    sendRuntimeMessageMock.mockResolvedValueOnce({
+      success: true,
+      assetId: 'styled-asset',
+      dataUrl: 'styled',
+      filename: 'styled.webp',
+      editorAssetCapability: capability,
+    });
+    const setSaveDialogState = vi.fn();
+    await persistSelectionCapture({
+      actionType,
+      quickActionTransactionId: 'tx-1',
+      dataUrl: 'raw',
+      mode: 'selection',
+      sessionActivePresetId: null,
+      setSaveDialogState,
+    });
+    expect(sendRuntimeMessageMock.mock.calls[0]![0]).toMatchObject({
+      type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      quickActionTransactionId: 'tx-1',
+      dataUrl: 'raw',
+    });
+    if (actionType === 'copy')
+      expect(copyImageToClipboardMock).toHaveBeenCalledWith('styled', expect.any(Object));
+    if (actionType === 'edit')
+      expect(sendRuntimeMessageMock.mock.calls[1]![0]).toMatchObject({
+        type: MessageType.OPEN_EDITOR_WITH_IMAGE,
+        dataUrl: 'styled',
+        assetId: 'styled-asset',
+      });
+    if (actionType === 'download_default')
+      expect(sendRuntimeMessageMock.mock.calls[1]![0]).toMatchObject({
+        type: MessageType.EXECUTE_SAVE,
+        dataUrl: 'styled',
+        filename: 'styled.webp',
+      });
+    if (actionType === 'ask_preset')
+      expect(setSaveDialogState).toHaveBeenCalledWith({
+        dataUrl: 'styled',
+        filename: 'styled.webp',
+      });
+    if (actionType === 'save_to_library') expect(sendRuntimeMessageMock).toHaveBeenCalledOnce();
+  }
+);
+it('does not deliver a raw selection after gallery preparation refuses', async () => {
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'appearance refused' });
+  await expect(
+    persistSelectionCapture({
+      actionType: 'copy',
+      dataUrl: 'raw',
+      mode: 'selection',
+      sessionActivePresetId: null,
+      setSaveDialogState: vi.fn(),
+    })
+  ).rejects.toThrow('appearance refused');
+  expect(copyImageToClipboardMock).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).toHaveBeenCalledOnce();
+});
+
+it('keeps the prepared filename when a native capture opens the preset dialog', async () => {
+  const setSaveDialogState = vi.fn();
+  await persistBackgroundCapture({
+    mode: 'visible',
+    response: { action: 'ask_preset', dataUrl: 'styled', filename: 'styled.webp' },
+    sessionActivePresetId: null,
+    setSaveDialogState,
+  });
+  expect(setSaveDialogState).toHaveBeenCalledWith({ dataUrl: 'styled', filename: 'styled.webp' });
+});

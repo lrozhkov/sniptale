@@ -5,7 +5,14 @@ import {
   reviewTimelineInspectorCommands,
 } from './inspector-navigation';
 import { useReviewAudioWiring } from './voiceover-recording';
-import { ReviewInspectorBinding, reviewInspectorContext } from './inspector-binding';
+import {
+  ReviewInspectorBinding,
+  reviewInspectorContext,
+  backupReview,
+  flushReviewTextVoiceBuffers,
+} from './inspector-binding';
+import { useReviewProjectCommands } from './project-controls';
+import { ReviewKeyboardHelp } from './keyboard-help';
 import { usePresentationPreview } from './use-presentation-preview';
 import { ReviewEditorPresentationDialog } from './presentation-preview-dialog';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
@@ -67,6 +74,7 @@ type ReviewEditorProps = {
   resource: LoadedReview;
   onBack(): void;
   onClose(): void;
+  onProjectCreated(aggregateId: string): void;
 };
 
 /** One immutable editor projection drives the disposable seam preview workflow. */
@@ -109,7 +117,13 @@ function useEditorPresentationPreview(
 }
 
 /** Localize prepared window choices without adding scene/export policy to the workspace shell. */
-function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditorProps) {
+function ReviewEditor({
+  resource,
+  onBack,
+  onClose,
+  onJoinPreview,
+  onProjectCreated,
+}: ReviewEditorProps) {
   const state = useReviewEditorState(resource);
   const editorReady = !state.advanced.ui.modeSelectionPending;
   const previewPreferences = useReviewPreviewPreferences();
@@ -131,6 +145,11 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
     state;
   const joinPreview = useEditorPresentationPreview(resource, state, previewPreferences.preferences);
+  const projectCommands = useReviewProjectCommands(
+    state,
+    () => flushReviewTextVoiceBuffers(state, canvasComments),
+    onProjectCreated
+  );
 
   const waveforms = useReviewWaveforms(
     resource.file,
@@ -172,6 +191,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
             />
           </div>
           <ReviewInspectorBinding
+            onRenameProject={projectCommands.rename}
             recording={
               voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
             }
@@ -239,6 +259,13 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
               zoomAnchor={state.zoomAnchor}
               beforeAction={state.beforeAction}
               historyControls={<ReviewHistoryControlBinding state={state} />}
+              utilityControls={
+                <ReviewKeyboardHelp
+                  busy={busy || editing.exporter.phase !== 'idle'}
+                  onNewProject={projectCommands.newProject}
+                  onBackup={() => void state.run(() => backupReview(state, canvasComments))}
+                />
+              }
               editing={editing}
               edits={snapshot.document.edits}
               annotations={snapshot.document.annotations}
@@ -306,16 +333,23 @@ export function VideoReview({
   onClose?(): void;
 }) {
   useAppLocale();
-  const { resource, failed, retry } = useLoadedReview(aggregateId);
+  const [activeId, setActiveId] = useState(aggregateId);
+  useEffect(() => setActiveId(aggregateId), [aggregateId]);
+  const { resource, failed, retry } = useLoadedReview(activeId);
   useEffect(() => {
-    setGalleryQuickEditUrl(aggregateId);
-    return () => clearGalleryQuickEditUrl(aggregateId);
-  }, [aggregateId]);
+    setGalleryQuickEditUrl(activeId);
+    return () => clearGalleryQuickEditUrl(activeId);
+  }, [activeId]);
   return (
     <ReviewDialog>
       {resource ? (
         <ReviewEditor
+          key={`${resource.snapshot.workspace.aggregateId}:${resource.snapshot.workspace.createdAt}`}
           resource={resource}
+          onProjectCreated={(id) => {
+            setActiveId(id);
+            retry();
+          }}
           onBack={onBack}
           onClose={onClose}
           onJoinPreview={onJoinPreview}

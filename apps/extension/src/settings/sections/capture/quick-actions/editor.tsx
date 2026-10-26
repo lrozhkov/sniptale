@@ -1,3 +1,9 @@
+import { Camera, Image, Info, PanelTop, Zap } from 'lucide-react';
+import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
+import { createQuickActionAppearance } from '../../../../contracts/quick-action-appearance';
+import { QuickActionHeaderSettings } from './appearance/header';
+import { QuickActionBackgroundSettings } from './appearance/background';
+import { QuickActionInformationSettings } from './appearance/information';
 import { translate } from '../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import {
@@ -20,11 +26,6 @@ import {
 import { type QuickActionsSectionState } from './controller';
 import { settingsModalClassName } from '../../../section-surface/panel-controls';
 
-const editorSectionClassName = [
-  'border-b border-[var(--sniptale-color-border-subtle)] py-3',
-  'first:pt-0 last:border-b-0 last:pb-0',
-].join(' ');
-
 function resolveQuickActionsEditorTitle(isExisting: boolean) {
   return isExisting
     ? translate('settings.quickActions.editTitle')
@@ -35,33 +36,70 @@ function QuickActionsEditorBody(props: {
   state: QuickActionsSectionState;
   viewportPresets: ViewportPreset[] | undefined;
 }) {
+  const appearance = props.state.editForm?.appearance ?? createQuickActionAppearance();
+  const onChange = (value: typeof appearance) => props.state.updateFormField('appearance', value);
   return (
-    <ProductModalBody compact className="!space-y-0">
-      <div className={editorSectionClassName}>
-        <QuickActionsEditorIdentityFields state={props.state} />
-      </div>
-      <div className={editorSectionClassName}>
-        <QuickActionsEditorPrimaryCaptureFields state={props.state} />
-      </div>
-      <div className={editorSectionClassName}>
-        <QuickActionsEditorPrimaryOutputField state={props.state} />
-      </div>
-      {props.state.editForm?.screenshotMode !== 'desktop' ||
-      props.state.editForm?.afterCapture !== 'copy' ? (
-        <div className={editorSectionClassName}>
-          <QuickActionsEditorSecondaryCaptureFields
-            state={props.state}
-            viewportPresets={props.viewportPresets}
-          />
-          <QuickActionsEditorAdvancedOutputFields state={props.state} />
-        </div>
-      ) : null}
-      <div className={editorSectionClassName}>
-        <QuickActionsEditorToggleRow
-          state={props.state}
-          includeExitAfterCapture={props.state.editForm?.screenshotMode !== 'desktop'}
-        />
-      </div>
+    <ProductModalBody compact className="!space-y-0 !p-0">
+      <CategorizedInspector
+        initialSection="action"
+        showSectionHeading
+        ariaLabel={translate('settings.quickActions.appearanceNavigation')}
+        dataUi="quick-action.appearance.inspector"
+        sections={[
+          { id: 'action', icon: Zap, label: translate('settings.quickActions.appearanceAction') },
+          {
+            id: 'capture',
+            icon: Camera,
+            label: translate('settings.quickActions.appearanceCapture'),
+          },
+          {
+            id: 'header',
+            icon: PanelTop,
+            label: translate('settings.quickActions.appearanceHeader'),
+          },
+          {
+            id: 'background',
+            icon: Image,
+            label: translate('settings.quickActions.appearanceBackground'),
+          },
+          {
+            id: 'information',
+            icon: Info,
+            label: translate('settings.quickActions.appearanceInformation'),
+          },
+        ]}
+        renderSection={(section) => {
+          if (section === 'header')
+            return <QuickActionHeaderSettings value={appearance} onChange={onChange} />;
+          if (section === 'background')
+            return <QuickActionBackgroundSettings value={appearance} onChange={onChange} />;
+          if (section === 'information')
+            return <QuickActionInformationSettings value={appearance} onChange={onChange} />;
+          return (
+            <div className="space-y-3">
+              {section === 'action' ? (
+                <>
+                  <QuickActionsEditorIdentityFields state={props.state} />
+                  <QuickActionsEditorPrimaryOutputField state={props.state} />
+                  <QuickActionsEditorToggleRow
+                    state={props.state}
+                    includeExitAfterCapture={props.state.editForm?.screenshotMode !== 'desktop'}
+                  />
+                </>
+              ) : (
+                <>
+                  <QuickActionsEditorPrimaryCaptureFields state={props.state} />
+                  <QuickActionsEditorSecondaryCaptureFields
+                    state={props.state}
+                    viewportPresets={props.viewportPresets}
+                  />
+                  <QuickActionsEditorAdvancedOutputFields state={props.state} />
+                </>
+              )}
+            </div>
+          );
+        }}
+      />
     </ProductModalBody>
   );
 }
@@ -82,7 +120,7 @@ export function QuickActionsEditor(props: {
     <ProductModal
       isOpen
       onClose={state.handleCancelEdit}
-      width="500px"
+      width="540px"
       maxHeight="85vh"
       scrollable
       dialogClassName={settingsModalClassName}
@@ -92,7 +130,11 @@ export function QuickActionsEditor(props: {
         title={resolveQuickActionsEditorTitle(isExisting)}
         onClose={state.handleCancelEdit}
       />
-      <QuickActionsEditorBody state={state} viewportPresets={viewportPresets} />
+      <QuickActionsEditorBody
+        key={state.editingId}
+        state={state}
+        viewportPresets={viewportPresets}
+      />
       <QuickActionsEditorFooter state={state} />
     </ProductModal>
   );

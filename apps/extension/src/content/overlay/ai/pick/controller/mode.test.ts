@@ -235,6 +235,7 @@ function registerAiPickSourceTests() {
     await Promise.resolve();
 
     expect(enableAiPickModeDeferredMock).toHaveBeenCalledWith(expect.any(Function), {
+      openTable: true,
       source: aiPickSource,
     });
   });
@@ -246,7 +247,9 @@ function registerAiPickSourceTests() {
     handleAiPickContentStart(context);
     await Promise.resolve();
 
-    expect(enableAiPickModeDeferredMock).toHaveBeenCalledWith(expect.any(Function));
+    expect(enableAiPickModeDeferredMock).toHaveBeenCalledWith(expect.any(Function), {
+      openTable: true,
+    });
   });
 }
 
@@ -287,4 +290,11 @@ describe('ai-pick-controller-mode', () => {
   registerAiPickStartTests();
   registerAiPickSourceTests();
   registerAiPickWarmupTests();
+});
+
+it('keeps an already open catalog stable when its toolbar command repeats', () => {
+  const context = createContext({ aiPickMode: true, treeData: createTree() });
+  handleAiPickContentStart(context);
+  expect(enableAiPickModeDeferredMock).not.toHaveBeenCalled();
+  expect(context.cancelActiveAiRequest).not.toHaveBeenCalled();
 });

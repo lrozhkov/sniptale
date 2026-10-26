@@ -1,3 +1,4 @@
+import { parseQuickActionAppearance } from '../../../../../contracts/quick-action-appearance';
 import type { QuickAction } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
 import {
@@ -51,6 +52,14 @@ export async function saveEditedQuickAction(props: {
 
   if (!props.editForm.name.trim()) {
     toast.error(translate('settings.quickActions.validationNameRequired'));
+    return;
+  }
+
+  if (
+    props.editForm.appearance !== undefined &&
+    !parseQuickActionAppearance(props.editForm.appearance)
+  ) {
+    toast.error(translate('settings.quickActions.appearanceInvalid'));
     return;
   }
 

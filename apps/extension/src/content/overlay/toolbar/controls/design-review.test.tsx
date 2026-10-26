@@ -127,3 +127,59 @@ it('toggles rulers through the mode owner and reflects reset on exit', () => {
   act(() => toggle.click());
   expect(getDesignReviewModeState().measurementsEnabled).toBe(false);
 });
+
+it('exposes independent review tools with exclusive page interaction semantics', () => {
+  act(() => {
+    enableDesignReviewMode();
+    root.render(
+      <ToolbarDesignReviewControls
+        compactMenus={false}
+        displayMode="horizontal"
+        panelOpen={false}
+        toolbarMenuState={createClosedToolbarMenuState()}
+        onTogglePanel={vi.fn()}
+      />
+    );
+  });
+  for (const tool of ['inspect', 'compare', 'move', 'comment']) {
+    const button = container.querySelector<HTMLButtonElement>(
+      `[data-ui="content.toolbar.review-tool.${tool}"]`
+    );
+    expect(button).not.toBeNull();
+    act(() => button!.click());
+    expect(getDesignReviewModeState()).toMatchObject({ tool });
+    expect(button?.getAttribute('aria-pressed')).toBe('true');
+    expect(
+      container.querySelectorAll('[data-ui^="content.toolbar.review-tool."][aria-pressed="true"]')
+    ).toHaveLength(1);
+  }
+});
+
+it('opens Check without changing the selected page tool', () => {
+  act(() => {
+    enableDesignReviewMode();
+    root.render(
+      <ToolbarDesignReviewControls
+        compactMenus={false}
+        displayMode="horizontal"
+        panelOpen={false}
+        toolbarMenuState={createClosedToolbarMenuState()}
+        onTogglePanel={vi.fn()}
+      />
+    );
+  });
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.review-tool.compare"]')!
+      .click()
+  );
+  act(() =>
+    container.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.review-check"]')!.click()
+  );
+  expect(getDesignReviewModeState()).toMatchObject({ tool: 'compare', checkOpen: true });
+  expect(
+    container
+      .querySelector('[data-ui="content.toolbar.review-tool.compare"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+});

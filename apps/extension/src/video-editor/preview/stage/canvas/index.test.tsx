@@ -169,6 +169,29 @@ it('previews an independent handle gesture and commits once without changing the
   expect(props.onUpdateClipTransform).not.toHaveBeenCalled();
   expect(props.onPreviewEffectAnchors).toHaveBeenLastCalledWith('effect', null);
 });
+it.each([
+  ['ArrowLeft', false, 99, 80],
+  ['ArrowRight', true, 110, 80],
+  ['ArrowUp', false, 100, 79],
+  ['ArrowDown', true, 100, 90],
+] as const)(
+  'moves an anchor with %s and preserves keyboard event ownership',
+  (key, shiftKey, x, y) => {
+    const props = fixture();
+    render(props);
+    const handle = container!.querySelector<HTMLButtonElement>('[data-effect-handle="tip"]')!;
+    const event = new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true });
+    act(() => handle.dispatchEvent(event));
+    expect(event.defaultPrevented).toBe(true);
+    expect(props.onUpdateEffectInstance).toHaveBeenCalledExactlyOnceWith('effect', {
+      sceneAnchors: { tip: { x, y } },
+    });
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    act(() => handle.dispatchEvent(tab));
+    expect(tab.defaultPrevented).toBe(false);
+    expect(props.onUpdateEffectInstance).toHaveBeenCalledOnce();
+  }
+);
 it('cancels a handle gesture with Escape and hides editing handles in a player or locked track', () => {
   const props = fixture();
   render(props);

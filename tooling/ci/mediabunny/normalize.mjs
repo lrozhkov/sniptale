@@ -50,7 +50,7 @@ function loadArtifacts() {
     !object(manifest) ||
     manifest.schemaVersion !== 1 ||
     manifest.package !== 'mediabunny' ||
-    manifest.version !== '1.61.3' ||
+    manifest.version !== '1.61.6' ||
     !Array.isArray(manifest.changes) ||
     manifest.changes.length !== 24 ||
     !object(manifest.payload) ||

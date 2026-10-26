@@ -169,3 +169,27 @@ it('keeps screenshot mode available when finishing fails', async () => {
   ).rejects.toThrow(failure);
   expect(onDisableScreenshotMode).not.toHaveBeenCalled();
 });
+
+it('waits for accepted unpin before handback and keeps runtime after refusal', async () => {
+  let accept!: (value: boolean) => void;
+  const onClosed = vi.fn();
+  exitScreenshotModeFromUserAction({
+    modeController: { handleToggleScreenshotMode: vi.fn() },
+    setPinToTab: () =>
+      new Promise((resolve) => {
+        accept = resolve;
+      }),
+    onClosed,
+  });
+  await Promise.resolve();
+  expect(onClosed).not.toHaveBeenCalled();
+  accept(false);
+  await vi.waitFor(() => expect(showToast).toHaveBeenCalledOnce());
+  expect(onClosed).not.toHaveBeenCalled();
+  exitScreenshotModeFromUserAction({
+    modeController: { handleToggleScreenshotMode: vi.fn() },
+    setPinToTab: async () => true,
+    onClosed,
+  });
+  await vi.waitFor(() => expect(onClosed).toHaveBeenCalledOnce());
+});

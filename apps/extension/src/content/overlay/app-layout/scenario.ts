@@ -28,7 +28,8 @@ type UserScreenshotModeExitArgs = {
   modeController: {
     handleToggleScreenshotMode: (enabled: boolean) => void;
   };
-  setPinToTab: (value: boolean) => void;
+  setPinToTab: (value: boolean) => void | Promise<boolean>;
+  onClosed?: () => void | Promise<void>;
   keepPinnedForAutoBlur?: boolean;
 };
 
@@ -59,13 +60,19 @@ export function resolveScenarioByClickTransition(args: {
 }
 
 export function exitScreenshotModeFromUserAction(args: UserScreenshotModeExitArgs): void {
+  let unpin: void | Promise<boolean>;
   void teardownDesignReviewSessionAfterUiTransition(() => {
     args.modeController.handleToggleScreenshotMode(false);
-    if (!args.keepPinnedForAutoBlur) args.setPinToTab(false);
-  }).catch((error) => {
-    logger.error('Failed to restore page changes before toolbar exit', error);
-    showToast(translate('content.toolbar.screenshotDisableError'), 'error');
-  });
+    if (!args.keepPinnedForAutoBlur) unpin = args.setPinToTab(false);
+  })
+    .then(async () => {
+      if ((await unpin) === false) throw new Error('Toolbar unpin was refused');
+      await args.onClosed?.();
+    })
+    .catch((error) => {
+      logger.error('Failed to restore page changes before toolbar exit', error);
+      showToast(translate('content.toolbar.screenshotDisableError'), 'error');
+    });
 }
 
 export async function finishScenarioRecorder(args: FinishScenarioRecorderArgs) {

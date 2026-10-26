@@ -309,12 +309,17 @@ it.each([
   ).toMatchObject({ top: expectedTop });
 });
 
-it.each([8, 934])('keeps recording menus outside the scrolling vertical toolbar at x=%s', (x) => {
+it.each([
+  ['videoRecording', 8],
+  ['videoRecording', 934],
+  ['pageControls', 8],
+  ['pageControls', 934],
+] as const)('keeps %s menus outside the scrolling vertical toolbar at x=%s', (owner, x) => {
   vi.stubGlobal('innerWidth', 1000);
   vi.stubGlobal('innerHeight', 560);
   const toolbar = document.createElement('div');
   toolbar.className = 'sniptale-toolbar';
-  toolbar.dataset['videoRecording'] = 'true';
+  toolbar.dataset[owner] = 'true';
   const anchor = document.createElement('button');
   toolbar.append(anchor);
   document.body.append(toolbar);

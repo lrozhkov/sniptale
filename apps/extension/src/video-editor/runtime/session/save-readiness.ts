@@ -1,3 +1,4 @@
+import type { VideoProject } from '../../../features/video/project/types/model';
 import type { VideoEditorSaveState } from '../../contracts/session-state';
 
 const SAVE_SETTLE_TIMEOUT_MS = 15_000;
@@ -129,4 +130,19 @@ export function observeVideoEditorSave(projectId: string): {
     projectId,
     current?.projectId === projectId ? current.generation : undefined
   );
+}
+
+/** Preserves the text session's lifetime checks around the existing mounted save barrier. */
+export async function saveVideoEditorTextSession(
+  projectId: string,
+  getCurrentProject: () => VideoProject | null,
+  save: (projectId: string) => Promise<void>
+): Promise<void> {
+  if (!getCurrentProject()) throw new Error('stale');
+  try {
+    await save(projectId);
+  } catch {
+    throw new Error(getCurrentProject() ? 'storage-failed' : 'stale');
+  }
+  if (!getCurrentProject()) throw new Error('stale');
 }

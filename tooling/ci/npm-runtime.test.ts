@@ -24,11 +24,11 @@ function runtimeFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-npm-runtime-'));
   roots.push(root);
   const dependencies = {
-    npm: '12.2.0',
+    npm: '12.2.1',
     'brace-expansion': '5.0.12',
-    undici: '6.29.0',
+    undici: '6.29.1',
     'http-cache-semantics': '4.3.0',
-    'ip-address': '10.7.3',
+    'ip-address': '10.7.4',
     'postcss-selector-parser': '7.1.6',
   };
   const packages: Record<string, unknown> = { '': { dependencies } };
@@ -68,7 +68,7 @@ function runtimeFixture() {
   fs.writeFileSync(path.join(root, 'package-lock.json'), bytes);
   const lock = {
     node: {
-      npmVersion: '12.2.0',
+      npmVersion: '12.2.1',
       npmLockSha256: crypto.createHash('sha256').update(bytes).digest('hex'),
     },
   };
@@ -121,7 +121,7 @@ it('rejects a symlink replacement and never removes an external package', () => 
   const { root, npmRoot, lock } = runtimeFixture();
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-npm-outside-'));
   roots.push(outside);
-  writePackage(outside, 'undici', '6.29.0');
+  writePackage(outside, 'undici', '6.29.1');
   const replacement = path.join(root, 'node_modules/undici');
   fs.rmSync(replacement, { recursive: true });
   fs.symlinkSync(outside, replacement);
@@ -134,7 +134,7 @@ it('rejects a manifest that disagrees with the locked dependency graph', () => {
   const { root, lock } = runtimeFixture();
   fs.writeFileSync(
     path.join(root, 'package.json'),
-    JSON.stringify({ dependencies: { npm: '12.2.0' } })
+    JSON.stringify({ dependencies: { npm: '12.2.1' } })
   );
   expect(() => validateNpmInputs(root, lock)).toThrow('input version drift');
 });

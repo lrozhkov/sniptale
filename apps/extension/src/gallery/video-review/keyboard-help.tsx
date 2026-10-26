@@ -1,9 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Keyboard } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductDropdownMenu, ProductDropdownItem } from '@sniptale/ui/product-menus/dropdown';
+import { useGlassSelectLayout } from '@sniptale/ui/glass-select/layout';
+import {
+  resolveThemeSafePortalTarget,
+  useResolvedPortalTheme,
+} from '@sniptale/ui/theme/safe-portal';
+import { isComposedEventWithinElement } from '@sniptale/ui/dom-events';
+import { Archive, FilePlus2, Keyboard, MoreHorizontal } from 'lucide-react';
 import { ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { translate } from '../../platform/i18n';
 import { formatHotkey } from '../../features/keyboard-shortcuts/hotkey-format';
-import { ReviewButton, reviewIconButtonClassName } from './controls';
+import { reviewIconButtonClassName } from './controls';
 
 function historyKey(key: string, shiftKey = false): string {
   const mac = /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -85,24 +94,153 @@ function KeyboardHelpDialog({ anchor, onClose }: { anchor: HTMLButtonElement; on
   );
 }
 
-/** Help is a nested native modal: the browser owns focus trapping and the top Escape layer. */
-export function ReviewKeyboardHelp() {
+/** Rare project commands share one menu; help retains its native modal and return target. */
+export function ReviewKeyboardHelp(props: {
+  busy?: boolean | undefined;
+  onNewProject?: (() => void) | undefined;
+  onBackup?: (() => void) | undefined;
+}) {
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
-  const close = () => {
-    setAnchor(null);
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const entry = useRef<'first' | 'last'>('first');
+  const { portalStyle } = useGlassSelectLayout({
+    portal: true,
+    isOpen: open,
+    containerRef: root,
+    menuRef: menu,
+    menuWidth: 256,
+  });
+  const theme = useResolvedPortalTheme(trigger.current);
+  const close = (restore = true) => {
+    setOpen(false);
+    if (restore && trigger.current?.isConnected) trigger.current.focus({ preventScroll: true });
   };
+  useEffect(() => {
+    if (!open) return;
+    const items = () => [
+      ...(menu.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []),
+    ];
+    const available = items();
+    (entry.current === 'last' ? available.at(-1) : available[0])?.focus({ preventScroll: true });
+    const outside = (event: PointerEvent) => {
+      if (
+        !isComposedEventWithinElement(event, root.current) &&
+        !isComposedEventWithinElement(event, menu.current)
+      )
+        close(false);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      } else if (event.key === 'Tab') {
+        // Native Tab continues from the original trigger, not the portal's DOM position.
+        close();
+      } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const buttons = items();
+        const current = buttons.findIndex((button) => button === document.activeElement);
+        const next =
+          event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? buttons.length - 1
+              : (current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[next]?.focus({ preventScroll: true });
+      }
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', key, true);
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', key, true);
+    };
+  }, [open]);
   return (
-    <>
-      <ReviewButton
-        label={translate('gallery.keyboard.title')}
+    <div ref={root} className="shrink-0">
+      <ContentToolbarButton
+        ref={trigger}
+        tone="utility"
+        size="compact"
+        title={translate('gallery.videoReview.moreActions')}
+        aria-label={translate('gallery.videoReview.moreActions')}
         className={reviewIconButtonClassName}
-        aria-haspopup="dialog"
-        aria-expanded={!!anchor}
-        onClick={(event) => setAnchor(event.currentTarget)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        dataUi="gallery.videoReview.moreActions"
+        data-local-space-activation="true"
+        onClick={() => {
+          entry.current = 'first';
+          setOpen(!open);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+          event.preventDefault();
+          event.stopPropagation();
+          entry.current = event.key === 'ArrowUp' ? 'last' : 'first';
+          setOpen(true);
+        }}
       >
-        <Keyboard size={16} aria-hidden />
-      </ReviewButton>
-      {anchor ? <KeyboardHelpDialog anchor={anchor} onClose={close} /> : null}
-    </>
+        <MoreHorizontal size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+      {open
+        ? createPortal(
+            <div ref={menu} style={portalStyle} data-theme={theme ?? undefined}>
+              <ProductDropdownMenu
+                role="menu"
+                aria-label={translate('gallery.videoReview.moreActions')}
+                data-ui="gallery.videoReview.utilityMenu"
+                style={{ position: 'relative', top: 'auto', left: 'auto', width: '100%' }}
+              >
+                {props.onNewProject ? (
+                  <ProductDropdownItem
+                    role="menuitem"
+                    disabled={Boolean(props.busy)}
+                    onClick={() => {
+                      close();
+                      props.onNewProject?.();
+                    }}
+                  >
+                    <FilePlus2 size={16} aria-hidden="true" />
+                    <span data-ui="gallery.videoReview.newProject">
+                      {translate('videoEditor.app.newProjectAction')}
+                    </span>
+                  </ProductDropdownItem>
+                ) : null}
+                <ProductDropdownItem
+                  role="menuitem"
+                  onClick={() => {
+                    close(false);
+                    setAnchor(trigger.current);
+                  }}
+                >
+                  <Keyboard size={16} aria-hidden="true" />
+                  {translate('gallery.keyboard.title')}
+                </ProductDropdownItem>
+                {props.onBackup ? (
+                  <ProductDropdownItem
+                    role="menuitem"
+                    disabled={Boolean(props.busy)}
+                    onClick={() => {
+                      close();
+                      props.onBackup?.();
+                    }}
+                  >
+                    <Archive size={16} aria-hidden="true" />
+                    {translate('gallery.app.selectionBackup')}
+                  </ProductDropdownItem>
+                ) : null}
+              </ProductDropdownMenu>
+            </div>,
+            resolveThemeSafePortalTarget(trigger.current)
+          )
+        : null}
+      {anchor ? <KeyboardHelpDialog anchor={anchor} onClose={() => setAnchor(null)} /> : null}
+    </div>
   );
 }

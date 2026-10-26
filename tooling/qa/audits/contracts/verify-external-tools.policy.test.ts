@@ -49,6 +49,14 @@ it('keeps the native knip config within the authoritative audit scope', () => {
   expect(config.entry).not.toContain('src/**/*.{ts,tsx,js,mjs,cjs}');
   expect(config.project).not.toContain('src/**/*.{ts,tsx,js,mjs,cjs}');
   expect(config.include).toEqual(['unresolved', 'unlisted', 'binaries']);
-  expect(config.ignoreBinaries).toEqual(['codeql', 'flock', 'gcc', 'mkfifo', 'printf', 'xwininfo']);
+  expect(config.ignoreBinaries).toEqual([
+    'codeql',
+    'flock',
+    'gcc',
+    'import',
+    'mkfifo',
+    'printf',
+    'xwininfo',
+  ]);
   expect(config.ignore).not.toContain('tooling/test/e2e/**');
 });

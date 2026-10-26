@@ -416,11 +416,6 @@
   color: var(--guide-muted);
 }
 
-.guide-document :is(input, textarea):not(.sniptale-input):not(.sniptale-textarea):hover,
-.guide-document :is(input, textarea):not(.sniptale-input):not(.sniptale-textarea):focus {
-  border-color: var(--sniptale-color-border-soft);
-  background: var(--sniptale-color-surface-input);
-}
 .guide-inspector-panel h2 {
   margin: 0 0 0.75rem;
   font-size: 0.8125rem;

@@ -1,3 +1,4 @@
+import type { CameraShadowVector } from '../../project/camera/shadow-direction';
 import type { QuickEditHomography } from '../motion/spatial-geometry';
 import {
   resolveDecoratedMediaFrame,
@@ -281,6 +282,8 @@ export function drawFittedMediaLayer(params: {
   windowHeader?: WindowHeader;
   hideWindowHeader?: boolean;
   camera?: boolean;
+  /** Camera-local vector already compensates layer rotation/scale, but retains viewport raster scaling. */
+  cameraShadowLocalVector?: CameraShadowVector;
   context: CanvasRenderingContext2D;
   displayScale: number;
   fitMode: VideoMediaFitMode;
@@ -353,7 +356,8 @@ export function drawFittedMediaLayer(params: {
     params.cameraAppearance,
     params.camera,
     params.shadowColor,
-    radius
+    radius,
+    params.cameraShadowLocalVector
   );
   if (radius > 0) {
     params.context.save();
@@ -557,19 +561,7 @@ export function mapSourceNormalizedPointToVisualLayer(
     y: content.y + params.point.y * content.height,
   };
   if (!isInsideVisualFrame(point, params)) return null;
-  const { center, angle } = visualLayerRotation(params.frame);
-  const x = point.x - center.x;
-  const y = point.y - center.y;
-  return {
-    x:
-      center.x +
-      params.renderState.translateX +
-      params.renderState.scaleX * (x * Math.cos(angle) - y * Math.sin(angle)),
-    y:
-      center.y +
-      params.renderState.translateY +
-      params.renderState.scaleY * (x * Math.sin(angle) + y * Math.cos(angle)),
-  };
+  return mapVisualLayerPointThroughRenderState(params, point);
 }
 
 /** Inverse mapping rejects cropped content and letterboxing instead of moving a different point. */
@@ -614,19 +606,10 @@ export function mapWindowNormalizedPointToVisualLayer(
 ): SourcePoint | null {
   if (!isValidPointMapping(params)) return null;
   const window = getVisualLayerMappingWindow(params);
-  const { center, angle } = visualLayerRotation(params.frame);
-  const x = window.x + params.point.x * window.width - center.x;
-  const y = window.y + params.point.y * window.height - center.y;
-  return {
-    x:
-      center.x +
-      params.renderState.translateX +
-      params.renderState.scaleX * (x * Math.cos(angle) - y * Math.sin(angle)),
-    y:
-      center.y +
-      params.renderState.translateY +
-      params.renderState.scaleY * (x * Math.sin(angle) + y * Math.cos(angle)),
-  };
+  return mapVisualLayerPointThroughRenderState(params, {
+    x: window.x + params.point.x * window.width,
+    y: window.y + params.point.y * window.height,
+  });
 }
 
 /** Pointer inversion stays unbounded so a drag can clamp the authored area at its owner. */
@@ -642,6 +625,25 @@ export function mapVisualLayerPointToWindowNormalized(
   return {
     x: (center.x + x * Math.cos(angle) + y * Math.sin(angle) - window.x) / window.width,
     y: (center.y - x * Math.sin(angle) + y * Math.cos(angle) - window.y) / window.height,
+  };
+}
+
+function mapVisualLayerPointThroughRenderState(
+  params: VisualLayerSourcePointMapping,
+  point: SourcePoint
+): SourcePoint {
+  const { center, angle } = visualLayerRotation(params.frame);
+  const x = point.x - center.x;
+  const y = point.y - center.y;
+  return {
+    x:
+      center.x +
+      params.renderState.translateX +
+      params.renderState.scaleX * (x * Math.cos(angle) - y * Math.sin(angle)),
+    y:
+      center.y +
+      params.renderState.translateY +
+      params.renderState.scaleY * (x * Math.sin(angle) + y * Math.cos(angle)),
   };
 }
 

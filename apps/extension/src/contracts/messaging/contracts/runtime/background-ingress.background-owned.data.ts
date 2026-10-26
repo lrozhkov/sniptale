@@ -2,6 +2,29 @@ import type { BackgroundIngressRouteGroupData } from './background-ingress.types
 
 export const backgroundIngressBackgroundOwnedRouteGroups = [
   {
+    acceptedSenderClass: 'checked top-level content runtime including the owned shim sender',
+    actionKind: 'background-owned',
+    alternateAuthorizationPolicyIds: [],
+    alternateAuthorityFamilies: [],
+    authorizationPolicyId: 'background-owned',
+    boundary: 'background-runtime',
+    errorShape: 'standard runtime response with fixed preference refusal code',
+    freshnessReplayPolicy:
+      'canonical runtime freshness and replay checks before native preference dispatch',
+    handlerId: 'page-launch-preferences',
+    keepChannelBehaviorSource: 'background-owned-route-handler',
+    ownerModule: 'apps/extension/src/background/runtime/page-access/page-launch-preferences.ts',
+    policyAuthorityFamily: 'page-launch-preferences',
+    policyStateIds: [],
+    requiredAuthority: 'checked native top-level content sender; corner-only preference mutation',
+    responseShape: 'success and committed corner or fixed failure code',
+    routeAuthorityFamily: 'background-owned-ipc',
+    sideEffects: 'bounded shared corner patch through the existing Settings writer',
+    transitiveStateOwner: 'composition persistence Settings queue and erasure boundary',
+    messageTypes: ['PAGE_LAUNCH_PREFERENCES'],
+  },
+
+  {
     acceptedSenderClass: 'authorized extension page or content runtime selected by owner policy',
     actionKind: 'background-owned',
     alternateAuthorizationPolicyIds: [],

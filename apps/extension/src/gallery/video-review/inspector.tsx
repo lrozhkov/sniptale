@@ -1,3 +1,4 @@
+import { ReviewProjectTitle } from './project-controls';
 import type { ReviewInspectorNavigation } from './inspector-navigation';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -7,7 +8,6 @@ import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
 import './inspector-navigation.css';
 import {
-  Archive,
   Clapperboard,
   List,
   PanelLeft,
@@ -82,6 +82,7 @@ export function ReviewInspector(props: {
   recording?: ReactNode;
   beforeAction?: ReviewBeforeAction | undefined;
   filename: string;
+  onRenameProject?: ((name: string) => Promise<void>) | undefined;
   annotations: readonly ReviewAnnotation[];
   selectedId: string | null;
   busy: boolean;
@@ -107,7 +108,6 @@ export function ReviewInspector(props: {
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
-  onBackup?(): void;
   onOpenVideoEditor?(): void;
   children: ReactNode;
   actions?: ReactNode;
@@ -338,7 +338,7 @@ function ReviewAnnotationList(props: {
 
 /** Project actions reuse the inspector's compact export controls. */
 function ReviewProjectActions(
-  props: Pick<Parameters<typeof ReviewInspector>[0], 'onBackup' | 'onOpenVideoEditor' | 'busy'>
+  props: Pick<Parameters<typeof ReviewInspector>[0], 'onOpenVideoEditor' | 'busy'>
 ) {
   return (
     <>
@@ -352,17 +352,6 @@ function ReviewProjectActions(
         >
           <Clapperboard size={15} aria-hidden="true" />
           <span>{translate('gallery.videoReview.openVideoEditor')}</span>
-        </ReviewButton>
-      ) : null}
-      {props.onBackup ? (
-        <ReviewButton
-          label={translate('gallery.app.selectionBackup')}
-          disabled={props.busy}
-          className={`${reviewTextButtonClassName} justify-start`}
-          onClick={props.onBackup}
-        >
-          <Archive size={15} aria-hidden="true" />
-          <span>{translate('gallery.app.selectionBackup')}</span>
         </ReviewButton>
       ) : null}
     </>
@@ -464,7 +453,15 @@ function ReviewInspectorHeader(
   return (
     <header className="flex shrink-0 items-center gap-1">
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={props.filename}>
-        {props.filename}
+        {props.onRenameProject ? (
+          <ReviewProjectTitle
+            name={props.filename}
+            busy={props.busy}
+            onRename={props.onRenameProject}
+          />
+        ) : (
+          props.filename
+        )}
       </h2>
       {props.section === 'scene' ||
       props.section === 'speech' ||

@@ -14,7 +14,9 @@ import { inspectReviewVideo, readReviewMediaOriginal } from './source';
 /** Discovery is read-only and used only before the first authored camera attachment. */
 export async function findReviewWebcam(aggregateId: string, signal: AbortSignal) {
   signal.throwIfAborted();
-  const root = await getMediaLibraryEntry(aggregateId);
+  const snapshot = await readVideoWorkspace(aggregateId);
+  signal.throwIfAborted();
+  const root = await getMediaLibraryEntry(snapshot?.workspace.sourceMediaId ?? aggregateId);
   if (root?.recordingGroup?.role !== 'display') return null;
   const groupId = root.recordingGroup.groupId;
   const siblings = await listMediaLibrary();

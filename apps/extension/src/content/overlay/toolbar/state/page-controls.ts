@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PAGE_TOOLBAR_CONTROLS,
   type ContentToolbarPreferences,
@@ -7,6 +7,11 @@ import {
 } from '../../../../contracts/settings';
 import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
 import { translate } from '../../../../platform/i18n';
+import {
+  createPageToolbarLayoutCommands,
+  getPageToolbarLayout,
+  hasPageToolbarCustomization,
+} from './page-layout';
 
 type Controls = NonNullable<ContentToolbarPreferences['pageControls']>;
 
@@ -18,6 +23,7 @@ const NAVIGATION_CONTROLS: readonly PageToolbarControl[] = [
   'after-capture',
   'capture-delay',
   'capture-size',
+  'quick-actions',
   'scenario-panel',
 ];
 const MODE_CONTROL_PREFIX: Record<PageToolbarMode, string | null> = {
@@ -34,6 +40,7 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
   const [overrides, setOverrides] = useState<
     NonNullable<ContentToolbarPreferences['pageControlOverrides']>
   >({});
+  const [layouts, setLayouts] = useState<NonNullable<ContentToolbarPreferences['pageLayouts']>>({});
   const [editing, setEditing] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -51,6 +58,7 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
       if (request !== generation.current) return;
       setControls(settings.contentToolbar?.pageControls ?? {});
       setOverrides(settings.contentToolbar?.pageControlOverrides ?? {});
+      setLayouts(settings.contentToolbar?.pageLayouts ?? {});
       setReady(true);
     } catch {
       if (request === generation.current) setError(translate('common.errors.loadFailed'));
@@ -76,7 +84,7 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
     return () => window.removeEventListener('keydown', onEscape);
   }, [editing]);
   const setPreferences = async (
-    patch: Pick<ContentToolbarPreferences, 'pageControls' | 'pageControlOverrides'>
+    patch: Pick<ContentToolbarPreferences, 'pageControls' | 'pageControlOverrides' | 'pageLayouts'>
   ) => {
     if (!enabled || !ready || saving.current) return;
     const request = generation.current;
@@ -90,6 +98,7 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
       if (request === generation.current) {
         setControls(settings.contentToolbar?.pageControls ?? {});
         setOverrides(settings.contentToolbar?.pageControlOverrides ?? {});
+        setLayouts(settings.contentToolbar?.pageLayouts ?? {});
       }
     } catch {
       if (request === generation.current) setError(translate('common.errors.saveFailed'));
@@ -101,6 +110,8 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
       }
     }
   };
+  const savedLayout = layouts[mode];
+  const layout = useMemo(() => getPageToolbarLayout(mode, savedLayout), [mode, savedLayout]);
   const modeOverrides = mode === 'cursor' ? undefined : overrides[mode];
   const modePrefix = MODE_CONTROL_PREFIX[mode];
   const effectiveControls = { ...controls };
@@ -111,6 +122,14 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
   if (mode === 'drawing') effectiveControls['drawing-pencil'] = true;
   return {
     controls: effectiveControls,
+    hasCustomization: hasPageToolbarCustomization({
+      pageControls: controls,
+      pageControlOverrides: overrides,
+      pageLayouts: layouts,
+    }),
+    layout,
+    layoutActive: enabled && ready && (editing || savedLayout != null),
+    ...createPageToolbarLayoutCommands(layout, mode, setPreferences),
     mode,
     hasOverrides: NAVIGATION_CONTROLS.some(
       (control) => typeof modeOverrides?.[control] === 'boolean'

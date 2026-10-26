@@ -55,6 +55,9 @@ for (const variant of [
       });
       await tilt.fill('-30');
       await tilt.press('Enter');
+      await dialog
+        .locator('[data-review-header-track="annotationEffects"] [data-review-track-select]')
+        .click();
       await button('gallery.videoReview.annotationEffectsAdd').click();
       await button('gallery.videoReview.annotationEffectsChoose').click();
       await page.getByRole('option', { name: variant.title, exact: true }).click();

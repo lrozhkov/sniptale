@@ -81,9 +81,11 @@ async function classifyReviewAssetIds(args: {
     if (!workspace) continue;
     const targetOwned = args.targetAggregates.has(workspace.aggregateId);
     if (targetOwned) addReviewAssetIds(workspace, args.owned);
-    const sourceAssetId = workspace.aggregateId.startsWith(PROJECT_ASSET_PREFIX)
-      ? workspace.aggregateId.slice(PROJECT_ASSET_PREFIX.length)
+    const sourceMediaId = workspace.sourceMediaId ?? workspace.aggregateId;
+    const sourceAssetId = sourceMediaId.startsWith(PROJECT_ASSET_PREFIX)
+      ? sourceMediaId.slice(PROJECT_ASSET_PREFIX.length)
       : null;
+    if (workspace.sourceMediaId && sourceAssetId) args.protectedIds.add(sourceAssetId);
     if (!targetOwned || (sourceAssetId && args.protectedIds.has(sourceAssetId))) {
       addReviewAssetIds(workspace, args.protectedIds);
     }

@@ -55,12 +55,7 @@ function fixture() {
   return {
     client,
     deps,
-    async render(
-      refreshToken = 0,
-      canRetry?: boolean,
-      retryModelLabel?: string | null,
-      showRetry = true
-    ) {
+    async render(refreshToken = 0, canRetry?: boolean, showRetry = true) {
       await act(async () =>
         root.render(
           <CommandPressScope value>
@@ -69,7 +64,6 @@ function fixture() {
               dependencies={deps}
               refreshToken={refreshToken}
               {...(canRetry === undefined ? {} : { canRetry })}
-              {...(retryModelLabel === undefined ? {} : { retryModelLabel })}
             />
           </CommandPressScope>
         )
@@ -101,13 +95,11 @@ describe('private voice history panel', () => {
     await act(async () => button('retry').click());
     expect(f.client.retry).toHaveBeenCalledOnce();
   });
-  it('names the speech model used for saved-audio recognition', async () => {
+  it('keeps model metadata out of the history header', async () => {
     const f = fixture();
-    await f.render(0, true, 'Speech model');
-    expect(container.querySelector('dt')?.textContent).toBe(
-      'settings.voiceInput.historyRetryModel'
-    );
-    expect(container.querySelector('dd')?.textContent).toBe('Speech model');
+    await f.render(0, true);
+    expect(container.querySelector('dl')).toBeNull();
+    expect(container.textContent).not.toContain('settings.voiceInput.historyRetryModel');
   });
 
   it('requires an explicit saved-audio transcription capability before Retry', async () => {
@@ -186,7 +178,7 @@ describe('private voice history panel', () => {
     expect(f.client.list).toHaveBeenCalledTimes(2);
   });
 
-  it('preserves completed rows on retry failure and offers refresh', async () => {
+  it('preserves completed rows on retry failure and permits explicit retry', async () => {
     const f = fixture();
     await f.render(0, true);
     f.client.retry.mockRejectedValueOnce(new Error('provider-unavailable'));
@@ -199,15 +191,56 @@ describe('private voice history panel', () => {
 
 it('keeps Chrome history readable without model retry controls and restores them on return', async () => {
   const f = fixture();
-  await f.render(0, true, 'Speech model', false);
+  await f.render(0, true, false);
   expect(button('retry')).toBeNull();
   expect(button('play')).not.toBeNull();
   expect(button('copy')).not.toBeNull();
   expect(button('delete')).not.toBeNull();
   expect(container.textContent).not.toContain('Speech model');
   expect(container.textContent).not.toContain('settings.voiceInput.historyRetryUnavailable');
-  await f.render(0, true, 'Speech model', true);
+  await f.render(0, true, true);
   expect(button('retry').disabled).toBe(false);
-  expect(container.textContent).toContain('Speech model');
+  expect(container.textContent).not.toContain('Speech model');
   expect(f.client.remove).not.toHaveBeenCalled();
+});
+
+it('uses named icon actions, offers audio download and has no manual refresh', async () => {
+  const f = fixture();
+  f.deps.download = vi.fn();
+  await f.render(0, true);
+  for (const name of ['play', 'copy', 'download', 'retry', 'delete']) {
+    const action = button(name);
+    expect(action.getAttribute('aria-label')).toBeTruthy();
+    expect(action.querySelector('svg')).not.toBeNull();
+    expect(action.textContent).toBe('');
+  }
+  expect(button('refresh')).toBeNull();
+  await act(async () => button('download').click());
+  expect(f.deps.download).toHaveBeenCalledWith(expect.any(File), 'dictation-1.wav');
+  expect(f.client.remove).not.toHaveBeenCalled();
+});
+
+it('expands overflowing text without changing the full copy value', async () => {
+  const height = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(100);
+  const visible = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(60);
+  try {
+    const f = fixture();
+    const text = 'A long dictated sentence. '.repeat(40);
+    f.client.list.mockResolvedValue([{ ...entry, transcript: text }]);
+    await f.render();
+    const paragraph = container.querySelector<HTMLElement>(
+      '[data-ui="settings.voice.history-text"]'
+    )!;
+    expect(paragraph.style.userSelect).toBe('text');
+    expect(paragraph.textContent).toBe(text);
+    expect(button('expand')).not.toBeNull();
+    act(() => button('expand').click());
+    expect(paragraph.className).not.toContain('line-clamp');
+    expect(paragraph.textContent).toBe(text);
+    await act(async () => button('copy').click());
+    expect(f.deps.copy).toHaveBeenCalledWith(text);
+  } finally {
+    height.mockRestore();
+    visible.mockRestore();
+  }
 });

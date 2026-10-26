@@ -90,6 +90,7 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('interface.preferences', 'locale'),
     field('interface.preferences', 'popup-startup'),
     field('interface.preferences', 'context-menu'),
+    field('interface.preferences', 'page-launch'),
   ]),
   ...domain('capture.quick-actions', [
     field('capture.quick-actions', 'items', { kind: 'collection', dynamicItems: true }),

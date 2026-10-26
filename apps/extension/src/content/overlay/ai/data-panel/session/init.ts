@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import type { ParsedDOMTree } from '@sniptale/runtime-contracts/dom-tree';
-import { loadSpoilerState } from '../../persistence/spoiler-state';
 import type { TreeNodeState } from '../types';
 import { buildInitialTreeState } from './tree';
 
@@ -22,21 +21,8 @@ export function useTreeDataInitialization(props: {
       return;
     }
 
+    setIsDataSpoilerOpen(true);
     setTreeState(buildInitialTreeState(treeData));
     setExcludedColumns(new Map());
-  }, [onSelectedDataChange, setExcludedColumns, setTreeState, treeData]);
-
-  useEffect(() => {
-    let isSubscribed = true;
-
-    void loadSpoilerState().then((saved) => {
-      if (isSubscribed) {
-        setIsDataSpoilerOpen(saved);
-      }
-    });
-
-    return () => {
-      isSubscribed = false;
-    };
-  }, [setIsDataSpoilerOpen]);
+  }, [onSelectedDataChange, setExcludedColumns, setIsDataSpoilerOpen, setTreeState, treeData]);
 }

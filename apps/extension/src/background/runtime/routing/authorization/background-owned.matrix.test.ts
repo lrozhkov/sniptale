@@ -336,3 +336,27 @@ it('rejects unsupported or unauthorized background-owned routes', () => {
     reason: 'Missing background-owned IPC policy for UNKNOWN_ROUTE',
   });
 });
+
+it('requires a native top-level document for corner preference changes', () => {
+  const tab = { id: 7 } as chrome.tabs.Tab;
+  const create = (sender: chrome.runtime.MessageSender): BackgroundOwnedAuthorizationRequest => ({
+    kind: 'background-owned',
+    message: { type: MessageType.PAGE_LAUNCH_PREFERENCES, corner: 'top-left' },
+    sender,
+  });
+  for (const url of [
+    'https://example.test/page',
+    'chrome-extension://test/assets/content-shim.js',
+  ]) {
+    expect(
+      authorizeBackgroundOwnedRoute(create({ url, tab, frameId: 0, documentId: 'doc-1' }))
+    ).toMatchObject({ authorized: true });
+  }
+  for (const sender of [
+    { url: 'https://example.test/page' },
+    { url: 'https://example.test/page', tab, frameId: 1, documentId: 'doc-1' },
+    { url: 'https://example.test/page', tab, frameId: 0 },
+  ]) {
+    expect(authorizeBackgroundOwnedRoute(create(sender))).toMatchObject({ authorized: false });
+  }
+});

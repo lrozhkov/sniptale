@@ -82,7 +82,11 @@ it('uses compact non-collapsible navigation and renders only the active logical 
   act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
 
   const navigation = container.querySelector('nav');
-  expect(navigation?.querySelectorAll('button')).toHaveLength(4);
+  expect(
+    Array.from(navigation?.querySelectorAll('button') ?? []).map((button) =>
+      button.getAttribute('aria-label')
+    )
+  ).toEqual(['Текст', 'Размер и отступы', 'Фон и эффекты', 'Границы и скругление']);
   expect(navigation?.className).toContain('border-solid');
   expect(navigation?.className).toContain('justify-items-center');
   expect(container.querySelector('details')).toBeNull();
@@ -145,6 +149,7 @@ it('shows image layout properties without preview or asset-upload controls', () 
   );
 
   expect(container.querySelector('nav')?.querySelectorAll('button')).toHaveLength(5);
+  expect(container.querySelector('button[aria-label="Инструменты"]')).toBeNull();
   expect(container.textContent).toContain('Вписывание');
   expect(container.textContent).toContain('Позиция');
   expect(container.querySelector('img')).toBeNull();

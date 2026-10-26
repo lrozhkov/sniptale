@@ -12,7 +12,8 @@ function recordsForScope(
   const records = new Map(current.map((record) => [record.annotationId, structuredClone(record)]));
   const beforeRecords = new Map(before.map((record) => [record.annotationId, record]));
   const afterRecords = new Map(after.map((record) => [record.annotationId, record]));
-  const fields = scope === 'content-editing' ? (['textChange'] as const) : DESIGN_FIELDS;
+  const fields =
+    scope === 'content-editing' ? (['textChange', 'textMarkers'] as const) : DESIGN_FIELDS;
   for (const id of new Set([...beforeRecords.keys(), ...afterRecords.keys()])) {
     const previous = beforeRecords.get(id);
     const next = afterRecords.get(id);
@@ -38,6 +39,7 @@ function recordsForScope(
     record.propertyChanges ??= [];
     if (
       record.textChange ||
+      record.textMarkers?.length ||
       record.comment ||
       record.designReview?.action ||
       record.propertyChanges.length

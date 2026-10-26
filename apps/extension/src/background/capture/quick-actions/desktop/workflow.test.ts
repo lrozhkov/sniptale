@@ -1,3 +1,5 @@
+vi.mock('../appearance-render', () => ({ renderQuickActionAppearance: mocks.renderAppearance }));
+import { createQuickActionAppearance } from '../../../../contracts/quick-action-appearance';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   openEditor: vi.fn(),
   releasePermit: vi.fn(),
   saveAsset: vi.fn(),
+  renderAppearance: vi.fn(),
   sendRuntimeMessage: vi.fn(),
   transitionJob: vi.fn(),
   waitOffscreen: vi.fn(),
@@ -413,5 +416,59 @@ it('retains an in-flight background capture beyond the popup preparation deadlin
     height: 800,
   });
   await expect(capture).resolves.toEqual({ result: 'accepted' });
+  expect(mocks.releasePermit).toHaveBeenCalledOnce();
+});
+
+it('refuses changed appearance after desktop reservation', async () => {
+  const context = createContext();
+  context.action.appearance = createQuickActionAppearance();
+  const preparation = await reserveDesktopQuickAction({ context, tabId: 7 });
+  context.action.appearance.information.text = 'Changed';
+  await expect(
+    runDesktopQuickAction({
+      context,
+      tabId: 7,
+      desktopSelection: {
+        ...preparation,
+        status: 'selected',
+        dataUrl: createDataUrl(),
+        width: 1200,
+        height: 800,
+      },
+    })
+  ).rejects.toThrow('does not match');
+  expect(mocks.saveAsset).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(mocks.releasePermit).toHaveBeenCalledOnce());
+});
+it('styles the captured desktop raster before publication without page metadata', async () => {
+  const context = createContext();
+  context.action.appearance = createQuickActionAppearance();
+  let resolve!: (value: string) => void;
+  mocks.renderAppearance.mockReturnValue(
+    new Promise<string>((accept) => {
+      resolve = accept;
+    })
+  );
+  const pending = runPrepared(context, 7);
+  await vi.waitFor(() => expect(mocks.renderAppearance).toHaveBeenCalledOnce());
+  expect(mocks.saveAsset).not.toHaveBeenCalled();
+  const options = mocks.renderAppearance.mock.calls[0]![0];
+  expect(options.metadata).not.toHaveProperty('title');
+  expect(options.metadata).not.toHaveProperty('url');
+  resolve('data:image/webp;base64,styled');
+  await expect(pending).resolves.toEqual({ result: 'accepted' });
+  expect(mocks.saveAsset).toHaveBeenCalledWith(
+    'data:image/webp;base64,styled',
+    expect.stringMatching(/\.webp$/),
+    undefined,
+    'temporary'
+  );
+  expect(mocks.executeDownload).toHaveBeenCalledWith(
+    'data:image/webp;base64,styled',
+    expect.stringMatching(/\.webp$/),
+    'download_default',
+    'default-preset',
+    'job-1'
+  );
   expect(mocks.releasePermit).toHaveBeenCalledOnce();
 });

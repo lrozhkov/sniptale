@@ -104,7 +104,7 @@ it('fences whole source voice takes at schema 31 without changing old documents'
   expect(isExportReadyVideoProject(changed)).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(parseHydratableVideoProject({ ...changed, version: 40 })).not.toBeNull();
-  expect(parseHydratableVideoProject({ ...changed, version: 46 })).toBeNull();
+  expect(parseHydratableVideoProject({ ...changed, version: 49 })).toBeNull();
   expect(applyVideoProjectMutationPatch(changed, { sourceVoiceoverDocuments: [] }).version).toBe(
     31
   );

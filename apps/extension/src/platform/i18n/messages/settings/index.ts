@@ -11,6 +11,7 @@ import { settingsPermissionsMessages } from './permissions';
 import { settingsPrivacyMessages } from './privacy';
 import { settingsQuickActionsMessages } from './quick-actions';
 import { settingsVideoQualityMessages } from './video-quality';
+import { settingsWelcomeMessages } from './welcome';
 import { settingsVoiceInputMessages } from './voice-input';
 import { settingsCollectionMessages } from './collection';
 import { settingsStorageDraftsMessages } from './storage-drafts';
@@ -31,6 +32,7 @@ export const settingsMessages = defineMessageSource({
   hotkeyInput: settingsHotkeyInputMessages,
   videoQuality: settingsVideoQualityMessages,
   voiceInput: settingsVoiceInputMessages,
+  welcome: settingsWelcomeMessages,
   storageDrafts: settingsStorageDraftsMessages,
   settingsTransfer: settingsTransferMessages,
 });

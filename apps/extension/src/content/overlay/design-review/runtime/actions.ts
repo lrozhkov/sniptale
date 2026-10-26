@@ -198,6 +198,7 @@ function schedulePendingPageStyleHistoryCommit(): void {
 }
 
 export async function applyPageStylePatchWithHistory(args: {
+  deferCommit?: boolean;
   element: PageStyleMutationElement;
   patch: PageStylePatch;
 }): Promise<PageStylePatchApplyResult> {
@@ -221,7 +222,8 @@ export async function applyPageStylePatchWithHistory(args: {
       mutation: result.mutation,
       pending,
     });
-    schedulePendingPageStyleHistoryCommit();
+    if (args.deferCommit) clearPendingHistoryTimer();
+    else schedulePendingPageStyleHistoryCommit();
     return result;
   } catch (error) {
     if (!pendingHistoryCommit?.mutation) {

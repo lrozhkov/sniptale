@@ -190,7 +190,9 @@ for (const codec of [VideoOutputCodec.VP9, VideoOutputCodec.AVC]) {
           'rgb(240,240,20)',
         ].entries()) {
           const marker = document.createElement('div');
-          marker.style.cssText = `position:fixed;width:48px;height:48px;background:${color};z-index:1000;${index < 2 ? 'top' : 'bottom'}:0;${index % 2 ? 'right' : 'left'}:0;`;
+          marker.style.cssText =
+            `position:fixed;width:48px;height:48px;background:${color};` +
+            `z-index:1000;${index < 2 ? 'top' : 'bottom'}:0;${index % 2 ? 'right' : 'left'}:0;`;
           document.body.append(marker);
         }
         const clock = document.createElement('div');

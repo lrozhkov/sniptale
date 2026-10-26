@@ -1,7 +1,6 @@
 import type { ToolbarPageEditingMode } from '../types';
 
 export function createPageEditingModeSelector(params: {
-  aiPickMode: boolean;
   onAiPickContentStart: () => void;
   onToggleQuickEditDocumentMode: (enabled: boolean) => void;
   quickEditDocumentMode: boolean;
@@ -10,9 +9,7 @@ export function createPageEditingModeSelector(params: {
 }) {
   return async (mode: ToolbarPageEditingMode) => {
     if (mode === 'ai') {
-      if (!params.aiPickMode) {
-        params.onAiPickContentStart();
-      }
+      params.onAiPickContentStart();
       return;
     }
 

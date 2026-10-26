@@ -4,13 +4,21 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentToolbarShell } from './toolbar';
+import * as teardown from '../design-review/runtime/session-teardown';
 import type { ContentAppLayoutToolbarProps } from './types';
 import { createRecordingDrawingOwner } from '../toolbar/video-recording/drawing-session';
 import { INITIAL_VIDEO_RECORDING_TOOLBAR_STATE } from '../video-recording/session/state';
 import type { ToolbarVideoRecordingProps } from '../toolbar/types';
+import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
 import { createProps } from './toolbar.test-support';
 
+const releaseMock = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('../../runtime/entrypoint/markers', async (original) => ({
+  ...(await original<typeof import('../../runtime/entrypoint/markers')>()),
+  requestFullContentRuntimeRelease: releaseMock,
+}));
+const recoveryTest = vi.hoisted(() => ({ real: false }));
 const { preloadContentScenarioRecorderSidebarMock, showToastMock, toolbarMock } = vi.hoisted(
   () => ({
     preloadContentScenarioRecorderSidebarMock: vi.fn(async () => undefined),
@@ -20,6 +28,26 @@ const { preloadContentScenarioRecorderSidebarMock, showToastMock, toolbarMock } 
     )),
   })
 );
+
+vi.mock('../../application/page-recovery/use-page-recovery', async (original) => {
+  const actual =
+    await original<typeof import('../../application/page-recovery/use-page-recovery')>();
+  return {
+    ...actual,
+    usePageRecovery: (...args: Parameters<typeof actual.usePageRecovery>) =>
+      recoveryTest.real
+        ? actual.usePageRecovery(...args)
+        : {
+            state: { available: false, pending: false, error: false },
+            busy: false,
+            restore: vi.fn(async () => false),
+            discard: async (action: () => void) => {
+              action();
+              return true;
+            },
+          },
+  };
+});
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
   showToast: showToastMock,
@@ -64,6 +92,7 @@ async function renderShell(props: ReturnType<typeof createProps>) {
 function useContentToolbarShellTestScope() {
   beforeEach(() => {
     vi.clearAllMocks();
+    recoveryTest.real = false;
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   });
 
@@ -105,7 +134,9 @@ async function verifiesScreenshotDisableAndVisibility() {
 
   expect(props.toolbar.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
   expect(props.toolbar.setPinToTab).toHaveBeenCalledWith(false);
-  expect(props.scenario.actions.handleScreenshotModeDisabled).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() =>
+    expect(props.scenario.actions.handleScreenshotModeDisabled).toHaveBeenCalledTimes(1)
+  );
 
   props.toolbar.isToolbarVisible = false;
   await renderShell(props);
@@ -428,4 +459,46 @@ describe('ContentToolbarShell', () => {
     'leaves collapsed video mode to the canonical bottom-right show button surface',
     verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface
   );
+  it('runs viewer Reset and Close through the shell when page recovery is excluded', async () => {
+    recoveryTest.real = true;
+    vi.stubGlobal('location', { protocol: 'chrome-extension:' });
+    const props = createProps();
+    const reset = vi.spyOn(pagePreparationHistory, 'resetScope');
+    await renderShell(props);
+    const commands = toolbarMock.mock.calls.at(-1)![0] as unknown as {
+      onClearPagePreparation(): void;
+      onHide(): Promise<void>;
+    };
+    await act(async () => commands.onClearPagePreparation());
+    expect(reset).toHaveBeenCalledWith('content-editing');
+    await act(async () => commands.onHide());
+    expect(props.toolbar.setPinnedToolbarVisible).toHaveBeenCalledWith(false);
+  });
+  it('waits for scenario shutdown acknowledgements before releasing full runtime', async () => {
+    const props = createProps();
+    vi.spyOn(teardown, 'teardownDesignReviewSessionAfterUiTransition').mockImplementationOnce(
+      async (transition) => {
+        transition();
+      }
+    );
+    let finish!: () => void;
+    props.scenario.actions.handleScreenshotModeDisabled = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    await renderShell(props);
+    const commands = toolbarMock.mock.calls.at(-1)![0] as unknown as {
+      onToggleScreenshotMode(enabled: boolean): void;
+    };
+    await act(async () => commands.onToggleScreenshotMode(false));
+    await vi.waitFor(() =>
+      expect(props.scenario.actions.handleScreenshotModeDisabled).toHaveBeenCalledOnce()
+    );
+    await vi.waitFor(() => expect(props.toolbar.setPinToTab).toHaveBeenCalledWith(false));
+    expect(releaseMock).not.toHaveBeenCalled();
+    await act(async () => finish());
+    await vi.waitFor(() => expect(releaseMock).toHaveBeenCalledOnce());
+  });
 });

@@ -47,6 +47,8 @@ for (const viewport of [
       await page.mouse.up();
       await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
       await page.mouse.click(bounds.x + 3, bounds.y + 3);
+      await expect(page.locator('[data-ui="drawing.selection.actions.front"]')).toHaveCount(0);
+      await page.locator('[data-ui="drawing.selection.actions.reveal"]').click();
       await expect(page.locator('[data-ui="drawing.selection.actions.front"]')).toBeVisible();
       const sample = async (name: string) => {
         await page.mouse.move(1000, 450);
@@ -79,6 +81,12 @@ for (const viewport of [
       await page.keyboard.press('Control+z');
       expect(await sample('undo-layer-order')).toEqual(below);
       await page.mouse.click(bounds.x + 3, bounds.y + 3);
+      if (
+        (await page
+          .locator('[data-ui="drawing.selection.actions.reveal"]')
+          .getAttribute('aria-expanded')) === 'false'
+      )
+        await page.locator('[data-ui="drawing.selection.actions.reveal"]').click();
       await page.locator('[data-ui="drawing.selection.actions.front"]').click();
       await page.mouse.dblclick(bounds.x + 10, bounds.y + 10);
       await expect(input).toBeVisible();

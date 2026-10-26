@@ -213,3 +213,58 @@ it('propagates a persistence failure even when the job cannot be marked failed',
     )
   ).rejects.toBe('unavailable');
 });
+
+it('prepares the captured image and filename before any publication', async () => {
+  const ports = createPorts(createSettings({ captureAction: 'edit' }));
+  let resolve!: (value: { dataUrl: string; filename: string }) => void;
+  const pending = new Promise<{ dataUrl: string; filename: string }>((accept) => {
+    resolve = accept;
+  });
+  const prepareImage = vi.fn(() => pending);
+  const result = runStartCaptureUseCase(
+    {
+      capture: async () => ({ dataUrl: 'raw', jobId: 'job-1' }),
+      captureTarget: 'visible',
+      prepareImage,
+      resolvedTabId: 7,
+      scenarioCapture: undefined,
+      scenarioSessionService: createScenarioSessionServiceStub(),
+    },
+    ports
+  );
+  await vi.waitFor(() => expect(prepareImage).toHaveBeenCalledWith('raw', 'visible.png'));
+  expect(ports.saveScreenshotToMediaHubFromDataUrl).not.toHaveBeenCalled();
+  resolve({ dataUrl: 'styled', filename: 'visible.webp' });
+  await expect(result).resolves.toMatchObject({
+    filename: 'visible.webp',
+    payload: { assetId: 'asset-1', dataUrl: 'styled', jobId: 'job-1' },
+  });
+  expect(ports.saveScreenshotToMediaHubFromDataUrl).toHaveBeenCalledWith(
+    'styled',
+    'visible.webp',
+    7,
+    'temporary'
+  );
+});
+it('marks the capture job failed when image preparation refuses before publication', async () => {
+  const ports = createPorts();
+  await expect(
+    runStartCaptureUseCase(
+      {
+        capture: async () => ({ dataUrl: 'raw', jobId: 'job-1' }),
+        captureTarget: 'visible',
+        prepareImage: async () => {
+          throw new Error('appearance refused');
+        },
+        resolvedTabId: 7,
+        scenarioCapture: undefined,
+        scenarioSessionService: createScenarioSessionServiceStub(),
+      },
+      ports
+    )
+  ).rejects.toThrow('appearance refused');
+  expect(ports.saveScreenshotToMediaHubFromDataUrl).not.toHaveBeenCalled();
+  expect(ports.transitionCaptureJob).toHaveBeenCalledWith('job-1', 'failed', {
+    error: 'appearance refused',
+  });
+});

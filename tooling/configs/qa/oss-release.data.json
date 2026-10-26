@@ -57,14 +57,14 @@
       "source": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/@zip.js__zip.js-2.23.0.txt",
+      "archivePath": "LICENSES/dependencies/@zip.js__zip.js-2.24.0.txt",
       "sha256": "1b7ebc8d7889ed25491484ab2b102370742ca6c0b26650a0c62cc2269b579b84",
-      "source": "LICENSES/dependencies/@zip.js__zip.js-2.23.0.txt"
+      "source": "LICENSES/dependencies/@zip.js__zip.js-2.24.0.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/@zumer__snapdom-3.3.3.txt",
+      "archivePath": "LICENSES/dependencies/@zumer__snapdom-3.3.5.txt",
       "sha256": "c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2",
-      "source": "LICENSES/dependencies/@zumer__snapdom-3.3.3.txt"
+      "source": "LICENSES/dependencies/@zumer__snapdom-3.3.5.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",
@@ -72,9 +72,9 @@
       "source": "LICENSES/dependencies/core-util-is-1.0.3.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/dompurify-3.4.16.txt",
+      "archivePath": "LICENSES/dependencies/dompurify-3.4.17.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-      "source": "LICENSES/dependencies/dompurify-3.4.16.txt"
+      "source": "LICENSES/dependencies/dompurify-3.4.17.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/fabric-7.4.0.txt",
@@ -117,42 +117,42 @@
       "source": "LICENSES/dependencies/lie-3.3.0.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/lucide-react-1.52.0.txt",
+      "archivePath": "LICENSES/dependencies/lucide-react-1.59.0.txt",
       "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
-      "source": "LICENSES/dependencies/lucide-react-1.52.0.txt"
+      "source": "LICENSES/dependencies/lucide-react-1.59.0.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE",
+      "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/LICENSE",
       "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE"
+      "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/LICENSE"
     },
     {
-      "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/README.md",
-      "sha256": "c3a87c3784618c36512562995abacccdf5bdc09511e7ff5f87548d72f317341a",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/README.md"
+      "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/README.md",
+      "sha256": "35e090bb0019effc70359e2021ebde90705a7db44b615effbeacfbbd90007ded",
+      "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/README.md"
     },
     {
-      "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json",
-      "sha256": "e10e6612cd3999826d6bc89f66e7f0ab542f1039097df87e33dcbf55e131e15d",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json",
+      "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json",
+      "sha256": "b5201f8d0985605d3769439cc67a2cac1bbbc942de0e882087062e17af1a44cd",
+      "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json",
       "distribution": "source"
     },
     {
-      "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz",
-      "sha256": "c93dd9b7ed6c9faf20747903c8a2411c32ad3434397b0c353055154a1d106daa",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz",
+      "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz",
+      "sha256": "f9be915f3a4bfb3c6e7648e9c6b32b0da8e551f9f639ad22552d3c0db9111fd8",
+      "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz",
       "distribution": "source"
     },
     {
-      "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch",
-      "sha256": "8cb6755bd04a52f3efcb655fcd9472de49a1c0a01f1753b2bc6fc6c0aa411407",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch",
+      "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch",
+      "sha256": "67e9895b496ac9cb46acad2a2174c2893fe9bbef02f69c63f191e677b2a20cae",
+      "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch",
       "distribution": "source"
     },
     {
-      "archivePath": "LICENSES/dependencies/mediabunny-1.61.3.txt",
+      "archivePath": "LICENSES/dependencies/mediabunny-1.61.6.txt",
       "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
-      "source": "LICENSES/dependencies/mediabunny-1.61.3.txt"
+      "source": "LICENSES/dependencies/mediabunny-1.61.6.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/pako-1.0.11.txt",
@@ -180,14 +180,14 @@
       "source": "LICENSES/dependencies/process-nextick-args-2.0.1.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/react-19.3.0.txt",
+      "archivePath": "LICENSES/dependencies/react-19.3.1.txt",
       "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
-      "source": "LICENSES/dependencies/react-19.3.0.txt"
+      "source": "LICENSES/dependencies/react-19.3.1.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/react-dom-19.3.0.txt",
+      "archivePath": "LICENSES/dependencies/react-dom-19.3.1.txt",
       "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
-      "source": "LICENSES/dependencies/react-dom-19.3.0.txt"
+      "source": "LICENSES/dependencies/react-dom-19.3.1.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/readable-stream-2.3.8.txt",
@@ -225,9 +225,9 @@
       "source": "LICENSES/dependencies/util-deprecate-1.0.2.txt"
     },
     {
-      "archivePath": "LICENSES/dependencies/zod-4.6.6.txt",
+      "archivePath": "LICENSES/dependencies/zod-4.6.7.txt",
       "sha256": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8",
-      "source": "LICENSES/dependencies/zod-4.6.6.txt"
+      "source": "LICENSES/dependencies/zod-4.6.7.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/zustand-5.0.15.txt",
@@ -251,12 +251,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "57cc9e579054c57446f863eec0bdca7659ed444d38c1916a43a0be6a7356721c",
+      "sha256": "bd8cc40ce59be43fa0f958c8916e578543547804ca4f26d8f9c9a97dc33a5293",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "0b1236f15c2f472c72cac2d9799a124f0bad97b03e44ef434951a68695b3e707",
+      "sha256": "bdf5787ad56c97f7631602bb437720ea96cc4bb2b1af28f105d8ab45a23bfa1b",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],
@@ -349,7 +349,7 @@
     "reviewedSelections": [
       {
         "packageName": "dompurify",
-        "version": "3.4.16",
+        "version": "3.4.17",
         "selectedLicense": "Apache-2.0"
       },
       {
@@ -361,7 +361,7 @@
     "modifiedSources": [
       {
         "packageName": "mediabunny",
-        "version": "1.61.3",
+        "version": "1.61.6",
         "owner": "tooling/ci/mediabunny"
       }
     ]

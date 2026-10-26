@@ -121,15 +121,15 @@ export async function requestPopupMediaDevicePermission(
     );
     return requestPopupMediaDevicePermission(config, deviceId);
   }
-  const request = acquirePopupMediaDevicePermission(config, deviceId);
-  pendingMediaPermissionRequests.set(config.permissionName, {
+  const ownedRequest = {
     deviceId: deviceId ?? null,
-    request,
-  });
+    request: acquirePopupMediaDevicePermission(config, deviceId),
+  };
+  pendingMediaPermissionRequests.set(config.permissionName, ownedRequest);
   try {
-    await request;
+    await ownedRequest.request;
   } finally {
-    if (pendingMediaPermissionRequests.get(config.permissionName)?.request === request) {
+    if (pendingMediaPermissionRequests.get(config.permissionName) === ownedRequest) {
       pendingMediaPermissionRequests.delete(config.permissionName);
     }
   }

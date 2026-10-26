@@ -86,27 +86,12 @@
   );
 }
 
-/* Tool guidance stays on the header in either presentation. */
-:is(
-    [data-active-tool-lane='annotation']
-      [data-review-track-muted]:has([data-ui='gallery.videoReview.annotationEffectsLane']),
-    [data-active-tool-lane='source']
-      [data-review-track-muted]:has([data-ui='gallery.videoReview.sourceLane']),
-    [data-active-tool-lane='focus']
-      [data-review-track-muted]:has([data-ui='gallery.videoReview.zoomLane']),
-    [data-active-tool-lane='original'] [data-review-track-muted]:has([data-original-audio-lane])
-  )
-  > [data-ui='gallery.videoReview.trackHeader'],
-[data-active-tool-lane='annotation'] [data-review-header-track='annotationEffects'],
-[data-active-tool-lane='source'] [data-review-header-track='source'],
-[data-active-tool-lane='focus'] [data-review-header-track='zoom'],
-[data-active-tool-lane='original'] [data-review-header-track='originalAudio'] {
-  box-shadow: inset 2px 0 color-mix(in srgb, var(--sniptale-color-accent) 60%, transparent);
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 6%,
-    var(--sniptale-color-surface-panel)
-  );
+/* Track selection belongs to the whole header, independently from its mini actions. */
+[data-ui='gallery.videoReview.trackHeader'][data-review-header-selected='true'] {
+  background-color: var(--sniptale-color-surface-hover);
+}
+[data-review-header-selected='true'] .review-track-select {
+  color: var(--sniptale-color-text-primary);
 }
 
 /* Lane switches share mini-action pitch, independent from inspector parameter switches. */
@@ -152,4 +137,21 @@
 .review-track-reordering,
 .review-track-reordering * {
   cursor: grabbing !important;
+}
+
+.review-track-select {
+  align-self: stretch;
+  border-radius: var(--sniptale-radius-sm);
+  color: var(--sniptale-color-text-secondary);
+}
+.review-track-select:enabled:hover,
+.review-track-select[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+}
+.review-track-select:enabled:hover:not([aria-pressed='true']) {
+  background-color: var(--sniptale-color-surface-hover);
+}
+.review-track-select:focus-visible {
+  outline: 1px solid var(--sniptale-color-border-strong);
+  outline-offset: -1px;
 }

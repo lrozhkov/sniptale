@@ -8,7 +8,11 @@ import {
   registerContentRuntimeCleanup,
   runWhenContentBodyReady,
 } from './lifecycle';
-import { CONTENT_RUNTIME_CLEANUP_KEY } from './markers';
+import {
+  CONTENT_RUNTIME_CLEANUP_KEY,
+  installContentRuntimeReleaseGuard,
+  requestFullContentRuntimeRelease,
+} from './markers';
 
 type ContentRuntimeGlobal = typeof globalThis & {
   [CONTENT_RUNTIME_CLEANUP_KEY]?: () => void;
@@ -102,5 +106,39 @@ describe('content entrypoint body readiness', () => {
         Reflect.deleteProperty(document, 'readyState');
       }
     }
+  });
+});
+
+describe('guarded full runtime handback', () => {
+  it('refuses missing and active guards and releases the canonical cleanup once', async () => {
+    const cleanup = vi.fn();
+    registerContentRuntimeCleanup(cleanup);
+    expect(await requestFullContentRuntimeRelease()).toBe(false);
+    const dispose = installContentRuntimeReleaseGuard(async () => false);
+    expect(await requestFullContentRuntimeRelease()).toBe(false);
+    installContentRuntimeReleaseGuard(async () => true);
+    dispose();
+    expect(await requestFullContentRuntimeRelease()).toBe(true);
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(hasRegisteredContentRuntimeCleanup()).toBe(false);
+    expect(await requestFullContentRuntimeRelease()).toBe(false);
+  });
+  it('does not release a replacement runtime after a delayed accepted decision', async () => {
+    let accept!: (value: boolean) => void;
+    const oldCleanup = vi.fn();
+    const newCleanup = vi.fn();
+    registerContentRuntimeCleanup(oldCleanup);
+    installContentRuntimeReleaseGuard(
+      () =>
+        new Promise((resolve) => {
+          accept = resolve;
+        })
+    );
+    const release = requestFullContentRuntimeRelease();
+    registerContentRuntimeCleanup(newCleanup);
+    accept(true);
+    expect(await release).toBe(false);
+    expect(oldCleanup).not.toHaveBeenCalled();
+    expect(newCleanup).not.toHaveBeenCalled();
   });
 });

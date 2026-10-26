@@ -1,7 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { createRequestCameraAction } from './request-camera';
-import { createRequestFileSchemeAction, createRequestOriginAction } from './request-origin';
+import {
+  createRequestFileSchemeAction,
+  createRequestOriginAction,
+  requestSettingsOriginAccess,
+} from './request-origin';
 import { createRequestWebMediaAction } from './request-web-media';
 import { initialPermissions } from '../../../permissions-lib';
 
@@ -311,5 +315,27 @@ it('preserves a pre-existing file origin when registration fails', async () => {
     'Failed to register granted local-file access.'
   );
 
+  expect(browserPermissionsRemoveMock).not.toHaveBeenCalled();
+});
+
+it('exposes the same all-sites transaction without a Settings UI setter', async () => {
+  requestOriginPermissionsMock.mockResolvedValueOnce(false);
+  await expect(requestSettingsOriginAccess(initialPermissions[0]!)).resolves.toBe(false);
+  expect(runtimeSendMessageMock).not.toHaveBeenCalled();
+  requestOriginPermissionsMock.mockResolvedValueOnce(true);
+  await expect(requestSettingsOriginAccess(initialPermissions[0]!)).resolves.toBe(true);
+  expect(requestOriginPermissionsMock).toHaveBeenCalledWith(['<all_urls>']);
+  expect(runtimeSendMessageMock).toHaveBeenCalledWith({
+    type: 'PAGE_ACCESS',
+    operation: 'register-granted-all-sites',
+  });
+});
+it('preserves a pre-existing all-sites grant if registration fails through the public transaction', async () => {
+  browserPermissionsContainsMock.mockResolvedValue(true);
+  requestOriginPermissionsMock.mockResolvedValue(true);
+  runtimeSendMessageMock.mockResolvedValueOnce({ success: false, error: 'registration failed' });
+  await expect(requestSettingsOriginAccess(initialPermissions[0]!)).rejects.toThrow(
+    'registration failed'
+  );
   expect(browserPermissionsRemoveMock).not.toHaveBeenCalled();
 });

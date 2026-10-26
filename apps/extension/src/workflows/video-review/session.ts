@@ -79,6 +79,7 @@ class VideoReviewSession {
   private state: ReviewSessionState;
   private durable: VideoWorkspaceSnapshot;
   private failedHistory = false;
+  private failedProjectCommand: 'rename' | 'create' | undefined;
   private failedSpeechSave: string | undefined;
   private disposed = false;
   private disposal: Promise<void> | undefined;
@@ -155,6 +156,8 @@ class VideoReviewSession {
       commitDurable: this.commitDurable.bind(this),
       saveBuffered: () =>
         this.enqueue(() => saveExplicitReviewBuffer(this.state, this.persistBuffer.bind(this))),
+      rename: this.rename.bind(this),
+      createProject: this.createProject.bind(this),
       reset: this.reset.bind(this),
       history: this.history.bind(this),
       reload: this.reload.bind(this),
@@ -814,6 +817,88 @@ class VideoReviewSession {
         direction,
       }
     );
+  }
+
+  private resumeProjectStorageFailure() {
+    if (this.failedProjectCommand && this.state.error === 'storage') {
+      this.state = { ...this.state, error: null };
+      this.coordinator.resume();
+      this.emit();
+    }
+  }
+
+  /** Saves every captured field before replacing the source's default project. */
+  private async createProject(commandId: string) {
+    await this.coordinator.flushCaptured();
+    let created: VideoWorkspaceSnapshot | undefined;
+    await this.enqueue(async () => {
+      this.failedProjectCommand = undefined;
+      await saveExplicitReviewBuffer(this.state, this.persistBuffer.bind(this));
+      const current = this.state.snapshot.workspace;
+      const sourceMediaId = current.sourceMediaId ?? current.aggregateId;
+      const archiveId = `${sourceMediaId.split(':', 1)[0]}:quick-project:${commandId}`;
+      try {
+        created = await (
+          this.deps.createVideoWorkspaceProject ??
+          reviewSessionPersistence.createVideoWorkspaceProject
+        )({
+          aggregateId: current.aggregateId,
+          expectedRevision: current.revision,
+          expectedSourceAssetId: current.sourceAssetId,
+          archiveId,
+        });
+        this.failedProjectCommand = undefined;
+      } catch (error) {
+        this.failedProjectCommand = 'create';
+        throw error;
+      }
+      // The opening owner replaces this mounted session after successful publication.
+      return this.state.snapshot;
+    }).catch((error: unknown) => {
+      this.resumeProjectStorageFailure();
+      throw error;
+    });
+    if (!created) throw new VideoWorkspaceError('conflict');
+    return created;
+  }
+
+  /** Metadata uses the same serialized writer and CAS as content, outside Undo history. */
+  private async rename(name: string) {
+    const retry = this.failedProjectCommand === 'rename';
+    await this.coordinator.flushCaptured();
+    return this.enqueue(async () => {
+      this.failedProjectCommand = undefined;
+      await saveExplicitReviewBuffer(this.state, this.persistBuffer.bind(this));
+      const current = this.state.snapshot.workspace;
+      try {
+        if (retry) {
+          const accepted = await this.deps.readVideoWorkspace(current.aggregateId);
+          if (
+            accepted?.workspace.project?.name === name.trim() &&
+            accepted.workspace.sourceAssetId === current.sourceAssetId &&
+            accepted.workspace.createdAt === current.createdAt &&
+            accepted.workspace.revision === current.revision + 1
+          ) {
+            this.failedProjectCommand = undefined;
+            return accepted;
+          }
+        }
+        await (
+          this.deps.renameVideoWorkspaceProject ??
+          reviewSessionPersistence.renameVideoWorkspaceProject
+        )(current.aggregateId, current.revision, name);
+        const saved = await this.deps.readVideoWorkspace(current.aggregateId);
+        if (!saved) throw new VideoWorkspaceError('conflict');
+        this.failedProjectCommand = undefined;
+        return saved;
+      } catch (error) {
+        this.failedProjectCommand = 'rename';
+        throw error;
+      }
+    }).catch((error: unknown) => {
+      this.resumeProjectStorageFailure();
+      throw error;
+    });
   }
 
   private reload() {

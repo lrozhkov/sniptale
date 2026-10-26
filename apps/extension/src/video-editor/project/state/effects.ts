@@ -24,7 +24,10 @@ import { editMotionSpatialSettings } from '../../../features/video/project/motio
 import { editMotionTransitionPhase } from '../../../features/video/project/motion/timing';
 import { editMotionBlurPhase } from '../../../features/video/project/motion/blur';
 import { constrainMotionTiming } from '../../../features/video/project/motion/placement';
-import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
+import {
+  resolveVideoProjectActionOccurrences,
+  type VideoProjectActionOccurrence,
+} from '../../../features/video/project/action-occurrences';
 import {
   resolveVideoProjectActionPresentations,
   getVideoProjectActionPresentation,
@@ -252,17 +255,8 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
           } else return project;
         }
         if (!style && !keyStyle && patch.time !== undefined && occurrence) {
-          const clips = occurrence.playbackRun
-            ? project.clips.filter((clip) => occurrence.playbackRun!.clipIds.includes(clip.id))
-            : [];
-          const start = clips.length ? Math.min(...clips.map((clip) => clip.startTime)) : 0;
-          const end = clips.length
-            ? Math.max(...clips.map((clip) => clip.startTime + clip.duration))
-            : project.duration;
-          const time = Math.max(
-            start,
-            Math.min(Math.max(start, end - 1 / project.fps), patch.time)
-          );
+          const { start, last } = actionPlaybackRunWindow(project, occurrence.playbackRun);
+          const time = Math.max(start, Math.min(last, patch.time));
           presentation = { ...presentation, offset: time - occurrence.time };
         }
         if (presentation?.point)
@@ -333,17 +327,24 @@ function resolveSourceActionOffset(
     (item) => item.occurrence.eventId === event.id && item.occurrence.clipId === clipId
   );
   if (!row) return null;
-  const clips = project.clips.filter((clip) =>
-    row.occurrence.playbackRun?.clipIds.includes(clip.id)
-  );
+  const { start, last } = actionPlaybackRunWindow(project, row.occurrence.playbackRun);
+  const current = Math.max(start, Math.min(last, row.animationStart));
+  const requested = Math.max(start, Math.min(last, time));
+  return Math.max(-2, Math.min(2, offset + requested - current));
+}
+
+function actionPlaybackRunWindow(
+  project: VideoProject,
+  playbackRun: VideoProjectActionOccurrence['playbackRun']
+) {
+  const clips = playbackRun
+    ? project.clips.filter((clip) => playbackRun.clipIds.includes(clip.id))
+    : [];
   const start = clips.length ? Math.min(...clips.map((clip) => clip.startTime)) : 0;
   const end = clips.length
     ? Math.max(...clips.map((clip) => clip.startTime + clip.duration))
     : project.duration;
-  const last = Math.max(start, end - 1 / project.fps);
-  const current = Math.max(start, Math.min(last, row.animationStart));
-  const requested = Math.max(start, Math.min(last, time));
-  return Math.max(-2, Math.min(2, offset + requested - current));
+  return { start, last: Math.max(start, end - 1 / project.fps) };
 }
 
 function createActionDeleter(set: VideoEditorStoreSet) {

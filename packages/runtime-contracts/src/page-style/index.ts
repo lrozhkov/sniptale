@@ -37,12 +37,15 @@ export const PAGE_STYLE_ALLOWED_PROPERTIES = [
   'padding-top',
   'text-align',
   'text-decoration',
+  'translate',
   'width',
 ] as const;
 
 export type PageStyleProperty = (typeof PAGE_STYLE_ALLOWED_PROPERTIES)[number];
 
 export interface PageStyleDeclaration {
+  /** Retains the original cascade priority when a preview is cancelled. */
+  priority?: '' | 'important';
   property: PageStyleProperty;
   value: string | null;
 }

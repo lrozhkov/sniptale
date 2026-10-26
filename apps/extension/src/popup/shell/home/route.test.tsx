@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => ({
   getQuickActions: vi.fn(),
   loadSettings: vi.fn(),
   homePage: vi.fn(),
+  subscribe: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/infrastructure/browser-storage', () => ({
+  browserStorage: { canObserveChanges: () => true, subscribeToChanges: mocks.subscribe },
 }));
 
 vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
@@ -32,15 +37,17 @@ vi.mock('./page-shell', () => ({
   },
 }));
 
+import { ScreenshotsRoute } from './route';
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.subscribe.mockReturnValue(vi.fn());
   mocks.getQuickActions.mockResolvedValue([]);
 });
 
 it('loads screenshot settings and shortcuts while forwarding the fixed screenshot mode', async () => {
   mocks.getQuickActions.mockResolvedValue([{ id: 'shortcut', status: true }]);
   mocks.loadSettings.mockResolvedValue({ viewportPresets: [{ id: 'preset' }] });
-  const { ScreenshotsRoute } = await import('./route');
   const container = document.createElement('div');
   const root = createRoot(container);
 
@@ -71,12 +78,32 @@ it('loads screenshot settings and shortcuts while forwarding the fixed screensho
 
 it('ignores a screenshot override supplied to another route descriptor', async () => {
   mocks.loadSettings.mockResolvedValue({});
-  const { ScreenshotsRoute } = await import('./route');
   const container = document.createElement('div');
   const root = createRoot(container);
 
   act(() => root.render(<ScreenshotsRoute startup={{ page: 'menu' }} />));
 
   expect(mocks.homePage).toHaveBeenCalledWith(expect.objectContaining({ startupMode: null }));
+  act(() => root.unmount());
+});
+
+it('updates popup placement without losing the selected screenshot mode', async () => {
+  mocks.getQuickActions.mockResolvedValue([{ id: 'shortcut', status: true }]);
+  mocks.loadSettings.mockResolvedValue({ pageLaunch: { quickActionsPopup: true } });
+  const root = createRoot(document.createElement('div'));
+  await act(async () =>
+    root.render(<ScreenshotsRoute startup={{ page: 'screenshots', screenshotMode: 'tab' }} />)
+  );
+  expect(mocks.homePage).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      quickActions: [{ id: 'shortcut', status: true }],
+      startupMode: 'tab',
+    })
+  );
+  mocks.loadSettings.mockResolvedValue({ pageLaunch: { quickActionsPopup: false } });
+  await act(async () => mocks.subscribe.mock.calls[0]![0]({ sniptale_settings: {} }, 'sync'));
+  expect(mocks.homePage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ quickActions: [], startupMode: 'tab' })
+  );
   act(() => root.unmount());
 });

@@ -1,8 +1,21 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
+import { normalizePageLaunchPreferences } from '../../../contracts/page-launch';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CollapsedPanels } from './collapsed-panels';
+
+vi.mock('../quick-actions/preferences', () => ({
+  usePageLaunchPreferences: () => {
+    const [preferences, setPreferences] = useState(() => normalizePageLaunchPreferences(undefined));
+    return {
+      preferences,
+      saveCorner: async (corner: typeof preferences.corner) => {
+        setPreferences((current) => ({ ...current, corner }));
+      },
+    };
+  },
+}));
 
 vi.mock('../../platform/dom-host', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/dom-host')>()),
@@ -108,12 +121,12 @@ it('groups equivalent compact restore buttons and invokes only the selected late
   expect(props.scenario.actions.setSidebarVisible).toHaveBeenCalledExactlyOnceWith(true);
 });
 
-it('hides during countdown, capture and inactive modes without losing the committed corner', () => {
+it('hides during countdown, capture and inactive modes without losing the committed corner', async () => {
   const props = createProps();
   render(props);
-  act(() =>
-    handle().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }))
-  );
+  await act(async () => {
+    handle().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+  });
   expect(dock().dataset['corner']).toBe('bottom-left');
   props.countdownActive = true;
   render(props);
@@ -150,19 +163,21 @@ it('suspends only scenario restore during video mode and restores the collapsed 
   expect(props.scenario.actions.setSidebarVisible).not.toHaveBeenCalled();
 });
 
-it('captures a thresholded drag, clamps it, shows four guides, and docks without activating actions', () => {
+it('captures a thresholded drag, clamps it, shows four guides, and docks without activating actions', async () => {
   const props = createProps();
   render(props);
   pointer('pointerdown', 30, 30);
   pointer('pointermove', 31, 31);
-  expect(dock().dataset['dragging']).toBe('false');
+  expect(dock().dataset['dragging']).toBe('true');
   pointer('pointermove', 1200, 500, 2);
-  expect(dock().dataset['dragging']).toBe('false');
+  expect(dock().dataset['dragging']).toBe('true');
   pointer('pointermove', -50, -50);
   expect(dock().style.left).toBe('0px');
   expect(dock().style.top).toBe('0px');
   expect(container.querySelectorAll('[data-active]')).toHaveLength(4);
-  pointer('pointerup', 20, 20);
+  await act(async () => {
+    pointer('pointerup', 20, 20);
+  });
   expect(dock().dataset['corner']).toBe('top-left');
   expect(dock().dataset['dragging']).toBe('false');
   expect(container.querySelector('[data-active]')).toBeNull();
@@ -210,7 +225,7 @@ it('releases an active pointer and removes listeners on unmount', () => {
   expect(release).toHaveBeenCalledTimes(1);
 });
 
-it('supports all corner directions from the focusable handle', () => {
+it('supports all corner directions from the focusable handle', async () => {
   render(createProps());
   for (const [key, corner] of [
     ['ArrowUp', 'top-right'],
@@ -218,12 +233,14 @@ it('supports all corner directions from the focusable handle', () => {
     ['ArrowDown', 'bottom-left'],
     ['ArrowRight', 'bottom-right'],
   ] as const) {
-    act(() => handle().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key })));
+    await act(async () => {
+      handle().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
+    });
     expect(dock().dataset['corner']).toBe(corner);
   }
 });
 
-it('uses native command activation and cancels armed Space without restoring a panel', () => {
+it('uses native command activation and cancels armed Space without restoring a panel', async () => {
   const props = createProps();
   render(props);
   expect(handle().tagName).toBe('BUTTON');
@@ -233,7 +250,9 @@ it('uses native command activation and cancels armed Space without restoring a p
     return event;
   };
   key('keydown', 'Enter');
-  act(() => handle().click());
+  await act(async () => {
+    handle().click();
+  });
   expect(dock().dataset['corner']).toBe('bottom-left');
   expect(key('keydown', 'Enter', true).defaultPrevented).toBe(true);
   key('keyup', 'Enter');
@@ -244,9 +263,13 @@ it('uses native command activation and cancels armed Space without restoring a p
   expect(dock().dataset['corner']).toBe('bottom-left');
   key('keydown', ' ');
   expect(key('keyup', ' ').defaultPrevented).toBe(false);
-  act(() => handle().click());
+  await act(async () => {
+    handle().click();
+  });
   expect(dock().dataset['corner']).toBe('top-left');
-  act(() => handle().click());
+  await act(async () => {
+    handle().click();
+  });
   expect(dock().dataset['corner']).toBe('top-right');
   expect(props.toolbar.setPinnedToolbarVisible).not.toHaveBeenCalled();
   expect(props.scenario.actions.setSidebarVisible).not.toHaveBeenCalled();

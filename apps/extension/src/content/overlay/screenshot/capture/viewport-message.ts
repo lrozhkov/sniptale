@@ -14,15 +14,19 @@ export function createViewportCaptureMessage(
     ? runtime.scenario?.buildCapturePayload?.(type)
     : undefined;
 
+  const transactionId = runtime.quickActionOverlayRef?.current?.transactionId;
+  const transaction = transactionId ? { quickActionTransactionId: transactionId } : {};
   return type === 'full'
     ? {
         type: CaptureMessageType.CAPTURE_FULL,
         actionType,
+        ...transaction,
         ...(scenarioCapture == null ? {} : { scenarioCapture }),
       }
     : {
         type: CaptureMessageType.CAPTURE_VISIBLE,
         actionType,
+        ...transaction,
         ...(scenarioCapture == null ? {} : { scenarioCapture }),
       };
 }

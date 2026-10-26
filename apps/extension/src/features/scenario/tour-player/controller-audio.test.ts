@@ -1,5 +1,5 @@
-import { getTourAnnotations } from '@sniptale/runtime-contracts/scenario/types/tour';
 // @vitest-environment jsdom
+import { getTourAnnotations } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createTourDocument } from '../project/factories';
 import { createTourActionSlide as createTourImageSlide } from './test-support';

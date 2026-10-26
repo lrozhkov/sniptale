@@ -1,3 +1,17 @@
+/** Installs gesture-local Escape cancellation on the gesture's actual document. */
+export function bindTourAuthoringEscape(document, signal, cancel) {
+  document.addEventListener(
+    'keydown',
+    (key) => {
+      if (key.key !== 'Escape') return;
+      key.preventDefault();
+      key.stopPropagation();
+      cancel();
+    },
+    { capture: true, signal }
+  );
+}
+
 /** A point gesture previews in source coordinates and commits once; cancellation restores the node. */
 export function bindTourObjectDrag(node, object, box, callbacks, lifetime) {
   node.dataset.tourObjectId = object.id;
@@ -56,16 +70,7 @@ export function bindTourObjectDrag(node, object, box, callbacks, lifetime) {
     );
     node.addEventListener('pointercancel', cancel, { signal: gesture.signal });
     node.addEventListener('lostpointercapture', cancel, { signal: gesture.signal });
-    document.addEventListener(
-      'keydown',
-      (key) => {
-        if (key.key !== 'Escape') return;
-        key.preventDefault();
-        key.stopPropagation();
-        cancel();
-      },
-      { capture: true, signal: gesture.signal }
-    );
+    bindTourAuthoringEscape(document, gesture.signal, cancel);
     lifetime.addEventListener('abort', cancel, { once: true });
     node.setPointerCapture?.(pointerId);
   });
@@ -123,16 +128,7 @@ export function bindTourImagePlacement(node, plane, slide, box, callbacks, lifet
     node.ownerDocument.defaultView?.addEventListener('blur', cancel, { signal: gesture.signal });
     node.addEventListener('pointercancel', cancel, { signal: gesture.signal });
     node.addEventListener('lostpointercapture', cancel, { signal: gesture.signal });
-    node.ownerDocument.addEventListener(
-      'keydown',
-      (key) => {
-        if (key.key !== 'Escape') return;
-        key.preventDefault();
-        key.stopPropagation();
-        cancel();
-      },
-      { capture: true, signal: gesture.signal }
-    );
+    bindTourAuthoringEscape(node.ownerDocument, gesture.signal, cancel);
     lifetime.addEventListener('abort', cancel, { once: true });
     node.setPointerCapture?.(pointerId);
   });

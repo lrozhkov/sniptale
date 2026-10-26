@@ -19,6 +19,10 @@ import { installContentRuntimeMessagingMock } from '../../application/runtime-se
 import { setScreenshotSurfaceBinding } from '../viewport-selector/capability';
 
 const sendRuntimeMessageMock = vi.fn();
+const releaseRuntimeMock = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../../runtime/entrypoint/markers', () => ({
+  requestFullContentRuntimeRelease: releaseRuntimeMock,
+}));
 
 vi.mock('../../selection/locker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../selection/locker')>()),
@@ -495,6 +499,7 @@ describe('screenshot-controller-mode', () => {
 
     await closeQuickActionCapture(params, runtime, 1);
 
+    expect(releaseRuntimeMock).not.toHaveBeenCalled();
     expect(params.setScreenshotMode).not.toHaveBeenCalledWith(false);
     expect(params.setIsToolbarVisible).toHaveBeenCalledWith(true);
     expect(params.setCaptureAction).toHaveBeenCalledWith('edit');
@@ -546,4 +551,29 @@ describe('screenshot-controller-mode', () => {
     expectQuickActionCloseRestoresPreLockedBaseline
   );
   it('ignores stale quick-action close attempts', expectStaleQuickActionCloseDoesNotRestoreLock);
+});
+
+it('releases an idle quick-action runtime only after accepted native capture cleanup', async () => {
+  const params = createScreenshotParams();
+  const runtime = createScreenshotRuntime();
+  let accept!: () => void;
+  sendRuntimeMessageMock.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        accept = resolve;
+      })
+  );
+  const closing = closeQuickActionCapture(params, runtime);
+  expect(releaseRuntimeMock).not.toHaveBeenCalled();
+  expect(params.quickActionOverlayRef.current).toBeNull();
+  accept();
+  await closing;
+  expect(releaseRuntimeMock).toHaveBeenCalledOnce();
+});
+it('preserves the full runtime when native quick-action cleanup fails', async () => {
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'restore refused' });
+  await expect(
+    closeQuickActionCapture(createScreenshotParams(), createScreenshotRuntime())
+  ).rejects.toThrow('restore refused');
+  expect(releaseRuntimeMock).not.toHaveBeenCalled();
 });

@@ -536,3 +536,50 @@ it('filters unrelated image notifications and normalizes malformed image fields'
   );
   expect(listener).toHaveBeenCalledExactlyOnceWith({ imageFormat: 'png', imageQuality: 100 });
 });
+
+it('serializes page layout choices across independent module writers', async () => {
+  let persisted: Record<string, unknown> = {
+    contentToolbar: { compactMenus: true, recordingControls: { camera: false } },
+  };
+  const entered = controlledGate();
+  const releaseWrite = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      entered.release();
+      await releaseWrite.promise;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const firstPage = await import('./index');
+  vi.resetModules();
+  const secondPage = await import('./index');
+  const first = firstPage.patchSettings({
+    contentToolbar: { pageLayouts: { drawing: ['drawing-pencil', 'mode', 'separator:custom'] } },
+  });
+  await entered.promise;
+  const second = secondPage.patchSettings({
+    contentToolbar: {
+      pageLayouts: { highlighter: ['auto-blur', 'mode'] },
+      pageControls: { 'capture-full': false },
+    },
+  });
+  releaseWrite.release();
+  await Promise.all([first, second]);
+  expect((await secondPage.loadSettings()).contentToolbar).toMatchObject({
+    compactMenus: true,
+    recordingControls: { camera: false },
+    pageControls: { 'capture-full': false },
+    pageLayouts: {
+      drawing: ['drawing-pencil', 'mode', 'separator:custom'],
+      highlighter: ['auto-blur', 'mode'],
+    },
+  });
+  await firstPage.patchSettings({
+    contentToolbar: { pageLayouts: { drawing: ['mode', 'drawing-pencil'] } },
+  });
+  expect((await secondPage.loadSettings()).contentToolbar?.pageLayouts).toEqual({
+    drawing: ['mode', 'drawing-pencil'],
+    highlighter: ['auto-blur', 'mode'],
+  });
+});

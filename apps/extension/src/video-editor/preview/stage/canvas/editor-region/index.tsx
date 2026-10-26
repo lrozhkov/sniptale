@@ -18,7 +18,7 @@ import {
   resizeEditorRegion,
   type EditorRegionModel,
 } from './model';
-import { beginEditorRegionGesture } from './gesture';
+import { beginEditorRegionGesture, canvasArrowDelta } from './gesture';
 
 type Props = Pick<
   PreviewStageCanvasProps,
@@ -144,17 +144,11 @@ function EditorRegionFrame(
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => begin(event, handle)}
       onKeyDown={(event) => {
-        const delta = {
-          ArrowLeft: [-1, 0],
-          ArrowRight: [1, 0],
-          ArrowUp: [0, -1],
-          ArrowDown: [0, 1],
-        }[event.key];
+        const delta = canvasArrowDelta(event);
         if (!delta) return;
         event.preventDefault();
         event.stopPropagation();
-        const step = event.shiftKey ? 10 : 1;
-        commit(resizeEditorRegion(model, handle, delta[0]! * step, delta[1]! * step));
+        commit(resizeEditorRegion(model, handle, delta.x, delta.y));
       }}
     />
   ));
@@ -181,17 +175,11 @@ function EditorRegionFrame(
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => begin(event, 'move')}
           onKeyDown={(event) => {
-            const delta = {
-              ArrowLeft: [-1, 0],
-              ArrowRight: [1, 0],
-              ArrowUp: [0, -1],
-              ArrowDown: [0, 1],
-            }[event.key];
+            const delta = canvasArrowDelta(event);
             if (!delta) return;
             event.preventDefault();
             event.stopPropagation();
-            const step = event.shiftKey ? 10 : 1;
-            commit(resizeEditorRegion(model, 'move', delta[0]! * step, delta[1]! * step));
+            commit(resizeEditorRegion(model, 'move', delta.x, delta.y));
           }}
         />
         {projected ? null : handles}

@@ -1,7 +1,10 @@
+// @vitest-environment jsdom
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createDrawingSession } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
-import { createDrawingModeController } from './mode';
+import { createDrawingModeController, useDrawingModeIntegration } from './mode';
 
 function createHarness(activationAllowed: boolean) {
   const session = createDrawingSession({ onDocumentCommit: () => true });
@@ -55,6 +58,50 @@ it('fails drawing activation closed when page scroll ownership is ambiguous', ()
   expect(harness.onUnavailable).toHaveBeenCalledTimes(1);
   expect(harness.setDrawingMode).not.toHaveBeenCalled();
   expect(harness.base.handleEnableCursorMode).not.toHaveBeenCalled();
+});
+
+it('retains stable injected mode registration and finalizes drawing before disabling its mode', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const harness = createHarness(true);
+  const registerMode = vi.fn<(mode: 'drawing', disable: () => void) => void>();
+  const setModeEnabled = vi.fn();
+  const setDrawingMode = vi.fn();
+  const setNavigationLockEnabled = vi.fn();
+  const root = createRoot(document.createElement('div'));
+  function Harness({ enabled }: { enabled: boolean }) {
+    useDrawingModeIntegration({
+      baseModeController: harness.base,
+      controller: harness.controller,
+      modeState: {
+        drawingMode: enabled,
+        screenshotMode: false,
+        setDrawingMode,
+        setNavigationLockEnabled,
+      },
+      registerMode,
+      setModeEnabled,
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(createElement(Harness, { enabled: true })));
+    const disable = registerMode.mock.calls[0]![1];
+    act(() => root.render(createElement(Harness, { enabled: true })));
+    expect(registerMode).toHaveBeenCalledExactlyOnceWith('drawing', disable);
+    expect(setModeEnabled).toHaveBeenCalledExactlyOnceWith('drawing', true);
+    act(() => disable());
+    expect(harness.controller.finalizeInteraction).toHaveBeenCalledOnce();
+    expect(setDrawingMode).toHaveBeenCalledWith(false);
+    expect(setNavigationLockEnabled).toHaveBeenCalledWith(false);
+    expect(
+      vi.mocked(harness.controller.finalizeInteraction).mock.invocationCallOrder[0]
+    ).toBeLessThan(setDrawingMode.mock.invocationCallOrder[0]!);
+    act(() => root.render(createElement(Harness, { enabled: false })));
+    expect(setModeEnabled).toHaveBeenLastCalledWith('drawing', false);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
 });
 
 it('does not enable drawing when sibling-mode cleanup fails', () => {

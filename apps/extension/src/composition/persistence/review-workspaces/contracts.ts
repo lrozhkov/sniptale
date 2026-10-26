@@ -25,6 +25,8 @@ export interface VideoWorkspaceProject {
 /** Durable review history for one library media identity; the document is derived by replay. */
 export interface VideoWorkspace {
   aggregateId: string;
+  /** Archived projects retain their source independently of their workspace identity. */
+  sourceMediaId?: string;
   formatVersion: 1 | 2 | 3 | 4;
   /** Formats 3 and 4 require permanent project metadata. Formats 1 and 2 are legacy. */
   project?: VideoWorkspaceProject;

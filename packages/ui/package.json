@@ -142,12 +142,12 @@
   "dependencies": {
     "@sniptale/foundation": "0.5.1",
     "@sniptale/runtime-contracts": "0.5.1",
-    "lucide-react": "^1.52.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "lucide-react": "^1.59.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/ui/src",

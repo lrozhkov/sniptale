@@ -264,8 +264,8 @@ export function PreviewPanel(props: PreviewPanelProps) {
   const initialReview =
     !props.trashMode &&
     props.initialMode === 'edit' &&
-    isGalleryMediaItem(item) &&
-    item.mimeType.startsWith('video/');
+    ((isGalleryMediaItem(item) && item.mimeType.startsWith('video/')) ||
+      (item.type === 'quick-edit-project' && !item.unavailableReason));
   const [reviewState, setReviewState] = useState(() => ({
     itemId: item.id,
     active: initialReview,
@@ -291,7 +291,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
   if (review && !props.trashMode)
     return (
       <VideoReview
-        aggregateId={item.id}
+        aggregateId={item.type === 'quick-edit-project' ? item.entityId : item.id}
         onClose={onClose}
         onBack={() => {
           setReviewState({ itemId: item.id, active: false });

@@ -283,3 +283,41 @@ it('clamps marker movement between neighbours, retaining identity, crop and tran
   expect(moveQuickEditWebcamPosition(value, '1', NaN, 12)).toBe(value);
   expect(value.positions[1]!.time).toBe(4);
 });
+
+it.each(['shrink', 'shift', 'overlay'] as const)(
+  'retains %s behavior only in schema 24, including positions',
+  (screenBehavior) => {
+    const webcam: ReturnType<typeof camera> = { ...camera(), split: 'left', screenBehavior };
+    const state = { ...createQuickEditAdvancedState(), webcam };
+    expect(loadQuickEditAdvancedState(state)?.webcam).toEqual(webcam);
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 23 })).toBeNull();
+    expect(parseQuickEditWebcam({ ...webcam, screenBehavior: 'unknown' })).toBeNull();
+    const position = {
+      id: 'position',
+      time: 1,
+      placement: webcam.placement,
+      split: 'right' as const,
+      screenBehavior,
+      transition: { type: 'none' as const, duration: 0 },
+    };
+    delete webcam.screenBehavior;
+    const positioned = { ...state, webcam: { ...webcam, positions: [position] } };
+    expect(loadQuickEditAdvancedState(positioned)?.webcam?.positions[0]).toEqual(position);
+    expect(loadQuickEditAdvancedState({ ...positioned, schemaVersion: 23 })).toBeNull();
+    expect(
+      parseQuickEditWebcam({ ...webcam, positions: [{ ...position, screenBehavior: null }] })
+    ).toBeNull();
+  }
+);
+
+it.each(['classic', 'angle', 'center', 'nearest-edge'] as const)(
+  'retains %s shadow direction only in schema 25',
+  (mode) => {
+    const webcam = { ...camera(), shadowDirection: { mode, angle: 225 } };
+    const state = { ...createQuickEditAdvancedState(), webcam };
+    expect(loadQuickEditAdvancedState(state)?.webcam).toEqual(webcam);
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 24 })).toBeNull();
+    for (const direction of [null, { mode, angle: 360 }, { mode, angle: NaN }])
+      expect(parseQuickEditWebcam({ ...webcam, shadowDirection: direction })).toBeNull();
+  }
+);

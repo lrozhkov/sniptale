@@ -1,3 +1,4 @@
+import { pageRecoveryService } from '../../page-recovery/service';
 import type { AudioJobService } from '../../ai/audio/service';
 import type { LocalDataErasureMessage } from '../../../contracts/messaging/privacy-erasure';
 import { createPrivacyErasureStorageCleanupAdapter } from '../../../composition/persistence/privacy-erasure/cleanup';
@@ -81,6 +82,7 @@ const privacyErasureUseCase = new PrivacyErasureUseCase({
     cancelActiveJob: requestActivePagePackageJobCancellationForPrivacyErasure,
     reserveErasureExclusion: reservePopupExportErasureExclusion,
   },
+  pageRecovery: pageRecoveryService,
   runtime: backgroundRuntimeCleanupAdapter,
   storage: createPrivacyErasureStorageCleanupAdapter(extensionPageLocalStorageErasureAdapter),
 });

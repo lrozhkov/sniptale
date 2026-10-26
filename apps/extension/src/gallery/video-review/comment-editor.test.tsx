@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
 import { act, type ReactNode } from 'react';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot, type Root } from 'react-dom/client';
@@ -28,7 +29,11 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await act(async () => root.unmount());
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
+  expect(document.querySelectorAll('[data-ui="shared.toast.host"]')).toHaveLength(0);
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -68,7 +73,7 @@ it('commits text after the debounce and switches the zoom behavior once', async 
   });
   const editor = host.querySelector('[data-ui="gallery.videoReview.canvasCommentEditor"]')!;
   const area = editor!.querySelector('textarea')!;
-  typeValue(area, 'Hello there');
+  await act(async () => typeValue(area, 'Hello there'));
   await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
   expect(onPatch).toHaveBeenCalledWith({ text: 'Hello there' });
 
@@ -161,10 +166,10 @@ it('keeps the typed draft when the acknowledged text arrives and commits it late
     });
   render('Hello');
   const area = host.querySelector('textarea') as HTMLTextAreaElement;
-  typeValue(area, 'A');
+  await act(async () => typeValue(area, 'A'));
   await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
   expect(onPatch).toHaveBeenCalledWith({ text: 'A' });
-  typeValue(area, 'AB');
+  await act(async () => typeValue(area, 'AB'));
   render('A');
   expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('AB');
   await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
@@ -187,8 +192,11 @@ it('commits pending text when the editor unmounts', async () => {
       />
     );
   });
-  typeValue(host.querySelector('textarea') as HTMLTextAreaElement, 'Draft');
-  await act(async () => root.unmount());
+  await act(async () => typeValue(host.querySelector('textarea') as HTMLTextAreaElement, 'Draft'));
+  await act(async () => {
+    root.unmount();
+    hideAllToasts();
+  });
   expect(onPatch).toHaveBeenCalledWith({ text: 'Draft' });
 });
 

@@ -1,3 +1,4 @@
+import { PageQuickActionsMenu } from '../quick-actions/menu';
 import { useEffect, useId, useState } from 'react';
 import { FileStack, GripVertical, PanelLeft } from 'lucide-react';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
@@ -137,6 +138,9 @@ export function CollapsedPanels(props: CollapsedPanelsProps) {
           >
             <PanelLeft aria-hidden="true" size={16} />
           </ContentToolbarButton>
+        ) : null}
+        {showToolbar && drag.preferences.quickActionsCorner ? (
+          <PageQuickActionsMenu compact />
         ) : null}
         {showScenario ? (
           <ContentToolbarButton

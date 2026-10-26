@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 import { anchorReviewVoiceoverAtSource } from '../../../features/video/review/voiceover-edits';
 import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';

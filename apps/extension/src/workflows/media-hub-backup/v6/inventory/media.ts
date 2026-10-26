@@ -1,7 +1,10 @@
+import { readVideoWorkspace } from '../../../../composition/persistence/review-workspaces/store';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence/review-workspaces/contracts';
 import { projectRecordingMetadataPrivacy } from '../privacy';
 import {
   readVideoReviewForBackup,
+  remapVideoReviewRecordingSource,
   type VideoReviewBackupDatabase,
 } from '../../../../composition/persistence/review-workspaces/backup-restore';
 import {
@@ -443,14 +446,18 @@ function buildRootSummary(args: {
 
 async function buildMediaRoot(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
+  sourceMediaId?: string;
   db: MediaInventoryDatabase;
   item: MediaLibraryItem;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
   rootIndex: number;
 }): Promise<MediaHubBackupRootInventoryItem> {
-  const entry = parseMediaLibraryEntry(await args.db.get(MEDIA_LIBRARY_STORE, args.item.id));
-  if (!entry) throw new Error(`Media backup row is invalid: ${args.item.id}.`);
+  const sourceEntry = parseMediaLibraryEntry(
+    await args.db.get(MEDIA_LIBRARY_STORE, args.sourceMediaId ?? args.item.id)
+  );
+  if (!sourceEntry) throw new Error(`Media backup row is invalid: ${args.item.id}.`);
+  const entry = { ...sourceEntry, id: args.item.id };
   const collector = createMediaObjectCollector(args.rootIndex, args.paths);
   const source = await buildMediaSource({
     collector,
@@ -507,6 +514,31 @@ async function buildMediaRoot(args: {
     ...(source.webSnapshot ? { webSnapshot: source.webSnapshot } : {}),
     ...(workspace ? { workspace } : {}),
   };
+  if (args.sourceMediaId) {
+    const localId = entry.id.slice(entry.id.indexOf(':') + 1);
+    if (metadata.entry.source.kind === 'recording' && metadata.recording) {
+      if (metadata.videoReview)
+        metadata.videoReview = remapVideoReviewRecordingSource(
+          metadata.videoReview,
+          metadata.entry.source.recordingId,
+          localId
+        );
+      metadata.entry.source = { kind: 'recording', recordingId: localId };
+      metadata.recording = {
+        ...metadata.recording,
+        entry: { ...metadata.recording.entry, id: localId },
+        ...(metadata.recording.telemetry
+          ? { telemetry: { ...metadata.recording.telemetry, recordingId: localId } }
+          : {}),
+      };
+    } else if (metadata.entry.source.kind === 'project-asset' && metadata.projectAsset) {
+      metadata.entry.source = { kind: 'project-asset', projectAssetId: localId };
+      metadata.projectAsset = { ...metadata.projectAsset, id: localId };
+    } else if (metadata.entry.source.kind === 'project-export' && metadata.projectExport) {
+      metadata.entry.source = { ...metadata.entry.source, exportId: localId };
+      metadata.projectExport = { ...metadata.projectExport, id: localId };
+    }
+  }
   return {
     descriptor: {
       mediaSubtype: 'library-item',
@@ -523,6 +555,7 @@ async function buildMediaRoot(args: {
 
 export async function buildMediaRootInventory(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
+  reviewWorkspaceHeads?: readonly unknown[];
   db: MediaInventoryDatabase;
   items: MediaLibraryItem[];
   coveredProjectMediaIds?: ReadonlySet<string>;
@@ -535,6 +568,42 @@ export async function buildMediaRootInventory(args: {
     .sort((a, b) => a.id.localeCompare(b.id));
   for (const [rootIndex, item] of items.entries()) {
     roots.push(await buildMediaRoot({ ...args, item, rootIndex }));
+  }
+  for (const head of args.reviewWorkspaceHeads ?? []) {
+    if (
+      !isRecord(head) ||
+      typeof head['sourceMediaId'] !== 'string' ||
+      typeof head['aggregateId'] !== 'string'
+    )
+      continue;
+    if (
+      args.options.scope === 'selected' &&
+      !args.options.selected?.mediaAssetIds.includes(head['aggregateId'])
+    )
+      continue;
+    const archived = await readVideoWorkspace(head['aggregateId']);
+    if (!archived) throw new Error('Quick project changed before backup.');
+    const sourceMediaId = archived.workspace.sourceMediaId;
+    const source = args.items.find((item) => item.id === sourceMediaId);
+    if (!source || archived.workspace.project?.lifecycle.trashedAt !== undefined) continue;
+    const item = {
+      ...source,
+      id: archived.workspace.aggregateId,
+      ...(archived.workspace.project ? { lifecycle: archived.workspace.project.lifecycle } : {}),
+    };
+    if (!selected(item, args.options)) continue;
+    roots.push(
+      await buildMediaRoot({
+        ...args,
+        item,
+        ...(sourceMediaId ? { sourceMediaId } : {}),
+        expectedReview:
+          args.expectedReview?.workspace.aggregateId === archived.workspace.aggregateId
+            ? args.expectedReview
+            : archived,
+        rootIndex: roots.length,
+      })
+    );
   }
   return roots;
 }

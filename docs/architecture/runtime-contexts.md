@@ -206,9 +206,15 @@ The Scenario page explicitly saves the source before generation without changing
 
 `background/ai/llm/review-text-job` and its typed `sniptale-gallery-review-text` Port own Gallery AI text editing. They use the existing one-shot LLM capability authority with purpose `review-text`. It does not masquerade as a DOM, scenario or audio operation. Consume the exact top-level Gallery document and disclosed context/destination binding once. Recheck committed workspace text and result-time projection before POST.
 
-A connection owns cancellation before any authorization await. Disconnect/deadline/erasure stop the same one-shot flight. Worker interruption never resumes it. Runtime wiring composes audio and text jobs behind the existing erasure holder, reserving both before cancellation and draining both before storage erasure. The existing LLM transport and metadata-only history remain the provider and diagnostic owners.
+A connection owns cancellation before authorization starts. Disconnect, deadline, and erasure cancel the same request. Worker interruption does not resume a request. Runtime wiring reserves the audio, Gallery text, and content text services before erasure cancellation. Erasure waits for their active requests and metadata writes before it removes stored data. The existing LLM transport and metadata history remain the provider and diagnostic owners.
 
 Gallery alone owns the disposable editable proposal and explicit text-only durable Apply through the current review session.
+
+`background/ai/llm/content-text-job` owns the `sniptale-content-text-rewrite` Port for page text replacement. It uses the existing `content-ai-pick` capability and privacy normalization. The capability binds the selected text to the content document. The service checks the approved provider destination before POST. It returns plain text through the existing LLM transport.
+
+Content checks the original target, text, markup, and current frame ancestry before it applies a response. QuickEdit owns the synchronous DOM mutation, annotation evidence, and Undo/Redo history. The response enters `textContent` only. Stop, Close, mode exit, and stale targets preserve the accepted source. Chrome AI uses a cancellable browser session and the same text bounds.
+
+Prompt dictation uses the public content voice session and transcript insertion.
 
 Gallery caption appearance belongs to the authored scene and individual text fragments. `features/video/review/caption-plan` owns disposable cue projection and stable overlap slots. `workflows/video-review/render-captions` uses the existing bundled font and canonical output geometry for manual preview and both final render paths. Text visibility on the timeline is independent from burn-in. Fragment export receives the full edit time map from export lifecycle and samples global main time.
 
@@ -255,3 +261,20 @@ Terminal intent does not prove successful cleanup. Confirmed offscreen completio
 Terminal recovery projects STOPPING with an error. It never restores active recording from terminal evidence. The original trusted popup can retry Stop with its unexpired capability. Terminal authority does not permit pause, resume, settings changes or camera control after grant revocation.
 
 Unknown offscreen state cannot prove successful deletion. Offscreen retains the exact terminal outcome for repeated commands within its lifetime. Missing or failed evidence does not become success through an idle Stop. Terminal evidence remains for the browser session after capability expiry, without extending control authority. Explicit local-data erasure contains failed or unknown terminal state through the existing recovery owner. It verifies offscreen termination, drains side effects, and removes verified surface and lease authority before storage erasure. Ordinary Stop cannot use this erasure recovery.
+
+
+## Quick-action screenshot appearance
+
+The existing per-tab surface transaction retains the accepted appearance and output settings. Native capture and gallery requests carry its transaction identifier. The background checks the native tab and current transaction before preparation and publication. This identifier does not grant capture authority. Desktop capture uses its existing accepted reservation and media permit.
+
+The background composes the completed raster before its existing publication and delivery. The existing offscreen document renders only the bounded window header through `OFFSCREEN_QUICK_ACTION_HEADER`. This command uses the canonical background capability and completion contract. It does not use IndexedDB admission or retain screenshot jobs. Worker composition uses the existing gradient renderer. Selection delivery uses the same transformed bytes that gallery save returns.
+
+A composition failure retains the raw source through the existing temporary media sink and returns an error. Cancellation, a replaced transaction, or media erasure prevents late publication and fallback writes.
+
+### Page launcher and quick-action placement
+
+The content shim reads `pageLaunch` preferences from the existing sync settings key. It does not write defaults on opening. Its native DOM group uses the same corner gesture controller as the collapsed content toolbar. The Settings owner serializes corner writes through the existing settings queue and persistence permit. The background route checks the media erasure generation inside that write.
+
+The shim keeps its mount observer while the full content runtime is present. Initial passive wakeup completes before the launcher appears. The full runtime owns active UI and capture. Status and preset availability reads check page access without loading the full runtime. Explicit Close waits for page restoration, the unpin response, and scenario shutdown responses. The App owner then checks committed UI state before the existing cleanup callback can release the runtime. The callback removes the full host after it disposes listeners. A completed quick action requests the same guarded cleanup. Failed native commands request it after rollback. Active work prevents release.
+
+Quick-action placement has three independent settings: popup, corner group, and page toolbar. A corner menu requires the launcher group or a collapsed toolbar group. Menu commands use the existing trusted content capability flow. The full menu commits dismissal before it sends the capture command. The shim has no React, app persistence, parser, or full content service dependency. Its existing build limits and forbidden-input checks still apply.

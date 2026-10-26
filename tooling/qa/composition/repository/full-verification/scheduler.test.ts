@@ -92,14 +92,21 @@ it('keeps release result order while running the pre-build lanes concurrently', 
     workers: 6,
   });
   expect(scheduledTasks?.find(({ id }) => id === 'typecheck')?.dependencies).toEqual(['lint']);
-  expect(scheduledTasks?.find(({ id }) => id === 'graph')?.dependencies).toEqual([
-    'lint',
-    'typecheck',
-  ]);
+  expect(scheduledTasks?.find(({ id }) => id === 'graph')).toMatchObject({
+    cpuTokens: 1,
+    dependencies: ['lint', 'typecheck'],
+    memoryMiB: 3072,
+  });
+  expect(workerRunner).toHaveBeenCalledWith(
+    expect.objectContaining({ lane: 'graph', memoryMiB: 3072 })
+  );
   expect(scheduledTasks?.find(({ id }) => id === 'light')).toMatchObject({
     dependencies: ['lint', 'typecheck'],
-    memoryMiB: 2048,
+    memoryMiB: 3072,
   });
+  expect(workerRunner).toHaveBeenCalledWith(
+    expect.objectContaining({ lane: 'light', memoryMiB: 3072 })
+  );
   expect(workerRunner).toHaveBeenCalledWith(
     expect.objectContaining({ lane: 'lint', oxlintThreadCount: 6 })
   );

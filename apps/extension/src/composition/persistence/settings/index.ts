@@ -1,3 +1,4 @@
+import { normalizePageLaunchPreferences, type PageCorner } from '../../../contracts/page-launch';
 import { normalizeConfigurableCaptureAction } from '../../../features/quick-actions-presets/policy';
 import {
   createRecommendedContextMenuSettings,
@@ -135,6 +136,16 @@ function cloneContentToolbarSettings(
   return {
     ...settings,
     ...(settings.recordingControls ? { recordingControls: { ...settings.recordingControls } } : {}),
+    ...(settings.pageLayouts
+      ? {
+          pageLayouts: Object.fromEntries(
+            Object.entries(settings.pageLayouts).map(([mode, items]) => [
+              mode,
+              items ? [...items] : null,
+            ])
+          ),
+        }
+      : {}),
     ...(settings.pageControls ? { pageControls: { ...settings.pageControls } } : {}),
     ...(settings.pageControlOverrides
       ? {
@@ -394,9 +405,8 @@ export async function loadSettings(): Promise<NormalizedSettings> {
   return normalizeLoadedSettings(parsedSettings.value);
 }
 
-/** Observe the normalized settings authority, including key removal, across extension pages. */
-export function subscribeToSettingsChanges(
-  listener: (settings: NormalizedSettings) => void
+function subscribeToNormalizedSettingsChange(
+  listener: (previous: NormalizedSettings, next: NormalizedSettings) => void
 ): () => void {
   if (typeof chrome === 'undefined') return () => undefined;
   return browserStorage.subscribeToChanges((changes, areaName) => {
@@ -404,6 +414,15 @@ export function subscribeToSettingsChanges(
     const change = changes[STORAGE_KEY];
     const previous = normalizeLoadedSettings(parseStoredSettings(change?.oldValue).value);
     const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value);
+    listener(previous, next);
+  });
+}
+
+/** Observe the normalized settings authority, including key removal, across extension pages. */
+export function subscribeToSettingsChanges(
+  listener: (settings: NormalizedSettings) => void
+): () => void {
+  return subscribeToNormalizedSettingsChange((previous, next) => {
     if (
       Object.keys(next.localStoragePolicy).every(
         (key) =>
@@ -420,12 +439,7 @@ export function subscribeToSettingsChanges(
 export function subscribeToImagePreferencesChanges(
   listener: (preferences: Pick<NormalizedSettings, 'imageFormat' | 'imageQuality'>) => void
 ): () => void {
-  if (typeof chrome === 'undefined') return () => undefined;
-  return browserStorage.subscribeToChanges((changes, areaName) => {
-    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
-    const change = changes[STORAGE_KEY];
-    const previous = normalizeLoadedSettings(parseStoredSettings(change?.oldValue).value);
-    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value);
+  return subscribeToNormalizedSettingsChange((previous, next) => {
     if (previous.imageFormat === next.imageFormat && previous.imageQuality === next.imageQuality)
       return;
     listener({ imageFormat: next.imageFormat, imageQuality: next.imageQuality });
@@ -436,14 +450,9 @@ export function subscribeToImagePreferencesChanges(
 export function subscribeToVoiceInputPreferencesChanges(
   listener: (preferences: VoiceInputPreferences) => void
 ): () => void {
-  if (typeof chrome === 'undefined') return () => undefined;
-  return browserStorage.subscribeToChanges((changes, areaName) => {
-    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
-    const change = changes[STORAGE_KEY];
-    const previous = normalizeLoadedSettings(
-      parseStoredSettings(change?.oldValue).value
-    ).voiceInput;
-    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value).voiceInput;
+  return subscribeToNormalizedSettingsChange((oldSettings, newSettings) => {
+    const previous = oldSettings.voiceInput;
+    const next = newSettings.voiceInput;
     if (JSON.stringify(previous) === JSON.stringify(next)) return;
     listener(next ?? { ...DEFAULT_VOICE_INPUT_SETTINGS });
   });
@@ -491,18 +500,35 @@ function applySettingsPatch(
   currentSettings: NormalizedSettings,
   settingsPatch: SettingsPatch
 ): NormalizedSettings {
+  const { pageLaunch: pageLaunchPatch, ...otherPatch } = settingsPatch;
   const pageControlOverrides = mergePageControlOverrides(
     currentSettings.contentToolbar?.pageControlOverrides,
     settingsPatch.contentToolbar?.pageControlOverrides
   );
   return normalizeLoadedSettings({
     ...currentSettings,
-    ...settingsPatch,
+    ...otherPatch,
+    ...(currentSettings.pageLaunch || pageLaunchPatch
+      ? {
+          pageLaunch: normalizePageLaunchPreferences({
+            ...currentSettings.pageLaunch,
+            ...pageLaunchPatch,
+          }),
+        }
+      : {}),
     contentToolbar: {
       ...DEFAULT_CONTENT_TOOLBAR_SETTINGS,
       ...currentSettings.contentToolbar,
       ...settingsPatch.contentToolbar,
       ...(pageControlOverrides ? { pageControlOverrides } : {}),
+      ...(currentSettings.contentToolbar?.pageLayouts || settingsPatch.contentToolbar?.pageLayouts
+        ? {
+            pageLayouts: {
+              ...currentSettings.contentToolbar?.pageLayouts,
+              ...settingsPatch.contentToolbar?.pageLayouts,
+            },
+          }
+        : {}),
       ...(currentSettings.contentToolbar?.pageControls || settingsPatch.contentToolbar?.pageControls
         ? {
             pageControls: {
@@ -622,6 +648,23 @@ export async function removeRetiredSynchronizedSettings(): Promise<void> {
       delete nextRaw[retiredField];
       await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw }, permit);
       return loadSettings();
+    })
+  );
+}
+
+/** Commits the shared corner inside the existing settings queue and erasure boundary. */
+export function patchPageLaunchCorner(
+  corner: PageCorner,
+  isCurrent: () => boolean
+): Promise<NormalizedSettings> {
+  return queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      if (!isCurrent()) throw new Error('Page-launch preference request is no longer current');
+      const current = await loadSettings();
+      if (!isCurrent()) throw new Error('Page-launch preference request is no longer current');
+      const next = applySettingsPatch(current, { pageLaunch: { corner } });
+      await writeSettings(next, permit);
+      return next;
     })
   );
 }

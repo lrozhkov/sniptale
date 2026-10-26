@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
 } from '../../features/video/project/scene/focus-appearance';
-// @vitest-environment jsdom
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { ReviewStageFocusControl } from './stage-focus';
 import {

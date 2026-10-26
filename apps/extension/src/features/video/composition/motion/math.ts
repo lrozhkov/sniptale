@@ -45,3 +45,13 @@ export function motionConnectionProgress(region: VideoProjectMotionRegion, progr
     return applyTemporalEasing(progress, easing);
   return cameraTransitionProgress(progress, motionTransitionTypeForEasing(easing));
 }
+
+/** Enumerates an axis-aligned rectangle in clockwise order from its upper-left corner. */
+export function rectCorners(rect: { x: number; y: number; width: number; height: number }) {
+  return [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y + rect.height },
+    { x: rect.x, y: rect.y + rect.height },
+  ];
+}

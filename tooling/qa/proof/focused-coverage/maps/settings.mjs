@@ -45,6 +45,7 @@ export const SETTINGS_OWNER_MAPPINGS = [
     reason:
       'Appearance controls are covered by their direct interaction and disabled-state suites.',
     testFiles: [
+      'apps/extension/src/settings/sections/general/interface-browser/content/controls-card.test.tsx',
       'apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.guard.test.tsx',
       'apps/extension/src/settings/sections/general/interface-browser/content/context-menu-controls.test.tsx',
       'apps/extension/src/settings/sections/general/interface-browser/content/theme-chips.test.tsx',
@@ -98,6 +99,7 @@ export const SETTINGS_OWNER_MAPPINGS = [
       'Quick-action editor and list branches are covered by the real compose and state suites.',
     testFiles: [
       'apps/extension/src/settings/sections/capture/quick-actions/index.compose.test.tsx',
+      'apps/extension/src/settings/sections/capture/quick-actions/editor-appearance.test.tsx',
       'apps/extension/src/settings/sections/capture/quick-actions/index.states.test.tsx',
     ],
   },

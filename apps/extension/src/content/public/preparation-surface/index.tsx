@@ -24,6 +24,7 @@ import {
   type ContentDrawingController,
 } from '../../../content/drawing/controller';
 import { useDrawingModeIntegration } from '../../../content/drawing/mode';
+import { registerContentMode, setContentModeEnabled } from '../../application/mode-session';
 import { useVideoRecordingSurfaceController } from '../../../content/overlay/video-recording/session/controller';
 import {
   disableHighlighterMode,
@@ -253,6 +254,8 @@ function usePreparationControllers(
     baseModeController,
     controller: drawingController,
     modeState,
+    registerMode: registerContentMode,
+    setModeEnabled: setContentModeEnabled,
   });
   const drawingAwareAiController = {
     ...aiController,

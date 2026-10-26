@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { drawVideoProjectSceneEdges } from '../../../features/video/composition/canvas/scene-edges';
 import { createImageClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
-// @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 

@@ -26,6 +26,11 @@ export interface NativeIngestionCleanupPort {
   reserveErasureExclusion(): ErasureExclusion;
 }
 
+interface PageRecoveryCleanupPort {
+  cleanup(): Promise<readonly ErasureParticipantResult[]>;
+  reserveErasureExclusion(): ErasureExclusion;
+}
+
 interface RuntimeCleanupPort {
   cleanup(state: BackgroundRuntimeState): Promise<readonly ErasureParticipantResult[]>;
 }
@@ -45,6 +50,7 @@ export interface PrivacyErasurePorts {
   media: MediaCleanupPort;
   nativeIngestion: NativeIngestionCleanupPort;
   popupExport: PopupExportExclusionPort;
+  pageRecovery: PageRecoveryCleanupPort;
   runtime: RuntimeCleanupPort;
   storage: StorageCleanupPort;
 }

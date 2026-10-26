@@ -71,6 +71,9 @@ for (const variant of [
           exact: true,
         });
       await textCategory().click();
+      await page
+        .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+        .click();
       const panel = page.locator('[data-ui="video-editor.text.panel"]');
       await panel
         .getByRole('button', { name: label('videoEditor.sidebar.newProjectText'), exact: true })
@@ -137,6 +140,9 @@ for (const variant of [
         `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${saved.id}&theme=${variant.theme}`
       );
       await textCategory().click();
+      await page
+        .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+        .click();
       await panel.locator('article > button[aria-expanded]').click();
       await expect(field).toHaveValue('Montage text / Текст');
       await expect(
@@ -175,6 +181,9 @@ for (const variant of [
       await expect.poll(async () => (await savedProject(page))?.duration).toBe(0);
       await page.reload();
       await textCategory().click();
+      await page
+        .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+        .click();
       await expect(followProject).toHaveAttribute('aria-pressed', 'true');
       await followProject.scrollIntoViewIfNeeded();
       await page.screenshot({

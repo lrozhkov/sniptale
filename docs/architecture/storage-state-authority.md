@@ -32,3 +32,12 @@ Serialize the complete read, mutation, and write sequence through the state owne
 Propagate authoritative write failure to the recovery owner. Apply fail-soft behavior only to advisory state with a documented policy. Restore previous visible state after a failed optimistic mutation.
 
 Use `StateManager` only for a domain that needs registered adapters, key revisions, and durable stale-write rejection. Move a domain and remove its previous authority together in the same change. Do not move secrets, temporary capabilities, bounded advisory history, or page-local state into `StateManager` for consistency alone.
+
+
+## Page recovery
+
+The background recovery owner stores one opaque set for each tab with native session proof. Its local key is `sniptale_page_recovery`. The session key `sniptale_page_recovery_claims` binds native tab and document identities to private nonces and producer leases. Content cannot select these native identities or read another tab's set.
+
+The service serializes complete operations. A replacement document or acknowledged discard invalidates the previous lease. Discard deletes the private set before the local Reset or Close action. Failed writes retain the last acknowledged set. Failed deletion retains current page edits and permits another explicit attempt.
+
+Session proof survives a service-worker restart. A complete browser restart deletes that proof. Recovery then refuses every previous set, including the original tab's set. It does not select an owner by URL, tab position, or claim order. Unclaimed bytes retain their original expiry.

@@ -9,6 +9,13 @@ import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import * as quickEdit from '../../selection/quick-edit';
 import { registerDesignReviewCommentDraftFinalizer } from '../design-review/session/comment-draft-finalization';
 import { createProps } from './toolbar.test-support';
+import { createRuntimePortFixture } from '../../../../../../tooling/test/support/chrome-runtime-port';
+import type { PageRecoveryRequest } from '../../../contracts/page-recovery';
+const recoveryTransport = vi.hoisted(() => ({ connect: vi.fn() }));
+vi.mock('@sniptale/platform/browser/runtime', async (original) => ({
+  ...(await original<typeof import('@sniptale/platform/browser/runtime')>()),
+  browserRuntime: { connect: recoveryTransport.connect, getLastError: () => undefined },
+}));
 const { clearAllPagePreparationChangesMock, flushPendingPageStyleHistoryMock, showToastMock } =
   vi.hoisted(() => ({
     clearAllPagePreparationChangesMock: vi.fn(() => true),
@@ -34,6 +41,27 @@ vi.mock('../toolbar/view', () => ({
 }));
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+let recoveryPort: ReturnType<typeof createRuntimePortFixture>;
+let recoveryLease: string;
+let pendingDiscard: Extract<PageRecoveryRequest, { kind: 'discard' }> | null = null;
+
+async function resetAfterAcknowledgement(action: () => void, assertPending: () => void) {
+  await act(async () => action());
+  assertPending();
+  expect(pendingDiscard).toMatchObject({ kind: 'discard', lease: recoveryLease });
+  const message = pendingDiscard!;
+  recoveryLease = crypto.randomUUID();
+  await act(async () => {
+    recoveryPort.onMessage.emit({
+      kind: 'result',
+      requestId: message.requestId,
+      status: 'ready',
+      lease: recoveryLease,
+      available: false,
+    });
+  });
+  pendingDiscard = null;
+}
 async function renderShell(props: ReturnType<typeof createProps>) {
   if (!container) {
     container = document.createElement('div');
@@ -50,6 +78,23 @@ function useContentToolbarShellTestScope() {
     vi.clearAllMocks();
     flushPendingPageStyleHistoryMock.mockReset();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    recoveryPort = createRuntimePortFixture();
+    recoveryLease = crypto.randomUUID();
+    pendingDiscard = null;
+    recoveryTransport.connect.mockReturnValue(recoveryPort.port);
+    recoveryPort.postMessage.mockImplementation((message: PageRecoveryRequest) => {
+      if (message.kind === 'discard') {
+        pendingDiscard = message;
+        return;
+      }
+      recoveryPort.onMessage.emit({
+        kind: 'result',
+        requestId: message.requestId,
+        status: 'ready',
+        lease: recoveryLease,
+        available: false,
+      });
+    });
   });
 
   afterEach(() => {
@@ -108,7 +153,9 @@ async function verifiesPendingDrawingTextEnablesReset() {
     onClearPagePreparation: () => void;
   };
   expect(lastToolbarProps.canClearPagePreparation).toBe(true);
-  lastToolbarProps.onClearPagePreparation();
+  await resetAfterAcknowledgement(lastToolbarProps.onClearPagePreparation, () => {
+    expect(clearAllPagePreparationChangesMock).not.toHaveBeenCalled();
+  });
   expect(clearAllPagePreparationChangesMock).toHaveBeenCalledOnce();
 }
 
@@ -135,7 +182,9 @@ async function verifiesPendingDesignReviewCommentEnablesReset() {
       onClearPagePreparation: () => void;
     };
     expect(lastToolbarProps.canClearPagePreparation).toBe(true);
-    lastToolbarProps.onClearPagePreparation();
+    await resetAfterAcknowledgement(lastToolbarProps.onClearPagePreparation, () => {
+      expect(clearAllPagePreparationChangesMock).not.toHaveBeenCalled();
+    });
     expect(finalize).toHaveBeenCalledOnce();
     expect(clearAllPagePreparationChangesMock).toHaveBeenCalledOnce();
   } finally {
@@ -229,7 +278,9 @@ describe('Reset availability and toolbar binding', () => {
       await renderShell(props);
       const toolbar = toolbarMock.mock.calls.at(-1)?.[0] as { onClearPagePreparation: () => void };
       expect(toolbarMock.mock.calls.at(-1)?.[0]).toMatchObject({ canClearPagePreparation: true });
-      toolbar.onClearPagePreparation();
+      await resetAfterAcknowledgement(toolbar.onClearPagePreparation, () => {
+        expect(resetScope).not.toHaveBeenCalled();
+      });
       expect(resetScope).toHaveBeenCalledWith(scope);
       expect(clearAllPagePreparationChangesMock).not.toHaveBeenCalled();
     }
@@ -254,7 +305,9 @@ describe('Reset availability and toolbar binding', () => {
     act(() => window.dispatchEvent(new Event('sniptale-document-mode-history-changed')));
     expect(toolbarMock.mock.calls.at(-1)?.[0]).toMatchObject({ canClearPagePreparation: true });
     const toolbar = toolbarMock.mock.calls.at(-1)?.[0] as { onClearPagePreparation: () => void };
-    toolbar.onClearPagePreparation();
+    await resetAfterAcknowledgement(toolbar.onClearPagePreparation, () => {
+      expect(resetScope).not.toHaveBeenCalled();
+    });
     expect(finalize).toHaveBeenCalledOnce();
     expect(resetScope).toHaveBeenCalledWith('content-editing');
     expect(finalize.mock.invocationCallOrder[0]).toBeLessThan(

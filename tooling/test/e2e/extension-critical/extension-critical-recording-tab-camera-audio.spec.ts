@@ -447,7 +447,8 @@ test('TAB popup repeats recording after closing the camera teleprompter companio
       offscreenId,
       `(() => {
       const probe = globalThis.__tabCameraSensors;
-      return { tab: probe.tabRequests, camera: probe.cameraRequests, microphone: probe.microphoneRequests, audioErrors: probe.audioErrors };
+      return { tab: probe.tabRequests, camera: probe.cameraRequests, microphone: ` +
+        `probe.microphoneRequests, audioErrors: probe.audioErrors };
     })()`
     );
     startupProof.push({ sensors });
@@ -466,162 +467,167 @@ test('TAB popup repeats recording after closing the camera teleprompter companio
 });
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
-  test(`TAB toolbar records controlled camera and microphone into playable artifacts ${viewport.name}`, async ({}, info) => {
-    test.setTimeout(100_000);
-    const host = await startHostServer();
-    const launched = await launchExtensionBrowser({
-      viewport: viewport.size,
-    });
-    try {
-      const { context, extensionId } = launched;
-      const { page, popup } = await openDesignReview(
-        context,
-        extensionId,
-        host.origin,
-        viewport.size
-      );
-      const contentMessages: string[] = [];
-      page.on('console', (message) => {
-        if (message.type() === 'error' || message.type() === 'warning') {
-          contentMessages.push(message.text());
-        }
+  test(
+    `TAB toolbar records controlled camera and microphone into playable artifacts ` +
+      `${viewport.name}`,
+    async ({}, info) => {
+      test.setTimeout(100_000);
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({
+        viewport: viewport.size,
       });
-      await context.grantPermissions(['camera', 'microphone']);
-      const worker = context.serviceWorkers()[0];
-      if (!worker) throw new Error('Recording background worker is unavailable');
-      expect(
-        await worker.evaluate(async () => ({
-          camera: (await navigator.permissions.query({ name: 'camera' as PermissionName })).state,
-          microphone: (await navigator.permissions.query({ name: 'microphone' as PermissionName }))
-            .state,
-        }))
-      ).toEqual({ camera: 'granted', microphone: 'granted' });
-      await popup.evaluate(
-        async (defaults) => {
-          await chrome.storage.local.set({
-            sniptale_video_settings: {
-              ...defaults,
-              microphoneDeviceId: null,
-              microphoneEnabled: true,
-              webcamDeviceId: null,
-              webcamEnabled: true,
-              webcamPresentation: { ...defaults.webcamPresentation, mode: 'separate-track' },
-              systemAudioEnabled: false,
-              countdownSeconds: 0,
-              warnWithoutMicrophone: false,
-              qualityProfileId: null,
-            },
-            sniptale_video_ui_state: { captureMode: 'TAB', viewportPresetId: null },
-            'sniptale-locale-preference': 'en',
-          });
-        },
-        {
-          ...DEFAULT_VIDEO_SETTINGS,
-          outputProfile: {
-            ...DEFAULT_VIDEO_SETTINGS.outputProfile,
-            resolution: VideoResolutionPreset.SOURCE,
-          },
-        }
-      );
-      await page.bringToFront();
-      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
-      await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
-      for (const kind of ['camera', 'microphone']) {
-        await expect(
-          page.locator(`[data-ui="content.toolbar.video-recording.${kind}.toggle"]`)
-        ).toHaveAttribute('aria-pressed', 'true');
-      }
-      const action = await triggerExtensionAction(context, extensionId, page);
-      await evaluateInTarget(context, action, 'window.close()').catch(() => undefined);
-      await page.bringToFront();
-      const offscreenId = await installRecordingSensors(context);
-      await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
       try {
-        await expect
-          .poll(
-            async () => {
-              const { state } = await readState(popup);
-              return { status: state.status, mode: state.captureMode, error: state.error };
-            },
-            { timeout: 30_000 }
-          )
-          .toEqual({
-            status: VideoRecordingStatus.RECORDING,
-            mode: CaptureMode.TAB,
-            error: null,
-          });
-      } catch (error) {
-        const diagnostics = {
-          state: await readState(popup),
-          content: await page.locator('body').innerText(),
-          toolbar: await page.locator('[data-ui="content.toolbar.root"]').innerText(),
-          toasts: await page.locator('.sniptale-toast').allTextContents(),
-          contentMessages,
-          popup: await popup.locator('body').innerText(),
-        };
-        console.log('TAB_CAMERA_START_FAILURE', JSON.stringify(diagnostics));
-        await info.attach('tab-camera-start-failure', {
-          body: JSON.stringify(diagnostics, null, 2),
-          contentType: 'application/json',
-        });
-        await page.screenshot({
-          path: info.outputPath('tab-camera-start-failure.png'),
-          fullPage: false,
-        });
-        throw error;
-      }
-      await expect
-        .poll(async () => (await readState(popup)).state.duration, {
-          timeout: 30_000,
-        })
-        .toBeGreaterThan(3);
-      expect(
-        await evaluateInTarget(
+        const { context, extensionId } = launched;
+        const { page, popup } = await openDesignReview(
           context,
-          offscreenId,
-          `(() => {
+          extensionId,
+          host.origin,
+          viewport.size
+        );
+        const contentMessages: string[] = [];
+        page.on('console', (message) => {
+          if (message.type() === 'error' || message.type() === 'warning') {
+            contentMessages.push(message.text());
+          }
+        });
+        await context.grantPermissions(['camera', 'microphone']);
+        const worker = context.serviceWorkers()[0];
+        if (!worker) throw new Error('Recording background worker is unavailable');
+        expect(
+          await worker.evaluate(async () => ({
+            camera: (await navigator.permissions.query({ name: 'camera' as PermissionName })).state,
+            microphone: (
+              await navigator.permissions.query({ name: 'microphone' as PermissionName })
+            ).state,
+          }))
+        ).toEqual({ camera: 'granted', microphone: 'granted' });
+        await popup.evaluate(
+          async (defaults) => {
+            await chrome.storage.local.set({
+              sniptale_video_settings: {
+                ...defaults,
+                microphoneDeviceId: null,
+                microphoneEnabled: true,
+                webcamDeviceId: null,
+                webcamEnabled: true,
+                webcamPresentation: { ...defaults.webcamPresentation, mode: 'separate-track' },
+                systemAudioEnabled: false,
+                countdownSeconds: 0,
+                warnWithoutMicrophone: false,
+                qualityProfileId: null,
+              },
+              sniptale_video_ui_state: { captureMode: 'TAB', viewportPresetId: null },
+              'sniptale-locale-preference': 'en',
+            });
+          },
+          {
+            ...DEFAULT_VIDEO_SETTINGS,
+            outputProfile: {
+              ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+              resolution: VideoResolutionPreset.SOURCE,
+            },
+          }
+        );
+        await page.bringToFront();
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+        for (const kind of ['camera', 'microphone']) {
+          await expect(
+            page.locator(`[data-ui="content.toolbar.video-recording.${kind}.toggle"]`)
+          ).toHaveAttribute('aria-pressed', 'true');
+        }
+        const action = await triggerExtensionAction(context, extensionId, page);
+        await evaluateInTarget(context, action, 'window.close()').catch(() => undefined);
+        await page.bringToFront();
+        const offscreenId = await installRecordingSensors(context);
+        await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
+        try {
+          await expect
+            .poll(
+              async () => {
+                const { state } = await readState(popup);
+                return { status: state.status, mode: state.captureMode, error: state.error };
+              },
+              { timeout: 30_000 }
+            )
+            .toEqual({
+              status: VideoRecordingStatus.RECORDING,
+              mode: CaptureMode.TAB,
+              error: null,
+            });
+        } catch (error) {
+          const diagnostics = {
+            state: await readState(popup),
+            content: await page.locator('body').innerText(),
+            toolbar: await page.locator('[data-ui="content.toolbar.root"]').innerText(),
+            toasts: await page.locator('.sniptale-toast').allTextContents(),
+            contentMessages,
+            popup: await popup.locator('body').innerText(),
+          };
+          console.log('TAB_CAMERA_START_FAILURE', JSON.stringify(diagnostics));
+          await info.attach('tab-camera-start-failure', {
+            body: JSON.stringify(diagnostics, null, 2),
+            contentType: 'application/json',
+          });
+          await page.screenshot({
+            path: info.outputPath('tab-camera-start-failure.png'),
+            fullPage: false,
+          });
+          throw error;
+        }
+        await expect
+          .poll(async () => (await readState(popup)).state.duration, {
+            timeout: 30_000,
+          })
+          .toBeGreaterThan(3);
+        expect(
+          await evaluateInTarget(
+            context,
+            offscreenId,
+            `(() => {
         const probe = globalThis.__tabCameraSensors;
         return { tab: probe.tabRequests, camera: probe.cameraRequests, microphone: probe.microphoneRequests };
       })()`
-        )
-      ).toMatchObject({ tab: 1, camera: 1, microphone: 1 });
-      expect((await readState(popup)).state.liveMedia).toMatchObject({
-        microphoneEnabled: true,
-        webcamEnabled: true,
-      });
-      await page.screenshot({
-        path: info.outputPath('tab-camera-microphone-recording.png'),
-        fullPage: false,
-      });
-      await page.locator('[data-ui="content.toolbar.video-recording.stop"]').click();
-      await expect
-        .poll(async () => (await readState(popup)).postRecordResult, {
-          timeout: 30_000,
-        })
-        .toBeTruthy();
-      const saved = (await readState(popup)).postRecordResult!;
-      const artifacts = await inspectSavedArtifacts(popup, saved.primaryRecordingId);
-      const artifactProof = info.outputPath('saved-tab-camera-artifacts.json');
-      await writeFile(artifactProof, JSON.stringify(artifacts, null, 2));
-      await info.attach('saved-tab-camera-artifacts', {
-        path: artifactProof,
-        contentType: 'application/json',
-      });
-      expect(artifacts.map((artifact) => artifact.role).sort()).toEqual(['display', 'webcam']);
-      for (const artifact of artifacts) {
-        expect(artifact.size).toBeGreaterThan(0);
-        expect(artifact.width).toBeGreaterThan(0);
-        expect(artifact.height).toBeGreaterThan(0);
-        expect(artifact.playedUntil).toBeGreaterThan(0.1);
+          )
+        ).toMatchObject({ tab: 1, camera: 1, microphone: 1 });
+        expect((await readState(popup)).state.liveMedia).toMatchObject({
+          microphoneEnabled: true,
+          webcamEnabled: true,
+        });
+        await page.screenshot({
+          path: info.outputPath('tab-camera-microphone-recording.png'),
+          fullPage: false,
+        });
+        await page.locator('[data-ui="content.toolbar.video-recording.stop"]').click();
+        await expect
+          .poll(async () => (await readState(popup)).postRecordResult, {
+            timeout: 30_000,
+          })
+          .toBeTruthy();
+        const saved = (await readState(popup)).postRecordResult!;
+        const artifacts = await inspectSavedArtifacts(popup, saved.primaryRecordingId);
+        const artifactProof = info.outputPath('saved-tab-camera-artifacts.json');
+        await writeFile(artifactProof, JSON.stringify(artifacts, null, 2));
+        await info.attach('saved-tab-camera-artifacts', {
+          path: artifactProof,
+          contentType: 'application/json',
+        });
+        expect(artifacts.map((artifact) => artifact.role).sort()).toEqual(['display', 'webcam']);
+        for (const artifact of artifacts) {
+          expect(artifact.size).toBeGreaterThan(0);
+          expect(artifact.width).toBeGreaterThan(0);
+          expect(artifact.height).toBeGreaterThan(0);
+          expect(artifact.playedUntil).toBeGreaterThan(0.1);
+        }
+        const display = artifacts.find((artifact) => artifact.id === saved.primaryRecordingId);
+        expect(display?.audio?.duration).toBeGreaterThan(3);
+        expect(display?.audio?.rms).toBeGreaterThan(0.001);
+        expect((await readState(popup)).state.error).toBeNull();
+      } finally {
+        await closeExtensionBrowser(launched);
+        host.server.closeAllConnections();
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
       }
-      const display = artifacts.find((artifact) => artifact.id === saved.primaryRecordingId);
-      expect(display?.audio?.duration).toBeGreaterThan(3);
-      expect(display?.audio?.rms).toBeGreaterThan(0.001);
-      expect((await readState(popup)).state.error).toBeNull();
-    } finally {
-      await closeExtensionBrowser(launched);
-      host.server.closeAllConnections();
-      await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
-  });
+  );
 }

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../platform/i18n';
-import { registerContentMode, setContentModeEnabled } from '../application/mode-session';
 import type { ContentDrawingController } from './controller';
 
 interface DrawingModeState {
@@ -28,8 +27,10 @@ export function useDrawingModeIntegration(args: {
   baseModeController: DrawingModeController;
   controller: ContentDrawingController;
   modeState: DrawingModeState;
+  registerMode(mode: 'drawing', disable: () => void): void;
+  setModeEnabled(mode: 'drawing', enabled: boolean): void;
 }) {
-  const { baseModeController, controller, modeState } = args;
+  const { baseModeController, controller, modeState, registerMode, setModeEnabled } = args;
   const { drawingMode, screenshotMode, setDrawingMode, setNavigationLockEnabled } = modeState;
   const previousScreenshotModeRef = useRef(screenshotMode);
   const disableDrawing = useCallback(() => {
@@ -38,12 +39,12 @@ export function useDrawingModeIntegration(args: {
   }, [controller, setDrawingMode]);
 
   useEffect(() => {
-    registerContentMode('drawing', () => {
+    registerMode('drawing', () => {
       disableDrawing();
       setNavigationLockEnabled(false);
     });
-    setContentModeEnabled('drawing', drawingMode === true);
-  }, [disableDrawing, drawingMode, setNavigationLockEnabled]);
+    setModeEnabled('drawing', drawingMode === true);
+  }, [disableDrawing, drawingMode, setNavigationLockEnabled, registerMode, setModeEnabled]);
 
   useEffect(() => {
     if (previousScreenshotModeRef.current && !screenshotMode) {
