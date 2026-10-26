@@ -107,7 +107,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047`
 - Repository/source: https://github.com/gpac/mp4box.js.git
 
-### `@zip.js/zip.js` 2.23.0
+### `@zip.js/zip.js` 2.24.0
 
 - Installed path: `node_modules/@zip.js/zip.js`
 - Declared license expression: `BSD-3-Clause`
@@ -115,11 +115,11 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/@zip.js/zip.js/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/@zip.js__zip.js-2.23.0.txt`](LICENSES/dependencies/@zip.js__zip.js-2.23.0.txt)
+- Redistributed license text: [`LICENSES/dependencies/@zip.js__zip.js-2.24.0.txt`](LICENSES/dependencies/@zip.js__zip.js-2.24.0.txt)
 - License text SHA-256: `1b7ebc8d7889ed25491484ab2b102370742ca6c0b26650a0c62cc2269b579b84`
 - Repository/source: https://github.com/gildas-lormeau/zip.js.git
 
-### `@zumer/snapdom` 3.3.3
+### `@zumer/snapdom` 3.3.5
 
 - Installed path: `node_modules/@zumer/snapdom`
 - Declared license expression: `MIT`
@@ -127,7 +127,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/@zumer/snapdom/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/@zumer__snapdom-3.3.3.txt`](LICENSES/dependencies/@zumer__snapdom-3.3.3.txt)
+- Redistributed license text: [`LICENSES/dependencies/@zumer__snapdom-3.3.5.txt`](LICENSES/dependencies/@zumer__snapdom-3.3.5.txt)
 - License text SHA-256: `c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2`
 - Repository/source: https://github.com/zumerlab/snapdom.git
 
@@ -143,7 +143,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710`
 - Repository/source: https://github.com/isaacs/core-util-is
 
-### `dompurify` 3.4.16
+### `dompurify` 3.4.17
 
 - Installed path: `node_modules/dompurify`
 - Declared license expression: `(MPL-2.0 OR Apache-2.0)`
@@ -151,7 +151,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/dompurify/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/dompurify-3.4.16.txt`](LICENSES/dependencies/dompurify-3.4.16.txt)
+- Redistributed license text: [`LICENSES/dependencies/dompurify-3.4.17.txt`](LICENSES/dependencies/dompurify-3.4.17.txt)
 - License text SHA-256: `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`
 - Repository/source: https://github.com/cure53/DOMPurify.git
 
@@ -251,7 +251,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `5c81b0caa98593408b03125efa25efe622341ed87ae55561968828cd887d64a4`
 - Repository/source: https://github.com/calvinmetcalf/lie.git
 
-### `lucide-react` 1.52.0
+### `lucide-react` 1.59.0
 
 - Installed path: `node_modules/lucide-react`
 - Declared license expression: `ISC`
@@ -259,11 +259,11 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/lucide-react/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/lucide-react-1.52.0.txt`](LICENSES/dependencies/lucide-react-1.52.0.txt)
+- Redistributed license text: [`LICENSES/dependencies/lucide-react-1.59.0.txt`](LICENSES/dependencies/lucide-react-1.59.0.txt)
 - License text SHA-256: `b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57`
 - Repository/source: https://github.com/lucide-icons/lucide.git
 
-### `mediabunny` 1.61.3
+### `mediabunny` 1.61.6
 
 - Installed path: `node_modules/mediabunny`
 - Declared license expression: `MPL-2.0`
@@ -271,18 +271,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/mediabunny/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/mediabunny-1.61.3.txt`](LICENSES/dependencies/mediabunny-1.61.3.txt)
+- Redistributed license text: [`LICENSES/dependencies/mediabunny-1.61.6.txt`](LICENSES/dependencies/mediabunny-1.61.6.txt)
 - License text SHA-256: `3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04`
 - Repository/source: https://github.com/Vanilagy/mediabunny.git
-- MPL-2.0 corresponding source: https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz
+- MPL-2.0 corresponding source: https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.6.tgz
 - Modified source archive: [sniptale-dependency-source-0.5.1.zip](https://github.com/lrozhkov/sniptale/releases/download/v0.5.1/sniptale-dependency-source-0.5.1.zip)
 - Files inside that source archive (combine with upstream source above):
-  - `LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz` (SHA-256: c93dd9b7ed6c9faf20747903c8a2411c32ad3434397b0c353055154a1d106daa)
-  - `LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json` (SHA-256: e10e6612cd3999826d6bc89f66e7f0ab542f1039097df87e33dcbf55e131e15d)
-  - `LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch` (SHA-256: 8cb6755bd04a52f3efcb655fcd9472de49a1c0a01f1753b2bc6fc6c0aa411407)
-  - `LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE` (SHA-256: 3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04)
-  - `LICENSES/dependencies/mediabunny-1.61.3-modified/README.md` (SHA-256: c3a87c3784618c36512562995abacccdf5bdc09511e7ff5f87548d72f317341a)
-- Original package integrity: sha512-kUqLKVXQVwHR62GkOJxYosAmXERJbqnXBgJDTtRlxHEYviVkMg/Evhl9XN6kedqS5LP1tV4kFKyzY/V4a4ofow==
+  - `LICENSES/dependencies/mediabunny-1.61.6-modified/patch-payload.json.gz` (SHA-256: f9be915f3a4bfb3c6e7648e9c6b32b0da8e551f9f639ad22552d3c0db9111fd8)
+  - `LICENSES/dependencies/mediabunny-1.61.6-modified/patch-manifest.json` (SHA-256: b5201f8d0985605d3769439cc67a2cac1bbbc942de0e882087062e17af1a44cd)
+  - `LICENSES/dependencies/mediabunny-1.61.6-modified/source.patch` (SHA-256: 67e9895b496ac9cb46acad2a2174c2893fe9bbef02f69c63f191e677b2a20cae)
+  - `LICENSES/dependencies/mediabunny-1.61.6-modified/LICENSE` (SHA-256: 3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04)
+  - `LICENSES/dependencies/mediabunny-1.61.6-modified/README.md` (SHA-256: 35e090bb0019effc70359e2021ebde90705a7db44b615effbeacfbbd90007ded)
+- Original package integrity: sha512-VHEZ53/7jGl4dQ+uOdndsZufFYwEUFWv9UXgvrGun3OapyzoqI9iaPOD7z3xxY/nAttLZBNwswgJzMtGJAquOQ==
 
 ### `pako` 1.0.11
 
@@ -344,7 +344,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `ecdccbcf39024f624ded480c01c0b25458e1eca8f26ecf040933865ce56d9a4f`
 - Repository/source: https://github.com/calvinmetcalf/process-nextick-args.git
 
-### `react` 19.3.0
+### `react` 19.3.1
 
 - Installed path: `node_modules/react`
 - Declared license expression: `MIT`
@@ -352,11 +352,11 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/react/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/react-19.3.0.txt`](LICENSES/dependencies/react-19.3.0.txt)
+- Redistributed license text: [`LICENSES/dependencies/react-19.3.1.txt`](LICENSES/dependencies/react-19.3.1.txt)
 - License text SHA-256: `da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93`
 - Repository/source: https://github.com/react/react.git
 
-### `react-dom` 19.3.0
+### `react-dom` 19.3.1
 
 - Installed path: `node_modules/react-dom`
 - Declared license expression: `MIT`
@@ -364,7 +364,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/react-dom/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/react-dom-19.3.0.txt`](LICENSES/dependencies/react-dom-19.3.0.txt)
+- Redistributed license text: [`LICENSES/dependencies/react-dom-19.3.1.txt`](LICENSES/dependencies/react-dom-19.3.1.txt)
 - License text SHA-256: `da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93`
 - Repository/source: https://github.com/react/react.git
 
@@ -452,7 +452,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7`
 - Repository/source: https://github.com/TooTallNate/util-deprecate.git
 
-### `zod` 4.6.6
+### `zod` 4.6.7
 
 - Installed path: `node_modules/zod`
 - Declared license expression: `MIT`
@@ -460,7 +460,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License source class: `installed-file`
 - License source: `node_modules/zod/LICENSE`
 - License storage: `generated-copy`
-- Redistributed license text: [`LICENSES/dependencies/zod-4.6.6.txt`](LICENSES/dependencies/zod-4.6.6.txt)
+- Redistributed license text: [`LICENSES/dependencies/zod-4.6.7.txt`](LICENSES/dependencies/zod-4.6.7.txt)
 - License text SHA-256: `3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8`
 - Repository/source: https://github.com/colinhacks/zod.git
 

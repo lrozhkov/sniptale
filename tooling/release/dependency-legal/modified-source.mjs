@@ -73,7 +73,7 @@ export async function selectModifiedDependencySource(record, policies = []) {
   if (!policy) return null;
   if (
     record.packageName !== 'mediabunny' ||
-    record.version !== '1.61.3' ||
+    record.version !== '1.61.6' ||
     policy.owner !== OWNER ||
     Object.keys(policy).sort().join(',') !== 'owner,packageName,version'
   ) {

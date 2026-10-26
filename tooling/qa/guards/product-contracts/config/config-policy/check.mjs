@@ -36,7 +36,7 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
 const REQUIRED_NODE_VERSION = '24.21.0';
 const REQUIRED_NODE_ENGINE = '>=24.21.0 <25';
-const REQUIRED_PACKAGE_MANAGER = 'npm@12.2.0';
+const REQUIRED_PACKAGE_MANAGER = 'npm@12.2.1';
 const REQUIRED_NPM_CONFIG = Object.freeze(['loglevel=error', 'min-release-age=7']);
 const REQUIRED_PACKAGE_DEPENDENCY_BASELINES = {
   react: /^\^19\.3\.\d+$/u,
@@ -182,11 +182,11 @@ function collectNpmPolicyViolations(packageJson, npmrcSource, nvmrcSource) {
   }
   if (
     packageJson.devEngines?.packageManager?.name !== 'npm' ||
-    packageJson.devEngines.packageManager.version !== '12.2.0' ||
+    packageJson.devEngines.packageManager.version !== '12.2.1' ||
     packageJson.devEngines.packageManager.onFail !== 'error'
   ) {
     violations.push(
-      createViolation(PACKAGE_JSON_PATH, 'devEngines.packageManager must enforce npm 12.2.0')
+      createViolation(PACKAGE_JSON_PATH, 'devEngines.packageManager must enforce npm 12.2.1')
     );
   }
   return violations;

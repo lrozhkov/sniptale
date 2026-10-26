@@ -88,7 +88,7 @@
  		if (!this.trackDatasInCurrentCluster.has(trackData)) {
 --- a/src/media-source.ts
 +++ b/src/media-source.ts
-@@ -42,6 +42,7 @@
+@@ -43,6 +43,7 @@
  	UnthrottledTimerHandle,
  	wait,
  } from './misc';
@@ -96,7 +96,7 @@
  import { Muxer } from './muxer';
  import { SubtitleParser } from './subtitles';
  import { toAlaw, toUlaw } from './pcm';
-@@ -1901,6 +1902,16 @@
+@@ -1986,6 +1987,16 @@
   * @public
   */
  export class EncodedAudioPacketSource extends AudioSource {
@@ -113,7 +113,7 @@
  	/** Creates a new {@link EncodedAudioPacketSource} whose packets are encoded using `codec`. */
  	constructor(codec: AudioCodec) {
  		super(codec);
-@@ -1927,6 +1938,34 @@
+@@ -2012,6 +2023,34 @@
  		}
  
  		this._ensureValidAdd();
@@ -148,17 +148,29 @@
  		return this._connectedTrack!.output._muxer.addEncodedAudioPacket(this._connectedTrack!, packet, meta);
  	}
  }
-@@ -1974 +2013 @@
+@@ -2056,11 +2095,17 @@
+ 
+ 	constructor(private source: AudioSource, private encodingConfig: AudioEncodingConfig) {}
+ 
 -	async add(audioSample: AudioSample, shouldClose: boolean) {
 +	async add(audioSample: AudioSample, shouldClose: boolean, previous?: Promise<void>) {
-@@ -1977,0 +2017,6 @@
-+
+ 		try {
+ 			this.checkForEncoderError();
+ 			this.source._ensureValidAdd();
+ 
 +			if (previous) {
 +				await previous;
 +				if (this.closed) return;
 +				this.checkForEncoderError();
 +			}
-@@ -2734,0 +2780,22 @@
++
+ 			// Ensure audio parameters remain constant
+ 			if (this.lastNumberOfChannels !== null && this.lastSampleRate !== null) {
+ 				if (
+@@ -2817,6 +2862,28 @@
+ 	/** @internal */
+ 	private _abortController: AbortController | null = null;
+ 	/** @internal */
 +	/** @internal */
 +	private _resumeRequested = false;
 +	/** @internal */
@@ -181,9 +193,27 @@
 +	private _nativeGeneration = 0;
 +	/** @internal */
 +	private _restartNativeCapture: (() => void) | null = null;
-@@ -2789,0 +2857 @@
+ 	private _track: MediaStreamAudioTrack;
+ 	/** @internal */
+ 	private _audioContext: AudioContext | null = null;
+@@ -2872,11 +2939,13 @@
+ 		this._options = options;
+ 		this._encoder = new AudioEncoderWrapper(this, encodingConfig);
+ 		this._track = track;
 +		this._acceptingAudio = true;
-@@ -2794,0 +2863,12 @@
+ 	}
+ 
+ 	/** @internal */
+ 	override async _start() {
+ 		if (!this._errorPromiseAccessed) {
++
+ 			Logging._warn(
+ 				'Make sure not to ignore the `errorPromise` field on MediaStreamAudioTrackSource, so that any internal'
+ 				+ ' errors get bubbled up properly.',
+@@ -2889,16 +2958,28 @@
+ 		let errored = false;
+ 		let lastSampleTimestamp: number | null = null;
+ 		let timestampOffset = 0;
 +		let restarted = false;
 +		const fail = (error: unknown) => {
 +			if (errored || this._forceClosed) return;
@@ -196,19 +226,37 @@
 +		const nativeBufferSize = 128;
 +		// A full native backlog can arrive while one earlier sample awaits encoder or writer progress.
 +		const nativeBurstCapacity = typeof MediaStreamTrackProcessor !== 'undefined' ? nativeBufferSize + 1 : 0;
-@@ -2797 +2877 @@
+ 
+ 		const onAudioSample = (audioSample: AudioSample) => {
 -			if (errored) {
 +			if (errored || !this._acceptingAudio) {
-@@ -2804 +2884 @@
+ 				audioSample.close();
+ 				return;
+ 			}
+ 
+ 			const currentTimestamp = audioSample.timestamp;
+ 
 -			if (this._paused) {
 +			if (this._paused || this._resumeRequested) {
-@@ -2820,0 +2901,5 @@
+ 				const dataSeen = firstAudioDataTimestamp !== null;
+ 				if (dataSeen) {
+ 					if (lastSampleTimestamp !== null && this._options.timestampBase !== 'unix') {
+@@ -2915,6 +2996,11 @@
+ 				return;
+ 			}
+ 
 +			if (restarted && lastSampleTimestamp !== null && this._options.timestampBase !== 'unix') {
 +				timestampOffset -= currentTimestamp - lastSampleTimestamp - audioSample.duration;
 +			}
 +			restarted = false;
 +
-@@ -2845,2 +2930,6 @@
+ 			if (firstAudioDataTimestamp === null) {
+ 				firstAudioDataTimestamp = audioSample.timestamp;
+ 
+@@ -2939,39 +3025,68 @@
+ 
+ 			lastSampleTimestamp = currentTimestamp;
+ 
 -			if (this._encoder.getQueueSize() >= 8) {
 -				// Drop data if the encoder is overloaded
 +			// Native packet quanta vary. Bound retained PCM, not the number of packet objects.
@@ -217,9 +265,13 @@
 +			if ((this._admittedAudioDuration + duration > 1 + 1e-9
 +				&& this._admittedAudio.size >= nativeBurstCapacity)
 +				|| this._admittedAudioBytes + bytes > 4 * 1024 * 1024) {
-@@ -2847,0 +2937 @@
+ 				audioSample.close();
 +				fail(new Error('Live audio buffer exceeded its bounded capacity.'));
-@@ -2853,7 +2943,8 @@
+ 				return;
+ 			}
+ 
+ 			audioSample.setTimestamp(currentTimestamp + timestampOffset);
+ 
 -			void this._encoder.add(audioSample, true)
 -				.catch((error) => {
 -					errored = true;
@@ -235,9 +287,11 @@
 +					if (!this._admittedAudio.delete(audioSample)) return;
 +					this._admittedAudioDuration = Math.max(0, this._admittedAudioDuration - duration);
 +					this._admittedAudioBytes -= bytes;
-@@ -2860,0 +2952 @@
+ 				});
 +			void this._audioDrain.catch(fail);
-@@ -2864,14 +2956,36 @@
+ 		};
+ 
+ 		if (typeof MediaStreamTrackProcessor !== 'undefined') {
 -			// Great, MediaStreamTrackProcessor is supported, this is the preferred way of doing things
 -			const processor = new MediaStreamTrackProcessor({ track: this._track });
 -			const consumer = new WritableStream<AudioData>({
@@ -288,13 +342,25 @@
 +					if (!signal.aborted) fail(error);
 +				}
 +			})();
-@@ -2917,0 +3032 @@
+ 		} else {
+ 			// Let's fall back to an AudioContext approach
+ 
+@@ -3012,21 +3127,37 @@
+ 	 */
+ 	pause() {
+ 		this._paused = true;
 +		this._resumeRequested = false;
-@@ -2921,0 +3037 @@
+ 	}
+ 
+ 	/** Resumes the capture of audio data after being paused. */
+ 	resume() {
 +		if (!this._paused) return;
-@@ -2922,0 +3039 @@
+ 		this._paused = false;
 +		this._restartNativeCapture?.();
-@@ -2926,0 +3044,10 @@
+ 	}
+ 
+ 	/** @internal */
+ 	override async _flushAndClose(forceClose: boolean) {
 +		this._acceptingAudio = false;
 +		this._resumeRequested = false;
 +		this._forceClosed = forceClose;
@@ -305,10 +371,18 @@
 +			this._admittedAudioDuration = 0;
 +			this._admittedAudioBytes = 0;
 +		}
-@@ -2931,0 +3059,3 @@
-+
+ 		try {
+ 			if (this._abortController) {
+ 				this._abortController.abort();
+ 				this._abortController = null;
+ 			}
+ 
 +			await this._nativePump;
 +			if (!forceClose) await this._audioDrain;
++
+ 			if (this._audioContext) {
+ 				assert(this._scriptProcessorNode);
+ 
 --- a/src/output.ts
 +++ b/src/output.ts
 @@ -19,8 +19,8 @@

@@ -7,8 +7,8 @@ import { createRuntimeParityReceipt } from './runtime-parity.mjs';
 
 const PATCHED_DEPENDENCIES = [
   { name: 'brace-expansion', version: '5.0.12', consumer: 'minimatch' },
-  { name: 'undici', version: '6.29.0', consumer: 'node-gyp' },
-  { name: 'ip-address', version: '10.7.3', consumer: 'socks' },
+  { name: 'undici', version: '6.29.1', consumer: 'node-gyp' },
+  { name: 'ip-address', version: '10.7.4', consumer: 'socks' },
   { name: 'postcss-selector-parser', version: '7.1.6', consumer: '@npmcli/query' },
   { name: 'http-cache-semantics', version: '4.3.0', consumer: 'make-fetch-happen' },
 ];

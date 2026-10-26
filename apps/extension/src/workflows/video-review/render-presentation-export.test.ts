@@ -544,3 +544,45 @@ it('rejects stale preview candidate geometry and oversized raster before opening
   ).rejects.toThrow('does not match');
   expect(io.open).not.toHaveBeenCalled();
 });
+
+it('cancels pending presentation video admission before awaiting its rejection', async () => {
+  const args = fixture();
+  const controller = new AbortController();
+  args.signal = controller.signal;
+  const entered = Promise.withResolvers<void>();
+  const pending = Promise.withResolvers<void>();
+  io.videoAdd.mockImplementationOnce(async () => {
+    entered.resolve();
+    await pending.promise;
+  });
+  io.cancel.mockImplementation(async () => pending.reject(controller.signal.reason));
+  const rendering = writeReviewPresentationFrames(args);
+  const rejected = expect(rendering).rejects.toMatchObject({ name: 'AbortError' });
+  try {
+    await entered.promise;
+    controller.abort();
+    expect(io.cancel).toHaveBeenCalledOnce();
+  } finally {
+    pending.reject(controller.signal.reason);
+    await rejected;
+  }
+  expect(io.release).toHaveBeenCalledOnce();
+  expect(io.rendererDispose).toHaveBeenCalledOnce();
+  expect(io.samples.every((sample) => sample.close.mock.calls.length === 1)).toBe(true);
+});
+
+it('releases presentation output acquired during abort before starting it', async () => {
+  const args = fixture();
+  const controller = new AbortController();
+  args.signal = controller.signal;
+  const createOutput = io.media.getMockImplementation()!;
+  io.media.mockImplementationOnce((input) => {
+    const tracks = createOutput(input);
+    controller.abort();
+    return tracks;
+  });
+  await expect(writeReviewPresentationFrames(args)).rejects.toMatchObject({ name: 'AbortError' });
+  expect(io.cancel).toHaveBeenCalledOnce();
+  expect(io.start).not.toHaveBeenCalled();
+  expect(io.rendererDispose).toHaveBeenCalledOnce();
+});

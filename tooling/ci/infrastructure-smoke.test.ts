@@ -62,7 +62,7 @@ case "$*" in
   *"osv-scanner --version"*) printf '%s\n' '${lock.osvScanner.version}' ;;
   *"gitleaks --version"*) printf '%s\n' '8.30.1' ;;
   *"actionlint --version"*) printf '%s\n' '1.7.12' ;;
-  *"playwright --version"*) printf '%s\n' '1.64.0' ;;
+  *"playwright --version"*) printf '%s\n' '1.64.1' ;;
   *"/opt/sniptale-mutation/node_modules/@stryker-mutator/core/bin/stryker.js --version"*) printf '%s\n' '${mutation.devDependencies['@stryker-mutator/core']}' ;;
   *"ps --version"*) printf '%s\n' 'ps from procps-ng 4.0.2' ;;
   *"node -e"*) printf '%s\n' "$browser_json" ;;

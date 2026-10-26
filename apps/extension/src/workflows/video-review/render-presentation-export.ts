@@ -1,3 +1,4 @@
+import { ownReviewOutputCancellation } from './render-output-lifetime';
 import { reviewFrameDecorations } from './render-export-input';
 import type { AudioSample, Output } from 'mediabunny';
 import type { ReviewFrameExportInput } from './render-export-input';
@@ -353,6 +354,7 @@ export async function writeReviewPresentationFrames(
   let renderer: Renderer | null = null;
   let encoder: Encoder | null = null;
   let output: Output | null = null;
+  let outputLifetime: ReturnType<typeof ownReviewOutputCancellation> | undefined;
   const audioState: { audio: AsyncGenerator<AudioSample> | null } = { audio: null };
   const disposeEncoder = () => {
     const current = encoder;
@@ -406,6 +408,8 @@ export async function writeReviewPresentationFrames(
       createMux(args, prepared, encoder, metadata)
     );
     output = tracks.output;
+    outputLifetime = ownReviewOutputCancellation(output, args.signal);
+    args.signal.throwIfAborted();
     if (tracks.video.kind !== 'sample')
       throw new Error('Presentation video output configuration changed');
     const video = tracks.video.source;
@@ -442,11 +446,12 @@ export async function writeReviewPresentationFrames(
     return receipt;
   } catch (error) {
     disposeEncoder();
-    return await cleanupReviewExportFailure(error, () => output?.cancel());
+    return await cleanupReviewExportFailure(error, () => outputLifetime?.cancel());
   } finally {
     try {
       await audioState.audio?.return(undefined);
     } finally {
+      outputLifetime?.dispose();
       disposeEncoder();
       renderer?.dispose();
       args.onTimeEstimate?.(null);

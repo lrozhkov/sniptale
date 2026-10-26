@@ -3,19 +3,19 @@
   "platform": "linux/amd64",
   "node": {
     "version": "24.21.0",
-    "npmVersion": "12.2.0",
-    "npmLockSha256": "2ae240f88f4b3ced8b77b7fdff7dadd57326477b217ff653bfa50176605dfaae",
+    "npmVersion": "12.2.1",
+    "npmLockSha256": "44e12def44e0b692a76c9a00f4c7fc218d85f585f0af61aec788821303d780d8",
     "image": "node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20",
     "baseDebianSnapshot": "20261008T000000Z"
   },
   "projectToolchain": {
     "oxfmt": {
       "packagePath": "node_modules/oxfmt",
-      "version": "0.72.0"
+      "version": "0.73.0"
     },
     "oxlint": {
       "packagePath": "node_modules/oxlint",
-      "version": "1.87.0"
+      "version": "1.88.0"
     },
     "oxlintTsgolint": {
       "packagePath": "node_modules/oxlint-tsgolint",
@@ -35,12 +35,12 @@
     },
     "viteReact": {
       "packagePath": "node_modules/@vitejs/plugin-react",
-      "version": "6.1.0"
+      "version": "6.1.2"
     }
   },
   "dependencyGraph": {
     "packagePath": "node_modules/dependency-cruiser",
-    "version": "18.5.0"
+    "version": "18.6.0"
   },
   "openstackController": {
     "pythonVersion": "3.14.8",
@@ -63,8 +63,8 @@
     }
   },
   "playwright": {
-    "version": "1.64.0",
-    "npmLockSha256": "f7aa01093f08797cf23dd35f4ca1ee26e66455a3a23c70531c48327f79816464",
+    "version": "1.64.1",
+    "npmLockSha256": "65e01057945f2af97c8abbe6dfa00da48d08fd55a47c6a8de29d1cb9871c4303",
     "browser": "chromium",
     "browserRevision": "1248",
     "browserVersion": "156.0.8078.4",
@@ -111,7 +111,7 @@
     "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
   },
   "mutationRunner": {
-    "packageJsonSha256": "c454333b8542a3e8f3e1e985b0f826850be93d0e48271aedbb154efa93b5a260",
-    "packageLockSha256": "8d586c603f347232ae9c620a601a9824ff32a683fca72d70d1da1a72a7c2397a"
+    "packageJsonSha256": "825f498af79d317f500177752369de0c06292893e91e5b72474e52bae140660b",
+    "packageLockSha256": "5c687c5d7a3fadd352ef7a5dfdad61056c906645082fc4b0cbaa6ccd4ac0fbc2"
   }
 }

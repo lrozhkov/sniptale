@@ -7,7 +7,7 @@ import { mergeProcessCovs } from '@bcoe/v8-coverage';
 import v8CoverageRuntime from '@vitest/coverage-v8';
 import { V8CoverageProvider } from '@vitest/coverage-v8/dist/provider.js';
 
-const SUPPORTED_VITEST_VERSION = '5.0.3';
+const SUPPORTED_VITEST_VERSION = '5.0.5';
 const DEFAULT_CONCURRENCIES = [4, 8, 12];
 const PROFILE_FILENAME = 'coverage-profile.json';
 const SLOW_FILE_LIMIT = 50;
