@@ -62,26 +62,27 @@ function drawInformation(
   context.fillStyle = options.appearance.information.color;
   context.font = `${options.appearance.information.size}px sans-serif`;
   context.textBaseline = 'top';
-  const available = geometry.width - geometry.padding * 2;
-  for (const [index, line] of lines.entries()) {
-    let text = line;
-    if (context.measureText(text).width > available) {
-      let low = 0,
-        high = text.length;
-      while (low < high) {
-        const middle = Math.ceil((low + high) / 2);
-        if (context.measureText(text.slice(0, middle) + '…').width <= available) low = middle;
-        else high = middle - 1;
-      }
-      text = text.slice(0, low) + '…';
-    }
-    context.fillText(
-      text,
-      geometry.padding,
-      geometry.informationY + index * geometry.lineHeight,
-      available
+  const sourceWidth = geometry.width - geometry.padding * 2;
+  const inset = geometry.informationInset;
+  const available = sourceWidth - inset * 2;
+  let text = lines.join('  ·  ');
+  if (!text) return;
+  if (context.measureText(text).width > available) {
+    const segments = Array.from(
+      new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text),
+      (item) => item.segment
     );
+    let low = 0,
+      high = segments.length;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (context.measureText(segments.slice(0, middle).join('') + '…').width <= available)
+        low = middle;
+      else high = middle - 1;
+    }
+    text = segments.slice(0, low).join('') + '…';
   }
+  context.fillText(text, geometry.padding + inset, geometry.informationY, available);
 }
 
 function readRasterLayout(options: QuickActionRasterOptions) {
@@ -124,19 +125,15 @@ function drawFramedSource(
   source: ImageBitmap,
   headerBitmap: ImageBitmap | undefined
 ) {
-  const top = geometry.sourceY - geometry.headerHeight;
-  const radius =
-    background.kind === 'none'
-      ? 0
-      : Math.min(background.radius, source.width / 2, (source.height + geometry.headerHeight) / 2);
+  const top = geometry.padding;
   context.save();
   context.beginPath();
   context.roundRect(
     geometry.sourceX,
     top,
     source.width,
-    source.height + geometry.headerHeight,
-    radius
+    geometry.frameHeight,
+    geometry.frameRadius
   );
   if (background.kind !== 'none' && background.shadow) {
     context.shadowColor = '#00000040';
@@ -149,6 +146,15 @@ function drawFramedSource(
   }
   context.shadowColor = 'transparent';
   context.clip();
+  if (geometry.informationHeight) {
+    context.fillStyle = '#ffffff';
+    context.fillRect(
+      geometry.sourceX,
+      geometry.informationY - 8,
+      source.width,
+      geometry.informationHeight
+    );
+  }
   if (headerBitmap) context.drawImage(headerBitmap, geometry.sourceX, top);
   context.drawImage(source, geometry.sourceX, geometry.sourceY);
   context.restore();

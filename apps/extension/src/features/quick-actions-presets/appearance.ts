@@ -60,7 +60,7 @@ export function quickActionAppearanceGeometry(
     ? Math.ceil(windowHeaderGeometry(appearance.header, source).height)
     : 0;
   const lineHeight = Math.ceil(appearance.information.size * 1.5);
-  const informationHeight = lineCount ? lineHeight * lineCount + 16 : 0;
+  const informationHeight = lineCount ? lineHeight + 16 : 0;
   const width = source.width + padding * 2;
   const height = source.height + headerHeight + informationHeight + padding * 2;
   const pixelBytes = source.width * source.height * 4 + width * height * 8;
@@ -77,6 +77,21 @@ export function quickActionAppearanceGeometry(
     throw new Error('Quick-action appearance exceeds raster limits');
   }
   const informationAbove = appearance.information.position === 'above' ? informationHeight : 0;
+  const frameHeight = source.height + headerHeight + informationHeight;
+  const frameRadius =
+    appearance.background.kind === 'none'
+      ? 0
+      : Math.min(appearance.background.radius, source.width / 2, frameHeight / 2);
+  const informationOffset =
+    appearance.information.position === 'above'
+      ? headerHeight + 8
+      : headerHeight + source.height + 8;
+  const edgeDistance = Math.min(informationOffset, frameHeight - informationOffset - lineHeight);
+  const cornerInset =
+    informationHeight && edgeDistance < frameRadius
+      ? frameRadius - Math.sqrt(frameRadius ** 2 - (frameRadius - edgeDistance) ** 2)
+      : 0;
+  const informationInset = Math.max(Math.min(8, source.width / 4), Math.ceil(cornerInset));
   return {
     width,
     height,
@@ -84,11 +99,14 @@ export function quickActionAppearanceGeometry(
     headerHeight,
     informationHeight,
     lineHeight,
+    frameHeight,
+    frameRadius,
+    informationInset,
     sourceX: padding,
     sourceY: padding + informationAbove + headerHeight,
     informationY:
       appearance.information.position === 'above'
-        ? padding + 8
+        ? padding + headerHeight + 8
         : padding + headerHeight + source.height + 8,
   };
 }

@@ -77,13 +77,16 @@ describe('quick-action raster resources and composition', () => {
     input.appearance.titleSource = 'static';
     input.appearance.background.kind = 'paint';
     input.appearance.information.enabled = true;
-    const source = bitmap(),
-      header = { ...bitmap(), height: 1 };
+    input.dataUrl = sizedRaster(640, 480);
+    const source = { ...bitmap(), width: 640, height: 480 },
+      header = { ...bitmap(), width: 640, height: 46 };
     decode.mockResolvedValueOnce(source).mockResolvedValueOnce(header);
     await renderQuickActionAppearance(input);
     expect(context.drawImage).toHaveBeenCalledWith(header, 32, 32);
-    expect(context.drawImage).toHaveBeenCalledWith(source, 32, 33);
-    expect(context.fillText).toHaveBeenCalledWith('…', 32, 44, 2);
+    expect(context.drawImage).toHaveBeenCalledWith(source, 32, 78);
+    expect(context.fillText).toHaveBeenCalledWith('Page', 40, 566, 624);
+    expect(context.fillRect).toHaveBeenCalledWith(32, 558, 640, 40);
+    expect(context.roundRect).toHaveBeenCalledWith(32, 32, 640, 566, 12);
     expect(source.close).toHaveBeenCalledOnce();
     expect(header.close).toHaveBeenCalledOnce();
   });
@@ -156,7 +159,7 @@ it('preserves a short caption above the source without clipping text', async () 
     text: 'Caption',
   };
   await renderQuickActionAppearance(input);
-  expect(context.fillText).toHaveBeenCalledWith('Caption', 0, 8, 640);
+  expect(context.fillText).toHaveBeenCalledWith('Caption', 8, 8, 624);
 });
 it('refuses an unsupported source, over-budget work and malformed background before decode', async () => {
   for (const patch of [{ dataUrl: 'bad' }, { dataUrl: sizedRaster(7000, 7000) }]) {
@@ -191,4 +194,66 @@ it('omits an overlong optional favicon address while rendering the bounded page 
     source: { width: 2, height: 3 },
   });
   expect(encode).toHaveBeenCalledOnce();
+});
+
+it('draws all selected information in one horizontal row within the source card', async () => {
+  const input = options();
+  input.dataUrl = sizedRaster(1280, 560);
+  decode.mockResolvedValue({ ...bitmap(), width: 1280, height: 560 });
+  input.metadata.url = 'https://example.test';
+  input.appearance.background.kind = 'paint';
+  input.appearance.information = {
+    ...input.appearance.information,
+    enabled: true,
+    url: true,
+    date: true,
+    dimensions: true,
+    text: 'Caption',
+  };
+  await renderQuickActionAppearance(input);
+  expect(context.fillText).toHaveBeenCalledExactlyOnceWith(
+    'Page  ·  https://example.test  ·  Today  ·  1280 × 560  ·  Caption',
+    40,
+    600,
+    1264
+  );
+  expect(context.fillRect).toHaveBeenCalledWith(32, 592, 1280, 40);
+});
+
+it('fits a narrow caption without splitting an emoji grapheme', async () => {
+  const input = options();
+  input.dataUrl = sizedRaster(64, 48);
+  decode.mockResolvedValue({ ...bitmap(), width: 64, height: 48 });
+  input.metadata.title = 'Hello 👨‍👩‍👧‍👦 world';
+  input.appearance.information.enabled = true;
+  await renderQuickActionAppearance(input);
+  expect(context.fillText).toHaveBeenCalledExactlyOnceWith('Hello …', 8, 56, 48);
+});
+
+it('keeps an above caption within the card after the window header and before source pixels', async () => {
+  const input = options();
+  input.dataUrl = sizedRaster(1280, 560);
+  input.appearance.header = { ...DEFAULT_WINDOW_HEADER };
+  input.appearance.background.kind = 'paint';
+  input.appearance.information.enabled = true;
+  input.appearance.information.position = 'above';
+  const source = { ...bitmap(), width: 1280, height: 560 };
+  const header = { ...bitmap(), width: 1280, height: 54 };
+  decode.mockResolvedValueOnce(source).mockResolvedValueOnce(header);
+  await renderQuickActionAppearance(input);
+  expect(context.drawImage).toHaveBeenCalledWith(header, 32, 32);
+  expect(context.fillRect).toHaveBeenCalledWith(32, 86, 1280, 40);
+  expect(context.fillText).toHaveBeenCalledExactlyOnceWith('Page', 40, 94, 1264);
+  expect(context.drawImage).toHaveBeenCalledWith(source, 32, 126);
+});
+
+it('insets caption text instead of clipping its beginning at a large card radius', async () => {
+  const input = options();
+  input.dataUrl = sizedRaster(1280, 560);
+  decode.mockResolvedValue({ ...bitmap(), width: 1280, height: 560 });
+  input.appearance.background.kind = 'paint';
+  input.appearance.background.radius = 256;
+  input.appearance.information.enabled = true;
+  await renderQuickActionAppearance(input);
+  expect(context.fillText).toHaveBeenCalledExactlyOnceWith('Page', 225, 600, 894);
 });
