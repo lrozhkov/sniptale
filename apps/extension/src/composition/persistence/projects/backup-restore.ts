@@ -1,3 +1,4 @@
+import { allocateVideoProjectRevisionInTransaction } from './revisions';
 import {
   promoteReviewPrimarySourceLifecycles,
   promoteReviewSourceLifecycles,
@@ -303,10 +304,15 @@ async function publishProjectExports(
 
 async function publishProjectSidecars(
   root: PreparedVideoProjectArchiveRoot,
-  stores: VideoProjectBackupRestoreStores
+  stores: VideoProjectBackupRestoreStores,
+  workspaceRevision: number
 ) {
   if (root.thumbnail) await stores.thumbnails.put(root.thumbnail);
-  if (root.presentation) await stores.presentations.put(root.presentation);
+  if (root.presentation)
+    await stores.presentations.put({
+      ...root.presentation,
+      presentationRevision: workspaceRevision,
+    });
 }
 
 async function retainRestoredReviewSources(
@@ -360,6 +366,11 @@ export async function putVideoProjectBackupRestore(args: {
   if ((existing || childConflict) && args.strategy === 'duplicate') {
     throw new Error('Video project restore conflict changed after preflight.');
   }
+  const workspaceRevision = await allocateVideoProjectRevisionInTransaction(
+    args.tx,
+    args.root.entry.id,
+    existing?.workspaceRevision ?? 0
+  );
   const releasedCandidates = new Set(assetOwnership.owned);
   if (existing && args.strategy === 'replace')
     await deleteExisting({
@@ -376,12 +387,13 @@ export async function putVideoProjectBackupRestore(args: {
   await args.stores.projects.put(
     withVideoProjectUsage({
       ...args.root.entry,
+      workspaceRevision,
       lifecycle: promoteLibraryLifecycle(lifecycle, lifecycle.updatedAt),
     })
   );
   await publishProjectAssets(args.root, args.stores);
   await publishProjectExports(args.root, args.stores);
-  await publishProjectSidecars(args.root, args.stores);
+  await publishProjectSidecars(args.root, args.stores, workspaceRevision);
   await retainRestoredReviewSources(args.root, args.tx);
   await promoteProjectSourceLifecycles(
     args.root.entry.project,

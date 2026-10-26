@@ -28,6 +28,8 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/review-workspaces/storage.ts',
   // Reads and writes only the existing caller transaction; caller owns its active permit/commit/abort.
   'apps/extension/src/composition/persistence/scenario/storage.ts',
+  // Appends only through the admitted domain transaction; the caller owns permit and commit/abort.
+  'apps/extension/src/composition/persistence/sync-capture/capture.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
   // VoiceHistoryOwner.mutate owns the active caller permit and awaits catalog transaction completion.
   'apps/extension/src/composition/persistence/voice-input-history/catalog.ts',

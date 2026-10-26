@@ -1,0 +1,429 @@
+import type { VideoProject } from '../../../features/video/project/types';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { parseAssetRef } from '../assets/guards';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+  parseVideoProjectEntry,
+} from '../projects/read-guards';
+import {
+  captureRootKey,
+  MAX_CAPTURE_METADATA_BYTES,
+  MAX_CAPTURE_ROWS,
+  type CapturedVideoProjectRows,
+  type CapturedChange,
+  type SyncCaptureAppliedOperation,
+  type SyncCaptureProfile,
+  type SyncCaptureRootState,
+  type SyncCaptureRecord,
+} from './contracts';
+
+function identity(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 256;
+}
+
+function storageKey(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 2048;
+}
+
+function ordinal(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function parseRows<T>(value: unknown, parse: (row: unknown) => T | null): T[] | null {
+  if (!Array.isArray(value) || value.length > MAX_CAPTURE_ROWS) return null;
+  const rows: unknown[] = value;
+  const parsed = rows.map(parse);
+  return parsed.some((row) => row === null) ? null : parsed.filter((row) => row !== null);
+}
+
+/** The experiment has no capture owners for these additional project resources. */
+export function isSupportedCaptureProject(project: VideoProject): boolean {
+  if (
+    project.source.kind !== 'manual' ||
+    project.baseRecordingId !== null ||
+    project.cursorTrack !== null ||
+    project.watermarkSource !== undefined ||
+    project.bookendPresets !== undefined ||
+    project.watermark?.image !== undefined ||
+    project.sceneBackground?.kind === 'image' ||
+    project.sceneBackground?.remembered?.image !== undefined
+  )
+    return false;
+  if (
+    [
+      project.effectInstances,
+      project.effectSnapshots,
+      project.sourceVoiceoverDocuments,
+      project.sourceAudioDocuments,
+      project.commentDocuments,
+      project.textDocuments,
+      project.objectTracks,
+      project.motionRegions,
+      project.actionFeedback,
+      project.actionEvents,
+    ].some((rows) => rows !== undefined && rows.length > 0)
+  )
+    return false;
+  const ids = new Set(project.assets.map((asset) => asset.id));
+  return (
+    project.assets.length <= MAX_CAPTURE_ROWS &&
+    ids.size === project.assets.length &&
+    project.assets.every(
+      (asset) =>
+        !asset.recordingPart &&
+        asset.type !== 'RECORDING' &&
+        (asset.source.kind === 'library-asset' ||
+          (asset.source.kind === 'project-asset' && !asset.source.originRecordingId))
+    ) &&
+    project.clips.every(
+      (clip) =>
+        (clip.type === 'VIDEO' || clip.type === 'AUDIO' || clip.type === 'IMAGE') &&
+        ids.has(clip.assetId)
+    )
+  );
+}
+
+/** Reject binary, cyclic, or excessive metadata before any JSON size calculation. */
+function boundedMetadata(value: unknown): boolean {
+  const active = new WeakSet<object>();
+  let nodes = 0;
+  let characters = 0;
+  function visit(item: unknown, depth: number): boolean {
+    if (++nodes > 100_000 || depth > 64) return false;
+    if (typeof item === 'string') {
+      characters += item.length;
+      return characters <= MAX_CAPTURE_METADATA_BYTES;
+    }
+    if (item === undefined || item === null || typeof item === 'boolean') return true;
+    if (typeof item === 'number') return Number.isFinite(item);
+    if (typeof item !== 'object' || active.has(item)) return false;
+    if (
+      !Array.isArray(item) &&
+      Object.getPrototypeOf(item) !== Object.prototype &&
+      Object.getPrototypeOf(item) !== null
+    )
+      return false;
+    active.add(item);
+    const valid = Object.entries(item).every(([key, child]) => {
+      characters += key.length;
+      return characters <= MAX_CAPTURE_METADATA_BYTES && visit(child, depth + 1);
+    });
+    active.delete(item);
+    return valid;
+  }
+  return (
+    visit(value, 0) &&
+    new TextEncoder().encode(JSON.stringify(value)).byteLength <= MAX_CAPTURE_METADATA_BYTES
+  );
+}
+
+/** Parse accepted native rows again when they cross the persistence boundary. */
+export function parseCapturedVideoProjectRows(value: unknown): CapturedVideoProjectRows | null {
+  if (!isRecord(value) || !boundedMetadata(value)) return null;
+  const project = parseVideoProjectEntry(value['project']);
+  const assets = parseRows(value['assets'], parseProjectAssetEntry);
+  const exports = parseRows(value['exports'], parseProjectExportEntry);
+  const media = parseRows(value['media'], parseMediaLibraryEntry);
+  const refs = parseRows(value['refs'], parseAssetRef);
+  if (!project || !assets || !exports || !media || !refs || media.some((row) => row.blob))
+    return null;
+  for (const rows of [assets, exports, media]) {
+    if (new Set(rows.map((row) => row.id)).size !== rows.length) return null;
+  }
+  if (new Set(refs.map((ref) => ref.assetId)).size !== refs.length) return null;
+  const resources = new Map(refs.map((ref) => [ref.assetId, ref]));
+  if (
+    [...assets, ...exports].some((entry) => {
+      const ref = resources.get(entry.assetId);
+      return (
+        !ref ||
+        ref.size !== entry.size ||
+        (entry.mimeType !== undefined && ref.mimeType !== entry.mimeType)
+      );
+    }) ||
+    exports.some((entry) => entry.projectId !== project.id)
+  )
+    return null;
+  const parsed = { project, assets, exports, media, refs };
+  if (!isSupportedCaptureProject(project.project) || !completeCapturedGraph(parsed)) return null;
+  if (new TextEncoder().encode(JSON.stringify(parsed)).byteLength > MAX_CAPTURE_METADATA_BYTES)
+    return null;
+  return parsed;
+}
+
+/** Resolve the full admitted dependency closure; do not silently discard missing rows. */
+function completeCapturedGraph(rows: CapturedVideoProjectRows): boolean {
+  const closure = new CapturedProjectClosure(rows);
+  return closure.admitProjectSources() && closure.admitExports() && closure.resolveDependencies();
+}
+
+class CapturedProjectClosure {
+  private readonly assets;
+  private readonly media;
+  private readonly exports;
+  private readonly refs;
+  private readonly neededAssets = new Set<string>();
+  private readonly neededMedia = new Set<string>();
+  private readonly neededRefs = new Set<string>();
+
+  constructor(private readonly rows: CapturedVideoProjectRows) {
+    this.assets = new Map(rows.assets.map((entry) => [entry.id, entry]));
+    this.media = new Map(rows.media.map((entry) => [entry.id, entry]));
+    this.exports = new Map(rows.exports.map((entry) => [entry.id, entry]));
+    this.refs = new Map(rows.refs.map((entry) => [entry.assetId, entry]));
+  }
+
+  admitProjectSources(): boolean {
+    for (const asset of this.rows.project.project.assets) {
+      const source = asset.source;
+      const resource =
+        source.kind === 'project-asset'
+          ? this.assets.get(source.projectAssetId)
+          : source.kind === 'library-asset'
+            ? this.media.get(source.mediaId)
+            : undefined;
+      if (
+        !resource ||
+        resource.size !== asset.metadata.size ||
+        resource.mimeType !== asset.metadata.mimeType
+      )
+        return false;
+      if (source.kind === 'project-asset') {
+        this.neededAssets.add(source.projectAssetId);
+        if (source.originMediaId) this.neededMedia.add(source.originMediaId);
+      } else if (source.kind === 'library-asset') this.neededMedia.add(source.mediaId);
+    }
+    return true;
+  }
+
+  admitExports(): boolean {
+    for (const entry of this.rows.exports) {
+      if (!entry.mimeType || entry.recordingMetadata) return false;
+      this.neededRefs.add(entry.assetId);
+      if (this.media.has(`export:${entry.id}`)) this.neededMedia.add(`export:${entry.id}`);
+    }
+    return true;
+  }
+
+  resolveDependencies(): boolean {
+    // Growing sets traverse cycles once; input row limits bound the work.
+    let assetOffset = 0;
+    let mediaOffset = 0;
+    while (assetOffset < this.neededAssets.size || mediaOffset < this.neededMedia.size) {
+      const assetIds = [...this.neededAssets];
+      for (; assetOffset < assetIds.length; assetOffset++) {
+        if (!this.admitProjectAsset(assetIds[assetOffset]!)) return false;
+      }
+      const mediaIds = [...this.neededMedia];
+      for (; mediaOffset < mediaIds.length; mediaOffset++) {
+        if (!this.admitMedia(mediaIds[mediaOffset]!)) return false;
+      }
+    }
+    return (
+      this.neededAssets.size === this.assets.size &&
+      this.neededMedia.size === this.media.size &&
+      this.neededRefs.size === this.refs.size &&
+      [...this.neededRefs].every((id) => this.refs.has(id))
+    );
+  }
+
+  private admitProjectAsset(id: string): boolean {
+    const entry = this.assets.get(id);
+    if (!entry) return false;
+    this.neededRefs.add(entry.assetId);
+    if (entry.originMediaId) this.neededMedia.add(entry.originMediaId);
+    if (this.media.has(`project-asset:${entry.id}`))
+      this.neededMedia.add(`project-asset:${entry.id}`);
+    return true;
+  }
+
+  private admitMedia(id: string): boolean {
+    const entry = this.media.get(id);
+    if (!entry || entry.recordingMetadata || entry.recordingGroup) return false;
+    const source = entry.source;
+    switch (source.kind) {
+      case 'project-asset': {
+        const target = this.assets.get(source.projectAssetId);
+        if (!target || entry.size !== target.size || entry.mimeType !== target.mimeType)
+          return false;
+        if (
+          entry.id.startsWith('project-asset:') &&
+          entry.id !== `project-asset:${source.projectAssetId}`
+        )
+          return false;
+        this.neededAssets.add(source.projectAssetId);
+        return true;
+      }
+      case 'project-export': {
+        const target = this.exports.get(source.exportId);
+        return (
+          target !== undefined &&
+          entry.size === target.size &&
+          entry.mimeType === target.mimeType &&
+          source.projectId === this.rows.project.id &&
+          (!entry.id.startsWith('export:') || entry.id === `export:${source.exportId}`)
+        );
+      }
+      case 'stored-asset': {
+        const target = this.refs.get(source.assetId);
+        if (!target || entry.size !== target.size || entry.mimeType !== target.mimeType)
+          return false;
+        this.neededRefs.add(source.assetId);
+        return true;
+      }
+      case 'recording':
+      case 'screenshot':
+      case 'web-snapshot':
+        return false;
+    }
+  }
+}
+
+type CaptureRecordHeader = Pick<SyncCaptureRecord, 'version' | 'key' | 'createdAt' | 'spaceId'>;
+type CaptureRoot = Pick<
+  SyncCaptureRootState,
+  'rootKind' | 'rootId' | 'rootKey' | 'generation' | 'basis'
+>;
+
+function parseCaptureHeader(value: Record<string, unknown>): CaptureRecordHeader | null {
+  if (
+    value['version'] !== 1 ||
+    !storageKey(value['key']) ||
+    !ordinal(value['createdAt']) ||
+    !identity(value['spaceId'])
+  )
+    return null;
+  return {
+    version: 1,
+    key: value['key'],
+    createdAt: value['createdAt'],
+    spaceId: value['spaceId'],
+  };
+}
+
+function parseCaptureProfile(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): SyncCaptureProfile | null {
+  if (
+    value['key'] !== 'profile' ||
+    typeof value['enabled'] !== 'boolean' ||
+    !ordinal(value['connectionGeneration']) ||
+    value['connectionGeneration'] === 0
+  )
+    return null;
+  return {
+    ...header,
+    kind: 'profile',
+    key: 'profile',
+    enabled: value['enabled'],
+    connectionGeneration: value['connectionGeneration'],
+  };
+}
+
+function parseAppliedOperation(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): SyncCaptureAppliedOperation | null {
+  if (
+    !storageKey(value['rootKey']) ||
+    !ordinal(value['generation']) ||
+    value['generation'] === 0 ||
+    !identity(value['operationId']) ||
+    typeof value['sourceDigest'] !== 'string' ||
+    !/^[a-f0-9]{64}$/u.test(value['sourceDigest'])
+  )
+    return null;
+  return {
+    ...header,
+    kind: 'applied-operation',
+    rootKey: value['rootKey'],
+    generation: value['generation'],
+    operationId: value['operationId'],
+    sourceDigest: value['sourceDigest'],
+  };
+}
+
+function parseCaptureRoot(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): CaptureRoot | null {
+  if (
+    !storageKey(value['rootKey']) ||
+    !ordinal(value['generation']) ||
+    value['generation'] === 0 ||
+    (value['rootKind'] !== 'video-project' && value['rootKind'] !== 'media') ||
+    !identity(value['rootId']) ||
+    captureRootKey(header.spaceId, value['rootKind'], value['rootId']) !== value['rootKey'] ||
+    !Array.isArray(value['basis']) ||
+    value['basis'].length > MAX_CAPTURE_ROWS
+  )
+    return null;
+  const basis: unknown[] = value['basis'];
+  if (!basis.every(identity) || new Set(basis).size !== basis.length) return null;
+  return {
+    rootKind: value['rootKind'],
+    rootId: value['rootId'],
+    rootKey: value['rootKey'],
+    generation: value['generation'],
+    basis,
+  };
+}
+
+function parseCapturedChange(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): CapturedChange | null {
+  const root = parseCaptureRoot(value, header);
+  if (
+    !root ||
+    !identity(value['operationId']) ||
+    !ordinal(value['connectionGeneration']) ||
+    value['connectionGeneration'] === 0 ||
+    (value['origin'] !== 'local-edit' && value['origin'] !== 'local-restore') ||
+    !(value['publicationId'] === null || identity(value['publicationId'])) ||
+    !isRecord(value['change'])
+  )
+    return null;
+  const change = value['change'];
+  const rows =
+    change['kind'] === 'video-project' ? parseCapturedVideoProjectRows(change['rows']) : null;
+  if (
+    change['kind'] !== 'tombstone' &&
+    (!rows || rows.project.id !== root.rootId || root.rootKind !== 'video-project')
+  )
+    return null;
+  return {
+    ...header,
+    ...root,
+    kind: 'captured-change',
+    operationId: value['operationId'],
+    connectionGeneration: value['connectionGeneration'],
+    origin: value['origin'],
+    publicationId: value['publicationId'],
+    change: rows ? { kind: 'video-project', rows } : { kind: 'tombstone' },
+  };
+}
+
+/** Unknown or malformed capture data refuses mutation and physical cleanup. */
+export function parseSyncCaptureRecord(value: unknown): SyncCaptureRecord | null {
+  if (!isRecord(value)) return null;
+  const header = parseCaptureHeader(value);
+  if (!header) return null;
+  switch (value['kind']) {
+    case 'profile':
+      return parseCaptureProfile(value, header);
+    case 'applied-operation':
+      return parseAppliedOperation(value, header);
+    case 'root-state': {
+      const root = parseCaptureRoot(value, header);
+      return root ? { ...header, ...root, kind: 'root-state' } : null;
+    }
+    case 'captured-change':
+      return parseCapturedChange(value, header);
+    default:
+      return null;
+  }
+}

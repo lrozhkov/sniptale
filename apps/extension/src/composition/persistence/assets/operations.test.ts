@@ -382,7 +382,7 @@ it('reads retention once for an entire physical-delete operation', async () => {
   await completePhysicalDeleteOperation(
     buildPhysicalDeleteOperation(Array.from({ length: 32 }, (_, i) => `asset-${i}`))
   );
-  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(db.getAll).toHaveBeenCalledTimes(13);
   expect(mocks.deleteObject).toHaveBeenCalledTimes(32);
 });
 
@@ -402,7 +402,7 @@ it('retains the failing and unprocessed intents after a partial replay batch', a
   expect(mocks.log).toHaveBeenCalledWith(
     expect.objectContaining({ code: 'deleted', counts: { deleted: 1 } })
   );
-  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(db.getAll).toHaveBeenCalledTimes(13);
   expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-a']]);
   expect(mocks.deleteObject.mock.calls).toEqual([['a'], ['b']]);
 });
@@ -479,7 +479,7 @@ it('keeps projected targets pending while completing unrelated intents in the sa
       operationId: `delete-${id}`,
     }))
   );
-  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(db.getAll).toHaveBeenCalledTimes(13);
   expect(mocks.deleteObject.mock.calls).toEqual([['unowned']]);
   expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-unowned']]);
   expect(mocks.log).toHaveBeenCalledWith(

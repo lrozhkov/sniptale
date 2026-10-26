@@ -204,11 +204,11 @@
       "file": "apps/extension/src/composition/persistence/projects/index.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when prepared-asset lease/private-publication/cancellation contract or database test receiver change. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "8ba42cbf7195c92442b66231de5f6a746a4e3c4c6b2e46003176638a1005c53a",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state authority, commit, recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry, transaction, or proof fixture.",
+      "astHash": "481a9d8b4a3bc4119965f847583568c30680545657af12debb7daf9f22588ab3",
       "signatureHash": "ca5c21808b7301620588e1be3b88183d84f3536b6878394e48a5a6869e0776ab",
-      "reason": "tool-noise: The prepared-annotation describe group uses the existing createDb/resetProjectsDbMocks fixture and index prepare/publish/read API, beside prepared scene resources. Private flags and failed ready claims are variants of the same prepared-asset contract; the file still has one database mock receiver and no production authority. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "reason": "tool-noise: This API suite retains its common reset and database receiver. Separate empty responses model the new stores. Existing project and prepared-resource scenarios keep their ownership and fixture lifetime. Fresh read-only capture_structural_classification inspected this exact scope. Final candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-27"
     },
     {
       "rule": "structural-file-risk",
@@ -1447,11 +1447,11 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The chronological registry appends one metadata-only DB38 to39 descriptor. It performs no row writes; upgrade transaction and recovery stay in the existing executor. Splitting the registry by length adds navigation without an independent authority. Main and independent read-only structural diagnosis inspected this exact scope and classified Keep. Final independent architecture review must assess it.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery, parser or selection authority. Remove when the analyzer recognizes this cohesive registry or proof boundary.",
-      "reviewDate": "2026-10-25",
-      "astHash": "f24a0f3b6225d82f507e24826d84b44c588743beecc93436a445eb68fe64ac97",
-      "signatureHash": "e475b1fb64e96c97e8e5f06c50cd59834a250f161221c716acf6b3c21840b0ee"
+      "reason": "tool-noise: The chronological registry owns schema descriptors. This candidate creates empty DB40 stores and indexes. Execution and recovery remain in existing owners. Splitting the registry would separate chronological schema history without separating authority. Fresh read-only capture_structural_classification inspected this exact scope. Final candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state authority, commit, recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry, transaction, or proof fixture.",
+      "reviewDate": "2026-10-27",
+      "astHash": "609799b6ebf2b655c9900d6598edbcf755dbaf755f3c24a930119c7c66ca7cfd",
+      "signatureHash": "07c774e9a0b3f74167f16d2ba52e7b0fa3c0fe23d1d97eda8352dd7c8c08b5a4"
     },
     {
       "rule": "structural-function-risk",
@@ -1721,22 +1721,22 @@
       "rule": "structural-file-risk",
       "file": "apps/extension/src/composition/persistence/projects/backup-restore.test.ts",
       "symbol": "<file>",
-      "owner": "extension:composition:persistence",
-      "reason": "tool-noise: This suite proves the existing atomic project restore and resource graph. The candidate adds passive speech metadata to that same root contract. Existing store constructors and restore operations own all fixtures. It adds no runtime import, writer, or recovery lifetime. File length alone exceeds the budget. Independent architecture review must assess this exact classification.",
-      "removalCondition": "Remove when this exact file AST or signature changes. Reassess any new fixture authority, writer, operation, or recovery lifetime. Remove when the analyzer models this cohesive root proof. Independent architecture review must assess this exact classification.",
-      "reviewDate": "2026-10-21",
-      "astHash": "f6217724c1c0a374a32d893bd3d0e038deb3bb7008e642b0e0c79e6f239e449f",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: This suite proves one restored project graph through existing store fixtures. The added case proves local revision allocation and presentation rebinding. Counted state consists of test observations. No independent runtime authority appears. Fresh read-only capture_structural_classification inspected this exact scope. Final candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state authority, commit, recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry, transaction, or proof fixture.",
+      "reviewDate": "2026-10-27",
+      "astHash": "1b86344d7f2d95ae47ac558671c7a2afb7d227cb27259cb6865c92bfd9b8aa1e",
       "signatureHash": "921e5efc231b3d0eca846f5008c75cd2bc9fb2f8c73af38380f9c092797cb29f"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/composition/persistence/projects/index.save.test.ts",
       "symbol": "<file>",
-      "owner": "extension:composition:persistence",
-      "reason": "tool-noise: This suite proves the canonical project root writer and its existing transaction mocks. The candidate adds whole takes and passive speech resource retention. It preserves save, reopen, and retry under the same revision authority. It adds no runtime import or writer. File length alone exceeds the budget. Independent architecture review must assess this exact classification.",
-      "removalCondition": "Remove when this exact file AST or signature changes. Reassess any new fixture authority, writer, operation, or recovery lifetime. Remove when the analyzer models this cohesive root proof. Independent architecture review must assess this exact classification.",
-      "reviewDate": "2026-10-21",
-      "astHash": "94397d764356b8d438c6268eb234630948a14fd40ac2218b71c2375ebc04fec0",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: The changed mock separates capture and local revision stores from project assertions. Existing scenarios still prove the canonical save owner. The candidate adds no fixture lifetime or production bypass. Fresh read-only capture_structural_classification inspected this exact scope. Final candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state authority, commit, recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry, transaction, or proof fixture.",
+      "reviewDate": "2026-10-27",
+      "astHash": "b67b430f0ff713ec6e4d080d91dc75f317472ed5a85b777a88227e6219a2e923",
       "signatureHash": "217ad7a800b6b93ec678032c58b25c6c2cf97007f01b1ef317cecb383d2cd960"
     },
     {
@@ -1887,10 +1887,10 @@
       "file": "apps/extension/src/composition/persistence/projects/index.stale-save.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: File scale supplies both score points. These tests use the existing database mock and canonical workspace fixture to prove one guarded publication contract. Local seed identities and transaction observations are proof data, not independent persistence authorities. Promise gates control preparation and commits follow IndexedDB ordering. The asset-read spy is restored in finally. No production or harness authority is added. Independent read-only image_structural_diagnosis confirmed this classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent fixture lifecycle, shared mutable test authority, unrelated persistence contract or production write bypass. Remove when the analyzer models this cohesive proof boundary. Final independent architecture review must assess this exact classification.",
-      "reviewDate": "2026-10-21",
-      "astHash": "089fb48763a3137ac83c6b0e5919c70c4d372c891c0d78cae55cebfd89773454",
+      "reason": "tool-noise: These controlled tests retain one project head and promise gates. Separate mock responses preserve project assertions. The updated expectation proves fresh restore admission. Capture retention adds only a typed fixture field. Fresh read-only capture_structural_classification inspected this exact scope. Final candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state authority, commit, recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry, transaction, or proof fixture.",
+      "reviewDate": "2026-10-27",
+      "astHash": "0c800f426f3cd006cfdc7cb65ecc68fb659d1d5d9f016a3503ebd9b752023c54",
       "signatureHash": "f91dd62b8698efdfcb53b623335e3d48703425104c758d2849540c341c4732ba"
     },
     {
@@ -2404,10 +2404,10 @@
       "file": "apps/extension/src/composition/persistence/projects/index.ts",
       "symbol": "saveVideoProject",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One destination save transaction owns predecessor admission, binding publication, reference checks, root publication, and abort. Bindings are cloned before asynchronous preparation. The existing transaction publishes them atomically. Separate publication would break that invariant. Existing lifecycle and physical deletion remain under this owner. Main and independent structural diagnosis inspected this exact implementation. Final architecture review must assess this classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent owner, state authority, writer, resource lifetime, recovery operation, or public contract. Remove when the analyzer models this cohesive operation or its test observations.",
-      "reviewDate": "2026-10-23",
-      "astHash": "5e2797aa60339b926396933a6a3a3b2bb2d2fbf13958b95ae331a76f645fdf9c",
+      "reason": "tool-noise: This save owns predecessor admission, root publication and one abort path. Local revision allocation and capture use its native transaction. Their named owners retain their mechanics. Post-commit physical cleanup remains separate. Fresh read-only capture_structural_classification inspected this exact scope. Final candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state authority, commit, recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry, transaction, or proof fixture.",
+      "reviewDate": "2026-10-27",
+      "astHash": "2afe55d2dca3daa57850ae27115392505c00e338ce1343a6e3eba70ec144a898",
       "signatureHash": "9c1a61ad3c8a2a28fe294876778e34eaab975da22af58ffeb31606d55d285db1"
     },
     {
@@ -2750,6 +2750,17 @@
       "reviewDate": "2026-10-26",
       "astHash": "44279cdf2a63f65c1218261119337cf4c77b067824d2490b0c9fd946e7ea2158",
       "signatureHash": "e334f60762c5cd84fd18aa0402084a7fdff701dfec12d1adcc97957992db825f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/projects/asset-publication.ts",
+      "symbol": "publishProjectMediaAsset",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: The existing publication transaction owns one commit and abort lifetime. Capture records its accepted after-image in that transaction. Capture mechanics stay in their named owner. No independent commit or recovery lifetime appears. Fresh read-only capture_structural_classification inspected this exact scope. Final candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state authority, commit, recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry, transaction, or proof fixture.",
+      "reviewDate": "2026-10-27",
+      "astHash": "318562ac2e9ea1f92490803a5e5b0ec12afb0e102554422250617ffcaf0c455d",
+      "signatureHash": "8f851fd09dd55225e411bc30cf58bf55a7bed33ed76d1d5a5206557829c1e22c"
     }
   ]
 }

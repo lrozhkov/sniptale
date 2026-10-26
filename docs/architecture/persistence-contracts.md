@@ -713,3 +713,21 @@ Two-sided entrance reveals equal contour lengths in both directions from the ori
 Both editors retain the origin across phase changes and preserve it through conversion, history, save and reopen. Sampling remains independent of previous frames. Existing source cuts, rates and retained phase clocks keep their semantics.
 
 Database version 39 changes the mediaLibrary contract to 31 and the videoProjects contract to 8. This additive migration preserves all rows, history, stores, indexes and immutable media. Earlier writers cannot admit this database. Existing mutation, history, CAS, save and resource owners retain authority.
+
+## Local Montage admission revisions
+
+`workspaceRevision` is a local admission token. An archived revision does not authorize a local write. The `videoProjects` contract version 9 owns `video_project_revisions` in physical database version 40. Each record retains one project identity and its highest allocated or retired revision.
+
+Creation, save and restore allocate a fresh safe integer in the native domain transaction. Allocation uses the highest current native revision and retained revision. Ordinary deletion retains the current revision before it removes the project. In-place cascade writers can advance the live revision without rewriting this record. The next allocation or deletion includes that live revision. Refuse malformed records and safe-integer exhaustion instead of resetting the counter.
+
+Restore preserves authored project content and timestamps. It allocates local admission metadata and rebinds `presentationRevision` to that local revision. Retain revision records after ordinary deletion. Remove them during whole-local-data erasure. Exclude these local counters from portable media backup and synchronization. Editors must submit their loaded numeric admission token to obtain lifetime fencing. A timestamp-only caller does not obtain that guarantee.
+
+## Experimental immutable sync capture
+
+The `syncCapture` contract version 1 owns `sync_capture` in physical database version 40. The additive migration creates empty stores and preserves released domain rows and immutable objects. Migration does not enable capture.
+
+An explicit experimental profile enables capture for a bounded Montage graph. The domain transaction saves the accepted project and its immutable native source snapshot together. Publication replay retains its original snapshot under the stable publication identity. Capture root state retains generation and causal predecessors after ordinary deletion and recreation. Capture generation does not allocate native project admission revisions.
+
+The experiment accepts at most 32 rows in each captured collection and 1 MiB of metadata per snapshot. It retains at most 128 pending captures and refuses further capture mutations at that limit. These bounds apply to the experiment, not the planned release capacity. Missing dependencies or unsupported sidecars abort the enabled mutation. An absent or disabled profile does not read the project graph or append a capture.
+
+Pending captures retain physical assets through the existing asset retention authority. Invalid capture data refuses physical cleanup. No verified remote settlement exists in this experiment, so pending claims do not expire. Native media bytes remain in OPFS. The capture store contains metadata and references without media Blobs. The test-only frozen database adapter reuses the existing backup inventory and codecs. The test-only apply command reuses canonical restore and commits its provenance receipt with the native replacement. Neither test-only command provides a product runtime route.

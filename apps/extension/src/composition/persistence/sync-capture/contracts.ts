@@ -1,0 +1,92 @@
+import type { AssetRef } from '../assets/contracts';
+import type { MediaLibraryEntry } from '../media-library/contracts';
+import type {
+  StoredProjectAssetEntry,
+  StoredProjectExportEntry,
+  VideoProjectEntry,
+} from '../projects/contracts';
+
+export const SYNC_CAPTURE_PROFILE_KEY = 'profile';
+export const MAX_CAPTURE_ROWS = 32;
+export const MAX_PENDING_CAPTURES = 128;
+export const MAX_CAPTURE_METADATA_BYTES = 1024 * 1024;
+
+/** The experiment admits only an explicitly enabled, local capture profile. */
+export interface SyncCaptureProfile {
+  version: 1;
+  kind: 'profile';
+  key: 'profile';
+  createdAt: number;
+  enabled: boolean;
+  spaceId: string;
+  connectionGeneration: number;
+}
+
+export type CaptureRootKind = 'media' | 'video-project';
+export type CaptureOrigin = 'local-edit' | 'local-restore';
+
+/** Native accepted rows remain distinct from the portable backup representation. */
+export interface CapturedVideoProjectRows {
+  project: VideoProjectEntry;
+  assets: StoredProjectAssetEntry[];
+  exports: StoredProjectExportEntry[];
+  media: Omit<MediaLibraryEntry, 'blob'>[];
+  refs: AssetRef[];
+}
+
+/** A deleted native identity retains its generation and causal predecessor. */
+export interface SyncCaptureRootState {
+  version: 1;
+  kind: 'root-state';
+  key: string;
+  createdAt: number;
+  spaceId: string;
+  rootKind: CaptureRootKind;
+  rootId: string;
+  rootKey: string;
+  generation: number;
+  basis: string[];
+}
+
+/** Pending snapshots retain their bytes until a future verified settlement owner admits release. */
+export interface CapturedChange {
+  version: 1;
+  kind: 'captured-change';
+  key: string;
+  createdAt: number;
+  spaceId: string;
+  connectionGeneration: number;
+  rootKind: CaptureRootKind;
+  rootId: string;
+  rootKey: string;
+  generation: number;
+  operationId: string;
+  basis: string[];
+  origin: CaptureOrigin;
+  publicationId: string | null;
+  change: { kind: 'video-project'; rows: CapturedVideoProjectRows } | { kind: 'tombstone' };
+}
+
+/** The local receipt records one checked application and prevents an outgoing echo. */
+export interface SyncCaptureAppliedOperation {
+  version: 1;
+  kind: 'applied-operation';
+  key: string;
+  createdAt: number;
+  spaceId: string;
+  rootKey: string;
+  operationId: string;
+  sourceDigest: string;
+  generation: number;
+}
+
+export type SyncCaptureRecord =
+  | SyncCaptureProfile
+  | SyncCaptureRootState
+  | CapturedChange
+  | SyncCaptureAppliedOperation;
+
+/** Tuple encoding prevents delimiter collisions in local native-store keys. */
+export function captureRootKey(spaceId: string, kind: CaptureRootKind, rootId: string): string {
+  return JSON.stringify([spaceId, kind, rootId]);
+}

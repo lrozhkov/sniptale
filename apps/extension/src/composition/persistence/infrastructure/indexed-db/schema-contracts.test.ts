@@ -116,6 +116,8 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['recording_recovery_sessions', { keyPath: 'id' }],
     ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -190,6 +192,8 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['recording_recovery_sessions', { keyPath: 'id' }],
     ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual([
@@ -263,6 +267,11 @@ it('upgrades each retained source contract only after all required stores valida
       ]);
     else if (migration.fromDatabaseVersion === 34)
       expect(db.createObjectStore.mock.calls).toEqual([['voice_input_history', { keyPath: 'id' }]]);
+    else if (migration.fromDatabaseVersion === 39)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['sync_capture', { keyPath: 'key' }],
+        ['video_project_revisions', { keyPath: 'projectId' }],
+      ]);
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -302,6 +311,8 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['recording_recovery_sessions', { keyPath: 'id' }],
     ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -352,6 +363,8 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['recording_recovery_sessions', { keyPath: 'id' }],
     ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);

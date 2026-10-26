@@ -33,10 +33,12 @@ import {
   SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STATE_MANAGER_STORE,
+  SYNC_CAPTURE_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_PROJECT_REVISIONS_STORE,
   WEB_SNAPSHOTS_STORE,
   type EXPECTED_STORES,
 } from './core.stores.ts';
@@ -60,6 +62,11 @@ interface StoredSchemaContract {
 }
 
 export const PERSISTENCE_DOMAIN_REGISTRY = [
+  {
+    domainId: 'syncCapture',
+    schemaVersion: 1,
+    stores: [{ storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' }],
+  },
   {
     domainId: 'voiceInputHistory',
     schemaVersion: 1,
@@ -99,9 +106,10 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 8,
+    schemaVersion: 9,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_ASSETS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_EXPORTS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_EXPORT_INPUTS_STORE, dataClass: 'operational-recoverable' },

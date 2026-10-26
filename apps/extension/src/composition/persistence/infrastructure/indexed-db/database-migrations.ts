@@ -3,6 +3,7 @@ import { estimateUsageIndexBytes } from './usage-index-migration';
 import type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
   VOICE_INPUT_HISTORY_STORE,
+  SYNC_CAPTURE_STORE,
   ASSET_OPERATIONS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -14,6 +15,7 @@ import {
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_PROJECT_REVISIONS_STORE,
   RECORDING_TELEMETRY_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
@@ -892,6 +894,31 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         db,
         [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
         'Camera project stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'syncCapture', from: 0, to: 1 },
+      { domainId: 'videoProjects', from: 8, to: 9 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 39,
+    toDatabaseVersion: 40,
+    risk: 'additive',
+    stores: [SYNC_CAPTURE_STORE, VIDEO_PROJECT_REVISIONS_STORE],
+    migrate(db) {
+      const store = db.createObjectStore(SYNC_CAPTURE_STORE, { keyPath: 'key' });
+      for (const index of ['kind', 'rootKey', 'createdAt']) store.createIndex(index, index);
+      db.createObjectStore(VIDEO_PROJECT_REVISIONS_STORE, { keyPath: 'projectId' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CAPTURE_STORE, VIDEO_PROJECT_REVISIONS_STORE],
+        'Sync capture or project revision store is unavailable.'
       );
     },
   },

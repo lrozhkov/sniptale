@@ -68,14 +68,18 @@ function createDb() {
           storeName === 'aggregate_presentations'
             ? deleteMocks.presentationDeleteMock
             : deleteMocks.txDeleteMock,
-        get: deleteMocks.txGetMock,
+        get:
+          storeName === 'sync_capture' || storeName === 'video_project_revisions'
+            ? async () => undefined
+            : deleteMocks.txGetMock,
         getAll: deleteMocks.txGetAllMock,
         index: vi.fn(() => ({
           count: deleteMocks.txCountMock,
           getAll: async () => [],
           getAllKeys: async () => [],
         })),
-        put: deleteMocks.txPutMock,
+        put:
+          storeName === 'video_project_revisions' ? async () => undefined : deleteMocks.txPutMock,
       })),
     })),
   };

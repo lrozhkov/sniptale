@@ -12,6 +12,7 @@ export type PersistenceDomainId =
   | 'runtimeRecovery'
   | 'scenarioProjects'
   | 'snapshots'
+  | 'syncCapture'
   | 'videoProjects';
 
 type DatabaseMigrationRisk = 'additive' | 'destructive' | 'transforming';

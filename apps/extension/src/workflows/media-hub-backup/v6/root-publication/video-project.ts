@@ -1,8 +1,11 @@
+import { captureVideoProjectInTransaction } from '../../../../composition/persistence/sync-capture/capture';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance/integrity';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { verifyPreparedMediaReviewAnnotations } from './media-review-assets';
 import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import {
+  VIDEO_PROJECT_REVISIONS_STORE,
+  SYNC_CAPTURE_STORE,
   STORE_NAME,
   IMAGE_WORKSPACES_STORE,
   SCENARIO_ASSETS_STORE,
@@ -55,6 +58,8 @@ import { preparePortableAggregatePresentation } from './presentation';
 import { transformPortableVideoProjectReferences } from './video-project-references';
 
 const VIDEO_PROJECT_RESTORE_STORES = [
+  VIDEO_PROJECT_REVISIONS_STORE,
+  SYNC_CAPTURE_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
   PROJECT_ASSETS_STORE,
@@ -296,6 +301,8 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
             conflicted: restored.conflicted,
           }
         );
+        if (restored.imported)
+          await captureVideoProjectInTransaction(tx, entry.id, { origin: 'local-restore' });
         await tx.done;
         imported = restored.imported;
         conflicted = restored.conflicted;

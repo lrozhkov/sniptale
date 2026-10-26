@@ -384,3 +384,44 @@ it('admits border origins and two-sided phases without rewriting released projec
     ],
   });
 });
+
+it('adds empty capture and native revision stores without rewriting version 39 rows or OPFS objects', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 39
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 40
+  )!;
+  expect(target.records).toEqual({
+    ...source.records,
+    sync_capture: [],
+    video_project_revisions: [],
+  });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(
+    target.stores.filter((name) => name !== 'sync_capture' && name !== 'video_project_revisions')
+  ).toEqual(source.stores);
+  expect(target.indexes).toEqual({
+    ...source.indexes,
+    sync_capture: ['kind', 'rootKey', 'createdAt'],
+    video_project_revisions: [],
+  });
+  expect(target.domainVersions).toEqual({
+    ...source.domainVersions,
+    syncCapture: 1,
+    videoProjects: 9,
+  });
+  expect(
+    PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
+  ).toMatchObject({
+    schemaVersion: 9,
+    stores: expect.arrayContaining([
+      { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
+    ]),
+  });
+  expect(PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'syncCapture')).toEqual({
+    domainId: 'syncCapture',
+    schemaVersion: 1,
+    stores: [{ storeName: 'sync_capture', dataClass: 'durable-authority' }],
+  });
+});

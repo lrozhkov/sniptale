@@ -1,3 +1,5 @@
+import { retainVideoProjectRevisionInTransaction } from './revisions';
+import { captureDeletionInTransaction } from '../sync-capture/capture';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   collectProjectOwnedAssetIds,
@@ -18,6 +20,8 @@ export async function deleteVideoProject(id: string): Promise<string[]> {
       const existing = parseVideoProjectEntry(await projectStore.get(id));
       const projectAssetIds = collectProjectOwnedAssetIds(existing?.project);
 
+      if (existing)
+        await retainVideoProjectRevisionInTransaction(tx, id, existing.workspaceRevision ?? 0);
       await projectStore.delete(id);
       await aggregatePresentationStore.delete(['video-project', id]);
       const deletedProjectAssetIds = await deleteProjectAssetsUnreferencedByOtherProjects({
@@ -26,6 +30,7 @@ export async function deleteVideoProject(id: string): Promise<string[]> {
         projectAssetIds: projectAssetIds,
       });
       if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
+      if (existing) await captureDeletionInTransaction(tx, 'video-project', id);
       await tx.done;
       return deletedProjectAssetIds;
     } catch (error) {

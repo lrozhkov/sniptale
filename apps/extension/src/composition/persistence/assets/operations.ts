@@ -140,6 +140,7 @@ async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
     if (owners.has(id)) return 'adopted';
     if (projected.has(id)) return 'referenced';
     if (snapshot.protectedRollbackAssetIds.has(id)) return 'rollback';
+    if (snapshot.protectedSyncCaptureAssetIds.has(id)) return 'publication';
     if (journals.some((journal) => readyJournalClaimsAsset(journal, id))) return 'publication';
     return 'unowned';
   };

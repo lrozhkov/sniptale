@@ -75,12 +75,18 @@ function createDb() {
     get: projectsDbMocks.dbGetMock,
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({
+      objectStore: vi.fn((storeName: string) => ({
         delete: projectsDbMocks.txDeleteMock,
         index: () => ({ count: async () => 0, getAll: async () => [], getAllKeys: async () => [] }),
-        get: projectsDbMocks.txGetMock,
+        get:
+          storeName === 'sync_capture' || storeName === 'video_project_revisions'
+            ? async () => undefined
+            : projectsDbMocks.txGetMock,
         getAll: projectsDbMocks.txGetAllMock,
-        put: projectsDbMocks.txPutMock,
+        put:
+          storeName === 'video_project_revisions'
+            ? async () => undefined
+            : projectsDbMocks.txPutMock,
       })),
     })),
   };

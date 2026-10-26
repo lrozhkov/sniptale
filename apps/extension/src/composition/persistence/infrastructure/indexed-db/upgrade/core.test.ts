@@ -5,7 +5,11 @@ import {
   EXPECTED_STORES,
   SCHEMA_CONTRACTS_STORE,
 } from '../core.stores.ts';
-import { CURRENT_SCHEMA_CONTRACTS, type DatabaseMigrationDescriptor } from '../schema-contracts.ts';
+import {
+  CURRENT_SCHEMA_CONTRACTS,
+  DATABASE_MIGRATIONS,
+  type DatabaseMigrationDescriptor,
+} from '../schema-contracts.ts';
 import { executeDatabaseUpgrade, handleDatabaseUpgrade } from './core.ts';
 
 function createUpgradeHarness() {
@@ -49,6 +53,9 @@ it('creates the complete current beta schema and persists every domain contract'
       expectedIndexes
     );
   }
+  expect(harness.db.createObjectStore).toHaveBeenCalledWith('video_project_revisions', {
+    keyPath: 'projectId',
+  });
   expect(
     harness.stores.get(SCHEMA_CONTRACTS_STORE)?.put.mock.calls.map(([value]) => value)
   ).toEqual(CURRENT_SCHEMA_CONTRACTS);
@@ -132,3 +139,84 @@ it('aborts immediately when a malformed async descriptor is invoked without awai
   expect(harness.transaction.abort).toHaveBeenCalledOnce();
   expect(harness.transaction.objectStore).not.toHaveBeenCalled();
 });
+
+it('admits version 39 capture and project revision stores before publishing contracts', () => {
+  const harness = createUpgradeHarness();
+  const contracts = { put: vi.fn((_value: unknown) => undefined) };
+  harness.transaction.objectStore.mockReturnValue(contracts);
+  handleDatabaseUpgrade(harness.db, 39, 40, harness.transaction);
+  expect(harness.db.createObjectStore.mock.calls).toEqual([
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
+  ]);
+  expect(harness.stores.get('video_project_revisions')?.createIndex).not.toHaveBeenCalled();
+  expect(harness.stores.get('video_project_revisions')?.put).not.toHaveBeenCalled();
+  expect(harness.transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(harness.stores.get('sync_capture')?.createIndex.mock.calls).toEqual([
+    ['kind', 'kind'],
+    ['rootKey', 'rootKey'],
+    ['createdAt', 'createdAt'],
+  ]);
+  expect(contracts.put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(harness.db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(harness.transaction.abort).not.toHaveBeenCalled();
+});
+
+it('aborts capture admission before contract publication when native store creation fails', () => {
+  const harness = createUpgradeHarness();
+  harness.db.createObjectStore.mockImplementation(() => {
+    throw new Error('capture store creation failed');
+  });
+  expect(() => handleDatabaseUpgrade(harness.db, 39, 40, harness.transaction)).toThrow(
+    'capture store creation failed'
+  );
+  expect(harness.transaction.abort).toHaveBeenCalledOnce();
+  expect(harness.transaction.objectStore).not.toHaveBeenCalled();
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 39)!;
+  expect(migration.domainVersions).toEqual([
+    { domainId: 'syncCapture', from: 0, to: 1 },
+    { domainId: 'videoProjects', from: 8, to: 9 },
+  ]);
+  expect(() => migration.validate(harness.db, harness.transaction)).toThrow(
+    'Sync capture or project revision store is unavailable.'
+  );
+});
+
+it('aborts when project revision creation fails and permits a complete retry from version 39', () => {
+  const interrupted = createUpgradeHarness();
+  interrupted.db.createObjectStore.mockImplementationOnce(() => ({
+    createIndex: vi.fn(),
+    put: vi.fn(),
+  }));
+  interrupted.db.createObjectStore.mockImplementationOnce(() => {
+    throw new Error('project revision store creation failed');
+  });
+  expect(() => handleDatabaseUpgrade(interrupted.db, 39, 40, interrupted.transaction)).toThrow(
+    'project revision store creation failed'
+  );
+  expect(interrupted.transaction.abort).toHaveBeenCalledOnce();
+  expect(interrupted.transaction.objectStore).not.toHaveBeenCalled();
+
+  const retry = createUpgradeHarness();
+  const contracts = { put: vi.fn() };
+  retry.transaction.objectStore.mockReturnValue(contracts);
+  handleDatabaseUpgrade(retry.db, 39, 40, retry.transaction);
+  expect([...retry.stores.keys()]).toEqual(['sync_capture', 'video_project_revisions']);
+  expect(contracts.put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(retry.transaction.abort).not.toHaveBeenCalled();
+});
+
+it.each(['sync_capture', 'video_project_revisions'])(
+  'rejects version 40 validation when %s is absent',
+  (omittedStore) => {
+    const harness = createUpgradeHarness();
+    const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 39)!;
+    harness.db.objectStoreNames.push(
+      ...['sync_capture', 'video_project_revisions'].filter((name) => name !== omittedStore)
+    );
+    expect(() => migration.validate(harness.db, harness.transaction)).toThrow(
+      'Sync capture or project revision store is unavailable.'
+    );
+    expect(harness.transaction.objectStore).not.toHaveBeenCalled();
+  }
+);

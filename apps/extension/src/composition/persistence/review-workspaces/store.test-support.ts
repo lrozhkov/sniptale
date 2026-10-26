@@ -45,6 +45,8 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
       'asset_owners',
       'asset_refs',
       'asset_operations',
+      'sync_capture',
+      'video_project_revisions',
     ].map((name): [string, Map<string, unknown>] => [name, new Map()]),
     ['video_workspaces', new Map()],
     ['video_workspace_history', new Map()],
@@ -64,11 +66,38 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
           const keyOf = (key: IDBValidKey) => (typeof key === 'string' ? key : JSON.stringify(key));
           const ownRows = (key: IDBValidKey, indexName = 'aggregateId') =>
             [...store].filter(([, value]) => isRecord(value) && value[indexName] === key);
+          const write = async (value: unknown, add: boolean) => {
+            if (failure(name)) throw new DOMException('No space', 'QuotaExceededError');
+            if (!isRecord(value)) throw new Error('Invalid fixture row');
+            const key =
+              name === 'sync_capture'
+                ? value['key']
+                : name === 'video_project_revisions'
+                  ? value['projectId']
+                  : name === 'video_workspace_history'
+                    ? JSON.stringify([value['aggregateId'], value['ordinal']])
+                    : name === 'asset_owners'
+                      ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
+                      : (value['aggregateId'] ??
+                        value['id'] ??
+                        value['operationId'] ??
+                        value['assetId']);
+            if (typeof key !== 'string' || !key) throw new Error('Missing test row identity');
+            if (add && store.has(key))
+              throw new DOMException('Duplicate fixture row', 'ConstraintError');
+            store.set(key, structuredClone(value));
+          };
           return {
             get: async (key: IDBValidKey) => structuredClone(store.get(keyOf(key))),
             getAll: async () => structuredClone([...store.values()]),
+            count: async () => store.size,
             index: (indexName: string) => {
-              if (indexName !== 'aggregateId' && indexName !== 'assetId')
+              if (
+                indexName !== 'aggregateId' &&
+                indexName !== 'assetId' &&
+                indexName !== 'kind' &&
+                indexName !== 'projectId'
+              )
                 throw new Error('Unexpected test index');
               return {
                 count: async (key: IDBValidKey) => ownRows(key, indexName).length,
@@ -94,21 +123,8 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
                   }),
               };
             },
-            put: async (value: unknown) => {
-              if (failure(name)) throw new DOMException('No space', 'QuotaExceededError');
-              if (!isRecord(value)) throw new Error('Invalid fixture row');
-              const key =
-                name === 'video_workspace_history'
-                  ? JSON.stringify([value['aggregateId'], value['ordinal']])
-                  : name === 'asset_owners'
-                    ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
-                    : (value['aggregateId'] ??
-                      value['id'] ??
-                      value['operationId'] ??
-                      value['assetId']);
-              if (typeof key !== 'string' || !key) throw new Error('Missing test row identity');
-              store.set(key, structuredClone(value));
-            },
+            put: async (value: unknown) => write(value, false),
+            add: async (value: unknown) => write(value, true),
             delete: async (key: IDBValidKey) => {
               store.delete(keyOf(key));
             },

@@ -1,3 +1,4 @@
+import { captureVideoProjectInTransaction } from '../sync-capture/capture';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import type { IDBPTransaction } from 'idb';
 import {
@@ -24,6 +25,11 @@ import {
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { assertStandaloneMediaSourceReplaceable } from './source-admission';
 import {
+  SYNC_CAPTURE_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  THUMBNAILS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -120,6 +126,12 @@ async function publishProjectMediaAsset(args: {
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        SYNC_CAPTURE_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
+        IMAGE_WORKSPACES_STORE,
+        THUMBNAILS_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+        PROJECT_EXPORTS_STORE,
         args.storeName,
         MEDIA_LIBRARY_STORE,
         ASSET_REFS_STORE,
@@ -228,6 +240,10 @@ async function publishProjectMediaAsset(args: {
       if (physicalDelete.assetIds.length > 0) {
         await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
       }
+      if (args.storeName === PROJECT_EXPORTS_STORE && 'projectId' in args.entry)
+        await captureVideoProjectInTransaction(tx, args.entry.projectId, {
+          publicationId: args.journal.journalId,
+        });
       await tx.done;
     } catch (error) {
       await abortIndexedDbMutation(tx, error);

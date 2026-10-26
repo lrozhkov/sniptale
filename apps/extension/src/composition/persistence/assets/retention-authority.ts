@@ -1,3 +1,4 @@
+import { collectSyncCaptureClaims } from '../sync-capture/claims';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
@@ -11,6 +12,7 @@ import {
 import type { AssetOperation, AssetOwner, AssetRef, ArchiveRestoreSession } from './contracts';
 import { collectBackupRollbackAssetIds } from './retention-claims';
 import {
+  SYNC_CAPTURE_STORE,
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_REFS_STORE,
@@ -46,6 +48,7 @@ export async function collectDurableAssetSnapshot(
   owners: AssetOwner[];
   operationIds: Set<string>;
   protectedRollbackAssetIds: Set<string>;
+  protectedSyncCaptureAssetIds: Set<string>;
   publishedProjectAssetIds: Set<string>;
   refs: AssetRef[];
 }> {
@@ -148,8 +151,12 @@ export async function collectDurableAssetSnapshot(
       publishedProjectAssetIds.add(entry.source.projectAssetId);
     return projectMediaOwners(entry);
   });
+  const captureClaims = collectSyncCaptureClaims(await db.getAll(SYNC_CAPTURE_STORE));
+  if (!captureClaims.valid) logger.debug(`Retention validation failed: ${SYNC_CAPTURE_STORE}`);
+  authorityValid = authorityValid && captureClaims.valid;
   return {
     authorityValid,
+    protectedSyncCaptureAssetIds: captureClaims.assetIds,
     archiveSessions: operationsResult.archiveSessions,
     embeddedBinaryMetadata,
     expectedOwnerAssets: new Map(expectedOwners.map((owner) => [ownerKey(owner), owner.assetId])),
