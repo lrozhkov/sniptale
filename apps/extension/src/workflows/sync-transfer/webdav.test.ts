@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { createWebdavRemoteStore } from './webdav';
+import { allocateWebdavWorkspaceRoot, createWebdavRemoteStore } from './webdav';
 import { SyncRemoteError } from './remote-store';
 
 const signal = () => new AbortController().signal;
@@ -605,4 +605,76 @@ it('refuses the initial probe and later subrequests before native fetch when adm
     remote.write('one/two/file.bin', new Blob(['bytes']), signal())
   ).rejects.toMatchObject({ code: 'authentication' });
   expect(fetchMock.mock.calls.map(([, init]) => init?.method)).toEqual(['PROPFIND', 'PROPFIND']);
+});
+
+const allocationRoot = 'https://dav.example/root/Sniptale-10000000-0000-4000-8000-000000000001/';
+function allocate(rootUrl = allocationRoot, requestSignal = signal()) {
+  return allocateWebdavWorkspaceRoot(
+    {
+      rootUrl,
+      authentication: auth,
+      request: (admittedSignal, issue) => issue(admittedSignal),
+    },
+    requestSignal
+  );
+}
+
+it('allocates only the planned final root with one library MKCOL and no parent or file writes', async () => {
+  fetchMock.mockResolvedValueOnce(new Response(null, { status: 201 }));
+  await allocate();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  const [url, init] = fetchMock.mock.calls[0]!;
+  expect(url).toBe(allocationRoot);
+  expect(init?.method).toBe('MKCOL');
+  expect(init?.body).toBeUndefined();
+  expect(init?.credentials).toBe('omit');
+  expect(init?.redirect).toBe('error');
+});
+
+it.each([405, 412])(
+  'refuses occupied allocation roots without adoption or cleanup (%s)',
+  async (status) => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status }));
+    await expect(allocate()).rejects.toMatchObject({ code: 'collision', status });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  }
+);
+
+it.each([200, 204, 207])(
+  'does not turn other successful HTTP statuses into ownership (%s)',
+  async (status) => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status }));
+    await expect(allocate()).rejects.toMatchObject({ code: 'invalid-response' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  }
+);
+
+it('does not retry or claim ownership after a lost allocation response', async () => {
+  fetchMock.mockRejectedValueOnce(new TypeError('private upstream detail'));
+  await expect(allocate()).rejects.toMatchObject({ code: 'transport', status: null });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  'https://dav.example/root/',
+  'http://dav.example/root/',
+  'https://dav.example/root/Sniptale-not-a-uuid/',
+])('rejects allocation outside a generated workspace child (%s)', async (root) => {
+  await expect(allocate(root)).rejects.toMatchObject({ code: 'invalid-configuration' });
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('refuses cancelled allocation without dispatch', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await expect(allocate(allocationRoot, controller.signal)).rejects.toMatchObject({
+    code: 'cancelled',
+  });
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('retains a temporary lock failure without retry or ownership', async () => {
+  fetchMock.mockResolvedValueOnce(new Response(null, { status: 423 }));
+  await expect(allocate()).rejects.toMatchObject({ code: 'temporary', status: 423 });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
 });

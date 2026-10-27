@@ -311,3 +311,11 @@ Malformed evidence remains in place. Each publication rechecks native admission 
 
 
 Settings queue display includes admitted source labels, source timestamps and fixed operation states. It excludes file bodies, resolved credentials and provider addresses. Labels remain plain text and do not enter diagnostic messages. Management commands retain existing native enrollment admission, revision CAS and privacy exclusion. A delayed command cannot mutate a replacement enrollment.
+
+## Workspace allocation evidence
+
+The native remote-connection owner retains one allocation plan under workspace-allocation in sync_connection. The plan contains the selected parent URL, account, generated child URL and random workspace identities. It contains no credentials, authorization headers or media. Existing exclusions remove this store from backups, Settings transfer, remote sync, diagnostics and logs. Verified local-data erasure removes this store.
+
+Each journal command checks its exact incarnation and revision. Opening commands capture the prepared database handle synchronously before waiting for connection admission. The canonical mutation permit orders their transactions. Erasure closes the retained handle, so a delayed opening cannot recreate selected account metadata. The handle capture never initializes storage. It also refuses an installed capture profile or connection. Explicit abandonment permits a new plan without remote cleanup. Uncertain allocation never authorizes adoption or deletion of an existing folder. Provider errors contain fixed codes and numeric statuses only.
+
+The exclusive root operation uses the existing WebDAV authentication and guarded request adapter. It omits cookies and refuses redirects. Its caller must preserve the plan before dispatch and control request cancellation and drain. The explicit test harness supplies this caller. Production creation, marker publication and enrollment remain disabled pending their lifecycle checks.

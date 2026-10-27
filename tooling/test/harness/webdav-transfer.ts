@@ -1,3 +1,4 @@
+import { createWebdavWorkspaceHarness } from './webdav-workspace';
 import { createWebdavConnectionHarness } from './webdav-connection';
 import { createWebdavPortableHarness } from './webdav-portable';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -130,6 +131,7 @@ async function readProof(key: string, expectedSize: number) {
 
 const webdavTransferHarness = {
   connect,
+  workspace: createWebdavWorkspaceHarness(),
   connection: createWebdavConnectionHarness((remote) => {
     store = remote;
   }),

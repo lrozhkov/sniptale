@@ -470,3 +470,38 @@ export async function createWebdavRemoteStore(
     throw failure(error, signal);
   }
 }
+
+/**
+ * Allocate one new planned workspace root through one exclusive MKCOL.
+ * The caller must persist its plan before this call and own request admission and drain.
+ * Only a positive 201 acknowledges allocation. An error grants no ownership or retry authority.
+ */
+export async function allocateWebdavWorkspaceRoot(
+  options: WebdavRemoteStoreOptions,
+  signal: AbortSignal
+): Promise<void> {
+  try {
+    signal.throwIfAborted();
+    const root = rootURL(options.rootUrl);
+    if (
+      !/\/Sniptale-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\/$/u.test(
+        root.pathname
+      )
+    )
+      throw new SyncRemoteError('invalid-configuration');
+    const guardedFetch = clientFetch(root, options);
+    await makeCollection({
+      url: root.href,
+      fetchOptions: { signal },
+      fetch: async (input, init) => {
+        const response = await guardedFetch(input, init);
+        if (response.status !== 201) throw new SyncRemoteError('invalid-response');
+        return response;
+      },
+    });
+    signal.throwIfAborted();
+  } catch (error) {
+    if (statusOf(error) === 405 && !signal.aborted) throw new SyncRemoteError('collision', 405);
+    throw failure(error, signal);
+  }
+}

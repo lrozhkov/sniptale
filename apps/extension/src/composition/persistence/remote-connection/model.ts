@@ -79,6 +79,27 @@ export function sameConnectionScope(
     left.profileCreatedAt === right.profileCreatedAt
   );
 }
+/** Admit a canonical HTTPS collection URL without credentials, query or fragment. */
+export function parseConnectionRootUrl(value: unknown): string | null {
+  if (!text(value, 4096)) return null;
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol !== 'https:' ||
+      !url.hostname ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      !url.pathname.endsWith('/') ||
+      url.href !== value
+    )
+      return null;
+  } catch {
+    return null;
+  }
+  return value;
+}
 export function parseConnectionBinding(value: unknown): SyncConnectionBinding | null {
   if (
     !isRecord(value) ||
@@ -99,22 +120,7 @@ export function parseConnectionBinding(value: unknown): SyncConnectionBinding | 
     !ordinal(value['profileCreatedAt'])
   )
     return null;
-  try {
-    const url = new URL(value['rootUrl']);
-    if (
-      url.protocol !== 'https:' ||
-      !url.hostname ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      !url.pathname.endsWith('/') ||
-      url.href !== value['rootUrl']
-    )
-      return null;
-  } catch {
-    return null;
-  }
+  if (!parseConnectionRootUrl(value['rootUrl'])) return null;
   return {
     provider: 'webdav',
     rootUrl: value['rootUrl'],

@@ -9,7 +9,7 @@ import type { Duplex } from 'node:stream';
 import { promisify } from 'node:util';
 
 type Fault = {
-  method: 'PUT' | 'GET' | 'PROPFIND';
+  method: 'PUT' | 'GET' | 'PROPFIND' | 'MKCOL';
   key: string;
   kind:
     | 'status'
@@ -65,6 +65,8 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
 
   const counts = {
     puts: 0,
+    mkcols: 0,
+    mkcolStatuses: [] as { key: string; status: number }[],
     gets: 0,
     getKeys: [] as string[],
     propfinds: 0,
@@ -133,6 +135,7 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
           record(false);
         });
       }
+      if (incoming.method === 'MKCOL') counts.mkcols++;
       if (incoming.method === 'GET') {
         counts.gets++;
         counts.getKeys.push(key);
@@ -148,6 +151,8 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
         if (fault.kind === 'redirect') {
           downstream.writeHead(307, { location: '/__dav_redirect_sink' }).end();
         } else {
+          if (incoming.method === 'MKCOL')
+            counts.mkcolStatuses.push({ key, status: fault.status ?? 503 });
           downstream.writeHead(fault.status ?? 503).end();
         }
         incoming.resume();
@@ -193,6 +198,8 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
         else downstream.destroy();
       });
       outgoing.on('response', (response) => {
+        if (incoming.method === 'MKCOL')
+          counts.mkcolStatuses.push({ key, status: response.statusCode ?? 502 });
         response.on('error', () => {
           downstream.destroy();
         });
@@ -291,8 +298,8 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
     armFault(fault: Fault) {
       if (closed || armed || reached || release)
         throw new Error('DAV lab fault is already active.');
-      if (fault.kind === 'lost-response' && fault.method !== 'PUT') {
-        throw new Error('Lost-response faults require PUT.');
+      if (fault.kind === 'lost-response' && fault.method !== 'PUT' && fault.method !== 'MKCOL') {
+        throw new Error('Lost-response faults require PUT or MKCOL.');
       }
       if (
         fault.status !== undefined &&

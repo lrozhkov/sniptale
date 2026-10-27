@@ -882,3 +882,19 @@ The native paged queue reader returns display metadata from each operation's adm
 The sync-transfer management workflow applies selected commands through existing native revision CAS. It attempts confirmed history delivery after a successful command. A history failure retains the applied command result and leaves native events eligible for automatic discovery. Commands grant no transport, settlement or source-release authority.
 
 Settings owns page selection, pending interaction and recovery feedback. Refresh starts a new live traversal. A stale command refuses without automatic mutation retry. The interface reloads native revisions before another command and restores keyboard focus. Queue pause controls future admissions. Cancellation retains local sources and promises no server rollback.
+
+## Native workspace allocation
+
+The remote-connection owner stores one workspace-allocation journal in sync_connection. The journal contains the selected parent, account, generated child root and workspace identities. It contains no credentials. Existing backup, transfer and erasure policies apply to the entire store.
+
+Journal operations refuse an installed capture profile or connection. Initial commands require a prepared native database. One native transaction checks these records and changes the journal. The existing connection admission lock serializes commands. A random incarnation and increasing revision reject stale commands after abandonment, erasure or recreation. Reads refuse malformed records. They do not change storage.
+
+Before waiting for connection admission, the journal owner captures the prepared database handle synchronously. This read does not initialize storage. The canonical mutation permit orders the transaction after other maintenance. Erasure closes the captured handle. A delayed command cannot reopen the database or write into its replacement. Cold database admission refuses the command. The connection page loads native state before it enables creation.
+
+The native owner generates the workspace and bootstrap UUIDs. The child name is Sniptale- followed by the bootstrap UUID. The immutable plan precedes any remote write. The allocating phase precedes the root MKCOL request. Only a positive HTTP 201 response permits the `confirm` command to record allocated state.
+
+An error leaves allocating state unchanged. Restart and folder existence cannot grant ownership. Explicit abandonment changes local evidence only. A replacement requires the exact abandoned identity and receives new identities. A delayed result cannot advance that replacement.
+
+The provider primitive issues one MKCOL for the final child root. It refuses an occupied path and does not create parents or retry. The generic object store requires no collection allocation operation. Callers retain responsibility for current request authorization, cancellation and drain. The test harness checks the exact allocating identity before dispatch and records allocated state under that revision after success.
+
+Allocated state records root allocation only. Marker publication, enrollment and production request admission remain separate release requirements. Production ingress remains disabled.
