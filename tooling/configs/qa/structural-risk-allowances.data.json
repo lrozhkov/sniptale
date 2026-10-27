@@ -1535,10 +1535,10 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx",
       "symbol": "TourNarrationAI",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: This form owns one voice draft, provider approval and target selection lifetime. The shared selection hook owns catalog admission and preference commands. Voice parameters and results remain existing local components. The existing attempt hook owns generation and explicit publication. Loading, unavailable and save-error branches project that same form lifetime. Mounted tests, both primary viewports and real NeuralDeep proof cover selection, refusal, cancellation, Apply and retained playback. This function adds no durable writer, network owner or independent recovery. Forwarding components would distribute the same visible receiver.",
+      "reason": "tool-noise: This form owns one voice draft, provider approval, explicit profile-reset intent and target selection lifetime. The shared selection hook owns catalog admission and preference commands. Voice parameters and results remain existing local components. The existing attempt hook owns generation and explicit publication. Mounted proof reproduces same-ID replacement and checks refusal before the correction. Primary viewport and real provider proof cover selection, cancellation, Apply and retained playback. This function adds no durable writer, network owner or independent recovery. Forwarding components would distribute the same visible receiver.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
       "reviewDate": "2026-10-27",
-      "astHash": "f9cfc288b915fd92e462e6be7e151bea47956d0513f0eb5594fb9cbb7e96b7c7",
+      "astHash": "96dbc7b6e6fc4450623c02f215b6fb7e8144544d25bda2daaa13f1d3e8577d78",
       "signatureHash": "fc2ff29cd7dd2af6b1c33aef69f08045dd9326a84c0b638dfa741c6352cf3124"
     },
     {

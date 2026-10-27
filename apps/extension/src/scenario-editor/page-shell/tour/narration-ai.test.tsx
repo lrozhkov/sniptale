@@ -585,3 +585,42 @@ it('retains the voice draft while its model is unavailable and restores the same
   expect(access.prepareNarration).not.toHaveBeenCalled();
   expect(io.generate).not.toHaveBeenCalled();
 });
+
+it('initializes the updated profile only after explicit replacement under the same model ID succeeds', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(100, 100, 280, 32)
+  );
+  await editVoice('retained draft');
+  const replacement: Catalog = {
+    ...fixture,
+    models: [
+      {
+        ...fixture.models[0]!,
+        modelCode: 'replacement-voice',
+        displayName: 'Updated speech',
+        audio: { speech: { voiceId: 'updated voice', responseFormat: 'wav' } },
+      },
+    ],
+  };
+  io.catalog.mockResolvedValue(replacement);
+  const choose = async () => {
+    await act(async () => button('.sniptale-ai-model-selector-trigger').click());
+    const option = [
+      ...host.querySelectorAll<HTMLButtonElement>('.sniptale-dropdown-menu button'),
+    ].find((node) => node.textContent?.includes('Updated speech'));
+    if (!option) throw new Error('Missing updated model');
+    await act(async () => option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  };
+  io.remember.mockRejectedValueOnce(new Error('refused'));
+  await choose();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'retained draft'
+  );
+  await choose();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'updated voice'
+  );
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(access.applyNarration).not.toHaveBeenCalled();
+  expect(io.generate).not.toHaveBeenCalled();
+});

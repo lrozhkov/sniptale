@@ -36,6 +36,7 @@ export function TourNarrationAI({
   const selection = useAIScenarioModelSelection('scenario-speech');
   const catalog = selection.configuration;
   const [profile, setProfile] = useState<Profile | null>(null);
+  const profileReset = useRef<string | null>(null);
   const [approved, setApproved] = useState<string | null>(null);
   const [selected, setSelected] = useState(() => new Set(targets.map(scenarioNarrationTargetKey)));
   const operation = useScenarioNarrationAI(
@@ -50,9 +51,12 @@ export function TourNarrationAI({
   );
   const { resetUnacceptedPreviews } = operation;
   useEffect(() => {
+    if (selection.selectionPending) return;
+    const replace = profileReset.current === selection.modelId && !selection.selectionFailed;
+    profileReset.current = null;
     const model = catalog?.models.find((entry) => entry.id === selection.modelId);
     if (!model) return;
-    if (profile?.modelId === model.id) return;
+    if (profile?.modelId === model.id && !replace) return;
     const provider = catalog?.providers.find((entry) => entry.id === model.providerId);
     const next: Profile = model.audio?.speech
       ? { modelId: model.id, ...model.audio.speech }
@@ -62,7 +66,14 @@ export function TourNarrationAI({
           responseFormat: provider?.connectionType === 'google' ? 'wav' : 'mp3',
         };
     if (resetUnacceptedPreviews()) setProfile(next);
-  }, [catalog, selection.modelId, profile, resetUnacceptedPreviews]);
+  }, [
+    catalog,
+    selection.modelId,
+    selection.selectionPending,
+    selection.selectionFailed,
+    profile,
+    resetUnacceptedPreviews,
+  ]);
   const model = catalog?.models.find((entry) => entry.id === profile?.modelId);
   const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
   useEffect(() => setApproved(null), [provider?.id]);
@@ -109,7 +120,16 @@ export function TourNarrationAI({
         profile={profile}
         disabled={busy || disabled}
         busy={busy}
-        onSelectModel={selection.chooseModel}
+        onSelectModel={(id) => {
+          if (
+            !id ||
+            selection.selectionPending ||
+            !catalog?.models.some((entry) => entry.id === id)
+          )
+            return;
+          profileReset.current = id;
+          selection.chooseModel(id);
+        }}
         onOpenModels={() => void selection.retryConfiguration()}
         onChange={(next) => {
           if (JSON.stringify(next) !== JSON.stringify(profile) && resetUnacceptedPreviews())
