@@ -165,6 +165,17 @@ async function configureProvider(
     await dialog.locator('input').nth(0).fill(providerName);
     await dialog.locator('input').nth(1).fill(`${origin}/v1`);
     await dialog.locator('input[type=password]').fill('synthetic-test-only-key');
+    await dialog
+      .getByLabel(translate('settings.aiProviders.providerManagementLabel', locale), {
+        exact: true,
+      })
+      .click();
+    await settings
+      .getByRole('option', {
+        name: translate('settings.aiProviders.providerModeManual', locale),
+        exact: true,
+      })
+      .click();
     await command(dialog, locale, 'common.actions.add').click();
     await expect(dialog).toHaveCount(0);
     const models = settings.getByRole('region', {
@@ -351,6 +362,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .toBeLessThan(beforeDrag.x - 30);
       await expectWithinViewport(page, popover);
       await prompt.fill('Rewrite only this selected text.');
+      await expect(submit).toBeEnabled();
       await expectWithinViewport(page, submit);
       await page.screenshot({ path: info.outputPath('plain-text-ready.png'), fullPage: false });
       await prompt.press('Control+Enter');

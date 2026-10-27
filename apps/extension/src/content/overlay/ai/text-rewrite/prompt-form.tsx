@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, type SyntheticEvent } from 'react';
 import { Send, Square } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { CONTENT_AI_PAYLOAD_LIMITS } from '@sniptale/runtime-contracts/ai/payload-policy';
@@ -9,7 +9,7 @@ import { translate } from '../../../../platform/i18n';
 import { isContentEventWithinElement } from '../../../platform/dom-host';
 import { ContentVoiceInputButton } from '../../../voice-input/button';
 import { useAIModalPromptVoiceInput } from '../modal/session/prompt-voice-input';
-import { isTrustedKeyboardEvent } from '../../../platform/trusted-events';
+import { isTrustedDomEvent, isTrustedKeyboardEvent } from '../../../platform/trusted-events';
 import type { useTextRewriteSession } from './session';
 type Session = ReturnType<typeof useTextRewriteSession>;
 function TextRequestFeedback({ session }: { session: Session }) {
@@ -53,10 +53,34 @@ function TextRequestFeedback({ session }: { session: Session }) {
           {translate(errorKeys[error])}
         </p>
       ) : null}
-      {session.models.failed ? (
-        <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-danger)]">
-          {translate('content.toolbar.aiTextModelsError')}
+      {session.models.pending && !session.request.busy ? (
+        <p role="status" className="mt-2 text-xs">
+          {translate('common.states.saving')}
         </p>
+      ) : null}
+      {session.models.unavailable && error !== 'model-unavailable' ? (
+        <p role="status" className="mt-2 text-xs">
+          {translate('aiModal.modelSelectionUnavailable')}
+        </p>
+      ) : null}
+      {session.models.selectionFailed ? (
+        <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-danger)]">
+          {translate('aiModal.modelSelectionSaveFailed')}
+        </p>
+      ) : null}
+      {session.models.failed ? (
+        <div className="mt-2 flex items-center gap-2">
+          <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+            {translate('content.toolbar.aiTextModelsError')}
+          </p>
+          <ProductActionButton
+            compact
+            onClick={session.models.reload}
+            disabled={session.request.busy || session.models.pending}
+          >
+            {translate('common.actions.retry')}
+          </ProductActionButton>
+        </div>
       ) : null}
     </>
   );
@@ -104,7 +128,8 @@ function useTextRewritePrompt(session: Session) {
         event.key !== 'Enter' ||
         !(event.ctrlKey || event.metaKey) ||
         voiceBusy ||
-        requestBusy
+        requestBusy ||
+        session.models.pending
       )
         return;
       // The editable bridge dispatches an untrusted local key event before this original event.
@@ -114,7 +139,7 @@ function useTextRewritePrompt(session: Session) {
     };
     window.addEventListener('keydown', handleSubmitKey, true);
     return () => window.removeEventListener('keydown', handleSubmitKey, true);
-  }, [submitRequest, requestBusy, voiceBusy]);
+  }, [submitRequest, requestBusy, voiceBusy, session.models.pending]);
   return { textareaRef, voice, voiceBusy };
 }
 
@@ -199,20 +224,31 @@ function TextRewritePromptFields({
   );
 }
 
+function requireTrustedModelInteraction(event: SyntheticEvent) {
+  if (isTrustedDomEvent(event.nativeEvent)) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 function TextRewriteFooter({ session, voiceBusy }: { session: Session; voiceBusy: boolean }) {
   return (
     <div
       className="flex min-w-0 shrink-0 items-center gap-2 px-3 pb-3"
       data-ui="content.ai-text.footer"
     >
-      <div className="min-w-0 flex-1">
+      <div
+        className="min-w-0 flex-1"
+        onMouseDownCapture={requireTrustedModelInteraction}
+        onClickCapture={requireTrustedModelInteraction}
+      >
         <AIModelSelector
           models={session.models.models}
           providers={session.models.providers}
           selectedModelId={session.models.selectedModelId}
           onSelect={session.models.select}
+          onOpen={session.models.reload}
           isEventWithinElement={isContentEventWithinElement}
-          disabled={session.request.busy}
+          disabled={session.request.busy || session.models.pending}
         />
       </div>
       <ProductActionButton
@@ -222,7 +258,10 @@ function TextRewriteFooter({ session, voiceBusy }: { session: Session; voiceBusy
         data-ui="content.ai-text.submit"
         disabled={
           !session.request.busy &&
-          (!session.prompt.trim() || !session.models.selectedModelId || voiceBusy)
+          (!session.prompt.trim() ||
+            !session.models.selectedModelId ||
+            voiceBusy ||
+            session.models.pending)
         }
         title={session.request.busy ? undefined : getTextDisclosure(session.models)}
         aria-description={session.request.busy ? undefined : getTextDisclosure(session.models)}

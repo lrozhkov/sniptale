@@ -217,7 +217,14 @@ it.each([false, true])(
   async (local) => {
     await click(ui('content.toolbar.ai-text'));
     mocks.models.mockResolvedValueOnce({
-      defaultModelId: 'disclosed',
+      scenario: 'page-edit',
+      remembered: null,
+      resolution: {
+        status: 'initial',
+        modelId: 'disclosed',
+        previousSelection: null,
+        reason: null,
+      },
       models: [
         {
           id: 'disclosed',
@@ -267,3 +274,111 @@ it('offers ready prompts and places public dictation inside the prompt field', a
   );
   expect(mocks.request).not.toHaveBeenCalled();
 });
+
+it('persists only a trusted explicit model choice from the actual selector', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ x: 10, y: 10, width: 200, height: 40 })
+  );
+  await selectTarget();
+  expect(mocks.remember).not.toHaveBeenCalled();
+  const trigger = shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!;
+  await click(trigger);
+  const option = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Other text model'
+  );
+  if (!option) throw new Error('Model option missing');
+  await click(option, false);
+  expect(mocks.remember).not.toHaveBeenCalled();
+  await click(option);
+  expect(mocks.remember).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ scenario: 'page-edit' }),
+    'page-edit',
+    'other',
+    'explicit'
+  );
+  expect(target.textContent).toBe('Original words');
+  expect(mocks.request).not.toHaveBeenCalled();
+});
+
+it.each(['catalog', 'preference', 'destination'] as const)(
+  'preserves the page and prompt without inference when %s preparation fails',
+  async (failure) => {
+    await selectTarget();
+    await fill('Keep this instruction');
+    const markup = target.innerHTML;
+    const catalog = await mocks.models.mock.results[0]!.value;
+    if (failure === 'catalog') mocks.models.mockRejectedValueOnce(new Error('Unavailable'));
+    if (failure === 'preference') mocks.remember.mockRejectedValueOnce(new Error('Unavailable'));
+    if (failure === 'destination') {
+      const next = structuredClone(catalog);
+      next.providers[0].destinationBinding = `sha256:${'b'.repeat(64)}`;
+      mocks.models.mockResolvedValue(next);
+    }
+    await submit();
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(target.innerHTML).toBe(markup);
+    expect(ui<HTMLTextAreaElement>('content.ai-text.prompt').value).toBe('Keep this instruction');
+    expect(shadow.textContent).toContain(
+      failure === 'catalog'
+        ? 'content.toolbar.aiTextModelsError'
+        : failure === 'preference'
+          ? 'aiModal.modelSelectionSaveFailed'
+          : 'content.toolbar.aiTextModelUnavailable'
+    );
+    if (failure === 'catalog') {
+      const retry = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+        (node) => node.textContent === 'common.actions.retry'
+      );
+      if (!retry) throw new Error('Retry control missing');
+      await click(retry);
+      await submit();
+      expect(mocks.request).toHaveBeenCalledOnce();
+    }
+  }
+);
+it('blocks submission and duplicate choices while an explicit choice is being saved', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ x: 10, y: 10, width: 200, height: 40 })
+  );
+  await selectTarget();
+  await fill('Instruction');
+  const pending = deferred<void>();
+  mocks.remember.mockReturnValueOnce(pending.promise);
+  await click(shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!);
+  const option = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Other text model'
+  );
+  if (!option) throw new Error('Model option missing');
+  await click(option);
+  expect(ui<HTMLButtonElement>('content.ai-text.submit').disabled).toBe(true);
+  expect(
+    shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')?.disabled
+  ).toBe(true);
+  await submit();
+  expect(mocks.request).not.toHaveBeenCalled();
+  expect(mocks.remember).toHaveBeenCalledOnce();
+  await act(async () => pending.resolve());
+  expect(ui<HTMLButtonElement>('content.ai-text.submit').disabled).toBe(false);
+  expect(target.textContent).toBe('Original words');
+});
+it.each(['cancel', 'source-change'] as const)(
+  'does not send a request after %s while fresh selection preparation is pending',
+  async (change) => {
+    await selectTarget();
+    await fill('Instruction');
+    const catalog = await mocks.models.mock.results[0]!.value;
+    const pending = deferred<typeof catalog>();
+    mocks.models.mockReturnValueOnce(pending.promise);
+    await submit();
+    expect(mocks.request).not.toHaveBeenCalled();
+    if (change === 'cancel') await click(ui('content.ai-text.submit'));
+    else target.textContent = 'Page changed during preparation';
+    await act(async () => pending.resolve(catalog));
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(target.textContent).toBe(
+      change === 'cancel' ? 'Original words' : 'Page changed during preparation'
+    );
+    expect(ui<HTMLTextAreaElement>('content.ai-text.prompt').value).toBe('Instruction');
+    if (change === 'cancel') expect(mocks.remember).not.toHaveBeenCalled();
+  }
+);

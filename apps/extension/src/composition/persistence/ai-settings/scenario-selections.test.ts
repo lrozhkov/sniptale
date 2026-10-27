@@ -8,7 +8,9 @@ import {
 } from '../../../contracts/settings/ai-catalog';
 import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 import { resolveAIScenarioModel } from '../../../features/ai/selection';
+import { mergeChromeAiSelectorEntries } from '../../../features/ai/chrome/constants';
 import {
+  AI_CHROME_ENABLED_KEY,
   AI_MODELS_KEY,
   AI_PROVIDERS_KEY,
   AI_SCENARIO_SELECTIONS_KEY,
@@ -298,4 +300,41 @@ it('restricts Chrome execution to supported content scenarios', () => {
       selection: null,
     })
   ).toMatchObject({ status: 'empty', modelId: null });
+});
+
+it('remembers Chrome page editing through the existing writer and refuses use after disable', async () => {
+  const chrome = mergeChromeAiSelectorEntries({ models: [], providers: [] });
+  const model = chrome.models[0]!;
+  storage.state.local[AI_CHROME_ENABLED_KEY] = true;
+  const selection: AIRememberScenarioSelectionInput = {
+    scenario: 'page-edit',
+    modelId: model.id,
+    modelCode: model.modelCode,
+    providerId: model.providerId,
+    source: 'explicit',
+  };
+  await mutateStoredAISettings({ operation: 'remember-scenario-selection', selection });
+  const remembered = await loadAIScenarioSelection('page-edit');
+  expect(remembered).toMatchObject({
+    modelId: model.id,
+    providerIncarnation: 'chrome-built-in',
+    source: 'explicit',
+  });
+  storage.local.set.mockClear();
+  expect(await loadAIScenarioSelection('page-edit')).toEqual(remembered);
+  expect(storage.local.set).not.toHaveBeenCalled();
+  storage.state.local[AI_CHROME_ENABLED_KEY] = false;
+  await expect(
+    mutateStoredAISettings({ operation: 'remember-scenario-selection', selection })
+  ).rejects.toThrow();
+  expect(await loadAIScenarioSelection('page-edit')).toEqual(remembered);
+  expect(storage.local.set).not.toHaveBeenCalled();
+  expect(
+    resolveAIScenarioModel({
+      scenario: 'page-edit',
+      models,
+      providers: selectorProviders(),
+      selection: remembered,
+    })
+  ).toMatchObject({ status: 'unavailable', modelId: null });
 });

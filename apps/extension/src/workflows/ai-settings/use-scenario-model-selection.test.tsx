@@ -38,8 +38,8 @@ function context(): Context {
 let host: HTMLDivElement;
 let root: Root;
 let selection: ReturnType<typeof useAIScenarioModelSelection>;
-function Surface() {
-  selection = useAIScenarioModelSelection('scenario-edit');
+function Surface({ enabled = true }: { enabled?: boolean }) {
+  selection = useAIScenarioModelSelection('scenario-edit', enabled);
   return <p>{selection.modelId ?? 'none'}</p>;
 }
 async function open() {
@@ -207,4 +207,18 @@ it('refuses preparation after a preference failure and keeps the previous visibl
   expect(selection.modelId).toBe('first');
   expect(selection.selectionFailed).toBe(true);
   expect(selection.selectionPending).toBe(false);
+});
+
+it('does not read or write while disabled and loads a fresh choice on activation', async () => {
+  await act(async () => root.render(<Surface enabled={false} />));
+  expect(io.read).not.toHaveBeenCalled();
+  expect(io.remember).not.toHaveBeenCalled();
+  expect(selection.configuration).toBeNull();
+  await act(async () => root.render(<Surface />));
+  expect(io.read).toHaveBeenCalledExactlyOnceWith('scenario-edit');
+  expect(selection.modelId).toBe('first');
+  await act(async () => root.render(<Surface enabled={false} />));
+  expect(selection.configuration).toBeNull();
+  expect(selection.modelId).toBeNull();
+  expect(io.remember).not.toHaveBeenCalled();
 });

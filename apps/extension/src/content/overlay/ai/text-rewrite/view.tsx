@@ -24,7 +24,14 @@ function useTextRewritePosition(session: Session, ref: RefObject<HTMLElement | n
     active: target !== null,
     elementRef: ref,
     uiScale,
-    measurementKey: `${session.request.busy}:${session.request.error}:${session.models.failed}`,
+    measurementKey: [
+      session.request.busy,
+      session.request.error,
+      session.models.failed,
+      session.models.pending,
+      session.models.unavailable,
+      session.models.selectionFailed,
+    ].join(':'),
   });
   const basePosition = resolveDesignReviewPopoverPosition(
     target ? { x: target.anchor.x / uiScale, y: target.anchor.y / uiScale } : { x: 12, y: 12 },

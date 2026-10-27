@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import {
   createGuideProject,
   createGuideStep,
@@ -20,6 +21,7 @@ for (const viewport of [
   test(`real neuraldeep.ru setup and automatic catalog ${viewport.width}`, async ({
     page,
     extensionId,
+    hostOrigin,
   }, info) => {
     test.setTimeout(120000);
     await page.setViewportSize(viewport);
@@ -145,7 +147,7 @@ for (const viewport of [
     await expect(providers).toContainText(connectionName);
     if (viewport.width === 1280) {
       if (!evidence.providerId) throw new Error('Connected provider identity is unavailable');
-      await runRealScenarioText(
+      const model = await runRealScenarioText(
         page,
         extensionId,
         evidence.providerId,
@@ -153,6 +155,15 @@ for (const viewport of [
         info.outputPath('scenario-ai-proposal.png')
       );
       await expect(row).toBeVisible();
+      await row.getByRole('switch').click();
+      await expect(row.getByRole('switch')).toBeChecked({ timeout: 45000 });
+      await runRealPageText(
+        page,
+        extensionId,
+        hostOrigin,
+        model,
+        info.outputPath('page-text-applied.png')
+      );
     }
     if (viewport.width === 1920) {
       await runConcurrentProviderToggle(
@@ -414,6 +425,97 @@ async function runRealScenarioText(
   await expect(dialog.getByRole('button', { name: 'Get suggestions', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
   await page.goto(settingsUrl);
+  return model;
+}
+
+async function runRealPageText(
+  settings: Page,
+  extensionId: string,
+  hostOrigin: string,
+  model: { id: string; displayName: string },
+  screenshotPath: string
+) {
+  const before = await settings.evaluate(
+    async () =>
+      (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+        'sniptale_ai_scenario_selections'
+      ]
+  );
+  const { page, popup } = await openDesignReview(settings.context(), extensionId, hostOrigin, {
+    width: 1280,
+    height: 560,
+  });
+  const ui = (name: string) => page.locator(`[data-ui="${name}"]`);
+  try {
+    await page.evaluate(() => {
+      const text = document.createElement('p');
+      text.id = 'live-page-text';
+      text.textContent = 'Original synthetic page text';
+      text.style.cssText =
+        'position:absolute;left:32px;top:90px;background:white;color:black;padding:8px;font:20px Georgia;z-index:1';
+      document.body.append(text);
+    });
+    await ui('content.toolbar.mode-selector-button').click();
+    await ui('content.toolbar.mode-option.quick-edit').click();
+    await ui('content.toolbar.ai-text').click();
+    const source = page.locator('#live-page-text');
+    await source.click();
+    const popover = ui('content.ai-text.popover');
+    await expect(popover).toBeVisible();
+    expect(
+      await settings.evaluate(
+        async () =>
+          (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+            'sniptale_ai_scenario_selections'
+          ]
+      )
+    ).toEqual(before);
+    const selector = popover.locator('.sniptale-ai-model-selector-trigger');
+    await selector.click();
+    await page
+      .getByPlaceholder(translate('aiModal.modelSearchPlaceholder', 'en'), { exact: true })
+      .fill(model.displayName);
+    await page.getByTitle(model.displayName, { exact: true }).click();
+    await expect(selector).toContainText(model.displayName);
+    await expect(ui('content.ai-text.submit')).toBeDisabled();
+    await ui('content.ai-text.prompt').fill(
+      'Return exactly these four words and nothing else: Revised synthetic page text'
+    );
+    await ui('content.ai-text.submit').click();
+    await expect(source).toHaveText('Revised synthetic page text', { timeout: 60000 });
+    await expect(popover).toHaveCount(0);
+    const remembered = await settings.evaluate(
+      async () =>
+        (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+          'sniptale_ai_scenario_selections'
+        ]
+    );
+    expect(remembered).toEqual(
+      expect.objectContaining({
+        'page-edit': expect.objectContaining({ modelId: model.id }),
+        'scenario-edit': expect.objectContaining({ modelId: model.id }),
+      })
+    );
+    await page.screenshot({ path: screenshotPath, fullPage: false });
+    await page.keyboard.press('Control+z');
+    await expect(source).toHaveText('Original synthetic page text');
+    await source.click();
+    await expect(popover.locator('.sniptale-ai-model-selector-trigger')).toContainText(
+      model.displayName
+    );
+    expect(
+      await settings.evaluate(
+        async () =>
+          (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+            'sniptale_ai_scenario_selections'
+          ]
+      )
+    ).toEqual(remembered);
+    await page.keyboard.press('Escape');
+  } finally {
+    await page.close();
+    await popup.close();
+  }
 }
 
 async function runConcurrentProviderToggle(

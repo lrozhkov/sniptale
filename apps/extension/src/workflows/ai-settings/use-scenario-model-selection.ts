@@ -26,7 +26,7 @@ function hasSameModel(choice: Choice, context: Context): boolean {
 }
 
 /** Owns one mounted interface choice. Opening or reloading an interface never writes a preference. */
-export function useAIScenarioModelSelection(scenario: AIPersistedScenario) {
+export function useAIScenarioModelSelection(scenario: AIPersistedScenario, enabled = true) {
   const [configuration, setConfiguration] = useState<Context | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
   const [configurationFailed, setConfigurationFailed] = useState(false);
@@ -68,18 +68,19 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario) {
   }, [scenario]);
 
   useEffect(() => {
-    active.current = true;
+    active.current = enabled;
     context.current = null;
     choice.current = null;
     setConfiguration(null);
     setModelId(null);
     setSelectionUnavailable(false);
-    void reload();
+    setSelectionFailed(false);
+    if (enabled) void reload();
     return () => {
       active.current = false;
       generation.current += 1;
     };
-  }, [reload]);
+  }, [enabled, reload]);
 
   const chooseModel = (id: string | null) => {
     const current = context.current;
