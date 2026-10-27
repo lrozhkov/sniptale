@@ -291,3 +291,33 @@ it('keeps one delivery while pending and removes digit routing when disposed', a
   expect((await pressDigit('2')).defaultPrevented).toBe(false);
   expect(mocks.send).toHaveBeenCalledOnce();
 });
+
+it.each([true, false])(
+  'owns available menu digits before a site listener (capture=%s)',
+  async (capture) => {
+    await open();
+    const siteKey = vi.fn((event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    });
+    document.addEventListener('keydown', siteKey, capture);
+    try {
+      await pressDigit('9');
+      expect(siteKey).toHaveBeenCalledOnce();
+      expect(mocks.send).not.toHaveBeenCalled();
+      siteKey.mockClear();
+      const event = await pressDigit('1');
+      expect(siteKey).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(true);
+      expect(mocks.source).toHaveBeenCalledWith(event);
+      expect(mocks.send).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ actionId: 'second' })
+      );
+      await pressDigit('1');
+      expect(siteKey).toHaveBeenCalledOnce();
+      expect(mocks.send).toHaveBeenCalledOnce();
+    } finally {
+      document.removeEventListener('keydown', siteKey, capture);
+    }
+  }
+);

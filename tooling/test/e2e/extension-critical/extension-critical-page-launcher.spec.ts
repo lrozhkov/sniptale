@@ -902,7 +902,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           await expect(menu).toHaveCount(0);
           await trigger.click();
         }
-        await rows.first().focus();
+        if (surface === 'shim') await rows.first().focus();
         await page.evaluate(() => document.querySelector('#quick-digit-field')?.remove());
         const menuBounds = (await menu.boundingBox())!;
         const menuPoint = {
@@ -913,7 +913,34 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           path: info.outputPath(`digit-menu-${surface}.png`),
           fullPage: false,
         });
+        if (surface !== 'shim') {
+          await page.evaluate(() => {
+            const seen: string[] = [];
+            const guard = new AbortController();
+            Reflect.set(window, '__quickMenuSiteDigits', seen);
+            Reflect.set(window, '__quickMenuSiteAbort', guard);
+            document.addEventListener(
+              'keydown',
+              (event) => {
+                if (!/^[0-9]$/.test(event.key)) return;
+                seen.push(event.key);
+                event.preventDefault();
+                event.stopImmediatePropagation();
+              },
+              { capture: true, signal: guard.signal }
+            );
+          });
+        }
         await page.keyboard.press(key);
+        if (surface !== 'shim') {
+          const siteDigits = await page.evaluate(() => {
+            const guard: unknown = Reflect.get(window, '__quickMenuSiteAbort');
+            if (!(guard instanceof AbortController)) throw new Error('Site keyboard guard missing');
+            guard.abort();
+            return Reflect.get(window, '__quickMenuSiteDigits');
+          });
+          expect(siteDigits).toEqual([]);
+        }
         await expect(menu).toHaveCount(0);
         await expect.poll(observedIds).toEqual([...previousIds, actionId]);
         await expect

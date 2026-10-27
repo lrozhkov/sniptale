@@ -147,8 +147,8 @@ export function usePageQuickActionsMenu(props: {
       triggerRef.current?.focus({ preventScroll: true });
       void trigger(action, event);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [actions, open, busy, trigger]);
   const title = translate('content.pageLauncher.actions');
   return {
