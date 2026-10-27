@@ -35,15 +35,16 @@ describe('route-response model resolution', () => {
     expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to the stored default model id and rejects when nothing is configured', async () => {
-    await expect(resolveRequiredLlmModelId()).resolves.toBe('model-default');
-    expect(initializeAiStorageAccessMock).toHaveBeenCalledTimes(1);
-
-    loadDefaultModelIdMock.mockResolvedValueOnce(null);
-    await expect(resolveRequiredLlmModelId()).rejects.toThrow(
-      translate('background.runtime.llmModelMissing')
-    );
-  });
+  it.each([undefined, null, ''])(
+    'refuses missing identity %s despite a stored global default',
+    async (modelId) => {
+      await expect(resolveRequiredLlmModelId(modelId)).rejects.toThrow(
+        translate('background.runtime.llmModelMissing')
+      );
+      expect(initializeAiStorageAccessMock).not.toHaveBeenCalled();
+      expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('route-response normalization', () => {

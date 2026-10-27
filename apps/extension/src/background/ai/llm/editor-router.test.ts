@@ -67,6 +67,7 @@ import { routeScenarioEditorLlmMessage } from './editor-router';
 function createMessage() {
   return {
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
+    modelId: 'model-1',
     contractVersion: 4 as const,
     projectId: 'project-1',
     baseRevision: 1,
@@ -131,7 +132,7 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
   expect(routeScenarioEditorLlmMessage(createMessage(), sendResponse, createSender())).toBe(true);
   await expectSuccessfulResponse(sendResponse);
 
-  expect(loadDefaultModelIdMock).toHaveBeenCalledTimes(1);
+  expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
   expect(resolveModelConfigMock).toHaveBeenCalledWith('model-1');
   expect(loadScenarioEditorSystemPromptMock).toHaveBeenCalledTimes(1);
   expect(requestMultimodalChatCompletionMock).toHaveBeenCalledWith({
@@ -212,11 +213,16 @@ it('prefers an explicit model id over the stored default model selection', async
   expect(resolveModelConfigMock).toHaveBeenCalledWith('model-explicit');
 });
 
-it('returns the translated missing-model error when no explicit or default model exists', async () => {
+it('refuses missing explicit identity despite a stored global default', async () => {
   const sendResponse = vi.fn();
-  loadDefaultModelIdMock.mockResolvedValue(null);
 
-  expect(routeScenarioEditorLlmMessage(createMessage(), sendResponse, createSender())).toBe(true);
+  expect(
+    routeScenarioEditorLlmMessage(
+      { ...createMessage(), modelId: null },
+      sendResponse,
+      createSender()
+    )
+  ).toBe(true);
 
   await vi.waitFor(() => {
     expect(sendResponse).toHaveBeenCalledWith({
@@ -224,6 +230,9 @@ it('returns the translated missing-model error when no explicit or default model
       success: false,
     });
   });
+  expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
+  expect(resolveModelConfigMock).not.toHaveBeenCalled();
+  expect(requestMultimodalChatCompletionMock).not.toHaveBeenCalled();
 });
 
 it('surfaces schema parse failures without exposing raw provider output', async () => {

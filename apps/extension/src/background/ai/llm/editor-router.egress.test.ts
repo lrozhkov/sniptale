@@ -63,6 +63,7 @@ function createMessage() {
     llmSessionToken: 'llm-token-1',
     projectSnapshotJson: '{"steps":[]}',
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
+    modelId: 'model-1',
   } as const;
 }
 
