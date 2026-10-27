@@ -72,20 +72,15 @@ export const AIModelSchema = z
   .object({
     ...operationFields,
     source: z.enum(['catalog', 'manual']).optional(),
+    propertySource: z.enum(['catalog', 'manual']).optional(),
     enabled: z.boolean().optional(),
     retirementOverride: z.boolean().optional(),
     capabilities: z.custom<AIModelCapabilities>(isAIModelCapabilities).optional(),
     catalog: z.custom<AICatalogFacts>(isAICatalogFacts).optional(),
     id: z.string().uuid(),
     providerId: z.string().uuid(schemaMessageKey('validation.schemas.selectProvider')),
-    modelCode: z
-      .string()
-      .min(1, schemaMessageKey('validation.schemas.modelCodeRequired'))
-      .max(200, schemaMessageKey('validation.schemas.max200Characters')),
-    displayName: z
-      .string()
-      .min(1, schemaMessageKey('validation.schemas.nameRequired'))
-      .max(100, schemaMessageKey('validation.schemas.max100Characters')),
+    modelCode: z.string().min(1, schemaMessageKey('validation.schemas.modelCodeRequired')).max(500),
+    displayName: z.string().min(1, schemaMessageKey('validation.schemas.nameRequired')).max(500),
     systemPrompt: z
       .string()
       .max(10000, schemaMessageKey('validation.schemas.max10000Characters'))

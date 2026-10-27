@@ -9,7 +9,8 @@ import {
   getAIModelOperation,
   isValidAIModelOperationConfiguration,
 } from '../../../contracts/settings/model-operation';
-import type { AIModel } from '../../../contracts/settings';
+import type { AIModel, AIProvider } from '../../../contracts/settings';
+import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 import {
   runWithExclusivePersistenceMutationPermit,
   runWithAtomicPersistenceMutationPermit,
@@ -69,13 +70,15 @@ function queueAISettingsMutation<T>(run: () => Promise<T>): Promise<T> {
   return nextMutation;
 }
 
-async function assertModelProviderExists(model: AIModel): Promise<void> {
+async function assertModelProviderExists(model: AIModel): Promise<AIProvider> {
   if (!isValidAIModelOperationConfiguration(model))
     throw new Error('Invalid AI model operation configuration');
   const providers = await loadAIProviders();
-  if (!providers.some((provider) => provider.id === model.providerId)) {
+  const provider = providers.find((entry) => entry.id === model.providerId);
+  if (!provider) {
     throw new Error(`Provider ${model.providerId} not found for model ${model.id}`);
   }
+  return provider;
 }
 
 async function addProvider(command: { provider: AIProviderUpsertInput }): Promise<void> {
@@ -102,17 +105,52 @@ async function clearProviderSecret(providerId: string): Promise<void> {
   await clearAIProviderSecret(providerId);
 }
 
+async function resolveModelProperties(
+  model: AIModel,
+  models: readonly AIModel[],
+  provider: AIProvider
+): Promise<AIModel> {
+  const { catalog: _submittedCatalog, ...configured } = model;
+  const matches = models.filter(
+    (entry) =>
+      entry.providerId === model.providerId && entry.modelCode === model.modelCode && entry.catalog
+  );
+  const scope = matches.length ? await createAIProviderDestinationBinding(provider) : undefined;
+  const current = matches.find((entry) => entry.catalog?.scope === scope)?.catalog;
+  const provenance = current ?? matches.find((entry) => entry.id === model.id)?.catalog;
+  if (
+    model.propertySource === 'catalog' ||
+    (model.propertySource === undefined && model.source === 'catalog')
+  ) {
+    if (!current || current.lifecycle === 'absent' || current.lifecycle === 'unknown')
+      throw new Error('Current AI model catalog properties are unavailable');
+    return {
+      ...configured,
+      propertySource: 'catalog',
+      retirementOverride: false,
+      displayName: current.displayName,
+      capabilities: current.capabilities,
+      catalog: current,
+    };
+  }
+  return {
+    ...configured,
+    ...(model.propertySource === 'manual' ? { source: 'manual' as const } : {}),
+    ...(provenance ? { catalog: provenance } : {}),
+  };
+}
+
 async function addModel(model: AIModel, permit: PersistenceMutationPermit): Promise<void> {
-  await assertModelProviderExists(model);
+  const provider = await assertModelProviderExists(model);
   const models = await loadAIModels();
   if (models.some((current) => current.id === model.id)) {
     throw new Error(`Model ${model.id} already exists`);
   }
-  await saveAIModels([...models, model], permit);
+  await saveAIModels([...models, await resolveModelProperties(model, models, provider)], permit);
 }
 
 async function updateModel(model: AIModel, permit: PersistenceMutationPermit): Promise<void> {
-  await assertModelProviderExists(model);
+  const provider = await assertModelProviderExists(model);
   const models = await loadAIModels();
   const index = models.findIndex((current) => current.id === model.id);
   if (index < 0) {
@@ -125,13 +163,27 @@ async function updateModel(model: AIModel, permit: PersistenceMutationPermit): P
     systemPrompt: previousPrompt,
     ...previous
   } = nextModels[index]!;
-  nextModels[index] = {
-    ...previous,
-    ...(getAIModelOperation(model) === 'text' && previousPrompt !== undefined
-      ? { systemPrompt: previousPrompt }
-      : {}),
-    ...model,
-  };
+  const {
+    catalog: _catalog,
+    capabilities: _capabilities,
+    source: _source,
+    propertySource: _propertySource,
+    retirementOverride: _retirementOverride,
+    ...changedIdentity
+  } = previous;
+  const sameIdentity =
+    previous.providerId === model.providerId && previous.modelCode === model.modelCode;
+  nextModels[index] = await resolveModelProperties(
+    {
+      ...(sameIdentity ? previous : changedIdentity),
+      ...(getAIModelOperation(model) === 'text' && previousPrompt !== undefined
+        ? { systemPrompt: previousPrompt }
+        : {}),
+      ...model,
+    },
+    models,
+    provider
+  );
   const defaultModelId = await loadDefaultModelId();
   await saveAIModelGraph(
     nextModels,

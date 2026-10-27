@@ -52,6 +52,7 @@ export function filterAIModelsByOperation<T extends AIModelOperationSubject>(
 }
 
 export interface AIModelOperationSubject {
+  propertySource?: AIModelSource | undefined;
   operation?: AIModelOperation | undefined;
   enabled?: boolean | undefined;
   source?: AIModelSource | undefined;
@@ -68,7 +69,11 @@ export function supportsAIModelOperation(
   if (model.enabled === false) return false;
   if (
     model.catalog?.lifecycle === 'retired' &&
-    !(model.source === 'manual' && model.retirementOverride === true)
+    !(
+      model.source === 'manual' &&
+      model.propertySource !== 'catalog' &&
+      model.retirementOverride === true
+    )
   )
     return false;
   if (model.catalog?.lifecycle === 'absent' && (model.catalog.absenceCount ?? 0) >= 2) return false;

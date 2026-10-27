@@ -96,3 +96,40 @@ it('validates the same audio operation constraints in runtime models and the mod
       .success
   ).toBe(false);
 });
+
+it('retains catalog and manual property ownership and rejects an unknown ownership value', async () => {
+  const { AIModelSchema } = await import('./ai-settings');
+  const base = {
+    id: '00000000-0000-4000-8000-000000000001',
+    providerId: '00000000-0000-4000-8000-000000000002',
+    modelCode: 'exact',
+    displayName: 'Name',
+  };
+  for (const propertySource of ['catalog', 'manual']) {
+    expect(AIModelSchema.strict().parse({ ...base, propertySource })).toEqual({
+      ...base,
+      propertySource,
+    });
+  }
+  expect(AIModelSchema.strict().safeParse({ ...base, propertySource: 'automatic' }).success).toBe(
+    false
+  );
+});
+
+it('admits existing catalog identity bounds in runtime models without widening manual entry', async () => {
+  const { AIModelSchema, ModelFormSchema } = await import('./ai-settings');
+  const base = {
+    id: '00000000-0000-4000-8000-000000000001',
+    providerId: '00000000-0000-4000-8000-000000000002',
+    modelCode: 'c'.repeat(500),
+    displayName: 'n'.repeat(500),
+  };
+  expect(AIModelSchema.strict().safeParse(base).success).toBe(true);
+  expect(ModelFormSchema.safeParse(base).success).toBe(false);
+  expect(AIModelSchema.strict().safeParse({ ...base, modelCode: 'c'.repeat(501) }).success).toBe(
+    false
+  );
+  expect(AIModelSchema.strict().safeParse({ ...base, displayName: 'n'.repeat(501) }).success).toBe(
+    false
+  );
+});

@@ -164,3 +164,41 @@ it('updates every manual profile for the same exact remote ID without inventing 
   ).toBe(true);
   expect(refreshed.added).toBe(0);
 });
+
+it('updates catalog-owned properties in a manual allowlist and preserves equal record references', () => {
+  const model = {
+    ...run([]).models[0]!,
+    source: 'manual' as const,
+    propertySource: 'catalog' as const,
+  };
+  const next = run(
+    [model],
+    [{ modelCode: 'remote', facts: { ...facts, displayName: 'Fresh name' } }]
+  ).models[0]!;
+  expect(next).toMatchObject({
+    id: model.id,
+    source: 'manual',
+    propertySource: 'catalog',
+    displayName: 'Fresh name',
+  });
+  expect(
+    run(
+      [next],
+      [{ modelCode: 'remote', facts: { ...facts, displayName: 'Fresh name', observedAt: 2 } }]
+    ).models[0]
+  ).toBe(next);
+});
+
+it('drops stale automatic capability claims for a catalog-bound manual record after a scope change', () => {
+  const model = {
+    ...run([]).models[0]!,
+    source: 'manual' as const,
+    propertySource: 'catalog' as const,
+    catalog: { ...facts, scope: 'old-scope' },
+  };
+  expect(run([model], [], 2).models[0]).toMatchObject({
+    id: model.id,
+    capabilities: { operations: {}, input: {}, output: {}, features: {} },
+    catalog: { lifecycle: 'unknown', scope: 'scope' },
+  });
+});

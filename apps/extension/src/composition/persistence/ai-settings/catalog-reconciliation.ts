@@ -32,11 +32,18 @@ function sameFacts(left: AICatalogFacts | undefined, right: AICatalogFacts): boo
   return JSON.stringify(leftFacts) === JSON.stringify(rightFacts);
 }
 
+function followsCatalogProperties(model: AIModel): boolean {
+  return (
+    model.propertySource === 'catalog' ||
+    (model.propertySource === undefined && model.source === 'catalog')
+  );
+}
+
 function reconcilePresent(model: AIModel, facts: AICatalogFacts): AIModel {
   if (sameFacts(model.catalog, facts)) return model;
   return {
     ...model,
-    ...(model.source === 'catalog'
+    ...(followsCatalogProperties(model)
       ? { displayName: facts.displayName, capabilities: facts.capabilities }
       : {}),
     catalog: facts,
@@ -54,7 +61,7 @@ function reconcileAbsent(model: AIModel, input: CatalogReconciliationInput): AIM
     } = model.catalog;
     return {
       ...model,
-      ...(model.source === 'catalog'
+      ...(followsCatalogProperties(model)
         ? { capabilities: { operations: {}, input: {}, output: {}, features: {} } }
         : {}),
       catalog: { ...previous, scope: input.scope, lifecycle: 'unknown' },
@@ -67,6 +74,7 @@ function reconcileAbsent(model: AIModel, input: CatalogReconciliationInput): AIM
   const absenceCount = (previous?.absenceCount ?? 0) + (increments ? 1 : 0);
   if (
     model.source === 'catalog' &&
+    followsCatalogProperties(model) &&
     absenceCount >= 2 &&
     input.now - firstAbsentAt >= ABSENT_RETENTION_MS &&
     !input.referencedModelIds.has(model.id)

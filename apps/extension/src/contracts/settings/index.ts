@@ -304,6 +304,8 @@ export interface AIProvider {
 }
 
 export interface AIModel {
+  /** Property updates are independent from manual list membership and allowlist admission. */
+  propertySource?: AIModelSource | undefined;
   source?: AIModelSource | undefined;
   enabled?: boolean | undefined;
   capabilities?: AIModelCapabilities | undefined;

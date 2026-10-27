@@ -288,3 +288,25 @@ it('accepts identity-bound enabled changes without configuration replacement fie
   ])
     expect(aiSettingsMutationMessageSchema.safeParse(invalid).success).toBe(false);
 });
+
+it.each(['add-model', 'update-model'] as const)(
+  'preserves property ownership through strict %s messages',
+  (operation) => {
+    const model = {
+      id: '00000000-0000-4000-8000-000000000001',
+      providerId: '00000000-0000-4000-8000-000000000002',
+      modelCode: 'c'.repeat(500),
+      displayName: 'n'.repeat(500),
+      source: 'manual',
+      propertySource: 'catalog',
+    };
+    const message = { type: MessageType.AI_SETTINGS_MUTATION, operation, model };
+    expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
+    expect(
+      aiSettingsMutationMessageSchema.safeParse({
+        ...message,
+        model: { ...model, propertySource: 'invalid' },
+      }).success
+    ).toBe(false);
+  }
+);

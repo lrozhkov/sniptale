@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   filterAIModelsByOperation,
+  supportsAIModelOperation,
+  supportsAIProviderModelOperation,
   getAIModelOperation,
   isValidAIModelOperationConfiguration,
 } from './model-operation';
@@ -121,4 +123,51 @@ it('admits explicitly selected PCM synthesis without model-name inference', () =
       audio: { speech: { voiceId: 'Leda', responseFormat: 'pcm' } },
     })
   ).toBe(true);
+});
+
+it('requires manual property ownership for a retired model override', () => {
+  const model = {
+    source: 'manual' as const,
+    retirementOverride: true,
+    capabilities: {
+      operations: { text: 'supported' as const },
+      input: {},
+      output: {},
+      features: {},
+    },
+    catalog: {
+      displayName: 'Retired',
+      lifecycle: 'retired' as const,
+      observedAt: 1,
+      capabilities: {
+        operations: { text: 'supported' as const },
+        input: {},
+        output: {},
+        features: {},
+      },
+    },
+  };
+  expect(supportsAIModelOperation({ ...model, propertySource: 'catalog' }, 'text')).toBe(false);
+  expect(supportsAIModelOperation({ ...model, propertySource: 'manual' }, 'text')).toBe(true);
+  expect(
+    supportsAIModelOperation({ ...model, propertySource: 'manual', enabled: false }, 'text')
+  ).toBe(false);
+});
+
+it('admits catalog-owned properties on a manual allowlist without enabling automatic rows', () => {
+  const model = {
+    source: 'manual' as const,
+    propertySource: 'catalog' as const,
+    capabilities: {
+      operations: { text: 'supported' as const },
+      input: {},
+      output: {},
+      features: {},
+    },
+  };
+  const provider = { connectionType: 'neuraldeep' as const, management: 'manual' as const };
+  expect(supportsAIProviderModelOperation(model, provider, 'text')).toBe(true);
+  expect(supportsAIProviderModelOperation({ ...model, source: 'catalog' }, provider, 'text')).toBe(
+    false
+  );
 });

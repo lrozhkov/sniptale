@@ -58,6 +58,9 @@ function isAIModel(value: unknown): value is AIModel {
     (value['source'] === undefined ||
       value['source'] === 'manual' ||
       value['source'] === 'catalog') &&
+    (value['propertySource'] === undefined ||
+      value['propertySource'] === 'catalog' ||
+      value['propertySource'] === 'manual') &&
     (value['enabled'] === undefined || typeof value['enabled'] === 'boolean') &&
     (value['retirementOverride'] === undefined ||
       typeof value['retirementOverride'] === 'boolean') &&
