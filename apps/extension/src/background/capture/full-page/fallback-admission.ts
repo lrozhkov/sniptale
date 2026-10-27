@@ -1,4 +1,8 @@
-import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
+import {
+  finalizeScreenshotDataUrl,
+  optimizeScreenshotBlob,
+} from '../../../platform/media-utils/screenshot-encoding';
+import { blobToDataUrl, dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import type { FullPageQualityPolicy } from '../../../contracts/full-page-capture';
 import { FULL_PAGE_QUALITY_ABSOLUTE_LIMITS } from '../../../contracts/full-page-capture';
 import {
@@ -25,15 +29,26 @@ function readPngDimensions(header: Uint8Array): { height: number; width: number 
   return width > 0 && height > 0 ? { height, width } : null;
 }
 
-/** Admits the browser-produced PNG fallback without allocating its decoded raster. */
+/** Check the native PNG source before final encoding and file-size admission. */
 export async function assertFullPageViewportFallbackWithinPolicy(args: {
   dataUrl: string;
   policy: FullPageQualityPolicy;
   signal?: AbortSignal | undefined;
-}): Promise<{ height: number; width: number }> {
+  outputPurpose?: 'appearance-source';
+  format?: 'png' | 'jpeg' | 'webp';
+  quality?: number;
+}): Promise<{ height: number; width: number; dataUrl?: string }> {
   const blob = await dataUrlToBlob(args.dataUrl, args.signal);
   const budget = resolveFullPageRasterBudget(args.policy);
-  if (blob.type !== 'image/png' || blob.size <= 0 || blob.size > budget.maxEncodedBytes) {
+  const maxEncodedBytes =
+    args.outputPurpose === 'appearance-source'
+      ? FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxFileSizeMiB * 1024 * 1024
+      : budget.maxEncodedBytes;
+  if (
+    blob.type !== 'image/png' ||
+    blob.size <= 0 ||
+    blob.size > FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxFileSizeMiB * 1024 * 1024
+  ) {
     throw new Error(FULL_PAGE_FILE_BUDGET_ERROR);
   }
   const dimensions = readPngDimensions(
@@ -49,5 +64,27 @@ export async function assertFullPageViewportFallbackWithinPolicy(args: {
   ) {
     throw new Error(FULL_PAGE_RASTER_BUDGET_ERROR);
   }
-  return dimensions;
+  if (
+    args.outputPurpose !== 'appearance-source' &&
+    args.format !== undefined &&
+    args.format !== 'png'
+  ) {
+    const dataUrl = await finalizeScreenshotDataUrl(args.dataUrl, {
+      format: args.format,
+      quality: (args.quality ?? 1) * 100,
+      ...(args.signal === undefined ? {} : { signal: args.signal }),
+    });
+    args.signal?.throwIfAborted();
+    const encoded = await dataUrlToBlob(dataUrl, args.signal);
+    args.signal?.throwIfAborted();
+    if (encoded.size > maxEncodedBytes) throw new Error(FULL_PAGE_FILE_BUDGET_ERROR);
+    return { ...dimensions, dataUrl };
+  }
+  const output =
+    args.outputPurpose === 'appearance-source'
+      ? blob
+      : await optimizeScreenshotBlob(blob, args.signal);
+  args.signal?.throwIfAborted();
+  if (output.size > maxEncodedBytes) throw new Error(FULL_PAGE_FILE_BUDGET_ERROR);
+  return output === blob ? dimensions : { ...dimensions, dataUrl: await blobToDataUrl(output) };
 }

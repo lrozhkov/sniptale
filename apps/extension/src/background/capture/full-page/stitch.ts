@@ -1,6 +1,8 @@
+import { optimizeScreenshotBlob } from '../../../platform/media-utils/screenshot-encoding';
 import { loadSettings } from '../../../composition/persistence/settings';
 import {
   DEFAULT_FULL_PAGE_QUALITY_POLICY,
+  FULL_PAGE_QUALITY_ABSOLUTE_LIMITS,
   type FullPageQualityPolicy,
 } from '../../../contracts/full-page-capture';
 import type {
@@ -275,10 +277,15 @@ async function encodeCanvas(
     imageQuality: settings.imageQuality,
     options,
   });
-  const blob = await output.canvas.convertToBlob({
+  const encoded = await output.canvas.convertToBlob({
     type: resolved.type,
     quality: resolved.quality,
   });
+  throwIfStitchFinalizationAborted(abortSignal);
+  const blob =
+    options.outputPurpose === 'appearance-source'
+      ? encoded
+      : await optimizeScreenshotBlob(encoded, abortSignal);
   throwIfStitchFinalizationAborted(abortSignal);
   return {
     blob,
@@ -294,6 +301,14 @@ async function downscaleOversizedEncoding(args: {
   abortSignal?: AbortSignal | undefined;
 }): Promise<{ blob: Blob; output: OutputCanvas }> {
   throwIfStitchFinalizationAborted(args.abortSignal);
+  if (args.options.outputPurpose === 'appearance-source') {
+    if (
+      args.blob.type !== 'image/png' ||
+      args.blob.size > FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxFileSizeMiB * 1024 * 1024
+    )
+      throw new Error(FULL_PAGE_FILE_BUDGET_ERROR);
+    return { blob: args.blob, output: args.output };
+  }
   const policy = args.options.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY;
   const budget = resolveFullPageRasterBudget(policy);
   if (args.blob.size <= budget.maxEncodedBytes) return { blob: args.blob, output: args.output };

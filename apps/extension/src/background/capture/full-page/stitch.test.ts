@@ -1,3 +1,9 @@
+const { optimizeScreenshotBlobMock } = vi.hoisted(() => ({
+  optimizeScreenshotBlobMock: vi.fn(async (blob: Blob) => blob),
+}));
+vi.mock('../../../platform/media-utils/screenshot-encoding', () => ({
+  optimizeScreenshotBlob: optimizeScreenshotBlobMock,
+}));
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -94,6 +100,7 @@ function enqueueBitmap(width = 800, height = 600) {
 }
 
 beforeEach(() => {
+  optimizeScreenshotBlobMock.mockReset().mockImplementation(async (blob: Blob) => blob);
   mocks.bitmaps.length = 0;
   mocks.canvases.length = 0;
   mocks.drawImage.mockClear();
@@ -461,4 +468,82 @@ it('does not publish a screenshot when cancellation arrives during final encodin
   resolveEncoding(new Blob(['encoded'], { type: 'image/png' }));
 
   await expect(finishing).rejects.toThrow('cancelled during encode');
+});
+
+it('keeps an appearance PNG above the selected final file cap at native scale', async () => {
+  enqueueBitmap();
+  const stitcher = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'first',
+    geometry: documentGeometry,
+    qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe,
+    frozenExtentWarning: false,
+    warnings: [],
+  });
+  await stitcher.drawFrame('first', tilePlan(), tileState(documentGeometry));
+  class LargePng extends Blob {
+    get size() {
+      return 70 * 1024 * 1024;
+    }
+  }
+  mocks.convertToBlob.mockResolvedValue(new LargePng(['source'], { type: 'image/png' }));
+  const result = await stitcher.finish({
+    format: 'png',
+    outputPurpose: 'appearance-source',
+    qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe,
+  });
+  expect(result.metadata.downscaled).toBe(false);
+  expect(result.metadata.outputScale).toBe(1);
+  expect(mocks.convertToBlob).toHaveBeenCalledOnce();
+  expect(optimizeScreenshotBlobMock).not.toHaveBeenCalled();
+});
+it('optimizes final PNG before applying its file budget without reducing dimensions', async () => {
+  enqueueBitmap();
+  const stitcher = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'first',
+    geometry: documentGeometry,
+    qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe,
+    frozenExtentWarning: false,
+    warnings: [],
+  });
+  await stitcher.drawFrame('first', tilePlan(), tileState(documentGeometry));
+  class LargePng extends Blob {
+    get size() {
+      return 70 * 1024 * 1024;
+    }
+  }
+  mocks.convertToBlob.mockResolvedValue(new LargePng(['source'], { type: 'image/png' }));
+  optimizeScreenshotBlobMock.mockResolvedValue(new Blob(['optimized'], { type: 'image/png' }));
+  const result = await stitcher.finish({
+    format: 'png',
+    qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe,
+  });
+  expect(result.metadata.downscaled).toBe(false);
+  expect(mocks.convertToBlob).toHaveBeenCalledOnce();
+  expect(optimizeScreenshotBlobMock).toHaveBeenCalledOnce();
+});
+
+it('rejects an appearance source above the absolute encoded ceiling without extra scaling', async () => {
+  enqueueBitmap();
+  const stitcher = await createStreamingFullPageStitcher({
+    firstFrameDataUrl: 'first',
+    geometry: documentGeometry,
+    qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe,
+    frozenExtentWarning: false,
+    warnings: [],
+  });
+  await stitcher.drawFrame('first', tilePlan(), tileState(documentGeometry));
+  class LargePng extends Blob {
+    get size() {
+      return 128 * 1024 * 1024 + 1;
+    }
+  }
+  mocks.convertToBlob.mockResolvedValue(new LargePng(['source'], { type: 'image/png' }));
+  await expect(
+    stitcher.finish({
+      format: 'png',
+      outputPurpose: 'appearance-source',
+      qualityPolicy: FULL_PAGE_QUALITY_PROFILES.safe,
+    })
+  ).rejects.toThrow('maximum file size');
+  expect(mocks.convertToBlob).toHaveBeenCalledOnce();
 });

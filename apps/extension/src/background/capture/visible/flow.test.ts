@@ -165,13 +165,69 @@ describe('capture-visible-flow transactions', () => {
     browserTabsCaptureVisibleTabMock.mockResolvedValue('data:image/png;base64,raw');
     finalizeCapturedDataUrlMock.mockResolvedValue('data:image/png;base64,crop');
 
-    await expect(captureVisibleTabForCrop(19)).resolves.toBe('data:image/png;base64,crop');
+    await expect(captureVisibleTabForCrop(19)).resolves.toBe('data:image/png;base64,raw');
 
     expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
     expect(browserTabsCaptureVisibleTabMock).toHaveBeenCalledWith(6, {
       format: 'png',
-      quality: 90,
     });
     expect(transitionCaptureJobMock).toHaveBeenLastCalledWith('capture-job-1', 'completed');
   });
+});
+
+it.each(['jpeg', 'webp'] as const)(
+  'keeps %s settings lossless until selection crop',
+  async (imageFormat) => {
+    vi.clearAllMocks();
+    loadSettingsMock.mockResolvedValue({ imageFormat, imageQuality: 72 });
+    resolveVisibleCaptureApiFormatMock.mockImplementation((format) =>
+      format === 'webp' ? 'png' : format
+    );
+    browserTabsGetMock.mockResolvedValue({ id: 20, windowId: 6 });
+    browserTabsQueryMock.mockResolvedValue([{ id: 20, windowId: 6 }]);
+    browserTabsCaptureVisibleTabMock.mockResolvedValue('data:image/png;base64,raw');
+    finalizeCapturedDataUrlMock.mockImplementation(async ({ dataUrl }) => dataUrl);
+    resetNativeVisibleCaptureCoordinatorForTests();
+    await expect(captureVisibleTabForCrop(20)).resolves.toBe('data:image/png;base64,raw');
+    expect(browserTabsCaptureVisibleTabMock).toHaveBeenLastCalledWith(6, { format: 'png' });
+    expect(finalizeCapturedDataUrlMock).not.toHaveBeenCalled();
+  }
+);
+
+it('applies an explicit native output profile without changing global screenshot preferences', async () => {
+  vi.clearAllMocks();
+  const settings = { imageFormat: 'png' as const, imageQuality: 90 };
+  loadSettingsMock.mockResolvedValue(settings);
+  resolveVisibleCaptureApiFormatMock.mockImplementation((format) =>
+    format === 'webp' ? 'png' : format
+  );
+  browserTabsGetMock.mockResolvedValue({ id: 21, windowId: 6 });
+  browserTabsQueryMock.mockResolvedValue([{ id: 21, windowId: 6 }]);
+  browserTabsCaptureVisibleTabMock.mockResolvedValue('data:image/jpeg;base64,raw');
+  finalizeCapturedDataUrlMock.mockImplementation(async ({ dataUrl }) => dataUrl);
+  resetNativeVisibleCaptureCoordinatorForTests();
+  await captureVisibleTabTransaction(21, { format: 'jpeg', quality: 61 });
+  expect(browserTabsCaptureVisibleTabMock).toHaveBeenLastCalledWith(6, {
+    format: 'jpeg',
+    quality: 61,
+  });
+  expect(finalizeCapturedDataUrlMock).toHaveBeenCalledWith(
+    expect.objectContaining({ settings: { imageFormat: 'jpeg', imageQuality: 61 } })
+  );
+  expect(settings).toEqual({ imageFormat: 'png', imageQuality: 90 });
+});
+
+it('keeps an appearance source lossless when the selected native profile is JPEG', async () => {
+  vi.clearAllMocks();
+  loadSettingsMock.mockResolvedValue({ imageFormat: 'webp', imageQuality: 90 });
+  resolveVisibleCaptureApiFormatMock.mockReturnValue('jpeg');
+  browserTabsGetMock.mockResolvedValue({ id: 22, windowId: 6 });
+  browserTabsQueryMock.mockResolvedValue([{ id: 22, windowId: 6 }]);
+  browserTabsCaptureVisibleTabMock.mockResolvedValue('data:image/png;base64,raw');
+  resetNativeVisibleCaptureCoordinatorForTests();
+  await expect(
+    captureVisibleTabTransaction(22, { losslessSource: true, format: 'jpeg', quality: 61 })
+  ).resolves.toMatchObject({ dataUrl: 'data:image/png;base64,raw' });
+  expect(browserTabsCaptureVisibleTabMock).toHaveBeenLastCalledWith(6, { format: 'png' });
+  expect(finalizeCapturedDataUrlMock).not.toHaveBeenCalled();
 });

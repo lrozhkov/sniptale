@@ -1,3 +1,4 @@
+import { optimizeScreenshotDataUrl } from '../../../platform/media-utils/screenshot-encoding';
 import { createScreenshotFilename as generateFilename } from '../../../workflows/file-naming/index';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
 import type { CaptureActionType, Settings } from '../../../contracts/settings';
@@ -33,6 +34,7 @@ export function createVisibleCapturePromise(
 export async function runStartCaptureUseCase(
   args: {
     actionType?: CaptureActionType | undefined;
+    imageFormat?: Settings['imageFormat'] | undefined;
     capture: () => Promise<CaptureDeliveryPayload>;
     captureTarget: CaptureModeLabel;
     prepareImage?: CaptureImagePreparation | undefined;
@@ -46,13 +48,22 @@ export async function runStartCaptureUseCase(
   const settings = await ports.loadSettings();
   args.assertCurrent?.();
   const captureAction = args.actionType ?? settings.captureAction;
-  let filename = await ports.generateFilename(args.captureTarget, settings.imageFormat, settings);
+  let filename = await ports.generateFilename(
+    args.captureTarget,
+    args.imageFormat ?? settings.imageFormat,
+    settings
+  );
   args.assertCurrent?.();
   const capturePromise = args.capture().then(async (payload) => {
-    if (!args.prepareImage) return payload;
     const { dataUrl, jobId } = readCaptureDeliveryPayload(payload);
     try {
-      const prepared = await args.prepareImage(dataUrl, filename);
+      const prepared = args.prepareImage
+        ? await args.prepareImage(dataUrl, filename)
+        : { dataUrl, filename };
+      if (!args.prepareImage && args.captureTarget !== 'full') {
+        prepared.dataUrl = await optimizeScreenshotDataUrl(prepared.dataUrl);
+      }
+      args.assertCurrent?.();
       filename = prepared.filename;
       return jobId ? { dataUrl: prepared.dataUrl, jobId } : prepared.dataUrl;
     } catch (error) {

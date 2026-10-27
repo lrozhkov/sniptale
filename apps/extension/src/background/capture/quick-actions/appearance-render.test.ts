@@ -1,3 +1,9 @@
+const { optimizeScreenshotBlobMock } = vi.hoisted(() => ({
+  optimizeScreenshotBlobMock: vi.fn(async (blob: Blob) => blob),
+}));
+vi.mock('../../../platform/media-utils/screenshot-encoding', () => ({
+  optimizeScreenshotBlob: optimizeScreenshotBlobMock,
+}));
 import { createGradientPaint } from '@sniptale/foundation/paint';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createQuickActionAppearance } from '../../../contracts/quick-action-appearance';
@@ -49,6 +55,7 @@ function options(): QuickActionRasterOptions {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  optimizeScreenshotBlobMock.mockImplementation(async (blob: Blob) => blob);
   canvases.length = 0;
   decode.mockImplementation(async () => bitmap());
   encode.mockImplementation(async ({ type }: { type: string }) => new Blob(['encoded'], { type }));
@@ -256,4 +263,19 @@ it('insets caption text instead of clipping its beginning at a large card radius
   input.appearance.information.enabled = true;
   await renderQuickActionAppearance(input);
   expect(context.fillText).toHaveBeenCalledExactlyOnceWith('Page', 225, 600, 894);
+});
+
+it('rejects an encoded appearance above its final file cap before reading encoded bytes', async () => {
+  const input = { ...options(), maxEncodedBytes: 8 };
+  const encoded = new Blob(['oversized-output'], { type: 'image/png' });
+  const read = vi.spyOn(encoded, 'arrayBuffer');
+  encode.mockResolvedValue(encoded);
+  await expect(renderQuickActionAppearance(input)).rejects.toThrow('maximum file size');
+  expect(read).not.toHaveBeenCalled();
+});
+it('checks the optimized final PNG size instead of the initial browser encoding size', async () => {
+  const input = { ...options(), maxEncodedBytes: 8 };
+  encode.mockResolvedValue(new Blob(['oversized-output'], { type: 'image/png' }));
+  optimizeScreenshotBlobMock.mockResolvedValueOnce(new Blob(['fits'], { type: 'image/png' }));
+  await expect(renderQuickActionAppearance(input)).resolves.toMatch(/^data:image\/png/);
 });

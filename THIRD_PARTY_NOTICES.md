@@ -167,6 +167,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `eda412692b7398293a049ecf913319da26eb8f7fe27f10709821dd187b517e0b`
 - Repository/source: https://github.com/fabricjs/fabric.js.git
 
+### `fflate` 0.8.3
+
+- Installed path: `node_modules/fflate`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/fflate/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/fflate-0.8.3.txt`](LICENSES/dependencies/fflate-0.8.3.txt)
+- License text SHA-256: `0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551`
+- Repository/source: https://github.com/101arrowz/fflate
+
 ### `hachure-fill` 0.5.2
 
 - Installed path: `node_modules/hachure-fill`

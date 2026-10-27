@@ -82,6 +82,11 @@
       "source": "LICENSES/dependencies/fabric-7.4.0.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/fflate-0.8.3.txt",
+      "sha256": "0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551",
+      "source": "LICENSES/dependencies/fflate-0.8.3.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/hachure-fill-0.5.2.txt",
       "sha256": "5e807b516a9be9229ed459880bf353a336e2d947867247290680d437017be391",
       "source": "LICENSES/dependencies/hachure-fill-0.5.2.txt"
@@ -256,12 +261,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "0abffc4c513c36cf14bf651e5b67c5027e2264044ee0d7eeef820129cade950a",
+      "sha256": "42f393313ad8399861b5526e8fe33e5466d31ac5807189f68e6a5c5011cc7450",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "73fe9b568924dc2453ecd81aa82270ca9580c571a94093ddf95e04dd52e4ca42",
+      "sha256": "2119ea13557c784bf1a550723836b1a311b6cbb27120645650069afa0826542e",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],

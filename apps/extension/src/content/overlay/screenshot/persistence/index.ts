@@ -225,6 +225,7 @@ export async function persistSelectionCapture({
     libraryDestinationRequested: actionType === 'save_to_library',
     message: {
       type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      actionType,
       ...(quickActionTransactionId ? { quickActionTransactionId } : {}),
       dataUrl,
       filename,

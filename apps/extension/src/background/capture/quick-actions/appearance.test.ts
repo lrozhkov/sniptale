@@ -1,3 +1,8 @@
+const { loadSettingsMock } = vi.hoisted(() => ({ loadSettingsMock: vi.fn() }));
+vi.mock('../../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/settings')>()),
+  loadSettings: loadSettingsMock,
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createQuickActionAppearance } from '../../../contracts/quick-action-appearance';
 import { reserveMediaErasureExclusion } from '../../mutation-exclusion/media-activity';
@@ -257,4 +262,44 @@ it('omits unavailable page metadata and keeps legacy desktop output unchanged', 
       getMediaAuthorityGeneration()
     )('raw', 'old.png')
   ).resolves.toEqual({ dataUrl: 'raw', filename: 'old.png' });
+});
+
+it('applies a local clipboard PNG override before rendering without changing the action snapshot', async () => {
+  const snapshot = { ...output(), imageFormat: 'jpeg' as const, imageQuality: 72 };
+  mocks.snapshot.mockReturnValue(snapshot);
+  const admission = beginPageAppearance(1, 'tx', 'png');
+  try {
+    await expect(admission.prepare!('data:image/png;base64,crop', 'capture.jpg')).resolves.toEqual({
+      dataUrl: 'styled',
+      filename: 'capture.png',
+    });
+    expect(mocks.render).toHaveBeenCalledWith(
+      expect.objectContaining({ imageFormat: 'png', imageQuality: 72 })
+    );
+    expect(snapshot.imageFormat).toBe('jpeg');
+    expect(mocks.current).toHaveBeenCalledWith(1, 'tx');
+  } finally {
+    admission.release();
+  }
+});
+
+it('retains the lossless full-page source when the final appearance exceeds its selected file budget', async () => {
+  loadSettingsMock.mockResolvedValue({ fullPageQuality: { maxFileSizeMiB: 8 } });
+  mocks.render.mockImplementation(async (options: QuickActionRasterOptions) => {
+    expect(options.maxEncodedBytes).toBe(8 * 1024 * 1024);
+    throw new Error('Full-page screenshot exceeds the configured maximum file size');
+  });
+  const admission = beginPageAppearance(1, 'tx', undefined, true);
+  try {
+    await expect(admission.prepare!('data:image/png;base64,raw', 'capture.jpg')).rejects.toThrow();
+    expect(mocks.save).toHaveBeenCalledWith(
+      'data:image/png;base64,raw',
+      'capture.original.png',
+      1,
+      'temporary'
+    );
+    expect(mocks.render).toHaveBeenCalledOnce();
+  } finally {
+    admission.release();
+  }
 });

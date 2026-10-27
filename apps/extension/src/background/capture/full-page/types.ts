@@ -6,6 +6,7 @@ import type {
 import type { FullPageQualityPolicy } from '../../../contracts/full-page-capture';
 
 export type FullPageCaptureOptions = {
+  outputPurpose?: 'appearance-source';
   abortSignal?: AbortSignal;
   backendKind?: FullPageCaptureBackendKind;
   documentId?: string;

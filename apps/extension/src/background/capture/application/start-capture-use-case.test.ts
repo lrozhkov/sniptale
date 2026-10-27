@@ -268,3 +268,30 @@ it('marks the capture job failed when image preparation refuses before publicati
     error: 'appearance refused',
   });
 });
+
+it('names the screenshot from the selected native output profile without changing global settings', async () => {
+  const settings = createSettings({ captureAction: 'download_default', imageFormat: 'png' });
+  const ports = createPorts(settings);
+  vi.mocked(ports.generateFilename).mockImplementation(
+    (_mode, format) => `capture.${format === 'jpeg' ? 'jpg' : format}`
+  );
+  const result = await runStartCaptureUseCase(
+    {
+      capture: async () => 'data:image/jpeg;base64,captured',
+      captureTarget: 'visible',
+      imageFormat: 'jpeg',
+      resolvedTabId: 7,
+      scenarioCapture: undefined,
+      scenarioSessionService: createScenarioSessionServiceStub(),
+    },
+    ports
+  );
+  expect(result.filename).toBe('capture.jpg');
+  expect(ports.saveScreenshotToMediaHubFromDataUrl).toHaveBeenCalledWith(
+    'data:image/jpeg;base64,captured',
+    'capture.jpg',
+    7,
+    'temporary'
+  );
+  expect(settings.imageFormat).toBe('png');
+});

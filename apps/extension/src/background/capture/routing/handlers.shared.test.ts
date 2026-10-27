@@ -1,3 +1,9 @@
+const { optimizeScreenshotDataUrlMock } = vi.hoisted(() => ({
+  optimizeScreenshotDataUrlMock: vi.fn(async (dataUrl: string) => dataUrl),
+}));
+vi.mock('../../../platform/media-utils/screenshot-encoding', () => ({
+  optimizeScreenshotDataUrl: optimizeScreenshotDataUrlMock,
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
@@ -55,6 +61,7 @@ import {
   respondWithCaptureAction,
 } from './handlers.shared';
 import { createScenarioSessionServiceStub } from '../../../../../../tooling/test/support/scenario-session-service.stub';
+import { reserveMediaErasureExclusion } from '../../mutation-exclusion/media-activity';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
 
 beforeEach(() => {
@@ -301,3 +308,56 @@ it.each(['capture.png', 'capture.jpg', 'capture.webp'])(
     });
   }
 );
+
+it('refuses native publication and delivery when erasure begins during final PNG optimization', async () => {
+  let resume!: (value: string) => void;
+  let started!: () => void;
+  const optimizing = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  optimizeScreenshotDataUrlMock.mockImplementationOnce(() => {
+    started();
+    return new Promise<string>((resolve) => {
+      resume = resolve;
+    });
+  });
+  const sendResponse = vi.fn();
+  const pending = runPreparedCaptureAction({
+    context: {
+      resolvedTabId: 42,
+      sendResponse,
+      viewportState: new Map(),
+      screenshotModeState: new Map(),
+      captureGuardState: { isCapturing: false },
+      scenarioSessionService: createScenarioSessionServiceStub(),
+      message: { actionType: 'copy' },
+    },
+    captureTarget: 'visible',
+    capture: async () => 'data:image/png;base64,old',
+  });
+  await optimizing;
+  const outcome = pending.then(
+    () => null,
+    (error: unknown) => error
+  );
+  const erasure = reserveMediaErasureExclusion();
+  let drained = false;
+  const drain = erasure.waitForActiveMutations().then(() => {
+    drained = true;
+  });
+  try {
+    await Promise.resolve();
+    expect(drained).toBe(false);
+    resume('data:image/png;base64,old');
+    expect(await outcome).toEqual(
+      expect.objectContaining({ message: expect.stringContaining('cancelled') })
+    );
+    await drain;
+    expect(saveScreenshotToMediaHubFromDataUrlMock).not.toHaveBeenCalled();
+    expect(sendResponse).not.toHaveBeenCalled();
+  } finally {
+    resume('data:image/png;base64,old');
+    erasure.release();
+    await pending.catch(() => undefined);
+  }
+});

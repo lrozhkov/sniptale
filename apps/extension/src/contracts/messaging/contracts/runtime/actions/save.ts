@@ -60,6 +60,7 @@ export const runtimeActionSaveMessageContracts = {
         type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
         required: { dataUrl: isImageDataUrl, filename: isString },
         optional: {
+          actionType: isCaptureActionType,
           contentIntent: isContentPrivilegedActionCapability,
           quickActionTransactionId: (value) =>
             isString(value) && value.length > 0 && value.length <= 128,

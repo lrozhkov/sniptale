@@ -37,9 +37,15 @@ export function handleFullCapture(context: CaptureRouteContext): boolean {
     runPreparedCaptureAction({
       context,
       captureTarget: 'full',
-      capture: async () => {
+      capture: async (losslessSource, outputProfile) => {
         const capture = await captureFullPageTransaction(context.resolvedTabId, undefined, {
           backendKind: 'native',
+          ...(outputProfile
+            ? { format: outputProfile.format, quality: outputProfile.quality / 100 }
+            : {}),
+          ...(losslessSource
+            ? { format: 'png' as const, quality: 1, outputPurpose: 'appearance-source' as const }
+            : {}),
           ...(binding?.documentId === undefined ? {} : { documentId: binding.documentId }),
         });
         await reportFullPageCaptureWarning(context.resolvedTabId, capture);

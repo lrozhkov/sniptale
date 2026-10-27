@@ -1,3 +1,4 @@
+import { optimizePngBlob } from '../../../platform/media-utils/png-optimization';
 import {
   isPagePackageEntryPath,
   MAX_PAGE_PACKAGE_ENTRIES,
@@ -95,7 +96,7 @@ export async function createSafeWebCopyContributions(
       path: 'snapshot/index.html',
     },
     {
-      blob: artifacts.screenshotBlob,
+      blob: await optimizePngBlob(artifacts.screenshotBlob),
       mimeType: 'image/png',
       path:
         (artifacts.screenshotCoverage ?? 'full-page') === 'full-page'

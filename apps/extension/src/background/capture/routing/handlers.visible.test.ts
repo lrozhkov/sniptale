@@ -1,3 +1,11 @@
+const { getQuickActionAppearanceSnapshotMock } = vi.hoisted(() => ({
+  getQuickActionAppearanceSnapshotMock: vi.fn(),
+}));
+vi.mock('../quick-actions/flow/surface', () => ({
+  getQuickActionAppearanceSnapshot: getQuickActionAppearanceSnapshotMock,
+}));
+const { beginPageAppearanceMock } = vi.hoisted(() => ({ beginPageAppearanceMock: vi.fn() }));
+vi.mock('../quick-actions/appearance', () => ({ beginPageAppearance: beginPageAppearanceMock }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -43,6 +51,7 @@ vi.mock('../index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../index')>()),
   captureFullPage: captureFullPageMock,
   captureVisibleTabForCropTransaction: captureVisibleTabForCropTransactionMock,
+  captureVisibleTabTransaction: captureVisibleTabForCropTransactionMock,
 }));
 
 vi.mock('../jobs/state-machine', async (importOriginal) => ({
@@ -96,6 +105,8 @@ function flushPromises() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getQuickActionAppearanceSnapshotMock.mockReturnValue({ imageFormat: 'webp', imageQuality: 61 });
+  beginPageAppearanceMock.mockReturnValue({ assertCurrent() {}, release() {} });
   loadSettingsMock.mockResolvedValue({
     captureAction: 'download_default',
     imageFormat: 'png',
@@ -199,3 +210,64 @@ describe('capture-router-handlers.visible crop', () => {
     });
   });
 });
+
+it('captures a lossless viewport before quick action appearance encoding', async () => {
+  beginPageAppearanceMock.mockReturnValue({
+    prepare: async (dataUrl: string, filename: string) => ({ dataUrl, filename }),
+    assertCurrent() {},
+    release() {},
+  });
+  const context = createContext();
+  handleVisibleCapture(context);
+  await vi.waitFor(() => expect(captureVisibleTabForCropTransactionMock).toHaveBeenCalled());
+  expect(captureVisibleTabForCropTransactionMock).toHaveBeenCalledWith(42, {
+    losslessSource: true,
+  });
+});
+
+it('selects lossless appearance output for an explicit visible clipboard action', async () => {
+  beginPageAppearanceMock.mockReturnValue({
+    prepare: async (dataUrl: string, filename: string) => ({ dataUrl, filename }),
+    assertCurrent() {},
+    release() {},
+  });
+  const context = createContext();
+  context.message = { actionType: 'copy', quickActionTransactionId: 'clipboard-appearance' };
+  handleVisibleCapture(context);
+  await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalled());
+  expect(beginPageAppearanceMock).toHaveBeenCalledWith(42, 'clipboard-appearance', 'png', false);
+});
+
+it.each(['jpeg', 'webp'] as const)(
+  'uses an unstyled quick action %s format and quality for native capture and filename',
+  async (imageFormat) => {
+    getQuickActionAppearanceSnapshotMock.mockReturnValue({ imageFormat, imageQuality: 61 });
+    loadSettingsMock.mockResolvedValue({
+      captureAction: 'download_default',
+      imageFormat: 'png',
+      imageQuality: 90,
+    });
+    generateFilenameMock.mockImplementation(
+      (_mode: string, format: string) => `visible.${format === 'jpeg' ? 'jpg' : format}`
+    );
+    captureVisibleTabForCropTransactionMock.mockResolvedValue({
+      dataUrl: `data:image/${imageFormat};base64,captured`,
+      jobId: 'profile-job',
+    });
+    const context = createContext();
+    context.message = { actionType: 'download_default', quickActionTransactionId: 'profile' };
+    handleVisibleCapture(context);
+    await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalled());
+    expect(captureVisibleTabForCropTransactionMock).toHaveBeenCalledWith(42, {
+      losslessSource: false,
+      format: imageFormat,
+      quality: 61,
+    });
+    expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
+      `data:image/${imageFormat};base64,captured`,
+      `visible.${imageFormat === 'jpeg' ? 'jpg' : imageFormat}`,
+      42,
+      'temporary'
+    );
+  }
+);

@@ -1,3 +1,4 @@
+import { optimizeScreenshotBlob } from '../../../platform/media-utils/screenshot-encoding';
 import { readImageDataUrlDimensions } from '@sniptale/runtime-contracts/validation/data-url';
 import { FULL_PAGE_QUALITY_ABSOLUTE_LIMITS } from '../../../contracts/full-page-capture';
 import type { QuickActionAppearance } from '../../../contracts/quick-action-appearance';
@@ -17,6 +18,7 @@ export interface QuickActionRasterOptions {
   metadata: QuickActionAppearanceMetadata;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;
+  maxEncodedBytes?: number;
   assertCurrent(): void;
   renderHeader(input: QuickActionHeaderRasterInput): Promise<string>;
 }
@@ -24,12 +26,19 @@ export interface QuickActionRasterOptions {
 async function encodeRaster(
   canvas: OffscreenCanvas,
   format: QuickActionRasterOptions['imageFormat'],
-  quality: number
+  quality: number,
+  maxEncodedBytes = FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxFileSizeMiB * 1024 * 1024
 ) {
   const blob = await canvas.convertToBlob({ type: `image/${format}`, quality: quality / 100 });
   if (blob.type !== `image/${format}`)
     throw new Error('Requested screenshot encoding is unavailable');
-  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const output = await optimizeScreenshotBlob(blob);
+  if (
+    output.size >
+    Math.min(maxEncodedBytes, FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.maxFileSizeMiB * 1024 * 1024)
+  )
+    throw new Error('Full-page screenshot exceeds the configured maximum file size');
+  const bytes = new Uint8Array(await output.arrayBuffer());
   const chunks: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += 32768)
     chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 32768)));
@@ -222,7 +231,12 @@ export async function renderQuickActionAppearance(
     drawFramedSource(context, background, geometry, source, headerBitmap);
     drawInformation(context, lines, options, geometry);
     options.assertCurrent();
-    const result = await encodeRaster(canvas, options.imageFormat, options.imageQuality);
+    const result = await encodeRaster(
+      canvas,
+      options.imageFormat,
+      options.imageQuality,
+      options.maxEncodedBytes
+    );
     options.assertCurrent();
     return result;
   } finally {

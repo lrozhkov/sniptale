@@ -39,6 +39,16 @@ async function openHarness(page: Page, extensionId: string, query = ''): Promise
   await expect
     .poll(() => page.evaluate(() => Boolean(window.__sniptaleFullPageCaptureHarness)))
     .toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(async () =>
+        (await chrome.tabs.query({})).some((tab) =>
+          tab.url?.endsWith('/settings/index.html?welcome=1')
+        )
+      )
+    )
+    .toBe(true);
+  await page.bringToFront();
 }
 
 async function getState(page: Page): Promise<HarnessState> {
@@ -246,7 +256,10 @@ test('viewport compositor keeps a fixed crop mask pinned while scrolling at 2x d
   });
 
   try {
-    const context = await browser.newContext({ viewport: null });
+    const context = await browser.newContext({
+      viewport: { width: 800, height: 600 },
+      deviceScaleFactor: 2,
+    });
     const page = await context.newPage();
     await page.goto(`${hostOrigin}/fixtures/viewport-compositor.html`);
     const cdp = await context.newCDPSession(page);

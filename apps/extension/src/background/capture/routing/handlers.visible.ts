@@ -1,5 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { captureVisibleTabForCropTransaction } from '../index';
+import { captureVisibleTabForCropTransaction, captureVisibleTabTransaction } from '../index';
 import { runGuardedCapture } from './guard';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { CaptureRouteContext } from './types';
@@ -14,8 +14,8 @@ export function handleVisibleCapture(context: CaptureRouteContext): boolean {
     runPreparedCaptureAction({
       context,
       captureTarget: 'visible',
-      capture: () =>
-        createVisibleCapturePromise(captureVisibleTabForCropTransaction, context.resolvedTabId),
+      capture: (losslessSource, outputProfile) =>
+        captureVisibleTabTransaction(context.resolvedTabId, { losslessSource, ...outputProfile }),
     })
   ).catch((error) => context.sendResponse(createRouteErrorResponse(error)));
   return true;

@@ -165,6 +165,12 @@
       "mode": "test-e2e"
     },
     {
+      "outputPath": "tooling/test/harness/screenshot-encoding.html",
+      "sourcePath": "tooling/test/harness/screenshot-encoding.html",
+      "rollupName": "testHarnessScreenshotEncoding",
+      "mode": "test-e2e"
+    },
+    {
       "outputPath": "tooling/test/harness/full-page-capture.html",
       "sourcePath": "tooling/test/harness/full-page-capture.html",
       "rollupName": "testHarnessFullPageCapture",
@@ -237,6 +243,7 @@
     "@zumer/snapdom",
     "dompurify",
     "fabric",
+    "fflate",
     "idb",
     "jszip",
     "lucide",
