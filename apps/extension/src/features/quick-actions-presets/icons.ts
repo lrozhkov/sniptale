@@ -198,3 +198,11 @@ const quickActionIconNodes = new Map<string, IconNode>([
 export function getQuickActionIconNode(name?: string): IconNode {
   return quickActionIconNodes.get(name ?? '') ?? Camera;
 }
+
+/** Adds React reconciliation keys without changing the native SVG definitions. */
+export function getQuickActionReactIconNode(name?: string): IconNode {
+  return getQuickActionIconNode(name).map(([tag, attrs], index) => [
+    tag,
+    { ...attrs, key: `${tag}-${index}` },
+  ]);
+}

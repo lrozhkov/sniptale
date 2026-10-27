@@ -1074,6 +1074,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           ).toBeVisible();
         }
       }
+      expect(logs.filter((message) => message.includes('unique "key"'))).toEqual([]);
     } catch (error) {
       await writeFile(
         info.outputPath('digit-diagnostics.json'),

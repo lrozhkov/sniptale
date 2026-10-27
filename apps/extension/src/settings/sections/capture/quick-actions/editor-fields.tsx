@@ -10,7 +10,7 @@ import { HotkeyInput } from './hotkey-input';
 import { delayOptions } from './section/constants';
 import {
   allowedQuickActionIcons,
-  getQuickActionIconNode,
+  getQuickActionReactIconNode,
 } from '../../../../features/quick-actions-presets/icons';
 import { SettingsControlRow, settingsMetaLabelClassName } from '../../../section-surface';
 import { type QuickActionsSectionState } from './controller';
@@ -28,7 +28,7 @@ const activeIconButtonClassName = [
 function DynamicIcon(props: { className?: string; name: string }) {
   return (
     <Icon
-      iconNode={getQuickActionIconNode(props.name)}
+      iconNode={getQuickActionReactIconNode(props.name)}
       aria-hidden="true"
       className={props.className}
     />

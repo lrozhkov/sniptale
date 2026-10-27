@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
-import { createElement as createReactElement } from 'react';
+import { act, createElement as createReactElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement as createSvg } from 'lucide';
 import * as originalIcons from 'lucide-react';
-import { expect, it } from 'vitest';
-import { allowedQuickActionIcons, getQuickActionIconNode } from './icons';
+import { expect, it, vi } from 'vitest';
+import {
+  allowedQuickActionIcons,
+  getQuickActionIconNode,
+  getQuickActionReactIconNode,
+} from './icons';
 
 const originalNames = [
   'Camera',
@@ -90,7 +95,7 @@ it.each([...originalNames, 'Layers', 'Layout', 'Images'] as const)(
     expect(geometry(native)).toEqual(geometry(original.querySelector('svg')!));
     const react = document.createElement('div');
     react.innerHTML = renderToStaticMarkup(
-      createReactElement(originalIcons.Icon, { iconNode: glyph })
+      createReactElement(originalIcons.Icon, { iconNode: getQuickActionReactIconNode(name) })
     );
     expect(geometry(react.querySelector('svg')!)).toEqual(geometry(native));
     expect(native.querySelector('script, image, use, foreignObject')).toBeNull();
@@ -108,3 +113,27 @@ it.each([undefined, '', 'Unknown', '__proto__', 'constructor', '<svg onload=aler
     expect(getQuickActionIconNode(name)).toBe(getQuickActionIconNode('Camera'));
   }
 );
+
+it('mounts and updates every quick-action glyph without React key warnings', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const errors = vi.spyOn(console, 'error');
+  try {
+    for (const name of [...originalNames, 'Layers', 'Layout', 'Images', 'Unknown', undefined]) {
+      await act(async () => {
+        root.render(
+          createReactElement(originalIcons.Icon, { iconNode: getQuickActionReactIconNode(name) })
+        );
+      });
+      expect(geometry(container.querySelector('svg')!)).toEqual(
+        geometry(createSvg(getQuickActionIconNode(name)))
+      );
+    }
+    expect(
+      errors.mock.calls.filter(([message]) => String(message).includes('unique "key"'))
+    ).toEqual([]);
+  } finally {
+    await act(async () => root.unmount());
+    errors.mockRestore();
+  }
+});

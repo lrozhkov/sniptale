@@ -6,7 +6,7 @@ import {
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
 import { translate } from '../../../platform/i18n';
-import { getQuickActionIconNode } from '../../../features/quick-actions-presets/icons';
+import { getQuickActionReactIconNode } from '../../../features/quick-actions-presets/icons';
 import { getQuickActionDisplayName } from '../../../features/quick-actions-presets/catalog';
 import { ToolbarMenuDropdown } from '../toolbar/menu/dropdown';
 import type { ToolbarMenuState } from '../toolbar/state/menu';
@@ -69,7 +69,11 @@ export function PageQuickActionsMenu(props: {
                   void trigger(action, event.nativeEvent);
                 }}
               >
-                <Icon iconNode={getQuickActionIconNode(action.icon)} size={18} aria-hidden="true" />
+                <Icon
+                  iconNode={getQuickActionReactIconNode(action.icon)}
+                  size={18}
+                  aria-hidden="true"
+                />
                 <ProductToolbarMenuItemCopy label={getQuickActionDisplayName(action)} />
                 {index < 10 ? (
                   <kbd className="sniptale-toolbar-menu-shortcut">

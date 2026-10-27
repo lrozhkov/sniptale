@@ -1,6 +1,6 @@
 import { Icon, Zap } from 'lucide-react';
 
-import { getQuickActionIconNode } from '../../../../features/quick-actions-presets/icons';
+import { getQuickActionReactIconNode } from '../../../../features/quick-actions-presets/icons';
 import { translate } from '../../../../platform/i18n';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import {
@@ -41,7 +41,7 @@ export function QuickActionsList(props: {
       meta,
       preview: (
         <Icon
-          iconNode={getQuickActionIconNode(action.icon)}
+          iconNode={getQuickActionReactIconNode(action.icon)}
           aria-hidden="true"
           className="h-4 w-4 text-[var(--sniptale-color-text-secondary)]"
         />

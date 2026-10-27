@@ -1,5 +1,5 @@
 import { Icon } from 'lucide-react';
-import { getQuickActionIconNode } from '../../../../features/quick-actions-presets/icons';
+import { getQuickActionReactIconNode } from '../../../../features/quick-actions-presets/icons';
 import { translate } from '../../../../platform/i18n/popup';
 import { hotkeyToKeyString } from '../../../../features/keyboard-shortcuts/hotkeys';
 import {
@@ -13,7 +13,7 @@ import { formatViewportPresetDimensions } from '../../../../features/viewport-pr
 export function DynamicIcon({ name, color }: { name: string; color?: string }) {
   return (
     <Icon
-      iconNode={getQuickActionIconNode(name)}
+      iconNode={getQuickActionReactIconNode(name)}
       aria-hidden="true"
       className="h-4 w-4"
       style={color ? { color } : undefined}
