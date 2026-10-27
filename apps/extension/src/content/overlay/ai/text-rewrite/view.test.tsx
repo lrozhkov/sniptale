@@ -14,6 +14,7 @@ import {
   ui,
 } from './view.test-support';
 import { act } from 'react';
+import { TextJobProviderError } from '../../../../workflows/ai-session/text-request-port';
 import { dispatchBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { translate } from '../../../../platform/i18n';
 import { expect, it, vi } from 'vitest';
@@ -452,4 +453,50 @@ it('accepts private bridged Submit once and refuses the retained event on a late
   expect(mocks.request).not.toHaveBeenCalled();
   expect(mocks.remember).not.toHaveBeenCalled();
   expect(target.textContent).toBe('Original words');
+});
+
+it.each([
+  ['invalid-credential', 'providerStatusInvalidKey'],
+  ['permission-denied', 'providerStatusDenied'],
+  ['model-unavailable', 'providerStatusModelUnavailable'],
+  ['quota-exceeded', 'providerStatusQuota'],
+  ['rate-limited', 'providerStatusRate'],
+  ['network', 'providerStatusNetwork'],
+  ['timeout', 'providerStatusTimeout'],
+  ['service-error', 'providerStatusUnavailable'],
+] as const)(
+  'explains %s and preserves markup and the instruction for explicit retry',
+  async (reason, key) => {
+    await selectTarget();
+    const before = target.innerHTML;
+    await fill('Keep this instruction');
+    mocks.request.mockRejectedValueOnce(new TextJobProviderError(reason, 'provider-failed'));
+    await submit();
+    expect(ui('content.ai-text.feedback').textContent).toBe(
+      translate(`settings.aiProviders.${key}`)
+    );
+    expect(target.innerHTML).toBe(before);
+    expect((ui('content.ai-text.prompt') as HTMLTextAreaElement).value).toBe(
+      'Keep this instruction'
+    );
+    expect(mocks.request).toHaveBeenCalledOnce();
+  }
+);
+it('clears provider evidence on a trusted explicit model choice without replay', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ x: 10, y: 10, width: 200, height: 40 })
+  );
+  await selectTarget();
+  await fill('Keep this instruction');
+  mocks.request.mockRejectedValueOnce(
+    new TextJobProviderError('quota-exceeded', 'provider-failed')
+  );
+  await submit();
+  await click(shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!);
+  const choice = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Other text model'
+  )!;
+  await click(choice);
+  expect(shadow.querySelector('[data-ui="content.ai-text.feedback"]')).toBeNull();
+  expect(mocks.request).toHaveBeenCalledOnce();
 });

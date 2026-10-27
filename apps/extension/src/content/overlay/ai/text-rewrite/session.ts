@@ -1,3 +1,5 @@
+import { TextJobProviderError } from '../../../../workflows/ai-session/text-request-port';
+import type { AIConnectionReason } from '../../../../contracts/settings/ai-catalog';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { useAIScenarioModelSelection } from '../../../../workflows/ai-settings/use-scenario-model-selection';
@@ -82,7 +84,10 @@ function useTextReplacementRequest(args: {
 }) {
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [error, setError] = useState<RequestError | null>(null);
+  const [error, setError] = useState<{
+    code: RequestError;
+    providerReason: AIConnectionReason | null;
+  } | null>(null);
   const flight = useRef<AbortController | null>(null);
   const startedAt = useRef(0);
   const scope = useRef({ active: args.active, target: args.target });
@@ -92,7 +97,7 @@ function useTextReplacementRequest(args: {
     flight.current = null;
     current?.abort();
     setBusy(false);
-    if (current && showStatus) setError('cancelled');
+    if (current && showStatus) setError({ code: 'cancelled', providerReason: null });
   }, []);
   useEffect(() => {
     setError(null);
@@ -121,11 +126,11 @@ function useTextReplacementRequest(args: {
     if (!target) return;
     const model = args.models.models.find((entry) => entry.id === args.models.selectedModelId);
     if (!model) {
-      setError('model-unavailable');
+      setError({ code: 'model-unavailable', providerReason: null });
       return;
     }
     if (!target.isCurrent()) {
-      setError('stale');
+      setError({ code: 'stale', providerReason: null });
       return;
     }
     const controller = new AbortController();
@@ -162,7 +167,10 @@ function useTextReplacementRequest(args: {
       if (flight.current === controller && !controller.signal.aborted) {
         const code = failure instanceof Error ? failure.message : '';
         if (code !== 'catalog-unavailable' && code !== 'selection-write-failed')
-          setError(requestError(failure));
+          setError({
+            code: requestError(failure),
+            providerReason: failure instanceof TextJobProviderError ? failure.reason : null,
+          });
       }
     } finally {
       if (flight.current === controller) {
@@ -172,7 +180,16 @@ function useTextReplacementRequest(args: {
     }
     if (applied) args.onApplied();
   }
-  return { busy, elapsed, error, cancel, submit };
+  const clearError = useCallback(() => setError(null), []);
+  return {
+    busy,
+    elapsed,
+    error: error?.code ?? null,
+    providerFailureReason: error?.providerReason ?? null,
+    clearError,
+    cancel,
+    submit,
+  };
 }
 
 /** Owns one page selection, prompt draft and request lifetime for the toolbar text tool. */
@@ -239,5 +256,18 @@ export function useTextRewriteSession(args: {
   useEffect(() => {
     picker.current?.setSelectedTarget(target?.element ?? null);
   }, [target]);
-  return { target, prompt, setPrompt, models, request, close };
+  return {
+    target,
+    prompt,
+    setPrompt,
+    models: {
+      ...models,
+      select: (id: string | null) => {
+        request.clearError();
+        models.select(id);
+      },
+    },
+    request,
+    close,
+  };
 }

@@ -27,6 +27,7 @@ function useTextRewritePosition(session: Session, ref: RefObject<HTMLElement | n
     measurementKey: [
       session.request.busy,
       session.request.error,
+      session.request.providerFailureReason,
       session.models.failed,
       session.models.pending,
       session.models.unavailable,
