@@ -145,7 +145,11 @@ export async function prepareCatalogReplica(args: {
     }
     for (const [index, attempt] of selected.attempts.entries()) {
       args.signal.throwIfAborted();
-      const physical = await createSyncAttempt(selected.operationText, attempt.attemptId);
+      const physical = await createSyncAttempt(
+        selected.operationText,
+        attempt.attemptId,
+        attempt.objects
+      );
       check(
         physical.recordKey === attempt.recordKey &&
           JSON.stringify(physical.objects) === JSON.stringify(attempt.objects)

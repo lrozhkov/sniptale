@@ -360,3 +360,70 @@ it('refuses missing or extra wire dependency inventory before staging files', as
   }
   expect(io.stage).not.toHaveBeenCalled();
 });
+
+it('stages reused same-space mappings through the existing native journal admission', async () => {
+  const f = await fixture();
+  const physical = await createSyncAttempt(
+    f.selected.operationText,
+    '00000000-0000-0000-0000-000000000009',
+    f.selected.objects
+  );
+  const selected = {
+    ...(await parseSyncAttemptText(physical.recordText)),
+    operationText: f.selected.operationText,
+  };
+  const catalog = {
+    ...projectSyncCatalog('space', [selected]),
+    invalid: [],
+    metadataBytes: 0,
+    pages: 1,
+  };
+  const journal = await prepareCatalogReplica({
+    ...f,
+    catalog,
+    rootKind: 'media',
+    rootId: mediaId,
+    signal: new AbortController().signal,
+  });
+  expect(f.reads).toEqual(f.selected.objects.map((item) => item.remoteKey));
+  expect(io.staged).toEqual(['original']);
+  expect(journal.payload.kind).toBe('media');
+  expect(journal.payload.input.sourceDigest).toBe(hashSyncText(f.selected.operationText));
+  expect(io.journal).toHaveBeenCalledOnce();
+});
+it('stages a mixed fresh editing and reused export mapping without downloading the export', async () => {
+  const f = await fixture(true);
+  const fresh = await createSyncAttempt(
+    f.selected.operationText,
+    '00000000-0000-0000-0000-000000000009'
+  );
+  const mixed = fresh.objects.map((item) =>
+    item.objectId === 'export'
+      ? f.selected.objects.find((candidate) => candidate.objectId === item.objectId)!
+      : item
+  );
+  const physical = await createSyncAttempt(f.selected.operationText, fresh.attemptId, mixed);
+  const selected = {
+    ...(await parseSyncAttemptText(physical.recordText)),
+    operationText: f.selected.operationText,
+  };
+  const media = await attempt(mediaEnvelope().envelope, 'media-op');
+  const catalog = {
+    ...projectSyncCatalog('space', [media, selected]),
+    invalid: [],
+    metadataBytes: 0,
+    pages: 1,
+  };
+  const privateKey = mixed.find((item) => item.objectId === 'private')!.remoteKey;
+  f.data.set(privateKey, new Blob([new Uint8Array(3)]));
+  const journal = await prepareCatalogReplica({
+    ...f,
+    catalog,
+    rootKind: 'video-project',
+    rootId: 'project',
+    signal: new AbortController().signal,
+  });
+  expect(f.reads).toEqual([privateKey]);
+  expect(io.staged).toEqual(['private']);
+  expect(journal.payload.kind).toBe('video-project');
+});

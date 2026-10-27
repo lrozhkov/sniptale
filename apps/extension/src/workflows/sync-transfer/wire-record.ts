@@ -135,17 +135,39 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   return operation;
 }
 
-function objectKeys(operation: SyncOperation, attemptId: string) {
+function objectKeys(
+  operation: SyncOperation,
+  attemptId: string,
+  retained?: { objectId: string; remoteKey: string }[]
+) {
+  if (retained) check(retained.length === (operation.envelope?.objects.length ?? 0));
   return (operation.envelope?.objects ?? []).map((object) => {
     check(identity(object.objectId) && !/[\\/?#:%]/u.test(object.objectId));
     check(object.filename.length > 0 && !/[\\/?#:]/u.test(object.filename));
     check(object.filename !== '.' && object.filename !== '..');
     for (const character of object.filename)
       check(character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127);
-    return {
-      objectId: object.objectId,
-      remoteKey: `Files/${hashSyncText(operation.spaceId)}/${attemptId}/${object.objectId}/${object.filename}`,
-    };
+    const proposed = retained?.find((item) => item.objectId === object.objectId);
+    if (retained) check(proposed);
+    const remoteKey =
+      proposed?.remoteKey ??
+      `Files/${hashSyncText(operation.spaceId)}/${attemptId}/${object.objectId}/${object.filename}`;
+    check(remoteKey.length <= 2048);
+    const parts = remoteKey.split('/');
+    check(
+      parts.length === 5 &&
+        parts[0] === 'Files' &&
+        parts[1] === hashSyncText(operation.spaceId) &&
+        UUID.test(parts[2] ?? '') &&
+        identity(parts[3]) &&
+        parts[3] !== '.' &&
+        parts[3] !== '..' &&
+        !/[\\/?#:%]/u.test(parts[3] ?? '') &&
+        parts[4] === object.filename
+    );
+    for (const character of parts[3] ?? '')
+      check(character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127);
+    return { objectId: object.objectId, remoteKey };
   });
 }
 function physicalText(
@@ -163,11 +185,16 @@ function physicalText(
   });
 }
 
-/** Each application dispatch gets fresh paths. Logical bytes stay identical across attempts. */
-export async function createSyncAttempt(operationText: string, attemptId: string) {
+/** Freeze canonical fresh or retained same-space file mappings under an independent manifest. */
+export async function createSyncAttempt(
+  operationText: string,
+  attemptId: string,
+  retained?: { objectId: string; remoteKey: string }[]
+) {
   check(UUID.test(attemptId));
   const operation = await parseSyncOperationText(operationText);
-  const objects = objectKeys(operation, attemptId);
+  const objects = objectKeys(operation, attemptId, retained);
+  check(new Set(objects.map((item) => item.remoteKey)).size === objects.length);
   const recordText = physicalText(operationText, attemptId, objects);
   check(new TextEncoder().encode(recordText).byteLength <= MAX_TEXT_BYTES);
   const recordSha256 = hashSyncText(recordText);
@@ -191,7 +218,14 @@ export async function parseSyncAttemptText(text: string) {
     typeof value['operationText'] === 'string' &&
       hashSyncText(value['operationText']) === value['operationSha256']
   );
-  const expected = await createSyncAttempt(value['operationText'], value['attemptId']);
+  check(Array.isArray(value['objects']) && value['objects'].length <= 64);
+  const objects = value['objects'].map((item) => {
+    check(isRecord(item));
+    fields(item, ['objectId', 'remoteKey']);
+    check(identity(item['objectId']) && typeof item['remoteKey'] === 'string');
+    return { objectId: item['objectId'], remoteKey: item['remoteKey'] };
+  });
+  const expected = await createSyncAttempt(value['operationText'], value['attemptId'], objects);
   check(expected.recordText === text);
   return { ...expected, operation: await parseSyncOperationText(value['operationText']) };
 }

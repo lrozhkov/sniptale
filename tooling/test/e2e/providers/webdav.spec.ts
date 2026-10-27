@@ -613,6 +613,7 @@ test('durable dispatch keeps original and export bytes after lost response and f
       prepared
     );
     expect(persisted?.recordText).toBe(prepared.recordText);
+    const recoveryPutStart = lab.proxy.counts.puts;
     const recovered = await sender.page.evaluate(
       ({ spaceId, operationId }) =>
         window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
@@ -622,7 +623,8 @@ test('durable dispatch keeps original and export bytes after lost response and f
     expect(JSON.parse(recovered.recordText)['operationText']).toBe(prepared.recordText);
     expect(
       new Set([...first!.objects, ...recovered.objects].map((item) => item.remoteKey)).size
-    ).toBe(prepared.objects.length * 2);
+    ).toBe(prepared.objects.length);
+    expect(lab.proxy.counts.puts - recoveryPutStart).toBe(1);
     for (const object of recovered.objects) {
       const expected = prepared.objects.find((item) => item.objectId === object.objectId)!;
       expect(await lab.externalProof(object.remoteKey)).toEqual({
@@ -634,6 +636,7 @@ test('durable dispatch keeps original and export bytes after lost response and f
       size: Buffer.byteLength(recovered.recordText),
       sha256: recovered.recordSha256,
     });
+    const concurrentPutStart = lab.proxy.counts.puts;
     const concurrent = await sender.page.evaluate(
       async ({ spaceId, operationId }) =>
         Promise.all(
@@ -647,7 +650,9 @@ test('durable dispatch keeps original and export bytes after lost response and f
       new Set([first!.recordKey, recovered.recordKey, ...concurrent.map((item) => item.recordKey)])
         .size
     ).toBe(4);
+    expect(lab.proxy.counts.puts - concurrentPutStart).toBe(2);
     for (const attempt of concurrent) {
+      expect(attempt.objects).toEqual(recovered.objects);
       expect(JSON.parse(attempt.recordText)['operationText']).toBe(prepared.recordText);
       expect(await lab.externalProof(attempt.recordKey)).toEqual({
         size: Buffer.byteLength(attempt.recordText),
@@ -667,6 +672,31 @@ test('durable dispatch keeps original and export bytes after lost response and f
       { ...prepared, initialId }
     );
     expect(retained).toEqual(first);
+    await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.reviseMetadata(id),
+      seeded.projectId
+    );
+    const revised = await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.prepare(id),
+      seeded.projectId
+    );
+    expect(revised.operationId).not.toBe(prepared.operationId);
+    const revisionPutStart = lab.proxy.counts.puts;
+    const revisionAttempt = await sender.page.evaluate(
+      ({ spaceId, operationId }) =>
+        window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
+      revised
+    );
+    expect(lab.proxy.counts.puts - revisionPutStart).toBe(1);
+    expect(revisionAttempt.recordKey).not.toBe(recovered.recordKey);
+    expect(revisionAttempt.objects).toEqual(recovered.objects);
+    for (const object of revisionAttempt.objects) {
+      const expected = revised.objects.find((item) => item.objectId === object.objectId)!;
+      expect(await lab.externalProof(object.remoteKey)).toEqual({
+        size: expected.size,
+        sha256: expected.sha256,
+      });
+    }
     await writeFile(
       info.outputPath('durable-dispatch-proof.json'),
       JSON.stringify(
@@ -677,11 +707,83 @@ test('durable dispatch keeps original and export bytes after lost response and f
           recovered,
           concurrent,
           borrowedAttempt,
+          revisionAttempt,
+          reusePuts: { recovered: 1, concurrent: 2, metadataRevision: 1 },
           fullBrowserRestart: true,
         },
         null,
         2
       )
+    );
+  } finally {
+    lab.proxy.releaseFault();
+    await sender.context.close();
+  }
+});
+
+test('partial dispatch reuses completed bytes after restart and isolates the lost file response', async ({
+  lab,
+}, info) => {
+  let sender = await openProvider(lab, info, 'partial-file-reuse');
+  try {
+    const seeded = await sender.page.evaluate(() => window.webdavTransferHarness.portable.source());
+    const prepared = await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.prepare(id),
+      seeded.projectId
+    );
+    expect(prepared.objects).toHaveLength(2);
+    const [completed, ambiguous] = prepared.objects;
+    expect(completed).toBeDefined();
+    expect(ambiguous).toBeDefined();
+    lab.proxy.armFault({
+      method: 'PUT',
+      key: ambiguous!.key,
+      kind: 'lost-response',
+      repeat: true,
+    });
+    await expect(
+      sender.page.evaluate(
+        ({ spaceId, operationId }) =>
+          window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
+        prepared
+      )
+    ).rejects.toThrow();
+    await lab.proxy.waitForFault();
+    lab.proxy.releaseFault();
+    for (const object of prepared.objects)
+      expect(await lab.externalProof(object.key)).toEqual({
+        size: object.size,
+        sha256: object.sha256,
+      });
+    expect(lab.proxy.counts.putBodies.some((body) => body.key === prepared.attemptKey)).toBe(false);
+    await sender.context.close();
+    sender = await openProvider(lab, info, 'partial-file-reuse');
+    const before = lab.proxy.counts.putBodies.length;
+    const recovered = await sender.page.evaluate(
+      ({ spaceId, operationId }) =>
+        window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
+      prepared
+    );
+    const completedBinding = recovered.objects.find(
+      (item) => item.objectId === completed!.objectId
+    );
+    const replacedBinding = recovered.objects.find((item) => item.objectId === ambiguous!.objectId);
+    expect(completedBinding?.remoteKey).toBe(completed!.key);
+    expect(replacedBinding?.remoteKey).not.toBe(ambiguous!.key);
+    expect(lab.proxy.counts.putBodies.slice(before).map((body) => body.key)).toEqual([
+      replacedBinding!.remoteKey,
+      recovered.recordKey,
+    ]);
+    for (const object of recovered.objects) {
+      const expected = prepared.objects.find((item) => item.objectId === object.objectId)!;
+      expect(await lab.externalProof(object.remoteKey)).toEqual({
+        size: expected.size,
+        sha256: expected.sha256,
+      });
+    }
+    await writeFile(
+      info.outputPath('partial-file-reuse-proof.json'),
+      JSON.stringify({ prepared, recovered, fullBrowserRestart: true }, null, 2)
     );
   } finally {
     lab.proxy.releaseFault();

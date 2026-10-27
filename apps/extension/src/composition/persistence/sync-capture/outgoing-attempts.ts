@@ -1,10 +1,16 @@
+import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { initDB } from '../infrastructure/indexed-db/core';
 import { SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE } from '../infrastructure/indexed-db/core.stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseSyncCaptureRecord } from './guards';
-import { matchesCapture, parsePrepared, type PreparedOutgoingOperation } from './outgoing';
+import {
+  matchesCapture,
+  parsePrepared,
+  preparedOutgoingOperationKey,
+  type PreparedOutgoingOperation,
+} from './outgoing';
 
 const MAX_RECORD_BYTES = 4 * 1024 * 1024;
 
@@ -240,4 +246,227 @@ export async function commitOutgoingDispatchAttempt(
       throw error;
     }
   });
+}
+
+interface CompletedOutgoingFile {
+  version: 1;
+  kind: 'completed-file';
+  key: string;
+  spaceId: string;
+  connectionGeneration: number;
+  operationId: string;
+  attemptId: string;
+  objectId: string;
+  attemptSha256: string;
+  captureSha256: string;
+}
+
+function completionPrefix(spaceId: string, connectionGeneration: number) {
+  return `completed-file:${JSON.stringify([spaceId, connectionGeneration])}:`;
+}
+function completionKey(attempt: OutgoingDispatchAttempt, objectId: string) {
+  const identity = JSON.stringify([attempt.operationId, attempt.attemptId, objectId]);
+  return `${completionPrefix(attempt.spaceId, attempt.connectionGeneration)}${identity}`;
+}
+function parseCompletion(value: unknown): CompletedOutgoingFile | null {
+  if (
+    !isRecord(value) ||
+    value['version'] !== 1 ||
+    value['kind'] !== 'completed-file' ||
+    !bounded(value['spaceId'], 256) ||
+    !bounded(value['operationId'], 256) ||
+    !uuid(value['attemptId']) ||
+    !bounded(value['objectId'], 256) ||
+    typeof value['connectionGeneration'] !== 'number' ||
+    !Number.isSafeInteger(value['connectionGeneration']) ||
+    value['connectionGeneration'] < 1 ||
+    !digest(value['attemptSha256']) ||
+    !digest(value['captureSha256'])
+  )
+    return null;
+  const completion: CompletedOutgoingFile = {
+    version: 1,
+    kind: 'completed-file',
+    key: '',
+    spaceId: value['spaceId'],
+    connectionGeneration: value['connectionGeneration'],
+    operationId: value['operationId'],
+    attemptId: value['attemptId'],
+    objectId: value['objectId'],
+    attemptSha256: value['attemptSha256'],
+    captureSha256: value['captureSha256'],
+  };
+  const identity = JSON.stringify([
+    completion.operationId,
+    completion.attemptId,
+    completion.objectId,
+  ]);
+  completion.key = `${completionPrefix(completion.spaceId, completion.connectionGeneration)}${identity}`;
+  return value['key'] === completion.key ? completion : null;
+}
+
+/** Admit only acknowledged and digest-checked PUT evidence; never alter the frozen attempt. */
+export async function commitCompletedOutgoingFile(
+  expectedPrepared: unknown,
+  expectedAttempt: unknown,
+  objectId: string
+): Promise<void> {
+  const expected = parsePrepared(structuredClone(expectedPrepared));
+  const attempt = parseAttempt(structuredClone(expectedAttempt));
+  if (
+    !expected ||
+    !attempt ||
+    !matchesPrepared(attempt, expected) ||
+    !attempt.objects.some((item) => item.objectId === objectId)
+  )
+    throw new Error('Invalid completed outgoing file.');
+  const proposed: CompletedOutgoingFile = {
+    version: 1,
+    kind: 'completed-file',
+    key: completionKey(attempt, objectId),
+    spaceId: attempt.spaceId,
+    connectionGeneration: attempt.connectionGeneration,
+    operationId: attempt.operationId,
+    attemptId: attempt.attemptId,
+    objectId,
+    attemptSha256: attempt.recordSha256,
+    captureSha256: expected.captureSha256,
+  };
+  await runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readwrite');
+    try {
+      const captures = tx.objectStore(SYNC_CAPTURE_STORE);
+      const store = tx.objectStore(SYNC_OUTBOX_STORE);
+      const profile = parseSyncCaptureRecord(await captures.get('profile'));
+      const capture = parseSyncCaptureRecord(await captures.get(expected.captureKey));
+      const current = parsePrepared(await store.get(expected.key));
+      const storedAttempt = parseAttempt(await store.get(attempt.key));
+      if (
+        !profile ||
+        profile.kind !== 'profile' ||
+        !profile.enabled ||
+        profile.spaceId !== expected.spaceId ||
+        profile.connectionGeneration !== expected.connectionGeneration ||
+        !capture ||
+        capture.kind !== 'captured-change' ||
+        !matchesCapture(expected, capture) ||
+        !current ||
+        JSON.stringify(current) !== JSON.stringify(expected) ||
+        !storedAttempt ||
+        JSON.stringify(storedAttempt) !== JSON.stringify(attempt)
+      )
+        throw new Error('Completed outgoing file evidence changed.');
+      const raw: unknown = await store.get(proposed.key);
+      const old = raw === undefined ? null : parseCompletion(raw);
+      if (raw !== undefined && (!old || JSON.stringify(old) !== JSON.stringify(proposed)))
+        throw new Error('Contradictory completed outgoing file.');
+      if (raw === undefined) await store.add(proposed);
+      await tx.done;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* The transaction can already be closed. */
+      }
+      await tx.done.catch(() => undefined);
+      throw error;
+    }
+  });
+}
+
+type CompletionReadTransaction = IDBPTransaction<unknown, string[], 'readonly'>;
+
+async function listConnectionCompletions(
+  tx: CompletionReadTransaction,
+  spaceId: string,
+  connectionGeneration: number
+) {
+  const prefix = completionPrefix(spaceId, connectionGeneration);
+  const rows: unknown[] = await tx
+    .objectStore(SYNC_OUTBOX_STORE)
+    .getAll(IDBKeyRange.bound(prefix, `${prefix}\uffff`), 8193);
+  const completions = rows.filter(
+    (row) => isRecord(row) && typeof row['key'] === 'string' && row['key'].startsWith(prefix)
+  );
+  if (completions.length > 8192) throw new Error('Completed outgoing file limit.');
+  return completions;
+}
+
+async function readCompletedFileJoin(
+  tx: CompletionReadTransaction,
+  completed: CompletedOutgoingFile,
+  preparedCache: Map<string, PreparedOutgoingOperation>,
+  attemptCache: Map<string, OutgoingDispatchAttempt>
+) {
+  const store = tx.objectStore(SYNC_OUTBOX_STORE);
+  const preparedKey = preparedOutgoingOperationKey(completed.spaceId, completed.operationId);
+  let prepared = preparedCache.get(preparedKey);
+  if (!prepared) {
+    const candidate = parsePrepared(await store.get(preparedKey));
+    if (!candidate) throw new Error('Invalid completed outgoing preparation.');
+    const capture = parseSyncCaptureRecord(
+      await tx.objectStore(SYNC_CAPTURE_STORE).get(candidate.captureKey)
+    );
+    if (!capture || capture.kind !== 'captured-change' || !matchesCapture(candidate, capture))
+      throw new Error('Invalid completed outgoing capture.');
+    prepared = candidate;
+    preparedCache.set(preparedKey, prepared);
+  }
+  const key = attemptKey(completed.spaceId, completed.operationId, completed.attemptId);
+  let attempt = attemptCache.get(key);
+  if (!attempt) {
+    const candidate = parseAttempt(await store.get(key));
+    if (!candidate) throw new Error('Invalid completed outgoing attempt.');
+    attempt = candidate;
+    attemptCache.set(key, attempt);
+  }
+  if (
+    prepared.spaceId !== completed.spaceId ||
+    prepared.connectionGeneration !== completed.connectionGeneration ||
+    prepared.captureSha256 !== completed.captureSha256 ||
+    !matchesPrepared(attempt, prepared) ||
+    attempt.recordSha256 !== completed.attemptSha256 ||
+    !attempt.objects.some((item) => item.objectId === completed.objectId)
+  )
+    throw new Error('Invalid completed outgoing file join.');
+  return { prepared, attempt, objectId: completed.objectId };
+}
+
+/** Read bounded completed-file joins. Consumers must parse manifests and recheck remote bytes. */
+export async function loadCompletedOutgoingFiles(spaceId: string, connectionGeneration: number) {
+  if (
+    !bounded(spaceId, 256) ||
+    !Number.isSafeInteger(connectionGeneration) ||
+    connectionGeneration < 1
+  )
+    throw new Error('Invalid completed outgoing file identity.');
+  const db = await initDB();
+  const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
+  const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+  if (
+    !profile ||
+    profile.kind !== 'profile' ||
+    !profile.enabled ||
+    profile.spaceId !== spaceId ||
+    profile.connectionGeneration !== connectionGeneration
+  ) {
+    await tx.done;
+    throw new Error('Completed outgoing file connection changed.');
+  }
+  const completions = await listConnectionCompletions(tx, spaceId, connectionGeneration);
+  const preparedCache = new Map<string, PreparedOutgoingOperation>();
+  const attemptCache = new Map<string, OutgoingDispatchAttempt>();
+  const result = [];
+  for (const raw of completions) {
+    const completed = parseCompletion(raw);
+    if (
+      !completed ||
+      completed.spaceId !== spaceId ||
+      completed.connectionGeneration !== connectionGeneration
+    )
+      throw new Error('Invalid completed outgoing file.');
+    result.push(await readCompletedFileJoin(tx, completed, preparedCache, attemptCache));
+  }
+  await tx.done;
+  return result;
 }

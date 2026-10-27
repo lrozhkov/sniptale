@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { createMediaLibraryEntry } from '../../composition/persistence/projects/index.test-support';
 import {
@@ -126,4 +127,49 @@ it('refuses physical mapping substitution and altered logical bytes', async () =
   ]) {
     await expect(parseSyncAttemptText(JSON.stringify(changed))).rejects.toThrow();
   }
+});
+
+it('round-trips canonical reused mappings across revisions and different logical object IDs', async () => {
+  const first = await createSyncAttempt(JSON.stringify(operation()), id1);
+  const revised = operation();
+  revised.operationId = 'next';
+  revised.parents = ['operation'];
+  if (!revised.envelope) throw new Error('Missing envelope.');
+  revised.envelope.objects[0]!.objectId = 'different-logical-object';
+  revised.envelope.objects[0]!.path = '_sniptale/assets/different-logical-object/original 100%.png';
+  if (!isRecord(revised.envelope.metadata)) throw new Error('Missing media metadata.');
+  revised.envelope.metadata = {
+    ...revised.envelope.metadata,
+    originalObjectId: 'different-logical-object',
+  };
+  revised.objects[0]!.objectId = 'different-logical-object';
+  const reused = await createSyncAttempt(JSON.stringify(revised), id2, [
+    { objectId: 'different-logical-object', remoteKey: first.objects[0]!.remoteKey },
+  ]);
+  const parsed = await parseSyncAttemptText(reused.recordText);
+  expect(parsed.objects[0]?.remoteKey).toBe(first.objects[0]?.remoteKey);
+  expect(parsed.recordKey).not.toBe(first.recordKey);
+  expect(parsed.operation).toEqual(revised);
+});
+it.each([
+  ['foreign space', (key: string) => key.replace(hashSyncText('space'), hashSyncText('foreign'))],
+  ['unknown namespace', (key: string) => key.replace('Files/', 'Originals/')],
+  ['invalid UUID', (key: string) => key.replace(id1, 'not-uuid')],
+  ['traversal object', (key: string) => key.replace('/sync-object-000001/', '/../')],
+  ['dot object', (key: string) => key.replace('/sync-object-000001/', '/./')],
+  ['encoded object', (key: string) => key.replace('/sync-object-000001/', '/%2e%2e/')],
+  ['unsafe object', (key: string) => key.replace('/sync-object-000001/', '/bad:object/')],
+  ['control object', (key: string) => key.replace('/sync-object-000001/', '/bad\u0000object/')],
+  ['wrong filename', (key: string) => key.replace('original 100%.png', 'other.png')],
+  [
+    'extra segment',
+    (key: string) => key.replace('/sync-object-000001/', '/extra/sync-object-000001/'),
+  ],
+  ['oversized key', (key: string) => key.replace('/sync-object-000001/', `/${'x'.repeat(2048)}/`)],
+])('rejects %s retained physical mappings in construction and parsing', async (_label, change) => {
+  const first = await createSyncAttempt(JSON.stringify(operation()), id1);
+  const objects = [{ ...first.objects[0]!, remoteKey: change(first.objects[0]!.remoteKey) }];
+  await expect(createSyncAttempt(JSON.stringify(operation()), id2, objects)).rejects.toThrow();
+  const value = JSON.parse(first.recordText);
+  await expect(parseSyncAttemptText(JSON.stringify({ ...value, objects }))).rejects.toThrow();
 });

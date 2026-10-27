@@ -6,7 +6,11 @@ import { parseSyncCaptureRecord } from '../../../apps/extension/src/composition/
 import { captureRootKey } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
 import { installExperimentalCaptureProfile } from '../../../apps/extension/src/composition/persistence/sync-capture/profile';
 import { parseMediaLibraryEntry } from '../../../apps/extension/src/composition/persistence/media-library/read-guards';
-import { parseProjectAssetEntry } from '../../../apps/extension/src/composition/persistence/projects/read-guards';
+import {
+  parseProjectAssetEntry,
+  parseVideoProjectEntry,
+} from '../../../apps/extension/src/composition/persistence/projects/read-guards';
+import { saveVideoProject } from '../../../apps/extension/src/composition/persistence/projects';
 import {
   parseAssetRef,
   publishReadyJournalWithRetry,
@@ -45,6 +49,18 @@ export function createWebdavOutgoingHarness(
     return row?.kind === 'root-state' ? row : null;
   }
   return {
+    async reviseMetadata(rootId: string) {
+      const db = await initDB();
+      const entry = parseVideoProjectEntry(await db.get('video_projects', rootId));
+      if (!entry) throw new Error('Native project is missing.');
+      await saveVideoProject(
+        { ...entry.project, name: `${entry.project.name} revised` },
+        {
+          expectedProject: entry.project,
+          expectedWorkspaceRevision: entry.workspaceRevision ?? null,
+        }
+      );
+    },
     async sendHistory(rootId: string) {
       const db = await initDB();
       const captures = (await db.getAll(SYNC_CAPTURE_STORE))

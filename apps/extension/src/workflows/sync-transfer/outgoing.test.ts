@@ -1,5 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createMediaLibraryEntry } from '../../composition/persistence/projects/index.test-support';
+import {
+  createMediaLibraryEntry,
+  createVideoProjectEntryWithMediaClip,
+  createProjectExportEntry,
+} from '../../composition/persistence/projects/index.test-support';
 import {
   captureRootKey,
   type CapturedChange,
@@ -15,11 +19,14 @@ import type {
 import type { AssetRef } from '../../composition/persistence/assets';
 import { parseSyncAttemptText } from './wire-record';
 import { dispatchPreparedOutgoing, prepareCapturedOutgoing } from './outgoing';
-import type { SyncRemoteStore } from './remote-store';
+import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
+import { VideoProjectAssetType } from '../../features/video/project/types';
 
 const io = vi.hoisted(() => ({
   prepared: new Map<string, PreparedOutgoingOperation>(),
   attempts: new Map<string, OutgoingDispatchAttempt>(),
+  completed: new Set<string>(),
+  failCompletion: false,
   read: vi.fn(),
   refuse: false,
 }));
@@ -45,6 +52,28 @@ vi.mock('../../composition/persistence/sync-capture/outgoing', async (original) 
   },
 }));
 vi.mock('../../composition/persistence/sync-capture/outgoing-attempts', () => ({
+  commitCompletedOutgoingFile: async (
+    _expected: unknown,
+    attempt: OutgoingDispatchAttempt,
+    objectId: string
+  ) => {
+    if (io.failCompletion) throw new Error('Completion refusal.');
+    io.completed.add(JSON.stringify([attempt.attemptId, objectId]));
+  },
+  loadCompletedOutgoingFiles: async (spaceId: string, connectionGeneration: number) =>
+    [...io.attempts.values()].flatMap((attempt) =>
+      attempt.spaceId === spaceId && attempt.connectionGeneration === connectionGeneration
+        ? attempt.objects
+            .filter((object) =>
+              io.completed.has(JSON.stringify([attempt.attemptId, object.objectId]))
+            )
+            .map((object) => ({
+              attempt: structuredClone(attempt),
+              prepared: structuredClone(io.prepared.get(attempt.operationId)!),
+              objectId: object.objectId,
+            }))
+        : []
+    ),
   commitOutgoingDispatchAttempt: async (
     _expected: unknown,
     draft: OutgoingDispatchAttemptDraft
@@ -134,7 +163,7 @@ function remote() {
     },
     read: async (key) => {
       const body = objects.get(key);
-      if (!body) throw new Error('Missing file.');
+      if (!body) throw new SyncRemoteError('missing');
       return corrupt ? new Blob(['bad']).stream() : body.stream();
     },
   };
@@ -153,6 +182,8 @@ function remote() {
 beforeEach(() => {
   io.prepared.clear();
   io.attempts.clear();
+  io.completed.clear();
+  io.failCompletion = false;
   io.refuse = false;
   vi.clearAllMocks();
   io.read.mockImplementation(
@@ -278,4 +309,293 @@ it('retains explicit restore provenance and causal parents in the frozen logical
   value.basis = ['deleted-operation', 'other-head'];
   const prepared = await prepareCapturedOutgoing(value);
   expect(JSON.parse(prepared.recordText)).toMatchObject({ kind: 'restore', parents: value.basis });
+});
+
+it('reuses checked unchanged file bytes for a metadata-only revision with an independent manifest', async () => {
+  const firstCapture = capture();
+  const firstPrepared = await prepareCapturedOutgoing(firstCapture);
+  const dav = remote();
+  const first = await dispatchPreparedOutgoing(
+    'space',
+    'operation',
+    dav.adapter,
+    new AbortController().signal
+  );
+  const nextCapture = capture();
+  nextCapture.key = 'capture-next';
+  nextCapture.operationId = 'operation-next';
+  nextCapture.generation = 2;
+  nextCapture.basis = ['operation'];
+  expect(nextCapture.change.kind).toBe('media');
+  if (nextCapture.change.kind === 'media')
+    nextCapture.change.rows.media.sourceTitle = 'Updated title';
+  const nextPrepared = await prepareCapturedOutgoing(nextCapture);
+  const next = await dispatchPreparedOutgoing(
+    'space',
+    'operation-next',
+    dav.adapter,
+    new AbortController().signal
+  );
+  expect(nextPrepared.recordText).not.toBe(firstPrepared.recordText);
+  expect(next.recordKey).not.toBe(first.recordKey);
+  expect(next.objects[0]?.remoteKey).toBe(first.objects[0]?.remoteKey);
+  expect(dav.writes.filter((key) => key.startsWith('Files/'))).toHaveLength(1);
+  expect((await parseSyncAttemptText(next.recordText)).operation.operationId).toBe(
+    'operation-next'
+  );
+});
+
+function nextRevision(value: CapturedChange) {
+  const next = structuredClone(value);
+  next.key += '-next';
+  next.operationId += '-next';
+  next.generation++;
+  next.basis = [value.operationId];
+  return next;
+}
+function projectCapture(): CapturedChange {
+  const base = capture();
+  if (base.change.kind !== 'media') throw new Error('Missing media fixture.');
+  const ref = base.change.rows.ref;
+  const project = createVideoProjectEntryWithMediaClip({ id: 'project' });
+  const asset = project.project.assets[0]!;
+  asset.type = VideoProjectAssetType.IMAGE;
+  asset.source = { kind: 'project-asset', projectAssetId: 'source' };
+  asset.metadata = { ...asset.metadata, mimeType: ref.mimeType, size: ref.size, duration: null };
+  return {
+    ...base,
+    rootKind: 'video-project',
+    rootId: project.id,
+    rootKey: captureRootKey('space', 'video-project', project.id),
+    change: {
+      kind: 'video-project',
+      rows: {
+        project,
+        assets: [base.change.rows.projectAsset],
+        exports: [
+          createProjectExportEntry({
+            id: 'export',
+            assetId: 'export-file',
+            projectId: project.id,
+            mimeType: 'image/png',
+            size: 3,
+            filename: 'saved.png',
+          }),
+        ],
+        media: [],
+        refs: [
+          ref,
+          {
+            ...ref,
+            assetId: 'export-file',
+            location: { kind: 'opfs', objectKey: 'objects/export-file' },
+          },
+        ],
+        mediaDependencies: [],
+      },
+    },
+  };
+}
+it('reuses unchanged originals and exports while changed export bytes get a fresh path', async () => {
+  const captured = projectCapture();
+  await prepareCapturedOutgoing(captured);
+  const dav = remote();
+  const first = await dispatchPreparedOutgoing(
+    'space',
+    'operation',
+    dav.adapter,
+    new AbortController().signal
+  );
+  const metadata = nextRevision(captured);
+  if (metadata.change.kind === 'video-project')
+    metadata.change.rows.project.project.name = 'Updated name';
+  await prepareCapturedOutgoing(metadata);
+  const second = await dispatchPreparedOutgoing(
+    'space',
+    metadata.operationId,
+    dav.adapter,
+    new AbortController().signal
+  );
+  expect(second.objects.map((item) => item.remoteKey)).toEqual(
+    first.objects.map((item) => item.remoteKey)
+  );
+  expect(dav.writes.filter((key) => key.startsWith('Files/'))).toHaveLength(2);
+  const changed = nextRevision(metadata);
+  if (changed.change.kind === 'video-project') changed.change.rows.refs[1]!.sha256 = null;
+  io.read.mockImplementation(
+    async (ref: AssetRef, filename: string) =>
+      new File(
+        [ref.assetId === 'export-file' ? new Uint8Array([1, 2, 3]) : new Uint8Array(3)],
+        filename,
+        { type: ref.mimeType }
+      )
+  );
+  await prepareCapturedOutgoing(changed);
+  const third = await dispatchPreparedOutgoing(
+    'space',
+    changed.operationId,
+    dav.adapter,
+    new AbortController().signal
+  );
+  expect(third.objects[0]?.remoteKey).toBe(first.objects[0]?.remoteKey);
+  expect(third.objects[1]?.remoteKey).not.toBe(first.objects[1]?.remoteKey);
+  expect(await dav.objects.get(first.objects[1]!.remoteKey)!.arrayBuffer()).toEqual(
+    new Uint8Array(3).buffer
+  );
+  expect(dav.writes.filter((key) => key.startsWith('Files/'))).toHaveLength(3);
+});
+it('reuses a durable completed part after restart and gives unfinished parts fresh keys', async () => {
+  await prepareCapturedOutgoing(projectCapture());
+  const dav = remote();
+  const adapter: SyncRemoteStore = {
+    ...dav.adapter,
+    write: async (key, body, signal) => {
+      if (key.startsWith('Files/') && dav.writes.length === 1)
+        throw new SyncRemoteError('temporary');
+      await dav.adapter.write(key, body, signal);
+    },
+  };
+  await expect(
+    dispatchPreparedOutgoing('space', 'operation', adapter, new AbortController().signal)
+  ).rejects.toThrow('temporary');
+  const first = [...io.attempts.values()][0]!;
+  expect(io.completed.size).toBe(1);
+  vi.resetModules();
+  const restarted = await import('./outgoing');
+  const next = await restarted.dispatchPreparedOutgoing(
+    'space',
+    'operation',
+    dav.adapter,
+    new AbortController().signal
+  );
+  expect(next.objects[0]?.remoteKey).toBe(first.objects[0]?.remoteKey);
+  expect(next.objects[1]?.remoteKey).not.toBe(first.objects[1]?.remoteKey);
+  expect(dav.writes.filter((key) => key.startsWith('Files/'))).toHaveLength(2);
+});
+it('does not reuse unknown-outcome PUT bytes observed before a delayed server write', async () => {
+  await prepareCapturedOutgoing(capture());
+  const dav = remote();
+  let pendingKey = '';
+  const ambiguous: SyncRemoteStore = {
+    ...dav.adapter,
+    write: async (key, body, signal) => {
+      await dav.adapter.write(key, body, signal);
+      pendingKey = key;
+      throw new SyncRemoteError('transport');
+    },
+  };
+  await expect(
+    dispatchPreparedOutgoing('space', 'operation', ambiguous, new AbortController().signal)
+  ).rejects.toThrow('transport');
+  // A successful read cannot establish that the failed PUT has stopped writing.
+  expect(
+    await new Response(
+      await dav.adapter.read(pendingKey, new AbortController().signal)
+    ).arrayBuffer()
+  ).toEqual(new Uint8Array(3).buffer);
+  expect(io.completed.size).toBe(0);
+  const next = await dispatchPreparedOutgoing(
+    'space',
+    'operation',
+    dav.adapter,
+    new AbortController().signal
+  );
+  dav.objects.set(pendingKey, new Blob(['late mutation']));
+  expect(next.objects[0]?.remoteKey).not.toBe(pendingKey);
+  expect(await dav.objects.get(next.objects[0]!.remoteKey)!.arrayBuffer()).toEqual(
+    new Uint8Array(3).buffer
+  );
+});
+it.each(['missing', 'digest', 'short', 'long'])(
+  'uses a fresh key without overwriting a %s completed candidate',
+  async (kind) => {
+    await prepareCapturedOutgoing(capture());
+    const dav = remote();
+    const first = await dispatchPreparedOutgoing(
+      'space',
+      'operation',
+      dav.adapter,
+      new AbortController().signal
+    );
+    const key = first.objects[0]!.remoteKey;
+    if (kind === 'missing') dav.objects.delete(key);
+    else
+      dav.objects.set(key, new Blob([kind === 'short' ? 'x' : kind === 'long' ? 'longer' : 'bad']));
+    const before = dav.objects.get(key);
+    const next = await dispatchPreparedOutgoing(
+      'space',
+      'operation',
+      dav.adapter,
+      new AbortController().signal
+    );
+    expect(next.objects[0]?.remoteKey).not.toBe(key);
+    expect(dav.objects.get(key)).toBe(before);
+    expect(dav.writes.filter((item) => item === key)).toHaveLength(1);
+  }
+);
+it.each(['temporary', 'authentication', 'access-denied', 'cancelled'] as const)(
+  'stops on a %s candidate read and retains completion evidence',
+  async (code) => {
+    await prepareCapturedOutgoing(capture());
+    const dav = remote();
+    await dispatchPreparedOutgoing('space', 'operation', dav.adapter, new AbortController().signal);
+    const before = structuredClone(io.completed);
+    const writes = [...dav.writes];
+    const attempts = io.attempts.size;
+    await expect(
+      dispatchPreparedOutgoing(
+        'space',
+        'operation',
+        {
+          ...dav.adapter,
+          read: async () => {
+            throw new SyncRemoteError(code);
+          },
+        },
+        new AbortController().signal
+      )
+    ).rejects.toThrow(code);
+    expect(io.completed).toEqual(before);
+    expect(dav.writes).toEqual(writes);
+    expect(io.attempts.size).toBe(attempts);
+  }
+);
+it('shares completed checked files between warm concurrent dispatches with independent manifests', async () => {
+  await prepareCapturedOutgoing(capture());
+  const dav = remote();
+  const first = await dispatchPreparedOutgoing(
+    'space',
+    'operation',
+    dav.adapter,
+    new AbortController().signal
+  );
+  const next = await Promise.all(
+    [1, 2].map(() =>
+      dispatchPreparedOutgoing('space', 'operation', dav.adapter, new AbortController().signal)
+    )
+  );
+  expect(new Set(next.map((item) => item.recordKey)).size).toBe(2);
+  expect(next.every((item) => item.objects[0]?.remoteKey === first.objects[0]?.remoteKey)).toBe(
+    true
+  );
+  expect(dav.writes.filter((item) => item.startsWith('Files/'))).toHaveLength(1);
+});
+it('refuses failed completion admission without publishing a manifest and retries on a fresh key', async () => {
+  await prepareCapturedOutgoing(capture());
+  const dav = remote();
+  io.failCompletion = true;
+  await expect(
+    dispatchPreparedOutgoing('space', 'operation', dav.adapter, new AbortController().signal)
+  ).rejects.toThrow('Completion refusal');
+  expect(io.completed.size).toBe(0);
+  expect(dav.writes).toHaveLength(1);
+  const first = [...io.attempts.values()][0]!;
+  io.failCompletion = false;
+  const next = await dispatchPreparedOutgoing(
+    'space',
+    'operation',
+    dav.adapter,
+    new AbortController().signal
+  );
+  expect(next.objects[0]?.remoteKey).not.toBe(first.objects[0]?.remoteKey);
 });

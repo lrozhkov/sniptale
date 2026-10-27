@@ -14,10 +14,15 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: io.database,
 }));
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal('IDBKeyRange', { bound: (lower: string, upper: string) => ({ lower, upper }) });
+});
 
 import {
   commitOutgoingDispatchAttempt,
+  commitCompletedOutgoingFile,
+  loadCompletedOutgoingFiles,
   loadOutgoingDispatchAttempt,
   type OutgoingDispatchAttemptDraft,
 } from './outgoing-attempts';
@@ -340,3 +345,153 @@ it.each(['space', 'operation', 'attempt'])(
     expect(io.database).not.toHaveBeenCalled();
   }
 );
+
+async function completionFixture() {
+  const f = await prepared();
+  const admitted = await commitOutgoingDispatchAttempt(f.accepted, attempt());
+  return { ...f, attempt: admitted.attempt };
+}
+it('admits monotonic completion under controlled parallel writers without changing the attempt', async () => {
+  const f = await completionFixture();
+  const frozen = structuredClone(f.attempt);
+  let release: () => void = () => undefined;
+  io.database.mockResolvedValueOnce(f.database).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(f.database);
+      })
+  );
+  const first = commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+  const second = commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+  await first;
+  release();
+  await second;
+  expect(f.table('sync_outbox').size).toBe(3);
+  expect(f.table('sync_outbox').get(f.attempt.key)).toEqual(frozen);
+  expect(await loadCompletedOutgoingFiles('space', 3)).toEqual([
+    { prepared: f.accepted, attempt: frozen, objectId: 'body' },
+  ]);
+});
+it('keeps delayed completion with its retained capture after delete and restore', async () => {
+  const f = await completionFixture();
+  let release: () => void = () => undefined;
+  io.database.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(f.database);
+      })
+  );
+  const pending = commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+  const latest = { kind: 'root-state', generation: 4, basis: ['restored'] };
+  f.table('sync_capture').set('latest', latest);
+  f.table('sync_capture').set('deleted', {
+    ...f.capture,
+    operationId: 'deleted',
+    generation: 2,
+    change: { kind: 'tombstone' },
+  });
+  f.table('sync_capture').set('recreated', {
+    ...f.capture,
+    key: 'recreated',
+    operationId: 'recreated',
+    generation: 3,
+  });
+  f.table('sync_capture').set('restored', {
+    ...f.capture,
+    key: 'restored',
+    operationId: 'restored',
+    generation: 4,
+    origin: 'local-restore',
+  });
+  release();
+  await pending;
+  expect(f.table('sync_capture').get('latest')).toEqual(latest);
+  await expect(
+    commitCompletedOutgoingFile({ ...f.accepted, operationId: 'recreated' }, f.attempt, 'body')
+  ).rejects.toThrow('Invalid');
+  expect((await loadCompletedOutgoingFiles('space', 3))[0]?.prepared.operationId).toBe('op');
+  expect((await loadCompletedOutgoingFiles('space', 3))[0]?.prepared.captureSha256).toBe(
+    f.accepted.captureSha256
+  );
+});
+it('aborts completion refusal and permits exact retry with no partial evidence or changed source claims', async () => {
+  const f = await completionFixture();
+  const before = structuredClone(f.rows);
+  f.failWrites(true);
+  await expect(commitCompletedOutgoingFile(f.accepted, f.attempt, 'body')).rejects.toThrow(
+    'No space'
+  );
+  expect(f.rows).toEqual(before);
+  f.failWrites(false);
+  await commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+  expect(f.table('sync_capture')).toEqual(before.get('sync_capture'));
+  expect(await loadCompletedOutgoingFiles('space', 3)).toHaveLength(1);
+});
+it('refuses delayed completion after connection change and never exposes old connection candidates', async () => {
+  const f = await completionFixture();
+  await commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+  let release: () => void = () => undefined;
+  io.database.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(f.database);
+      })
+  );
+  const pending = commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+  f.table('sync_capture').set('profile', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: true,
+    spaceId: 'space',
+    connectionGeneration: 4,
+  });
+  const before = structuredClone(f.rows);
+  release();
+  await expect(pending).rejects.toThrow('changed');
+  expect(f.rows).toEqual(before);
+  expect(await loadCompletedOutgoingFiles('space', 4)).toEqual([]);
+  await expect(loadCompletedOutgoingFiles('space', 3)).rejects.toThrow('changed');
+});
+it.each(['capture', 'prepared', 'attempt', 'completion'])(
+  'refuses a corrupted %s completion join without read-side writes',
+  async (kind) => {
+    const f = await completionFixture();
+    await commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+    if (kind === 'capture')
+      f.table('sync_capture').set(f.capture.key, { ...f.capture, createdAt: 999 });
+    if (kind === 'prepared')
+      f.table('sync_outbox').set(f.accepted.key, { ...f.accepted, captureSha256: 'a'.repeat(64) });
+    if (kind === 'attempt')
+      f.table('sync_outbox').set(f.attempt.key, { ...f.attempt, recordSha256: 'a'.repeat(64) });
+    if (kind === 'completion')
+      for (const [key, value] of f.table('sync_outbox')) {
+        if (key.startsWith('completed-file:'))
+          f.table('sync_outbox').set(key, {
+            ...(typeof value === 'object' && value !== null ? value : {}),
+            captureSha256: 'a'.repeat(64),
+          });
+      }
+    f.failWrites(true);
+    const before = structuredClone(f.rows);
+    await expect(loadCompletedOutgoingFiles('space', 3)).rejects.toThrow('Invalid');
+    expect(f.rows).toEqual(before);
+  }
+);
+it('bounds completed-file lookup and ignores other connection prefixes without mutating evidence', async () => {
+  const f = await completionFixture();
+  await commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+  f.table('sync_outbox').set('completed-file:["other",3]:bad', {
+    kind: 'completed-file',
+    key: 'completed-file:["other",3]:bad',
+  });
+  const before = structuredClone(f.rows);
+  expect(await loadCompletedOutgoingFiles('space', 3)).toHaveLength(1);
+  expect(f.rows).toEqual(before);
+  for (let index = 0; index < 8193; index++)
+    f.table('sync_outbox').set(`completed-file:["space",3]:${index}`, {
+      key: `completed-file:["space",3]:${index}`,
+    });
+  await expect(loadCompletedOutgoingFiles('space', 3)).rejects.toThrow('limit');
+});

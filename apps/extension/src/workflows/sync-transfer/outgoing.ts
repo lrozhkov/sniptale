@@ -6,11 +6,20 @@ import {
   preparedOutgoingOperationKey,
   type PreparedOutgoingOperation,
 } from '../../composition/persistence/sync-capture/outgoing';
-import { commitOutgoingDispatchAttempt } from '../../composition/persistence/sync-capture/outgoing-attempts';
+import {
+  commitOutgoingDispatchAttempt,
+  commitCompletedOutgoingFile,
+  loadCompletedOutgoingFiles,
+} from '../../composition/persistence/sync-capture/outgoing-attempts';
 import { digestBackupObject } from '../media-hub-backup/v6/shared-objects';
 import { encodeCapturedPortableRoot } from './captured-root';
-import type { SyncRemoteStore } from './remote-store';
-import { createSyncAttempt, hashSyncText, parseSyncOperationText } from './wire-record';
+import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
+import {
+  createSyncAttempt,
+  hashSyncText,
+  parseSyncAttemptText,
+  parseSyncOperationText,
+} from './wire-record';
 
 function check(condition: unknown): asserts condition {
   if (!condition) throw new Error('Invalid outgoing sync evidence.');
@@ -90,7 +99,7 @@ export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedO
   return accepted;
 }
 
-async function reserveAttempt(prepared: PreparedOutgoingOperation) {
+async function reserveAttempt(prepared: PreparedOutgoingOperation, retained: Map<string, string>) {
   const initialId = prepared.attemptKey.split('/').at(-1)?.slice(0, 36);
   check(initialId);
   const initial = await createSyncAttempt(prepared.recordText, initialId);
@@ -108,12 +117,25 @@ async function reserveAttempt(prepared: PreparedOutgoingOperation) {
       preparedSha256: prepared.recordSha256,
       ...physical,
     });
-  const first = await admit(initial);
-  if (first.created) return first.attempt;
-  const next = await admit(await createSyncAttempt(prepared.recordText, crypto.randomUUID()));
+  if (retained.size === 0) {
+    const first = await admit(initial);
+    if (first.created) return first.attempt;
+  }
+  const fresh = await createSyncAttempt(prepared.recordText, crypto.randomUUID());
+  const physical = await createSyncAttempt(
+    prepared.recordText,
+    fresh.attemptId,
+    fresh.objects.map((item) => ({
+      ...item,
+      remoteKey: retained.get(item.objectId) ?? item.remoteKey,
+    }))
+  );
+  const next = await admit(physical);
   check(next.created);
   return next.attempt;
 }
+
+class RemoteContentMismatch extends Error {}
 
 async function verifyRemote(
   remote: SyncRemoteStore,
@@ -123,23 +145,32 @@ async function verifyRemote(
   signal: AbortSignal
 ) {
   const stream = await remote.read(key, signal);
+  let bytes = 0;
+  const checked = stream.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        bytes += chunk.byteLength;
+        if (!Number.isSafeInteger(bytes) || bytes > size) throw new RemoteContentMismatch();
+        controller.enqueue(chunk);
+      },
+      flush() {
+        if (bytes !== size) throw new RemoteContentMismatch();
+      },
+    })
+  );
   const actual = await digestBackupObject(
-    { size, pipeTo: (sink) => stream.pipeTo(sink, { signal }) },
+    { size, pipeTo: (sink) => checked.pipeTo(sink, { signal }) },
     signal
   );
-  check(actual === sha256);
+  if (actual !== sha256) throw new RemoteContentMismatch();
 }
 
-/** One explicit dispatch. Failure preserves evidence; a later call reserves entirely fresh paths. */
-export async function dispatchPreparedOutgoing(
+async function readDispatchSources(
+  prepared: PreparedOutgoingOperation,
   spaceId: string,
   operationId: string,
-  remote: SyncRemoteStore,
   signal: AbortSignal
 ) {
-  signal.throwIfAborted();
-  const prepared = await loadPreparedOutgoingOperation(spaceId, operationId);
-  check(prepared);
   const operation = await parseSyncOperationText(prepared.recordText);
   check(operation.spaceId === spaceId && operation.operationId === operationId);
   check(operation.objects.length === prepared.objects.length);
@@ -155,16 +186,132 @@ export async function dispatchPreparedOutgoing(
     check(expected.size === object.ref.size && expected.mimeType === object.ref.mimeType);
     const file = await readAssetFile(object.ref, expected.filename);
     check(file.size === expected.size && (await hashFile(file, signal)) === object.sha256);
-    files.push({ objectId: object.objectId, file, sha256: object.sha256 });
+    files.push({ objectId: object.objectId, file, sha256: object.sha256, expected });
   }
+  return files;
+}
+
+type CompletedFileCandidate = Awaited<ReturnType<typeof loadCompletedOutgoingFiles>>[number];
+type ParsedPhysicalAttempt = Awaited<ReturnType<typeof parseSyncAttemptText>>;
+
+async function readCompletedCandidate(
+  candidate: CompletedFileCandidate,
+  parsed: Map<string, ParsedPhysicalAttempt>
+) {
+  let physical = parsed.get(candidate.attempt.key);
+  if (!physical) {
+    physical = await parseSyncAttemptText(candidate.attempt.recordText);
+    check(
+      physical.recordKey === candidate.attempt.recordKey &&
+        physical.recordSha256 === candidate.attempt.recordSha256 &&
+        JSON.stringify(physical.objects) === JSON.stringify(candidate.attempt.objects) &&
+        JSON.stringify(physical.operation) === candidate.prepared.recordText
+    );
+    parsed.set(candidate.attempt.key, physical);
+  }
+  const object = physical.operation.envelope?.objects.find(
+    (item) => item.objectId === candidate.objectId
+  );
+  const digest = physical.operation.objects.find((item) => item.objectId === candidate.objectId);
+  const binding = physical.objects.find((item) => item.objectId === candidate.objectId);
+  check(object && digest && binding);
+  return { object, digest, binding };
+}
+
+async function canReuseRemoteFile(
+  remote: SyncRemoteStore,
+  key: string,
+  size: number,
+  sha256: string,
+  signal: AbortSignal
+) {
+  try {
+    await verifyRemote(remote, key, size, sha256, signal);
+    return true;
+  } catch (error) {
+    signal.throwIfAborted();
+    if (
+      !(error instanceof RemoteContentMismatch) &&
+      !(error instanceof SyncRemoteError && error.code === 'missing')
+    )
+      throw error;
+    return false;
+  }
+}
+
+async function selectRetainedFiles(
+  spaceId: string,
+  connectionGeneration: number,
+  files: Awaited<ReturnType<typeof readDispatchSources>>,
+  remote: SyncRemoteStore,
+  signal: AbortSignal
+) {
+  const candidates = await loadCompletedOutgoingFiles(spaceId, connectionGeneration);
+  const retained = new Map<string, string>();
+  const parsed = new Map<string, Awaited<ReturnType<typeof parseSyncAttemptText>>>();
+  const checked = new Map<string, boolean>();
+  for (const source of files) {
+    for (const candidate of candidates) {
+      signal.throwIfAborted();
+      const { object, digest, binding } = await readCompletedCandidate(candidate, parsed);
+      if (
+        digest.sha256 !== source.sha256 ||
+        object.size !== source.expected.size ||
+        object.mimeType !== source.expected.mimeType ||
+        object.filename !== source.expected.filename
+      )
+        continue;
+      const verificationKey = JSON.stringify([binding.remoteKey, object.size, digest.sha256]);
+      let valid = checked.get(verificationKey);
+      if (valid === undefined) {
+        valid = await canReuseRemoteFile(
+          remote,
+          binding.remoteKey,
+          object.size,
+          digest.sha256,
+          signal
+        );
+        checked.set(verificationKey, valid);
+      }
+      if (valid && ![...retained.values()].includes(binding.remoteKey)) {
+        retained.set(source.objectId, binding.remoteKey);
+        break;
+      }
+    }
+  }
+  return retained;
+}
+
+/** Dispatch an independent frozen manifest; reuse only completed files with fresh digest checks. */
+export async function dispatchPreparedOutgoing(
+  spaceId: string,
+  operationId: string,
+  remote: SyncRemoteStore,
+  signal: AbortSignal
+) {
   signal.throwIfAborted();
-  const attempt = await reserveAttempt(prepared);
+  const prepared = await loadPreparedOutgoingOperation(spaceId, operationId);
+  check(prepared);
+  const files = await readDispatchSources(prepared, spaceId, operationId, signal);
+  signal.throwIfAborted();
+  const retained = await selectRetainedFiles(
+    spaceId,
+    prepared.connectionGeneration,
+    files,
+    remote,
+    signal
+  );
+  signal.throwIfAborted();
+  const attempt = await reserveAttempt(prepared, retained);
   for (const binding of attempt.objects) {
     signal.throwIfAborted();
     const source = files.find((item) => item.objectId === binding.objectId);
     check(source);
+    if (retained.get(binding.objectId) === binding.remoteKey) continue;
     await remote.write(binding.remoteKey, source.file, signal);
     await verifyRemote(remote, binding.remoteKey, source.file.size, source.sha256, signal);
+    signal.throwIfAborted();
+    await commitCompletedOutgoingFile(prepared, attempt, binding.objectId);
   }
   signal.throwIfAborted();
   const manifest = new Blob([attempt.recordText], { type: 'application/json' });
