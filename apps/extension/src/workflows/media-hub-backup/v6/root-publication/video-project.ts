@@ -42,13 +42,11 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import { putVideoProjectBackupRestore } from '../../../../composition/persistence/projects/backup-restore';
-import {
-  parseProjectAssetEntry,
-  parseProjectExportEntry,
-  parseVideoProjectEntry,
-} from '../../../../composition/persistence/projects/read-guards';
+import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
 import {
   decodePortableVideoProjectAssetRefs,
+  preparePortableVideoProjectAsset,
+  preparePortableVideoProjectExport,
   parsePortableVideoProjectMetadata,
 } from '../root-codecs/projects';
 import type { ArchiveRootPublisher } from '../restore';
@@ -198,15 +196,12 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
           };
         }
         const exportId = exportIdMap.get(item.entry.id)!;
-        const parsed = parseProjectExportEntry({
-          ...item.entry,
-          assetId: object.ref.assetId,
+        const parsed = preparePortableVideoProjectExport({
+          entry: item.entry,
+          originalRef: object.ref,
           id: exportId,
           projectId: targetProjectId,
-          mimeType: object.ref.mimeType,
-          size: object.ref.size,
         });
-        if (!parsed) throw new Error('Restored video project export metadata is invalid.');
         const thumbnail = item.thumbnail
           ? parseMediaThumbnailEntry({
               ...item.thumbnail,
@@ -347,15 +342,14 @@ async function prepareProjectAssets(
           reusePublished: true as const,
         };
       }
-      const parsed = parseProjectAssetEntry({
-        ...asset.entry,
-        ...restoredOriginMediaId(asset.entry.originMediaId, rootIdMap),
-        assetId: object.ref.assetId,
+      const parsed = preparePortableVideoProjectAsset({
+        entry: {
+          ...asset.entry,
+          ...restoredOriginMediaId(asset.entry.originMediaId, rootIdMap),
+        },
+        originalRef: object.ref,
         id: assetIdMap.get(asset.entry.id),
-        mimeType: object.ref.mimeType,
-        size: object.ref.size,
       });
-      if (!parsed) throw new Error('Restored video project asset metadata is invalid.');
       const videoReview = asset.videoReview
         ? prepareVideoReviewRestore({
             review: asset.videoReview,

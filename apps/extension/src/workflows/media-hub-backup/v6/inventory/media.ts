@@ -43,7 +43,11 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { sanitizeWebSnapshotPackageProvenance } from '../../../../features/web-snapshot/provenance';
 import { encodePortableEditorDocument } from '../root-codecs/editor-document';
-import { encodePortableThumbnail, type PortableMediaMetadata } from '../root-codecs/media';
+import {
+  encodePortableMediaOriginal,
+  encodePortableThumbnail,
+  type PortableMediaMetadata,
+} from '../root-codecs/media';
 import {
   projectImageWorkspacePrivacy,
   projectMediaEntryPrivacy,
@@ -334,10 +338,8 @@ async function buildMediaSource(args: {
   if (entry.source.kind === 'project-asset') {
     const asset = parseProjectAssetEntry(child);
     if (!asset) throw new Error('Project video asset is invalid.');
-    const { assetId: _localId, ...projectAsset } = asset;
     return {
-      originalObjectId,
-      projectAsset,
+      ...encodePortableMediaOriginal({ projectAsset: asset, originalObjectId }),
       ...(videoReview ? { videoReview, reviewAssets } : {}),
     };
   }

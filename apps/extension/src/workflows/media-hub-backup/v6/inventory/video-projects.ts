@@ -36,6 +36,8 @@ import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/
 import { encodePortableThumbnail } from '../root-codecs/media';
 import {
   encodePortableVideoProjectAssetRefs,
+  encodePortableVideoProjectAsset,
+  encodePortableVideoProjectExport,
   type PortableVideoProjectMetadata,
 } from '../root-codecs/projects';
 import type { MediaHubBackupExportOptions } from '../contracts';
@@ -110,7 +112,7 @@ async function buildProjectAssets(
     );
     const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
     const file = await readInventoryAssetFile(db, asset.assetId, filename);
-    const { assetId: _assetId, ...portable } = asset;
+    const portable = encodePortableVideoProjectAsset(asset);
     const videoReview = asset.mimeType.startsWith('video/')
       ? await readVideoReviewForBackup({
           db,
@@ -169,7 +171,7 @@ async function buildProjectExports({
       await db.get(MEDIA_LIBRARY_STORE, `export:${exportEntry.id}`)
     );
     const file = await readInventoryAssetFile(db, exportEntry.assetId, exportEntry.filename);
-    const { assetId: _assetId, recordingMetadata, ...portable } = exportEntry;
+    const { recordingMetadata, ...portable } = encodePortableVideoProjectExport(exportEntry);
     const thumbnail = parseMediaThumbnailEntry(
       await db.get(THUMBNAILS_STORE, `export:${exportEntry.id}`)
     );
@@ -259,7 +261,7 @@ async function buildReviewReferencedAssets(
     const filename =
       media?.filename ?? createReadableAssetFilename(fallbackIndex++, asset.mimeType);
     const file = await readInventoryAssetFile(db, asset.assetId, filename);
-    const { assetId: _assetId, ...portable } = asset;
+    const portable = encodePortableVideoProjectAsset(asset);
     output.push({
       entry: portable,
       ...(media

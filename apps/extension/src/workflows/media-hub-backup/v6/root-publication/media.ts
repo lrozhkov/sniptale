@@ -25,10 +25,7 @@ import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
-import {
-  parseProjectAssetEntry,
-  parseProjectExportEntry,
-} from '../../../../composition/persistence/projects/read-guards';
+import { parseProjectExportEntry } from '../../../../composition/persistence/projects/read-guards';
 import { putVideoReviewRestore } from '../../../../composition/persistence/review-workspaces/backup-restore';
 import {
   appendCommittedArchiveRootInTransaction,
@@ -74,7 +71,7 @@ import { createRecordingMediaId } from '../../../../features/media-hub/media-id'
 import { putWebSnapshotBackupRestore } from '../../../../composition/persistence/web-snapshots/backup-restore';
 import { parseStoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots';
 import type { StoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots/contracts';
-import { parsePortableMediaMetadata } from '../root-codecs/media';
+import { parsePortableMediaMetadata, preparePortableMediaOriginal } from '../root-codecs/media';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
@@ -338,16 +335,11 @@ function prepareProjectVideo(
   original: StagedArchiveObject
 ) {
   if (!media) throw new Error('Restored media metadata is invalid.');
-  const projectAsset =
-    metadata.projectAsset && media.source.kind === 'project-asset'
-      ? parseProjectAssetEntry({
-          ...metadata.projectAsset,
-          id: media.source.projectAssetId,
-          assetId: original.ref.assetId,
-          size: original.ref.size,
-          mimeType: original.ref.mimeType,
-        })
-      : null;
+  const projectAsset = preparePortableMediaOriginal({
+    metadata,
+    media,
+    originalRef: original.ref,
+  });
   const projectExport =
     metadata.projectExport && media.source.kind === 'project-export'
       ? parseProjectExportEntry({

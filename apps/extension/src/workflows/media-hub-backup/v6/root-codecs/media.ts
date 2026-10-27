@@ -77,6 +77,37 @@ export interface PortableMediaMetadata {
   presentation?: PortableAggregatePresentation;
 }
 
+/** Removes the local byte identity from a project-asset media original. */
+export function encodePortableMediaOriginal(args: {
+  projectAsset: StoredProjectAssetEntry;
+  originalObjectId: string;
+}): Pick<PortableMediaMetadata, 'projectAsset' | 'originalObjectId'> {
+  const { assetId: _assetId, ...projectAsset } = args.projectAsset;
+  return { originalObjectId: args.originalObjectId, projectAsset };
+}
+
+/** Rebinds a portable project-asset original to its prepared media and bytes. */
+export function preparePortableMediaOriginal(args: {
+  metadata: Pick<PortableMediaMetadata, 'projectAsset'>;
+  media: MediaLibraryEntry;
+  originalRef: Pick<StoredProjectAssetEntry, 'assetId' | 'mimeType' | 'size'>;
+}): StoredProjectAssetEntry | null {
+  const projectAsset =
+    args.metadata.projectAsset && args.media.source.kind === 'project-asset'
+      ? parseProjectAssetEntry({
+          ...args.metadata.projectAsset,
+          id: args.media.source.projectAssetId,
+          assetId: args.originalRef.assetId,
+          size: args.originalRef.size,
+          mimeType: args.originalRef.mimeType,
+        })
+      : null;
+  if (args.metadata.projectAsset && !projectAsset) {
+    throw new Error('Restored project video is invalid.');
+  }
+  return projectAsset;
+}
+
 export function encodePortableThumbnail(
   entry: MediaThumbnailEntry,
   objectId: string
