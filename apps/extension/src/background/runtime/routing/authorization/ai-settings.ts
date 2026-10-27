@@ -33,6 +33,7 @@ export function authorizeAiSettingsMutationRoute(
     (request.sender.tab?.id !== undefined ||
       isScenarioEditorSenderUrl(request.sender.url) ||
       isGallerySenderUrl(request.sender.url) ||
+      isVideoEditorSenderUrl(request.sender.url) ||
       isImageEditorSenderUrl(request.sender.url));
   const selection = request.message['selection'];
   const isScenarioChoice =

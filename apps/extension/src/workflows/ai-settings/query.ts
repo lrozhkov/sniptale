@@ -209,3 +209,12 @@ export async function rememberAIScenarioModelSelection(
   });
   if (!response.success) throw new Error(response.error ?? 'AI model selection could not be saved');
 }
+
+/** Requests budgeted metadata maintenance without granting permission or approving a model. */
+export async function refreshManagedAICatalogs(): Promise<void> {
+  const response = await sendRuntimeMessage({
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'refresh-managed-catalogs',
+  });
+  if (!response.success) throw new Error(response.error ?? 'AI catalog maintenance failed');
+}

@@ -254,39 +254,45 @@ it('authorizes local data erasure only from the owned settings page', () => {
   ).toEqual({ authorized: false, reason: 'Unauthorized local data erasure sender' });
 });
 
-it('admits bounded picker maintenance without granting provider-edit authority', () => {
-  const maintenance = {
-    type: MessageType.AI_SETTINGS_MUTATION,
-    operation: 'refresh-managed-catalogs',
-  };
-  const providerCheck = {
-    type: MessageType.AI_SETTINGS_MUTATION,
-    operation: 'refresh-provider-catalog',
-    providerId: 'provider',
-  };
-  const contentSender = sender({ url: CONTENT_URL, tabId: 41 });
-  expect(
-    authorizeIPCMessage({ kind: 'background-owned', message: maintenance, sender: contentSender })
-  ).toEqual({ authorized: true });
-  expect(
-    authorizeIPCMessage({ kind: 'background-owned', message: providerCheck, sender: contentSender })
-      .authorized
-  ).toBe(false);
-  expect(
-    authorizeIPCMessage({
-      kind: 'background-owned',
-      message: maintenance,
-      sender: sender({ url: SETTINGS_URL + '?aiUnlock=1', tabId: 41 }),
-    }).authorized
-  ).toBe(false);
-  expect(
-    authorizeIPCMessage({
-      kind: 'background-owned',
-      message: maintenance,
-      sender: sender({ url: CONTENT_URL }),
-    }).authorized
-  ).toBe(false);
-});
+it.each([CONTENT_URL, 'chrome-extension://test/apps/extension/src/video-editor/index.html'])(
+  'admits bounded picker maintenance without granting provider-edit authority for %s',
+  (url) => {
+    const maintenance = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'refresh-managed-catalogs',
+    };
+    const providerCheck = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'refresh-provider-catalog',
+      providerId: 'provider',
+    };
+    const contentSender = sender({ url, ...(url === CONTENT_URL ? { tabId: 41 } : {}) });
+    expect(
+      authorizeIPCMessage({ kind: 'background-owned', message: maintenance, sender: contentSender })
+    ).toEqual({ authorized: true });
+    expect(
+      authorizeIPCMessage({
+        kind: 'background-owned',
+        message: providerCheck,
+        sender: contentSender,
+      }).authorized
+    ).toBe(false);
+    expect(
+      authorizeIPCMessage({
+        kind: 'background-owned',
+        message: maintenance,
+        sender: sender({ url: SETTINGS_URL + '?aiUnlock=1', tabId: 41 }),
+      }).authorized
+    ).toBe(false);
+    expect(
+      authorizeIPCMessage({
+        kind: 'background-owned',
+        message: maintenance,
+        sender: sender({ url: CONTENT_URL }),
+      }).authorized
+    ).toBe(false);
+  }
+);
 
 it.each([
   ['https://example.test/page', 41, 'page-edit', true],

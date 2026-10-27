@@ -19,6 +19,7 @@ vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => ({
 }));
 
 import {
+  refreshManagedAICatalogs,
   requestAIModelSelectionBootstrap,
   requestAIScenarioModelSelection,
   rememberAIScenarioModelSelection,
@@ -326,4 +327,18 @@ it('does not silently replace a retired remembered model in another scenario', a
     modelId: null,
     previousSelection: { displayName: 'Previous model' },
   });
+});
+
+it('requests bounded automatic catalog maintenance through an explicit command', async () => {
+  queryMocks.sendRuntimeMessage.mockResolvedValue({ success: true });
+  await refreshManagedAICatalogs();
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledExactlyOnceWith({
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'refresh-managed-catalogs',
+  });
+});
+it('reports a refused maintenance command without retrying', async () => {
+  queryMocks.sendRuntimeMessage.mockResolvedValue({ success: false, error: 'Refused' });
+  await expect(refreshManagedAICatalogs()).rejects.toThrow('Refused');
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
 });

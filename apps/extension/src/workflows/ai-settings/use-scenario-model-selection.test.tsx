@@ -2,10 +2,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const io = vi.hoisted(() => ({ read: vi.fn(), remember: vi.fn() }));
+const io = vi.hoisted(() => ({ read: vi.fn(), remember: vi.fn(), maintain: vi.fn() }));
 vi.mock('./query', () => ({
   requestAIScenarioModelSelection: io.read,
   rememberAIScenarioModelSelection: io.remember,
+  refreshManagedAICatalogs: io.maintain,
 }));
 import { useAIScenarioModelSelection } from './use-scenario-model-selection';
 import type { requestAIScenarioModelSelection } from './query';
@@ -51,6 +52,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   io.read.mockResolvedValue(context());
   io.remember.mockResolvedValue(undefined);
+  io.maintain.mockResolvedValue(undefined);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -177,7 +179,7 @@ it('blocks duplicate choices and request preparation until the explicit choice i
   act(() => selection.chooseModel('first'));
   await expect(selection.prepareModelSelection()).rejects.toThrow('model-unavailable');
   expect(io.remember).toHaveBeenCalledTimes(1);
-  expect(io.read).toHaveBeenCalledTimes(1);
+  expect(io.read).toHaveBeenCalledTimes(2);
   await act(async () => release());
   expect(selection.selectionPending).toBe(false);
   expect(selection.modelId).toBe('second');
@@ -216,7 +218,8 @@ it('does not read or write while disabled and loads a fresh choice on activation
   expect(io.remember).not.toHaveBeenCalled();
   expect(selection.configuration).toBeNull();
   await act(async () => root.render(<Surface />));
-  expect(io.read).toHaveBeenCalledExactlyOnceWith('scenario-edit');
+  expect(io.read).toHaveBeenCalledTimes(2);
+  expect(io.read).toHaveBeenLastCalledWith('scenario-edit');
   expect(selection.modelId).toBe('first');
   await act(async () => root.render(<Surface enabled={false} />));
   expect(selection.configuration).toBeNull();
@@ -251,3 +254,92 @@ it.each(['choice', 'preparation'] as const)(
     expect(selection.modelId).toBe('first');
   }
 );
+
+function holdMaintenance() {
+  let release!: () => void;
+  io.maintain.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      release = resolve;
+    })
+  );
+  return () => release();
+}
+it('shows the cached candidate while maintenance is pending and applies discovery without approval', async () => {
+  const release = holdMaintenance();
+  await open();
+  expect(selection.modelId).toBe('first');
+  expect(io.maintain).toHaveBeenCalledTimes(1);
+  expect(io.remember).not.toHaveBeenCalled();
+  const next = context();
+  next.models.push({
+    id: 'third',
+    modelCode: 'third',
+    providerId: 'provider',
+    displayName: 'third',
+  });
+  io.read.mockResolvedValue(next);
+  await act(async () => release());
+  expect(selection.configuration?.models.map((model) => model.id)).toEqual([
+    'first',
+    'second',
+    'third',
+  ]);
+  expect(selection.modelId).toBe('first');
+  expect(io.remember).not.toHaveBeenCalled();
+});
+it('retains an explicit choice made while maintenance is pending', async () => {
+  const release = holdMaintenance();
+  await open();
+  await act(async () => selection.chooseModel('second'));
+  await act(async () => release());
+  expect(selection.modelId).toBe('second');
+  expect(io.remember).toHaveBeenCalledTimes(1);
+});
+it('requires explicit replacement when maintenance removes the visible candidate', async () => {
+  const release = holdMaintenance();
+  await open();
+  const next = context();
+  next.models = next.models.filter((model) => model.id === 'second');
+  next.resolution.modelId = 'second';
+  io.read.mockResolvedValue(next);
+  await act(async () => release());
+  expect(selection.modelId).toBeNull();
+  expect(selection.selectionUnavailable).toBe(true);
+  expect(io.remember).not.toHaveBeenCalled();
+});
+it.each(['maintenance', 'read'])(
+  'retains the saved catalog after advisory %s failure and permits refresh',
+  async (failure) => {
+    if (failure === 'maintenance') io.maintain.mockRejectedValueOnce(new Error('Unavailable'));
+    else io.read.mockResolvedValueOnce(context()).mockRejectedValueOnce(new Error('Unavailable'));
+    await open();
+    expect(selection.modelId).toBe('first');
+    expect(selection.configurationFailed).toBe(false);
+    await act(async () => selection.retryConfiguration());
+    expect(selection.modelId).toBe('first');
+    expect(io.maintain).toHaveBeenCalledTimes(2);
+    expect(io.remember).not.toHaveBeenCalled();
+  }
+);
+it.each(['refresh', 'reopen'])('discards late maintenance after a newer %s', async (action) => {
+  const release = holdMaintenance();
+  await open();
+  if (action === 'reopen') {
+    await act(async () => root.render(<Surface enabled={false} />));
+    await open();
+  } else await act(async () => selection.retryConfiguration());
+  const calls = io.read.mock.calls.length;
+  io.read.mockResolvedValue({ ...context(), models: [] });
+  await act(async () => release());
+  expect(io.read).toHaveBeenCalledTimes(calls);
+  expect(selection.modelId).toBe('first');
+});
+it('does not wait for remote maintenance before preparing the visible model', async () => {
+  const release = holdMaintenance();
+  await open();
+  await act(async () =>
+    expect(selection.prepareModelSelection()).resolves.toMatchObject({ modelId: 'first' })
+  );
+  expect(io.remember).toHaveBeenCalledTimes(1);
+  await act(async () => release());
+});

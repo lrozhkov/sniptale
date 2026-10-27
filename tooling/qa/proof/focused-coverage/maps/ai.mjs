@@ -396,6 +396,8 @@ export const AI_OWNER_MAPPINGS = [
     reason:
       'Mounted selection and query tests cover admission. Persistence participants cover concurrent choices, deletion, recreation, restore, and retry across IPC.',
     testFiles: [
+      'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
+      'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
       'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
       'apps/extension/src/video-editor/runtime/session/text-voice-selection.test.tsx',
       'apps/extension/src/video-editor/runtime/session/text-rewrite.test.tsx',

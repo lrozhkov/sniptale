@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AIPersistedScenario } from '../../contracts/settings/ai-catalog';
-import { rememberAIScenarioModelSelection, requestAIScenarioModelSelection } from './query';
+import {
+  rememberAIScenarioModelSelection,
+  requestAIScenarioModelSelection,
+  refreshManagedAICatalogs,
+} from './query';
 
 type Context = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
 type Choice = { context: Context; modelId: string; source: 'explicit' | 'initial' };
@@ -42,8 +46,7 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario, enabl
   const reload = useCallback(async () => {
     const request = ++generation.current;
     setConfigurationFailed(false);
-    try {
-      const next = await requestAIScenarioModelSelection(scenario);
+    const apply = (next: Context) => {
       if (!active.current || generation.current !== request) return;
       context.current = next;
       setConfiguration(next);
@@ -62,8 +65,20 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario, enabl
         setModelId(candidate);
         setSelectionUnavailable(next.resolution.status === 'unavailable');
       }
+    };
+    try {
+      apply(await requestAIScenarioModelSelection(scenario));
     } catch {
       if (active.current && generation.current === request) setConfigurationFailed(true);
+      return;
+    }
+    if (!active.current || generation.current !== request) return;
+    try {
+      await refreshManagedAICatalogs();
+      if (!active.current || generation.current !== request) return;
+      apply(await requestAIScenarioModelSelection(scenario));
+    } catch {
+      // Advisory metadata failure preserves the usable local catalog and visible choice.
     }
   }, [scenario]);
 
