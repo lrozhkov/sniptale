@@ -1,6 +1,7 @@
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { AIModelSelector } from '../../features/ai/model-selector';
 import { translate } from '../../platform/i18n';
+import type { AIModelCatalogPayload } from '../../contracts/messaging/ai-settings-runtime';
 import type { useReviewSpeech } from './use-speech';
 import { SpeechSynthesisProfileFields } from '../../ui/video-text/speech/profile';
 type Controller = ReturnType<typeof useReviewSpeech>;
@@ -10,7 +11,11 @@ export function SpeechTranscriptionModelField({
   onOpenModels,
 }: {
   onOpenModels?: (() => void) | undefined;
-  speech: Pick<Controller, 'catalogs' | 'modelId' | 'setModelId'>;
+  speech: {
+    catalogs: { transcription: AIModelCatalogPayload } | null;
+    modelId: string;
+    setModelId(id: string): void;
+  };
 }) {
   return (
     <InspectorParameterRow

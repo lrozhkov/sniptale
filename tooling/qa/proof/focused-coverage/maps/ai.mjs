@@ -1,5 +1,62 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'gallery-contextual-recognition',
+    productionFile: 'apps/extension/src/gallery/video-review/use-recognition.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted recognition, canonical recovery and selector consumers cover admission and retry. Existing preference and catalog participants cover parallel choices, deletion, recreation and refusal.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-recognition.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/recognition-recovery.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-profile.test.tsx',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-contextual-recognition',
+    productionFile: 'apps/extension/src/gallery/video-review/speech-panel.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted recognition, canonical recovery and selector consumers cover admission and retry. Existing preference and catalog participants cover parallel choices, deletion, recreation and refusal.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-recognition.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/recognition-recovery.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-profile.test.tsx',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-contextual-recognition',
+    productionFile: 'apps/extension/src/gallery/video-review/speech-profile.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted recognition, canonical recovery and selector consumers cover admission and retry. Existing preference and catalog participants cover parallel choices, deletion, recreation and refusal.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-recognition.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/recognition-recovery.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-profile.test.tsx',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
     owner: 'montage-authored-speech-selection',
     productionFile: 'apps/extension/src/video-editor/runtime/session/text-voice.ts',
     exclusive: true,

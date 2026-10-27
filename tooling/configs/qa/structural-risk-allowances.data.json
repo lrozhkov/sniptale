@@ -2761,6 +2761,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "f42e4d49ec9f01724bcc3ca05de1583418a8ccd99a69cb606b7e893caa652147",
       "signatureHash": "3d132dfa67d78dcd46b3165ccd760a4a9e28bc02659d1cc11292861bb070a33e"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/use-recognition.ts",
+      "symbol": "useReviewRecognition",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This existing Gallery recognition coordinator binds one parameter form to its existing attempt, job, proposal, explicit retry and acceptance lifetime. The shared scenario hook owns catalog and preference admission; the existing recognition workflow owns source Save, extraction, provider work and canonical publication. The candidate adds no durable writer or second controller. The 197-line body has 13 statements, cyclomatic 4, cognitive 3, nesting 1 and no recovery. Its score is 1 with delta 0. The sole blocker is the function line limit. Its callbacks share the same job/proposal lifetime and presentation receiver. Line-only extraction would distribute that operation across forwarding helpers. Main inspection and mounted refusal, cancellation, session replacement, retained-ID retry, canonical recovery, browser and real-provider proof support this classification. Fresh independent architecture review must assess this exact body and the remaining nested-operation and UI advisories. The corrected body passes the disclosed snapshot to the existing workflow and background admission owner. It adds no state authority.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, controller, resource, consent, retry, acceptance or recovery authority. Remove when the analyzer models this cohesive recognition coordinator. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-27",
+      "astHash": "032c6485490cc69f6317aedce3ed67e02764dd81b47d84a1e776e47c21bb1a77",
+      "signatureHash": "8e58752272e0524870e7b65e1c3bcee81b73dcc35914240ca0a335adcd71f173"
     }
   ]
 }

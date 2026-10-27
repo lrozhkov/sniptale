@@ -24,11 +24,31 @@ vi.mock('../../workflows/video-review/speech-audio', () => ({
   reviewSpeechWavIsSilent: async () => false,
 }));
 vi.mock('../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: async () => ({
-    models: [{ id: 'model', displayName: 'Transcription', providerId: 'provider' }],
-    providers: [{ id: 'provider', name: 'Provider' }],
-    defaultModelId: 'model',
-    chromeAiEnabled: false,
+  rememberAIScenarioModelSelection: async () => undefined,
+  requestAIScenarioModelSelection: async () => ({
+    models: [
+      {
+        id: 'model',
+        modelCode: 'speech-model',
+        displayName: 'Transcription',
+        providerId: 'provider',
+      },
+    ],
+    providers: [
+      {
+        id: 'provider',
+        name: 'Provider',
+        connectionType: 'openai-compatible',
+        incarnation: 'initial',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
+        destinationKind: 'external',
+        hasStoredApiKey: true,
+        createdAt: 1,
+      },
+    ],
+    scenario: 'gallery-transcription',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
     globalSystemPrompt: '',
   }),
 }));

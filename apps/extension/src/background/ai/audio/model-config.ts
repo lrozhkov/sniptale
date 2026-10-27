@@ -98,6 +98,8 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   if (
     args.approved &&
     (!provider ||
+      args.approved.modelId !== model.id ||
+      args.approved.approvedProviderId !== provider.id ||
       model.modelCode !== args.approved.approvedModelCode ||
       (await createAIProviderDestinationBinding(provider)) !== args.approved.approvedDestination)
   )
@@ -148,6 +150,7 @@ export function resolveAudioModelConfig(request: AudioJobStart): Promise<AudioMo
     ...(request.approvedProviderId === undefined
       ? {}
       : { approvedProviderId: request.approvedProviderId }),
+    ...(request.approvedSelection ? { approved: request.approvedSelection } : {}),
     recognition: request.operation === 'transcription' && Boolean(request.recognition),
     ...(request.operation === 'speech' ? { profile: request.profile } : {}),
   });

@@ -706,3 +706,75 @@ it.each(
     }
   }
 );
+
+it('rejects a destination edit during deferred audio authorization before secret access', async () => {
+  const approvedSelection = await selectVoiceModel();
+  const gate = Promise.withResolvers<void>();
+  const authorize = vi.fn(() => gate.promise);
+  const post = vi.fn();
+  const messages: AudioJobServerMessage[] = [];
+  const service = createAudioJobService({ authorize, request: post });
+  const job = service.connect((message) => messages.push(message));
+  job.receive({
+    type: 'start',
+    requestId: 'approval-race',
+    operation: 'transcription',
+    modelId: model.id,
+    approvedProviderId: provider.id,
+    scope: request.scope,
+    approvedSelection,
+  });
+  expect(authorize).toHaveBeenCalledOnce();
+  vi.mocked(loadAIProviders).mockResolvedValue([
+    { ...provider, baseUrl: 'https://audio.example.test/changed/v1/' },
+  ]);
+  gate.resolve();
+  await vi.waitFor(() =>
+    expect(
+      messages.some((message) => message.type === 'failure' || message.type === 'authorized')
+    ).toBe(true)
+  );
+  expect(messages).toContainEqual({
+    type: 'failure',
+    requestId: 'approval-race',
+    code: 'model-unavailable',
+  });
+  expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+  expect(post).not.toHaveBeenCalled();
+  await job.disconnect();
+});
+
+it.each(['destination', 'model', 'incarnation'] as const)(
+  'rejects a changed %s before a subsequent approved chunk',
+  async (change) => {
+    const approvedSelection = await selectVoiceModel();
+    const start: AudioJobStart = {
+      type: 'start',
+      requestId: 'chunk',
+      operation: 'transcription',
+      modelId: model.id,
+      approvedProviderId: provider.id,
+      scope: request.scope,
+      approvedSelection,
+    };
+    await expect(resolveAudioModelConfig(start)).resolves.toMatchObject({ modelCode: 'whisper' });
+    vi.mocked(activateStoredAIProviderSecretForUse).mockClear();
+    if (change === 'model') {
+      const current = await loadAIModels();
+      vi.mocked(loadAIModels).mockResolvedValue(
+        current.map((entry) => ({ ...entry, modelCode: 'changed' }))
+      );
+    } else {
+      vi.mocked(loadAIProviders).mockResolvedValue([
+        {
+          ...provider,
+          ...(change === 'destination'
+            ? { baseUrl: 'https://audio.example.test/new/v1/' }
+            : { incarnation: 'recreated' }),
+        },
+      ]);
+    }
+    await expect(resolveAudioModelConfig(start)).rejects.toThrow('model-unavailable');
+    expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+  }
+);

@@ -1,3 +1,4 @@
+import type { VoiceProviderSelection } from '@sniptale/runtime-contracts/voice-input';
 import {
   validAudioInputDuration,
   type AudioRecognitionOptions,
@@ -46,6 +47,7 @@ export interface ReviewRecognitionJob {
   target: ReviewSpeechTarget;
   modelId: string;
   approvedProviderId: string;
+  approvedSelection?: VoiceProviderSelection;
   grouping: ReviewRecognitionGrouping;
   recognition?: AudioRecognitionOptions;
   source: string | Blob;
@@ -146,6 +148,7 @@ export async function prepareReviewRecognition(
     grouping?: ReviewRecognitionGrouping;
     recognition?: AudioRecognitionOptions;
     previous?: ReviewRecognitionJob;
+    approvedSelection?: VoiceProviderSelection;
   } = {}
 ): Promise<ReviewRecognitionJob> {
   signal.throwIfAborted();
@@ -173,6 +176,7 @@ export async function prepareReviewRecognition(
     grouping,
     options.selection,
     options.recognition,
+    options.approvedSelection,
   ]);
   const saved = await session.saveBuffered();
   signal.throwIfAborted();
@@ -187,6 +191,9 @@ export async function prepareReviewRecognition(
     target: structuredClone(target),
     modelId,
     approvedProviderId,
+    ...(options.approvedSelection
+      ? { approvedSelection: structuredClone(options.approvedSelection) }
+      : {}),
     grouping,
     ...(options.recognition ? { recognition: structuredClone(options.recognition) } : {}),
     source:
@@ -241,6 +248,7 @@ export async function runReviewRecognition(
           requestId: crypto.randomUUID(),
           modelId: job.modelId,
           approvedProviderId: job.approvedProviderId,
+          ...(job.approvedSelection ? { approvedSelection: job.approvedSelection } : {}),
           ...(job.recognition ? { recognition: job.recognition } : {}),
           scope: reviewSpeechScope(session, job.target, chunk.start, chunk.end),
         },

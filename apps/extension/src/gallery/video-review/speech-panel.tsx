@@ -195,8 +195,14 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
   const provider = recognition.catalogs?.transcription.providers.find(
     (entry) => entry.id === model?.providerId
   );
-  const approvalKey = `${provider?.id ?? ''}:${recognition.multimodal ? 'audio-instructions' : 'audio'}`;
-  const disabled = recognition.running || !!consenting;
+  const approvalKey = JSON.stringify([
+    provider?.id,
+    provider?.incarnation,
+    provider?.connectionType,
+    provider?.destinationBinding,
+    recognition.multimodal ? 'audio-instructions' : 'audio',
+  ]);
+  const disabled = recognition.running || recognition.selectionPending || !!consenting;
   const scope = recognitionSourceDisclosure(recognition, access);
   const label = translate(
     recognition.snapshot.autosaveEnabled
@@ -245,6 +251,7 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
             disabled={
               !model ||
               !provider ||
+              recognition.selectionPending ||
               access.sourceAudioAvailable === false ||
               recognition.selectionUnavailable
             }
@@ -256,13 +263,16 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
           >
             {label}
           </ReviewButton>
-          {!recognition.catalogs?.transcription.models.length ? (
+          {!recognition.catalogs?.transcription.models.length ||
+          recognition.configurationFailed ||
+          recognition.modelUnavailable ||
+          recognition.error === 'model' ? (
             <ReviewButton
               label={translate('gallery.videoReview.speechReloadModels')}
               className={buttonClass}
               onClick={() => {
                 recognition.clearError();
-                recognition.reloadModels();
+                void recognition.reloadModels();
               }}
             >
               {translate('gallery.videoReview.speechReloadModels')}
@@ -292,6 +302,7 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
               disabled={
                 consenting !== provider.id ||
                 recognition.running ||
+                recognition.selectionPending ||
                 recognition.selectionUnavailable
               }
               onClick={() => {
@@ -318,8 +329,28 @@ function RecognitionSettings({ recognition, access }: { recognition: Recognition
 }
 
 function RecognitionFeedback({ recognition }: { recognition: Recognition }) {
+  const modelError = recognition.configurationFailed
+    ? 'aiModal.modelCatalogFailed'
+    : recognition.selectionFailed
+      ? 'aiModal.modelSelectionSaveFailed'
+      : recognition.modelUnavailable
+        ? 'aiModal.modelSelectionUnavailable'
+        : null;
   return (
     <>
+      {modelError && (
+        <p role="alert" className="text-xs">
+          {translate(modelError)}
+          {recognition.modelUnavailable && recognition.rememberedModelName
+            ? ` ${recognition.rememberedModelName}`
+            : ''}
+        </p>
+      )}
+      {recognition.selectionPending && !recognition.running && (
+        <p role="status" className="text-xs">
+          {translate('common.states.saving')}
+        </p>
+      )}
       {recognition.running && (
         <div role="status" className="flex flex-wrap items-center gap-2 text-xs">
           <LoaderCircle size={14} className="animate-spin" />
@@ -341,7 +372,7 @@ function RecognitionFeedback({ recognition }: { recognition: Recognition }) {
           )}
         </div>
       )}
-      {recognition.error && (
+      {recognition.error && !modelError && (
         <p role="alert" className="text-xs">
           {translate(
             recognition.error === 'too-large'

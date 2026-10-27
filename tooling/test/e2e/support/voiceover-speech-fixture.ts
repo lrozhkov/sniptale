@@ -27,6 +27,8 @@ export const speechModelResponse = aiSettingsQueryResponseSchema.parse({
         id: '00000000-0000-4000-8000-000000000101',
         name: 'Local speech fixture',
         connectionType: 'openai-compatible',
+        incarnation: 'fixture',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
         destinationKind: 'external',
         hasStoredApiKey: true,
         createdAt: 1,

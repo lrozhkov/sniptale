@@ -2,6 +2,10 @@ import {
   isValidAIModelOperationConfiguration,
   type AISpeechModelParameters,
 } from '../settings/model-operation';
+import {
+  parseVoiceProviderSelection,
+  type VoiceProviderSelection,
+} from '@sniptale/runtime-contracts/voice-input';
 import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
 
 export const AUDIO_JOB_PORT_NAME = 'sniptale-gallery-audio-job';
@@ -149,6 +153,8 @@ type AudioJobStartBase = {
   type: 'start';
   requestId: string;
   modelId: string;
+  /** Optional for existing callers. Binds a disclosed execution across asynchronous preparation. */
+  approvedSelection?: VoiceProviderSelection;
 };
 export type AudioJobStart = AudioJobStartBase &
   (
@@ -450,11 +456,23 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
       !identifier(approvedProviderId))
   )
     return null;
+  const approvedSelection =
+    value['approvedSelection'] === undefined
+      ? undefined
+      : parseVoiceProviderSelection(value['approvedSelection']);
+  if (
+    approvedSelection === null ||
+    (approvedSelection &&
+      (approvedSelection.modelId !== value['modelId'] ||
+        approvedSelection.approvedProviderId !== approvedProviderId))
+  )
+    return null;
   const base = {
     type: 'start' as const,
     requestId,
     modelId: value['modelId'],
     scope,
+    ...(approvedSelection ? { approvedSelection } : {}),
     ...(typeof approvedProviderId === 'string' ? { approvedProviderId } : {}),
   };
   if (value['operation'] === 'transcription') {
@@ -490,6 +508,7 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
             'requestId',
             'modelId',
             'approvedProviderId',
+            'approvedSelection',
             'scope',
             'operation',
             'text',

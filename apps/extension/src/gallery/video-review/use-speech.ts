@@ -272,7 +272,7 @@ function reviewSpeechGroups(snapshot: ReturnType<ReviewSpeechSession['getSnapsho
 
 /** Model discovery owns its retry lifecycle; remote audio commands keep a separate controller. */
 /** Existing configured audio model discovery shared by source speech and authored narration forms. */
-export function useReviewSpeechCatalog(
+function useReviewSpeechCatalog(
   setModelId: (update: (current: string) => string) => void,
   onError: () => void
 ) {
