@@ -50,6 +50,92 @@ async function configureToolbar(
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   for (const theme of ['light', 'dark'] as const) {
+    test(`navigation pin chrome ${theme} ${name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      try {
+        await popup.evaluate(async (theme) => {
+          await chrome.storage.local.set({
+            'sniptale-theme-preference': theme,
+            'sniptale-locale-preference': theme === 'light' ? 'en' : 'ru',
+          });
+          const grant = document.createElement('button');
+          grant.textContent = 'Grant pin proof';
+          grant.onclick = async () => {
+            grant.dataset['granted'] = String(
+              await chrome.permissions.request({ origins: ['<all_urls>'] })
+            );
+          };
+          document.body.append(grant);
+        }, theme);
+        const grant = popup.getByRole('button', { name: 'Grant pin proof' });
+        await grant.click();
+        await expect(grant).toHaveAttribute('data-granted', 'true');
+        for (const orientation of ['horizontal', 'vertical'] as const) {
+          await configureToolbar(popup, page, hostOrigin, orientation);
+          const pin = page.locator('[data-ui="content.toolbar.navigation.pin-to-tab"]');
+          await expect(pin).toBeEnabled();
+          const readPinned = () =>
+            popup.evaluate(async (origin) => {
+              const tab = (await chrome.tabs.query({})).find((tab) => tab.url === `${origin}/`);
+              const key = `sniptale.content.pin-to-tab:tab:${tab!.id}`;
+              return (await chrome.storage.session.get(key))[key] === true;
+            }, hostOrigin);
+          await expect(pin).toHaveAttribute('aria-pressed', 'false');
+          const inactiveColor = await pin
+            .locator('svg')
+            .evaluate((icon) => getComputedStyle(icon).stroke);
+          const inactiveIcon = await pin.locator('svg').getAttribute('class');
+          await page.mouse.move(10, 100);
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await pin.hover();
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await pin.click();
+          await expect(pin).toHaveAttribute('aria-pressed', 'true');
+          await expect.poll(readPinned).toBe(true);
+          await page.mouse.move(10, 100);
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await expect(pin).toHaveCSS('box-shadow', 'none');
+          await expect(pin.locator('svg')).not.toHaveAttribute('class', inactiveIcon!);
+          await expect
+            .poll(() => pin.locator('svg').evaluate((icon) => getComputedStyle(icon).stroke))
+            .not.toBe(inactiveColor);
+          await pin.hover();
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await page.mouse.down();
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await page.mouse.move(10, 100);
+          await page.mouse.up();
+          await expect(pin).toHaveAttribute('aria-pressed', 'true');
+          await page.getByRole('button', { name: 'Host action', exact: true }).click();
+          await page.screenshot({
+            path: info.outputPath(`navigation-pin-${orientation}-rest.png`),
+            fullPage: false,
+            animations: 'disabled',
+          });
+          await pin.focus();
+          await pin.press('Tab');
+          await page.keyboard.press('Shift+Tab');
+          await expect(pin).toBeFocused();
+          await expect(pin).toHaveCSS('outline-style', 'solid');
+          await page.screenshot({
+            path: info.outputPath(`navigation-pin-${orientation}.png`),
+            fullPage: false,
+            animations: 'disabled',
+          });
+          await pin.press('Enter');
+          await expect(pin).toHaveAttribute('aria-pressed', 'false');
+          await expect.poll(readPinned).toBe(false);
+        }
+      } finally {
+        await page.close();
+        await popup.close();
+      }
+    });
+
     test(`screenshot quick menus ${theme} ${name}`, async ({
       context,
       extensionId,

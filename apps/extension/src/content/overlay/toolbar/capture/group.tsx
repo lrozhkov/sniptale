@@ -31,6 +31,7 @@ function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
         <PageProtectedControls>
           <ContentToolbarButton
             type="button"
+            tone="utility"
             data-content-tool="true"
             active={pinned}
             aria-pressed={pinned}
@@ -45,7 +46,11 @@ function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
               );
             }}
           >
-            {pinned ? <Pin size={18} strokeWidth={2} /> : <PinOff size={18} strokeWidth={2} />}
+            {pinned ? (
+              <Pin size={18} strokeWidth={2} color="var(--sniptale-color-accent)" />
+            ) : (
+              <PinOff size={18} strokeWidth={2} />
+            )}
           </ContentToolbarButton>
         </PageProtectedControls>
       </PageToolbarSlot>
