@@ -1,3 +1,5 @@
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
 import type { VoiceProviderSelection } from '@sniptale/runtime-contracts/voice-input';
 import { hasCurrentOriginalAudioTargets } from '../../../features/video/project/timeline/original-audio';
 import {
@@ -63,6 +65,7 @@ interface VoiceState {
   running: boolean;
   applying: boolean;
   error: string | null;
+  providerFailureReason?: AIConnectionReason | null;
 }
 interface VoiceLifetime {
   projectId: string;
@@ -83,6 +86,7 @@ const initialState: VoiceState = {
   running: false,
   applying: false,
   error: null,
+  providerFailureReason: null,
 };
 function voiceError(error: unknown) {
   const code = error instanceof Error ? error.message : '';
@@ -150,7 +154,14 @@ function runVoiceAttempt(
     if (!current() || lifetime.active) return;
     const controller = new AbortController();
     lifetime.active = controller;
-    setState((value) => ({ ...value, running: true, applying, progress: null, error: null }));
+    setState((value) => ({
+      ...value,
+      running: true,
+      applying,
+      progress: null,
+      error: null,
+      providerFailureReason: null,
+    }));
     let abort = () => {};
     const cancelled = new Promise<void>((_resolve, reject) => {
       abort = () => reject(new DOMException('Cancelled', 'AbortError'));
@@ -165,7 +176,11 @@ function runVoiceAttempt(
       return true;
     } catch (error) {
       if (current() && !controller.signal.aborted)
-        setState((value) => ({ ...value, error: voiceError(error) }));
+        setState((value) => ({
+          ...value,
+          error: voiceError(error),
+          providerFailureReason: error instanceof AudioJobProviderError ? error.reason : null,
+        }));
       return false;
     } finally {
       controller.signal.removeEventListener('abort', abort);
@@ -279,7 +294,11 @@ async function generateVoiceBatch(
     },
     failed: (cause) => {
       if (!signal.aborted && access.getProject())
-        setState((value) => ({ ...value, error: voiceError(cause) }));
+        setState((value) => ({
+          ...value,
+          error: voiceError(cause),
+          providerFailureReason: cause instanceof AudioJobProviderError ? cause.reason : null,
+        }));
     },
   });
 }
@@ -383,6 +402,7 @@ function openVoiceSelection(
     activeId: '',
     consent: null,
     error: null,
+    providerFailureReason: null,
     source: lifetime.batch ? 'ai' : value.source,
   }));
 }
@@ -614,7 +634,8 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
       if (source === latest.current.source || lifetime.batch) return;
       if (!editable() || acquired() || latest.current.consent) return;
       const change = () => {
-        if (current()) setState((value) => ({ ...value, source, error: null }));
+        if (current())
+          setState((value) => ({ ...value, source, error: null, providerFailureReason: null }));
       };
       if (latest.current.source === 'microphone') recording.dismiss(change);
       else change();
@@ -642,12 +663,13 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
         !selection.configuration?.models.some((entry) => entry.id === id)
       )
         return;
+      setState((value) => ({ ...value, error: null, providerFailureReason: null }));
       lifetime.profileReset = id;
       selection.chooseModel(id);
     },
     changeProfile(profile: ReviewSpeechProfile) {
       if (!editable() || acquired() || latest.current.consent) return;
-      setState((value) => ({ ...value, profile, error: null }));
+      setState((value) => ({ ...value, profile, error: null, providerFailureReason: null }));
     },
     changePlacement(placement: VideoProjectVoicePlacement) {
       if (editable() && active && !active.accepted)

@@ -526,3 +526,27 @@ it('locks model controls during preference admission without clearing the source
     )?.value
   ).toBe('5');
 });
+
+it.each([
+  ['invalid-credential', 'providerStatusInvalidKey'],
+  ['permission-denied', 'providerStatusDenied'],
+  ['model-unavailable', 'providerStatusModelUnavailable'],
+  ['quota-exceeded', 'providerStatusQuota'],
+  ['rate-limited', 'providerStatusRate'],
+  ['network', 'providerStatusNetwork'],
+  ['timeout', 'providerStatusTimeout'],
+  ['service-error', 'providerStatusUnavailable'],
+] as const)(
+  'explains recognition %s in the existing alert without starting another attempt',
+  (reason, key) => {
+    const controller = createController();
+    controller.error = 'provider-failed';
+    controller.providerFailureReason = reason;
+    const props = createProps(controller);
+    open(props);
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      `settings.aiProviders.${key}`
+    );
+    expect(controller.recognize).not.toHaveBeenCalled();
+  }
+);

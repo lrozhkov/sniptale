@@ -1,3 +1,4 @@
+import { getVideoAIProviderFailureKey } from './ai-provider-error';
 import { OriginalAudioPlacementFields } from '../inputs/original-audio';
 import { useVideoEditorPlaybackPort } from '../../../../runtime/controller/store';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -471,13 +472,14 @@ function VoiceRequestStatus({ operation: op }: { operation: VideoProjectTextVoic
       {op.error ? (
         <p role="alert" className="text-sm break-words">
           {translate(
-            op.error === 'selection'
-              ? 'videoEditor.sidebar.textVoicePlacementConflict'
-              : op.error === 'stale'
-                ? 'videoEditor.sidebar.textVoiceStale'
-                : op.error === 'model-unavailable'
-                  ? 'gallery.videoReview.speechMissingModel'
-                  : 'videoEditor.sidebar.recognitionFailed'
+            getVideoAIProviderFailureKey(op.providerFailureReason) ??
+              (op.error === 'selection'
+                ? 'videoEditor.sidebar.textVoicePlacementConflict'
+                : op.error === 'stale'
+                  ? 'videoEditor.sidebar.textVoiceStale'
+                  : op.error === 'model-unavailable'
+                    ? 'gallery.videoReview.speechMissingModel'
+                    : 'videoEditor.sidebar.recognitionFailed')
           )}
         </p>
       ) : null}

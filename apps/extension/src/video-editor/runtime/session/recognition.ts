@@ -1,3 +1,5 @@
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { VideoProject } from '../../../features/video/project/types/model';
 import { editReviewTextFragment } from '../../../features/video/review/text-document';
@@ -22,6 +24,7 @@ interface RecognitionState {
   applying: boolean;
   accepted: boolean;
   error: string | null;
+  providerFailureReason?: AIConnectionReason | null;
   completed: number;
   total: number;
   proposal: ProjectRecognitionProposal | null;
@@ -31,6 +34,7 @@ const initial: RecognitionState = {
   applying: false,
   accepted: false,
   error: null,
+  providerFailureReason: null,
   completed: 0,
   total: 0,
   proposal: null,
@@ -46,13 +50,20 @@ function runRecognitionCommand(
   if (lifetime.active) return;
   const controller = new AbortController();
   lifetime.active = controller;
-  setState((value) => ({ ...value, running: true, applying, error: null }));
+  setState((value) => ({
+    ...value,
+    running: true,
+    applying,
+    error: null,
+    providerFailureReason: null,
+  }));
   void work(controller.signal)
     .catch((error: unknown) => {
       if (owner.current === lifetime && lifetime.mounted && !controller.signal.aborted)
         setState((value) => ({
           ...value,
           error: error instanceof Error ? error.message : 'failed',
+          providerFailureReason: error instanceof AudioJobProviderError ? error.reason : null,
         }));
     })
     .finally(() => {
@@ -207,6 +218,7 @@ export function useVideoProjectRecognition(project: VideoProject) {
     selectionPending: selection.selectionPending,
     setModelId(id: string | null) {
       if (!owner.current.mounted || owner.current.active || selection.selectionPending) return;
+      setState((value) => ({ ...value, error: null, providerFailureReason: null }));
       selection.chooseModel(id);
     },
     loadModels: selection.retryConfiguration,

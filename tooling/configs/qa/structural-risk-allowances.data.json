@@ -2756,10 +2756,10 @@
       "file": "apps/extension/src/video-editor/runtime/session/text-voice.ts",
       "symbol": "useVideoProjectTextVoice",
       "owner": "extension:video-editor:runtime",
-      "reason": "tool-noise: This existing project voice coordinator retains one attempt, consent, placement, preview and acceptance lifetime. Its three existing refs hold current presentation state, the project lifetime and current command ports; no new writer or state receiver was added. Shared scenario selection owns catalog and preference admission outside this hook. The candidate removes the duplicate catalog authority and keeps source Save, history and byte publication in their existing owners. The destination-consent correction compares the disclosed snapshot before Save and forwards it through the existing workflow. No new state receiver or authority is added. The 224-line body has 25 statements, cyclomatic10, cognitive9, nesting1 and no recovery; score4 delta0. The remaining blocker is the function line limit. Splitting these closures would distribute the same project identity, cancellation and acquired-take locks. Main inspection and mounted cancellation, replacement, refusal, local-source and accepted-take proof support this classification. Fresh independent architecture review must assess the exact body and this classification.",
+      "reason": "tool-noise: This existing project voice coordinator retains one attempt, consent, placement, preview and acceptance lifetime. Its existing refs hold current presentation state, project lifetime and command ports. Provider failure feedback shares the existing attempt state and alert receiver. The candidate adds no controller, durable writer, egress, resource or recovery authority. The 226-line body has 25 statements, cyclomatic 10, cognitive 9, nesting 1, no recovery and score 4 with delta 0. Shared scenario selection and workflows retain catalog, preference, source Save, history and byte publication authority. Splitting these closures would distribute the same project identity, cancellation and acquired-take locks. Main inspection and current mounted refusal, source-preservation and error-clearing proof support Keep, subject to fresh independent architecture review.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state receiver, writer, resource, consent, cancellation or recovery authority. Remove when the analyzer models this cohesive project-operation coordinator. Independent architecture review must assess this classification.",
       "reviewDate": "2026-10-27",
-      "astHash": "08ce53779d5d4682d246c5a61d187108eddbddbd6ac3bf391b3a5cd8db96d263",
+      "astHash": "bafcd894661a7f8abdd4ebfd6ac6ba86bb88c7456ed28f729d482cda5a4f16db",
       "signatureHash": "3d132dfa67d78dcd46b3165ccd760a4a9e28bc02659d1cc11292861bb070a33e"
     },
     {
@@ -2778,10 +2778,10 @@
       "file": "apps/extension/src/video-editor/runtime/session/recognition.ts",
       "symbol": "useVideoProjectRecognition",
       "owner": "extension:video-editor:runtime",
-      "reason": "tool-noise: The mounted Montage recognition coordinator retains one project lifetime for source admission, cancellation, proposals, explicit retries, history and save acknowledgement. Shared selection and existing workflows own catalog, preferences, source Save, extraction, egress and publication. The 156-line body has 15 statements, cyclomatic 2, cognitive 1, nesting 0 and score 1 with delta 0. Its source/project ports and callbacks share that lifetime. Line-only extraction would distribute one registered operation. Controlled refusal, cancellation, replacement, parameter-retry, history and browser proof support Keep, subject to independent architecture review.",
+      "reason": "tool-noise: This existing Video recognition coordinator retains one project lifetime for source admission, cancellation, proposals, explicit retry, history and Save acknowledgement. Provider failure feedback shares its existing attempt state and alert receiver. The candidate adds no controller, durable writer, egress, resource or recovery authority. The 157-line body has 15 statements, cyclomatic 2, cognitive 1, nesting 0 and score 1 with delta 0. Shared selection and workflows retain catalog, preferences, source Save, extraction and publication. Line-only extraction would distribute one registered operation. Main inspection and current mounted source-preservation and error-clearing proof support Keep, subject to fresh independent architecture review.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any new independent state receiver, request controller, persistence writer, consent, retry, history or publication authority. Remove when the analyzer models this cohesive coordinator.",
       "reviewDate": "2026-10-27",
-      "astHash": "049e46bd5a2dbb46980bf1668967946cef23e7f0e6eec735bbcd7a80041dfe7a",
+      "astHash": "402ed15211eca0a02222f991e8b7a1412c974bc2d865755191d7611074bb8edc",
       "signatureHash": "244a6f71f8761ae14a154a5611135a3a0a58bd0e2d84eca6c943ce77b68d4c48"
     },
     {

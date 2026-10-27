@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
 import { inspectReviewAudio } from '../../../workflows/video-review/audio-import';
 import { ProjectTextVoicePanel } from '../../workspace/sidebar/selection/inspection/text-voice';
 import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
@@ -728,7 +729,8 @@ it('continues after a failed phrase and requires fresh consent for unfinished te
   await mountBatch(3);
   const request = vi.mocked(runReviewSpeechJob).getMockImplementation()!;
   vi.mocked(runReviewSpeechJob).mockImplementation(async (...args) => {
-    if (vi.mocked(runReviewSpeechJob).mock.calls.length === 2) throw new Error('interrupted');
+    if (vi.mocked(runReviewSpeechJob).mock.calls.length === 2)
+      throw new AudioJobProviderError('quota-exceeded', 'provider-failed');
     return request(...args);
   });
   await act(async () => operation.prepare());
@@ -736,7 +738,10 @@ it('continues after a failed phrase and requires fresh consent for unfinished te
   expect(operation.items.map((item) => !!item.preview)).toEqual([true, false, true]);
   expect(operation.progress).toEqual({ completed: 3, total: 3 });
   expect(operation.error).toBe('failed');
+  expect(operation.providerFailureReason).toBe('quota-exceeded');
+  expect(host.textContent).toContain(translate('settings.aiProviders.providerStatusQuota'));
   await act(async () => operation.prepare());
+  expect(operation.providerFailureReason).toBeNull();
   expect(operation.consent?.queue.items.map((item) => item.fragmentId)).toEqual(['phrase-1']);
   expect(runReviewSpeechJob).toHaveBeenCalledTimes(3);
   await act(async () => operation.start());

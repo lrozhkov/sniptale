@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
 import { act, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -467,3 +468,21 @@ it.each(['model', 'parameters'] as const)(
     expect(runReviewSpeechJob).toHaveBeenCalledTimes(3);
   }
 );
+
+it('retains bounded recognition evidence without mutating source and clears it on explicit model choice', async () => {
+  await mount();
+  const before = structuredClone(useVideoEditorStore.getState().project);
+  vi.mocked(runReviewSpeechJob).mockRejectedValueOnce(
+    new AudioJobProviderError('quota-exceeded', 'provider-failed')
+  );
+  await recognize();
+  expect(current()).toMatchObject({
+    error: 'provider-failed',
+    providerFailureReason: 'quota-exceeded',
+    proposal: null,
+  });
+  expect(useVideoEditorStore.getState().project).toEqual(before);
+  expect(runReviewSpeechJob).toHaveBeenCalledOnce();
+  await act(async () => current().setModelId('model'));
+  expect(current()).toMatchObject({ error: null, providerFailureReason: null });
+});

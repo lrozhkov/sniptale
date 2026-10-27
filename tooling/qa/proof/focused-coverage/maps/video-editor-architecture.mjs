@@ -41,6 +41,18 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   {
+    owner: 'video-inspector-audio-provider-copy',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/ai-provider-error.ts',
+    exclusive: true,
+    reason:
+      'Fixed audio provider feedback belongs to the Video inspector. Mounted recognition and speech session consumers prove local copy, source preservation and explicit error clearing.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
     owner: 'shared-scene-plane-projection',
     productionFile:
       'apps/extension/src/features/video/composition/motion/spatial-projection-bounds.ts',

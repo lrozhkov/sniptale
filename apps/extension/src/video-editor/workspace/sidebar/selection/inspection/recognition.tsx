@@ -1,3 +1,4 @@
+import { getVideoAIProviderFailureKey } from './ai-provider-error';
 import { useState } from 'react';
 import { AudioLines } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
@@ -320,7 +321,11 @@ function RecognitionStatus({ controller }: { controller: VideoProjectRecognition
         !controller.selectionFailed &&
         !controller.selectionUnavailable && (
           <p role="alert" className="text-xs">
-            {translate(messages.get(controller.error) ?? 'videoEditor.sidebar.recognitionFailed')}
+            {translate(
+              getVideoAIProviderFailureKey(controller.providerFailureReason) ??
+                messages.get(controller.error) ??
+                'videoEditor.sidebar.recognitionFailed'
+            )}
           </p>
         )}
     </>
