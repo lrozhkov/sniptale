@@ -24,6 +24,10 @@ interface AIProviderRuntimeOptions {
   apiKey: string;
   fetch: typeof globalThis.fetch;
   operation: 'text' | 'transcription' | 'speech';
+  compatibleChat?: {
+    supportsStructuredOutputs: boolean;
+    transformRequestBody?: (body: Record<string, unknown>) => Record<string, unknown>;
+  };
 }
 
 /** Composes ready-made packages. Callers must supply the authorized, bounded network transport. */
@@ -71,7 +75,7 @@ export function createAIProviderRuntime(options: AIProviderRuntimeOptions): Prov
     case 'yandex':
     case 'neuraldeep':
       return options.operation === 'text'
-        ? createOpenAICompatible({ ...settings, name: options.type })
+        ? createOpenAICompatible({ ...settings, name: options.type, ...options.compatibleChat })
         : createOpenAI(settings);
     case 'chrome-built-in':
     case 'gigachat':

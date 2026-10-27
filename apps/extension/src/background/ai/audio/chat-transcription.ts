@@ -1,3 +1,4 @@
+import type { JSONSchema7, LanguageModelV4CallOptions } from '@ai-sdk/provider';
 import type { AudioRecognitionOptions, AudioTranscriptResult } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
 
@@ -5,7 +6,7 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function transcriptionSchema(rewrite: boolean) {
+function transcriptionSchema(rewrite: boolean): JSONSchema7 {
   return {
     type: 'object',
     additionalProperties: false,
@@ -30,12 +31,12 @@ function transcriptionSchema(rewrite: boolean) {
 }
 
 /** Fixed timing and structure instructions remain code-owned; user instructions are additional. */
-export function encodeChatTranscription(
+export function buildChatTranscriptionCall(
   config: AudioModelConfig,
   options: AudioRecognitionOptions,
   duration: number,
-  audio: string
-): string {
+  audio: Uint8Array
+): LanguageModelV4CallOptions {
   const params = config.transcription;
   if (params?.transport !== 'audio-chat') throw new Error('invalid-request');
   const schema = transcriptionSchema(options.mode === 'rewrite');
@@ -68,14 +69,13 @@ export function encodeChatTranscription(
   ]
     .filter(Boolean)
     .join('\n');
-  const format =
-    params.structuredOutput === 'json_object'
-      ? { type: 'json_object' }
-      : { type: 'json_schema', json_schema: { name: 'timed_transcript', strict: true, schema } };
-  const bothub = params.chatProtocol === 'bothub';
-  return JSON.stringify({
-    model: config.modelCode,
-    messages: [
+  return {
+    maxOutputTokens: 24000,
+    responseFormat: {
+      type: 'json',
+      ...(params.structuredOutput === 'json_schema' ? { name: 'timed_transcript', schema } : {}),
+    },
+    prompt: [
       { role: 'system', content: `${extra}\n\n${structural}` },
       {
         role: 'user',
@@ -84,16 +84,32 @@ export function encodeChatTranscription(
             type: 'text',
             text: 'Process the attached complete audio using the requested mode and schema.',
           },
-          bothub
-            ? { type: 'image_url', image_url: { url: `data:audio/wav;base64,${audio}` } }
-            : { type: 'input_audio', input_audio: { data: audio, format: 'wav' } },
+          { type: 'file', data: { type: 'data', data: audio }, mediaType: 'audio/wav' },
         ],
       },
     ],
-    ...(bothub
-      ? { responseFormat: format, maxTokens: 24000 }
-      : { response_format: format, max_tokens: 24000 }),
+  };
+}
+
+/** Maps the explicitly selected Bothub proxy format through the ready-made SDK hook. */
+export function transformBothubChatRequest(body: Record<string, unknown>): Record<string, unknown> {
+  const messages = body['messages'];
+  if (!Array.isArray(messages)) throw new Error('invalid-request');
+  const mapped = messages.map((message: unknown) => {
+    if (!record(message) || !Array.isArray(message['content'])) return message;
+    return {
+      ...message,
+      content: message['content'].map((part: unknown) => {
+        if (!record(part) || part['type'] !== 'input_audio') return part;
+        const audio = part['input_audio'];
+        if (!record(audio) || audio['format'] !== 'wav' || typeof audio['data'] !== 'string')
+          throw new Error('invalid-request');
+        return { type: 'image_url', image_url: { url: `data:audio/wav;base64,${audio['data']}` } };
+      }),
+    };
   });
+  const { response_format, max_tokens, ...rest } = body;
+  return { ...rest, messages: mapped, responseFormat: response_format, maxTokens: max_tokens };
 }
 
 /** Untrusted model JSON is admitted locally; HTTP success alone never admits a transcript. */

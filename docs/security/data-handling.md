@@ -126,7 +126,7 @@ Local-data erasure removes it even if preferences remain preserved. Custom image
 
 Gallery speech editing retains project authority separately from private dictation history. Explicitly accepted transcripts and phrase edits become project content through review history. Accepted generated audio uses the existing private project-asset publication and reference-retention rules. Project backup includes those accepted references and text. It excludes jobs, secrets and temporary previews.
 
-Ready-made SDK adapters assemble speech and standard transcription provider headers inside the admitted background transport. `background/ai/audio/request.ts` still assembles legacy audio-chat transcription bearer headers.
+Ready-made SDK adapters assemble speech, standard transcription, and audio-chat provider headers inside the admitted background transport. `background/ai/audio/request.ts` owns credential construction and guarded network effects. Bothub uses the SDK request transformation hook for its explicitly selected proxy format.
 
 The background audio request owner sends saved speech text or explicitly configured private dictation audio to the selected provider. For transcription, it sends authorized source intervals. It rejects redirects. It omits ambient credentials and referrers. It bounds response bytes and elapsed time.
 

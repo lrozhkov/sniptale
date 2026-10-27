@@ -330,11 +330,18 @@ it('posts a complete declared multimodal file once and admits only schema-valid 
   expect(post).toHaveBeenCalledTimes(1);
   const request = post.mock.calls[0]![1]!;
   expect(new Headers(request.headers).get('Content-Type')).toBe('application/json');
-  const payload = JSON.parse(new TextDecoder().decode(request.body as ArrayBuffer));
+  const payload = JSON.parse(request.body as string);
   expect(payload.messages[1].content[1]).toEqual({
     type: 'image_url',
     image_url: { url: 'data:audio/wav;base64,Ynl0ZXM=' },
   });
+  expect(payload.responseFormat).toMatchObject({
+    type: 'json_schema',
+    json_schema: { name: 'timed_transcript', strict: true },
+  });
+  expect(payload.maxTokens).toBe(24000);
+  expect(payload).not.toHaveProperty('response_format');
+  expect(payload).not.toHaveProperty('max_tokens');
   expect(result).toMatchObject({ kind: 'transcript', result: { text: 'Hello.' } });
 });
 
@@ -370,7 +377,7 @@ it('preserves every audio byte across base64 block boundaries without extra POST
     onReceiving() {},
   });
   expect(post).toHaveBeenCalledOnce();
-  const payload = JSON.parse(new TextDecoder().decode(post.mock.calls[0]![1]!.body as ArrayBuffer));
+  const payload = JSON.parse(post.mock.calls[0]![1]!.body as string);
   const encoded = payload.messages[1].content[1].input_audio.data;
   expect(Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))).toEqual(bytes);
 });

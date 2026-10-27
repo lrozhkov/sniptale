@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createProviderSdkFetch } from './llm/transport/http';
 import { generateText } from 'ai';
-import { createAIProviderRuntime } from './providers';
+import {
+  createAIProviderRuntime,
+  AIProviderRequestError,
+  classifyAIProviderFailure,
+} from './providers';
+import { APICallError } from '@ai-sdk/provider';
 import {
   getAIProviderDefinition,
   AI_PROVIDER_TYPES,
@@ -58,6 +63,35 @@ describe('ready-made AI provider integration', () => {
     expect(result.text).toBe('OK');
     expect(transport).toHaveBeenCalledTimes(1);
     expect(transport.mock.calls[0]?.[0]).toBe('https://api.neuraldeep.ru/v1/chat/completions');
+  });
+
+  it('applies explicit compatible chat configuration through the ready-made adapter', async () => {
+    const transport = vi.fn<typeof fetch>(async () =>
+      Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'OK' } }] })
+    );
+    const transformRequestBody = vi.fn((body: Record<string, unknown>) => ({
+      ...body,
+      declaredProxy: true,
+    }));
+    const provider = createAIProviderRuntime({
+      type: 'openai-compatible',
+      baseUrl: 'https://provider.test/v1',
+      apiKey: 'fixture',
+      fetch: transport,
+      operation: 'text',
+      compatibleChat: { supportsStructuredOutputs: true, transformRequestBody },
+    });
+    const result = await provider.languageModel('declared').doGenerate({
+      prompt: [{ role: 'user', content: [{ type: 'text', text: 'OK' }] }],
+      responseFormat: { type: 'json', name: 'declared', schema: { type: 'object' } },
+    });
+    expect(result.response?.body).toBeDefined();
+    expect(transformRequestBody).toHaveBeenCalledOnce();
+    expect(transport).toHaveBeenCalledOnce();
+    expect(JSON.parse(transport.mock.calls[0]![1]!.body as string)).toMatchObject({
+      declaredProxy: true,
+      response_format: { type: 'json_schema', json_schema: { name: 'declared', strict: true } },
+    });
   });
 
   it('leaves Chrome local and rejects the incompatible GigaChat runtime', () => {
@@ -212,4 +246,59 @@ it('admits only operations implemented by the pinned provider packages', () => {
     }
   }
   expect(transport).not.toHaveBeenCalled();
+});
+
+describe('provider admission and safe connection evidence', () => {
+  it('refuses an unsupported operation before constructing a provider request', () => {
+    const transport = vi.fn<typeof fetch>();
+    expect(() =>
+      createAIProviderRuntime({
+        type: 'anthropic',
+        baseUrl: 'https://provider.test/v1',
+        apiKey: 'fixture',
+        fetch: transport,
+        operation: 'speech',
+      })
+    ).toThrow('provider-unavailable');
+    expect(transport).not.toHaveBeenCalled();
+  });
+  it.each([
+    [401, 'invalid-credential'],
+    [403, 'permission-denied'],
+    [402, 'quota-exceeded'],
+    [404, 'model-unavailable'],
+    [429, 'rate-limited'],
+    [503, 'service-error'],
+    [400, 'unknown'],
+  ])('classifies HTTP %i without retaining its payload', (statusCode, reason) => {
+    const error = new APICallError({
+      message: 'private response',
+      url: 'https://provider.test',
+      requestBodyValues: {},
+      statusCode,
+    });
+    expect(classifyAIProviderFailure(error)).toBe(reason);
+  });
+  it.each(['AbortError', 'TimeoutError'])('classifies %s as transient timeout evidence', (name) => {
+    const error = new Error('private transport detail');
+    error.name = name;
+    expect(classifyAIProviderFailure(error)).toBe('timeout');
+  });
+  it('retains fixed product reasons and distinguishes network from unknown evidence', () => {
+    expect(classifyAIProviderFailure(new AIProviderRequestError('permission-denied'))).toBe(
+      'permission-denied'
+    );
+    expect(classifyAIProviderFailure(new TypeError('private detail'))).toBe('network');
+    expect(classifyAIProviderFailure(new Error('private detail'))).toBe('unknown');
+    expect(classifyAIProviderFailure(null)).toBe('unknown');
+    expect(
+      classifyAIProviderFailure(
+        new APICallError({
+          message: 'private response',
+          url: 'https://provider.test',
+          requestBodyValues: {},
+        })
+      )
+    ).toBe('unknown');
+  });
 });
