@@ -994,3 +994,14 @@ A supported native project save can reference a Library original from before syn
 The native transaction commits the dependency and project together. A later capture failure, including queue capacity, rolls back both captures and the project mutation. Parallel saves share the initial media head through native transaction serialization. Local-only saving creates no capture rows. Enrollment does not scan or upload the existing Library.
 
 This change freezes native metadata and immutable file references, not file bytes inside IndexedDB. The existing capture claims retain those files. Outgoing preparation checks their bytes through the existing codecs. Production activation still requires a producer that enqueues dependency operations before dependent publication.
+
+
+## Retained capture queue reconciliation
+
+The native queue owner reconciles bounded retained capture keys into its existing operations. Each capture uses the same admission writer as explicit enqueue. Discovery reads keys through the kind index, then handles one metadata body at a time. The current capture limit bounds this pass. Oversized state refuses without repair.
+
+The command captures the prepared database handle before mutation admission. Each operation checks the exact profile lifetime, enabled capture and active connection authorization. Erasure closes that handle. Delayed work cannot reopen a replacement database. Each transaction commits or aborts independently. A refused capture retains its evidence and does not suppress other valid captures.
+
+Repeated reconciliation preserves operation controls, history, retry budgets and deadlines. Queue refusal leaves committed native content and capture rows unchanged. The existing wakeup reconciles before due discovery and recovers missed notifications after restart. A reconciliation failure does not suppress independently admitted queued retries. Native project saving does not wait for enqueue, hashing or network IO.
+
+The security qualification composition uses the existing coordinator and wakeup. Automatic capture discovery requires checked CREATE or JOIN workspace identity. Legacy experimental connections retain explicit enqueue and existing due retries. Production activation remains a separate gate. Immutable records can arrive out of order because catalog and incoming admission reject incomplete dependency closure. Publication of one operation does not establish complete project readiness or current remote file integrity.

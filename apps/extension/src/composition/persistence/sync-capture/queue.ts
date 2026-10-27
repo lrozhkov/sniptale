@@ -16,7 +16,7 @@ import {
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseSyncCaptureRecord } from './guards';
-import type { CapturedChange, CaptureRootKind } from './contracts';
+import { type CapturedChange, type CaptureRootKind } from './contracts';
 import { matchesCapture, parsePrepared, preparedOutgoingOperationKey } from './outgoing';
 import { matchesOutgoingDispatchPrepared, parseOutgoingDispatchAttempt } from './outgoing-attempts';
 import {
@@ -307,82 +307,86 @@ export async function loadSyncQueuePage(value: SyncQueueScope, options: unknown 
     more && last ? { scope, afterOperationId: last.operationId } : null;
   return { connection, operations, nextCursor, sources };
 }
+/** Admit a retained capture in the caller's mutation transaction. The caller owns commit and abort. */
+export async function enqueueSyncQueueCaptureInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  capture: CapturedChange
+): Promise<{ operation: SyncQueueOperation; existing: boolean }> {
+  const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+  const current = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get(capture.key));
+  if (
+    !profile ||
+    profile.kind !== 'profile' ||
+    profile.spaceId !== capture.spaceId ||
+    profile.connectionGeneration !== capture.connectionGeneration ||
+    !current ||
+    JSON.stringify(current) !== JSON.stringify(capture)
+  )
+    throw new Error('Sync queue capture changed.');
+  const scope = {
+    spaceId: profile.spaceId,
+    connectionGeneration: profile.connectionGeneration,
+    profileCreatedAt: profile.createdAt,
+  };
+  const connection = await readConnection(tx, scope);
+  const store = tx.objectStore(SYNC_OUTBOX_STORE);
+  const key = queueOperationKey(scope, capture.operationId);
+  const configured = parseConnectionMetadata(
+    await tx.objectStore(SYNC_CONNECTION_STORE).get('connection')
+  );
+  const authorization =
+    configured && sameConnectionScope(configured.binding, scope) ? configured.identity : null;
+  const raw: unknown = await store.get(key);
+  if (raw !== undefined) {
+    const accepted = await readOperation(tx, scope, capture.operationId);
+    return { operation: accepted, existing: true };
+  }
+  const row: SyncQueueOperation = recordQueueTransition(
+    {
+      ...scope,
+      version: 1,
+      kind: 'queue-operation',
+      key,
+      operationId: capture.operationId,
+      captureKey: capture.key,
+      captureSha256: queueHash(JSON.stringify(capture)),
+      rootKey: capture.rootKey,
+      generation: capture.generation,
+      revision: 1,
+      status: 'queued',
+      stage: 'queued',
+      runId: null,
+      authorization,
+      nextDueAt: authorization && configured?.phase === 'active' ? Date.now() : null,
+      automaticRetryCount: 0,
+      writeStarted: false,
+      outcome: 'none',
+      attemptId: null,
+      failureCode: null,
+      eventSequence: 0,
+      pendingTransitions: [],
+      droppedTransitions: 0,
+    },
+    'enqueued'
+  );
+  await store.add(row);
+  await store.put(
+    recordQueueTransition(
+      { ...connection, revision: nextRevision(connection.revision) },
+      'enqueued'
+    )
+  );
+  return { operation: row, existing: false };
+}
 /** Freeze the exact retained native capture identity; repeated enqueue is idempotent. */
 export async function enqueueSyncQueueOperation(value: unknown): Promise<SyncQueueOperation> {
   const capture = parseSyncCaptureRecord(structuredClone(value));
   if (!capture || capture.kind !== 'captured-change')
     throw new Error('Invalid sync queue capture.');
-  return withSyncQueueTransaction(async (tx) => {
-    const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
-    const current = parseSyncCaptureRecord(
-      await tx.objectStore(SYNC_CAPTURE_STORE).get(capture.key)
-    );
-    if (
-      !profile ||
-      profile.kind !== 'profile' ||
-      profile.spaceId !== capture.spaceId ||
-      profile.connectionGeneration !== capture.connectionGeneration ||
-      !current ||
-      JSON.stringify(current) !== JSON.stringify(capture)
-    )
-      throw new Error('Sync queue capture changed.');
-    const scope = {
-      spaceId: profile.spaceId,
-      connectionGeneration: profile.connectionGeneration,
-      profileCreatedAt: profile.createdAt,
-    };
-    const connection = await readConnection(tx, scope);
-    const store = tx.objectStore(SYNC_OUTBOX_STORE);
-    const key = queueOperationKey(scope, capture.operationId);
-    const configured = parseConnectionMetadata(
-      await tx.objectStore(SYNC_CONNECTION_STORE).get('connection')
-    );
-    const authorization =
-      configured && sameConnectionScope(configured.binding, scope) ? configured.identity : null;
-    const raw: unknown = await store.get(key);
-    if (raw !== undefined) {
-      const accepted = await readOperation(tx, scope, capture.operationId);
-      return accepted;
-    }
-    const row: SyncQueueOperation = recordQueueTransition(
-      {
-        ...scope,
-        version: 1,
-        kind: 'queue-operation',
-        key,
-        operationId: capture.operationId,
-        captureKey: capture.key,
-        captureSha256: queueHash(JSON.stringify(capture)),
-        rootKey: capture.rootKey,
-        generation: capture.generation,
-        revision: 1,
-        status: 'queued',
-        stage: 'queued',
-        runId: null,
-        authorization,
-        nextDueAt: authorization && configured?.phase === 'active' ? Date.now() : null,
-        automaticRetryCount: 0,
-        writeStarted: false,
-        outcome: 'none',
-        attemptId: null,
-        failureCode: null,
-        eventSequence: 0,
-        pendingTransitions: [],
-        droppedTransitions: 0,
-      },
-      'enqueued'
-    );
-    await store.add(row);
-    await store.put(
-      recordQueueTransition(
-        { ...connection, revision: nextRevision(connection.revision) },
-        'enqueued'
-      )
-    );
-    return row;
-  });
+  return withSyncQueueTransaction(
+    async (tx) => (await enqueueSyncQueueCaptureInTransaction(tx, capture)).operation
+  );
 }
-
 /** Pause controls future admissions without changing capture enrollment or active run identity. */
 export async function commandSyncQueue(
   value: SyncQueueScope,

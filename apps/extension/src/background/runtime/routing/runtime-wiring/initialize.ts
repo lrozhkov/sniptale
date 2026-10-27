@@ -13,6 +13,7 @@ import {
   discoverDueSyncQueueOperations,
   deferDueSyncQueueOperation,
 } from '../../../../composition/persistence/sync-capture/queue-schedule';
+import { reconcileSyncQueueCaptures } from '../../../../composition/persistence/sync-capture/queue-reconciliation';
 import { recoverInterruptedSyncQueueOperation } from '../../../../workflows/sync-transfer/queue';
 import {
   loadSyncConnection,
@@ -148,6 +149,7 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
     const retryWakeup = createSyncQueueRetryWakeup({
       loadConnection: loadSyncConnection,
+      reconcileCaptures: reconcileSyncQueueCaptures,
       loadProgress: loadSyncQueueScheduleProgress,
       initializePage: initializeSyncQueueSchedulePage,
       discoverDue: discoverDueSyncQueueOperations,

@@ -1,6 +1,7 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { SyncConnectionMetadata } from '../../composition/persistence/remote-connection/model';
+import type { reconcileSyncQueueCaptures } from '../../composition/persistence/sync-capture/queue-reconciliation';
 import type { SyncQueueScheduleProgress } from '../../composition/persistence/sync-capture/queue-model';
 import type {
   loadSyncQueueScheduleProgress,
@@ -18,6 +19,7 @@ const logger = createLogger({ namespace: 'SyncQueueRetry' });
 /** Native scheduling and the existing coordinator retain all durable admission authority. */
 export interface SyncQueueRetryWakeupDependencies {
   loadConnection(): Promise<SyncConnectionMetadata | null>;
+  reconcileCaptures: typeof reconcileSyncQueueCaptures;
   loadProgress: typeof loadSyncQueueScheduleProgress;
   initializePage: typeof initializeSyncQueueSchedulePage;
   discoverDue: typeof discoverDueSyncQueueOperations;
@@ -102,9 +104,20 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
     const connection = await deps.loadConnection();
     if (disposed) return;
     if (!connection || connection.phase !== 'active') return;
-    await initialize(connection);
     const { spaceId, connectionGeneration, profileCreatedAt } = connection.binding;
     const scope = { spaceId, connectionGeneration, profileCreatedAt };
+    if (connection.workspace) {
+      try {
+        const result = await deps.reconcileCaptures(scope, connection.identity);
+        if (result.refused > 0) logger.warn('Sync capture enqueue deferred');
+      } catch {
+        // Committed queued work retains independent native admission after discovery failure.
+        logger.warn('Sync capture enqueue deferred');
+      }
+    }
+    if (disposed) return;
+    await initialize(connection);
+    if (disposed) return;
     let dispatches = 0;
     for (let page = 0; page < 2 && !disposed; page++) {
       const result = await deps.discoverDue(scope, connection.identity, 16);

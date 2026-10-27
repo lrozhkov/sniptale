@@ -4,6 +4,7 @@ vi.mock('../../../page-recovery/ports', () => ({ registerPageRecoveryPorts: vi.f
 vi.mock('../../../ai/audio/port', () => ({ registerAudioJobPorts: vi.fn() }));
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { reconcileSyncQueueCaptures } from '../../../../composition/persistence/sync-capture/queue-reconciliation';
 import type { SyncConnectionMetadata } from '../../../../composition/persistence/remote-connection/model';
 import type { SyncWorkspaceSelection } from '../../../../composition/persistence/remote-connection/workspace-selection';
 
@@ -53,6 +54,15 @@ const {
 vi.mock('../../../sync-connection/retry-wakeup', () => ({
   createSyncQueueRetryWakeup: createRetryWakeup,
 }));
+vi.mock(
+  '../../../../composition/persistence/sync-capture/queue-reconciliation',
+  async (original) => ({
+    ...(await original<
+      typeof import('../../../../composition/persistence/sync-capture/queue-reconciliation')
+    >()),
+    reconcileSyncQueueCaptures: vi.fn(),
+  })
+);
 vi.mock('../../../../composition/persistence/sync-capture/queue-schedule', () => ({
   loadSyncQueueScheduleProgress: vi.fn(),
   initializeSyncQueueSchedulePage: vi.fn(),
@@ -331,6 +341,7 @@ it('registers the security control only in the security E2E build', () => {
     expect(createRetryWakeup).toHaveBeenCalledWith(
       expect.objectContaining({
         loadConnection: syncWiring.loadConnection,
+        reconcileCaptures: reconcileSyncQueueCaptures,
         coordinator: expect.objectContaining({
           start: syncWiring.start,
           inspect: syncWiring.inspect,

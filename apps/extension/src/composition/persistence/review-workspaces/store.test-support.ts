@@ -106,24 +106,27 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
                 count: async (key: IDBValidKey) => ownRows(key, indexName).length,
                 getAll: async (key: IDBValidKey) =>
                   structuredClone(ownRows(key, indexName).map(([, value]) => value)),
-                getAllKeys: async (key: IDBValidKey) =>
-                  ownRows(key, indexName).map(([encoded]) => {
-                    const parsed: unknown = JSON.parse(encoded);
-                    if (
-                      !Array.isArray(parsed) ||
-                      !parsed.length ||
-                      !parsed.every(
-                        (part: unknown) =>
-                          typeof part === 'string' ||
-                          (typeof part === 'number' && Number.isFinite(part))
+                getAllKeys: async (key: IDBValidKey, count?: number) =>
+                  ownRows(key, indexName)
+                    .slice(0, count)
+                    .map(([encoded]) => {
+                      if (name === 'sync_capture') return encoded;
+                      const parsed: unknown = JSON.parse(encoded);
+                      if (
+                        !Array.isArray(parsed) ||
+                        !parsed.length ||
+                        !parsed.every(
+                          (part: unknown) =>
+                            typeof part === 'string' ||
+                            (typeof part === 'number' && Number.isFinite(part))
+                        )
                       )
-                    )
-                      throw new Error('Invalid fixture compound key');
-                    return parsed.filter(
-                      (part: unknown): part is string | number =>
-                        typeof part === 'string' || typeof part === 'number'
-                    );
-                  }),
+                        throw new Error('Invalid fixture compound key');
+                      return parsed.filter(
+                        (part: unknown): part is string | number =>
+                          typeof part === 'string' || typeof part === 'number'
+                      );
+                    }),
               };
             },
             put: async (value: unknown) => write(value, false),

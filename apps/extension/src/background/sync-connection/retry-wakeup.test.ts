@@ -12,7 +12,11 @@ const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ warn }),
 }));
-const scope = { spaceId: 'space', connectionGeneration: 3, profileCreatedAt: 1 };
+const scope = {
+  spaceId: '33333333-3333-4333-8333-333333333333',
+  connectionGeneration: 3,
+  profileCreatedAt: 1,
+};
 const authorization = { incarnation: '11111111-1111-4111-8111-111111111111', revision: 2 };
 const alarmName = 'sniptale:sync-queue-retry';
 function connection(): SyncConnectionMetadata {
@@ -27,6 +31,11 @@ function connection(): SyncConnectionMetadata {
       accountId: 'alice',
     },
     identity: authorization,
+    workspace: {
+      spaceId: scope.spaceId,
+      bootstrapId: '44444444-4444-4444-8444-444444444444',
+      fingerprint: 'a'.repeat(64),
+    },
     phase: 'active',
     updateNonce: null,
     credentialId: '22222222-2222-4222-8222-222222222222',
@@ -79,6 +88,9 @@ function dependencies() {
     loadConnection: vi
       .fn<SyncQueueRetryWakeupDependencies['loadConnection']>()
       .mockResolvedValue(connection()),
+    reconcileCaptures: vi
+      .fn<SyncQueueRetryWakeupDependencies['reconcileCaptures']>()
+      .mockResolvedValue({ enqueued: 0, existing: 0, refused: 0 }),
     loadProgress: vi
       .fn<SyncQueueRetryWakeupDependencies['loadProgress']>()
       .mockResolvedValue(progress()),
@@ -417,4 +429,81 @@ it('registers the browser startup event to recover a missing alarm without anoth
   const unsubscribe = deps.subscribeStartup.mock.results[0]!.value;
   owner.dispose();
   expect(unsubscribe).toHaveBeenCalledOnce();
+});
+
+it('reconciles committed captures before due discovery without requiring a save notification', async () => {
+  const deps = dependencies();
+  const reached = deferred<void>();
+  const release = deferred<{ enqueued: number; existing: number; refused: number }>();
+  deps.reconcileCaptures.mockImplementationOnce(() => {
+    reached.resolve();
+    return release.promise;
+  });
+  const owner = createSyncQueueRetryWakeup(deps);
+  const running = owner.run();
+  await reached.promise;
+  expect(deps.reconcileCaptures).toHaveBeenCalledExactlyOnceWith(scope, authorization);
+  expect(deps.loadProgress).not.toHaveBeenCalled();
+  expect(deps.discoverDue).not.toHaveBeenCalled();
+  release.resolve({ enqueued: 2, existing: 1, refused: 0 });
+  await running;
+  expect(deps.discoverDue).toHaveBeenCalledWith(scope, authorization, 16);
+  owner.dispose();
+});
+
+it('preserves queued retries when reconciliation refuses and logs only a fixed message', async () => {
+  const deps = dependencies();
+  deps.reconcileCaptures.mockRejectedValueOnce(new Error('private endpoint and secret'));
+  deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+  const owner = createSyncQueueRetryWakeup(deps);
+  await owner.run();
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  expect(warn).toHaveBeenCalledExactlyOnceWith('Sync capture enqueue deferred');
+  await owner.run();
+  expect(deps.reconcileCaptures).toHaveBeenCalledTimes(2);
+  owner.dispose();
+});
+
+it('does not discover or dispatch after disposal while capture reconciliation is pending', async () => {
+  const deps = dependencies();
+  const reached = deferred<void>();
+  const release = deferred<{ enqueued: number; existing: number; refused: number }>();
+  deps.reconcileCaptures.mockImplementationOnce(() => {
+    reached.resolve();
+    return release.promise;
+  });
+  const owner = createSyncQueueRetryWakeup(deps);
+  const running = owner.run();
+  await reached.promise;
+  owner.dispose();
+  release.resolve({ enqueued: 1, existing: 0, refused: 0 });
+  await running;
+  expect(deps.loadProgress).not.toHaveBeenCalled();
+  expect(deps.discoverDue).not.toHaveBeenCalled();
+  expect(deps.coordinator.start).not.toHaveBeenCalled();
+});
+
+it('continues valid due work after a per-capture refusal without leaking capture details', async () => {
+  const deps = dependencies();
+  deps.reconcileCaptures.mockResolvedValue({ enqueued: 1, existing: 0, refused: 1 });
+  deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+  const owner = createSyncQueueRetryWakeup(deps);
+  await owner.run();
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  expect(warn).toHaveBeenCalledExactlyOnceWith('Sync capture enqueue deferred');
+  owner.dispose();
+});
+
+it('preserves legacy explicit queue retries without enabling automatic capture discovery', async () => {
+  const deps = dependencies();
+  const { workspace, ...legacy } = connection();
+  void workspace;
+  deps.loadConnection.mockResolvedValue(legacy);
+  deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+  const owner = createSyncQueueRetryWakeup(deps);
+  await owner.run();
+  expect(deps.reconcileCaptures).not.toHaveBeenCalled();
+  expect(deps.discoverDue).toHaveBeenCalledWith(scope, authorization, 16);
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  owner.dispose();
 });
