@@ -80,6 +80,7 @@ async function run(
       apiKey: config.apiKey,
       modelCode: config.modelCode,
       connectionType: config.connectionType,
+      observationBinding: config.observationBinding,
       ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
       systemPrompt: REVIEW_TEXT_SYSTEM_PROMPT,
       userPrompt: JSON.stringify(request.context),

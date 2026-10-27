@@ -11,6 +11,16 @@ import {
 } from '../../providers';
 import { createProviderSdkFetch } from './http';
 
+import {
+  admitStoredAIOperation,
+  commitStoredAIOperation,
+} from '../../../../composition/persistence/ai-settings/graph-mutations';
+import type {
+  AIOperationObservationBinding,
+  AIOperationObservationToken,
+  AIOperationObservationOutcome,
+} from '../../../../composition/persistence/ai-settings/operation-observations';
+
 const logger = createLogger({ namespace: 'BackgroundLlmHttp' });
 
 export type ChatCompletionRequestContentPart =
@@ -50,6 +60,7 @@ export function extractJSON(content: string): string {
 }
 
 interface ChatRequestOptions {
+  observationBinding?: AIOperationObservationBinding | undefined;
   baseUrl: string;
   apiKey: string;
   modelCode: string;
@@ -62,12 +73,12 @@ interface ChatRequestOptions {
   rejectTruncated?: boolean;
 }
 
-function safeFailure(error: unknown, options: ChatRequestOptions): never {
-  if (options.signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
-  if (error instanceof AIProviderRequestError) throw error;
+function createChatFailure(error: unknown, options: ChatRequestOptions): Error {
+  if (options.signal?.aborted) return new DOMException('Cancelled', 'AbortError');
+  if (error instanceof AIProviderRequestError) return error;
   if (APICallError.isInstance(error) && error.statusCode === 400) {
     const label = options.providerErrorLabel ? ` (${options.providerErrorLabel})` : '';
-    throw new AIProviderRequestError(
+    return new AIProviderRequestError(
       'unknown',
       `${translate('background.runtime.llmInvalidRequestPrefix')}${label}`
     );
@@ -78,63 +89,89 @@ function safeFailure(error: unknown, options: ChatRequestOptions): never {
     (APICallError.isInstance(error) && error.statusCode === 200)
   ) {
     logger.error('Unexpected response structure from provider');
-    throw new AIProviderRequestError(
+    return new AIProviderRequestError(
       'unknown',
       translate('background.runtime.llmUnexpectedResponse')
     );
   }
   const reason = classifyAIProviderFailure(error);
   if (reason === 'invalid-credential')
-    throw new AIProviderRequestError(reason, translate('background.runtime.llmInvalidApiKey'));
+    return new AIProviderRequestError(reason, translate('background.runtime.llmInvalidApiKey'));
   if (reason === 'permission-denied')
-    throw new AIProviderRequestError(
+    return new AIProviderRequestError(
       reason,
       translate('settings.aiProviders.providerStatusDenied')
     );
   if (reason === 'quota-exceeded')
-    throw new AIProviderRequestError(reason, translate('settings.aiProviders.providerStatusQuota'));
+    return new AIProviderRequestError(
+      reason,
+      translate('settings.aiProviders.providerStatusQuota')
+    );
   if (reason === 'model-unavailable')
-    throw new AIProviderRequestError(
+    return new AIProviderRequestError(
       reason,
       translate('settings.aiProviders.providerStatusModelUnavailable')
     );
   if (reason === 'rate-limited')
-    throw new AIProviderRequestError(reason, translate('background.runtime.llmRateLimitExceeded'));
+    return new AIProviderRequestError(reason, translate('background.runtime.llmRateLimitExceeded'));
   if (reason === 'service-error')
-    throw new AIProviderRequestError(reason, translate('background.runtime.llmServerError'));
+    return new AIProviderRequestError(reason, translate('background.runtime.llmServerError'));
   if (reason === 'timeout')
-    throw new AIProviderRequestError(reason, translate('background.runtime.llmRequestTimeout'));
+    return new AIProviderRequestError(reason, translate('background.runtime.llmRequestTimeout'));
   if (APICallError.isInstance(error) && error.statusCode !== undefined)
-    throw new AIProviderRequestError(reason, `API error (${error.statusCode}): Unknown error`);
-  throw new AIProviderRequestError(
+    return new AIProviderRequestError(reason, `API error (${error.statusCode}): Unknown error`);
+  return new AIProviderRequestError(
     reason,
     translate('background.runtime.llmUnexpectedProcessingError')
   );
+}
+
+function createChatObservation(options: ChatRequestOptions) {
+  let receipt: AIOperationObservationToken | null = null;
+  let dispatched = false;
+  return {
+    admit: async () => {
+      if (options.observationBinding)
+        receipt = await admitStoredAIOperation(options.observationBinding).catch(() => null);
+    },
+    fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+      dispatched = true;
+      return globalThis.fetch(input, init);
+    },
+    observe: async (outcome: AIOperationObservationOutcome) => {
+      if (!receipt || !dispatched || options.signal?.aborted) return;
+      await commitStoredAIOperation(receipt, outcome).catch(() => undefined);
+    },
+  };
 }
 
 async function sendChatRequest(options: ChatRequestOptions, content: UserContent): Promise<string> {
   if (!isAllowedAIProviderBaseUrl(options.baseUrl)) {
     throw new Error(translate('background.runtime.llmProviderBaseUrlHttpsRequired'));
   }
+  const observation = createChatObservation(options);
   let admissionFailed = false;
   let admissionFailure: unknown;
   try {
     const transport = createProviderSdkFetch({
       baseUrl: options.baseUrl,
+      transport: observation.fetch,
       ...(options.signal ? { signal: options.signal } : {}),
-      ...(options.beforeSend
-        ? {
-            beforeSend: async () => {
-              try {
-                await options.beforeSend?.();
-              } catch (error) {
-                admissionFailed = true;
-                admissionFailure = error;
-                throw error;
-              }
-            },
+      beforeSend: async () => {
+        try {
+          await options.beforeSend?.();
+          if (options.observationBinding) {
+            await observation.admit();
+            // Advisory admission can wait for graph writers. Recheck egress authority after that wait.
+            await options.beforeSend?.();
           }
-        : {}),
+          options.signal?.throwIfAborted();
+        } catch (error) {
+          admissionFailed = true;
+          admissionFailure = error;
+          throw error;
+        }
+      },
     });
     const provider = createAIProviderRuntime({
       type: options.connectionType ?? 'openai-compatible',
@@ -172,11 +209,15 @@ async function sendChatRequest(options: ChatRequestOptions, content: UserContent
         'unknown',
         translate('background.runtime.llmUnexpectedResponse')
       );
+    await observation.observe({ kind: 'success' });
     logger.debug('Parsed chat completion content', { contentLength: text.length });
     return text;
   } catch (error) {
     if (admissionFailed) throw admissionFailure;
-    return safeFailure(error, options);
+    const failure = createChatFailure(error, options);
+    if (failure instanceof AIProviderRequestError)
+      await observation.observe({ kind: 'failure', reason: failure.reason });
+    throw failure;
   }
 }
 

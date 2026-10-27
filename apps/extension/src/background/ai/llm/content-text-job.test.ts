@@ -23,6 +23,13 @@ const config = {
   modelCode: 'code',
   connectionType: 'openai-compatible' as const,
   destinationBinding: 'fixture-destination-binding',
+  observationBinding: {
+    providerId: 'provider',
+    incarnation: 'incarnation',
+    revision: 1,
+    credentialRevision: 2,
+    destination: 'fixture-destination-binding',
+  },
   effectiveSystemPrompt: 'Preserve meaning.',
 };
 async function fixture() {
@@ -88,6 +95,7 @@ it('returns literal text through the existing normalized transport and records m
     expect(options.userPrompt).toContain(h.request.text);
     expect(options.userPrompt).toContain(h.request.prompt);
     expect(options.rejectTruncated).toBe(true);
+    expect(options.observationBinding).toEqual(config.observationBinding);
     return '<b>Literal text</b>';
   });
   h.connection.receive(h.request);

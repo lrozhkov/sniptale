@@ -351,3 +351,28 @@ it('refuses a recreated provider or revoked host grant after resolving the reque
     vi.unstubAllGlobals();
   }
 });
+
+it('captures stable non-secret observation authority and invalidates it after credential rotation', async () => {
+  mockResolvedModelConfigState();
+  const provider = {
+    ...createProvider(),
+    incarnation: 'incarnation',
+    revision: 3,
+    credentialRevision: 4,
+  };
+  loadAIProvidersMock.mockResolvedValue([provider]);
+  vi.stubGlobal('chrome', { permissions: { contains: vi.fn().mockResolvedValue(true) } });
+  const first = await resolveModelConfig('model-1');
+  expect(first.observationBinding).toEqual({
+    providerId: provider.id,
+    incarnation: 'incarnation',
+    revision: 3,
+    credentialRevision: 4,
+    destination: first.destinationBinding,
+  });
+  expect(JSON.stringify(first.observationBinding)).not.toContain('secret');
+  expect(await resolveModelConfig('model-1')).toEqual(first);
+  await expect(assertResolvedLlmModelConfigCurrent(first)).resolves.toBeUndefined();
+  loadAIProvidersMock.mockResolvedValue([{ ...provider, credentialRevision: 5 }]);
+  await expect(assertResolvedLlmModelConfigCurrent(first)).rejects.toThrow('model-unavailable');
+});

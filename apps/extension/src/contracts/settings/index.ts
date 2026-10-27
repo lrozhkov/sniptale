@@ -295,6 +295,7 @@ export interface AIProvider {
   catalogUpdatedAt?: number | undefined;
   lastRefreshAttemptAt?: number | undefined;
   refreshGeneration?: string | undefined;
+  operationGeneration?: string | undefined;
   id: string;
   name: string;
   connectionType: AIConnectionType;

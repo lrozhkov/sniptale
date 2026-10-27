@@ -141,6 +141,7 @@ async function processScenarioEditorRequest(
     baseUrl: config.baseUrl,
     modelCode: config.modelCode,
     connectionType: config.connectionType,
+    observationBinding: config.observationBinding,
     beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
     ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
     providerErrorLabel: config.providerId,

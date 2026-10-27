@@ -11,6 +11,7 @@ import { SYSTEM_PROMPT_JSON, SYSTEM_PROMPT_TABLES } from './prompts';
 import { assertResolvedLlmModelConfigCurrent, type ResolvedLlmModelConfig } from '../model-config';
 
 type TransportRequestSettings = {
+  observationBinding?: ResolvedLlmModelConfig['observationBinding'];
   baseUrl: string;
   apiKey: string;
   modelCode: string;
@@ -52,6 +53,7 @@ async function requestConfigChatCompletion(
     apiKey: settings.apiKey,
     modelCode: settings.modelCode,
     connectionType: settings.connectionType,
+    observationBinding: settings.observationBinding,
     ...(settings.maxOutputTokens ? { maxOutputTokens: settings.maxOutputTokens } : {}),
     systemPrompt,
     userPrompt,
@@ -140,6 +142,7 @@ export async function processMarkdownRequest(
         apiKey: config.apiKey,
         modelCode: config.modelCode,
         connectionType: config.connectionType,
+        observationBinding: config.observationBinding,
         beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
         ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
       },
@@ -194,6 +197,7 @@ export async function processJsonConfigRequest(
           apiKey: config.apiKey,
           modelCode: config.modelCode,
           connectionType: config.connectionType,
+          observationBinding: config.observationBinding,
           beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
           ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
         },

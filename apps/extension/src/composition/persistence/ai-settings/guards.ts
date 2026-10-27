@@ -37,6 +37,9 @@ function isAIProvider(value: unknown): value is AIProvider {
     (value['refreshGeneration'] === undefined ||
       (typeof value['refreshGeneration'] === 'string' &&
         value['refreshGeneration'].length <= 200)) &&
+    (value['operationGeneration'] === undefined ||
+      (typeof value['operationGeneration'] === 'string' &&
+        value['operationGeneration'].length <= 200)) &&
     ['revision', 'credentialRevision', 'catalogUpdatedAt', 'lastRefreshAttemptAt'].every(
       (key) =>
         value[key] === undefined ||

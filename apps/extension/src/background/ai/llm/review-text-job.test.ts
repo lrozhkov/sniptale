@@ -36,6 +36,13 @@ const config = {
   modelCode: 'code',
   connectionType: 'openai-compatible' as const,
   destinationBinding: 'fixture-destination-binding',
+  observationBinding: {
+    providerId: 'provider',
+    incarnation: 'incarnation',
+    revision: 1,
+    credentialRevision: 2,
+    destination: 'fixture-destination-binding',
+  },
   effectiveSystemPrompt: 'hidden prompt must not be sent',
 };
 function setup() {
@@ -79,6 +86,7 @@ describe('one-shot cancellable text editing jobs', () => {
         systemPrompt: REVIEW_TEXT_SYSTEM_PROMPT,
         userPrompt: JSON.stringify(start.context),
         modelCode: 'code',
+        observationBinding: config.observationBinding,
         signal: expect.any(AbortSignal),
       })
     );

@@ -24,6 +24,7 @@ export async function correctVoiceTranscript(args: {
     apiKey: config.apiKey,
     modelCode: config.modelCode,
     connectionType: config.connectionType,
+    observationBinding: config.observationBinding,
     ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
     systemPrompt: args.prompt,
     userPrompt: args.transcript,

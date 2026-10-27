@@ -53,6 +53,7 @@ export const AIProviderSchema = z.object({
   catalogUpdatedAt: z.number().nonnegative().optional(),
   lastRefreshAttemptAt: z.number().nonnegative().optional(),
   refreshGeneration: z.string().min(1).max(200).optional(),
+  operationGeneration: z.string().min(1).max(200).optional(),
   createdAt: z.number(),
 });
 

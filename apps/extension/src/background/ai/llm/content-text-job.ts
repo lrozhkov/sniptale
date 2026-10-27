@@ -75,6 +75,7 @@ async function runContentTextRequest(
       apiKey: config.apiKey,
       modelCode: config.modelCode,
       connectionType: config.connectionType,
+      observationBinding: config.observationBinding,
       ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
       systemPrompt: `${config.effectiveSystemPrompt}\n\n${CONTENT_TEXT_SYSTEM_PROMPT}`,
       userPrompt: `Selected text:\n${egress.request.markdownData}\n\nUser instruction:\n${egress.request.prompt}`,

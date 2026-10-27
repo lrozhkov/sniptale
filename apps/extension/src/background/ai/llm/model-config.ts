@@ -15,7 +15,10 @@ import {
 } from '../../../contracts/settings/ai-provider';
 import type { ReviewTextStart } from '../../../contracts/ai/review-text';
 
+import type { AIOperationObservationBinding } from '../../../composition/persistence/ai-settings/operation-observations';
+
 export interface ResolvedLlmModelConfig {
+  observationBinding?: AIOperationObservationBinding | undefined;
   connectionType: AIProviderType;
   destinationBinding: string;
   maxOutputTokens?: number | undefined;
@@ -89,10 +92,22 @@ export async function resolveModelConfig(
   }
 
   const effectiveSystemPrompt = model.systemPrompt?.trim() || globalPrompt;
+  const destinationBinding = await createAIProviderDestinationBinding(provider);
 
   return {
     connectionType: provider.connectionType,
-    destinationBinding: await createAIProviderDestinationBinding(provider),
+    destinationBinding,
+    ...(provider.incarnation
+      ? {
+          observationBinding: {
+            providerId: provider.id,
+            incarnation: provider.incarnation,
+            revision: provider.revision ?? 0,
+            credentialRevision: provider.credentialRevision ?? 0,
+            destination: destinationBinding,
+          },
+        }
+      : {}),
     ...(model.capabilities?.maxOutputTokens
       ? { maxOutputTokens: Math.min(3000, model.capabilities.maxOutputTokens) }
       : {}),

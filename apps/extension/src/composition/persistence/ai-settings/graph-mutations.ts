@@ -51,6 +51,13 @@ import {
   type AICatalogRefreshToken,
   type AICatalogRefreshOutcome,
 } from './managed-catalog';
+import {
+  admitOperationObservation,
+  commitOperationObservation,
+  type AIOperationObservationBinding,
+  type AIOperationObservationToken,
+  type AIOperationObservationOutcome,
+} from './operation-observations';
 import { assertAISettingsGraphInvariants } from './graph-invariants';
 import {
   AIModelProviderChangedError,
@@ -421,6 +428,28 @@ export function commitStoredAICatalogRefresh(
   return queueAISettingsMutation(() =>
     runWithExclusivePersistenceMutationPermit((permit) =>
       commitCatalogRefresh(token, outcome, now, permit)
+    )
+  );
+}
+
+/** Admit advisory request metadata without initialization, secret activation or graph repair. */
+export function admitStoredAIOperation(binding: AIOperationObservationBinding) {
+  return queueAISettingsMutation(() =>
+    runWithExclusivePersistenceMutationPermit((permit) =>
+      admitOperationObservation(binding, permit)
+    )
+  );
+}
+
+/** Publish a bounded operation outcome after earlier graph mutations settle. */
+export function commitStoredAIOperation(
+  token: AIOperationObservationToken,
+  outcome: AIOperationObservationOutcome,
+  now = Date.now()
+): Promise<boolean> {
+  return queueAISettingsMutation(() =>
+    runWithExclusivePersistenceMutationPermit((permit) =>
+      commitOperationObservation(token, outcome, now, permit)
     )
   );
 }
