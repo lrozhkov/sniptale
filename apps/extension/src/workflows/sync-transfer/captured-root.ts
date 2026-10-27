@@ -21,6 +21,7 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
   envelope: Awaited<ReturnType<typeof parsePortableSyncRoot>>['envelope'];
   objects: ArchiveRootObjectSource[];
   dependencies: CapturedMediaDependency[];
+  bindings: { objectId: string; ref: AssetRef }[];
 }> {
   const parsed = parseSyncCaptureRecord(value);
   if (!parsed || parsed.kind !== 'captured-change' || parsed.change.kind === 'tombstone')
@@ -28,11 +29,14 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
   // Parsers can retain nested values. Detach the entire accepted snapshot before the first read.
   const capture = structuredClone(parsed);
   const collector = createObjectCollector('sync', createArchivePathAllocator());
+  const bindings: { objectId: string; ref: AssetRef }[] = [];
   const add = async (ref: AssetRef, filename: string) => {
     const file = await readAssetFile(ref, filename);
     if (file.size !== ref.size || file.type !== ref.mimeType)
       throw new Error('Captured source size or MIME differs from its reference.');
-    return collector.addObject(file, filename, ref.mimeType);
+    const objectId = collector.addObject(file, filename, ref.mimeType);
+    bindings.push({ objectId, ref });
+    return objectId;
   };
   let metadata: unknown;
   let dependencies: CapturedMediaDependency[] = [];
@@ -105,5 +109,5 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     objects: collector.objects.map((object) => object.ref),
   });
   await parsePortableSyncRoot(envelope);
-  return { envelope, objects: collector.objects, dependencies };
+  return { envelope, objects: collector.objects, dependencies, bindings };
 }

@@ -485,3 +485,151 @@ for (const viewport of [
     }
   });
 }
+
+test('durable dispatch keeps original and export bytes after lost response and full browser restart', async ({
+  lab,
+}, info) => {
+  let sender = await openProvider(lab, info, 'durable-dispatch');
+  try {
+    const seeded = await sender.page.evaluate(() =>
+      window.webdavTransferHarness.portable.source({ skipFixtureTransfer: true })
+    );
+    const prepared = await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.prepare(id),
+      seeded.projectId
+    );
+    expect(prepared.objects).toHaveLength(2);
+    const borrowed = await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.prepare(id),
+      seeded.mediaId
+    );
+    expect(borrowed.objects).toHaveLength(1);
+    expect(lab.proxy.counts.puts).toBe(0);
+    const borrowedAttempt = await sender.page.evaluate(
+      ({ spaceId, operationId }) =>
+        window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
+      borrowed
+    );
+    for (const object of borrowed.objects)
+      expect(await lab.externalProof(object.key)).toEqual({
+        size: object.size,
+        sha256: object.sha256,
+      });
+    expect([...prepared.objects, ...borrowed.objects].map((item) => item.sha256).sort()).toEqual(
+      [...seeded.editing.map((item) => item.sha256), seeded.exported.sha256].sort()
+    );
+    lab.proxy.armFault({
+      method: 'PUT',
+      key: prepared.attemptKey,
+      kind: 'lost-response',
+      repeat: true,
+    });
+    await expect(
+      sender.page.evaluate(
+        (input) =>
+          window.webdavTransferHarness.portable.outgoing.send(input.spaceId, input.operationId),
+        prepared
+      )
+    ).rejects.toThrow();
+    await lab.proxy.waitForFault();
+    lab.proxy.releaseFault();
+    const initialId = prepared.attemptKey.split('/').at(-1)!.slice(0, 36);
+    const first = await sender.page.evaluate(
+      ({ spaceId, operationId, initialId }) =>
+        window.webdavTransferHarness.portable.outgoing.attempt(spaceId, operationId, initialId),
+      { ...prepared, initialId }
+    );
+    expect(first).not.toBeNull();
+    expect(await lab.externalProof(prepared.attemptKey)).toEqual({
+      size: Buffer.byteLength(first!.recordText),
+      sha256: first!.recordSha256,
+    });
+    for (const object of prepared.objects)
+      expect(await lab.externalProof(object.key)).toEqual({
+        size: object.size,
+        sha256: object.sha256,
+      });
+    expect(prepared.objects.some((object) => object.sha256 === seeded.exported.sha256)).toBe(true);
+    await sender.context.close();
+    sender = await openProvider(lab, info, 'durable-dispatch');
+    const persisted = await sender.page.evaluate(
+      ({ spaceId, operationId }) =>
+        window.webdavTransferHarness.portable.outgoing.prepared(spaceId, operationId),
+      prepared
+    );
+    expect(persisted?.recordText).toBe(prepared.recordText);
+    const recovered = await sender.page.evaluate(
+      ({ spaceId, operationId }) =>
+        window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
+      prepared
+    );
+    expect(recovered.recordKey).not.toBe(first!.recordKey);
+    expect(JSON.parse(recovered.recordText)['operationText']).toBe(prepared.recordText);
+    expect(
+      new Set([...first!.objects, ...recovered.objects].map((item) => item.remoteKey)).size
+    ).toBe(prepared.objects.length * 2);
+    for (const object of recovered.objects) {
+      const expected = prepared.objects.find((item) => item.objectId === object.objectId)!;
+      expect(await lab.externalProof(object.remoteKey)).toEqual({
+        size: expected.size,
+        sha256: expected.sha256,
+      });
+    }
+    expect(await lab.externalProof(recovered.recordKey)).toEqual({
+      size: Buffer.byteLength(recovered.recordText),
+      sha256: recovered.recordSha256,
+    });
+    const concurrent = await sender.page.evaluate(
+      async ({ spaceId, operationId }) =>
+        Promise.all(
+          [1, 2].map(() =>
+            window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId)
+          )
+        ),
+      prepared
+    );
+    expect(
+      new Set([first!.recordKey, recovered.recordKey, ...concurrent.map((item) => item.recordKey)])
+        .size
+    ).toBe(4);
+    for (const attempt of concurrent) {
+      expect(JSON.parse(attempt.recordText)['operationText']).toBe(prepared.recordText);
+      expect(await lab.externalProof(attempt.recordKey)).toEqual({
+        size: Buffer.byteLength(attempt.recordText),
+        sha256: attempt.recordSha256,
+      });
+      for (const object of attempt.objects) {
+        const expected = prepared.objects.find((item) => item.objectId === object.objectId)!;
+        expect(await lab.externalProof(object.remoteKey)).toEqual({
+          size: expected.size,
+          sha256: expected.sha256,
+        });
+      }
+    }
+    const retained = await sender.page.evaluate(
+      ({ spaceId, operationId, initialId }) =>
+        window.webdavTransferHarness.portable.outgoing.attempt(spaceId, operationId, initialId),
+      { ...prepared, initialId }
+    );
+    expect(retained).toEqual(first);
+    await writeFile(
+      info.outputPath('durable-dispatch-proof.json'),
+      JSON.stringify(
+        {
+          logicalSha256: prepared.recordSha256,
+          originalAndExportObjects: prepared.objects,
+          first,
+          recovered,
+          concurrent,
+          borrowedAttempt,
+          fullBrowserRestart: true,
+        },
+        null,
+        2
+      )
+    );
+  } finally {
+    lab.proxy.releaseFault();
+    await sender.context.close();
+  }
+});

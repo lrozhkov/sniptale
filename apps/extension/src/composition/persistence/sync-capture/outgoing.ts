@@ -11,7 +11,7 @@ import { parseSyncCaptureRecord } from './guards';
 const MAX_RECORD_BYTES = 4 * 1024 * 1024;
 
 /** Exact prepared transport bytes and source bindings; capture claims retain their lifetime. */
-interface PreparedOutgoingOperation {
+export interface PreparedOutgoingOperation {
   version: 1;
   key: string;
   createdAt: number;
@@ -142,7 +142,8 @@ function parseObjects(value: unknown): PreparedOutgoingOperation['objects'] | nu
   return objects;
 }
 
-function parsePrepared(value: unknown): PreparedOutgoingOperation | null {
+/** Validate retained preparation evidence for sibling dispatch admission. */
+export function parsePrepared(value: unknown): PreparedOutgoingOperation | null {
   if (!isRecord(value)) return null;
   const identity = parseIdentity(value);
   const { recordText, recordSha256, attemptKey } = value;
@@ -166,7 +167,11 @@ function parsePrepared(value: unknown): PreparedOutgoingOperation | null {
   return { ...identity, recordText, recordSha256, attemptKey, objects };
 }
 
-function matchesCapture(record: PreparedOutgoingOperation, capture: CapturedChange): boolean {
+/** Compare prepared evidence with the complete normalized retained capture. */
+export function matchesCapture(
+  record: PreparedOutgoingOperation,
+  capture: CapturedChange
+): boolean {
   if (
     record.spaceId !== capture.spaceId ||
     record.operationId !== capture.operationId ||

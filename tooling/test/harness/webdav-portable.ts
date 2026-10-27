@@ -1,3 +1,4 @@
+import { createWebdavOutgoingHarness } from './webdav-outgoing';
 import { importMediaHubBackup } from '../../../apps/extension/src/workflows/media-hub-backup/v6/public';
 import type { VideoProjectEntry } from '../../../apps/extension/src/composition/persistence/projects/contracts';
 import { buildMediaHubBackupExportPlanFromLibraryV6 } from '../../../apps/extension/src/workflows/media-hub-backup/v6/inventory';
@@ -286,7 +287,7 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
     await connected().write(`${key}/metadata.json`, metadata, signal());
     return objects;
   }
-  async function source() {
+  async function source(options: { skipFixtureTransfer?: boolean } = {}) {
     await profile(19);
     const privateId = crypto.randomUUID();
     const borrowedId = crypto.randomUUID();
@@ -366,9 +367,10 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
         frozen.change.rows.exports.some((item) => item.id === exportId),
       'Saved export is missing from actual frozen capture.'
     );
-    const borrowed = await send(mediaId, 'Originals/borrowed');
-    const project = await send(entry.id, 'Projects/native');
-    await connected().write('Exports/saved-export.png', exported, signal());
+    const borrowed = options.skipFixtureTransfer ? [] : await send(mediaId, 'Originals/borrowed');
+    const project = options.skipFixtureTransfer ? [] : await send(entry.id, 'Projects/native');
+    if (!options.skipFixtureTransfer)
+      await connected().write('Exports/saved-export.png', exported, signal());
     return {
       projectId: entry.id,
       mediaId,
@@ -554,5 +556,11 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
       exportAbsent: true,
     };
   }
-  return { source, target, proof, afterSaveBackup };
+  return {
+    source,
+    target,
+    proof,
+    afterSaveBackup,
+    outgoing: createWebdavOutgoingHarness(connected, latest),
+  };
 }
