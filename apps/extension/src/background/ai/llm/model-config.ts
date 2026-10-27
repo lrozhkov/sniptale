@@ -1,3 +1,4 @@
+import { AIProviderRequestError } from '../providers';
 import { supportsAIProviderModelOperation } from '../../../contracts/settings/model-operation';
 import { translate } from '../../../platform/i18n';
 import { isAllowedAIProviderBaseUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
@@ -59,7 +60,7 @@ export async function resolveModelConfig(
     !supportsAIProviderModelOperation(model, provider, 'text') ||
     provider.connectionType === 'chrome-built-in'
   )
-    throw new Error('Selected AI model does not support text requests');
+    throw new AIProviderRequestError('model-unavailable');
   const needsCredential =
     getAIProviderDefinition(provider.connectionType).credential !== 'none' ||
     provider.hasStoredApiKey;

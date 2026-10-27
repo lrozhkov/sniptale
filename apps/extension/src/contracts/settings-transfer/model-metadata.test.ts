@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import type { AIModelCapabilities } from '../settings/ai-catalog';
 import type { AIModel } from '../settings';
 import {
@@ -198,3 +198,38 @@ it('excludes local operation generations and observations from portable model me
   expect(parseSettingsTransferModelMetadata(exported)).toEqual(configuration);
   expect(() => parseSettingsTransferModelMetadata(model)).toThrow(TypeError);
 });
+
+it.each([-1, 0, 1])(
+  'projects cached retirement at deadline offset %s for portable export',
+  (offset) => {
+    const retirementAt = Date.parse('2030-01-01T00:00:00Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(retirementAt + offset);
+    try {
+      const model: AIModel = {
+        ...configuredModel(),
+        source: 'catalog',
+        propertySource: 'catalog',
+        enabled: true,
+        retirementOverride: true,
+        catalog: {
+          capabilities,
+          displayName: 'Scheduled',
+          lifecycle: 'deprecated',
+          observedAt: 17,
+          retirementAt,
+        },
+      };
+      const exported = selectSettingsTransferModelMetadata(model);
+      expect(exported.enabled).toBe(offset < 0);
+      expect(exported.catalog).toBeUndefined();
+      expect(parseSettingsTransferModelMetadata(exported).enabled).toBe(offset < 0);
+      const manual = { ...model, source: 'manual' as const, propertySource: 'manual' as const };
+      expect(selectSettingsTransferModelMetadata(manual).enabled).toBe(true);
+      expect(
+        selectSettingsTransferModelMetadata({ ...manual, retirementOverride: false }).enabled
+      ).toBe(offset < 0);
+    } finally {
+      clock.mockRestore();
+    }
+  }
+);

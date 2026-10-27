@@ -1,5 +1,49 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'settings-model-form-consumers',
+    exclusive: true,
+    productionFile:
+      'apps/extension/src/settings/sections/ai/connections/forms/model-form-modal-content.tsx',
+    reason:
+      'Direct form and mounted audio model consumers cover catalog facts, retirement controls and manual recovery.',
+    testFiles: [
+      'apps/extension/src/settings/sections/ai/connections/index.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/modals.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/forms/model-form-modal-content.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/audio-models.test.tsx',
+    ],
+  },
+  {
+    owner: 'settings-connection-modal-composition',
+    exclusive: true,
+    productionFile: 'apps/extension/src/settings/sections/ai/connections/surface/modals.tsx',
+    reason:
+      'Current modal root, form binding and mounted audio consumers cover provider/model drafts, conditional dialogs and callback composition.',
+    testFiles: [
+      'apps/extension/src/settings/sections/ai/connections/index.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/modals.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/modals.root.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/audio-models.test.tsx',
+    ],
+  },
+  {
+    owner: 'ai-model-lifecycle-consumers',
+    productionFile: 'apps/extension/src/contracts/settings/model-operation.ts',
+    allowCrossOwner: true,
+    reason:
+      'Lifecycle eligibility is consumed by configuration admission, scenario queries, transfer and model forms. These suites cover deadline boundaries and explicit manual recovery.',
+    testFiles: [
+      'apps/extension/src/contracts/settings/model-operation.test.ts',
+      'apps/extension/src/contracts/settings-transfer/model-metadata.test.ts',
+      'apps/extension/src/background/ai/llm/model-config.test.ts',
+      'apps/extension/src/background/ai/audio/model-config.test.ts',
+      'apps/extension/src/background/ai/audio/model-config.retirement.test.ts',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/forms/model-catalog.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/forms/model-draft.test.ts',
+    ],
+  },
+  {
     owner: 'background-managed-catalog-receiver',
     productionFile: 'apps/extension/src/background/ai/settings/managed-catalog.ts',
     reason:

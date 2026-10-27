@@ -171,10 +171,30 @@ async function enrichCatalogModel(
     return model;
   const details = await jsonRequest(`${baseUrl}/show`, { model: model.modelCode });
   if (typeof details !== 'object' || details === null || Array.isArray(details)) return model;
-  return (
-    parseAICatalogPage({ models: [{ ...details, name: model.modelCode }] }, 'ollama', now)
-      .models[0] ?? model
+  const enriched = parseAICatalogPage(
+    { models: [{ ...details, name: model.modelCode }] },
+    'ollama',
+    now
+  ).models[0];
+  if (!enriched) return model;
+  const retirementDates = [model.facts.retirementAt, enriched.facts.retirementAt].filter(
+    (value): value is number => value !== undefined
   );
+  const retirementAt = retirementDates.length ? Math.min(...retirementDates) : undefined;
+  return {
+    ...enriched,
+    facts: {
+      ...enriched.facts,
+      lifecycle:
+        enriched.facts.lifecycle === 'retired' ||
+        (retirementAt !== undefined && retirementAt <= now)
+          ? 'retired'
+          : model.facts.lifecycle === 'deprecated'
+            ? 'deprecated'
+            : enriched.facts.lifecycle,
+      ...(retirementAt === undefined ? {} : { retirementAt }),
+    },
+  };
 }
 
 interface ManagedCatalogDependencies {

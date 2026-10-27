@@ -1,3 +1,4 @@
+import { getAIModelLifecycle } from '../../../../../contracts/settings/model-operation';
 import {
   getAIProviderDefinition,
   type AIProviderType,
@@ -226,11 +227,13 @@ export function useModelFormState(
   const isEditing = Boolean(model);
   const catalogModels = getModelCatalogEntries(models, formData.providerId);
   const catalogModel = catalogModels.find((entry) => entry.modelCode === formData.modelCode);
-  const lifecycle =
-    catalogModel?.catalog?.lifecycle ??
+  const catalogFacts =
+    catalogModel?.catalog ??
     (model?.providerId === formData.providerId && model.modelCode === formData.modelCode
-      ? model.catalog?.lifecycle
+      ? model.catalog
       : undefined);
+  const lifecycle = getAIModelLifecycle(catalogFacts);
+  const retirementAt = catalogFacts?.retirementAt;
 
   const handleChange =
     (field: 'displayName' | 'modelCode' | 'systemPrompt') =>
@@ -330,6 +333,7 @@ export function useModelFormState(
     catalogModels,
     catalogModel,
     lifecycle,
+    retirementAt,
     handleChange,
     handleProviderChange,
     handleCatalogSelect,

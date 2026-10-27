@@ -260,7 +260,7 @@ it('rejects audio model IDs before activating credentials for a text request', a
       audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
     },
   ]);
-  await expect(resolveModelConfig('audio')).rejects.toThrow('does not support text');
+  await expect(resolveModelConfig('audio')).rejects.toThrow('model-unavailable');
   expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
 });
 
@@ -332,7 +332,7 @@ describe('native model admission', () => {
             },
           },
         ]);
-      await expect(resolveModelConfig('model-1')).rejects.toThrow('does not support text');
+      await expect(resolveModelConfig('model-1')).rejects.toThrow('model-unavailable');
       expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
     }
   );
@@ -377,3 +377,48 @@ it('captures stable non-secret observation authority and invalidates it after cr
   loadAIProvidersMock.mockResolvedValue([{ ...provider, credentialRevision: 5 }]);
   await expect(assertResolvedLlmModelConfigCurrent(first)).rejects.toThrow('model-unavailable');
 });
+
+it.each([0, 1])(
+  'revalidates cached text retirement before secret activation at deadline offset %s',
+  async (offset) => {
+    resetResolveModelConfigMocks();
+    mockResolvedModelConfigState();
+    const retirementAt = Date.parse('2030-01-01T00:00:00Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(retirementAt - 1);
+    const capabilities = {
+      operations: { text: 'supported' as const },
+      input: {},
+      output: {},
+      features: {},
+    };
+    loadAIProvidersMock.mockResolvedValue([{ ...createProvider(), management: 'automatic' }]);
+    loadAIModelsMock.mockResolvedValue([
+      {
+        ...createModel('model-1'),
+        source: 'catalog',
+        capabilities,
+        catalog: {
+          displayName: 'Scheduled',
+          capabilities,
+          lifecycle: 'deprecated',
+          observedAt: 1,
+          retirementAt,
+        },
+      },
+    ]);
+    vi.stubGlobal('chrome', { permissions: { contains: vi.fn(async () => true) } });
+    try {
+      const config = await resolveModelConfig('model-1');
+      expect(config.modelId).toBe('model-1');
+      activateStoredAIProviderSecretForUseMock.mockClear();
+      clock.mockReturnValue(retirementAt + offset);
+      await expect(assertResolvedLlmModelConfigCurrent(config)).rejects.toThrow(
+        'model-unavailable'
+      );
+      expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+    } finally {
+      clock.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  }
+);

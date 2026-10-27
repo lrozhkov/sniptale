@@ -14,7 +14,7 @@ import type {
   AIModelLifecycle,
 } from '../../../../../contracts/settings/ai-catalog';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
-import { translate } from '../../../../../platform/i18n';
+import { formatDateTime, getCurrentLocale, translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import {
   ProductField,
@@ -36,6 +36,7 @@ type ModelFormModalContentProps = {
     models: AIModel[];
     selected?: AIModel | undefined;
     lifecycle?: AIModelLifecycle | undefined;
+    retirementAt?: number | undefined;
     onSelect(id: string | null): void;
     onManual(): void;
     onReset(): void;
@@ -268,6 +269,22 @@ function ModelLifecycleFields(props: ModelFormModalContentProps) {
             </dt>
             <dd className="m-0 text-right">{translate(statuses[props.catalog.lifecycle])}</dd>
           </div>
+          {props.catalog.retirementAt !== undefined ? (
+            <div className="grid min-h-7 grid-cols-2 gap-2">
+              <dt className="text-[var(--sniptale-color-text-muted)]">
+                {translate('settings.aiProviders.modelRetirementDate')}
+              </dt>
+              <dd className="m-0 text-right">
+                <time dateTime={new Date(props.catalog.retirementAt).toISOString()}>
+                  {formatDateTime(
+                    props.catalog.retirementAt,
+                    { dateStyle: 'short', timeStyle: 'short' },
+                    getCurrentLocale()
+                  )}
+                </time>
+              </dd>
+            </div>
+          ) : null}
         </dl>
       ) : null}
       {retired ? (

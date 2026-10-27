@@ -10,6 +10,7 @@ import {
   type AIScenario,
   type AIModelCapabilities,
   type AICatalogFacts,
+  type AIModelLifecycle,
   type AIModelSource,
 } from './ai-catalog';
 /** Execution parameters for current interfaces. Capability metadata can declare several operations. */
@@ -62,6 +63,15 @@ export interface AIModelOperationSubject {
   retirementOverride?: boolean | undefined;
 }
 
+/** Applies a known retirement deadline to cached facts without changing stored state. */
+export function getAIModelLifecycle(
+  catalog: Pick<AICatalogFacts, 'lifecycle' | 'retirementAt'> | undefined,
+  now = Date.now()
+): AIModelLifecycle | undefined {
+  if (catalog?.retirementAt !== undefined && catalog.retirementAt <= now) return 'retired';
+  return catalog?.lifecycle;
+}
+
 /** Resolves current eligibility without changing the user's selection or granting data egress. */
 export function supportsAIModelOperation(
   model: AIModelOperationSubject,
@@ -69,7 +79,7 @@ export function supportsAIModelOperation(
 ): boolean {
   if (model.enabled === false) return false;
   if (
-    model.catalog?.lifecycle === 'retired' &&
+    getAIModelLifecycle(model.catalog) === 'retired' &&
     !(
       model.source === 'manual' &&
       model.propertySource !== 'catalog' &&

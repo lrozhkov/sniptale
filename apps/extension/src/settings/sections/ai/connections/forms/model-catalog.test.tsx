@@ -163,26 +163,30 @@ it('retains the captured connection incarnation until explicit provider reselect
   await save();
   expect(updateModel).toHaveBeenLastCalledWith(expect.anything(), 'second');
 });
-it('copies retired facts as disabled without an override and keeps retirement permission explicit', async () => {
-  await render([{ ...catalog, catalog: { ...catalog.catalog!, lifecycle: 'retired' } }]);
-  await choose();
-  expect(state.formData.enabled).toBe(false);
-  expect(state.formData.retirementOverride).toBe(false);
-  await act(async () => state.handleManualEntry());
-  await act(async () => state.handleRetirementOverrideChange(true));
-  expect(state.formData.enabled).toBe(false);
-  await act(async () => state.handleEnabledChange(true));
-  await save();
-  expect(updateModel).toHaveBeenCalledWith(
-    expect.objectContaining({
-      id: catalog.id,
-      enabled: true,
-      propertySource: 'manual',
-      retirementOverride: true,
-    }),
-    'first'
-  );
-});
+it.each([{ lifecycle: 'retired' as const }, { lifecycle: 'deprecated' as const, retirementAt: 1 }])(
+  'keeps retirement permission explicit for %j',
+  async (facts) => {
+    await render([{ ...catalog, catalog: { ...catalog.catalog!, ...facts } }]);
+    await choose();
+    expect(state.formData.enabled).toBe(false);
+    expect(state.formData.retirementOverride).toBe(false);
+    expect(state.lifecycle).toBe('retired');
+    await act(async () => state.handleManualEntry());
+    await act(async () => state.handleRetirementOverrideChange(true));
+    expect(state.formData.enabled).toBe(false);
+    await act(async () => state.handleEnabledChange(true));
+    await save();
+    expect(updateModel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: catalog.id,
+        enabled: true,
+        propertySource: 'manual',
+        retirementOverride: true,
+      }),
+      'first'
+    );
+  }
+);
 it('accepts catalog IDs and copied names up to the provider contract limit', async () => {
   const long = {
     ...catalog,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   filterAIModelsByOperation,
   supportsAIModelOperation,
@@ -196,4 +196,57 @@ it('accepts independent speech and recognition parameters for a model with sever
       audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
     })
   ).toBe(false);
+});
+
+it('blocks cached capabilities exactly at the known retirement deadline', () => {
+  const capabilities = {
+    operations: { text: 'supported' as const },
+    input: {},
+    output: {},
+    features: {},
+  };
+  const model = {
+    source: 'catalog' as const,
+    capabilities,
+    catalog: {
+      displayName: 'Timed model',
+      lifecycle: 'deprecated' as const,
+      observedAt: 1,
+      retirementAt: 1000,
+      capabilities,
+    },
+  };
+  const clock = vi.spyOn(Date, 'now');
+  try {
+    clock.mockReturnValue(999);
+    expect(supportsAIModelOperation(model, 'text')).toBe(true);
+    clock.mockReturnValue(1000);
+    expect(supportsAIModelOperation(model, 'text')).toBe(false);
+    clock.mockReturnValue(1001);
+    expect(supportsAIModelOperation(model, 'text')).toBe(false);
+    expect(
+      supportsAIModelOperation(
+        {
+          ...model,
+          source: 'manual',
+          propertySource: 'catalog',
+          retirementOverride: true,
+        },
+        'text'
+      )
+    ).toBe(false);
+    expect(
+      supportsAIModelOperation(
+        {
+          ...model,
+          source: 'manual',
+          propertySource: 'manual',
+          retirementOverride: true,
+        },
+        'text'
+      )
+    ).toBe(true);
+  } finally {
+    clock.mockRestore();
+  }
 });

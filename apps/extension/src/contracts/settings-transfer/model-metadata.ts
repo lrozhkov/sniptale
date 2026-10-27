@@ -1,4 +1,7 @@
-import { isValidAIModelOperationConfiguration } from '../settings/model-operation';
+import {
+  getAIModelLifecycle,
+  isValidAIModelOperationConfiguration,
+} from '../settings/model-operation';
 import { isAIModelCapabilities } from '../settings/ai-catalog';
 import type { AIModel } from '../settings';
 
@@ -72,7 +75,7 @@ export function selectSettingsTransferModelMetadata(model: AIModel): AIModel {
     model.propertySource !== 'catalog' &&
     model.retirementOverride === true;
   const lifecycleBlocked =
-    (model.catalog?.lifecycle === 'retired' && !retirementPermitted) ||
+    (getAIModelLifecycle(model.catalog) === 'retired' && !retirementPermitted) ||
     (model.catalog?.lifecycle === 'absent' && (model.catalog.absenceCount ?? 0) >= 2);
   const enabled = lifecycleBlocked ? false : model.enabled;
   return {

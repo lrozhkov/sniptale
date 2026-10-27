@@ -421,3 +421,61 @@ it('shows speech controls and forwards voice changes without exposing the text p
     speech: { voiceId: 'new-voice', responseFormat: 'mp3' },
   });
 });
+
+it('displays a known retirement date as read-only localized metadata', () => {
+  const retirementAt = Date.parse('2030-04-25T10:30:00.000Z');
+  const props = createProps();
+  renderContent({ catalog: { ...props.catalog, lifecycle: 'deprecated', retirementAt } });
+  const time = container?.querySelector('time');
+  expect(time?.getAttribute('datetime')).toBe('2030-04-25T10:30:00.000Z');
+  expect(time?.textContent).toContain('2030');
+  expect(container?.textContent).toContain(translate('settings.aiProviders.modelRetirementDate'));
+  expect(time?.closest('dd')).not.toBeNull();
+});
+
+it.each(['catalog', 'manual'] as const)(
+  'requires explicit retirement permission before enabling a %s draft',
+  (mode) => {
+    const props = createProps();
+    const onEnabledChange = vi.fn();
+    const onRetirementOverrideChange = vi.fn();
+    const formData = {
+      ...props.formData,
+      propertySource: mode,
+      enabled: false,
+      retirementOverride: false,
+    };
+    const catalog = {
+      ...props.catalog,
+      mode,
+      lifecycle: 'retired' as const,
+      selected: {
+        id: 'known',
+        providerId: props.formData.providerId,
+        modelCode: 'scheduled',
+        displayName: 'Scheduled',
+      },
+      onEnabledChange,
+      onRetirementOverrideChange,
+    };
+    renderContent({ formData, catalog });
+    const enabled = container?.querySelector<HTMLButtonElement>(
+      `[role="switch"][aria-label="${translate('settings.aiProviders.modelEnabledLabel')}"]`
+    );
+    expect(enabled?.disabled).toBe(true);
+    const permission = container?.querySelector<HTMLButtonElement>(
+      `[role="switch"][aria-label="${translate('settings.aiProviders.modelRetirementOverride')}"]`
+    );
+    if (mode === 'catalog') {
+      expect(permission).toBeNull();
+    } else {
+      expect(permission).not.toBeNull();
+      act(() => permission?.click());
+      expect(onRetirementOverrideChange).toHaveBeenCalledWith(true);
+      renderContent({ formData: { ...formData, retirementOverride: true }, catalog });
+      expect(enabled?.disabled).toBe(false);
+      act(() => enabled?.click());
+      expect(onEnabledChange).toHaveBeenCalledWith(true);
+    }
+  }
+);

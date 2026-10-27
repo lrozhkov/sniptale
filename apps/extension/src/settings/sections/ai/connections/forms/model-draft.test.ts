@@ -96,3 +96,13 @@ it('scopes catalog choices to current present facts and keeps the stored configu
   expect(entries[0]?.id).toBe(model.id);
   expect(entries[0]?.displayName).toBe('Provider name');
 });
+
+it('resets expired catalog facts as disabled without retaining manual permission', () => {
+  const next = applyCatalogModelDraft(
+    { ...createModelDraft(model), retirementOverride: true, enabled: true },
+    { ...model, catalog: { ...model.catalog!, lifecycle: 'deprecated', retirementAt: 1 } }
+  );
+  expect(next.enabled).toBe(false);
+  expect(next.retirementOverride).toBe(false);
+  expect(next.propertySource).toBe('catalog');
+});

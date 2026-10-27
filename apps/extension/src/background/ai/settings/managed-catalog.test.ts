@@ -456,3 +456,30 @@ it.each([null, 42])(
     expect(transport).toHaveBeenCalledTimes(2);
   }
 );
+
+it.each([-1])(
+  'preserves Ollama list retirement evidence after valid detail enrichment at offset %s',
+  async (offset) => {
+    const retirementAt = Date.parse('2030-01-01T00:00:00Z');
+    const transport = vi
+      .fn()
+      .mockResolvedValueOnce(
+        json({ models: [{ name: 'local', expiration_date: '2030-01-01T00:00:00Z' }] })
+      )
+      .mockResolvedValueOnce(json({ capabilities: ['completion', 'vision'] }));
+    const page = await readProviderCatalog({
+      provider: provider('ollama'),
+      apiKey: '',
+      now: retirementAt + offset,
+      beforeSend: async () => undefined,
+      transport,
+    });
+    expect(page.complete).toBe(true);
+    expect(page.models[0]?.facts).toMatchObject({
+      retirementAt,
+      lifecycle: offset < 0 ? 'deprecated' : 'retired',
+      capabilities: { operations: { text: 'supported' }, input: { image: 'supported' } },
+    });
+    expect(transport).toHaveBeenCalledTimes(2);
+  }
+);

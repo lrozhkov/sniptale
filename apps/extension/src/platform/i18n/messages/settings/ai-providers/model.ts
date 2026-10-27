@@ -50,6 +50,7 @@ export const settingsAiProvidersModelMessages = defineMessageSource({
   modelSupportYes: { ru: 'Да', en: 'Yes' },
   modelSupportNo: { ru: 'Нет', en: 'No' },
   modelSupportUnknown: { ru: 'Неизвестно', en: 'Unknown' },
+  modelRetirementDate: { ru: 'Дата прекращения поддержки', en: 'Retirement date' },
   modelLifecycleLabel: { ru: 'Статус модели', en: 'Model status' },
   modelLifecycleActive: { ru: 'Доступна', en: 'Active' },
   modelLifecycleDeprecated: { ru: 'Устаревает', en: 'Deprecated' },

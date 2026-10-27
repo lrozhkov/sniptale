@@ -202,3 +202,24 @@ it('drops stale automatic capability claims for a catalog-bound manual record af
     catalog: { lifecycle: 'unknown', scope: 'scope' },
   });
 });
+
+it.each(['catalog', 'manual'] as const)(
+  'clears the previous scope retirement date for %s records',
+  (source) => {
+    const model: AIModel = {
+      ...run([]).models[0]!,
+      source,
+      propertySource: source,
+      catalog: { ...facts, scope: 'old-scope', lifecycle: 'deprecated', retirementAt: 1000 },
+    };
+    const changed = run([model], [], 2).models[0]!;
+    expect(changed.id).toBe(model.id);
+    expect(changed.catalog).toMatchObject({ scope: 'scope', lifecycle: 'unknown' });
+    expect(changed.catalog).not.toHaveProperty('retirementAt');
+    expect(model.catalog?.retirementAt).toBe(1000);
+    const refreshed = run([changed], [{ modelCode: model.modelCode, facts }], 3).models[0]!;
+    expect(refreshed.id).toBe(model.id);
+    expect(refreshed.catalog).not.toHaveProperty('retirementAt');
+    expect(supportsAIModelOperation(refreshed, 'text')).toBe(true);
+  }
+);

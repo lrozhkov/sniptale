@@ -1,3 +1,4 @@
+import { getAIModelLifecycle } from '../../../../../contracts/settings/model-operation';
 import type { AIModel } from '../../../../../contracts/settings';
 import type {
   AIModelCapabilities,
@@ -58,7 +59,7 @@ export function applyCatalogModelDraft(draft: ModelFormData, model: AIModel): Mo
     propertySource: 'catalog',
     capabilities,
     retirementOverride: false,
-    ...(model.catalog.lifecycle === 'retired' ? { enabled: false } : {}),
+    ...(getAIModelLifecycle(model.catalog) === 'retired' ? { enabled: false } : {}),
     ...(transcription || speech
       ? { audio: { ...(transcription ? { transcription } : {}), ...(speech ? { speech } : {}) } }
       : {}),

@@ -57,6 +57,7 @@ function reconcileAbsent(model: AIModel, input: CatalogReconciliationInput): AIM
       firstAbsentAt: _first,
       lastAbsentAt: _last,
       absenceCount: _count,
+      retirementAt: _retirement,
       ...previous
     } = model.catalog;
     return {
