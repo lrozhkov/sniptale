@@ -41,7 +41,7 @@
   z-index: 2147483646;
 }
 
-.sniptale-collapsed-panels .sniptale-drag-handle {
+.sniptale-collapsed-panels.sniptale-content-toolbar-adopted .sniptale-drag-handle {
   position: absolute;
   top: 4px;
   bottom: 4px;
@@ -65,6 +65,10 @@
   border-radius: inherit;
   background: var(--sniptale-color-surface-panel);
   pointer-events: none;
+}
+
+.sniptale-collapsed-panels .sniptale-drag-handle * {
+  cursor: inherit;
 }
 
 .sniptale-collapsed-panels .sniptale-drag-handle svg {

@@ -76,6 +76,10 @@ async function checkCornerGrip(
       const geometry = await grip.evaluate((button) => {
         const svg = button.querySelector('svg')!;
         const bounds = svg.getBoundingClientRect();
+        const peer = Array.from(button.parentElement!.querySelectorAll('button')).find(
+          (candidate) => candidate !== button && candidate.getBoundingClientRect().height > 0
+        )!;
+        const peerBounds = peer.querySelector('svg')!.getBoundingClientRect();
         const alpha = (color: string) =>
           color.startsWith('rgba')
             ? Number(color.slice(5, -1).split(',')[3])
@@ -85,6 +89,10 @@ async function checkCornerGrip(
         const style = getComputedStyle(button);
         const before = getComputedStyle(button, '::before');
         return {
+          centerOffset: bounds.y + bounds.height / 2 - peerBounds.y - peerBounds.height / 2,
+          cursors: [button, ...button.querySelectorAll('*')].map(
+            (element) => getComputedStyle(element).cursor
+          ),
           width: bounds.width,
           height: bounds.height,
           backing: Math.max(
@@ -93,6 +101,12 @@ async function checkCornerGrip(
           ),
         };
       });
+      expect
+        .soft(Math.abs(geometry.centerOffset), `${prefix} ${corner} centered`)
+        .toBeLessThanOrEqual(1);
+      expect
+        .soft([...new Set(geometry.cursors)], `${prefix} ${corner} icon cursor`)
+        .toEqual(['grab']);
       expect(geometry.width).toBeGreaterThanOrEqual(12);
       expect(geometry.height).toBeGreaterThanOrEqual(12);
       expect
@@ -100,6 +114,14 @@ async function checkCornerGrip(
         .toBeGreaterThanOrEqual(0.9);
     }
   }
+  const viewport = page.viewportSize()!;
+  await page.setViewportSize({ width: 1000, height: viewport.height });
+  await group.hover();
+  const narrow = (await group.boundingBox())!;
+  expect(narrow.x).toBeGreaterThanOrEqual(0);
+  expect(narrow.x + narrow.width).toBeLessThanOrEqual(1000);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1000);
+  await page.setViewportSize(viewport);
   await page.evaluate(() => {
     document.body.style.background = '';
   });
@@ -396,6 +418,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await collapsed.hover();
       const grip = collapsed.locator('[data-ui="content.collapsed-panels.drag-handle"]');
       await checkCornerGrip(page, popup, collapsed, grip, 'collapsed', info);
+      await collapsed.hover();
+      await grip.hover();
+      await page.mouse.down();
+      await expect(grip).toHaveCSS('cursor', 'grabbing');
+      await expect(grip.locator('svg')).toHaveCSS('cursor', 'grabbing');
+      await page.mouse.up();
       const collapsedActions = collapsed.locator('[data-ui="content.quick-actions.trigger"]');
       await collapsedActions.click();
       await installLongQuickActionList(popup);
