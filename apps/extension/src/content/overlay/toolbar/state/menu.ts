@@ -16,7 +16,6 @@ export type ToolbarPopoverMenu =
   | 'recording-camera'
   | 'recording-microphone'
   | 'recording-quality'
-  | 'recording-target'
   | 'recording-spotlight'
   | 'reset-confirm'
   | 'settings'

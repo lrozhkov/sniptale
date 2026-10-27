@@ -113,11 +113,12 @@ it('keeps failed selection recoverable and permits explicit retry', async () => 
   expect(query('quality.dropdown')).toBeNull();
 });
 
-it('replaces unrelated menus, keeps the capture choice and restores its trigger on Escape', async () => {
+it('keeps the capture choice in quality settings and restores its trigger on Escape', async () => {
   mount();
+  query('quality.menu')?.focus();
   await click('quality.menu');
-  await click('capture-target.menu');
-  expect(query('quality.dropdown')).toBeNull();
+  expect(query('capture-target.menu')).toBeNull();
+  expect(query('quality.dropdown')).not.toBeNull();
   const area = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.textContent === 'content.toolbar.videoRecordingTargetArea'
   );
@@ -126,9 +127,11 @@ it('replaces unrelated menus, keeps the capture choice and restores its trigger 
   );
   expect(area?.getAttribute('aria-pressed')).toBe('true');
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  expect(query('capture-target.dropdown')).toBeNull();
-  expect(query('capture-target.menu')?.getAttribute('title')).toContain(
-    'content.toolbar.videoRecordingTargetArea'
+  expect(query('quality.dropdown')).toBeNull();
+  expect(document.activeElement).toBe(query('quality.menu'));
+  await click('quality.menu');
+  expect(query('capture-target')?.querySelectorAll('button')[1]?.getAttribute('aria-pressed')).toBe(
+    'true'
   );
 });
 
@@ -192,7 +195,7 @@ it('keeps unsupported 4K60 unavailable when resolution or frame rate changes', a
 
 it('rejects host synthetic capture changes after an accepted area choice', async () => {
   mount();
-  await click('capture-target.menu');
+  await click('quality.menu');
   const buttons = query('capture-target')!.querySelectorAll('button');
   const tab = buttons[0]!;
   const area = buttons[1]!;

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { PAGE_TOOLBAR_CONTROLS } from '../../../../contracts/settings';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type {
@@ -40,7 +41,10 @@ it.each(['global', 'mode'] as const)(
       ...defaults,
       contentToolbar: {
         ...defaults.contentToolbar!,
-        pageControls: source === 'global' ? { 'drawing-pencil': false } : {},
+        pageControls: {
+          ...Object.fromEntries(PAGE_TOOLBAR_CONTROLS.map((control) => [control, true])),
+          ...(source === 'global' ? { 'drawing-pencil': false } : {}),
+        },
         pageControlOverrides: source === 'mode' ? { drawing: { 'drawing-pencil': false } } : {},
       },
     });
@@ -62,7 +66,7 @@ it('omits reveal and inheritance actions when the current mode has no applicable
     ...defaults,
     contentToolbar: {
       ...defaults.contentToolbar!,
-      pageControls: {},
+      pageControls: Object.fromEntries(PAGE_TOOLBAR_CONTROLS.map((control) => [control, true])),
       pageControlOverrides: { drawing: { 'drawing-marker': false } },
     },
   });
@@ -324,7 +328,13 @@ it('intercepts customization clicks instead of executing the wrapped command', a
   }
   await act(async () => root.render(<ButtonHarness />));
   act(() => controls.toggleEditing());
-  persistence.patch.mockResolvedValueOnce(createDefaultSettings());
+  persistence.patch.mockResolvedValueOnce({
+    ...createDefaultSettings(),
+    contentToolbar: {
+      ...createDefaultSettings().contentToolbar!,
+      pageControls: { 'capture-delay': true },
+    },
+  });
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.visibility.capture-delay"]')
@@ -376,7 +386,13 @@ it('retains acknowledged choices after failure, retries, and exits customization
   await act(async () => controls.setVisible('capture-delay', true));
   expect(controls.isVisible('capture-delay')).toBe(false);
   expect(controls.error).not.toBeNull();
-  persistence.patch.mockResolvedValueOnce(createDefaultSettings());
+  persistence.patch.mockResolvedValueOnce({
+    ...createDefaultSettings(),
+    contentToolbar: {
+      ...createDefaultSettings().contentToolbar!,
+      pageControls: { 'capture-delay': true },
+    },
+  });
   await act(async () => controls.setVisible('capture-delay', true));
   expect(controls.isVisible('capture-delay')).toBe(true);
   act(() => controls.toggleEditing());
@@ -570,4 +586,34 @@ it('enables Reset for another mode customization and disables it after acknowled
   expect(reset.disabled).toBe(false);
   await act(async () => reset.click());
   expect(reset.disabled).toBe(true);
+});
+
+it('hides optional controls for fresh settings and retains explicit saved choices', async () => {
+  persistence.load.mockResolvedValueOnce(createDefaultSettings());
+  await act(async () => root.render(<Harness enabled />));
+  for (const name of [
+    'after-capture',
+    'capture-delay',
+    'capture-size',
+    'quick-actions',
+    'scenario-panel',
+    'auto-blur',
+  ] as const)
+    expect(controls.isVisible(name)).toBe(false);
+  expect(controls.isVisible('capture-visible')).toBe(true);
+  expect(controls.hasCustomization).toBe(false);
+  act(() => controls.toggleEditing());
+  expect(controls.isVisible('quick-actions')).toBe(true);
+  act(() => controls.toggleEditing());
+  persistence.load.mockResolvedValueOnce({
+    ...createDefaultSettings(),
+    contentToolbar: {
+      ...createDefaultSettings().contentToolbar!,
+      pageControls: { 'quick-actions': true, 'capture-visible': false },
+    },
+  });
+  await act(async () => controls.reload());
+  expect(controls.isVisible('quick-actions')).toBe(true);
+  expect(controls.isVisible('capture-visible')).toBe(false);
+  expect(controls.hasCustomization).toBe(true);
 });

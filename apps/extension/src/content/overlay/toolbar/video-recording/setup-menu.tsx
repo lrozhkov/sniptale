@@ -1,10 +1,11 @@
-import { ArrowLeft, Check, ChevronRight, Crop, PanelTop, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuDivider,
+  ProductToolbarMenuGroupLabel,
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
@@ -16,7 +17,10 @@ import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-
 import type { ToolbarVideoRecordingProps } from '../types';
 import type { ToolbarMenuState } from '../state/menu';
 import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
-import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
+import {
+  resolveToolbarDrawingMenuStyle,
+  useToolbarFloatingMenuDismissal,
+} from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
 import { useToolbarMenuDirection } from '../menu/direction';
 import { RecordingOutputSettings } from './output-settings';
@@ -28,11 +32,8 @@ type SetupMenuProps = {
   toolbarMenuState: ToolbarMenuState;
 };
 
-function useSetupMenu(
-  props: SetupMenuProps,
-  menuType: 'recording-quality' | 'recording-target',
-  menuHeight: number
-) {
+function useSetupMenu(props: SetupMenuProps, menuHeight: number) {
+  const menuType = 'recording-quality';
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { closeMenu, toggleMenu, activeMenuType } = props.toolbarMenuState;
@@ -46,15 +47,24 @@ function useSetupMenu(
       displayMode: props.displayMode,
       getMenuPosition: (ref, height = menuHeight) => getToolbarMenuPosition(ref.current, height),
       menuHeight,
-      menuWidth: menuType === 'recording-quality' ? 320 : 280,
+      menuWidth: 320,
       preferredAlign: 'end',
+    });
+    const bounded = resolveToolbarDrawingMenuStyle({
+      anchorEl: triggerRef.current,
+      displayMode: props.displayMode,
+      menuHeight,
+      menuWidth: 320,
+      placement: dropdown.placement,
     });
     return {
       placement: dropdown.menuPlacement,
       style: {
         ...dropdown.style,
-        width: menuType === 'recording-quality' ? 320 : 280,
+        width: 320,
         maxWidth: 'calc(100vw - 16px)',
+        maxHeight: bounded?.maxHeight ?? 'calc(100vh - 16px)',
+        overflowY: 'auto' as const,
       },
     };
   };
@@ -77,7 +87,7 @@ function useQualityMenu(props: SetupMenuProps) {
   const pendingRef = useRef(false);
   const mountedRef = useRef(false);
   const detailTriggerRef = useRef<HTMLDivElement>(null);
-  const menu = useSetupMenu(props, 'recording-quality', details ? 340 : 400);
+  const menu = useSetupMenu(props, details ? 340 : 480);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -241,20 +251,24 @@ function RecordingQualityMenu(props: SetupMenuProps) {
                   />
                 </>
               ) : (
-                <RecordingQualityProfileList
-                  options={options}
-                  currentSummary={getToolbarOutputSummary(settings.outputProfile)}
-                  busy={busy}
-                  detailsDisabled={!props.recording.onOutputProfileChange}
-                  detailTriggerRef={detailTriggerRef}
-                  onDetails={() => setDetails(true)}
-                  onSelect={(profileId) =>
-                    void control.change(
-                      () => props.recording.onQualityProfileChange?.(profileId),
-                      true
-                    )
-                  }
-                />
+                <>
+                  <RecordingCaptureTarget recording={props.recording} disabled={busy} />
+                  <ProductToolbarMenuDivider />
+                  <RecordingQualityProfileList
+                    options={options}
+                    currentSummary={getToolbarOutputSummary(settings.outputProfile)}
+                    busy={busy}
+                    detailsDisabled={!props.recording.onOutputProfileChange}
+                    detailTriggerRef={detailTriggerRef}
+                    onDetails={() => setDetails(true)}
+                    onSelect={(profileId) =>
+                      void control.change(
+                        () => props.recording.onQualityProfileChange?.(profileId),
+                        true
+                      )
+                    }
+                  />
+                </>
               )}
             </ProductToolbarMenu>
           </div>
@@ -264,82 +278,48 @@ function RecordingQualityMenu(props: SetupMenuProps) {
   );
 }
 
-function RecordingTargetMenu(props: SetupMenuProps) {
-  const menu = useSetupMenu(props, 'recording-target', 130);
+function RecordingCaptureTarget(props: {
+  recording: ToolbarVideoRecordingProps;
+  disabled: boolean;
+}) {
   const mode = props.recording.captureMode ?? CaptureMode.TAB;
-  const label = translate(
-    mode === CaptureMode.TAB_CROP
-      ? 'content.toolbar.videoRecordingTargetArea'
-      : 'content.toolbar.videoRecordingTargetTab'
-  );
   return (
-    <div className="relative flex">
-      <ContentToolbarButton
-        ref={menu.triggerRef}
-        tone="property"
-        menuIndicator
-        dataUi="content.toolbar.video-recording.capture-target.menu"
-        title={`${translate('content.toolbar.videoRecordingTarget')}: ${label}`}
-        aria-expanded={menu.open}
-        aria-haspopup="dialog"
-        data-menu-side={menu.menuSide}
-        disabled={!props.recording.onCaptureModeChange || props.recording.setupPending}
-        onClick={menu.toggle}
-      >
-        {mode === CaptureMode.TAB_CROP ? <Crop size={18} /> : <PanelTop size={18} />}
-      </ContentToolbarButton>
-      {menu.open ? (
-        <ToolbarMenuDropdown
-          menuRef={menu.menuRef}
-          dataUi="content.toolbar.video-recording.capture-target.dropdown"
-        >
-          <div role="dialog" aria-label={translate('content.toolbar.videoRecordingSetup')}>
-            <ProductToolbarMenu
-              className="sniptale-content-menu-adopted"
-              compact
-              variant="viewport"
-              placement={menu.dropdown.placement}
-              style={menu.dropdown.style}
-            >
-              <div
-                className="px-1 py-1"
-                onClickCapture={(event) => {
-                  if (
-                    !isTrustedDomEvent(event.nativeEvent) &&
-                    !isBridgedMouseEvent(event.nativeEvent)
-                  ) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }
-                }}
-              >
-                <SegmentedSwitch
-                  activeId={mode}
-                  appearance="neutral"
-                  density="compact"
-                  ariaLabel={translate('content.toolbar.videoRecordingTarget')}
-                  dataAttribute={{ 'data-ui': 'content.toolbar.video-recording.capture-target' }}
-                  options={[
-                    {
-                      id: CaptureMode.TAB,
-                      label: translate('content.toolbar.videoRecordingTargetTab'),
-                    },
-                    {
-                      id: CaptureMode.TAB_CROP,
-                      label: translate('content.toolbar.videoRecordingTargetArea'),
-                    },
-                  ]}
-                  onChange={(value) => props.recording.onCaptureModeChange?.(value)}
-                />
-                {mode === CaptureMode.TAB_CROP ? (
-                  <p className="px-1 pt-2 text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
-                    {translate('content.toolbar.videoRecordingTargetAreaHint')}
-                  </p>
-                ) : null}
-              </div>
-            </ProductToolbarMenu>
-          </div>
-        </ToolbarMenuDropdown>
+    <div
+      className="px-1 py-1"
+      onClickCapture={(event) => {
+        if (!isTrustedDomEvent(event.nativeEvent) && !isBridgedMouseEvent(event.nativeEvent)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+    >
+      <ProductToolbarMenuGroupLabel>
+        {translate('content.toolbar.videoRecordingTarget')}
+      </ProductToolbarMenuGroupLabel>
+      <SegmentedSwitch
+        activeId={mode}
+        appearance="neutral"
+        density="compact"
+        ariaLabel={translate('content.toolbar.videoRecordingTarget')}
+        dataAttribute={{ 'data-ui': 'content.toolbar.video-recording.capture-target' }}
+        options={[
+          {
+            id: CaptureMode.TAB,
+            disabled: props.disabled || !props.recording.onCaptureModeChange,
+            label: translate('content.toolbar.videoRecordingTargetTab'),
+          },
+          {
+            id: CaptureMode.TAB_CROP,
+            disabled: props.disabled || !props.recording.onCaptureModeChange,
+            label: translate('content.toolbar.videoRecordingTargetArea'),
+          },
+        ]}
+        onChange={(value) => props.recording.onCaptureModeChange?.(value)}
+      />
+      {mode === CaptureMode.TAB_CROP ? (
+        <p className="px-1 pt-2 text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
+          {translate('content.toolbar.videoRecordingTargetAreaHint')}
+        </p>
       ) : null}
     </div>
   );
@@ -352,7 +332,6 @@ export function RecordingSetupControls(props: SetupMenuProps) {
       aria-label={translate('content.toolbar.videoRecordingSetup')}
     >
       <RecordingQualityMenu {...props} />
-      <RecordingTargetMenu {...props} />
     </ContentToolbarGroup>
   );
 }

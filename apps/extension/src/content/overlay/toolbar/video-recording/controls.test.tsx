@@ -454,8 +454,6 @@ for (const phase of ['idle', 'error', 'starting', 'recording', 'paused', 'stoppi
     renderPhase(phase);
     const setupVisible = phase === 'idle' || phase === 'error';
     expect(Boolean(queryButton('content.toolbar.video-recording.quality.menu'))).toBe(setupVisible);
-    expect(Boolean(queryButton('content.toolbar.video-recording.capture-target.menu'))).toBe(
-      setupVisible
-    );
+    expect(queryButton('content.toolbar.video-recording.capture-target.menu')).toBeNull();
   });
 }

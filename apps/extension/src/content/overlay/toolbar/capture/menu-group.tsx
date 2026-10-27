@@ -69,7 +69,6 @@ function TimerMenuNode(props: {
 export function ToolbarCaptureMenuGroup(
   props: ToolbarCaptureActionsProps & {
     menus: ReturnType<typeof useToolbarCaptureMenus>;
-    quickActionsAvailable?: boolean;
     onSelectCaptureAction: (action: ToolbarCaptureActionsProps['captureAction']) => Promise<void>;
   }
 ) {
@@ -126,17 +125,15 @@ export function ToolbarCaptureMenuGroup(
       >
         {viewportMenu}
       </PageControlVisibility>
-      {props.quickActionsAvailable ? (
-        <PageControlVisibility
-          control="quick-actions"
-          label={translate('content.pageLauncher.actions')}
-        >
-          <PageQuickActionsMenu
-            toolbarMenuState={captureProps.toolbarMenuState}
-            displayMode={captureProps.displayMode}
-          />
-        </PageControlVisibility>
-      ) : null}
+      <PageControlVisibility
+        control="quick-actions"
+        label={translate('content.pageLauncher.actions')}
+      >
+        <PageQuickActionsMenu
+          toolbarMenuState={captureProps.toolbarMenuState}
+          displayMode={captureProps.displayMode}
+        />
+      </PageControlVisibility>
       {captureProps.scenario ? <ScenarioPanelToggle scenario={captureProps.scenario} /> : null}
     </>
   );

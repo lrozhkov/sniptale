@@ -23,9 +23,7 @@ export function QuickActionsSection() {
   const placements = normalizePageLaunchPreferences(settings.pageLaunch);
   const [savingPlacement, setSavingPlacement] = useState(false);
   const [placementFailed, setPlacementFailed] = useState(false);
-  const updatePlacement = async (
-    key: 'quickActionsPopup' | 'quickActionsCorner' | 'quickActionsToolbar'
-  ) => {
+  const updatePlacement = async (key: 'quickActionsPopup' | 'quickActionsCorner') => {
     if (savingPlacement) return;
     setSavingPlacement(true);
     setPlacementFailed(false);
@@ -54,7 +52,6 @@ export function QuickActionsSection() {
           [
             ['quickActionsPopup', 'settings.quickActions.placementPopup'],
             ['quickActionsCorner', 'settings.quickActions.placementCorner'],
-            ['quickActionsToolbar', 'settings.quickActions.placementToolbar'],
           ] as const
         ).map(([key, label]) => (
           <SettingsControlRow key={key} label={translate(label)}>

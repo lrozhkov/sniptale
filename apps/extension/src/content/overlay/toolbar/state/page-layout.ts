@@ -8,7 +8,24 @@ import {
   type ContentToolbarPreferences,
   type PageToolbarLayoutItem,
   type PageToolbarMode,
+  type PageToolbarControl,
 } from '../../../../contracts/settings';
+
+const DEFAULT_HIDDEN_CONTROLS: readonly PageToolbarControl[] = [
+  'after-capture',
+  'capture-delay',
+  'capture-size',
+  'quick-actions',
+  'scenario-panel',
+  'auto-blur',
+];
+
+/** Default visibility is shared by fresh settings and the page-toolbar reset. */
+export function createDefaultPageToolbarControls() {
+  return Object.fromEntries(
+    PAGE_TOOLBAR_CONTROLS.map((control) => [control, !DEFAULT_HIDDEN_CONTROLS.includes(control)])
+  );
+}
 
 const CAPTURE: PageToolbarLayoutItem[] = [
   'separator:capture',
@@ -134,7 +151,7 @@ export function createPageToolbarResetPatch(): Pick<
   'pageControls' | 'pageControlOverrides' | 'pageLayouts'
 > {
   return {
-    pageControls: Object.fromEntries(PAGE_TOOLBAR_CONTROLS.map((control) => [control, true])),
+    pageControls: createDefaultPageToolbarControls(),
     pageControlOverrides: Object.fromEntries(
       PAGE_TOOLBAR_OVERRIDE_MODES.map((mode) => [
         mode,
@@ -206,9 +223,13 @@ export function hasPageToolbarCustomization(
   >
 ): boolean {
   const { pageControls = {}, pageControlOverrides = {}, pageLayouts = {} } = preferences;
+  const defaults = createDefaultPageToolbarControls();
   return (
     PAGE_TOOLBAR_CONTROLS.some(
-      (control) => control !== 'drawing-pencil' && pageControls[control] === false
+      (control) =>
+        control !== 'drawing-pencil' &&
+        typeof pageControls[control] === 'boolean' &&
+        pageControls[control] !== defaults[control]
     ) ||
     PAGE_TOOLBAR_OVERRIDE_MODES.some((owner) =>
       PAGE_TOOLBAR_CONTROLS.some(

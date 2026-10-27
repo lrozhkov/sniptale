@@ -124,20 +124,32 @@ async function mode(page: Page, name: string) {
   await expect(ui(page, `mode-option.${name}`)).toHaveCount(0);
 }
 async function expectSeparators(page: Page) {
-  const adjacent = await ui(page, 'root').evaluate((root) => {
-    const visible = [...root.children]
-      .sort((a, b) => Number(getComputedStyle(a).order) - Number(getComputedStyle(b).order))
-      .filter(
-        (child) =>
-          child.getBoundingClientRect().width > 0 && child.getBoundingClientRect().height > 0
-      );
-    return visible.some(
-      (child, index) =>
-        child.classList.contains('sniptale-divider') &&
-        visible[index + 1]?.classList.contains('sniptale-divider')
-    );
+  const dividers = ui(page, 'root').locator('.sniptale-divider');
+  for (const divider of await dividers.all()) await expect(divider).toBeVisible();
+}
+
+async function enableOptionalToolbarControls(popup: Page) {
+  await popup.evaluate(async () => {
+    const stored = await chrome.storage.sync.get('sniptale_settings');
+    const settings = stored.sniptale_settings ?? {};
+    await chrome.storage.sync.set({
+      sniptale_settings: {
+        ...settings,
+        contentToolbar: {
+          ...settings.contentToolbar,
+          pageControls: {
+            ...settings.contentToolbar?.pageControls,
+            'after-capture': true,
+            'capture-delay': true,
+            'capture-size': true,
+            'quick-actions': true,
+            'scenario-panel': true,
+            'auto-blur': true,
+          },
+        },
+      },
+    });
   });
-  expect(adjacent).toBe(false);
 }
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
@@ -150,6 +162,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       const hostOrigin = host.origin;
       try {
         const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+        await enableOptionalToolbarControls(popup);
         await popup.evaluate(
           async (theme) =>
             chrome.storage.local.set({
@@ -158,6 +171,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             }),
           size.width === 1920 ? 'dark' : 'light'
         );
+        await reopenToolbarAfterReload(page, popup, hostOrigin);
         await page.bringToFront();
         if (orientation === 'vertical') {
           await ui(page, 'settings-button').click();
@@ -600,6 +614,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           size
         );
         page.setDefaultTimeout(10000);
+        await enableOptionalToolbarControls(popup);
         await popup.evaluate(
           async (dark) =>
             chrome.storage.local.set({
@@ -735,11 +750,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(root).not.toHaveAttribute('data-page-layout', 'true');
         await page.keyboard.press('Escape');
         await expect(ui(page, 'capture-full-button')).toBeVisible();
-        await expect(ui(page, 'timer-button')).toBeVisible();
+        await expect(ui(page, 'timer-button')).toHaveCount(0);
         await expect(root.locator('[data-page-toolbar-item]')).toHaveCount(0);
         await expect(ui(page, 'capture-leading-divider')).toBeVisible();
         await mode(page, 'cursor');
-        await expect(ui(page, 'timer-button')).toBeVisible();
+        await expect(ui(page, 'timer-button')).toHaveCount(0);
         await page.setViewportSize({ width: 1000, height: size.height });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true
@@ -751,4 +766,85 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       }
     });
   }
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`page toolbar optional defaults reset and recording transition ${name}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size });
+    try {
+      const { page, popup } = await openDesignReview(
+        launched.context,
+        launched.extensionId,
+        host.origin,
+        size
+      );
+      const errors: string[] = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      await mode(page, 'cursor');
+      const optional = {
+        'after-capture': '[data-ui="content.toolbar.capture-action-button"]',
+        'capture-delay': '[data-ui="content.toolbar.timer-button"]',
+        'capture-size': '[data-ui="content.toolbar.viewport-button"]',
+        'quick-actions': '[data-ui="content.quick-actions.trigger"]',
+        'scenario-panel': '[data-ui="content.toolbar.scenario-panel-button"]',
+        'auto-blur': '[data-ui="content.toolbar.auto-blur-button"]',
+      };
+      for (const selector of Object.values(optional))
+        await expect(page.locator(selector)).toHaveCount(0);
+      const separators = ui(page, 'root').locator('.sniptale-divider');
+      const count = await separators.count();
+      expect(count).toBeGreaterThanOrEqual(4);
+      await expectSeparators(page);
+      await page.screenshot({
+        path: info.outputPath('fresh-toolbar-defaults.png'),
+        fullPage: false,
+      });
+      await customize(page);
+      for (const control of Object.keys(optional)) {
+        const choice = ui(page, `visibility.${control}`);
+        await expect(choice).toHaveAttribute('aria-pressed', 'false');
+        await choice.click();
+        await expect(choice).toHaveAttribute('aria-pressed', 'true');
+      }
+      await ui(page, 'customize-done').click();
+      for (const selector of Object.values(optional))
+        await expect(page.locator(selector)).toBeVisible();
+      await page.locator(optional['quick-actions']).click();
+      await expect(
+        page.locator('[data-ui="content.quick-actions.dropdown"] .sniptale-popover-menu')
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.screenshot({
+        path: info.outputPath('optional-buttons-enabled.png'),
+        fullPage: false,
+      });
+      await ui(page, 'settings-button').click();
+      await ui(page, 'settings.reset-page-toolbar').click();
+      await expect(ui(page, 'settings.reset-page-toolbar')).toBeDisabled();
+      await page.keyboard.press('Escape');
+      for (const selector of Object.values(optional))
+        await expect(page.locator(selector)).toHaveCount(0);
+      await expect(separators).toHaveCount(count);
+      await expectSeparators(page);
+      await page.screenshot({
+        path: info.outputPath('reset-toolbar-defaults.png'),
+        fullPage: false,
+      });
+      await customize(page);
+      await mode(page, 'video-recording');
+      await expect(ui(page, 'root')).toHaveAttribute('data-video-recording', 'true');
+      await expect(ui(page, 'video-recording.quality.menu')).toBeVisible();
+      expect(errors).toEqual([]);
+      await page.screenshot({
+        path: info.outputPath('recording-from-page-customization.png'),
+        fullPage: false,
+      });
+      await popup.close();
+      await page.close();
+    } finally {
+      await closeExtensionBrowser(launched);
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
 }

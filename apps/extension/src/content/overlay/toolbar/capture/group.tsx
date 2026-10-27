@@ -1,4 +1,3 @@
-import { usePageLaunchPreferences } from '../../quick-actions/preferences';
 import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from '../controls/page-layout';
 import { PanelBottomClose, Pin, PinOff } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -84,17 +83,15 @@ export function ToolbarCaptureActionGroup(
   }
 ) {
   const { menus, onSelectCaptureAction, ...captureProps } = props;
-  const { preferences } = usePageLaunchPreferences();
   const visibility = useContext(PageToolbarControlsContext);
   const capturesVisible =
     !visibility ||
     (['capture-visible', 'capture-selection', 'capture-full'] as const).some(visibility.isVisible);
   const optionsVisible =
-    (preferences.quickActionsToolbar && (!visibility || visibility.isVisible('quick-actions'))) ||
     !visibility ||
-    (['after-capture', 'capture-delay', 'capture-size', 'scenario-panel'] as const).some(
-      visibility.isVisible
-    );
+    (
+      ['after-capture', 'capture-delay', 'capture-size', 'quick-actions', 'scenario-panel'] as const
+    ).some(visibility.isVisible);
 
   return (
     <>
@@ -114,13 +111,12 @@ export function ToolbarCaptureActionGroup(
           />
         </PageToolbarGroup>
       ) : null}
-      {capturesVisible && optionsVisible ? <PageToolbarDivider /> : null}
+      <PageToolbarDivider />
       {optionsVisible ? (
         <PageToolbarGroup>
           <ToolbarCaptureMenuGroup
             {...captureProps}
             menus={menus}
-            quickActionsAvailable={preferences.quickActionsToolbar}
             onSelectCaptureAction={onSelectCaptureAction}
           />
         </PageToolbarGroup>
