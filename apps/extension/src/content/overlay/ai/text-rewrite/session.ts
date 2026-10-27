@@ -9,6 +9,7 @@ import {
 import { finalizeQuickEditElementChanges } from '../../../selection/quick-edit';
 import { setNavigationInputShieldSuspended } from '../../../selection/locker';
 import { isTrustedDomEvent } from '../../../platform/trusted-events';
+import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { requestTextReplacement } from './request';
 
 type RequestError =
@@ -54,7 +55,12 @@ function getSubmissionTarget(args: {
   pending: boolean;
   prompt: string;
 }): QuickEditTextReplacementTarget | null {
-  if (!isTrustedDomEvent(args.event) || !args.active || args.pending || !args.prompt.trim())
+  if (
+    (!isTrustedDomEvent(args.event) && !isBridgedMouseEvent(args.event)) ||
+    !args.active ||
+    args.pending ||
+    !args.prompt.trim()
+  )
     return null;
   return args.target;
 }

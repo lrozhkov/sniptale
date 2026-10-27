@@ -10,7 +10,6 @@ import {
   type PagePreparationHistoryBridge,
 } from '../../../parser/page-preparation/history';
 import { initializeContentUiRoots } from '../../../platform/dom-host';
-import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { TextRewriteControl } from './view';
 import { installEditableKeydownBridge } from '../../../runtime/ui-activation-bridge/targets';
 
@@ -108,15 +107,7 @@ export function ui<T extends HTMLElement = HTMLElement>(name: string): T {
   return element;
 }
 export async function click(element: HTMLElement, admitted = true) {
-  const event = createBridgedMouseEvent('click', {
-    button: 0,
-    buttons: 0,
-    clientX: 20,
-    clientY: 30,
-    ctrlKey: false,
-    metaKey: false,
-    shiftKey: false,
-  });
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true, composed: false });
   if (admitted) trusted.add(event);
   await act(async () => element.dispatchEvent(event));
 }

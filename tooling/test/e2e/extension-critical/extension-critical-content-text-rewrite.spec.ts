@@ -346,6 +346,26 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(
         ui(page, 'content.ai-text.footer').locator('[data-ui="content.ai-text.voice"]')
       ).toHaveCount(0);
+      await page.evaluate(() => {
+        for (const type of ['mousedown', 'click']) {
+          window.addEventListener(
+            type,
+            (event) => {
+              if (
+                !event.isTrusted ||
+                event
+                  .composedPath()
+                  .some((node) => node instanceof HTMLElement && node.id === 'ai-text-ordinary') ||
+                !event.composedPath().some((node) => node instanceof HTMLButtonElement)
+              )
+                return;
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            },
+            true
+          );
+        }
+      });
       await popover.locator('.sniptale-ai-model-selector-trigger').click();
       await page.getByRole('button', { name: modelName, exact: true }).click();
       await expect(submit).toHaveAttribute('title', modelTitlePattern);

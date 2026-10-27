@@ -10,6 +10,7 @@ import { isContentEventWithinElement } from '../../../platform/dom-host';
 import { ContentVoiceInputButton } from '../../../voice-input/button';
 import { useAIModalPromptVoiceInput } from '../modal/session/prompt-voice-input';
 import { isTrustedDomEvent, isTrustedKeyboardEvent } from '../../../platform/trusted-events';
+import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import type { useTextRewriteSession } from './session';
 type Session = ReturnType<typeof useTextRewriteSession>;
 function TextRequestFeedback({ session }: { session: Session }) {
@@ -225,7 +226,7 @@ function TextRewritePromptFields({
 }
 
 function requireTrustedModelInteraction(event: SyntheticEvent) {
-  if (isTrustedDomEvent(event.nativeEvent)) return;
+  if (isTrustedDomEvent(event.nativeEvent) || isBridgedMouseEvent(event.nativeEvent)) return;
   event.preventDefault();
   event.stopPropagation();
 }

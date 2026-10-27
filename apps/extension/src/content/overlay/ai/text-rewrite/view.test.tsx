@@ -14,6 +14,7 @@ import {
   ui,
 } from './view.test-support';
 import { act } from 'react';
+import { dispatchBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { translate } from '../../../../platform/i18n';
 import { expect, it, vi } from 'vitest';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
@@ -26,6 +27,7 @@ it('opens the selected text form, rejects synthetic submission and commits liter
   await fill('Shorten this');
   await click(ui('content.ai-text.submit'), false);
   expect(mocks.request).not.toHaveBeenCalled();
+  expect(mocks.remember).not.toHaveBeenCalled();
   mocks.request.mockResolvedValueOnce('<b>Literal answer</b>');
   await submit();
   expect(mocks.request).toHaveBeenCalledWith(
@@ -382,3 +384,72 @@ it.each(['cancel', 'source-change'] as const)(
     if (change === 'cancel') expect(mocks.remember).not.toHaveBeenCalled();
   }
 );
+
+it('accepts the private synchronous bridge for model choice and refuses its retained replay', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ x: 10, y: 10, width: 200, height: 40 })
+  );
+  await selectTarget();
+  const source = new MouseEvent('click');
+  await act(async () => {
+    dispatchBridgedMouseEvent(
+      shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!,
+      'click',
+      source
+    );
+  });
+  const option = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Other text model'
+  );
+  if (!option) throw new Error('Model option missing');
+  let retained: Event | null = null;
+  option.addEventListener('click', (event) => {
+    retained = event;
+  });
+  await act(async () => {
+    dispatchBridgedMouseEvent(option, 'click', source);
+  });
+  expect(mocks.remember).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ scenario: 'page-edit' }),
+    'page-edit',
+    'other',
+    'explicit'
+  );
+  mocks.remember.mockClear();
+  await click(shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!);
+  const reopened = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Text model'
+  );
+  if (!reopened || !retained) throw new Error('Replay fixture missing');
+  await act(async () => {
+    reopened.dispatchEvent(retained!);
+  });
+  expect(mocks.remember).not.toHaveBeenCalled();
+});
+
+it('accepts private bridged Submit once and refuses the retained event on a later target', async () => {
+  await selectTarget();
+  await fill('Bridge instruction');
+  const button = ui('content.ai-text.submit');
+  let retained: Event | null = null;
+  button.addEventListener('click', (event) => {
+    retained = event;
+  });
+  await act(async () => {
+    dispatchBridgedMouseEvent(button, 'click', new MouseEvent('click'));
+  });
+  expect(mocks.request).toHaveBeenCalledOnce();
+  expect(target.textContent).toBe('Edited source');
+  act(() => pagePreparationHistory.undo('page-editing'));
+  await selectTarget();
+  await fill('Retained instruction');
+  mocks.request.mockClear();
+  mocks.remember.mockClear();
+  if (!retained) throw new Error('Retained bridge event missing');
+  await act(async () => {
+    ui('content.ai-text.submit').dispatchEvent(retained!);
+  });
+  expect(mocks.request).not.toHaveBeenCalled();
+  expect(mocks.remember).not.toHaveBeenCalled();
+  expect(target.textContent).toBe('Original words');
+});
