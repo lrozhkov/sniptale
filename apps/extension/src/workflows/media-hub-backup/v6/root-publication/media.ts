@@ -1,3 +1,5 @@
+import { captureMediaInTransaction } from '../../../../composition/persistence/sync-capture/capture';
+import { parseCapturedMediaRows } from '../../../../composition/persistence/sync-capture/guards';
 import {
   publishPreparedMediaSourceInTransaction,
   publishPreparedMediaProjectChildInTransaction,
@@ -53,6 +55,7 @@ import {
   STORE_NAME,
   THUMBNAILS_STORE,
   WEB_SNAPSHOTS_STORE,
+  SYNC_CAPTURE_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
@@ -446,6 +449,22 @@ async function prepareMediaRoot(args: {
 
 type PreparedMediaRoot = Awaited<ReturnType<typeof prepareMediaRoot>>;
 
+/** Broad archive restores can contain graphs outside the original-only capture pilot. */
+function isCaptureOriginal(prepared: PreparedMediaRoot): boolean {
+  return (
+    parseCapturedMediaRows({
+      media: prepared.media,
+      projectAsset: prepared.projectAsset,
+      ref: prepared.original.ref,
+    }) !== null &&
+    !prepared.thumbnail &&
+    !prepared.presentation &&
+    !prepared.workspace &&
+    !prepared.videoReview &&
+    prepared.reviewAssets.length === 0
+  );
+}
+
 async function hasRelatedMediaConflict(stores: MediaRestoreStores, prepared: PreparedMediaRoot) {
   if (prepared.projectAsset)
     return Boolean(await stores.projectAssets.get(prepared.projectAsset.id));
@@ -563,6 +582,7 @@ async function commitPreparedMediaRoot(args: {
     const tx = db.transaction(
       [
         MEDIA_LIBRARY_STORE,
+        SYNC_CAPTURE_STORE,
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,
@@ -647,6 +667,8 @@ async function commitPreparedMediaRoot(args: {
           conflicted: conflict.conflict,
         }
       );
+      if (isCaptureOriginal(args.prepared))
+        await captureMediaInTransaction(tx, args.prepared.media.id, { origin: 'local-restore' });
       await tx.done;
       return { conflicted: conflict.conflict, imported: true };
     } catch (error) {

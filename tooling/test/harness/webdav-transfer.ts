@@ -1,3 +1,4 @@
+import { createWebdavPortableHarness } from './webdav-portable';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { createWebdavRemoteStore } from '../../../apps/extension/src/workflows/sync-transfer/webdav';
 import {
@@ -127,6 +128,7 @@ async function readProof(key: string, expectedSize: number) {
 
 const webdavTransferHarness = {
   connect,
+  portable: createWebdavPortableHarness(connected),
   nativePutCalls: () => nativePutCalls,
   prepareSource,
   uploadSource,

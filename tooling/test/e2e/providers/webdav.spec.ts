@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, writeFile } from 'node:fs/promises';
 import { test as base, expect, type Page, type TestInfo } from '@playwright/test';
+import { applyHarnessBootstrap } from '../extension-critical.helpers';
 import { launchExtensionBrowser } from '../support/extension-browser-launch';
 import { startWebdavLabProxy } from './webdav-server';
 
@@ -334,6 +335,150 @@ if (process.env['SNIPTALE_WEBDAV_TEST_REDIS_FAULTS'] === '1') {
       await saveProof(info, { discovery, refusal, redisRestartVerified: true, original, source });
     } finally {
       await loaded.context.close();
+    }
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`native portable project crosses WebDAV and remains editable after restart ${viewport.width}`, async ({
+    lab,
+  }, info) => {
+    test.setTimeout(180_000);
+    const sender = await openProvider(lab, info, 'portable-source');
+    const sent = await sender.page.evaluate(() => window.webdavTransferHarness.portable.source());
+    try {
+      for (const object of sent.objects)
+        expect(await lab.externalProof(object.key)).toEqual({
+          size: object.size,
+          sha256: object.sha256,
+        });
+      expect(await lab.externalProof('Exports/saved-export.png')).toEqual(sent.exported);
+    } finally {
+      await sender.context.close();
+    }
+    let target = await openProvider(lab, info, 'portable-target');
+    try {
+      const beforeDownload = lab.proxy.counts.gets;
+      const admitted = await target.page.evaluate(() =>
+        window.webdavTransferHarness.portable.target()
+      );
+      expect(admitted.projectId).toBe(sent.projectId);
+      expect(admitted.objects).toEqual(sent.editing);
+      // Two bounded metadata files and two editing originals; no saved export request.
+      expect(lab.proxy.counts.gets - beforeDownload).toBe(4);
+      const editingProof = admitted.objects;
+      await target.context.close();
+      target = await openProvider(lab, info, 'portable-target');
+      expect(
+        await target.page.evaluate(
+          (id) => window.webdavTransferHarness.portable.proof(id),
+          sent.projectId
+        )
+      ).toEqual(admitted);
+      await target.page.setViewportSize(viewport);
+      await applyHarnessBootstrap(target.page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en' },
+      });
+      await target.page.goto(
+        `chrome-extension://${target.extensionId}/tooling/test/harness/video-editor.html?project=${sent.projectId}&theme=light`
+      );
+      await expect(target.page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      await expect
+        .poll(() =>
+          target.page.locator('[data-preview-stage-canvas]').evaluate((node) => {
+            if (!(node instanceof HTMLCanvasElement))
+              throw new Error('Editor preview is not a canvas.');
+            const context = node.getContext('2d');
+            if (!context) throw new Error('Editor preview is unavailable.');
+            const [left, right] = [0.25, 0.75].map(
+              (x) =>
+                context.getImageData(Math.floor(node.width * x), Math.floor(node.height / 2), 1, 1)
+                  .data
+            );
+            return Boolean(
+              left && right && left[0]! > 200 && left[1]! < 120 && right[1]! > 150 && right[0]! < 80
+            );
+          })
+        )
+        .toBe(true);
+      await target.page.screenshot({
+        path: info.outputPath('portable-native-editor.png'),
+        fullPage: false,
+      });
+      const clip = target.page.locator(`[data-project-timeline-clip="${sent.clipId}"]`);
+      await clip.click();
+      await target.page.keyboard.press('Delete');
+      await expect(clip).toHaveCount(0);
+      const proofPage = await target.context.newPage();
+      await proofPage.goto(
+        `chrome-extension://${target.extensionId}/tooling/test/harness/webdav-transfer.html`
+      );
+      await proofPage.waitForFunction(() => Boolean(window.webdavTransferHarness));
+      await expect
+        .poll(async () =>
+          (
+            await proofPage.evaluate(
+              (id) => window.webdavTransferHarness.portable.proof(id),
+              sent.projectId
+            )
+          ).clipIds.includes(sent.clipId)
+        )
+        .toBe(false);
+      // Restore the clip so the saved project still references both editing sources.
+      await target.page.keyboard.press('Control+z');
+      await expect(clip).toHaveCount(1);
+      await expect
+        .poll(async () =>
+          (
+            await proofPage.evaluate(
+              (id) => window.webdavTransferHarness.portable.proof(id),
+              sent.projectId
+            )
+          ).clipIds.includes(sent.clipId)
+        )
+        .toBe(true);
+      expect(
+        (
+          await proofPage.evaluate(
+            (id) => window.webdavTransferHarness.portable.proof(id),
+            sent.projectId
+          )
+        ).objects
+      ).toEqual(editingProof);
+      const backup = await proofPage.evaluate(
+        (input) => window.webdavTransferHarness.portable.afterSaveBackup(input),
+        sent
+      );
+      expect(backup).toMatchObject({
+        portableEncoded: true,
+        projectIncluded: true,
+        borrowedSourceIncluded: true,
+        exportAbsent: true,
+      });
+      expect(backup.generation).toBeGreaterThan(1);
+      expect(backup.imported).toBe(2);
+      expect(backup.clonedProjectId).not.toBe(sent.projectId);
+      expect(backup.restoredObjects).toEqual(sent.editing);
+      expect(backup.originalUnchanged).toBe(true);
+      await target.context.close();
+      target = await openProvider(lab, info, 'portable-target');
+      const persisted = await target.page.evaluate(
+        (id) => window.webdavTransferHarness.portable.proof(id),
+        sent.projectId
+      );
+      expect(persisted.objects).toEqual(editingProof);
+      expect(persisted.exportAbsent).toBe(true);
+      expect(persisted.clipIds).toContain(sent.clipId);
+      await writeFile(
+        info.outputPath('portable-native-proof.json'),
+        JSON.stringify({ sent, persisted, backup, viewport, fullBrowserRestart: true }, null, 2)
+      );
+    } finally {
+      await target.context.close();
     }
   });
 }
