@@ -303,3 +303,8 @@ Queue history uses the existing runtime-log tail and event-history archive. Mess
 A disjoint native delivery cursor records only the source digest and acknowledged sequence. It grants no transfer, settlement, retention-release or unload authority. Acknowledgement requires the current enrollment, retained source and active mutation permit. Failed delivery retains native evidence. A repeated row keeps its safe event identity.
 
 The caller holds one mutation permit through confirmed archive publication, recent-tail publication and native acknowledgement. Privacy erasure waits for that admitted work. Missing or replaced enrollment refuses delayed acknowledgement. Offscreen submits only scope and source hints through the existing bounded diagnostic Port. Background admits exact offscreen provenance and reloads native events before publication. Content cannot request queue delivery. The receiver admits at most four pending streams and coalesces duplicates. Ordinary offscreen cancellation defers submission. The existing archive retention and local-data erasure policies remain authoritative.
+
+Automatic background discovery uses the existing alarm permission. It performs local history delivery only and grants no network authority. Its persisted position contains the enrollment identity, native continuation key and revision. Exclude this sync_outbox metadata from portable exports. Discovery skips acknowledged sources without reading capture payloads or files. Fixed warnings exclude source identities and raw exceptions.
+
+Malformed evidence remains in place. Each publication rechecks native admission and retains the existing privacy mutation barrier. Disposal stops subsequent work. A delayed cursor save refuses erased or replaced enrollment.
+

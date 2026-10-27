@@ -10,11 +10,13 @@ import {
 } from '../../../contracts/diagnostics';
 import { createRuntimeLog } from '../../../composition/persistence/diagnostics/runtime-log';
 import { deliverSyncQueueHistory } from '../../../workflows/sync-transfer/queue-history';
+import { registerQueueHistoryCatchup } from './history-catchup';
 
 /** Bounded diagnostic ingress. Source hints confer no transfer or source-release authority. */
 export function registerDiagnosticLogPorts(): () => void {
   const log = createRuntimeLog();
   const maintenance = createMaintenanceLog();
+  const catchup = registerQueueHistoryCatchup();
   const active = new Set<() => void>();
   const pendingHistory = new Set<string>();
   const unsubscribe = browserRuntime.subscribeToConnections((port) => {
@@ -65,7 +67,9 @@ export function registerDiagnosticLogPorts(): () => void {
     port.onMessage.addListener(onMessage);
     port.onDisconnect.addListener(close);
   });
+  void catchup.run();
   return () => {
+    catchup.dispose();
     unsubscribe();
     for (const close of active) close();
   };

@@ -843,7 +843,17 @@ The delivery workflow opens the database before it requests that permit. It publ
 
 Delivery is at least once. A restart after archive publication can repeat a row with the same source digest and sequence. The journal timestamp identifies delivery observation because native markers contain no original event timestamp. Explicit gap rows report markers outside bounded retention. The workflow preserves every retained native marker after acknowledgement.
 
-Selected offscreen execution sends source hints through the existing diagnostic Port after request containment. The background receiver admits exact offscreen provenance and reloads native transitions. It coalesces duplicate hints and admits at most four pending deliveries. A hint is not a delivery receipt. Cancellation does not start another submission. The workflow and its admitted writes finish before privacy erasure can pass its mutation barrier. Startup catch-up scheduling and the queue command interface remain separate release requirements.
+Selected offscreen execution sends source hints through the existing diagnostic Port after request containment. The background receiver admits exact offscreen provenance and reloads native transitions. It coalesces duplicate hints and admits at most four pending deliveries. A hint is not a delivery receipt. Cancellation does not start another submission. The workflow and its admitted writes finish before privacy erasure can pass its mutation barrier. The queue command interface remains a separate release requirement.
+
+Background diagnostic registration starts one local history pass and listens to its dedicated browser alarm. Each pass checks or recreates the one-minute alarm before enrollment reads. Missing enrollment clears only that alarm. Browser scheduling provides no exact deadline. Overlapping automatic passes share one promise.
+
+Disposal prevents new sources and progress writes. Already admitted publication drains through the existing mutation barrier.
+
+Native history discovery reads at most two pages of 64 operation rows per pass. Each page uses bounded readonly metadata queries and skips acknowledged sources without capture or file reads. A separate enrollment-bound cursor stores the last scanned native key and revision under sync_outbox. Reads create no cursor. Position writes require current enrollment, mutation admission and revision CAS.
+
+The pass attempts each selected source before saving its page position. Failed delivery preserves the source acknowledgement for another cycle. The final page resets the position to the beginning. New rows before a saved position appear on the next cycle. Malformed rows and delivery cursors remain intact.
+
+Discovery counts them and advances past their native keys. A backend failure or stale scan state refuses the page or progress write. Restart resumes the last committed position. These bounds require capacity qualification before production activation. Enrollment commands must schedule discovery when activation becomes available.
 
 This experimental runner requires an explicitly admitted provider client. Production credentials, request authorization, offscreen lifecycle, Settings controls and event-history delivery remain separate release requirements. Capture enrollment is not network authorization. Future lifecycle admission must check its own revision at every actual HTTP request. The profile remains disabled by default.
 

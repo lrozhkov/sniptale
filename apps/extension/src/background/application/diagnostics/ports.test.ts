@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   append: vi.fn(),
   maintenance: vi.fn(),
   history: vi.fn(),
+  catchupRun: vi.fn().mockResolvedValue(undefined),
+  catchupDispose: vi.fn(),
   unsubscribe: vi.fn(),
 }));
 vi.mock('@sniptale/platform/browser/runtime', () => ({
@@ -21,6 +23,9 @@ vi.mock('../../../composition/persistence/library-lifecycle/maintenance-log', ()
 }));
 vi.mock('../../../workflows/sync-transfer/queue-history', () => ({
   deliverSyncQueueHistory: mocks.history,
+}));
+vi.mock('./history-catchup', () => ({
+  registerQueueHistoryCatchup: () => ({ run: mocks.catchupRun, dispose: mocks.catchupDispose }),
 }));
 import { registerDiagnosticLogPorts } from './ports';
 import { DIAGNOSTIC_LOG_PORT } from '../../../contracts/diagnostics';
@@ -247,4 +252,11 @@ it('contains a rejected delivery promise and releases its bounded pending slot',
   await Promise.resolve();
   await Promise.resolve();
   f.dispose();
+});
+
+it('starts history recovery and disposes its registration with diagnostic ingress', () => {
+  const f = setup();
+  expect(mocks.catchupRun).toHaveBeenCalledOnce();
+  f.dispose();
+  expect(mocks.catchupDispose).toHaveBeenCalledOnce();
 });

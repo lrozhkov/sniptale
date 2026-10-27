@@ -68,7 +68,14 @@ async function readHistorySource(
     ? readSyncQueueSourceInTransaction(tx, scope, null)
     : readSyncQueueSourceInTransaction(tx, scope, source.operationId);
 }
-async function readHistoryCursor(
+/** Invalid persisted delivery progress; source evidence must remain unchanged. */
+export class InvalidSyncQueueHistoryProgressError extends Error {
+  constructor() {
+    super('Invalid sync queue history cursor.');
+  }
+}
+/** Read and validate canonical delivery progress inside the caller-owned transaction. */
+export async function readSyncQueueHistoryProgressInTransaction(
   tx: QueueTransaction,
   sourceRef: string,
   eventSequence: number
@@ -85,7 +92,7 @@ async function readHistoryCursor(
     !queueOrdinal(raw['deliveredSequence']) ||
     raw['deliveredSequence'] > eventSequence
   )
-    throw new Error('Invalid sync queue history cursor.');
+    throw new InvalidSyncQueueHistoryProgressError();
   return raw['deliveredSequence'];
 }
 function historyBatchInput(value: unknown): SyncQueueHistoryBatch {
@@ -137,7 +144,11 @@ export async function loadSyncQueueHistoryBatch(
   const db = await initDB();
   const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
   const row = await readHistorySource(tx, scope, source);
-  const deliveredSequence = await readHistoryCursor(tx, sourceRef, row.eventSequence);
+  const deliveredSequence = await readSyncQueueHistoryProgressInTransaction(
+    tx,
+    sourceRef,
+    row.eventSequence
+  );
   await tx.done;
   return {
     scope,
@@ -174,7 +185,11 @@ export async function acknowledgeSyncQueueHistory(
       if (retained && JSON.stringify(retained) !== JSON.stringify(selected))
         throw new Error('Sync queue history source changed.');
     }
-    const current = await readHistoryCursor(tx, batch.sourceRef, row.eventSequence);
+    const current = await readSyncQueueHistoryProgressInTransaction(
+      tx,
+      batch.sourceRef,
+      row.eventSequence
+    );
     if (batch.deliveredSequence > current) throw new Error('Sync queue history cursor changed.');
     if (!isActivePersistenceMutationPermit(permit))
       throw new Error('Sync queue history mutation permit required.');

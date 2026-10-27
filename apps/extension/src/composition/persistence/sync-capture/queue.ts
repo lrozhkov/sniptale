@@ -76,7 +76,11 @@ function defaultConnection(scope: SyncQueueScope): SyncQueueConnection {
     droppedTransitions: 0,
   };
 }
-async function checkProfile(tx: QueueTransaction, scope: SyncQueueScope): Promise<void> {
+/** Require current enrollment inside the caller-owned native transaction. */
+export async function requireSyncQueueScopeInTransaction(
+  tx: QueueTransaction,
+  scope: SyncQueueScope
+): Promise<void> {
   const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
   if (
     !profile ||
@@ -151,7 +155,7 @@ async function mutateQueue<T>(
   mutate: (tx: IDBPTransaction<unknown, string[], 'readwrite'>) => Promise<T>
 ): Promise<T> {
   return withSyncQueueTransaction(async (tx) => {
-    await checkProfile(tx, scope);
+    await requireSyncQueueScopeInTransaction(tx, scope);
     return mutate(tx);
   });
 }
@@ -162,7 +166,7 @@ export async function loadSyncQueue(
   const scope = scopeInput(value);
   const db = await initDB();
   const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
-  await checkProfile(tx, scope);
+  await requireSyncQueueScopeInTransaction(tx, scope);
   const connection = await readConnection(tx, scope);
   const prefix = queueOperationPrefix(scope);
   const rows: unknown[] = await tx
@@ -188,7 +192,7 @@ export async function readSyncQueueSourceInTransaction(
   const scope = scopeInput(value);
   if (operationId !== null && !queueIdentity(operationId))
     throw new Error('Invalid sync queue operation identity.');
-  await checkProfile(tx, scope);
+  await requireSyncQueueScopeInTransaction(tx, scope);
   return operationId === null ? readConnection(tx, scope) : readOperation(tx, scope, operationId);
 }
 /** Continuation within one enrollment lifetime. Pages are live reads, not a shared snapshot. */
@@ -205,7 +209,7 @@ export async function loadSyncQueueOperation(
   if (!queueIdentity(operationId)) throw new Error('Invalid sync queue operation identity.');
   const db = await initDB();
   const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
-  await checkProfile(tx, scope);
+  await requireSyncQueueScopeInTransaction(tx, scope);
   const operation = await readOperation(tx, scope, operationId);
   await tx.done;
   return operation;
@@ -237,7 +241,7 @@ export async function loadSyncQueuePage(value: SyncQueueScope, options: unknown 
   const { limit, afterOperationId } = pageInput(scope, options);
   const db = await initDB();
   const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
-  await checkProfile(tx, scope);
+  await requireSyncQueueScopeInTransaction(tx, scope);
   const connection = await readConnection(tx, scope);
   const prefix = queueOperationPrefix(scope);
   const range = IDBKeyRange.bound(
