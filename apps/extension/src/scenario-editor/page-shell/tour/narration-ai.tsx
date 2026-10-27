@@ -42,10 +42,18 @@ export function TourNarrationAI({
   const operation = useScenarioNarrationAI(
     access,
     targets.filter((target) => selected.has(scenarioNarrationTargetKey(target))),
-    async (frozenProfile, providerId, signal) => {
+    async (frozenProfile, approvedSelection, signal) => {
       const prepared = await selection.prepareModelSelection(signal);
       const model = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
-      if (prepared.modelId !== frozenProfile.modelId || model?.providerId !== providerId)
+      const provider = prepared.catalog.providers.find((entry) => entry.id === model?.providerId);
+      if (
+        !model ||
+        prepared.modelId !== frozenProfile.modelId ||
+        prepared.modelId !== approvedSelection.modelId ||
+        model.providerId !== approvedSelection.approvedProviderId ||
+        model.modelCode !== approvedSelection.approvedModelCode ||
+        provider?.destinationBinding !== approvedSelection.approvedDestination
+      )
         throw new Error('model-unavailable');
     }
   );
@@ -76,7 +84,18 @@ export function TourNarrationAI({
   ]);
   const model = catalog?.models.find((entry) => entry.id === profile?.modelId);
   const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
-  useEffect(() => setApproved(null), [provider?.id]);
+  const approvedSelection =
+    model && provider?.destinationBinding
+      ? {
+          modelId: model.id,
+          approvedProviderId: provider.id,
+          approvedModelCode: model.modelCode,
+          approvedDestination: provider.destinationBinding,
+        }
+      : null;
+  const approvalKey = approvedSelection ? JSON.stringify(approvedSelection) : null;
+  const isApproved = approvalKey !== null && approved === approvalKey;
+  useEffect(() => setApproved(null), [approvalKey]);
   const attemptBusy = operation.running || operation.applying;
   const busy = attemptBusy || selection.selectionPending;
   return (
@@ -191,9 +210,9 @@ export function TourNarrationAI({
             <input
               data-ai-consent
               type="checkbox"
-              checked={approved === provider.id}
-              disabled={busy || disabled}
-              onChange={(event) => setApproved(event.currentTarget.checked ? provider.id : null)}
+              checked={isApproved}
+              disabled={busy || disabled || !approvedSelection}
+              onChange={(event) => setApproved(event.currentTarget.checked ? approvalKey : null)}
             />
             <span>{t('scenario.editor.tourNarrationAIConsent')}</span>
           </label>
@@ -209,8 +228,8 @@ export function TourNarrationAI({
             !profile ||
             !profile.voiceId.trim() ||
             profile.modelId !== selection.modelId ||
-            !provider ||
-            approved !== provider.id ||
+            !approvedSelection ||
+            !isApproved ||
             !operation.remaining
           }
           onClick={() => {
@@ -218,10 +237,10 @@ export function TourNarrationAI({
               profile &&
               profile.voiceId.trim() &&
               profile.modelId === selection.modelId &&
-              provider &&
-              approved === provider.id
+              approvedSelection &&
+              isApproved
             )
-              void operation.generate(profile, provider.id);
+              void operation.generate(profile, approvedSelection);
           }}
         >
           {t('gallery.videoReview.speechGenerateSelected')}

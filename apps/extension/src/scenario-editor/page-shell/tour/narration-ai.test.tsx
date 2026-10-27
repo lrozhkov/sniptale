@@ -99,6 +99,8 @@ beforeEach(async () => {
       {
         id: 'p',
         name: 'Disclosed provider',
+        incarnation: 'one',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
         connectionType: 'openai-compatible',
         destinationKind: 'external',
         hasStoredApiKey: true,
@@ -152,6 +154,12 @@ it('requires provider approval and explicit Apply before changing the current na
   expect(io.generate).not.toHaveBeenCalled();
   await start();
   expect(io.generate).toHaveBeenCalledTimes(3);
+  expect(io.generate.mock.calls[0]?.[2]).toEqual({
+    modelId: 'm',
+    approvedProviderId: 'p',
+    approvedModelCode: 'tts',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+  });
   expect(access.applyNarration).not.toHaveBeenCalled();
   expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(3);
   await act(async () => button('[data-ai-apply="a"]').click());
@@ -624,3 +632,42 @@ it('initializes the updated profile only after explicit replacement under the sa
   expect(access.applyNarration).not.toHaveBeenCalled();
   expect(io.generate).not.toHaveBeenCalled();
 });
+
+it.each(['destination', 'model-code'] as const)(
+  'clears Scenario approval after same-ID %s replacement',
+  async (change) => {
+    const checkbox = host.querySelector<HTMLInputElement>('[data-ai-consent]')!;
+    await act(async () => checkbox.click());
+    expect(checkbox.checked).toBe(true);
+    const next = structuredClone(fixture);
+    if (change === 'destination')
+      next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+    else next.models[0]!.modelCode = 'replacement-code';
+    io.catalog.mockResolvedValue(next);
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!.click()
+    );
+    expect(host.querySelector<HTMLInputElement>('[data-ai-consent]')?.checked ?? false).toBe(false);
+    expect(button('[data-ai-generate]').disabled).toBe(true);
+    expect(access.prepareNarration).not.toHaveBeenCalled();
+    expect(io.generate).not.toHaveBeenCalled();
+  }
+);
+it.each(['destination', 'model-code'] as const)(
+  'refuses changed Scenario %s after approval before source Save',
+  async (change) => {
+    await editVoice('retained voice');
+    await act(async () => host.querySelector<HTMLInputElement>('[data-ai-consent]')!.click());
+    const next = structuredClone(fixture);
+    if (change === 'destination')
+      next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+    else next.models[0]!.modelCode = 'replacement-code';
+    io.catalog.mockResolvedValue(next);
+    await act(async () => button('[data-ai-generate]').click());
+    expect(access.prepareNarration).not.toHaveBeenCalled();
+    expect(io.generate).not.toHaveBeenCalled();
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+      'retained voice'
+    );
+  }
+);

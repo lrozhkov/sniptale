@@ -1535,10 +1535,10 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx",
       "symbol": "TourNarrationAI",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: This form owns one voice draft, provider approval, explicit profile-reset intent and target selection lifetime. The shared selection hook owns catalog admission and preference commands. Voice parameters and results remain existing local components. The existing attempt hook owns generation and explicit publication. Mounted proof reproduces same-ID replacement and checks refusal before the correction. Primary viewport and real provider proof cover selection, cancellation, Apply and retained playback. This function adds no durable writer, network owner or independent recovery. Forwarding components would distribute the same visible receiver.",
+      "reason": "tool-noise: This 272-line form owns one voice draft, destination approval, explicit profile-reset intent and target selection lifetime. Score5 delta0 and the existing three owner groups remain unchanged. The complete approved identity only refines the existing approval key and fresh admission. The shared selection hook owns catalog admission and preference commands. The existing attempt hook owns generation and explicit publication. Controlled mounted proof covers same-ID code and destination changes and refusal before source Save. This function adds no durable writer, network owner or independent recovery. Forwarding components would distribute the same visible receiver.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
       "reviewDate": "2026-10-27",
-      "astHash": "96dbc7b6e6fc4450623c02f215b6fb7e8144544d25bda2daaa13f1d3e8577d78",
+      "astHash": "d650485d52606c861fc589d010ac7b5a501cccca6e825a8bcd58be3b21fba90d",
       "signatureHash": "fc2ff29cd7dd2af6b1c33aef69f08045dd9326a84c0b638dfa741c6352cf3124"
     },
     {
@@ -1546,11 +1546,11 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/use-narration-ai.ts",
       "symbol": "useScenarioNarrationAI",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: This hook owns one mounted attempt and disposable preview receiver. Its ref and React state represent the same attempt. One active controller serializes selection preparation, source preparation, generation and Apply. Cancellation during preference preparation prevents late source saves and provider work. Accepted durable state remains with the existing page mutation owner. Controlled tests cover refusal, cancellation, disposal, partial success and retry. Browser and real NeuralDeep proof cover Apply and retained playback. Splitting these transitions would distribute cancellation and preview disposal authority.",
+      "reason": "tool-noise: This 172-line hook owns one mounted attempt and disposable preview receiver. Score1 delta0 remains unchanged. Its ref and React state represent the same attempt. The approved snapshot is copied before preparation and retained by each queued request. One active controller serializes selection preparation, source preparation, generation and Apply. Cancellation during preference preparation prevents late source saves and provider work. Accepted durable state remains with the existing page mutation owner. Controlled tests cover deferred Save, refusal, cancellation, disposal, partial success and retry. Splitting these transitions would distribute cancellation and preview disposal authority.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
       "reviewDate": "2026-10-27",
-      "astHash": "7d7b2afb4e4f20ac19f568f84f096fcd314a33121068be09425b0f3a27a46b0a",
-      "signatureHash": "22ad8af849d5fadda9ae5b07e455b144ba6e9b6f835d2ac25b644caa79fbec20"
+      "astHash": "fe0acf6907d3c1e8e619910d25c9bc9c9914c220d7be600810c7e028a6791052",
+      "signatureHash": "ebbe3536369917af01b944fd961d6953a5f3f38a18ac1d8015c49bb992934c9e"
     },
     {
       "rule": "structural-function-risk",

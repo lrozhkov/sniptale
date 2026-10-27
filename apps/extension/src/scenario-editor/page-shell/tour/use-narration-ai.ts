@@ -1,3 +1,7 @@
+import {
+  parseVoiceProviderSelection,
+  type VoiceProviderSelection,
+} from '@sniptale/runtime-contracts/voice-input';
 import { useEffect, useRef, useState } from 'react';
 import type { ScenarioProjectSnapshot } from '../../../composition/persistence/scenario/contracts';
 import type { ScenarioNarrationText } from '../../../features/scenario/project/public';
@@ -36,7 +40,7 @@ export function useScenarioNarrationAI(
   targets: readonly ScenarioNarrationText[],
   prepareSelection?: (
     profile: AISpeechModelParameters & { modelId: string },
-    providerId: string,
+    approvedSelection: VoiceProviderSelection,
     signal: AbortSignal
   ) => Promise<void>
 ) {
@@ -76,7 +80,7 @@ export function useScenarioNarrationAI(
   const readyKey = (entry: Ready) => scenarioNarrationTargetKey(entry.preview.scope.target);
   const generate = async (
     profile: AISpeechModelParameters & { modelId: string },
-    approvedProviderId: string
+    approvedSelection: VoiceProviderSelection
   ) => {
     const lifetime = owner.current;
     if (lifetime.active || !lifetime.mounted) return;
@@ -87,11 +91,16 @@ export function useScenarioNarrationAI(
     if (!selected.length) return;
     const signature = JSON.stringify(lifetime.targets);
     const frozenProfile = structuredClone(profile);
+    const approved = parseVoiceProviderSelection(approvedSelection);
+    if (!approved || approved.modelId !== frozenProfile.modelId) {
+      update({ failed: true });
+      return;
+    }
     const controller = new AbortController();
     lifetime.active = controller;
     update({ running: true, failed: false, errors: {}, completed: 0, total: selected.length });
     try {
-      await lifetime.prepareSelection?.(frozenProfile, approvedProviderId, controller.signal);
+      await lifetime.prepareSelection?.(frozenProfile, { ...approved }, controller.signal);
       controller.signal.throwIfAborted();
       if (!lifetime.mounted || JSON.stringify(lifetime.targets) !== signature)
         throw new Error('stale');
@@ -106,7 +115,7 @@ export function useScenarioNarrationAI(
           const preview = await generateScenarioNarration(
             basis,
             frozenProfile,
-            approvedProviderId,
+            approved,
             controller.signal
           );
           if (!lifetime.mounted || controller.signal.aborted) {
