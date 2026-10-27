@@ -7,12 +7,15 @@ import {
 } from '../../composition/persistence/remote-connection/workspace-allocation';
 import {
   parseSyncConnectionIdentity,
+  parseConnectionAuthentication,
+  type SyncConnectionAuthentication,
   sameSyncConnectionIdentity,
 } from '../../composition/persistence/remote-connection/model';
 import { parseSyncWorkspaceMarker } from '../../contracts/sync-workspace';
 import { SyncCatalogError } from './catalog';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
-import type { createWebdavWorkspaceWriter } from './webdav';
+import { allocateWebdavWorkspaceRoot, createWebdavWorkspaceWriter } from './webdav';
+import { createSyncWorkspaceRequests } from './connection-requests';
 import { prepareSyncWorkspaceJoin, SyncWorkspaceError } from './workspace';
 
 type WebdavWorkspaceWriter = Awaited<ReturnType<typeof createWebdavWorkspaceWriter>>;
@@ -25,7 +28,9 @@ type WebdavWorkspaceClientFactory = (
 
 /** Fixed creation failures contain no endpoint, provider body or native exception. */
 class WebdavWorkspaceCreationError extends Error {
-  constructor(readonly code: 'allocation-refused' | 'foreign-metadata' | 'unavailable') {
+  constructor(
+    readonly code: 'allocation-refused' | 'foreign-metadata' | 'unavailable' | 'containment-failed'
+  ) {
     super(code);
     this.name = 'WebdavWorkspaceCreationError';
   }
@@ -217,4 +222,134 @@ export async function finishWebdavWorkspaceCreation(
       throw error;
     throw new WebdavWorkspaceCreationError('unavailable');
   }
+}
+
+/**
+ * Own one creation attempt and its in-memory credentials until all issued IO is contained.
+ * The caller must close this execution before it reports lifecycle or privacy completion.
+ * This installs no profile or connection and never adopts an uncertain allocating root.
+ */
+export function createWebdavWorkspaceCreation(options: {
+  identity: unknown;
+  authentication: unknown;
+  hasOriginPermission: (origin: string) => Promise<boolean>;
+}) {
+  let identity;
+  let detachedAuthentication: unknown;
+  try {
+    identity = parseSyncConnectionIdentity(structuredClone(options.identity));
+    detachedAuthentication = structuredClone(options.authentication);
+  } catch {
+    throw new SyncRemoteError('invalid-configuration');
+  }
+  if (!identity) throw new SyncRemoteError('invalid-configuration');
+  const selectedIdentity = identity;
+  const hasOriginPermission = options.hasOriginPermission;
+  const controller = new AbortController();
+  let authentication: SyncConnectionAuthentication | null = null;
+  let requests: ReturnType<typeof createSyncWorkspaceRequests> | null = null;
+  let running: Promise<Awaited<ReturnType<typeof finishWebdavWorkspaceCreation>>> | null = null;
+  let closing: Promise<void> | null = null;
+  let contained = false;
+
+  function clientOptions(plan: SyncWorkspaceAllocation) {
+    return {
+      rootUrl: plan.rootUrl,
+      authentication: async () => {
+        controller.signal.throwIfAborted();
+        if (!authentication) throw new SyncRemoteError('authentication');
+        return authentication;
+      },
+      request: (signal: AbortSignal, issue: (signal: AbortSignal) => Promise<Response>) => {
+        if (!requests) throw new SyncRemoteError('cancelled');
+        return requests.request(plan.identity, plan.phase, signal, issue);
+      },
+    };
+  }
+  async function execute() {
+    const signal = controller.signal;
+    let outcome:
+      | { kind: 'success'; value: Awaited<ReturnType<typeof finishWebdavWorkspaceCreation>> }
+      | { kind: 'failure'; error: Error };
+    try {
+      signal.throwIfAborted();
+      let plan = await loadSyncWorkspaceAllocation();
+      signal.throwIfAborted();
+      if (
+        !plan ||
+        !sameSyncConnectionIdentity(plan.identity, selectedIdentity) ||
+        plan.phase === 'allocating' ||
+        plan.phase === 'abandoned'
+      )
+        throw new WebdavWorkspaceCreationError('allocation-refused');
+      authentication = parseConnectionAuthentication(detachedAuthentication, plan.accountId);
+      detachedAuthentication = null;
+      if (!authentication) throw new SyncRemoteError('invalid-configuration');
+      requests = createSyncWorkspaceRequests({ allocation: plan, hasOriginPermission });
+      if (plan.phase === 'planned') {
+        const plannedIdentity = plan.identity;
+        plan = await nativeCommand(signal, () =>
+          commandSyncWorkspaceAllocation(plannedIdentity, 'allocate')
+        );
+        await allocateWebdavWorkspaceRoot(clientOptions(plan), signal);
+        const allocatingIdentity = plan.identity;
+        plan = await nativeCommand(signal, () =>
+          commandSyncWorkspaceAllocation(allocatingIdentity, 'confirm')
+        );
+      }
+      const result = await finishWebdavWorkspaceCreation(
+        (current, requestSignal) =>
+          createWebdavWorkspaceWriter(clientOptions(current), requestSignal),
+        plan.identity,
+        signal
+      );
+      outcome = { kind: 'success', value: result };
+    } catch (error) {
+      if (signal.aborted) outcome = { kind: 'failure', error: new SyncWorkspaceError('cancelled') };
+      else if (
+        error instanceof WebdavWorkspaceCreationError ||
+        error instanceof SyncWorkspaceError ||
+        error instanceof SyncRemoteError ||
+        error instanceof SyncCatalogError
+      )
+        outcome = { kind: 'failure', error };
+      else outcome = { kind: 'failure', error: new WebdavWorkspaceCreationError('unavailable') };
+    }
+    try {
+      await requests?.close();
+      contained = true;
+    } catch {
+      contained = false;
+    }
+    authentication = null;
+    detachedAuthentication = null;
+    if (!contained) throw new WebdavWorkspaceCreationError('containment-failed');
+    if (outcome.kind === 'failure') throw outcome.error;
+    return outcome.value;
+  }
+  function run() {
+    running ??= execute();
+    return running;
+  }
+  function close(): Promise<void> {
+    if (closing) return closing;
+    controller.abort();
+    closing = (async () => {
+      let failed = false;
+      try {
+        await requests?.close();
+      } catch {
+        failed = true;
+      }
+      if (running) await running.catch(() => undefined);
+      else {
+        authentication = null;
+        detachedAuthentication = null;
+        contained = true;
+      }
+      if (failed || !contained) throw new WebdavWorkspaceCreationError('containment-failed');
+    })();
+    return closing;
+  }
+  return { run, close };
 }

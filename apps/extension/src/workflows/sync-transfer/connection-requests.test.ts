@@ -3,10 +3,18 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { withSyncConnectionAdmissionLock } from '../../composition/persistence/remote-connection/coordination';
 import type { SyncConnectionMetadata } from '../../composition/persistence/remote-connection/model';
 import { loadSyncConnection } from '../../composition/persistence/remote-connection/store';
-import { createSyncConnectionRequests } from './connection-requests';
+import {
+  loadSyncWorkspaceAllocation,
+  type SyncWorkspaceAllocation,
+} from '../../composition/persistence/remote-connection/workspace-allocation';
+import { createSyncConnectionRequests, createSyncWorkspaceRequests } from './connection-requests';
 
 vi.mock('../../composition/persistence/remote-connection/store', () => ({
   loadSyncConnection: vi.fn(),
+}));
+
+vi.mock('../../composition/persistence/remote-connection/workspace-allocation', () => ({
+  loadSyncWorkspaceAllocation: vi.fn(),
 }));
 
 function deferred<T>() {
@@ -428,3 +436,290 @@ it('consumes successful response bytes and never dispatches after closure', asyn
   expect(issue).not.toHaveBeenCalled();
   expect(loadSyncConnection).toHaveBeenCalledTimes(reads);
 });
+
+function allocation(): SyncWorkspaceAllocation {
+  const bootstrapId = '22222222-2222-4222-8222-222222222222';
+  return {
+    version: 2,
+    kind: 'sync-workspace-allocation',
+    key: 'workspace-allocation',
+    provider: 'webdav',
+    parentUrl: 'https://dav.example/parent/',
+    rootUrl: `https://dav.example/parent/Sniptale-${bootstrapId}/`,
+    accountId: 'alice',
+    spaceId: '33333333-3333-4333-8333-333333333333',
+    bootstrapId,
+    createdAt: 1,
+    identity: { ...identity },
+    phase: 'allocating',
+    marker: null,
+  };
+}
+function workspaceSetup() {
+  const original = allocation();
+  let current: SyncWorkspaceAllocation | null = structuredClone(original);
+  const locks = admissionLocks();
+  vi.stubGlobal('navigator', { locks });
+  vi.mocked(loadSyncWorkspaceAllocation).mockImplementation(async () => structuredClone(current));
+  const permission = vi.fn(async (_origin: string) => true);
+  const requests = createSyncWorkspaceRequests({
+    allocation: original,
+    hasOriginPermission: permission,
+  });
+  const request = (issue: (signal: AbortSignal) => Promise<Response>) =>
+    requests.request(identity, 'allocating', signal(), issue);
+  return {
+    original,
+    requests,
+    request,
+    permission,
+    locks,
+    replace(value: SyncWorkspaceAllocation | null) {
+      current = value;
+    },
+  };
+}
+
+it.each([
+  'missing',
+  'phase',
+  'revision',
+  'incarnation',
+  'parentUrl',
+  'rootUrl',
+  'accountId',
+  'spaceId',
+  'bootstrapId',
+  'createdAt',
+  'planned',
+  'abandoned',
+])('refuses workspace %s changes before dispatch', async (condition) => {
+  const f = workspaceSetup();
+  const changed = allocation();
+  if (condition === 'phase') changed.phase = 'allocated';
+  if (condition === 'revision') changed.identity.revision++;
+  if (condition === 'incarnation')
+    changed.identity.incarnation = '44444444-4444-4444-8444-444444444444';
+  if (condition === 'parentUrl') changed.parentUrl = 'https://dav.example/another/';
+  if (condition === 'rootUrl') changed.rootUrl = 'https://dav.example/another/child/';
+  if (condition === 'accountId') changed.accountId = 'bob';
+  if (condition === 'spaceId') changed.spaceId = '44444444-4444-4444-8444-444444444444';
+  if (condition === 'bootstrapId') changed.bootstrapId = '44444444-4444-4444-8444-444444444444';
+  if (condition === 'createdAt') changed.createdAt++;
+  if (condition === 'planned' || condition === 'abandoned') changed.phase = condition;
+  f.replace(condition === 'missing' ? null : changed);
+  const issue = vi.fn(async (_signal: AbortSignal) => emptyResponse());
+  const expectedPhase =
+    condition === 'planned' || condition === 'abandoned' ? condition : 'allocating';
+  await expect(f.requests.request(identity, expectedPhase, signal(), issue)).rejects.toMatchObject({
+    code: 'authentication',
+  });
+  expect(issue).not.toHaveBeenCalled();
+  expect(f.permission).not.toHaveBeenCalled();
+  await f.requests.close();
+});
+
+it('shares one detached lifetime across changing workspace phase clients', async () => {
+  const f = workspaceSetup();
+  f.original.accountId = 'changed caller value';
+  f.original.identity.incarnation = '44444444-4444-4444-8444-444444444444';
+  const phases = [
+    'allocating',
+    'allocated',
+    'preparing-marker',
+    'publishing-marker',
+    'ready',
+  ] as const;
+  for (const [index, phase] of phases.entries()) {
+    const current = allocation();
+    current.identity.revision += index;
+    current.phase = phase;
+    f.replace(current);
+    const response = await f.requests.request(current.identity, phase, signal(), async () =>
+      emptyResponse()
+    );
+    expect(response.status).toBe(204);
+    if (index > 0) {
+      const stale = vi.fn(async (_signal: AbortSignal) => emptyResponse());
+      await expect(f.request(stale)).rejects.toMatchObject({ code: 'authentication' });
+      expect(stale).not.toHaveBeenCalled();
+    }
+  }
+  await f.requests.close();
+});
+
+it.each(['installed-profile', 'installed-connection', 'erased-database', 'permission-error'])(
+  'contains workspace %s admission errors in a fixed diagnostic',
+  async (condition) => {
+    const f = workspaceSetup();
+    if (condition === 'permission-error')
+      f.permission.mockRejectedValue(new Error('private provider URL and credentials'));
+    else
+      vi.mocked(loadSyncWorkspaceAllocation).mockRejectedValue(new Error('private native state'));
+    const issue = vi.fn(async (_signal: AbortSignal) => emptyResponse());
+    await expect(f.request(issue)).rejects.toMatchObject({ code: 'transport' });
+    expect(issue).not.toHaveBeenCalled();
+    await f.requests.close();
+  }
+);
+
+it('checks the workspace root origin and refuses denied permission', async () => {
+  const f = workspaceSetup();
+  f.permission.mockResolvedValue(false);
+  const issue = vi.fn(async (_signal: AbortSignal) => emptyResponse());
+  await expect(f.request(issue)).rejects.toMatchObject({ code: 'access-denied' });
+  expect(f.permission).toHaveBeenCalledExactlyOnceWith('https://dav.example');
+  expect(issue).not.toHaveBeenCalled();
+  await f.requests.close();
+});
+
+it.each(['erase', 'recreate', 'abandon', 'advance', 'install'])(
+  'refuses workspace %s while origin permission is pending',
+  async (condition) => {
+    const f = workspaceSetup();
+    const checking = deferred<void>();
+    const permission = deferred<boolean>();
+    f.permission.mockImplementation(async () => {
+      checking.resolve();
+      return permission.promise;
+    });
+    const expected = { ...identity };
+    const issue = vi.fn(async (_signal: AbortSignal) => emptyResponse());
+    const pending = f.requests.request(expected, 'allocating', signal(), issue);
+    const rejected = expect(pending).rejects.toMatchObject({
+      code: condition === 'install' ? 'transport' : 'authentication',
+    });
+    await checking.promise;
+    expected.revision++;
+    const changed = allocation();
+    if (condition === 'recreate')
+      changed.identity.incarnation = '44444444-4444-4444-8444-444444444444';
+    if (condition === 'abandon') changed.phase = 'abandoned';
+    if (condition === 'advance') changed.identity.revision++;
+    f.replace(condition === 'erase' ? null : changed);
+    if (condition === 'install')
+      vi.mocked(loadSyncWorkspaceAllocation).mockRejectedValue(
+        new Error('private installed state')
+      );
+    permission.resolve(true);
+    await rejected;
+    expect(issue).not.toHaveBeenCalled();
+    await f.requests.close();
+  }
+);
+
+it('closes queued workspace admission synchronously and drains permission before returning', async () => {
+  const f = workspaceSetup();
+  const checking = deferred<void>();
+  const permission = deferred<boolean>();
+  f.permission.mockImplementationOnce(async () => {
+    checking.resolve();
+    return permission.promise;
+  });
+  const issue = vi.fn(async (_signal: AbortSignal) => emptyResponse());
+  const first = expect(f.request(issue)).rejects.toMatchObject({ code: 'cancelled' });
+  await checking.promise;
+  const queued = expect(f.request(issue)).rejects.toMatchObject({ code: 'cancelled' });
+  let closed = false;
+  const closing = f.requests.close().then(() => {
+    closed = true;
+  });
+  expect(closed).toBe(false);
+  const afterClose = expect(f.request(issue)).rejects.toMatchObject({ code: 'cancelled' });
+  permission.resolve(true);
+  await Promise.all([first, queued, afterClose, closing]);
+  expect(issue).not.toHaveBeenCalled();
+  expect(f.permission).toHaveBeenCalledOnce();
+});
+
+it('releases workspace admission before headers and while an earlier phase body streams', async () => {
+  const f = workspaceSetup();
+  const issued = deferred<void>();
+  const headers = deferred<Response>();
+  const first = f.request(() => {
+    expect(f.locks.held()).toBe(1);
+    issued.resolve();
+    return headers.promise;
+  });
+  await issued.promise;
+  const second = await f.request(async () => emptyResponse());
+  expect(second.status).toBe(204);
+  headers.resolve(new Response(new ReadableStream<Uint8Array>()));
+  const response = await first;
+  const advanced = allocation();
+  advanced.phase = 'allocated';
+  advanced.identity.revision++;
+  f.replace(advanced);
+  const third = await f.requests.request(advanced.identity, advanced.phase, signal(), async () =>
+    emptyResponse()
+  );
+  expect(third.status).toBe(204);
+  await response.body!.cancel();
+  await f.requests.close();
+  expect(f.locks.maximumHeld()).toBe(1);
+});
+
+it('aborts workspace headers and waits for the issued transport to settle', async () => {
+  const f = workspaceSetup();
+  const issued = deferred<AbortSignal>();
+  const headers = deferred<Response>();
+  const pending = f.request((requestSignal) => {
+    issued.resolve(requestSignal);
+    return headers.promise;
+  });
+  const rejected = expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+  const requestSignal = await issued.promise;
+  let closed = false;
+  const closing = f.requests.close().then(() => {
+    closed = true;
+  });
+  expect(requestSignal.aborted).toBe(true);
+  expect(closed).toBe(false);
+  headers.reject(new Error('private transport error'));
+  await rejected;
+  await closing;
+});
+
+it.each([false, true])(
+  'drains workspace body cancellation with failure=%s across phase clients',
+  async (fail) => {
+    const f = workspaceSetup();
+    const cancelling = deferred<void>();
+    const disposed = deferred<void>();
+    const response = await f.request(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            cancel() {
+              cancelling.resolve();
+              return disposed.promise;
+            },
+          })
+        )
+    );
+    const reading = expect(response.text()).rejects.toMatchObject({ code: 'cancelled' });
+    const advanced = allocation();
+    advanced.identity.revision++;
+    advanced.phase = 'allocated';
+    f.replace(advanced);
+    let closed = false;
+    const closing = f.requests.close();
+    const settled = fail
+      ? expect(closing).rejects.toEqual(new Error('Sync request containment failed.'))
+      : closing.then(() => {
+          closed = true;
+        });
+    await cancelling.promise;
+    expect(closed).toBe(false);
+    if (fail) disposed.reject(new Error('private body cancellation error'));
+    else disposed.resolve();
+    await settled;
+    await reading;
+    expect(f.requests.close()).toBe(closing);
+    const issue = vi.fn(async (_signal: AbortSignal) => emptyResponse());
+    await expect(
+      f.requests.request(advanced.identity, advanced.phase, signal(), issue)
+    ).rejects.toMatchObject({ code: 'cancelled' });
+    expect(issue).not.toHaveBeenCalled();
+  }
+);

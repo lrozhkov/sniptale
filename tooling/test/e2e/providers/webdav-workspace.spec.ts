@@ -63,13 +63,13 @@ test('concurrent browsers cannot both acquire the same new workspace root', asyn
         )
       )
     );
+    await saveProof(info, { results, requests: lab.proxy.counts });
     expect(results.filter((result) => result.code === 'success')).toHaveLength(1);
     expect(results.filter((result) => result.code !== 'success')).toHaveLength(1);
     expect(results.find((result) => result.code !== 'success')?.code).toMatch(
       /^(collision|temporary)$/u
     );
     expect(lab.proxy.counts.mkcolStatuses.filter((item) => item.status === 201)).toHaveLength(1);
-    await saveProof(info, { results, requests: lab.proxy.counts });
   } finally {
     await first.context.close();
     await second.context.close();
@@ -363,6 +363,106 @@ test('foreign metadata prevents publication and remains independently readable',
       requests: lab.proxy.counts,
     });
   } finally {
+    await browser.context.close();
+  }
+});
+
+test('creation close contains held root headers and preserves uncertain allocation', async ({
+  lab,
+}, info) => {
+  const browser = await openProvider(lab, info, 'creation-held-root');
+  try {
+    const plan = await browser.page.evaluate(
+      (credentials) => window.webdavTransferHarness.workspace.plan(credentials),
+      lab.credentials
+    );
+    const key = `Sniptale-${plan.bootstrapId}/`;
+    lab.proxy.armFault({ method: 'MKCOL', key, kind: 'hold-response-headers' });
+    const running = browser.page.evaluate(
+      ({ credentials, identity }) =>
+        window.webdavTransferHarness.workspace.finish(credentials, identity),
+      { credentials: lab.credentials, identity: plan.identity }
+    );
+    await lab.proxy.waitForFault();
+    const before = await browser.page.evaluate(() =>
+      window.webdavTransferHarness.workspace.inspect()
+    );
+    expect(before?.phase).toBe('allocating');
+    const stopped = await browser.page.evaluate(() =>
+      window.webdavTransferHarness.workspace.stop()
+    );
+    expect(stopped).toEqual({ code: 'contained' });
+    const outcome = await running;
+    expect(outcome).toMatchObject({ code: 'cancelled', allocation: { phase: 'allocating' } });
+    lab.proxy.releaseFault();
+    const counts = { ...lab.proxy.counts };
+    const retry = await browser.page.evaluate(
+      ({ credentials, identity }) =>
+        window.webdavTransferHarness.workspace.finish(credentials, identity),
+      { credentials: lab.credentials, identity: before?.identity }
+    );
+    expect(retry.code).toBe('refused');
+    expect(lab.proxy.counts.mkcols).toBe(counts.mkcols);
+    expect(lab.proxy.counts.puts).toBe(0);
+    expect(lab.proxy.counts.gets).toBe(0);
+    expect(lab.proxy.counts.mkcolStatuses[0]).toEqual({ key, status: 201 });
+    await saveProof(info, { before, stopped, outcome, retry, requests: lab.proxy.counts });
+  } finally {
+    lab.proxy.releaseFault();
+    await browser.context.close();
+  }
+});
+
+test('creation close drains marker body and explicit recovery avoids another PUT', async ({
+  lab,
+}, info) => {
+  const browser = await openProvider(lab, info, 'creation-held-body');
+  try {
+    const plan = await browser.page.evaluate(
+      (credentials) => window.webdavTransferHarness.workspace.plan(credentials),
+      lab.credentials
+    );
+    const key = `Sniptale-${plan.bootstrapId}/.sniptale/workspace.json`;
+    lab.proxy.armFault({ method: 'GET', key, kind: 'hold-response-body' });
+    const running = browser.page.evaluate(
+      ({ credentials, identity }) =>
+        window.webdavTransferHarness.workspace.finish(credentials, identity),
+      { credentials: lab.credentials, identity: plan.identity }
+    );
+    await lab.proxy.waitForFault();
+    const before = await browser.page.evaluate(() =>
+      window.webdavTransferHarness.workspace.inspect()
+    );
+    expect(before?.phase).toBe('publishing-marker');
+    const external = await lab.externalProof(key);
+    const stopped = await browser.page.evaluate(() =>
+      window.webdavTransferHarness.workspace.stop()
+    );
+    expect(stopped).toEqual({ code: 'contained' });
+    expect(await running).toMatchObject({
+      code: 'cancelled',
+      allocation: { phase: 'publishing-marker' },
+    });
+    lab.proxy.releaseFault();
+    const puts = lab.proxy.counts.puts;
+    const recovered = await browser.page.evaluate(
+      ({ credentials, identity }) =>
+        window.webdavTransferHarness.workspace.finish(credentials, identity),
+      { credentials: lab.credentials, identity: before?.identity }
+    );
+    expect(recovered).toMatchObject({ code: 'success', allocation: { phase: 'ready' } });
+    expect(lab.proxy.counts.puts).toBe(puts);
+    expect(await lab.externalProof(key)).toEqual(external);
+    await saveProof(info, {
+      before,
+      stopped,
+      recovered,
+      external,
+      puts,
+      requests: lab.proxy.counts,
+    });
+  } finally {
+    lab.proxy.releaseFault();
     await browser.context.close();
   }
 });

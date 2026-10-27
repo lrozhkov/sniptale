@@ -5,6 +5,10 @@ import {
   type SyncConnectionIdentity,
 } from '../../composition/persistence/remote-connection/model';
 import { loadSyncConnection } from '../../composition/persistence/remote-connection/store';
+import {
+  loadSyncWorkspaceAllocation,
+  type SyncWorkspaceAllocation,
+} from '../../composition/persistence/remote-connection/workspace-allocation';
 import { SyncRemoteError } from './remote-store';
 
 interface ActiveRequest {
@@ -21,10 +25,14 @@ export function createSyncConnectionRequests(options: {
   if (!parsedIdentity) throw new SyncRemoteError('invalid-configuration');
   const identity: SyncConnectionIdentity = parsedIdentity;
   const hasOriginPermission = options.hasOriginPermission;
-  const active = new Set<ActiveRequest>();
-  let closed = false;
-  let containmentFailed = false;
-  let closing: Promise<void> | null = null;
+  async function admit(check: () => void) {
+    const before = await current();
+    check();
+    if (!(await hasOriginPermission(new URL(before.binding.rootUrl).origin)))
+      throw new SyncRemoteError('access-denied');
+    await current();
+    check();
+  }
 
   async function current() {
     const value = await loadSyncConnection();
@@ -33,9 +41,87 @@ export function createSyncConnectionRequests(options: {
     return value;
   }
 
+  const tracker = createIssuedRequests();
+  return {
+    request: (signal: AbortSignal, issue: (signal: AbortSignal) => Promise<Response>) =>
+      tracker.request(signal, issue, admit),
+    close: tracker.close,
+  };
+}
+
+/** Own every phase client's issued requests for one immutable native allocation lifetime. */
+export function createSyncWorkspaceRequests(options: {
+  allocation: SyncWorkspaceAllocation;
+  hasOriginPermission: (origin: string) => Promise<boolean>;
+}) {
+  let allocation: SyncWorkspaceAllocation;
+  try {
+    allocation = structuredClone(options.allocation);
+  } catch {
+    throw new SyncRemoteError('invalid-configuration');
+  }
+  const hasOriginPermission = options.hasOriginPermission;
+  const tracker = createIssuedRequests();
+
   async function request(
+    expectedIdentity: unknown,
+    expectedPhase: SyncWorkspaceAllocation['phase'],
     signal: AbortSignal,
     issue: (signal: AbortSignal) => Promise<Response>
+  ): Promise<Response> {
+    // Detach the expected CAS identity before any admission wait.
+    let expected: SyncConnectionIdentity | null;
+    try {
+      expected = parseSyncConnectionIdentity(structuredClone(expectedIdentity));
+    } catch {
+      throw new SyncRemoteError('authentication');
+    }
+    async function current() {
+      const value = await loadSyncWorkspaceAllocation();
+      if (
+        !expected ||
+        !value ||
+        value.parentUrl !== allocation.parentUrl ||
+        value.rootUrl !== allocation.rootUrl ||
+        value.accountId !== allocation.accountId ||
+        value.spaceId !== allocation.spaceId ||
+        value.bootstrapId !== allocation.bootstrapId ||
+        value.createdAt !== allocation.createdAt ||
+        value.identity.incarnation !== allocation.identity.incarnation ||
+        !sameSyncConnectionIdentity(value.identity, expected) ||
+        value.phase !== expectedPhase ||
+        (value.phase !== 'allocating' &&
+          value.phase !== 'allocated' &&
+          value.phase !== 'preparing-marker' &&
+          value.phase !== 'publishing-marker' &&
+          value.phase !== 'ready')
+      )
+        throw new SyncRemoteError('authentication');
+      return value;
+    }
+    return tracker.request(signal, issue, async (check) => {
+      const before = await current();
+      check();
+      if (!(await hasOriginPermission(new URL(before.rootUrl).origin)))
+        throw new SyncRemoteError('access-denied');
+      await current();
+      check();
+    });
+  }
+  return { request, close: tracker.close };
+}
+
+/** Keep issued transports and bodies owned until consumption or confirmed cancellation. */
+function createIssuedRequests() {
+  const active = new Set<ActiveRequest>();
+  let closed = false;
+  let containmentFailed = false;
+  let closing: Promise<void> | null = null;
+
+  async function request(
+    signal: AbortSignal,
+    issue: (signal: AbortSignal) => Promise<Response>,
+    admit: (check: () => void) => Promise<void>
   ): Promise<Response> {
     if (closed) throw new SyncRemoteError('cancelled');
     signal.throwIfAborted();
@@ -75,11 +161,7 @@ export function createSyncConnectionRequests(options: {
     try {
       const admitted = await withSyncConnectionAdmissionLock(async () => {
         check();
-        const before = await current();
-        check();
-        if (!(await hasOriginPermission(new URL(before.binding.rootUrl).origin)))
-          throw new SyncRemoteError('access-denied');
-        await current();
+        await admit(check);
         check();
         // Keep the promise nested. The admission lock ends after invocation, before headers or body.
         return { response: issue(controller.signal) };
@@ -146,7 +228,7 @@ export function createSyncConnectionRequests(options: {
     }
   }
 
-  /** Close the local executor after durable revocation. Failure never proves producer containment. */
+  /** Close local admission synchronously and drain every issued request and body. */
   function close(): Promise<void> {
     if (closing) return closing;
     closed = true;

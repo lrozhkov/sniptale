@@ -328,3 +328,12 @@ The remote marker contains public protocol fields and random workspace identifie
 The native journal freezes marker bytes before any metadata write. Conditional creation cannot fall back to an overwrite. Unknown metadata and mismatched markers refuse creation without deletion or cleanup. A missing marker in ready state cannot authorize reinitialization. Journal completion requires the exact current native revision and checked remote identity.
 
 The provider preserves the existing HTTPS, origin, path, cookie and redirect restrictions. The explicit test caller rechecks current permission and journal identity before each HTTP dispatch. A checked marker grants no credentials or execution authority. Production request cancellation, credential lifetime, enrollment and privacy containment remain separate release gates.
+
+
+## Creation execution containment
+
+Workspace creation uses the existing request and response-body tracker with native allocation admission. Every phase client rechecks the exact native revision, immutable allocation binding and current origin permission before dispatch. A callback cannot select a server URL from remote metadata. Root allocation and marker publication retain their constrained provider operations.
+
+The execution accepts detached authentication input and checks it against the native account. It writes no credentials to the allocation journal. One in-memory credential reference serves all phase clients and becomes unavailable after drain. Error results contain fixed codes only. This lifetime rule does not erase strings that the JavaScript engine or the caller retains.
+
+Close aborts and drains issued headers and response bodies before it reports containment. A failed cancellation cannot report successful closure. Closing after a remote write preserves native uncertainty or completed native evidence. It promises no remote rollback. Production privacy and permission owners still need to contain every producer, including surviving offscreen documents, before enrollment or erasure flows can be enabled.

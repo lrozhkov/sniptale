@@ -10,12 +10,11 @@ import {
   createWebdavWorkspaceWriter,
   createWebdavRemoteStore,
 } from '../../../apps/extension/src/workflows/sync-transfer/webdav';
-import { finishWebdavWorkspaceCreation } from '../../../apps/extension/src/workflows/sync-transfer/webdav-workspace';
+import { createWebdavWorkspaceCreation } from '../../../apps/extension/src/workflows/sync-transfer/webdav-workspace';
 import {
   prepareSyncWorkspaceJoin,
   SyncWorkspaceError,
 } from '../../../apps/extension/src/workflows/sync-transfer/workspace';
-import type { SyncWorkspaceAllocation } from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-allocation';
 import { SyncRemoteError } from '../../../apps/extension/src/workflows/sync-transfer/remote-store';
 
 type Credentials = { rootUrl: string; username: string; password: string };
@@ -46,33 +45,14 @@ function options(credentials: Credentials) {
   };
 }
 
-/** Bind each HTTP dispatch to the exact current local creation revision. */
-function writerOptions(credentials: Credentials, plan: SyncWorkspaceAllocation) {
-  if (plan.parentUrl !== credentials.rootUrl || plan.accountId !== credentials.username)
-    throw new SyncRemoteError('invalid-configuration');
-  const base = options({ ...credentials, rootUrl: plan.rootUrl });
-  return {
-    ...base,
-    request: (signal: AbortSignal, issue: (signal: AbortSignal) => Promise<Response>) =>
-      base.request(signal, (admittedSignal) =>
-        withSyncConnectionAdmissionLock(async () => {
-          const current = await loadSyncWorkspaceAllocation();
-          if (
-            !current ||
-            current.phase !== plan.phase ||
-            !sameSyncConnectionIdentity(current.identity, plan.identity)
-          )
-            throw new SyncRemoteError('invalid-configuration');
-          admittedSignal.throwIfAborted();
-          return { response: issue(admittedSignal) };
-        }).then((admitted) => admitted.response)
-      ),
-  };
-}
-
 /** Explicit test-only allocation ingress. It installs no profile and enables no capture. */
 export function createWebdavWorkspaceHarness() {
+  let active: ReturnType<typeof createWebdavWorkspaceCreation> | null = null;
   return {
+    async stop() {
+      await active?.close();
+      return { code: 'contained' };
+    },
     async plan(credentials: Credentials, expected: unknown = null) {
       // The connection page loads native state before it enables an explicit creation command.
       await loadSyncWorkspaceAllocation();
@@ -121,15 +101,32 @@ export function createWebdavWorkspaceHarness() {
       }
     },
     async finish(credentials: Credentials, identity: unknown) {
+      let execution: ReturnType<typeof createWebdavWorkspaceCreation> | null = null;
       try {
-        const result = await finishWebdavWorkspaceCreation(
-          (plan, signal) => createWebdavWorkspaceWriter(writerOptions(credentials, plan), signal),
+        if (active) throw new SyncRemoteError('invalid-configuration');
+        execution = createWebdavWorkspaceCreation({
           identity,
-          new AbortController().signal
-        );
+          authentication: {
+            kind: 'basic',
+            username: credentials.username,
+            password: credentials.password,
+          },
+          hasOriginPermission: (origin) =>
+            chrome.permissions.contains({ origins: [`${origin}/*`] }),
+        });
+        active = execution;
+        const result = await execution.run();
         return { code: 'success', status: null, ...result };
       } catch (error) {
         return { ...failure(error), allocation: await loadSyncWorkspaceAllocation() };
+      } finally {
+        if (execution) {
+          try {
+            await execution.close();
+          } finally {
+            if (active === execution) active = null;
+          }
+        }
       }
     },
     async join(credentials: Credentials, expected: unknown = null) {

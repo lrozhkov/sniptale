@@ -4,7 +4,7 @@ import {
   parseSyncWorkspaceMarker,
   SYNC_WORKSPACE_MARKER_KEY,
 } from '../../contracts/sync-workspace';
-import { finishWebdavWorkspaceCreation } from './webdav-workspace';
+import { createWebdavWorkspaceCreation, finishWebdavWorkspaceCreation } from './webdav-workspace';
 import { SyncRemoteError, type SyncRemotePage, type SyncRemoteStore } from './remote-store';
 import { hashSyncText } from './wire-record';
 
@@ -20,6 +20,13 @@ vi.mock('../../composition/persistence/remote-connection/workspace-allocation', 
   commandSyncWorkspaceAllocation: native.command,
   completeSyncWorkspaceMarker: native.complete,
 }));
+
+const lifecycle = vi.hoisted(() => ({ allocate: vi.fn(), writer: vi.fn(), requests: vi.fn() }));
+vi.mock('./webdav', () => ({
+  allocateWebdavWorkspaceRoot: lifecycle.allocate,
+  createWebdavWorkspaceWriter: lifecycle.writer,
+}));
+vi.mock('./connection-requests', () => ({ createSyncWorkspaceRequests: lifecycle.requests }));
 
 const spaceId = '10000000-0000-4000-8000-000000000001';
 const bootstrapId = '20000000-0000-4000-8000-000000000002';
@@ -88,6 +95,14 @@ function fixture(phase: SyncWorkspaceAllocation['phase'] = 'allocated') {
     return advance({ ...current, marker: structuredClone(marker) }, 'preparing-marker');
   });
   native.command.mockImplementation(async (expected: unknown, action: unknown) => {
+    if (action === 'allocate') {
+      events.push('allocate');
+      return advance(cas(expected, ['planned']), 'allocating');
+    }
+    if (action === 'confirm') {
+      events.push('confirm');
+      return advance(cas(expected, ['allocating']), 'allocated');
+    }
     expect(action).toBe('publish-marker');
     const current = cas(expected, ['preparing-marker', 'publishing-marker']);
     events.push('reserve');
@@ -424,4 +439,167 @@ it('does not expose an unknown factory failure', async () => {
   ).catch((error: unknown) => error);
   expect(failure).toMatchObject({ code: 'unavailable', message: 'unavailable' });
   expect(JSON.stringify(failure)).not.toContain('private');
+});
+
+function creationFixture(phase: SyncWorkspaceAllocation['phase'] = 'allocated') {
+  const io = fixture(phase);
+  const close = vi.fn(async () => undefined);
+  const request = vi.fn(
+    async (
+      _identity: unknown,
+      _phase: unknown,
+      signal: AbortSignal,
+      issue: (signal: AbortSignal) => Promise<Response>
+    ) => issue(signal)
+  );
+  lifecycle.requests.mockReturnValue({ request, close });
+  lifecycle.allocate.mockImplementation(async () => {
+    io.events.push('allocate-IO');
+  });
+  lifecycle.writer.mockImplementation(async () => {
+    const plan = io.current();
+    if (!plan) throw new Error('Missing test allocation');
+    return io.factory(plan);
+  });
+  const authentication = { kind: 'basic', username: 'account', password: 'private-password' };
+  const execution = createWebdavWorkspaceCreation({
+    identity: io.initialIdentity,
+    authentication,
+    hasOriginPermission: async () => true,
+  });
+  return { ...io, close, request, execution, authentication };
+}
+
+it('owns one creation promise, native allocation ordering, all phase clients and final drain', async () => {
+  const io = creationFixture('planned');
+  const running = io.execution.run();
+  expect(io.execution.run()).toBe(running);
+  expect((await running).allocation.phase).toBe('ready');
+  expect(io.events.indexOf('allocate')).toBeLessThan(io.events.indexOf('allocate-IO'));
+  expect(io.events.indexOf('allocate-IO')).toBeLessThan(io.events.indexOf('confirm'));
+  expect(io.events.indexOf('confirm')).toBeLessThan(io.events.indexOf('freeze'));
+  expect(lifecycle.requests).toHaveBeenCalledTimes(1);
+  expect(io.close).toHaveBeenCalledTimes(1);
+  await io.execution.close();
+  expect(io.execution.run()).toBe(running);
+  expect(lifecycle.allocate).toHaveBeenCalledTimes(1);
+});
+
+it('does not open storage or network when closed before its first run', async () => {
+  const io = creationFixture('planned');
+  await io.execution.close();
+  await expect(io.execution.run()).rejects.toMatchObject({ code: 'cancelled' });
+  expect(native.load).not.toHaveBeenCalled();
+  expect(lifecycle.requests).not.toHaveBeenCalled();
+  expect(lifecycle.allocate).not.toHaveBeenCalled();
+});
+
+it('waits for a pending initial read after close and refuses later allocation IO', async () => {
+  const io = creationFixture('planned');
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  native.load.mockImplementationOnce(async () => {
+    await held;
+    return io.current();
+  });
+  const running = io.execution.run().catch((error: unknown) => error);
+  let closed = false;
+  const closing = io.execution.close().then(() => {
+    closed = true;
+  });
+  await Promise.resolve();
+  expect(closed).toBe(false);
+  release();
+  expect(await running).toMatchObject({ code: 'cancelled' });
+  await closing;
+  expect(lifecycle.allocate).not.toHaveBeenCalled();
+  expect(lifecycle.requests).not.toHaveBeenCalled();
+});
+
+it.each(['allocating', 'abandoned'] as const)(
+  'refuses %s without adopting an uncertain root',
+  async (phase) => {
+    const io = creationFixture(phase);
+    await expect(io.execution.run()).rejects.toMatchObject({ code: 'allocation-refused' });
+    expect(lifecycle.allocate).not.toHaveBeenCalled();
+    expect(lifecycle.writer).not.toHaveBeenCalled();
+    await io.execution.close();
+  }
+);
+
+it('detaches authentication and releases its own client reference after a successful drain', async () => {
+  const io = creationFixture();
+  io.authentication.password = 'changed-after-selection';
+  lifecycle.writer.mockImplementationOnce(
+    async (options: { authentication(): Promise<unknown> }) => {
+      expect(await options.authentication()).toEqual({
+        kind: 'basic',
+        username: 'account',
+        password: 'private-password',
+      });
+      const current = io.current();
+      if (!current) throw new Error('Missing test allocation');
+      return io.factory(current);
+    }
+  );
+  await io.execution.run();
+  const options: { authentication(): Promise<unknown> } = lifecycle.writer.mock.calls[0]![0];
+  await expect(options.authentication()).rejects.toMatchObject({ code: 'authentication' });
+});
+
+it('refuses wrong-account credentials before reserving an allocation or issuing requests', async () => {
+  const io = creationFixture('planned');
+  const execution = createWebdavWorkspaceCreation({
+    identity: io.initialIdentity,
+    authentication: { kind: 'basic', username: 'other-account', password: 'private-password' },
+    hasOriginPermission: async () => true,
+  });
+  await expect(execution.run()).rejects.toMatchObject({ code: 'invalid-configuration' });
+  expect(native.command).not.toHaveBeenCalled();
+  expect(lifecycle.requests).not.toHaveBeenCalled();
+});
+
+it('cannot report successful creation or closure after failed request containment', async () => {
+  const io = creationFixture();
+  io.close.mockRejectedValue(new Error('Private cancellation failure'));
+  await expect(io.execution.run()).rejects.toMatchObject({
+    code: 'containment-failed',
+    message: 'containment-failed',
+  });
+  await expect(io.execution.close()).rejects.toMatchObject({ code: 'containment-failed' });
+  expect(io.current()?.phase).toBe('ready');
+});
+
+it('close waits for an in-flight marker read and prevents late native completion', async () => {
+  const io = creationFixture('publishing-marker');
+  io.files.set(SYNC_WORKSPACE_MARKER_KEY, new Blob([text]));
+  let entered!: () => void;
+  let release!: () => void;
+  const reached = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  io.read.mockImplementationOnce(async () => {
+    entered();
+    await held;
+    return new Blob([text]).stream();
+  });
+  const running = io.execution.run().catch((error: unknown) => error);
+  await reached;
+  let closed = false;
+  const closing = io.execution.close().then(() => {
+    closed = true;
+  });
+  await Promise.resolve();
+  expect(closed).toBe(false);
+  release();
+  expect(await running).toMatchObject({ code: 'cancelled' });
+  await closing;
+  expect(native.complete).not.toHaveBeenCalled();
+  expect(io.current()?.phase).toBe('publishing-marker');
+  expect(io.publishMarker).not.toHaveBeenCalled();
 });

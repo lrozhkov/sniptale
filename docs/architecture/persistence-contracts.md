@@ -912,3 +912,16 @@ The WebDAV workflow refuses unexpected files or child prefixes before initial pu
 Recovery first reads the exact marker, scans the catalog and reads the marker again. Matching evidence permits native ready state without another PUT. Missing marker evidence in publishing-marker state permits an explicit fresh publication revision with the same frozen bytes. A collision or temporary transport failure permits one checked readback. Failed verification preserves uncertainty. Ready state permits inspection only. A missing ready marker never starts initialization.
 
 The explicit test harness binds every HTTP dispatch to its current native journal revision. This proof does not activate production enrollment or establish production credential containment. Browser replay can issue more than one HTTP request for one library invocation. All such requests must retain the same key and frozen body.
+
+
+## Workspace creation request lifetime
+
+The transfer request owner shares its issued-request and response-body tracker between active connections and workspace creation. Each public adapter retains its own admission rules. The common private tracker owns cancellation and drain. It adds no durable authority or transport implementation.
+
+Workspace requests bind the native allocation lifetime, including its parent, child root, account and random identities. Each phase client supplies the exact current revision and phase. Under the existing connection admission lock, the adapter reads native state, checks current origin permission and reads native state again. The lock ends after fetch invocation, before response headers or body completion. Installed enrollment, changed state or missing state refuses dispatch.
+
+The named creation execution owns one run promise, one controller and one request tracker across all phase clients. It can allocate a planned root and finish the existing marker protocol. It refuses uncertain allocating state. Closing refuses new dispatch synchronously, aborts issued requests and waits for their actual completion. It also waits for the creation promise. Failed body cancellation prevents a successful containment result. A timeout grants no containment evidence.
+
+Creation credentials stay in memory and use a callback that reads the execution's current credential reference. The execution clears its own reference after drain. This does not promise physical erasure of JavaScript strings or copies that another caller owns. Successful run results contain checked workspace evidence only.
+
+This owner enables no production ingress or enrollment. Its production caller must close and drain it before reporting privacy or permission closure. Background and offscreen lifecycle integration, worker recovery and atomic native enrollment remain release gates. Closing one execution does not revoke a different execution's authority.
