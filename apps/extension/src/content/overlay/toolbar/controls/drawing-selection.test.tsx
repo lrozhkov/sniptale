@@ -281,3 +281,41 @@ it.each(['horizontal', 'vertical'] as const)(
     act(() => root.unmount());
   }
 );
+
+it.each(['horizontal', 'vertical'] as const)(
+  'omits empty mixed text options and restores single selection in %s mode',
+  (displayMode) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject({
+      id: 'text',
+      kind: 'text',
+      bounds: { x: 40, y: 0, width: 120, height: 30 },
+      text: 'Text',
+      color: '#111111',
+      backgroundColor: null,
+      fontFamily: 'sans',
+      fontSize: 24,
+    });
+    session.commitObject({
+      id: 'pencil',
+      kind: 'pencil',
+      samples: [
+        { x: 0, y: 0, t: 0 },
+        { x: 20, y: 0, t: 10 },
+      ],
+      color: '#111111',
+      width: 4,
+    });
+    session.setActiveTool('select');
+    session.setSelection(['text', 'pencil']);
+    const { host, root } = renderSelectionToolbar(session, displayMode);
+    expect(host.querySelectorAll('.sniptale-drawing-options-popover')).toHaveLength(1);
+    expect(host.querySelector('[data-ui="content.toolbar.drawing-options.selection"]')).toBeNull();
+    expect(host.querySelector('[data-ui="drawing.selection.actions.delete"]')).not.toBeNull();
+    act(() => session.setSelection(['text']));
+    expect(host.querySelector('[data-ui="content.toolbar.drawing-options.text"]')).not.toBeNull();
+    expect(host.querySelectorAll('.sniptale-drawing-options-popover')).toHaveLength(2);
+    act(() => root.unmount());
+  }
+);

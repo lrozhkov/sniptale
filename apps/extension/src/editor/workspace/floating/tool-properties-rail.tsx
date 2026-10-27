@@ -238,30 +238,32 @@ export function EditorFloatingToolPropertiesRail({
         className={TOOL_PROPERTIES_PAIR_CLASS_NAME}
         style={placement.style}
       >
-        <FloatingChromeToolbar
-          dataUi="editor.floating.tool-properties"
-          className={`min-w-0 max-w-full overflow-x-auto ${drawingOptionsTool ? 'overflow-y-hidden' : ''}`}
-        >
-          {drawingOptionsTool ? (
-            <EditorDrawingOptions
-              onDirectionChange={() => controller.applyToolMode()}
-              onApplyToSelection={() => controller.applyActiveSettingsToSelection()}
-              onPreviewSelection={() => controller.previewActiveSettingsOnSelection()}
-              onClearSelection={() => controller.clearSelection()}
-              onDeleteSelection={() => controller.deleteSelection()}
-              selectedType={selection.selectedObjectType}
-              tool={drawingOptionsTool}
-            />
-          ) : (
-            <ToolPropertiesButtons
-              activeGroupId={activeGroupId}
-              groups={groups}
-              onToggle={(groupId) =>
-                setActiveGroupId((current) => (current === groupId ? null : groupId))
-              }
-            />
-          )}
-        </FloatingChromeToolbar>
+        {drawingOptionsTool !== 'selection' ? (
+          <FloatingChromeToolbar
+            dataUi="editor.floating.tool-properties"
+            className={`min-w-0 max-w-full overflow-x-auto ${drawingOptionsTool ? 'overflow-y-hidden' : ''}`}
+          >
+            {drawingOptionsTool ? (
+              <EditorDrawingOptions
+                onDirectionChange={() => controller.applyToolMode()}
+                onApplyToSelection={() => controller.applyActiveSettingsToSelection()}
+                onPreviewSelection={() => controller.previewActiveSettingsOnSelection()}
+                onClearSelection={() => controller.clearSelection()}
+                onDeleteSelection={() => controller.deleteSelection()}
+                selectedType={selection.selectedObjectType}
+                tool={drawingOptionsTool}
+              />
+            ) : (
+              <ToolPropertiesButtons
+                activeGroupId={activeGroupId}
+                groups={groups}
+                onToggle={(groupId) =>
+                  setActiveGroupId((current) => (current === groupId ? null : groupId))
+                }
+              />
+            )}
+          </FloatingChromeToolbar>
+        ) : null}
         {showSelectionActions ? (
           <FloatingChromeToolbar dataUi="editor.floating.selection-actions" className="shrink-0">
             <DrawingSelectionActions

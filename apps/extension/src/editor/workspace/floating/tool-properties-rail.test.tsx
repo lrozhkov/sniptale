@@ -194,7 +194,8 @@ it('keeps drawing options stable during canvas interaction and only honors an ex
       selectedObjectsAreDrawing: true,
     },
   });
-  expect(container.querySelector('[data-ui="drawing-options.selection"]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="editor.floating.tool-properties"]')).toBeNull();
+  expect(container.querySelector('[data-ui="editor.floating.selection-actions"]')).not.toBeNull();
 });
 
 it('places selection actions beside drawing properties and allows deselection', () => {
@@ -217,7 +218,7 @@ it('places selection actions beside drawing properties and allows deselection', 
   expect(controller.clearSelection).toHaveBeenCalledOnce();
 });
 
-it('rounds both tool panels and exposes group and merge for multiple selected layers', () => {
+it('omits empty properties and exposes group and merge for multiple selected layers', () => {
   useEditorStore.setState({
     layers: [
       { id: 'first', type: 'shape', selected: true, locked: false, immutable: false },
@@ -240,7 +241,7 @@ it('rounds both tool panels and exposes group and merge for multiple selected la
   );
   const properties = container.querySelector('[data-ui="editor.floating.tool-properties"]');
   const actions = container.querySelector('[data-ui="editor.floating.selection-actions"]');
-  expect(properties?.className).not.toContain('!rounded-none');
+  expect(properties).toBeNull();
   expect(actions?.className).not.toContain('!rounded-none');
   expect(actions?.querySelector('[data-ui="drawing.selection.actions"]')?.className).toContain(
     'gap-2'
