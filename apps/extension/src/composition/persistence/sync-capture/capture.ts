@@ -88,7 +88,7 @@ async function captureMediaDependencies(
       if (editingMedia.has(media.id)) throw new UnsupportedSyncCaptureGraphError();
       continue;
     }
-    dependencies.push(await readAcceptedMediaDependency(tx, profile, media.id));
+    dependencies.push(await captureMediaDependency(tx, profile, media.id));
   }
   return dependencies;
 }
@@ -105,17 +105,29 @@ function collectEditingMediaIds(rows: CapturedVideoProjectRows): Set<string> {
   return mediaIds;
 }
 
-/** A causal head is usable only for the native snapshot that its owner admitted. */
-async function readAcceptedMediaDependency(
+/** Capture an absent dependency in this transaction. Existing heads must match the native snapshot. */
+async function captureMediaDependency(
   tx: CaptureTransaction,
   profile: SyncCaptureProfile,
   mediaId: string
 ): Promise<CapturedMediaDependency> {
   const rootKey = captureRootKey(profile.spaceId, 'media', mediaId);
-  const state = parseSyncCaptureRecord(
-    await tx.objectStore(SYNC_CAPTURE_STORE).get(JSON.stringify(['root-state', rootKey]))
-  );
+  const raw: unknown = await tx
+    .objectStore(SYNC_CAPTURE_STORE)
+    .get(JSON.stringify(['root-state', rootKey]));
   const frozen = await freezeMediaInTransaction(tx, mediaId);
+  if (raw === undefined) {
+    const captured = await appendCapture(
+      tx,
+      profile,
+      'media',
+      mediaId,
+      { kind: 'media', rows: frozen },
+      {}
+    );
+    return { mediaId, generation: captured.generation, basis: [captured.operationId] };
+  }
+  const state = parseSyncCaptureRecord(raw);
   if (
     !state ||
     state.kind !== 'root-state' ||

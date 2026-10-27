@@ -430,14 +430,86 @@ it('refuses changed Library metadata instead of reusing its previous causal head
   expect(captures()).toHaveLength(1);
 });
 
-it('refuses an untracked pre-profile Library dependency without inventing its revision', async () => {
+it('captures a pre-profile Library dependency with its project in one native save', async () => {
+  table('sync_capture').clear();
+  const data = await publishDependency();
+  const nativeMedia = structuredClone(table('media_library').get(data.mediaId));
+  expect(captures()).toEqual([]);
+  await installExperimentalCaptureProfile(profile());
+  await saveVideoProject(data.project, { expectedWorkspaceRevision: null });
+  const initial = captures();
+  const media = initial.find((row) => row.rootKind === 'media');
+  const project = initial.find((row) => row.rootKind === 'video-project');
+  expect(media).toMatchObject({ rootId: data.mediaId, generation: 1, basis: [] });
+  if (project?.change.kind !== 'video-project' || media?.change.kind !== 'media')
+    throw new Error('Expected native dependency and project captures');
+  const { parseMediaLibraryEntry } = await import('../media-library/read-guards');
+  expect(media.change.rows.media).toEqual(parseMediaLibraryEntry(nativeMedia));
+  expect(project.change.rows.mediaDependencies).toEqual([
+    { mediaId: data.mediaId, generation: 1, basis: [media.operationId] },
+  ]);
+  const current = currentProject();
+  await saveVideoProject(
+    { ...current.project, name: 'Second accepted edit' },
+    { expectedWorkspaceRevision: current.workspaceRevision ?? 0, expectedProject: current.project }
+  );
+  expect(captures().filter((row) => row.rootKind === 'media')).toEqual([media]);
+  expect(captures()).toHaveLength(3);
+  expect(table('media_library').get(data.mediaId)).toEqual(nativeMedia);
+});
+
+it('rolls back dependency genesis when the following project capture exceeds capacity', async () => {
   table('sync_capture').clear();
   const data = await publishDependency();
   await installExperimentalCaptureProfile(profile());
+  const { MAX_PENDING_CAPTURES } = await import('./contracts');
+  const seed = await saveVideoProject(createVideoProject({ id: 'capacity-seed' }), {
+    expectedWorkspaceRevision: null,
+  });
+  const template = captures()[0]!;
+  for (let index = 1; index < MAX_PENDING_CAPTURES - 1; index++) {
+    const operationId = crypto.randomUUID();
+    const key = JSON.stringify(['change', operationId]);
+    table('sync_capture').set(key, { ...template, key, operationId });
+  }
   const before = structuredClone(fixture.rows);
-  await expect(
-    saveVideoProject(data.project, { expectedWorkspaceRevision: null })
-  ).rejects.toMatchObject({ name: 'UnsupportedSyncCaptureGraphError' });
+  await expect(saveVideoProject(data.project, { expectedWorkspaceRevision: null })).rejects.toThrow(
+    'sync capture queue is full'
+  );
   expect(fixture.rows).toEqual(before);
-  expect(captures()).toEqual([]);
+  expect(table('video_projects').has(data.project.id)).toBe(false);
+  expect(table('video_projects').has(seed.id)).toBe(true);
+  for (const [key, raw] of table('sync_capture')) {
+    const row = parseSyncCaptureRecord(raw);
+    if (row?.kind === 'captured-change') table('sync_capture').delete(key);
+  }
+  await saveVideoProject(data.project, { expectedWorkspaceRevision: null });
+  expect(captures().filter((row) => row.rootId === data.mediaId)).toHaveLength(1);
+  expect(captures().filter((row) => row.rootId === data.project.id)).toHaveLength(1);
 });
+
+it.each(['malformed', 'empty-basis', 'wrong-digest'])(
+  'refuses %s existing dependency evidence instead of creating genesis',
+  async (kind) => {
+    const data = await publishDependency();
+    const [stateKey, state] = [...table('sync_capture')].find(
+      ([, raw]) => parseSyncCaptureRecord(raw)?.kind === 'root-state'
+    )!;
+    if (typeof state !== 'object' || state === null) throw new Error('Missing root state');
+    table('sync_capture').set(
+      stateKey,
+      kind === 'malformed'
+        ? { corrupt: true }
+        : kind === 'empty-basis'
+          ? { ...state, basis: [] }
+          : { ...state, nativeDigest: '0'.repeat(64) }
+    );
+    const before = structuredClone(fixture.rows);
+    await expect(
+      saveVideoProject(data.project, { expectedWorkspaceRevision: null })
+    ).rejects.toMatchObject({
+      name: 'UnsupportedSyncCaptureGraphError',
+    });
+    expect(fixture.rows).toEqual(before);
+  }
+);

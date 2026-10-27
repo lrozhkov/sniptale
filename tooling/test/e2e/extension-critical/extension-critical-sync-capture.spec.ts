@@ -422,3 +422,72 @@ test('native outgoing bytes survive concurrent preparation, recreation and resta
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+test('pre-profile originals join project capture atomically and survive browser restart', async ({}, info) => {
+  test.setTimeout(120_000);
+  const host = await startHostServer();
+  const profile = info.outputPath('preprofile-browser-profile');
+  let context: BrowserContext | undefined;
+  try {
+    context = await chromium.launchPersistentContext(profile, {
+      viewport: { width: 1920, height: 900 },
+      deviceScaleFactor: 1,
+      headless: true,
+    });
+    const page = await context.newPage();
+    await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
+    await page.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await page.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const proof = await page.evaluate(() =>
+      window.syncCaptureHarness.preProfileDependenciesProof()
+    );
+    expect(proof).toMatchObject({
+      localOnly: true,
+      rollback: true,
+      retry: true,
+      parallel: true,
+      sharedHead: true,
+    });
+    const frozen = await page.evaluate(
+      (id) => window.syncCaptureHarness.verifyFrozenPersistence(id),
+      proof.projectId
+    );
+    const hashes = await page.evaluate(
+      (id) => window.syncCaptureHarness.verifyAppliedSourcePersistence(id),
+      proof.projectId
+    );
+    expect(hashes).toContain(proof.sourceHash);
+    const captured = await page.evaluate(() => window.syncCaptureHarness.changes());
+    await context.close();
+    context = await chromium.launchPersistentContext(profile, {
+      viewport: { width: 1920, height: 900 },
+      deviceScaleFactor: 1,
+      headless: true,
+    });
+    const restarted = await context.newPage();
+    await applyHarnessBootstrap(restarted, { preserveMediaLibrary: true });
+    await restarted.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await restarted.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    expect(await restarted.evaluate(() => window.syncCaptureHarness.changes())).toEqual(captured);
+    expect(
+      await restarted.evaluate(
+        (id) => window.syncCaptureHarness.verifyFrozenPersistence(id),
+        proof.projectId
+      )
+    ).toEqual(frozen);
+    expect(
+      await restarted.evaluate(
+        (id) => window.syncCaptureHarness.verifyAppliedSourcePersistence(id),
+        proof.projectId
+      )
+    ).toEqual(hashes);
+    await writeFile(
+      info.outputPath('preprofile-proof.json'),
+      JSON.stringify({ proof, frozen, hashes, fullBrowserRestart: true }, null, 2)
+    );
+  } finally {
+    await context?.close();
+    host.server.closeAllConnections();
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

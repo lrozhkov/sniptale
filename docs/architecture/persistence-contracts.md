@@ -985,3 +985,12 @@ The selection projection contains no credential or catalog payload. Its bindingK
 Coordinator containment precedes the existing atomic enrollment installer. Native source checks, prepared database capture, credential protection and transaction rollback remain with that installer. No runtime snapshot replaces native readiness or the enrollment receipt.
 
 The queue accepts invalid-workspace as a bounded failure code. Marker verification occurs after claim and before the first remote effect. Temporary refusal retains the existing retry budget and deadlines. Invalid identity requires explicit action and preserves local source evidence.
+
+
+## Project dependencies created before sync enrollment
+
+A supported native project save can reference a Library original from before sync enrollment. If its causal state is absent, the sync-capture owner records that original in the same project transaction. The project references the actual media operation and generation from that transaction. Later saves reuse the accepted head only while its native metadata digest matches. Malformed, empty or mismatched existing evidence still refuses the complete transaction.
+
+The native transaction commits the dependency and project together. A later capture failure, including queue capacity, rolls back both captures and the project mutation. Parallel saves share the initial media head through native transaction serialization. Local-only saving creates no capture rows. Enrollment does not scan or upload the existing Library.
+
+This change freezes native metadata and immutable file references, not file bytes inside IndexedDB. The existing capture claims retain those files. Outgoing preparation checks their bytes through the existing codecs. Production activation still requires a producer that enqueues dependency operations before dependent publication.

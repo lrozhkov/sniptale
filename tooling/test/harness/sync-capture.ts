@@ -172,6 +172,99 @@ async function materialize(capture: CapturedChange) {
   };
 }
 
+async function preProfileDependenciesProof() {
+  await harnessReady;
+  const local = await sourceProject('Before sync enrollment');
+  const source = local.project.assets[0];
+  check(source?.source.kind === 'project-asset', 'The local original is missing.');
+  const mediaId = `project-asset:${source.source.projectAssetId}`;
+  const mediaBefore = await (await initDB()).get('media_library', mediaId);
+  check((await changes()).length === 0, 'Local-only saving created capture rows.');
+  await installExperimentalCaptureProfile({
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: Date.now(),
+    enabled: true,
+    spaceId: 'preprofile-dependency-proof',
+    connectionGeneration: 1,
+  });
+  const candidate = (name: string) => {
+    const next = createEmptyVideoProject(name, 1280, 720);
+    next.assets = [{ ...structuredClone(source), source: { kind: 'library-asset', mediaId } }];
+    return next;
+  };
+  const failed = candidate('Rolled back dependency genesis');
+  await withCaptureWriteFailure('captured-change', 2, () =>
+    refused(() =>
+      saveVideoProject(failed, { expectedWorkspaceRevision: null, expectedProject: null })
+    )
+  );
+  const db = await initDB();
+  check((await changes()).length === 0, 'Failure retained a partial dependency capture.');
+  check(
+    (await db.get(VIDEO_PROJECTS_STORE, failed.id)) === undefined,
+    'Failure published the project.'
+  );
+  check(
+    JSON.stringify(await db.get('media_library', mediaId)) === JSON.stringify(mediaBefore),
+    'Failure changed the local original.'
+  );
+  const peer = candidate('Shared dependency in another project');
+  const saved = await Promise.all([
+    saveVideoProject(failed, { expectedWorkspaceRevision: null, expectedProject: null }),
+    saveVideoProject(peer, { expectedWorkspaceRevision: null, expectedProject: null }),
+  ]);
+  const captured = await changes();
+  const media = captured.filter((row) => row.rootKind === 'media');
+  const projects = captured.filter((row) => row.rootKind === 'video-project');
+  check(media.length === 1 && projects.length === 2, 'Parallel saves duplicated or lost capture.');
+  const dependency = media[0];
+  check(
+    dependency?.change.kind === 'media' &&
+      dependency.rootId === mediaId &&
+      dependency.generation === 1 &&
+      dependency.basis.length === 0,
+    'The original has no genuine initial capture.'
+  );
+  for (const row of projects) {
+    check(
+      row.change.kind === 'video-project' &&
+        JSON.stringify(row.change.rows.mediaDependencies) ===
+          JSON.stringify([{ mediaId, generation: 1, basis: [dependency.operationId] }]),
+      'A project does not reference the exact committed dependency.'
+    );
+  }
+  const first = saved[0];
+  check(first, 'The retried project is missing.');
+  await saveVideoProject(
+    { ...first.project, name: 'Accepted subsequent edit' },
+    {
+      expectedWorkspaceRevision: first.workspaceRevision ?? 0,
+      expectedProject: first.project,
+    }
+  );
+  check(
+    (await changes()).filter((row) => row.rootKind === 'media').length === 1,
+    'A later edit duplicated the initial dependency.'
+  );
+  check(
+    JSON.stringify(await db.get('media_library', mediaId)) === JSON.stringify(mediaBefore),
+    'Capture changed the local original.'
+  );
+  const file = await readAssetFile(dependency.change.rows.ref, 'original.png');
+  return {
+    projectId: first.id,
+    mediaId,
+    sourceHash: await sha(file),
+    localOnly: true,
+    rollback: true,
+    retry: true,
+    parallel: true,
+    sharedHead: true,
+  };
+}
+
 async function saveProof() {
   await harnessReady;
   const originalNow = Date.now;
@@ -1193,6 +1286,7 @@ async function recoverMediaReplicaProof(mediaId: string, journalId: string) {
 }
 
 const syncCaptureHarness = {
+  preProfileDependenciesProof,
   outgoing: outgoingHarness,
   stageMediaReplicaForRecovery,
   recoverMediaReplicaProof,
