@@ -198,3 +198,26 @@ it.each([
     expect(JSON.stringify(loggerErrorMock.mock.calls)).not.toContain('never-expose');
   }
 );
+
+it.each([
+  [403, 'permission-denied', 'settings.aiProviders.providerStatusDenied'],
+  [402, 'quota-exceeded', 'settings.aiProviders.providerStatusQuota'],
+  [404, 'model-unavailable', 'settings.aiProviders.providerStatusModelUnavailable'],
+] as const)(
+  'explains HTTP %i with a fixed reason and localized description',
+  async (status, reason, key) => {
+    const { requestChatCompletion } = await import('./request');
+    fetchMock.mockResolvedValueOnce(new Response('private-provider-message', { status }));
+    await expect(
+      requestChatCompletion({
+        apiKey: 'fixture',
+        baseUrl: 'https://provider.test',
+        modelCode: 'model',
+        systemPrompt: 'Prompt',
+        userPrompt: 'Synthetic input',
+      })
+    ).rejects.toMatchObject({ reason, message: translate(key) });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(loggerErrorMock.mock.calls)).not.toContain('private-provider-message');
+  }
+);

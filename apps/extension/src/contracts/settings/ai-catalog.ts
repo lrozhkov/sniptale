@@ -195,21 +195,7 @@ export function isAIConnectionObservation(value: unknown): value is AIConnection
     )
   )
     return false;
-  const reasons: readonly AIConnectionReason[] = [
-    'host-permission-required',
-    'invalid-credential',
-    'permission-denied',
-    'model-unavailable',
-    'quota-exceeded',
-    'rate-limited',
-    'network',
-    'timeout',
-    'service-error',
-    'unknown',
-    'secret-locked',
-    'catalog-unsupported',
-    'provider-unavailable',
-  ];
+
   return (
     ['unverified', 'available', 'unavailable', 'permission-required', 'locked'].includes(
       typeof value['status'] === 'string' ? value['status'] : ''
@@ -222,7 +208,7 @@ export function isAIConnectionObservation(value: unknown): value is AIConnection
     typeof value['revision'] === 'number' &&
     optionalNonnegative(value['revision']) &&
     optionalNonnegative(value['lastSuccessAt']) &&
-    (value['reason'] === undefined || reasons.some((reason) => reason === value['reason']))
+    (value['reason'] === undefined || isAIConnectionReason(value['reason']))
   );
 }
 
@@ -297,4 +283,24 @@ export function parseAIScenarioSelections(value: unknown): AIScenarioSelections 
     };
   }
   return selections;
+}
+
+/** Admits only fixed provider failure reasons at runtime boundaries. */
+export function isAIConnectionReason(value: unknown): value is AIConnectionReason {
+  const reasons: readonly AIConnectionReason[] = [
+    'host-permission-required',
+    'invalid-credential',
+    'permission-denied',
+    'model-unavailable',
+    'quota-exceeded',
+    'rate-limited',
+    'network',
+    'timeout',
+    'service-error',
+    'unknown',
+    'secret-locked',
+    'catalog-unsupported',
+    'provider-unavailable',
+  ];
+  return reasons.some((reason) => reason === value);
 }

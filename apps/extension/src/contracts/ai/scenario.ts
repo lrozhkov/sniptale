@@ -1,3 +1,4 @@
+import type { AIConnectionReason } from '../settings/ai-catalog';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ScenarioAiOperation } from '@sniptale/runtime-contracts/scenario-ai-operations';
 
@@ -29,6 +30,7 @@ export interface ProcessScenarioEditorWithLLMMessage {
 export type ScenarioAIParseError = 'invalid-json' | `invalid-schema:${number}`;
 
 export interface ProcessScenarioEditorWithLLMResponse {
+  failureReason?: AIConnectionReason | undefined;
   error?: string | undefined;
   operations?: ScenarioAiOperation[] | undefined;
   parseError?: ScenarioAIParseError | undefined;

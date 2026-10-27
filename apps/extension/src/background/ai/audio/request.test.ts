@@ -67,24 +67,28 @@ function run(request = speech, config = speechConfig) {
 }
 
 it.each([
-  [400, 'provider-request'],
-  [422, 'provider-request'],
-  [404, 'provider-not-found'],
-  [405, 'provider-not-found'],
-  [413, 'too-large'],
-  [401, 'provider-auth'],
-  [403, 'provider-auth'],
-  [429, 'provider-rate-limit'],
-  [500, 'provider-failed'],
-] as const)('rejects HTTP %s without reading or exposing its error body', async (status, code) => {
-  const cancel = vi.fn();
-  const body = new ReadableStream({ cancel });
-  const fetchMock = vi.fn<typeof fetch>(async () => new Response(body, { status }));
-  vi.stubGlobal('fetch', fetchMock);
-  await expect(run()).rejects.toThrow(code);
-  expect(cancel).toHaveBeenCalledOnce();
-  expect(fetchMock).toHaveBeenCalledTimes(1);
-});
+  [400, 'provider-request', 'unknown'],
+  [422, 'provider-request', 'unknown'],
+  [404, 'provider-not-found', 'model-unavailable'],
+  [405, 'provider-not-found', 'unknown'],
+  [413, 'too-large', 'unknown'],
+  [401, 'provider-auth', 'invalid-credential'],
+  [403, 'provider-auth', 'permission-denied'],
+  [402, 'provider-failed', 'quota-exceeded'],
+  [429, 'provider-rate-limit', 'rate-limited'],
+  [500, 'provider-failed', 'service-error'],
+] as const)(
+  'rejects HTTP %s without reading or exposing its error body',
+  async (status, code, reason) => {
+    const cancel = vi.fn();
+    const body = new ReadableStream({ cancel });
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(body, { status }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(run()).rejects.toMatchObject({ message: code, reason });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  }
+);
 it('rejects an incomplete operation before fetch or an already cancelled request', async () => {
   const fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal('fetch', fetchMock);

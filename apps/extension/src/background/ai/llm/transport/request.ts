@@ -86,6 +86,18 @@ function safeFailure(error: unknown, options: ChatRequestOptions): never {
   const reason = classifyAIProviderFailure(error);
   if (reason === 'invalid-credential')
     throw new AIProviderRequestError(reason, translate('background.runtime.llmInvalidApiKey'));
+  if (reason === 'permission-denied')
+    throw new AIProviderRequestError(
+      reason,
+      translate('settings.aiProviders.providerStatusDenied')
+    );
+  if (reason === 'quota-exceeded')
+    throw new AIProviderRequestError(reason, translate('settings.aiProviders.providerStatusQuota'));
+  if (reason === 'model-unavailable')
+    throw new AIProviderRequestError(
+      reason,
+      translate('settings.aiProviders.providerStatusModelUnavailable')
+    );
   if (reason === 'rate-limited')
     throw new AIProviderRequestError(reason, translate('background.runtime.llmRateLimitExceeded'));
   if (reason === 'service-error')

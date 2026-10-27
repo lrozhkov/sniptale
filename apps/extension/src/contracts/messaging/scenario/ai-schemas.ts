@@ -1,3 +1,4 @@
+import { isAIConnectionReason, type AIConnectionReason } from '../../settings/ai-catalog';
 import { z } from 'zod';
 
 import type {
@@ -113,6 +114,7 @@ export const processScenarioEditorWithLlmResponseSchema = defineProcessScenarioR
   z
     .object({
       error: z.string().optional(),
+      failureReason: z.custom<AIConnectionReason>(isAIConnectionReason).optional(),
       operations: z.array(scenarioAiOperationSchema).max(200).optional(),
       parseError: scenarioAIParseErrorSchema.optional(),
       success: z.boolean(),

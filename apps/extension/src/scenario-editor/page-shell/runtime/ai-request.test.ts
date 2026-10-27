@@ -25,7 +25,7 @@ vi.mock('../../../platform/runtime-messaging', () => ({
 }));
 vi.mock('../../../platform/media-utils/data-url', () => ({ blobToDataUrl: io.dataUrl }));
 vi.mock('./image-frame', () => ({ renderGuideImageFrame: io.frame }));
-import { requestGuideAiProposal, verifyGuideAiBasis } from './ai-request';
+import { requestGuideAiProposal, verifyGuideAiBasis, GuideAiProviderError } from './ai-request';
 
 function setup() {
   const project = createGuideProject('Private name', 'guide', 1);
@@ -176,4 +176,21 @@ it('checks limits and a revision changed during authorization before provider di
   });
   await expect(requestGuideAiProposal(s.args)).rejects.toThrow('basis');
   expect(io.send).not.toHaveBeenCalled();
+});
+
+it('uses fixed provider evidence and discards raw response text without applying changes', async () => {
+  const s = setup();
+  io.send.mockResolvedValueOnce({
+    success: false,
+    failureReason: 'quota-exceeded',
+    error: 'private-provider-text',
+  });
+  await expect(requestGuideAiProposal(s.args)).rejects.toMatchObject({
+    messageKey: 'settings.aiProviders.providerStatusQuota',
+  });
+  expect(s.step.blocks[0]).toMatchObject({
+    kind: 'text',
+    paragraphs: createGuideParagraphs('Before'),
+  });
+  expect(new GuideAiProviderError('unknown').messageKey).toBe('scenario.editor.guideAiFailed');
 });

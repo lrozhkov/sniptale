@@ -1,5 +1,19 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'ai-catalog-boundary-contract',
+    productionFile: 'apps/extension/src/contracts/settings/ai-catalog.ts',
+    reason:
+      'Catalog capabilities, lifecycle, operation observations and remembered choices share bounded metadata admission proof.',
+    testFiles: [
+      'apps/extension/src/contracts/settings/ai-catalog.test.ts',
+      'apps/extension/src/contracts/settings/model-operation.test.ts',
+      'apps/extension/src/features/ai/schemas/ai-settings.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/guards.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+    ],
+  },
+  {
     owner: 'canonical-ai-model-selector',
     productionFile: 'apps/extension/src/features/ai/model-selector/helpers.ts',
     reason:
@@ -570,11 +584,16 @@ through their existing consumer tests.',
   {
     owner: 'scenario-editor-llm-provider-route',
     productionFile: 'apps/extension/src/background/ai/llm/editor-router.ts',
-    reason: 'Scenario editor provider egress is covered by v2/v3 route and optional-field suites.',
+    exclusive: true,
+    reason:
+      'Scenario provider requests require payload boundary, sender, attachment and optional-field suites.',
     testFiles: [
       'apps/extension/src/background/ai/llm/editor-router.test.ts',
       'apps/extension/src/background/ai/llm/editor-router.v3.test.ts',
       'apps/extension/src/background/ai/llm/editor-router.optional-fields.test.ts',
+      'apps/extension/src/background/ai/llm/editor-router.boundary.test.ts',
+      'apps/extension/src/background/ai/llm/editor-router.attachments.test.ts',
+      'apps/extension/src/background/ai/llm/router-processing.test.ts',
     ],
   },
   {

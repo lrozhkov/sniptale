@@ -15,10 +15,10 @@ const io = vi.hoisted(() => ({
   verify: vi.fn(),
   remember: vi.fn(),
 }));
-vi.mock('./runtime/ai-request', () => ({
+vi.mock('./runtime/ai-request', async (original) => ({
+  ...(await original<typeof import('./runtime/ai-request')>()),
   requestGuideAiProposal: io.request,
   verifyGuideAiBasis: io.verify,
-  GuideAiStaleError: class extends Error {},
 }));
 vi.mock('../../workflows/ai-settings/query', () => ({
   requestAIScenarioModelSelection: io.configuration,
@@ -28,7 +28,7 @@ vi.mock('../../features/prompt-templates/hooks/use-prompt-templates', () => ({
   usePromptTemplates: () => ({ templates: [], isLoading: false, isMutating: false, error: null }),
 }));
 import { GuideAiAssistant, GuideAiEntry } from './ai-assistant';
-import { GuideAiStaleError } from './runtime/ai-request';
+import { GuideAiStaleError, GuideAiProviderError } from './runtime/ai-request';
 const project = createGuideProject('Guide');
 const step = createGuideStep('Before title', 'step');
 step.blocks = [{ kind: 'text', id: 'text', paragraphs: createGuideParagraphs('Before text') }];
@@ -517,4 +517,20 @@ it('explains a refused model preference write and preserves the previous visible
     'Model'
   );
   expect(io.request).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['permission-denied', 'settings.aiProviders.providerStatusDenied'],
+  ['quota-exceeded', 'settings.aiProviders.providerStatusQuota'],
+  ['model-unavailable', 'settings.aiProviders.providerStatusModelUnavailable'],
+] as const)('explains %s while preserving input and explicit retry', async (reason, key) => {
+  await open();
+  const instruction = document.querySelector('textarea')!.value;
+  io.request.mockRejectedValueOnce(new GuideAiProviderError(reason));
+  await act(async () => button('Get suggestions').click());
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe(createTranslator('en')(key));
+  expect(document.querySelector('textarea')!.value).toBe(instruction);
+  expect(change).not.toHaveBeenCalled();
+  expect(io.request).toHaveBeenCalledTimes(1);
+  expect(button('Get suggestions').disabled).toBe(false);
 });

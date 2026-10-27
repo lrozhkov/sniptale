@@ -1,3 +1,4 @@
+import { AIProviderRequestError } from '../providers';
 import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import { beforeEach, expect, it, vi } from 'vitest';
 
@@ -312,3 +313,15 @@ it.each([
     }
   }
 );
+
+it('returns only a fixed provider reason without logging or returning provider text', async () => {
+  requestMultimodalChatCompletionMock.mockRejectedValueOnce(
+    new AIProviderRequestError('quota-exceeded', 'private-provider-text')
+  );
+  const sendResponse = vi.fn();
+  routeScenarioEditorLlmMessage(createMessage(), sendResponse, createSender());
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({ success: false, failureReason: 'quota-exceeded' })
+  );
+  expect(loggerErrorMock).not.toHaveBeenCalled();
+});

@@ -1,3 +1,4 @@
+import { AIProviderRequestError } from '../providers';
 import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import type {
   ProcessScenarioEditorWithLLMMessage,
@@ -177,7 +178,10 @@ export function routeScenarioEditorLlmMessage(
   }
 
   respondAsyncLlmRoute({
-    work: processScenarioEditorRequest(message, canonicalPayload),
+    work: processScenarioEditorRequest(message, canonicalPayload).catch((error: unknown) => {
+      if (!(error instanceof AIProviderRequestError)) throw error;
+      return { success: false, failureReason: error.reason };
+    }),
     sendResponse,
     logger,
     failureLogMessage: 'Scenario editor LLM request failed',

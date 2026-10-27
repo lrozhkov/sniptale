@@ -3,9 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
 import type { GuideProject, GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { applyGuideAiProposal, type GuideAiScope } from '../../features/scenario/project/public';
-import type { Translate } from '../../platform/i18n';
+import type { Translate, TranslationKey } from '../../platform/i18n';
 import {
   GuideAiStaleError,
+  GuideAiProviderError,
   requestGuideAiProposal,
   verifyGuideAiBasis,
 } from './runtime/ai-request';
@@ -55,7 +56,7 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
   const { scope, imageCount } = selection;
   const [includeImages, setIncludeImages] = useState(false);
   const [pending, setPending] = useState(false);
-  const [failure, setFailure] = useState<'request' | 'stale' | null>(null);
+  const [failure, setFailure] = useState<TranslationKey | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [accepted, setAccepted] = useState<Set<number>>(new Set());
   useEffect(
@@ -112,7 +113,13 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
       }
     } catch (error) {
       if (job.current === controller && !controller.signal.aborted)
-        setFailure(error instanceof GuideAiStaleError ? 'stale' : 'request');
+        setFailure(
+          error instanceof GuideAiStaleError
+            ? 'scenario.editor.guideAiStale'
+            : error instanceof GuideAiProviderError
+              ? error.messageKey
+              : 'scenario.editor.guideAiFailed'
+        );
     } finally {
       if (job.current === controller) {
         job.current = null;

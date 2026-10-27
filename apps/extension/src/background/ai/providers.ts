@@ -98,15 +98,21 @@ export class AIProviderRequestError extends Error {
 export function classifyAIProviderFailure(error: unknown): AIConnectionReason {
   if (error instanceof AIProviderRequestError) return error.reason;
   if (APICallError.isInstance(error)) {
-    if (error.statusCode === 401) return 'invalid-credential';
-    if (error.statusCode === 403) return 'permission-denied';
-    if (error.statusCode === 402) return 'quota-exceeded';
-    if (error.statusCode === 404) return 'model-unavailable';
-    if (error.statusCode === 429) return 'rate-limited';
-    if ((error.statusCode ?? 0) >= 500) return 'service-error';
+    return classifyAIProviderHttpStatus(error.statusCode);
   }
   if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
     return 'timeout';
   if (error instanceof TypeError) return 'network';
+  return 'unknown';
+}
+
+/** Classifies documented HTTP evidence without reading a provider body or inferring retirement. */
+export function classifyAIProviderHttpStatus(status: number | undefined): AIConnectionReason {
+  if (status === 401) return 'invalid-credential';
+  if (status === 403) return 'permission-denied';
+  if (status === 402) return 'quota-exceeded';
+  if (status === 404) return 'model-unavailable';
+  if (status === 429) return 'rate-limited';
+  if ((status ?? 0) >= 500) return 'service-error';
   return 'unknown';
 }
