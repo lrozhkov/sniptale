@@ -175,3 +175,26 @@ it('retains an explicit manual retirement override and blocks repeated absence',
   model.catalog = { ...model.catalog, absenceCount: 1 };
   expect(selectSettingsTransferModelMetadata(model).enabled).toBe(true);
 });
+
+it('excludes local operation generations and observations from portable model metadata', () => {
+  const configuration = configuredModel();
+  const model: AIModel = {
+    ...configuration,
+    operationObservations: {
+      text: {
+        generation: 'local-generation',
+        observation: {
+          status: 'available',
+          scope: 'operation',
+          checkedAt: 100,
+          revision: 1,
+          lastSuccessAt: 100,
+        },
+      },
+    },
+  };
+  const exported = selectSettingsTransferModelMetadata(model);
+  expect(exported).toEqual(configuration);
+  expect(parseSettingsTransferModelMetadata(exported)).toEqual(configuration);
+  expect(() => parseSettingsTransferModelMetadata(model)).toThrow(TypeError);
+});

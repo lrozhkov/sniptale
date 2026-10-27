@@ -4,6 +4,7 @@ import type {
   AICatalogFacts,
   AIModelSource,
   AIConnectionObservation,
+  AIModelOperationObservations,
 } from './ai-catalog';
 import type { PageLaunchPreferences } from '../page-launch';
 import type { QuickActionAppearance } from '../quick-action-appearance';
@@ -305,6 +306,7 @@ export interface AIProvider {
 }
 
 export interface AIModel {
+  operationObservations?: AIModelOperationObservations | undefined;
   /** Property updates are independent from manual list membership and allowlist admission. */
   propertySource?: AIModelSource | undefined;
   source?: AIModelSource | undefined;

@@ -364,6 +364,7 @@ it('captures stable non-secret observation authority and invalidates it after cr
   vi.stubGlobal('chrome', { permissions: { contains: vi.fn().mockResolvedValue(true) } });
   const first = await resolveModelConfig('model-1');
   expect(first.observationBinding).toEqual({
+    model: { id: 'model-1', code: 'model-1-code', operation: 'text' },
     providerId: provider.id,
     incarnation: 'incarnation',
     revision: 3,

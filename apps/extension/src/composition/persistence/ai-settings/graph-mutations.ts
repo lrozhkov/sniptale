@@ -132,7 +132,11 @@ async function resolveModelProperties(
   models: readonly AIModel[],
   provider: AIProvider
 ): Promise<AIModel> {
-  const { catalog: _submittedCatalog, ...configured } = model;
+  const {
+    catalog: _submittedCatalog,
+    operationObservations: _submittedObservations,
+    ...configured
+  } = model;
   const matches = models.filter(
     (entry) =>
       entry.providerId === model.providerId && entry.modelCode === model.modelCode && entry.catalog

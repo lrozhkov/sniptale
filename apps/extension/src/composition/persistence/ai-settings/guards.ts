@@ -3,6 +3,7 @@ import {
   isAIModelCapabilities,
   isAICatalogFacts,
   isAIConnectionObservation,
+  isAIModelOperationObservations,
 } from '../../../contracts/settings/ai-catalog';
 import { isValidAIModelOperationConfiguration } from '../../../contracts/settings/model-operation';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
@@ -69,6 +70,8 @@ function isAIModel(value: unknown): value is AIModel {
       typeof value['retirementOverride'] === 'boolean') &&
     (value['capabilities'] === undefined || isAIModelCapabilities(value['capabilities'])) &&
     (value['catalog'] === undefined || isAICatalogFacts(value['catalog'])) &&
+    (value['operationObservations'] === undefined ||
+      isAIModelOperationObservations(value['operationObservations'])) &&
     (value['systemPrompt'] === undefined || isString(value['systemPrompt']))
   );
 }

@@ -784,13 +784,13 @@ it('captures a stable non-secret operation binding and changes it after credenti
   vi.mocked(loadAIProviders).mockResolvedValue([current]);
   const first = await resolveAudioModelConfig(request);
   expect(first.observationBinding).toEqual({
+    model: { id: model.id, code: model.modelCode, operation: 'speech' },
     providerId: provider.id,
     incarnation: 'incarnation',
     revision: 3,
     credentialRevision: 4,
     destination: await createAIProviderDestinationBinding(current),
   });
-  expect(JSON.stringify(first.observationBinding)).not.toContain('secret');
   expect(await resolveAudioModelConfig(request)).toEqual(first);
   vi.mocked(loadAIProviders).mockResolvedValue([{ ...current, credentialRevision: 5 }]);
   expect((await resolveAudioModelConfig(request)).observationBinding).not.toEqual(

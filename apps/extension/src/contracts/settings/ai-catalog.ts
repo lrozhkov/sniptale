@@ -304,3 +304,36 @@ export function isAIConnectionReason(value: unknown): value is AIConnectionReaso
   ];
   return reasons.some((reason) => reason === value);
 }
+
+/** Bounded local evidence is separate from model capabilities, lifecycle and user configuration. */
+export type AIModelOperationObservations = Partial<
+  Record<
+    AIModelOperation,
+    {
+      generation?: string | undefined;
+      observation?: AIConnectionObservation | undefined;
+    }
+  >
+>;
+
+/** Checks local operation evidence without admitting raw errors or foreign operation names. */
+export function isAIModelOperationObservations(
+  value: unknown
+): value is AIModelOperationObservations {
+  return (
+    isRecord(value) &&
+    Object.entries(value).every(
+      ([operation, entry]) =>
+        ['text', 'speech', 'transcription'].includes(operation) &&
+        isRecord(entry) &&
+        Object.keys(entry).every((key) => key === 'generation' || key === 'observation') &&
+        (entry['generation'] === undefined ||
+          (typeof entry['generation'] === 'string' &&
+            entry['generation'].length > 0 &&
+            entry['generation'].length <= 200)) &&
+        (entry['observation'] === undefined ||
+          (isAIConnectionObservation(entry['observation']) &&
+            entry['observation'].scope === 'operation'))
+    )
+  );
+}

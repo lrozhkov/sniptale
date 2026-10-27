@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { isAIConnectionObservation, isAIConnectionReason } from './ai-catalog';
+import {
+  isAIConnectionObservation,
+  isAIConnectionReason,
+  isAIModelOperationObservations,
+} from './ai-catalog';
 
 const observation = { status: 'available', scope: 'catalog', checkedAt: 100, revision: 2 };
 it('admits bounded observations without requiring failure or success-history fields', () => {
@@ -69,3 +73,28 @@ it.each(['private-response', null, undefined, {}, 402])(
     expect(isAIConnectionReason(value)).toBe(false);
   }
 );
+
+it('admits separate bounded operation generations and observations', () => {
+  expect(
+    isAIModelOperationObservations({
+      text: { generation: 'pending', observation: { ...observation, scope: 'operation' } },
+      speech: { observation: { ...observation, scope: 'operation', reason: 'model-unavailable' } },
+      transcription: { generation: 'another' },
+    })
+  ).toBe(true);
+});
+it.each([
+  null,
+  [],
+  { image: {} },
+  { text: null },
+  { text: { generation: '' } },
+  { text: { generation: 1 } },
+  { text: { generation: 'x'.repeat(201) } },
+  { text: { rawError: 'private-response' } },
+  { text: { observation } },
+  { text: { observation: { ...observation, scope: 'operation', secret: 'private' } } },
+  { text: { observation: { ...observation, scope: 'operation', reason: 'raw-response' } } },
+])('refuses invalid model operation metadata: %j', (value) => {
+  expect(isAIModelOperationObservations(value)).toBe(false);
+});

@@ -100,6 +100,7 @@ export async function resolveModelConfig(
     ...(provider.incarnation
       ? {
           observationBinding: {
+            model: { id: model.id, code: model.modelCode, operation: 'text' },
             providerId: provider.id,
             incarnation: provider.incarnation,
             revision: provider.revision ?? 0,

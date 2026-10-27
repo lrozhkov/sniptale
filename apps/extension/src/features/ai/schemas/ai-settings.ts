@@ -3,6 +3,8 @@ import {
   isAIModelCapabilities,
   isAICatalogFacts,
   isAIConnectionObservation,
+  isAIModelOperationObservations,
+  type AIModelOperationObservations,
   type AIModelCapabilities,
   type AICatalogFacts,
   type AIConnectionObservation,
@@ -79,6 +81,9 @@ const operationFields = {
 export const AIModelSchema = z
   .object({
     ...operationFields,
+    operationObservations: z
+      .custom<AIModelOperationObservations>(isAIModelOperationObservations)
+      .optional(),
     source: z.enum(['catalog', 'manual']).optional(),
     propertySource: z.enum(['catalog', 'manual']).optional(),
     enabled: z.boolean().optional(),

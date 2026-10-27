@@ -129,6 +129,7 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
     ...(provider.incarnation
       ? {
           observationBinding: {
+            model: { id: model.id, code: model.modelCode, operation: args.operation },
             providerId: provider.id,
             incarnation: provider.incarnation,
             revision: provider.revision ?? 0,
