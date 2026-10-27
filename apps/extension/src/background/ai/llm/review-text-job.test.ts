@@ -1,3 +1,4 @@
+import { AIProviderRequestError } from '../providers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createReviewTextJobService } from './review-text-job';
 import {
@@ -194,6 +195,7 @@ describe('one-shot cancellable text editing jobs', () => {
       type: 'failure',
       requestId: start.requestId,
       code: 'timeout',
+      failureReason: 'timeout',
     });
     wait.resolve();
     await service.cancelActiveJob();
@@ -309,5 +311,34 @@ it.each(['model-change', 'workspace-change'] as const)(
       status: 'failure',
       errorCode: 'provider-failure',
     });
+  }
+);
+
+it.each([
+  'invalid-credential',
+  'permission-denied',
+  'model-unavailable',
+  'quota-exceeded',
+  'rate-limited',
+  'network',
+  'timeout',
+  'service-error',
+] as const)(
+  'retains bounded %s evidence without sending private provider messages',
+  async (reason) => {
+    const { connection, deps, service, messages } = setup();
+    deps.request.mockRejectedValueOnce(new AIProviderRequestError(reason, 'PRIVATE_RESPONSE_BODY'));
+    connection.receive(start);
+    const reservation = service.reserveErasureExclusion();
+    await reservation.waitForActiveMutations();
+    reservation.release();
+    expect(messages.at(-1)).toEqual({
+      type: 'failure',
+      requestId: start.requestId,
+      code: 'provider-failed',
+      failureReason: reason,
+    });
+    expect(JSON.stringify(messages)).not.toContain('PRIVATE_RESPONSE_BODY');
+    expect(deps.request).toHaveBeenCalledOnce();
   }
 );

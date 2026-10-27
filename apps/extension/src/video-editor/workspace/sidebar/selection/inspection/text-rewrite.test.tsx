@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { TextJobProviderError } from '../../../../../workflows/ai-session/text-request-port';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getVideoProject } from '../../../../../composition/persistence/projects';
@@ -379,4 +380,23 @@ it('closes a disposable receipt without undoing accepted local work and restores
   expect(
     useVideoEditorStore.getState().project!.textDocuments![0]!.document.fragments[0]!.text
   ).toBe('Original text');
+});
+
+it('explains provider denial in the mounted text inspector without changing authored text', async () => {
+  await mount();
+  const before = useVideoEditorStore.getState().project;
+  vi.mocked(runReviewTextJob).mockImplementationOnce(async () => {
+    requestEntered.release();
+    throw new TextJobProviderError('permission-denied', 'provider-failed');
+  });
+  await act(async () => {
+    button('textRewriteStart').click();
+    await requestEntered.promise;
+  });
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'settings.aiProviders.providerStatusDenied'
+  );
+  expect(useVideoEditorStore.getState().project).toBe(before);
+  expect(host.querySelector('textarea')?.value).toBe('Make the text clear');
+  expect(runReviewTextJob).toHaveBeenCalledOnce();
 });

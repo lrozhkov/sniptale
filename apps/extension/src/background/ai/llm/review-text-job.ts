@@ -46,7 +46,12 @@ export function createReviewTextJobService(overrides: Partial<Dependencies> = {}
       phase: 'authorizing',
     }),
     result: (request, proposal) => ({ type: 'proposal', requestId: request.requestId, proposal }),
-    failure: (request, code) => ({ type: 'failure', requestId: request.requestId, code }),
+    failure: (request, code, failureReason) => ({
+      type: 'failure',
+      requestId: request.requestId,
+      code,
+      ...(failureReason === undefined ? {} : { failureReason }),
+    }),
   });
 }
 

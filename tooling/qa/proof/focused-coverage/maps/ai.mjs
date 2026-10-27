@@ -17,10 +17,11 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/gallery/video-review/ai-provider-error.ts',
     exclusive: true,
     reason:
-      'The pure fixed-copy selector has two mounted Gallery consumers. Their tests cover distinct provider feedback and existing generic recovery without transport, source or publication effects.',
+      'The pure fixed-copy selector has three mounted Gallery consumers. Their tests cover distinct provider feedback and existing generic recovery without transport, source or publication effects.',
     testFiles: [
       'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
       'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-rewrite-panel.test.tsx',
     ],
   },
   {

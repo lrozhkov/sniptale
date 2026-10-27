@@ -2794,6 +2794,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "7df14bc4a665165e15d47c0efa38b3a213900e1a1a11dd90b6eba34787507ba2",
       "signatureHash": "031afdb9ec7d9e870b41c1dc68a59e04af8d2157a0bd9f7d088e4385730745e6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/runtime/session/text-rewrite.ts",
+      "symbol": "useVideoProjectTextRewrite",
+      "owner": "extension:video-editor:runtime",
+      "reason": "tool-noise: This existing Video text rewrite hook retains one project identity, draft, cancellation, prepared proposal and explicit Apply lifetime. Provider evidence accompanies existing error state and its alert receiver. Its body grows from 145 to 162 lines while score 1, delta 0, twenty statements, one effect, one state authority and three owner groups remain unchanged. Current workflows retain source Save, authorization, provider egress, receipt acknowledgement and publication. The candidate adds no writer, resource or independent recovery authority. Mounted failure, unchanged-source and explicit-choice proof supports Keep. Line-only extraction would distribute the same operation receiver. Fresh independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new independent state receiver, writer, resource, consent, cancellation or recovery authority. Remove when the analyzer models this cohesive project text operation.",
+      "reviewDate": "2026-10-27",
+      "astHash": "891380ad29c06db68036481e4fa89261face4509106a4e43dbf5c01c3ec328b1",
+      "signatureHash": "a5862144e94f8138df1a63d57fe224b924d30f6e9ba423e165911b926efaaad4"
     }
   ]
 }

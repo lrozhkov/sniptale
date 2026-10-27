@@ -1,3 +1,5 @@
+import { TextJobProviderError } from '../../workflows/ai-session/text-request-port';
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
 import {
   useEffect,
   useRef,
@@ -46,6 +48,7 @@ export function useReviewTextRewrite(props: {
     accepted: false,
     preview: null as ReviewTextRewritePreview | null,
     error: null as string | null,
+    providerFailureReason: null as AIConnectionReason | null,
   });
   const lifetime = useRef({
     mounted: true,
@@ -76,7 +79,13 @@ export function useReviewTextRewrite(props: {
   const remember = (preview: ReviewTextRewritePreview | null) => {
     lifetime.current.preview = preview;
     lifetime.current.accepted = false;
-    setState((value) => ({ ...value, preview, accepted: false, error: null }));
+    setState((value) => ({
+      ...value,
+      preview,
+      accepted: false,
+      error: null,
+      providerFailureReason: null,
+    }));
   };
   let disclosure: ReviewTextRewritePreview | null = null;
   let disclosureError: string | null = null;
@@ -93,7 +102,10 @@ export function useReviewTextRewrite(props: {
     catalog,
     modelId,
     setModelId: (id: string) => {
-      if (!lifetime.current.active && !lifetime.current.preview) selection.chooseModel(id);
+      if (!lifetime.current.active && !lifetime.current.preview) {
+        setState((value) => ({ ...value, error: null, providerFailureReason: null }));
+        selection.chooseModel(id);
+      }
     },
     selectionPending: selection.selectionPending,
     selectionUnavailable: selection.selectionUnavailable,
@@ -211,6 +223,7 @@ type RewriteState = {
   accepted: boolean;
   preview: ReviewTextRewritePreview | null;
   error: string | null;
+  providerFailureReason: AIConnectionReason | null;
 };
 
 /** One mounted attempt owns preparation, elapsed time, cancellation and late-result disposal. */
@@ -224,7 +237,14 @@ function runTextRewriteAttempt(
   const controller = new AbortController();
   owner.active = controller;
   const started = performance.now();
-  setState((value) => ({ ...value, running: true, applying, elapsed: 0, error: null }));
+  setState((value) => ({
+    ...value,
+    running: true,
+    applying,
+    elapsed: 0,
+    error: null,
+    providerFailureReason: null,
+  }));
   const timer = setInterval(() => {
     if (owner.mounted)
       setState((value) => ({
@@ -252,7 +272,11 @@ function runTextRewriteAttempt(
           )
             ? error.message
             : 'failed';
-        setState((value) => ({ ...value, error: code }));
+        setState((value) => ({
+          ...value,
+          error: code,
+          providerFailureReason: error instanceof TextJobProviderError ? error.reason : null,
+        }));
       }
     })
     .finally(() => {

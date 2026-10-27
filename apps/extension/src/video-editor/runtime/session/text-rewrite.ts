@@ -1,3 +1,5 @@
+import { TextJobProviderError } from '../../../workflows/ai-session/text-request-port';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
 import {
   useCallback,
   useEffect,
@@ -38,6 +40,7 @@ interface RewriteState {
   elapsed: number;
   preview: ProjectTextRewritePreview | null;
   error: string | null;
+  providerFailureReason?: AIConnectionReason | null;
 }
 type RewriteWork = (signal: AbortSignal) => Promise<void>;
 type RewriteStateSetter = Dispatch<SetStateAction<RewriteState>>;
@@ -56,6 +59,7 @@ const initialState: RewriteState = {
   elapsed: 0,
   preview: null,
   error: null,
+  providerFailureReason: null,
 };
 const defaultOptions = (wholeDocument = false): RewriteOptions => ({
   prompt: '',
@@ -119,7 +123,14 @@ function runProjectTextRewriteAttempt(
   const current = () =>
     owner.current === lifetime && lifetime.mounted && lifetime.active === attempt;
   const started = performance.now();
-  setState((value) => ({ ...value, running: true, applying, elapsed: 0, error: null }));
+  setState((value) => ({
+    ...value,
+    running: true,
+    applying,
+    elapsed: 0,
+    error: null,
+    providerFailureReason: null,
+  }));
   const timer = setInterval(() => {
     if (current())
       setState((value) => ({
@@ -140,7 +151,11 @@ function runProjectTextRewriteAttempt(
       )
         return;
       if (current() && !signal.aborted)
-        setState((value) => ({ ...value, error: errorCode(error) }));
+        setState((value) => ({
+          ...value,
+          error: errorCode(error),
+          providerFailureReason: error instanceof TextJobProviderError ? error.reason : null,
+        }));
     })
     .finally(() => {
       clearInterval(timer);
@@ -237,7 +252,10 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
   const catalog = selection.configuration;
   const modelId = selection.modelId ?? '';
   const setModelId = (id: string) => {
-    if (!owner.current.active && !owner.current.preview) selection.chooseModel(id);
+    if (!owner.current.active && !owner.current.preview) {
+      setState((value) => ({ ...value, error: null, providerFailureReason: null }));
+      selection.chooseModel(id);
+    }
   };
   const setOptions = useCallback<typeof setOptionsState>((next) => {
     if (!owner.current.active && !owner.current.preview) setOptionsState(next);
@@ -246,7 +264,13 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
     if (!currentLifetime()) return;
     lifetime.preview = preview;
     lifetime.accepted = false;
-    setState((value) => ({ ...value, preview, accepted: false, error: null }));
+    setState((value) => ({
+      ...value,
+      preview,
+      accepted: false,
+      error: null,
+      providerFailureReason: null,
+    }));
   };
   const command = (work: RewriteWork, applying = false) =>
     runProjectTextRewriteAttempt(owner, lifetime, setState, work, applying);
@@ -284,11 +308,19 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
       const model = catalog?.models.find((entry) => entry.id === modelId);
       const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
       if (!model || !provider?.destinationBinding) {
-        setState((value) => ({ ...value, error: 'model-unavailable' }));
+        setState((value) => ({
+          ...value,
+          error: 'model-unavailable',
+          providerFailureReason: null,
+        }));
         return;
       }
       if (!disclosure) {
-        setState((value) => ({ ...value, error: disclosureError ?? 'invalid-request' }));
+        setState((value) => ({
+          ...value,
+          error: disclosureError ?? 'invalid-request',
+          providerFailureReason: null,
+        }));
         return;
       }
       const captured = structuredClone(disclosure);

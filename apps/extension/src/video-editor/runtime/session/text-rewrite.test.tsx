@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, useEffect } from 'react';
+import { TextJobProviderError } from '../../../workflows/ai-session/text-request-port';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getVideoProject } from '../../../composition/persistence/projects';
@@ -421,3 +422,21 @@ it.each(['catalog', 'preference', 'destination'] as const)(
     expect(current().selectionUnavailable).toBe(failure === 'destination');
   }
 );
+
+it('keeps provider evidence without changing source and clears it on explicit model choice', async () => {
+  await mount();
+  const before = useVideoEditorStore.getState().project;
+  vi.mocked(runReviewTextJob).mockImplementationOnce(async () => {
+    requestEntered.release();
+    throw new TextJobProviderError('quota-exceeded', 'provider-failed');
+  });
+  await generate();
+  expect(current().providerFailureReason).toBe('quota-exceeded');
+  expect(current().preview).toBeNull();
+  expect(useVideoEditorStore.getState().project).toBe(before);
+  expect(runReviewTextJob).toHaveBeenCalledOnce();
+  await act(async () => current().setModelId('model'));
+  expect(current().providerFailureReason).toBeNull();
+  expect(current().error).toBeNull();
+  expect(runReviewTextJob).toHaveBeenCalledOnce();
+});

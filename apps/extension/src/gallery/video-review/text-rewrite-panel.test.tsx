@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { TextJobProviderError } from '../../workflows/ai-session/text-request-port';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -380,3 +381,20 @@ it.each(['ru', 'en'] as const)(
     );
   }
 );
+
+it('explains a provider quota failure and retains authored text for explicit retry', async () => {
+  await mountForm();
+  jobs.generate.mockRejectedValueOnce(
+    new TextJobProviderError('quota-exceeded', 'provider-failed')
+  );
+  await click('textRewriteStart');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'settings.aiProviders.providerStatusQuota'
+  );
+  expect(host.querySelector('textarea')?.value).toBe('Shorten');
+  expect(jobs.generate).toHaveBeenCalledOnce();
+  expect(jobs.apply).not.toHaveBeenCalled();
+  await click('textRewriteStart');
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(jobs.generate).toHaveBeenCalledTimes(2);
+});

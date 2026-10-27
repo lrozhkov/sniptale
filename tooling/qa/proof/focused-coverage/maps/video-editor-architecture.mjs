@@ -46,10 +46,11 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/ai-provider-error.ts',
     exclusive: true,
     reason:
-      'Fixed audio provider feedback belongs to the Video inspector. Mounted recognition and speech session consumers prove local copy, source preservation and explicit error clearing.',
+      'Fixed provider feedback belongs to the Video inspector. Mounted recognition, speech and text rewrite consumers prove local copy, source preservation and explicit error clearing.',
     testFiles: [
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
       'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-rewrite.test.tsx',
     ],
   },
   {
