@@ -125,6 +125,19 @@
       "version": "1.0.3"
     },
     {
+      "archivePath": "LICENSES/dependencies/debug-4.4.3.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/debug/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "debug",
+      "packagePath": "node_modules/debug",
+      "selectedLicense": "MIT",
+      "sha256": "3a61c6c96caf5c1d9b623fb9b04c822b783dfcb78aa7e49c76a3f643e6ed7f95",
+      "sourceUrl": "https://github.com/debug-js/debug.git",
+      "version": "4.4.3"
+    },
+    {
       "archivePath": "LICENSES/dependencies/dompurify-3.4.17.txt",
       "licenseExpression": "(MPL-2.0 OR Apache-2.0)",
       "licenseSource": "node_modules/dompurify/LICENSE",
@@ -298,6 +311,19 @@
       "version": "1.61.6"
     },
     {
+      "archivePath": "LICENSES/dependencies/ms-2.1.3.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/ms/license.md",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "ms",
+      "packagePath": "node_modules/ms",
+      "selectedLicense": "MIT",
+      "sha256": "1662fae9b5314d11cf51284e2dcd1f006a354f7343f08712a730fcff9a359801",
+      "sourceUrl": "vercel/ms",
+      "version": "2.1.3"
+    },
+    {
       "archivePath": "LICENSES/dependencies/pako-1.0.11.txt",
       "licenseExpression": "(MIT AND Zlib)",
       "licenseSource": "node_modules/pako/LICENSE",
@@ -428,6 +454,19 @@
       "version": "5.1.2"
     },
     {
+      "archivePath": "LICENSES/dependencies/sax-1.6.1.txt",
+      "licenseExpression": "BlueOak-1.0.0",
+      "licenseSource": "node_modules/sax/LICENSE.md",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "sax",
+      "packagePath": "node_modules/sax",
+      "selectedLicense": "BlueOak-1.0.0",
+      "sha256": "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004",
+      "sourceUrl": "https://github.com/isaacs/sax-js.git",
+      "version": "1.6.1"
+    },
+    {
       "archivePath": "LICENSES/dependencies/scheduler-0.28.0.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/scheduler/LICENSE",
@@ -467,6 +506,19 @@
       "version": "1.1.1"
     },
     {
+      "archivePath": "LICENSES/dependencies/tsdav-2.5.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/tsdav/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "tsdav",
+      "packagePath": "node_modules/tsdav",
+      "selectedLicense": "MIT",
+      "sha256": "2595fc934bdb521ec42681a25f9c75977da1640cebbbf8e69b3a046c431874c0",
+      "sourceUrl": "https://github.com/natelindev/tsdav",
+      "version": "2.5.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/util-deprecate-1.0.2.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/util-deprecate/LICENSE",
@@ -478,6 +530,19 @@
       "sha256": "0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7",
       "sourceUrl": "https://github.com/TooTallNate/util-deprecate.git",
       "version": "1.0.2"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/xml-js-1.6.11.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/xml-js/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "xml-js",
+      "packagePath": "node_modules/xml-js",
+      "selectedLicense": "MIT",
+      "sha256": "8ada61091ef0ef154a69321483e5ffadf5c50693ca945047ffb90a6b4b12b088",
+      "sourceUrl": "https://github.com/nashwaan/xml-js.git",
+      "version": "1.6.11"
     },
     {
       "archivePath": "LICENSES/dependencies/zod-4.6.7.txt",

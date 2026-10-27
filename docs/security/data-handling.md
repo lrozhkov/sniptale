@@ -266,3 +266,16 @@ The bounded payload contains parsed native media or project metadata and the rem
 The logical operation identity stays inside the replica payload. The outer journal has no backup operation identity. Canonical startup recovery uses the registered replica adapter. A refused item retains its journal and files, then defers without blocking unrelated recovery. Diagnostics contain a static event code, never payloads, filenames, addresses or raw exception text. Diagnostics do not own publication state.
 
 Native publication commits source records, ownership, causal state and receipt atomically. Recovery after commit uses the receipt to avoid another publication. The existing journal owner removes the ready journal after success. Project cleanup reuses the caller's active lifecycle permit and remains outside the native transaction. Canonical local-data erasure removes these journals and objects through the existing lifecycle authority.
+
+
+## WebDAV transport
+
+The sync transfer adapter uses the pinned tsdav client for DAV operations and authentication helpers. A native GET preserves the response stream because the library buffers generic responses. The adapter adds no upload retry or independent publication authority.
+
+An authorized lifecycle owner supplies resolved credentials and cancellation for one selected HTTPS root. That owner must check the optional host grant before use. The adapter permits explicitly selected private corporate addresses. The adapter retains credentials only in its client closure. It does not store credentials or change permission grants.
+
+Every request stays inside the selected root, omits browser cookies and rejects redirects. The final network owner adds Authorization after root and cancellation checks. DAV request operations receive no resolved credential headers. A refused response produces a fixed code and numeric status. Diagnostics exclude credentials, addresses, filenames, response bodies and raw exceptions.
+
+DAV metadata responses have an eight MiB limit before XML parsing. Exceeding this limit refuses the listing rather than returning an incomplete successful catalog. Media transfers use native Blobs and response streams. The transfer caller must check actual size and digest before native publication or capture settlement.
+
+The provider test suite requires an explicit loopback Nextcloud endpoint and a separate command. Its TLS proxy preserves server XML and authentication behavior. Only the test browser can accept its temporary self-signed certificate. Production code requires HTTPS and does not bypass certificate validation.

@@ -20,6 +20,12 @@
       "owner": "background-gallery-audio-transport",
       "justification": "The canonical audio transport handles project transcription and speech, plus explicitly configured private voice transcription.",
       "reviewNote": "Only this owner constructs audio bearer headers. Bind editor jobs to their admitted source scope. Bind voice jobs to immutable private history audio and the configured provider, destination and model code. Recheck authority after upload preparation. Require host permission, credentials omit, redirect error, bounded bodies and a deadline. Never retry paid requests, log provider responses or send binary IPC."
+    },
+    {
+      "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
+      "owner": "sync-webdav-provider",
+      "justification": "The WebDAV adapter owns resolved provider authentication for one explicitly selected HTTPS root.",
+      "reviewNote": "The lifecycle caller supplies host authorization and cancellation. Keep credentials in memory, omit cookies, reject redirects, and restrict every request to the selected root. Bound DAV metadata before parsing. Never log response bodies, addresses, filenames or raw errors."
     }
   ],
   "credentialedFetchOwners": [

@@ -24,6 +24,7 @@ type LaunchExtensionBrowserOptions = {
   userDataDir?: string;
   fakeMediaDevices?: boolean;
   autoGrantMediaPermissions?: boolean;
+  ignoreHTTPSErrors?: boolean;
   windowCaptureTitle?: string;
 };
 
@@ -124,6 +125,7 @@ export async function launchExtensionBrowser(
     context = await chromium.launchPersistentContext(userDataDir, {
       viewport,
       deviceScaleFactor: 1,
+      ...(options.ignoreHTTPSErrors ? { ignoreHTTPSErrors: true } : {}),
       args: getChromiumLaunchArgs(options),
       channel: 'chromium',
       headless: process.env.PLAYWRIGHT_HEADLESS !== '0',

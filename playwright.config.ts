@@ -13,6 +13,7 @@ if (requestedWorkers && !/^[1-9]\d*$/u.test(requestedWorkers)) {
 
 export default defineConfig({
   testDir: './tooling/test/e2e',
+  testIgnore: ['**/tooling/test/e2e/providers/**'],
   outputDir: '.tmp/test-results',
   fullyParallel: false,
   workers: requestedWorkers ? Number(requestedWorkers) : DEFAULT_PLAYWRIGHT_WORKERS,

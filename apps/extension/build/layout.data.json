@@ -193,6 +193,12 @@
       "sourcePath": "tooling/test/harness/sync-capture.html",
       "rollupName": "testHarnessSyncCapture",
       "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/webdav-transfer.html",
+      "sourcePath": "tooling/test/harness/webdav-transfer.html",
+      "rollupName": "testHarnessWebdavTransfer",
+      "mode": "test-e2e"
     }
   ],
   "requiredReleaseArtifacts": [
@@ -250,6 +256,7 @@
     "react",
     "react-dom",
     "roughjs",
+    "tsdav",
     "zod",
     "zustand"
   ],

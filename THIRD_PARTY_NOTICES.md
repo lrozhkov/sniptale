@@ -143,6 +143,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710`
 - Repository/source: https://github.com/isaacs/core-util-is
 
+### `debug` 4.4.3
+
+- Installed path: `node_modules/debug`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/debug/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/debug-4.4.3.txt`](LICENSES/dependencies/debug-4.4.3.txt)
+- License text SHA-256: `3a61c6c96caf5c1d9b623fb9b04c822b783dfcb78aa7e49c76a3f643e6ed7f95`
+- Repository/source: https://github.com/debug-js/debug.git
+
 ### `dompurify` 3.4.17
 
 - Installed path: `node_modules/dompurify`
@@ -284,6 +296,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
   - `LICENSES/dependencies/mediabunny-1.61.6-modified/README.md` (SHA-256: 35e090bb0019effc70359e2021ebde90705a7db44b615effbeacfbbd90007ded)
 - Original package integrity: sha512-VHEZ53/7jGl4dQ+uOdndsZufFYwEUFWv9UXgvrGun3OapyzoqI9iaPOD7z3xxY/nAttLZBNwswgJzMtGJAquOQ==
 
+### `ms` 2.1.3
+
+- Installed path: `node_modules/ms`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/ms/license.md`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/ms-2.1.3.txt`](LICENSES/dependencies/ms-2.1.3.txt)
+- License text SHA-256: `1662fae9b5314d11cf51284e2dcd1f006a354f7343f08712a730fcff9a359801`
+- Repository/source: vercel/ms
+
 ### `pako` 1.0.11
 
 - Installed path: `node_modules/pako`
@@ -404,6 +428,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `c7cc929b57080f4b9d0c6cf57669f0463fc5b39906344dfc8d3bc43426b30eac`
 - Repository/source: https://github.com/feross/safe-buffer.git
 
+### `sax` 1.6.1
+
+- Installed path: `node_modules/sax`
+- Declared license expression: `BlueOak-1.0.0`
+- Selected license: `BlueOak-1.0.0`
+- License source class: `installed-file`
+- License source: `node_modules/sax/LICENSE.md`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/sax-1.6.1.txt`](LICENSES/dependencies/sax-1.6.1.txt)
+- License text SHA-256: `8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004`
+- Repository/source: https://github.com/isaacs/sax-js.git
+
 ### `scheduler` 0.28.0
 
 - Installed path: `node_modules/scheduler`
@@ -440,6 +476,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b`
 - Repository/source: https://github.com/nodejs/string_decoder.git
 
+### `tsdav` 2.5.0
+
+- Installed path: `node_modules/tsdav`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/tsdav/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/tsdav-2.5.0.txt`](LICENSES/dependencies/tsdav-2.5.0.txt)
+- License text SHA-256: `2595fc934bdb521ec42681a25f9c75977da1640cebbbf8e69b3a046c431874c0`
+- Repository/source: https://github.com/natelindev/tsdav
+
 ### `util-deprecate` 1.0.2
 
 - Installed path: `node_modules/util-deprecate`
@@ -451,6 +499,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/util-deprecate-1.0.2.txt`](LICENSES/dependencies/util-deprecate-1.0.2.txt)
 - License text SHA-256: `0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7`
 - Repository/source: https://github.com/TooTallNate/util-deprecate.git
+
+### `xml-js` 1.6.11
+
+- Installed path: `node_modules/xml-js`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/xml-js/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/xml-js-1.6.11.txt`](LICENSES/dependencies/xml-js-1.6.11.txt)
+- License text SHA-256: `8ada61091ef0ef154a69321483e5ffadf5c50693ca945047ffb90a6b4b12b088`
+- Repository/source: https://github.com/nashwaan/xml-js.git
 
 ### `zod` 4.6.7
 

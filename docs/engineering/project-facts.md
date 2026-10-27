@@ -211,6 +211,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/scenario-capture-edit`
 - `apps/extension/src/workflows/scenario-narration`
 - `apps/extension/src/workflows/settings-transfer`
+- `apps/extension/src/workflows/sync-transfer`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`
 - `apps/extension/src/workflows/voice-input`
