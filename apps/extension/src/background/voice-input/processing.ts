@@ -143,7 +143,11 @@ export function createVoiceInputProcessor(deps: {
     scope: VoiceHistoryScope,
     raw: string,
     assertCurrent: () => Promise<void>
-  ): Promise<{ transcript: string; correctionStatus: VoiceHistoryEntry['correctionStatus'] }> {
+  ): Promise<{
+    transcript: string;
+    correctionStatus: VoiceHistoryEntry['correctionStatus'];
+    failureCode?: VoiceInputErrorCode;
+  }> {
     if (args.preferences.backend !== 'model' || !args.preferences.correction?.enabled)
       return { transcript: raw, correctionStatus: 'off' };
     args.onPhase?.('processing-text', scope);
@@ -164,8 +168,9 @@ export function createVoiceInputProcessor(deps: {
       return { transcript, correctionStatus: 'applied' };
     } catch (error) {
       await assertCurrent();
-      if (getVoiceInputProcessingErrorCode(error) === 'stale') throw error;
-      return { transcript: raw, correctionStatus: 'failed' };
+      const failureCode = getVoiceInputProcessingErrorCode(error);
+      if (failureCode === 'stale') throw error;
+      return { transcript: raw, correctionStatus: 'failed', failureCode };
     }
   }
 

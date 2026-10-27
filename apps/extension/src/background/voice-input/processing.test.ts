@@ -453,3 +453,37 @@ it('keeps microphone permission separate and refuses arbitrary provider text', (
     'provider-failed'
   );
 });
+
+it.each([
+  ['invalid-credential', 'provider-invalid-credential'],
+  ['permission-denied', 'provider-permission-denied'],
+  ['quota-exceeded', 'provider-quota-exceeded'],
+  ['rate-limited', 'provider-rate-limited'],
+  ['service-error', 'provider-service-error'],
+  ['network', 'network'],
+  ['timeout', 'timeout'],
+  ['model-unavailable', 'model-unavailable'],
+  ['unknown', 'provider-failed'],
+] as const)(
+  'keeps ready raw text and bounded %s evidence when optional correction fails',
+  async (reason, code) => {
+    correct.mockRejectedValueOnce(
+      new AIProviderRequestError(reason, 'private response must not be retained')
+    );
+    await expect(run()).resolves.toMatchObject({
+      status: 'ready',
+      correctionStatus: 'failed',
+      transcript: 'Raw words',
+      failureCode: code,
+    });
+    expect(history.complete).toHaveBeenCalledWith(rawScope, {
+      rawTranscript: 'Raw words',
+      transcript: 'Raw words',
+      correctionStatus: 'failed',
+      failureCode: code,
+    });
+    expect(transcribe).toHaveBeenCalledOnce();
+    expect(correct).toHaveBeenCalledOnce();
+    expect(history.fail).not.toHaveBeenCalled();
+  }
+);

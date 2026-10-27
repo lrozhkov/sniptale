@@ -121,3 +121,19 @@ it('retains bounded provider evidence in failed history without admitting raw fi
     })
   ).toBeNull();
 });
+
+it('roundtrips ready raw recovery with optional-stage failure without changing its outcome', () => {
+  const ready = {
+    ...entry,
+    status: 'ready',
+    rawTranscript: 'raw',
+    transcript: 'raw',
+    correctionStatus: 'failed',
+    failureCode: 'provider-quota-exceeded',
+  };
+  expect(parseVoiceHistoryEntry(ready)).toEqual(ready);
+  expect(parseVoiceHistoryEntry({ ...ready, failureCode: null })).toEqual({
+    ...ready,
+    failureCode: null,
+  });
+});

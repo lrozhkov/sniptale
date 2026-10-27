@@ -306,7 +306,7 @@ test('native ASR failure retains audio and retries without inserting a partial r
       status: 'failed',
       rawTranscript: null,
       transcript: null,
-      failureCode: 'provider-failed',
+      failureCode: 'provider-service-error',
     });
     expect(await readVoiceStorage(page)).toMatchObject({ privateAudio: 1, libraryCount: 0 });
     await expect(ui(row, 'settings.voice.history-play')).toBeEnabled();
@@ -352,12 +352,16 @@ test('native correction failure preserves raw text and original audio for explic
     expect(original).toMatchObject({
       status: 'ready',
       correctionStatus: 'failed',
+      failureCode: 'provider-service-error',
       rawTranscript: RAW_TRANSCRIPT,
       transcript: RAW_TRANSCRIPT,
     });
     expect(await readVoiceStorage(page)).toMatchObject({ privateAudio: 1, libraryCount: 0 });
     expect(provider.uploads).toHaveLength(1);
     expect(provider.corrections).toHaveLength(1);
+    await expect(row).toContainText(
+      translate('settings.aiProviders.providerStatusUnavailable', 'en')
+    );
     await row.scrollIntoViewIfNeeded();
     await voiceScreenshot(page, info, 'correction-failure-raw-recovery');
     provider.respond('correction');
@@ -368,6 +372,7 @@ test('native correction failure preserves raw text and original audio for explic
       entryId: original.entryId,
       audioDigest: original.audioDigest,
       correctionStatus: 'applied',
+      failureCode: null,
     });
     expect(provider.uploads).toHaveLength(2);
     expect((await readVoiceStorage(page)).privateAudio).toBe(1);

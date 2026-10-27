@@ -288,6 +288,7 @@ export interface VoiceHistoryEntry extends VoiceHistoryScope {
   transcript: string | null;
   status: 'recorded' | 'processing' | 'ready' | 'failed' | 'cancelled';
   correctionStatus: 'off' | 'applied' | 'failed';
+  /** The latest processing-stage failure. Ready text can retain a failed optional correction reason. */
   failureCode: VoiceInputErrorCode | null;
 }
 

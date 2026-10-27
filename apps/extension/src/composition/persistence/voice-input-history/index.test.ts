@@ -126,3 +126,58 @@ it('strictly validates aggregate metadata without accepting duplicate sequence o
   expect(parseVoiceHistoryCatalog({ ...catalog, epoch: 'recreated' })).toBeNull();
   expect(parseVoiceHistoryCatalog({ ...catalog, unexpected: 'secret' })).toBeNull();
 });
+
+it('retains a bounded optional correction failure with ready raw text and clears it on retry', async () => {
+  const history = createHistoryFixture().create();
+  await history.initialize();
+  const source = await publish(history);
+  const processing = await history.beginProcessing(source);
+  const raw = await history.saveRawTranscript(processing, 'Accepted raw words');
+  const ready = await history.complete(raw, {
+    rawTranscript: 'Accepted raw words',
+    transcript: 'Accepted raw words',
+    correctionStatus: 'failed',
+    failureCode: 'provider-quota-exceeded',
+  });
+  expect(await history.get(ready)).toMatchObject({
+    status: 'ready',
+    correctionStatus: 'failed',
+    failureCode: 'provider-quota-exceeded',
+    transcript: 'Accepted raw words',
+  });
+  expect(await (await history.readAudio(source)).text()).toBe('original');
+  const retry = await history.beginProcessing(ready);
+  expect(await history.get(retry)).toMatchObject({
+    failureCode: null,
+    rawTranscript: 'Accepted raw words',
+  });
+  const completed = await history.complete(retry, {
+    rawTranscript: 'Accepted raw words',
+    transcript: 'Accepted raw words.',
+    correctionStatus: 'applied',
+    failureCode: 'provider-quota-exceeded',
+  });
+  expect(completed).toMatchObject({
+    status: 'ready',
+    failureCode: null,
+    transcript: 'Accepted raw words.',
+  });
+  expect((await history.list()).map((entry) => entry.entryId)).toEqual([source.entryId]);
+});
+it('drops unsupported optional correction metadata without losing usable text', async () => {
+  const history = createHistoryFixture().create();
+  await history.initialize();
+  const scope = await history.beginProcessing(await publish(history));
+  const result = {
+    rawTranscript: 'raw',
+    transcript: 'raw',
+    correctionStatus: 'failed' as const,
+    failureCode: 'provider-quota-exceeded' as const,
+  };
+  Reflect.set(result, 'failureCode', 'private provider body');
+  expect(await history.complete(scope, result)).toMatchObject({
+    status: 'ready',
+    transcript: 'raw',
+    failureCode: null,
+  });
+});

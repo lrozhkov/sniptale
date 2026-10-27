@@ -332,12 +332,12 @@ function HistoryEntryRow({
           {translate('settings.voiceInput.historyNoTranscript')}
         </p>
       )}
-      <HistoryProviderFailure entry={entry} />
       {entry.correctionStatus === 'failed' ? (
         <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('settings.voiceInput.historyCorrectionFailed')}
         </p>
       ) : null}
+      <HistoryProviderFailure entry={entry} />
       <HistoryEntryActions
         entry={entry}
         history={history}
@@ -372,7 +372,9 @@ function HistoryEntryRow({
 
 function HistoryProviderFailure({ entry }: { entry: VoiceHistoryEntry }) {
   const key =
-    entry.status === 'failed' ? getVoiceInputProviderErrorKey(entry.failureCode) : undefined;
+    entry.status === 'failed' || (entry.status === 'ready' && entry.correctionStatus === 'failed')
+      ? getVoiceInputProviderErrorKey(entry.failureCode)
+      : undefined;
   return key ? (
     <p className="text-xs text-[var(--sniptale-color-text-secondary)]">{translate(key)}</p>
   ) : null;

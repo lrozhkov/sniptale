@@ -1,5 +1,27 @@
 export const SHARED_FACADE_OWNER_MAPPINGS = [
   {
+    owner: 'private-voice-history-completion',
+    productionFile: 'apps/extension/src/composition/persistence/voice-input-history/index.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The private history writer owns revisioned capture, completion and cleanup. Existing storage, concurrency, processing and mounted history consumers prove optional-stage failure retention without another publication authority.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/voice-input-history/catalog.test.ts',
+      'apps/extension/src/composition/persistence/voice-input-history/concurrency.test.ts',
+      'apps/extension/src/composition/persistence/voice-input-history/index.test.ts',
+      'apps/extension/src/composition/persistence/voice-input-history/opfs.test.ts',
+      'apps/extension/src/composition/persistence/voice-input-history/privacy-erasure.test.ts',
+      'apps/extension/src/composition/persistence/voice-input-history/recovery.test.ts',
+      'apps/extension/src/background/voice-input/processing.test.ts',
+      'apps/extension/src/background/voice-input/processing-operation.test.ts',
+      'apps/extension/src/background/voice-input/capture-completion.test.ts',
+      'apps/extension/src/workflows/voice-input/history-client.test.ts',
+      'apps/extension/src/settings/sections/system/voice-input/history.test.tsx',
+      'apps/extension/src/settings/sections/system/voice-input/use-voice-history.test.ts',
+    ],
+  },
+  {
     owner: 'shared-voice-error-contract',
     productionFile: 'packages/runtime-contracts/src/voice-input/types.ts',
     exclusive: true,

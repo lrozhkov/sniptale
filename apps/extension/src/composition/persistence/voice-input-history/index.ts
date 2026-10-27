@@ -3,6 +3,7 @@ import {
   VOICE_HISTORY_MAX_AUDIO_BYTES,
   VOICE_HISTORY_MAX_DURATION_SECONDS,
   isVoiceHistoryMimeType,
+  isVoiceInputErrorCode,
   isVoiceHistoryText,
   parseVoiceCaptureToken,
   parseVoiceInputHistoryScope,
@@ -341,12 +342,17 @@ class VoiceHistoryOwner {
       rawTranscript: string;
       transcript: string;
       correctionStatus: VoiceHistoryEntry['correctionStatus'];
+      failureCode?: VoiceHistoryEntry['failureCode'];
     }
   ): Promise<VoiceHistoryEntry> {
     if (!isVoiceHistoryText(result.rawTranscript) || !isVoiceHistoryText(result.transcript))
       throw new VoiceHistoryError('too-large');
     return this.update(scope, (entry) => {
-      Object.assign(entry, result, { status: 'ready', failureCode: null });
+      const failureCode =
+        result.correctionStatus === 'failed' && isVoiceInputErrorCode(result.failureCode)
+          ? result.failureCode
+          : null;
+      Object.assign(entry, result, { status: 'ready', failureCode });
     });
   }
   async fail(

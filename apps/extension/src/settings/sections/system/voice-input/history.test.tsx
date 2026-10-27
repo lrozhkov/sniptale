@@ -256,3 +256,23 @@ it('explains retained quota failure while keeping accepted text and explicit ret
   expect(button('retry').disabled).toBe(false);
   expect(f.client.retry).not.toHaveBeenCalled();
 });
+
+it('explains an optional correction failure beside usable raw text without starting a retry', async () => {
+  const f = fixture();
+  f.client.list.mockResolvedValueOnce([
+    {
+      ...entry,
+      status: 'ready',
+      correctionStatus: 'failed',
+      failureCode: 'provider-quota-exceeded',
+      transcript: 'raw',
+    },
+  ]);
+  await f.render(0, true);
+  expect(container.textContent).toContain('settings.voiceInput.historyCorrectionFailed');
+  expect(container.textContent).toContain('settings.aiProviders.providerStatusQuota');
+  expect(container.textContent).toContain('raw');
+  expect(container.textContent).toContain('settings.voiceInput.historyStatusReady');
+  expect(button('retry').disabled).toBe(false);
+  expect(f.client.retry).not.toHaveBeenCalled();
+});
