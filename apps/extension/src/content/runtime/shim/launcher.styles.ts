@@ -128,6 +128,26 @@ cursor:grab;
 
 touch-action:none}
 
+.group .grip{
+
+display:grid;
+
+place-items:center;
+
+padding:0;
+
+background:inherit;
+
+color:inherit}
+
+.group .grip svg{
+
+width:16px;
+
+height:16px;
+
+stroke-width:2}
+
 .group[data-left=true] .grip{
 
 left:100%}

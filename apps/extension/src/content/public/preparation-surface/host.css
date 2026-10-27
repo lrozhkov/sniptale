@@ -52,7 +52,23 @@
   pointer-events: none;
   cursor: grab;
   touch-action: none;
+  isolation: isolate;
   transition: opacity 120ms ease-out;
+}
+
+/* The external handle needs its own panel material over arbitrary page colors. */
+.sniptale-collapsed-panels .sniptale-drag-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--sniptale-color-surface-panel);
+  pointer-events: none;
+}
+
+.sniptale-collapsed-panels .sniptale-drag-handle svg {
+  flex-shrink: 0;
 }
 
 .sniptale-collapsed-panels[data-corner$='right'] .sniptale-drag-handle {

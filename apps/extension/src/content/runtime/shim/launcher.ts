@@ -54,7 +54,14 @@ function createLauncherElements() {
   group.setAttribute('role', 'toolbar');
   const open = button('main', ['M4 4h16v16H4z', 'M4 9h16']);
   const actions = button('main', ['m13 2-9 12h7l-1 8 10-12h-7z']);
-  const grip = button('grip', ['M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01']);
+  const grip = button('grip', [
+    'M10 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M10 12a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M10 19a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M16 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M16 12a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M16 19a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+  ]);
   group.append(grip, open, actions);
   shadow.append(style, group);
   document.documentElement.append(host);

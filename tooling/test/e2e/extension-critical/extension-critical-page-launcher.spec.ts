@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile } from 'node:fs/promises';
 import { triggerExtensionAction } from '../support/recording-action';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
@@ -22,6 +22,89 @@ async function grantOrigin(popup: Page, origin: string) {
     'true'
   );
 }
+async function checkCornerGrip(
+  page: Page,
+  popup: Page,
+  group: Locator,
+  grip: Locator,
+  prefix: string,
+  info: TestInfo
+) {
+  for (const corner of ['top-left', 'top-right', 'bottom-left', 'bottom-right']) {
+    await popup.evaluate(async (corner) => {
+      const stored = await chrome.storage.sync.get('sniptale_settings');
+      await chrome.storage.sync.set({
+        sniptale_settings: {
+          ...stored['sniptale_settings'],
+          pageLaunch: { ...stored['sniptale_settings'].pageLaunch, corner },
+        },
+      });
+    }, corner);
+    await expect
+      .poll(async () => {
+        const box = await group.boundingBox();
+        return Boolean(
+          box &&
+          (corner.endsWith('left') ? box.x < 100 : box.x > page.viewportSize()!.width / 2) &&
+          (corner.startsWith('top') ? box.y < 100 : box.y > page.viewportSize()!.height / 2)
+        );
+      })
+      .toBe(true);
+    for (const background of ['#ffffff', '#111111']) {
+      await page.evaluate((color) => {
+        document.body.style.background = color;
+      }, background);
+      await group.hover();
+      await expect(grip).toHaveCSS('opacity', '1');
+      await grip.hover();
+      if (background === '#ffffff') {
+        const shell = (await group.boundingBox())!;
+        const handle = (await grip.boundingBox())!;
+        const x = Math.min(shell.x, handle.x) - 4;
+        const y = Math.min(shell.y, handle.y) - 4;
+        await page.screenshot({
+          path: info.outputPath(`${prefix}-grip-${corner}.png`),
+          fullPage: false,
+          clip: {
+            x,
+            y,
+            width: Math.max(shell.x + shell.width, handle.x + handle.width) - x + 4,
+            height: Math.max(shell.y + shell.height, handle.y + handle.height) - y + 4,
+          },
+        });
+      }
+      const geometry = await grip.evaluate((button) => {
+        const svg = button.querySelector('svg')!;
+        const bounds = svg.getBoundingClientRect();
+        const alpha = (color: string) =>
+          color.startsWith('rgba')
+            ? Number(color.slice(5, -1).split(',')[3])
+            : color === 'transparent'
+              ? 0
+              : 1;
+        const style = getComputedStyle(button);
+        const before = getComputedStyle(button, '::before');
+        return {
+          width: bounds.width,
+          height: bounds.height,
+          backing: Math.max(
+            alpha(style.backgroundColor),
+            before.content !== 'none' ? alpha(before.backgroundColor) : 0
+          ),
+        };
+      });
+      expect(geometry.width).toBeGreaterThanOrEqual(12);
+      expect(geometry.height).toBeGreaterThanOrEqual(12);
+      expect
+        .soft(geometry.backing, `${prefix} ${corner} ${background}`)
+        .toBeGreaterThanOrEqual(0.9);
+    }
+  }
+  await page.evaluate(() => {
+    document.body.style.background = '';
+  });
+}
+
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   test(`native page launcher handback, shared corner and quick actions ${name}`, async ({}, info) => {
     const host = await startHostServer();
@@ -84,6 +167,14 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         size.width === 1920 ? 'Открыть панель страницы' : 'Open page toolbar'
       );
       await expect(page.locator('#sniptale-extension-root')).toHaveCount(0);
+      await checkCornerGrip(
+        page,
+        popup,
+        launcher.locator('.group'),
+        launcher.getByRole('button', { name: /Move corner group|Переместить угловую группу/u }),
+        'shim',
+        info
+      );
       const actions = launcher.getByRole('button', { name: /Quick actions|Быстрые действия/u });
       await actions.click();
       await expect(launcher.getByRole('menu')).toBeVisible();
@@ -146,6 +237,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(collapsed.locator('[data-ui="content.quick-actions.trigger"]')).toBeVisible();
       await collapsed.hover();
       const grip = collapsed.locator('[data-ui="content.collapsed-panels.drag-handle"]');
+      await checkCornerGrip(page, popup, collapsed, grip, 'collapsed', info);
       await grip.focus();
       await page.keyboard.press('ArrowLeft');
       await expect(collapsed).toHaveAttribute('data-corner', 'bottom-left');
