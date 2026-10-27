@@ -60,7 +60,7 @@ function wavDescriptor(body: Buffer) {
     sampleRate: body.readUInt32LE(start + 24),
     sampleBits: body.readUInt16LE(start + 34),
     dataBytes: body.readUInt32LE(start + 40),
-    filenameIsPrivate: body.includes('filename="dictation.wav"'),
+    filenameIsPrivate: body.includes('filename="audio.wav"'),
     modelIsSelected: body.includes('synthetic-asr'),
   };
 }

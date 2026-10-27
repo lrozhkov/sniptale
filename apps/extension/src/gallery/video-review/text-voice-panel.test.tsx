@@ -174,7 +174,7 @@ async function render(
     deps
   );
   session.setAutosaveEnabled(false);
-  const beforeRequest = vi.fn(async () => undefined);
+  const beforeRequest = vi.fn(async (): Promise<void> => undefined);
   const props = {
     access: { session, beforeRequest, ...(sourceAudioAvailable ? { sourceAudioAvailable } : {}) },
     ids,

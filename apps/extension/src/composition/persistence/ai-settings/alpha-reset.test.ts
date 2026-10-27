@@ -47,6 +47,7 @@ vi.mock('../infrastructure/browser-storage', async (original) => ({
 
 import { resetIncompatibleAISettings } from './alpha-reset';
 import { createDefaultSettings, loadSettings, patchSettings } from '../settings';
+import { runWithExclusivePersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 
 const provider: AIProvider = {
   id: 'provider',
@@ -247,3 +248,72 @@ describe('canonical voice selection authority', () => {
     expect((await loadSettings()).voiceInput?.correction).toEqual({ enabled: false, model: null });
   });
 });
+
+it('merges parallel canonical recognition and correction approvals without a second voice selection map', async () => {
+  const recognitionModel: AIModel = {
+    ...model,
+    id: 'recognition',
+    modelCode: 'exact-asr',
+    operation: 'transcription',
+    audio: { transcription: { responseFormat: 'json', timestampGranularity: 'none' } },
+  };
+  storage.state.local[AI_MODELS_KEY] = [model, recognitionModel];
+  const recognition = {
+    ...selection,
+    modelId: recognitionModel.id,
+    approvedModelCode: recognitionModel.modelCode,
+  };
+  const entered = deferred();
+  const release = deferred();
+  storage.sync.set.mockImplementationOnce(async (items) => {
+    entered.resolve();
+    await release.promise;
+    Object.assign(storage.state.sync, items);
+  });
+  const first = patchSettings({ voiceInput: { transcription: recognition } });
+  await entered.promise;
+  const second = patchSettings({ voiceInput: { correction: { enabled: true, model: selection } } });
+  release.resolve();
+  await Promise.all([first, second]);
+  expect((await loadSettings()).voiceInput).toMatchObject({
+    transcription: recognition,
+    correction: { enabled: true, model: selection },
+  });
+  expect(storage.state.local[AI_SCENARIO_SELECTIONS_KEY]).toBeUndefined();
+});
+
+it('retains the canonical voice approval after storage refusal and accepts an explicit retry', async () => {
+  const before = (await loadSettings()).voiceInput;
+  storage.sync.set.mockRejectedValueOnce(new Error('Storage refused'));
+  const patch = { voiceInput: { correction: { enabled: true, model: selection } } };
+  await expect(patchSettings(patch)).rejects.toThrow('Storage refused');
+  expect((await loadSettings()).voiceInput).toEqual(before);
+  await patchSettings(patch);
+  expect((await loadSettings()).voiceInput?.correction?.model).toEqual(selection);
+  expect(storage.state.local[AI_SCENARIO_SELECTIONS_KEY]).toBeUndefined();
+});
+
+it.each(['delete', 'restore'] as const)(
+  'rejects delayed canonical voice approval after %s',
+  async (action) => {
+    const before = (await loadSettings()).voiceInput;
+    const entered = deferred();
+    const release = deferred();
+    const transition = runWithExclusivePersistenceMutationPermit(async () => {
+      entered.resolve();
+      await release.promise;
+      storage.state.local[AI_PROVIDERS_KEY] =
+        action === 'delete' ? [] : [{ ...provider, incarnation: 'restored' }];
+    });
+    await entered.promise;
+    const write = patchSettings({
+      voiceInput: { correction: { enabled: true, model: selection } },
+    });
+    const refusal = expect(write).rejects.toThrow('AI model selection changed');
+    release.resolve();
+    await transition;
+    await refusal;
+    expect((await loadSettings()).voiceInput).toEqual(before);
+    expect(storage.sync.set).not.toHaveBeenCalled();
+  }
+);

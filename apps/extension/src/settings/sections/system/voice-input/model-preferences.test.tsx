@@ -38,6 +38,8 @@ function createController(): Pick<VoiceInputSettingsController, 'models' | 'pref
     models: {
       transcription: empty,
       correction: empty,
+      transcriptionUnavailable: false,
+      correctionUnavailable: false,
       transcriptionSelectionId: null,
       correctionSelectionId: null,
       loading: false,
@@ -199,4 +201,61 @@ it('offers Off, Chrome and custom AI while off hides retained model fields', () 
   expect(container.querySelector('[data-ui="settings.voice.transcription-model"]')).toBeNull();
   act(() => off?.click());
   expect(controller.preferences.setBackend).toHaveBeenCalledWith('off');
+});
+
+it('explains unresolved voice approvals beside each selector without replacing their identity', () => {
+  const controller = createController();
+  const approval = {
+    modelId: 'gone',
+    approvedProviderId: 'provider',
+    approvedModelCode: 'retired-model',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+  };
+  controller.preferences.backend = 'model';
+  controller.preferences.transcription = approval;
+  controller.preferences.correction = { enabled: true, model: approval };
+  controller.models.transcriptionUnavailable = true;
+  controller.models.correctionUnavailable = true;
+  act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
+  for (const kind of ['transcription', 'correction']) {
+    const message = container.querySelector(
+      `[data-ui="settings.voice.${kind}-model"] [role="alert"]`
+    );
+    expect(message?.textContent).toContain('aiModal.modelSelectionUnavailable');
+    expect(message?.textContent).toContain('retired-model');
+  }
+  expect(controller.models.selectTranscription).not.toHaveBeenCalled();
+  expect(controller.models.selectCorrection).not.toHaveBeenCalled();
+});
+
+it('exposes the existing refresh action for an empty catalog without a false network error', () => {
+  const controller = createController();
+  controller.preferences.backend = 'model';
+  act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
+  const refresh = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'settings.voiceInput.reloadModels'
+  );
+  expect(refresh).toBeDefined();
+  expect(container.textContent).not.toContain('settings.voiceInput.modelsError');
+  act(() => refresh?.click());
+  expect(controller.models.refresh).toHaveBeenCalledOnce();
+  expect(controller.models.selectTranscription).not.toHaveBeenCalled();
+});
+
+it('blocks model reads while correction instructions own Save or Reset', () => {
+  const controller = createController();
+  controller.preferences.backend = 'model';
+  controller.preferences.correction.enabled = true;
+  controller.models.promptSaving = true;
+  act(() => root.render(<VoiceModelPreferences controller={controller} disabled={false} />));
+  const selectors = [...container.querySelectorAll<HTMLButtonElement>('button')].filter(
+    (button) => button.textContent === 'Choose configured model'
+  );
+  expect(selectors).toHaveLength(2);
+  expect(selectors.every((button) => button.disabled)).toBe(true);
+  const refresh = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'settings.voiceInput.reloadModels'
+  );
+  expect(refresh?.disabled).toBe(true);
+  expect(container.querySelector('textarea')?.disabled).toBe(true);
 });
