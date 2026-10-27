@@ -18,6 +18,7 @@ import {
   saveModelForm,
   saveProviderForm,
   type ModelFormSaveParams,
+  type ModelFormSaveSession,
   type ProviderFormSaveParams,
 } from './save';
 
@@ -180,6 +181,7 @@ async function submitModelForm(
   params.event.preventDefault();
 
   await saveModelForm({
+    session: params.session,
     formData: params.formData,
     isEditing: params.isEditing,
     onSave: params.onSave,
@@ -190,6 +192,10 @@ async function submitModelForm(
 }
 
 export function useModelFormState(model?: AIModel | null) {
+  const [saveSession] = useState<ModelFormSaveSession>(() => ({
+    modelId: model?.id ?? crypto.randomUUID(),
+    pending: false,
+  }));
   const [formData, setFormData] = useState<ModelFormData>({
     providerId: model?.providerId || '',
     displayName: model?.displayName || '',
@@ -246,8 +252,17 @@ export function useModelFormState(model?: AIModel | null) {
   const handleSubmit = async (event: React.FormEvent, onSave: () => void | Promise<void>) => {
     await submitModelForm(
       model === undefined
-        ? { event, formData, isEditing, onSave, setErrors, setIsSaving }
-        : { event, formData, isEditing, model, onSave, setErrors, setIsSaving }
+        ? { session: saveSession, event, formData, isEditing, onSave, setErrors, setIsSaving }
+        : {
+            session: saveSession,
+            event,
+            formData,
+            isEditing,
+            model,
+            onSave,
+            setErrors,
+            setIsSaving,
+          }
     );
   };
 

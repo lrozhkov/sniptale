@@ -160,13 +160,12 @@ export async function saveProviderForm(args: ProviderFormSaveParams): Promise<vo
   }
 }
 
-async function persistModelForm(args: {
+function buildModelFormRecord(args: {
   formData: ModelFormData;
-  isEditing: boolean;
-  model?: AIModel | null;
-}): Promise<void> {
-  const nextModel: AIModel = {
-    id: args.model?.id ?? crypto.randomUUID(),
+  session: ModelFormSaveSession;
+}): AIModel {
+  return {
+    id: args.session.modelId,
     providerId: args.formData.providerId,
     displayName: args.formData.displayName,
     modelCode: args.formData.modelCode,
@@ -176,14 +175,16 @@ async function persistModelForm(args: {
       ? { systemPrompt: args.formData.systemPrompt }
       : {}),
   };
-  if (args.isEditing && args.model) {
-    await updateAIModel(nextModel);
-    return;
-  }
-  await addAIModel(nextModel);
 }
 
+export type ModelFormSaveSession = {
+  modelId: string;
+  pending: boolean;
+  committedRecord?: string;
+};
+
 export type ModelFormSaveParams = {
+  session: ModelFormSaveSession;
   formData: ModelFormData;
   isEditing: boolean;
   model?: AIModel | null;
@@ -193,33 +194,37 @@ export type ModelFormSaveParams = {
 };
 
 export async function saveModelForm(args: ModelFormSaveParams): Promise<void> {
+  if (args.session.pending) return;
+
   const fieldErrors = mapModelFieldErrors(args.formData);
   if (fieldErrors) {
     args.setErrors(fieldErrors);
     return;
   }
 
+  args.session.pending = true;
+  args.setErrors({});
   args.setIsSaving(true);
 
   try {
-    await persistModelForm(
-      args.model === undefined
-        ? {
-            formData: args.formData,
-            isEditing: args.isEditing,
-          }
-        : {
-            formData: args.formData,
-            isEditing: args.isEditing,
-            model: args.model,
-          }
-    );
+    const nextModel = buildModelFormRecord(args);
+    const record = JSON.stringify(nextModel);
+    if (record !== args.session.committedRecord) {
+      if (args.isEditing || args.session.committedRecord !== undefined) {
+        await updateAIModel(nextModel);
+      } else {
+        await addAIModel(nextModel);
+      }
+      // Reload can fail after publication. Retry must not create a second record.
+      args.session.committedRecord = record;
+    }
     await args.onSave();
   } catch (error) {
     logger.error('Failed to save model form', error);
     const message = buildMutationFailureMessage(error, buildModelSaveErrorMessage());
     args.setErrors({ submit: message });
   } finally {
+    args.session.pending = false;
     args.setIsSaving(false);
   }
 }

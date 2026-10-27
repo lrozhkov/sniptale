@@ -69,6 +69,7 @@ async function verifyModelSaveErrorPath() {
   addAIModelMock.mockRejectedValue(new Error('save failed'));
 
   await saveModelForm({
+    session: { modelId: 'generated-id', pending: false },
     formData: {
       providerId: 'provider-1',
       displayName: 'Model',
@@ -109,6 +110,7 @@ async function verifyModelCreateOmitsEmptyPrompt() {
   addAIModelMock.mockResolvedValue(undefined);
 
   await saveModelForm({
+    session: { modelId: 'generated-id', pending: false },
     formData: {
       providerId: 'provider-1',
       displayName: 'Model',
@@ -128,7 +130,7 @@ async function verifyModelCreateOmitsEmptyPrompt() {
     modelCode: 'gpt-test',
   });
   expect(onSave).toHaveBeenCalledTimes(1);
-  expect(setErrors).not.toHaveBeenCalled();
+  expect(setErrors).toHaveBeenCalledExactlyOnceWith({});
 }
 
 describe('ai-providers-section-form-save.model', () => {
@@ -145,6 +147,7 @@ it('saves speech defaults without carrying over a text system prompt', async () 
   resetModelFormSaveMocks();
   const { saveModelForm } = await import('./save');
   await saveModelForm({
+    session: { modelId: 'generated-id', pending: false },
     formData: {
       providerId: 'provider-1',
       displayName: 'Speech',
