@@ -55,20 +55,61 @@ test('concurrent browsers cannot both acquire the same new workspace root', asyn
       ...lab.credentials,
       rootUrl: `${lab.credentials.rootUrl}Sniptale-${randomUUID()}/`,
     };
+    const browsers = [first, second];
     const results = await Promise.all(
-      [first, second].map((browser) =>
+      browsers.map((browser) =>
         browser.page.evaluate(
           (value) => window.webdavTransferHarness.workspace.directAllocate(value),
           credentials
         )
       )
     );
-    await saveProof(info, { results, requests: lab.proxy.counts });
-    expect(results.filter((result) => result.code === 'success')).toHaveLength(1);
-    expect(results.filter((result) => result.code !== 'success')).toHaveLength(1);
-    expect(results.find((result) => result.code !== 'success')?.code).toMatch(
-      /^(collision|temporary)$/u
-    );
+    const attempts = results.map((result, client) => ({ client, delayMs: 0, result }));
+    // Preserve contention evidence before checking whether either request acquired the root.
+    await saveProof(info, { initialResults: results, attempts, requests: lab.proxy.counts });
+    let winner = results.findIndex((result) => result.code === 'success');
+    const retryClient = results.findIndex((result) => result.status === 423);
+    if (winner === -1 && retryClient !== -1) {
+      for (const delayMs of [1000, 2000, 4000]) {
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+        const result = await browsers[retryClient]!.page.evaluate(
+          (value) => window.webdavTransferHarness.workspace.directAllocate(value),
+          credentials
+        );
+        attempts.push({ client: retryClient, delayMs, result });
+        await saveProof(info, { initialResults: results, attempts, requests: lab.proxy.counts });
+        if (result.code === 'success') {
+          winner = retryClient;
+          break;
+        }
+        if (result.status !== 423) break;
+      }
+    }
+    let competitor: (typeof results)[number] | null = null;
+    if (winner !== -1) {
+      competitor = await browsers[1 - winner]!.page.evaluate(
+        (value) => window.webdavTransferHarness.workspace.directAllocate(value),
+        credentials
+      );
+      attempts.push({ client: 1 - winner, delayMs: 0, result: competitor });
+    }
+    await saveProof(info, {
+      initialResults: results,
+      attempts,
+      competitor,
+      requests: lab.proxy.counts,
+    });
+    expect(results.filter((result) => result.code === 'success').length).toBeLessThanOrEqual(1);
+    expect(
+      results
+        .filter((result) => result.code !== 'success')
+        .every(
+          (result) =>
+            result.code === 'collision' || (result.code === 'temporary' && result.status === 423)
+        )
+    ).toBe(true);
+    expect(attempts.filter((attempt) => attempt.result.code === 'success')).toHaveLength(1);
+    expect(competitor?.code).toMatch(/^(collision|temporary)$/u);
     expect(lab.proxy.counts.mkcolStatuses.filter((item) => item.status === 201)).toHaveLength(1);
   } finally {
     await first.context.close();
@@ -119,7 +160,7 @@ test('lost MKCOL acknowledgement retains uncertainty after browser restart and r
   }
 });
 
-test('423 does not allocate ownership and explicit abandonment cannot be confirmed by an old callback', async ({
+test('423 preserves the native workspace plan for an explicit retry to ready', async ({
   lab,
 }, info) => {
   const browser = await openProvider(lab, info, 'workspace-locked');
@@ -128,43 +169,136 @@ test('423 does not allocate ownership and explicit abandonment cannot be confirm
       (credentials) => window.webdavTransferHarness.workspace.plan(credentials),
       lab.credentials
     );
-    lab.proxy.armFault({
-      method: 'MKCOL',
-      key: `Sniptale-${plan.bootstrapId}/`,
-      kind: 'status',
-      status: 423,
-    });
-    const outcome = await browser.page.evaluate(
+    const rootKey = `Sniptale-${plan.bootstrapId}/`;
+    lab.proxy.armFault({ method: 'MKCOL', key: rootKey, kind: 'status', status: 423 });
+    const refused = await browser.page.evaluate(
       ({ credentials, identity }) =>
         window.webdavTransferHarness.workspace.allocate(credentials, identity),
       { credentials: lab.credentials, identity: plan.identity }
     );
-    expect(outcome).toMatchObject({
+    await saveProof(info, { plan, refused, requests: lab.proxy.counts });
+    expect(refused).toMatchObject({
       code: 'temporary',
       status: 423,
-      allocation: { phase: 'allocating' },
+      allocation: { phase: 'planned' },
     });
-    const abandoned = await browser.page.evaluate(
-      (identity) => window.webdavTransferHarness.workspace.abandon(identity),
-      outcome.allocation?.identity
+    expect(refused.allocation).toMatchObject({
+      rootUrl: plan.rootUrl,
+      spaceId: plan.spaceId,
+      bootstrapId: plan.bootstrapId,
+      identity: { incarnation: plan.identity.incarnation },
+    });
+    expect(refused.allocation?.identity.revision).toBeGreaterThan(plan.identity.revision);
+    const completed = await browser.page.evaluate(
+      ({ credentials, identity }) =>
+        window.webdavTransferHarness.workspace.finish(credentials, identity),
+      { credentials: lab.credentials, identity: refused.allocation?.identity }
     );
-    expect(abandoned.phase).toBe('abandoned');
-    const next = await browser.page.evaluate(
-      ({ credentials, expected }) =>
-        window.webdavTransferHarness.workspace.plan(credentials, expected),
-      { credentials: lab.credentials, expected: abandoned.identity }
+    await saveProof(info, { plan, refused, completed, requests: lab.proxy.counts });
+    expect(completed).toMatchObject({
+      code: 'success',
+      allocation: {
+        phase: 'ready',
+        rootUrl: plan.rootUrl,
+        spaceId: plan.spaceId,
+        bootstrapId: plan.bootstrapId,
+      },
+    });
+    const markerKey = `${rootKey}.sniptale/workspace.json`;
+    const bodies = lab.proxy.counts.putBodies.filter((body) => body.key === markerKey);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.complete).toBe(true);
+    const external = await lab.externalProof(markerKey);
+    expect(external).toEqual({ size: bodies[0]?.bytes, sha256: bodies[0]?.sha256 });
+    expect(lab.proxy.counts.mkcolStatuses.filter((item) => item.key === rootKey)).toEqual([
+      { key: rootKey, status: 423 },
+      { key: rootKey, status: 201 },
+    ]);
+    await saveProof(info, {
+      plan,
+      refused,
+      completed,
+      bodies,
+      external,
+      requests: lab.proxy.counts,
+    });
+  } finally {
+    await browser.context.close();
+  }
+});
+
+test('a foreign folder appearing after 423 prevents retry adoption and preserves its exact sentinel', async ({
+  lab,
+}, info) => {
+  const browser = await openProvider(lab, info, 'workspace-refusal-foreign');
+  try {
+    const plan = await browser.page.evaluate(
+      (credentials) => window.webdavTransferHarness.workspace.plan(credentials),
+      lab.credentials
     );
-    expect(next.phase).toBe('planned');
-    expect(next.rootUrl).not.toBe(plan.rootUrl);
-    const retry = await browser.page.evaluate(
+    const rootKey = `Sniptale-${plan.bootstrapId}/`;
+    lab.proxy.armFault({ method: 'MKCOL', key: rootKey, kind: 'status', status: 423 });
+    const refused = await browser.page.evaluate(
       ({ credentials, identity }) =>
         window.webdavTransferHarness.workspace.allocate(credentials, identity),
-      { credentials: lab.credentials, identity: outcome.allocation?.identity }
+      { credentials: lab.credentials, identity: plan.identity }
     );
-    expect(retry.code).toBe('refused');
-    expect(retry.allocation).toEqual(next);
-    expect(lab.proxy.counts.mkcols).toBe(1);
-    await saveProof(info, { outcome, abandoned, next, retry, requests: lab.proxy.counts });
+    await saveProof(info, { plan, refused, requests: lab.proxy.counts });
+    expect(refused).toMatchObject({
+      code: 'temporary',
+      status: 423,
+      allocation: { phase: 'planned', rootUrl: plan.rootUrl },
+    });
+    const foreign = await browser.page.evaluate(
+      (credentials) => window.webdavTransferHarness.workspace.directAllocate(credentials),
+      { ...lab.credentials, rootUrl: plan.rootUrl }
+    );
+    expect(foreign.code).toBe('success');
+    const sentinelKey = `${rootKey}sentinel.bin`;
+    const sentinel = await browser.page.evaluate(async (key) => {
+      const source = await window.webdavTransferHarness.prepareSource(4096);
+      const written = await window.webdavTransferHarness.uploadSource(key);
+      return { source, written };
+    }, sentinelKey);
+    expect(sentinel.written.code).toBe('success');
+    const before = await lab.externalProof(sentinelKey);
+    expect(before).toEqual(sentinel.source);
+    const puts = lab.proxy.counts.puts;
+    const gets = lab.proxy.counts.gets;
+    const collision = await browser.page.evaluate(
+      ({ credentials, identity }) =>
+        window.webdavTransferHarness.workspace.allocate(credentials, identity),
+      { credentials: lab.credentials, identity: refused.allocation?.identity }
+    );
+    const finish = await browser.page.evaluate(
+      ({ credentials, identity }) =>
+        window.webdavTransferHarness.workspace.finish(credentials, identity),
+      { credentials: lab.credentials, identity: collision.allocation?.identity }
+    );
+    const after = await lab.externalProof(sentinelKey);
+    await saveProof(info, {
+      plan,
+      refused,
+      foreign,
+      sentinel,
+      before,
+      collision,
+      finish,
+      after,
+      puts,
+      gets,
+      requests: lab.proxy.counts,
+    });
+    expect(collision).toMatchObject({
+      code: 'collision',
+      status: 405,
+      allocation: { phase: 'allocating', rootUrl: plan.rootUrl },
+    });
+    expect(finish.code).toBe('refused');
+    expect(finish.allocation).toEqual(collision.allocation);
+    expect(lab.proxy.counts.puts).toBe(puts);
+    expect(lab.proxy.counts.gets).toBe(gets);
+    expect(after).toEqual(before);
   } finally {
     await browser.context.close();
   }

@@ -6,12 +6,18 @@ import type { SyncConnectionCoordinatorDependencies } from './coordinator';
 
 import type {
   SyncStartRequest,
+  SyncWorkspaceStartRequest,
   SyncInspectRequest,
   SyncStopRequest,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
-type GatewayMessage = SyncStartRequest | SyncInspectRequest | SyncStopRequest;
+type GatewayMessage =
+  | SyncStartRequest
+  | SyncWorkspaceStartRequest
+  | SyncInspectRequest
+  | SyncStopRequest;
 type GatewayCommand =
   | Omit<SyncStartRequest, 'capabilityToken'>
+  | Omit<SyncWorkspaceStartRequest, 'capabilityToken'>
   | Omit<SyncInspectRequest, 'capabilityToken'>
   | Omit<SyncStopRequest, 'capabilityToken'>;
 interface GatewayDependencies {
@@ -30,7 +36,7 @@ export function createSyncOffscreenGateway(
   deps: GatewayDependencies
 ): Pick<
   SyncConnectionCoordinatorDependencies,
-  'ensureDocument' | 'inspectExecutor' | 'startExecutor' | 'stopExecutor'
+  'ensureDocument' | 'inspectExecutor' | 'startExecutor' | 'startWorkspaceExecutor' | 'stopExecutor'
 > {
   async function document() {
     const urls = await deps.getDocumentUrls();
@@ -84,6 +90,26 @@ export function createSyncOffscreenGateway(
         ...input,
       });
       if (
+        response['result'] !== 'accepted' ||
+        response['executorId'] !== input.executorId ||
+        typeof response['executorRevision'] !== 'number' ||
+        !Number.isSafeInteger(response['executorRevision']) ||
+        response['executorRevision'] < input.executorRevision
+      )
+        return refused();
+      return { executorId: input.executorId, executorRevision: response['executorRevision'] };
+    },
+    async startWorkspaceExecutor(input) {
+      const response = await send({
+        type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+        requestId: deps.createRequestId(),
+        ...input,
+      });
+      if (
+        Object.keys(response).length !== 4 ||
+        !['success', 'result', 'executorId', 'executorRevision'].every((key) =>
+          Object.hasOwn(response, key)
+        ) ||
         response['result'] !== 'accepted' ||
         response['executorId'] !== input.executorId ||
         typeof response['executorRevision'] !== 'number' ||

@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { SyncConnectionMetadata } from '../../composition/persistence/remote-connection/model';
-import type { SyncOriginPermissionRequest } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import type {
+  SyncOriginPermissionRequest,
+  SyncWorkspaceOriginPermissionRequest,
+} from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import type { SyncWorkspaceAllocation } from '../../composition/persistence/remote-connection/workspace-allocation';
 import { routeSyncConnectionOriginPermission } from './route';
 
 vi.mock('@sniptale/platform/browser/runtime', async (original) => ({
@@ -10,6 +14,9 @@ vi.mock('@sniptale/platform/browser/runtime', async (original) => ({
 }));
 vi.mock('../../composition/persistence/remote-connection/store', () => ({
   loadSyncConnection: vi.fn(),
+}));
+vi.mock('../../composition/persistence/remote-connection/workspace-allocation', () => ({
+  loadSyncWorkspaceAllocation: vi.fn(),
 }));
 const authorization = { incarnation: '11111111-1111-4111-8111-111111111111', revision: 2 };
 const message: SyncOriginPermissionRequest = {
@@ -41,6 +48,29 @@ function connection(): SyncConnectionMetadata {
     credentialId: '33333333-3333-4333-8333-333333333333',
   };
 }
+const workspaceMessage: SyncWorkspaceOriginPermissionRequest = {
+  type: MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION,
+  requestId: message.requestId,
+  allocationIncarnation: authorization.incarnation,
+  origin: message.origin,
+};
+function workspace(): SyncWorkspaceAllocation {
+  return {
+    version: 2,
+    kind: 'sync-workspace-allocation',
+    key: 'workspace-allocation',
+    provider: 'webdav',
+    parentUrl: `${message.origin}/parent/`,
+    rootUrl: `${message.origin}/parent/Sniptale-33333333-3333-4333-8333-333333333333/`,
+    accountId: 'alice',
+    spaceId: authorization.incarnation,
+    bootstrapId: '33333333-3333-4333-8333-333333333333',
+    createdAt: 1,
+    identity: { ...authorization },
+    phase: 'allocating',
+    marker: null,
+  };
+}
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => {
@@ -52,6 +82,9 @@ function setup() {
   const loadConnection = vi
     .fn<() => Promise<SyncConnectionMetadata | null>>()
     .mockResolvedValue(connection());
+  const loadWorkspace = vi
+    .fn<() => Promise<SyncWorkspaceAllocation | null>>()
+    .mockResolvedValue(workspace());
   const contains = vi
     .fn<(permissions: chrome.permissions.Permissions) => Promise<boolean>>()
     .mockResolvedValue(true);
@@ -60,11 +93,12 @@ function setup() {
     const sendResponse = vi.fn((value: unknown) => response.resolve(value));
     const handled = routeSyncConnectionOriginPermission(input, source, sendResponse, {
       loadConnection,
+      loadWorkspace,
       contains,
     });
     return { handled, response: response.promise, sendResponse };
   };
-  return { loadConnection, contains, query };
+  return { loadConnection, loadWorkspace, contains, query };
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -110,11 +144,14 @@ it.each([
   { url: 'chrome-extension://test/apps/extension/src/offscreen/offscreen.html', tab },
 ])('refuses non-offscreen sender $url before storage or permission access', async (source) => {
   const f = setup();
-  expect(await f.query(message, source).response).toEqual({
-    success: false,
-    error: 'Sync origin permission query refused',
-  });
+  for (const input of [message, workspaceMessage]) {
+    expect(await f.query(input, source).response).toEqual({
+      success: false,
+      error: 'Sync origin permission query refused',
+    });
+  }
   expect(f.loadConnection).not.toHaveBeenCalled();
+  expect(f.loadWorkspace).not.toHaveBeenCalled();
   expect(f.contains).not.toHaveBeenCalled();
 });
 it.each([
@@ -210,4 +247,112 @@ it('leaves unrelated messages unhandled', () => {
   expect(query.handled).toBe(false);
   expect(query.sendResponse).not.toHaveBeenCalled();
   expect(f.loadConnection).not.toHaveBeenCalled();
+});
+
+it('checks workspace incarnation and root origin without a coordinator or native lock', async () => {
+  const f = setup();
+  expect(await f.query(workspaceMessage).response).toEqual({ success: true, allowed: true });
+  expect(f.loadWorkspace).toHaveBeenCalledTimes(2);
+  expect(f.loadConnection).not.toHaveBeenCalled();
+  expect(f.contains).toHaveBeenCalledExactlyOnceWith({ origins: ['https://dav.example.test/*'] });
+  expect(navigator.locks.request).not.toHaveBeenCalled();
+});
+it.each(['missing', 'abandoned', 'foreign', 'origin'] as const)(
+  'denies %s workspace before browser permission lookup',
+  async (condition) => {
+    const f = setup();
+    const current = workspace();
+    if (condition === 'abandoned') current.phase = 'abandoned';
+    if (condition === 'foreign') current.identity.incarnation = crypto.randomUUID();
+    if (condition === 'origin') current.rootUrl = 'https://other.example.test/root/';
+    f.loadWorkspace.mockResolvedValue(condition === 'missing' ? null : current);
+    expect(await f.query(workspaceMessage).response).toEqual({ success: true, allowed: false });
+    expect(f.contains).not.toHaveBeenCalled();
+  }
+);
+it.each([
+  'delete',
+  'abandon',
+  'recreate',
+  'root',
+  'account',
+  'parent',
+  'space',
+  'bootstrap',
+  'created',
+] as const)('refuses workspace %s while browser permission lookup is pending', async (change) => {
+  const f = setup();
+  const permission = deferred<boolean>();
+  const entered = deferred<void>();
+  f.contains.mockImplementation(async () => {
+    entered.resolve();
+    return permission.promise;
+  });
+  const query = f.query(workspaceMessage);
+  await entered.promise;
+  const updated = workspace();
+  if (change === 'abandon') updated.phase = 'abandoned';
+  if (change === 'recreate') updated.identity.incarnation = crypto.randomUUID();
+  if (change === 'root') updated.rootUrl = `${message.origin}/other/`;
+  if (change === 'account') updated.accountId = 'bob';
+  if (change === 'parent') updated.parentUrl = `${message.origin}/other/`;
+  if (change === 'space') updated.spaceId = crypto.randomUUID();
+  if (change === 'bootstrap') updated.bootstrapId = crypto.randomUUID();
+  if (change === 'created') updated.createdAt += 1;
+  f.loadWorkspace.mockResolvedValue(change === 'delete' ? null : updated);
+  permission.resolve(true);
+  expect(await query.response).toEqual({ success: true, allowed: false });
+  expect(navigator.locks.request).not.toHaveBeenCalled();
+});
+it('leaves workspace phase and revision admission with the native request owner', async () => {
+  const f = setup();
+  const advanced = workspace();
+  advanced.phase = 'allocated';
+  advanced.identity.revision += 1;
+  f.loadWorkspace.mockResolvedValueOnce(workspace()).mockResolvedValueOnce(advanced);
+  expect(await f.query(workspaceMessage).response).toEqual({ success: true, allowed: true });
+});
+it('detaches workspace input before native reads and denies missing browser permission', async () => {
+  const f = setup();
+  const read = deferred<SyncWorkspaceAllocation>();
+  f.loadWorkspace.mockReturnValueOnce(read.promise);
+  const input = { ...workspaceMessage };
+  const query = f.query(input);
+  input.allocationIncarnation = crypto.randomUUID();
+  input.origin = 'https://other.example.test';
+  read.resolve(workspace());
+  expect(await query.response).toEqual({ success: true, allowed: true });
+  f.loadWorkspace.mockClear();
+  f.contains.mockResolvedValue(false);
+  expect(await f.query(workspaceMessage).response).toEqual({ success: true, allowed: false });
+  expect(f.loadWorkspace).toHaveBeenCalledTimes(1);
+});
+it.each(['load', 'contains', 'reread'] as const)(
+  'returns a fixed workspace refusal after %s failure',
+  async (stage) => {
+    const f = setup();
+    const failure = new Error('private-workspace-secret');
+    if (stage === 'load') f.loadWorkspace.mockRejectedValueOnce(failure);
+    if (stage === 'contains') f.contains.mockRejectedValueOnce(failure);
+    if (stage === 'reread')
+      f.loadWorkspace.mockResolvedValueOnce(workspace()).mockRejectedValueOnce(failure);
+    expect(await f.query(workspaceMessage).response).toEqual({
+      success: false,
+      error: 'Sync origin permission query refused',
+    });
+  }
+);
+it.each([
+  { origin: 'http://dav.example.test' },
+  { origin: 'https://dav.example.test/' },
+  { allocationIncarnation: 'not-a-uuid' },
+  { password: 'private' },
+])('refuses malformed workspace permission input %# before native reads', async (change) => {
+  const f = setup();
+  expect(await f.query({ ...workspaceMessage, ...change }).response).toEqual({
+    success: false,
+    error: 'Sync origin permission query refused',
+  });
+  expect(f.loadWorkspace).not.toHaveBeenCalled();
+  expect(f.contains).not.toHaveBeenCalled();
 });

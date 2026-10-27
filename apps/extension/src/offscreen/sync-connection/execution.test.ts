@@ -12,10 +12,14 @@ import type { runSyncQueueOperation } from '../../workflows/sync-transfer/queue'
 import type { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
 import { DIAGNOSTIC_LOG_PORT } from '../../contracts/diagnostics';
 import { SyncRemoteError, type SyncRemoteStore } from '../../workflows/sync-transfer/remote-store';
-import { createSyncQueueExecution } from './execution';
+import { createSyncQueueExecution, createSyncWorkspaceExecution } from './execution';
+import type { createWebdavWorkspaceCreation } from '../../workflows/sync-transfer/webdav-workspace';
 import type { SyncExecutionInput } from './executor';
 
 const mocks = vi.hoisted(() => ({
+  workspace: vi.fn<typeof createWebdavWorkspaceCreation>(),
+  workspaceRun: vi.fn<ReturnType<typeof createWebdavWorkspaceCreation>['run']>(),
+  workspaceClose: vi.fn<() => Promise<void>>(),
   database: vi.fn<() => Promise<{ get(store: string, key: string): Promise<unknown> }>>(),
   get: vi.fn<(store: string, key: string) => Promise<unknown>>(),
   connection: vi.fn<typeof loadSyncConnection>(),
@@ -46,6 +50,9 @@ vi.mock('../../workflows/sync-transfer/connection-requests', () => ({
 vi.mock('../../workflows/sync-transfer/queue', () => ({ runSyncQueueOperation: mocks.run }));
 vi.mock('../../platform/runtime-messaging/diagnostic-capture', () => ({
   createDiagnosticPortWriter: mocks.writer,
+}));
+vi.mock('../../workflows/sync-transfer/webdav-workspace', () => ({
+  createWebdavWorkspaceCreation: mocks.workspace,
 }));
 vi.mock('../../workflows/sync-transfer/webdav', () => ({ createWebdavRemoteStore: mocks.webdav }));
 
@@ -428,4 +435,83 @@ it('submits through actual runtime IPC when offscreen has no chrome.storage', as
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+describe('workspace creation execution adapter', () => {
+  function workspaceInput() {
+    return {
+      allocation: input().authorization,
+      authentication: { kind: 'bearer' as const, accessToken: 'private-workspace-secret' },
+    };
+  }
+  beforeEach(() => {
+    mocks.workspace.mockReturnValue({ run: mocks.workspaceRun, close: mocks.workspaceClose });
+    mocks.workspaceClose.mockResolvedValue(undefined);
+  });
+
+  it('constructs the existing creation owner synchronously and returns only safe terminal evidence', async () => {
+    const selected = workspaceInput();
+    const permission = vi.fn(async () => true);
+    const execution = createSyncWorkspaceExecution(selected, permission);
+    expect(mocks.workspace).toHaveBeenCalledExactlyOnceWith({
+      identity: selected.allocation,
+      authentication: selected.authentication,
+      hasOriginPermission: permission,
+    });
+    expect(mocks.workspaceRun).not.toHaveBeenCalled();
+    const result = await execution.run();
+    expect(result).toEqual({
+      snapshot: { state: 'ready', failureCode: null },
+      containment: 'contained',
+    });
+    expect(JSON.stringify(result)).not.toContain('private-workspace-secret');
+    expect(mocks.history).not.toHaveBeenCalled();
+    expect(mocks.workspaceClose).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['authentication', 'authentication'],
+    ['access-denied', 'access-denied'],
+    ['storage-full', 'storage-full'],
+    ['transport', 'temporary'],
+    ['allocation-refused', 'invalid-workspace'],
+    ['containment-failed', 'internal'],
+  ])('projects fixed %s failures without provider details', async (code, expected) => {
+    mocks.workspaceRun.mockRejectedValue(
+      Object.assign(new Error('private-workspace-secret'), { code })
+    );
+    expect(await createSyncWorkspaceExecution(workspaceInput(), async () => true).run()).toEqual({
+      snapshot: { state: 'failed', failureCode: expected },
+      containment: 'contained',
+    });
+  });
+
+  it('reports unsafe containment when creation cannot drain', async () => {
+    mocks.workspaceRun.mockRejectedValue(new Error('private error'));
+    mocks.workspaceClose.mockRejectedValue(new Error('private body error'));
+    const execution = createSyncWorkspaceExecution(workspaceInput(), async () => true);
+    expect(await execution.run()).toMatchObject({
+      containment: 'unsafe',
+      snapshot: { state: 'failed', failureCode: 'internal' },
+    });
+    await expect(execution.drain()).rejects.toThrow('private body error');
+  });
+
+  it('drains before the first await and projects cancellation after held creation fails', async () => {
+    const held = deferred<void>();
+    mocks.workspaceRun.mockImplementation(async () => {
+      await held.promise;
+      throw new Error('private cancellation');
+    });
+    const execution = createSyncWorkspaceExecution(workspaceInput(), async () => true);
+    const result = execution.run();
+    const drain = execution.drain();
+    expect(mocks.workspaceClose).toHaveBeenCalledOnce();
+    held.resolve();
+    await drain;
+    expect(await result).toEqual({
+      snapshot: { state: 'interrupted', failureCode: 'interrupted' },
+      containment: 'contained',
+    });
+  });
 });

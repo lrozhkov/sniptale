@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { authorizeOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { createSyncOffscreenGateway } from './offscreen-gateway';
 
 const startup = '11111111-1111-4111-8111-111111111111';
@@ -13,6 +15,7 @@ const snapshot = () => ({
   phase: 'idle',
   binding: null,
   jobs: [],
+  workspace: null,
 });
 function setup() {
   const deps = {
@@ -113,4 +116,63 @@ it('rejects a replaced or ambiguous document before dispatch', async () => {
   deps.getDocumentUrls.mockResolvedValue([url, url]);
   await expect(gateway.inspectExecutor(null, challenge)).rejects.toThrow();
   expect(deps.send).not.toHaveBeenCalled();
+});
+
+it('signs a workspace selection and returns only the matching accepted receipt', async () => {
+  const { deps, gateway } = setup();
+  const input = {
+    offscreenStartupId: startup,
+    executorId: executor,
+    executorRevision: 1,
+    allocation: { incarnation: challenge, revision: 3 },
+    authentication: { kind: 'basic' as const, username: 'alice', password: 'private-password' },
+  };
+  deps.send.mockImplementation(async (message) => {
+    if (!isRecord(message)) throw new Error('Missing message');
+    expect(message).toEqual({
+      ...input,
+      type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+      requestId: challenge,
+      capabilityToken: expect.any(String),
+    });
+    expect(authorizeOffscreenCommandCapability(message).authorized).toBe(true);
+    return { success: true, result: 'accepted', executorId: executor, executorRevision: 2 };
+  });
+  const receipt = await gateway.startWorkspaceExecutor(input);
+  expect(receipt).toEqual({ executorId: executor, executorRevision: 2 });
+  expect(JSON.stringify(receipt)).not.toContain('private-password');
+});
+it.each([
+  { success: true, result: 'accepted', executorId: challenge, executorRevision: 2 },
+  { success: true, result: 'accepted', executorId: executor, executorRevision: 0 },
+  { success: true, result: 'accepted', executorId: executor, executorRevision: 1.5 },
+  { success: true, result: 'accepted', executorId: executor, executorRevision: '2' },
+  {
+    success: true,
+    result: 'accepted',
+    executorId: executor,
+    executorRevision: Number.MAX_SAFE_INTEGER + 1,
+  },
+  { success: true, result: 'stopped', executorId: executor, executorRevision: 2 },
+  {
+    success: true,
+    result: 'accepted',
+    executorId: executor,
+    executorRevision: 2,
+    password: 'private',
+  },
+  { success: false, error: 'private-provider-error' },
+  null,
+])('refuses malformed workspace acceptance receipt %#', async (response) => {
+  const { deps, gateway } = setup();
+  deps.send.mockResolvedValue(response);
+  await expect(
+    gateway.startWorkspaceExecutor({
+      offscreenStartupId: startup,
+      executorId: executor,
+      executorRevision: 1,
+      allocation: { incarnation: challenge, revision: 3 },
+      authentication: { kind: 'bearer', accessToken: 'private-token' },
+    })
+  ).rejects.toThrow('Sync executor command refused');
 });

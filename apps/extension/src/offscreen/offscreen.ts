@@ -1,7 +1,10 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createRuntimeMessagingTransport } from '../platform/runtime-messaging';
 import { createSyncConnectionExecutor } from './sync-connection/executor';
-import { createSyncQueueExecution } from './sync-connection/execution';
+import {
+  createSyncQueueExecution,
+  createSyncWorkspaceExecution,
+} from './sync-connection/execution';
 import { registerOffscreenSyncMessageListener } from './sync-connection/runtime';
 import { bootstrapOffscreenDocument } from './runtime/bootstrap';
 import { registerOffscreenRuntimeMessageListener } from './runtime';
@@ -36,6 +39,18 @@ if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1
   const executor = createSyncConnectionExecutor({
     executorId: crypto.randomUUID(),
     offscreenStartupId,
+    createWorkspaceExecution: (input) => {
+      const allocationIncarnation = input.allocation.incarnation;
+      return createSyncWorkspaceExecution(input, async (origin) => {
+        const response = await messaging.sendRuntimeMessage({
+          type: MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION,
+          requestId: crypto.randomUUID(),
+          allocationIncarnation,
+          origin,
+        });
+        return response.success === true && response.allowed === true;
+      });
+    },
     createExecution: (input) =>
       createSyncQueueExecution(input, async (origin) => {
         const response = await messaging.sendRuntimeMessage({

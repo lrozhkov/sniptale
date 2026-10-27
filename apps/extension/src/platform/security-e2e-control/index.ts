@@ -1,6 +1,7 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   connectionUuid,
+  parseConnectionAuthentication,
   parseSyncConnectionIdentity,
 } from '../../composition/persistence/remote-connection/model';
 import {
@@ -9,7 +10,10 @@ import {
   queueOrdinal,
   type SyncQueueScope,
 } from '../../composition/persistence/sync-capture/queue-model';
-import type { SyncConnectionIdentity } from '../../composition/persistence/remote-connection/model';
+import type {
+  SyncConnectionAuthentication,
+  SyncConnectionIdentity,
+} from '../../composition/persistence/remote-connection/model';
 import { parseSyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime/sync-connection';
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { browserRuntime, runtimeInfo } from '@sniptale/platform/browser/runtime';
@@ -121,10 +125,18 @@ export interface SecurityE2ESyncSelection {
   expectedRevision: number;
 }
 
+export interface SecurityE2ESyncWorkspaceSelection {
+  allocation: SyncConnectionIdentity;
+  authentication: SyncConnectionAuthentication;
+}
+
 /** Structural injection keeps background runtime ownership outside the app-core control module. */
 export interface SecurityE2ESyncRuntime {
   start(
     selection: SecurityE2ESyncSelection
+  ): Promise<{ executorId: string; executorRevision: number }>;
+  startWorkspace(
+    selection: SecurityE2ESyncWorkspaceSelection
   ): Promise<{ executorId: string; executorRevision: number }>;
   inspect(): Promise<SyncExecutorSnapshot | null>;
   reserveErasure(): { quiesce(): Promise<void>; release(): void };
@@ -163,11 +175,32 @@ function parseSyncSelection(value: unknown): SecurityE2ESyncSelection | null {
 }
 type SyncControlCommand =
   | { type: 'sync-start'; requestId: string; selection: SecurityE2ESyncSelection }
+  | {
+      type: 'sync-workspace-start';
+      requestId: string;
+      selection: SecurityE2ESyncWorkspaceSelection;
+    }
   | { type: 'sync-inspect' | 'sync-stop' | 'sync-erase'; requestId: string };
 
 function parseSyncControlCommand(value: unknown): SyncControlCommand | null {
   if (!isRecord(value) || !connectionUuid(value['requestId'])) return null;
   const requestId = value['requestId'];
+  if (value['type'] === 'sync-workspace-start') {
+    if (!exact(value, ['type', 'requestId', 'payload'])) return null;
+    const payload = value['payload'];
+    if (!isRecord(payload) || !exact(payload, ['allocation', 'authentication'])) return null;
+    const allocation = parseSyncConnectionIdentity(payload['allocation']);
+    const rawAuthentication = payload['authentication'];
+    if (!isRecord(rawAuthentication)) return null;
+    const username = rawAuthentication['username'];
+    const authentication = parseConnectionAuthentication(
+      rawAuthentication,
+      typeof username === 'string' ? username : ''
+    );
+    return allocation && authentication
+      ? { type: 'sync-workspace-start', requestId, selection: { allocation, authentication } }
+      : null;
+  }
   if (value['type'] === 'sync-start') {
     if (!exact(value, ['type', 'requestId', 'payload'])) return null;
     const selection = parseSyncSelection(value['payload']);
@@ -205,6 +238,8 @@ async function executeSyncCommand(command: SyncControlCommand, runtime: Security
   switch (command.type) {
     case 'sync-start':
       return projectSyncStartReceipt(await runtime.start(command.selection));
+    case 'sync-workspace-start':
+      return projectSyncStartReceipt(await runtime.startWorkspace(command.selection));
     case 'sync-inspect':
       return projectSyncSnapshot(await runtime.inspect());
     case 'sync-erase':

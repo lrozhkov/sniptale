@@ -8,6 +8,10 @@ import {
   commandSyncConnection,
 } from '../../../../composition/persistence/remote-connection/store';
 import {
+  loadSyncWorkspaceAllocation,
+  revokeSyncWorkspaceAllocation,
+} from '../../../../composition/persistence/remote-connection/workspace-allocation';
+import {
   ensureOffscreenDocument,
   waitForOffscreenReady,
 } from '../../../offscreen-document/service';
@@ -74,6 +78,10 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   const sync = createSyncConnectionCoordinator({
     ...syncGateway,
     loadConnection: loadSyncConnection,
+    loadWorkspace: loadSyncWorkspaceAllocation,
+    revokeWorkspace: async (incarnation) => {
+      await revokeSyncWorkspaceAllocation(incarnation);
+    },
     revokeConnection: async (identity) => {
       await commandSyncConnection(identity, 'pause');
     },
@@ -82,11 +90,24 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   configureSyncPrivacyErasurePort({ reserveErasureExclusion: () => sync.reserveErasure() });
   browserPermissions.subscribeToRemoved(() => {
     void (async () => {
-      const connection = await loadSyncConnection();
-      if (!connection) return;
-      const origin = new URL(connection.binding.rootUrl).origin;
-      if (await browserPermissions.contains({ origins: [origin + '/*'] })) return;
-      await sync.permissionsRemoved((candidate) => candidate === origin);
+      let origin: string | null;
+      try {
+        const connection = await loadSyncConnection();
+        const workspace = connection ? null : await loadSyncWorkspaceAllocation();
+        const rootUrl = connection?.binding.rootUrl ?? workspace?.rootUrl;
+        origin = rootUrl ? new URL(rootUrl).origin : null;
+        if (origin && (await browserPermissions.contains({ origins: [origin + '/*'] }))) return;
+      } catch {
+        // Unreadable authority cannot establish that a surviving executor is still admitted.
+        const reservation = sync.reserveErasure();
+        try {
+          await reservation.quiesce();
+        } finally {
+          reservation.release();
+        }
+        throw new Error('Sync permission authority unavailable');
+      }
+      await sync.permissionsRemoved((candidate) => origin === null || candidate === origin);
     })().catch(() => logger.warn('Sync permission revocation failed'));
   });
   void sync.inspect().catch(() => logger.warn('Sync executor adoption refused'));

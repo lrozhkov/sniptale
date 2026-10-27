@@ -3,6 +3,7 @@ import {
   completeSyncWorkspaceMarker,
   loadSyncWorkspaceAllocation,
   prepareSyncWorkspaceMarker,
+  recordSyncWorkspaceAllocationRefusal,
   type SyncWorkspaceAllocation,
 } from '../../composition/persistence/remote-connection/workspace-allocation';
 import {
@@ -291,7 +292,21 @@ export function createWebdavWorkspaceCreation(options: {
         plan = await nativeCommand(signal, () =>
           commandSyncWorkspaceAllocation(plannedIdentity, 'allocate')
         );
-        await allocateWebdavWorkspaceRoot(clientOptions(plan), signal);
+        try {
+          await allocateWebdavWorkspaceRoot(clientOptions(plan), signal);
+        } catch (error) {
+          if (
+            error instanceof SyncRemoteError &&
+            error.code === 'temporary' &&
+            error.status === 423
+          ) {
+            const refusedIdentity = plan.identity;
+            await nativeCommand(signal, () =>
+              recordSyncWorkspaceAllocationRefusal(refusedIdentity, error.status)
+            );
+          }
+          throw error;
+        }
         const allocatingIdentity = plan.identity;
         plan = await nativeCommand(signal, () =>
           commandSyncWorkspaceAllocation(allocatingIdentity, 'confirm')

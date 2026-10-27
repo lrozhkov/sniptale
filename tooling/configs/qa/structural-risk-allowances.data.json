@@ -2778,11 +2778,44 @@
       "file": "apps/extension/src/offscreen/sync-connection/executor.ts",
       "symbol": "createSyncConnectionExecutor",
       "owner": "extension:offscreen:sync-connection",
-      "reason": "tool-noise: This factory owns one disposable executor lifetime. Start, run completion, Inspect and Stop share jobs, binding, revision and phase. Transport validation and native HTTP resources have separate injected owners. Inclusive factory extent counts nested methods, while outer control metrics exclude their bodies. The result is 177 lines with seven statements, cyclomatic1, cognitive0, recovery0 and cohesion1. Moving the coupled methods would pass one mutable authority between helpers. Fresh read-only runtime_structure_diagnosis_sol inspected the source, consumers and metric calculation. Final independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes, the symbol disappears or its extent falls below the limit. Reassess any new independent authority, persistence writer, resource lifetime or recovery operation. Remove when the analyzer models this cohesive factory shape.",
+      "reason": "tool-noise: Queue and workspace slots share one disposable executor identity, revision, phase, mutual exclusion and Stop reservation. Stop owns synchronous admission closure and both workflow drainage outcomes. Native authority and HTTP resources remain in injected execution owners. Inclusive factory extent counts nested methods. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes or the symbol falls below the cap. Reassess any independent authority, resource lifetime or recovery owner. Remove when the analyzer models this cohesive factory.",
       "reviewDate": "2026-10-27",
-      "astHash": "ebf4c7344e4af099ab564931003cc38eadee2fa6a6224e6839c134156ab8e63b",
+      "astHash": "70ee4806b3ce4cf5c86cec36c50d9407f7dde8adc41244ef9894e1411ae28a5e",
       "signatureHash": "87de9e63d0bb330601835d536545f53642c845f667a8bdec466088e98dd813bf"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/background/sync-connection/coordinator.ts",
+      "symbol": "createSyncConnectionCoordinator",
+      "owner": "extension:background:sync-connection",
+      "reason": "tool-noise: One transition queue and generation exclusion own background admission, observation, revocation and containment for both execution kinds. Inclusive factory extent counts nested methods. Native authority and request resources retain their existing separate owners. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes or the symbol falls below the cap. Reassess any independent authority or separation of queue and exclusion ownership. Remove when the analyzer models this cohesive factory.",
+      "reviewDate": "2026-10-27",
+      "astHash": "dfc1bffe7acbe0f04aea54bd30f46b8b3c80ee3a3d22575dd4ccc59440e1a1d1",
+      "signatureHash": "3d813b90593606052dbadfec2df1799644761332a5b444d0c29802b689307186"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/remote-connection/workspace-allocation.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: These isolated tests exercise one native allocation journal and its cross-operation concurrency invariants. Each case creates its own database fixture. Fixture rows, transaction snapshots and fault counters create no independent production authority. Test runtime scoring excludes those contextual state and cluster counts. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any unrelated journal, fixture lifetime or mutation authority, or loss of isolated setup. Remove when the analyzer models this cohesive journal proof.",
+      "reviewDate": "2026-10-27",
+      "astHash": "4ac85a91223ffcd4365371a2f2f022c271a3878254042e471bd0d6f22d263d97",
+      "signatureHash": "e67d877d7258633f0ffacee69bef7307c53add048d279176c1427de478c77a21"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/contracts/messaging/contracts/runtime/sync-connection.test.ts",
+      "symbol": "describe callback",
+      "owner": "extension:app-core:contracts",
+      "reason": "tool-noise: This callback registers tests for one strict runtime contract family. Commands, authentication, snapshots and responses share the same boundary fixtures. Nested test bodies account for the inclusive extent. The callback creates no executable runtime authority. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess executable callback state, effects or unrelated contract responsibility. Remove when the analyzer models declarative test registration.",
+      "reviewDate": "2026-10-27",
+      "astHash": "5a9a5a04e7fc53e8303803aa77a963f4e07b1c3cdd5bd1ded08177b729c23397",
+      "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
     }
   ]
 }

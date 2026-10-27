@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
@@ -228,4 +228,21 @@ it('rechecks data preparation instead of replaying readiness from an old connect
       })
     ).toEqual({ duplicate: false, tracked: false });
   }
+});
+
+it('replays workspace admission by request identity without retaining authentication in correlation', async () => {
+  const execute = vi.fn(() => ({ success: true, result: 'accepted' }));
+  const message = {
+    type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+    requestId: crypto.randomUUID(),
+    authentication: { kind: 'bearer', accessToken: 'private-workspace-token' },
+  };
+  const args = { capabilityGeneration: crypto.randomUUID(), message, execute };
+  const first = executeOffscreenResponseCommand(args);
+  const replay = executeOffscreenResponseCommand(args);
+  expect(first.duplicate).toBe(false);
+  expect(replay.duplicate).toBe(true);
+  if (replay.duplicate)
+    expect(await replay.completion).toEqual({ success: true, result: 'accepted' });
+  expect(execute).toHaveBeenCalledOnce();
 });

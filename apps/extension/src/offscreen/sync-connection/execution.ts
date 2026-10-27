@@ -17,7 +17,13 @@ import { createDiagnosticPortWriter } from '../../platform/runtime-messaging/dia
 import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
 import { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
 import type { SyncExecutorBinding } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
-import type { SyncExecutionInput, SyncExecutionResult } from './executor';
+import type {
+  SyncExecutionInput,
+  SyncExecutionResult,
+  SyncWorkspaceExecutionInput,
+  SyncWorkspaceExecutionResult,
+} from './executor';
+import { createWebdavWorkspaceCreation } from '../../workflows/sync-transfer/webdav-workspace';
 
 function terminalSnapshot(
   result: Awaited<ReturnType<typeof runSyncQueueOperation>>,
@@ -121,6 +127,73 @@ export function createSyncQueueExecution(
             input: { scope: selection.scope, source: { kind: 'connection' } },
           });
         }
+        return { snapshot, containment: 'contained' };
+      } catch {
+        return { snapshot, containment: 'unsafe' };
+      }
+    },
+  };
+}
+
+/** Adapt the existing creation owner without duplicating its protocol or request lifetime. */
+export function createSyncWorkspaceExecution(
+  input: SyncWorkspaceExecutionInput,
+  hasOriginPermission: (origin: string) => Promise<boolean>
+) {
+  const creation = createWebdavWorkspaceCreation({
+    identity: input.allocation,
+    authentication: input.authentication,
+    hasOriginPermission,
+  });
+  let stopped = false;
+  return {
+    drain() {
+      stopped = true;
+      return creation.close();
+    },
+    async run(): Promise<SyncWorkspaceExecutionResult> {
+      let snapshot: SyncWorkspaceExecutionResult['snapshot'];
+      try {
+        await creation.run();
+        snapshot = { state: 'ready', failureCode: null };
+      } catch (error) {
+        let failureCode: SyncWorkspaceExecutionResult['snapshot']['failureCode'] = 'internal';
+        if (stopped) failureCode = 'interrupted';
+        else if (error instanceof Error && 'code' in error) {
+          switch (error.code) {
+            case 'authentication':
+            case 'access-denied':
+            case 'storage-full':
+              failureCode = error.code;
+              break;
+            case 'temporary':
+            case 'transport':
+            case 'unavailable':
+              failureCode = 'temporary';
+              break;
+            case 'cancelled':
+              failureCode = 'interrupted';
+              break;
+            case 'allocation-refused':
+            case 'foreign-metadata':
+            case 'invalid-configuration':
+            case 'marker-missing':
+            case 'invalid-marker':
+            case 'invalid-binding':
+            case 'unsupported-format':
+            case 'binding-mismatch':
+            case 'workspace-changed':
+            case 'metadata-limit':
+            case 'collision':
+            case 'invalid-response':
+              failureCode = 'invalid-workspace';
+              break;
+          }
+        }
+        snapshot = { state: failureCode === 'interrupted' ? 'interrupted' : 'failed', failureCode };
+      }
+      try {
+        await creation.close();
         return { snapshot, containment: 'contained' };
       } catch {
         return { snapshot, containment: 'unsafe' };

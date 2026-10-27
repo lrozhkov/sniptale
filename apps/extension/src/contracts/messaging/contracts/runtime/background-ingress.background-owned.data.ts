@@ -16,12 +16,14 @@ export const backgroundIngressBackgroundOwnedRouteGroups = [
     ownerModule: 'apps/extension/src/background/sync-connection/route.ts',
     policyAuthorityFamily: 'sync-connection-origin-permission',
     policyStateIds: [],
-    requiredAuthority: 'exact offscreen sender and current durable connection identity and origin',
+    requiredAuthority:
+      'exact offscreen sender and current durable connection or workspace allocation identity and origin',
     responseShape: 'allowed boolean or fixed sync origin permission refusal',
     routeAuthorityFamily: 'background-owned-ipc',
-    sideEffects: 'read-only native connection and optional host permission query',
+    sideEffects:
+      'read-only native connection or workspace allocation and optional host permission query',
     transitiveStateOwner: 'native remote-connection owner and browser permission authority',
-    messageTypes: ['SYNC_CONNECTION_ORIGIN_PERMISSION'],
+    messageTypes: ['SYNC_CONNECTION_ORIGIN_PERMISSION', 'SYNC_WORKSPACE_ORIGIN_PERMISSION'],
   },
   {
     acceptedSenderClass: 'checked top-level content runtime including the owned shim sender',

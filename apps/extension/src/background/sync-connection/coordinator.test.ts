@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SyncConnectionMetadata } from '../../composition/persistence/remote-connection/model';
+import type { SyncWorkspaceAllocation } from '../../composition/persistence/remote-connection/workspace-allocation';
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import {
   createSyncConnectionCoordinator,
@@ -44,9 +45,13 @@ function fixture() {
     phase: 'running',
     binding: { scope: selection.scope, authorization: selection.authorization },
     jobs: [],
+    workspace: null,
   };
   const deps = {
     loadConnection: vi.fn(async (): Promise<SyncConnectionMetadata | null> => metadata),
+    loadWorkspace: vi.fn(async (): Promise<SyncWorkspaceAllocation | null> => null),
+    revokeWorkspace: vi.fn(async (_incarnation: string) => undefined),
+    startWorkspaceExecutor: vi.fn(async () => ({ executorId: 'executor', executorRevision: 4 })),
     revokeConnection: vi.fn(async () => {
       metadata.phase = 'paused';
     }),
@@ -201,12 +206,12 @@ describe('sync lifecycle coordinator', () => {
     const f = fixture();
     f.deps.revokeConnection.mockRejectedValueOnce(new Error('revocation failed'));
     const first = f.coordinator.reserveErasure();
-    await expect(first.quiesce()).rejects.toThrow('revocation failed');
-    expect(f.deps.stopExecutor).not.toHaveBeenCalled();
+    await expect(first.quiesce()).rejects.toThrow('refused');
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
     first.release();
     const retry = f.coordinator.reserveErasure();
     await expect(retry.quiesce()).resolves.toBeUndefined();
-    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+    expect(f.deps.stopExecutor).toHaveBeenCalledTimes(2);
     retry.release();
   });
 
@@ -236,5 +241,143 @@ describe('sync lifecycle coordinator', () => {
     });
     await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
     expect(f.deps.startExecutor).not.toHaveBeenCalled();
+  });
+});
+
+function workspaceFixture() {
+  const f = fixture();
+  const workspace: SyncWorkspaceAllocation = {
+    version: 2,
+    kind: 'sync-workspace-allocation',
+    key: 'workspace-allocation',
+    provider: 'webdav',
+    parentUrl: 'https://dav.example/root/',
+    rootUrl: 'https://dav.example/root/Sniptale-10000000-0000-4000-8000-000000000003/',
+    accountId: 'account',
+    spaceId: '10000000-0000-4000-8000-000000000004',
+    bootstrapId: '10000000-0000-4000-8000-000000000003',
+    createdAt: 1,
+    identity: { incarnation: '10000000-0000-4000-8000-000000000005', revision: 1 },
+    phase: 'planned',
+    marker: null,
+  };
+  f.deps.loadConnection.mockResolvedValue(null);
+  f.deps.loadWorkspace.mockImplementation(async () => workspace);
+  f.snapshot.binding = null;
+  const selection = {
+    allocation: { ...workspace.identity },
+    authentication: { kind: 'basic' as const, username: 'account', password: 'private-password' },
+  };
+  return { ...f, workspace, selection };
+}
+
+describe('workspace lifecycle coordinator', () => {
+  it('detaches command input and checks current allocation before starting', async () => {
+    const f = workspaceFixture();
+    const promise = f.coordinator.startWorkspace(f.selection);
+    f.selection.authentication.password = 'mutated';
+    await expect(promise).resolves.toEqual({ executorId: 'executor', executorRevision: 4 });
+    expect(f.deps.startWorkspaceExecutor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allocation: f.workspace.identity,
+        authentication: { kind: 'basic', username: 'account', password: 'private-password' },
+      })
+    );
+  });
+  it.each(['allocating', 'abandoned'] as const)(
+    'refuses %s allocation without issuing a command',
+    async (phase) => {
+      const f = workspaceFixture();
+      f.workspace.phase = phase;
+      await expect(f.coordinator.startWorkspace(f.selection)).rejects.toThrow('refused');
+      expect(f.deps.startWorkspaceExecutor).not.toHaveBeenCalled();
+    }
+  );
+  it('refuses changed native revision after asynchronous document admission', async () => {
+    const f = workspaceFixture();
+    f.deps.ensureDocument.mockImplementation(async () => {
+      f.workspace.identity.revision += 1;
+      return 'startup';
+    });
+    await expect(f.coordinator.startWorkspace(f.selection)).rejects.toThrow('refused');
+    expect(f.deps.startWorkspaceExecutor).not.toHaveBeenCalled();
+  });
+  it('adopts a surviving workspace through phase revisions without restarting it', async () => {
+    const f = workspaceFixture();
+    f.snapshot.workspace = {
+      allocationIncarnation: f.workspace.identity.incarnation,
+      selectionRevision: 1,
+      state: 'running',
+      failureCode: null,
+    };
+    f.workspace.identity.revision = 4;
+    f.workspace.phase = 'publishing-marker';
+    await expect(f.coordinator.inspect()).resolves.toBe(f.snapshot);
+    expect(f.deps.startWorkspaceExecutor).not.toHaveBeenCalled();
+    f.workspace.phase = 'abandoned';
+    await expect(f.coordinator.inspect()).rejects.toThrow('refused');
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+  });
+  it('contains orphaned workspace when native authority is unreadable', async () => {
+    const f = workspaceFixture();
+    f.snapshot.workspace = {
+      allocationIncarnation: f.workspace.identity.incarnation,
+      selectionRevision: 1,
+      state: 'running',
+      failureCode: null,
+    };
+    f.deps.loadWorkspace.mockRejectedValue(new Error('private native error'));
+    await expect(f.coordinator.inspect()).rejects.toThrow('refused');
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+  });
+  it('invalidates held start before privacy containment and revokes current lifetime', async () => {
+    const f = workspaceFixture();
+    const entered = deferred<void>();
+    const held = deferred<void>();
+    f.deps.ensureDocument.mockImplementation(async () => {
+      entered.resolve();
+      await held.promise;
+      return 'startup';
+    });
+    const start = expect(f.coordinator.startWorkspace(f.selection)).rejects.toThrow('refused');
+    await entered.promise;
+    f.workspace.identity.revision = 5;
+    const reservation = f.coordinator.reserveErasure();
+    const quiescence = reservation.quiesce();
+    held.resolve();
+    await start;
+    await quiescence;
+    expect(f.deps.startWorkspaceExecutor).not.toHaveBeenCalled();
+    expect(f.deps.revokeWorkspace).toHaveBeenCalledWith(f.workspace.identity.incarnation);
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+    reservation.release();
+  });
+  it('revokes workspace before containment on relevant permission removal', async () => {
+    const f = workspaceFixture();
+    await f.coordinator.permissionsRemoved((origin) => origin === 'https://elsewhere.example');
+    expect(f.deps.stopExecutor).not.toHaveBeenCalled();
+    f.deps.stopExecutor.mockImplementation(async () => {
+      expect(f.deps.revokeWorkspace).toHaveBeenCalledWith(f.workspace.identity.incarnation);
+      return { executorId: 'executor', executorRevision: 5 };
+    });
+    await f.coordinator.permissionsRemoved((origin) => origin === 'https://dav.example');
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+  });
+  it('still contains on failed lifetime revocation without reporting privacy success', async () => {
+    const f = workspaceFixture();
+    f.deps.revokeWorkspace.mockRejectedValue(new Error('private failure'));
+    const reservation = f.coordinator.reserveErasure();
+    await expect(reservation.quiesce()).rejects.toThrow('refused');
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+    reservation.release();
+  });
+  it('contains on missing or unreadable native state during permission removal', async () => {
+    const f = workspaceFixture();
+    f.deps.loadWorkspace.mockResolvedValue(null);
+    await f.coordinator.permissionsRemoved(() => true);
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+    f.deps.loadWorkspace.mockRejectedValue(new Error('private native error'));
+    await expect(f.coordinator.permissionsRemoved(() => true)).rejects.toThrow('refused');
+    expect(f.deps.stopExecutor).toHaveBeenCalledTimes(2);
   });
 });

@@ -282,13 +282,13 @@ Quick-action placement has three independent settings: popup, corner group, and 
 
 ## WebDAV synchronization lifecycle
 
-The background sync coordinator controls admission, executor observation and erasure exclusion. The shared offscreen document owns each detached queue workflow and its HTTP requests. Commands carry native connection and queue identities. They carry no credentials, headers or file bodies.
+The background sync coordinator controls admission, executor observation and erasure exclusion. The shared offscreen document owns each detached queue workflow and its HTTP requests. Queue commands carry native connection and queue identities. Workspace creation carries an allocation identity and bounded authentication through the same authenticated command channel. Neither command carries file bodies.
 
 Start returns a short acknowledgement. Inspect returns a bounded disposable snapshot without waiting for IO. Stop aborts requests and waits for response bodies, workflows and native locks to drain. A timeout or missing response cannot prove containment.
 
 The executor identity lasts for one document. Its revision changes after a binding change or Stop reservation. Delayed commands must match both values. Native queue records remain authoritative after runtime termination. Worker restart requires a fresh startup challenge and a check of current durable authorization.
 
-The background origin-permission query accepts only the exact offscreen sender. It checks the native identity and canonical HTTPS origin before and after the browser permission query. It does not enter the coordinator queue or acquire the connection admission lock. Revocation must commit before Stop starts. Erasure must drain sync before mutation waits and media cleanup.
+The background origin-permission query accepts only the exact offscreen sender. It checks the native identity and canonical HTTPS origin before and after the browser permission query. It does not enter the coordinator queue or acquire the connection admission lock. The coordinator attempts durable revocation before Stop. Failed revocation still requires an observation and containment attempt. It cannot produce successful privacy completion. Erasure must drain sync before mutation waits and media cleanup.
 
 Production pages cannot start synchronization in this slice. The separate provider suite uses a security-only control Port for lifecycle proof. Each lifecycle command closes its Port after its response. The driver never attaches to the worker.
 
@@ -300,3 +300,16 @@ npm exec playwright test -- --config tooling/test/e2e/providers/webdav-lifecycle
 ```
 
 The lifecycle suite uses `.tmp/e2e-builds/security` by default. `SNIPTALE_WEBDAV_LIFECYCLE_BUILD_DIR` selects another security build. The existing provider command retains its test-e2e build and fixture list. Both suites require the explicit loopback server variables. Neither suite runs in the main pipeline.
+
+
+### Pre-enrollment workspace execution
+
+The same coordinator and offscreen executor own workspace creation before enrollment. The executor reserves one workspace execution handle before acknowledgement. A running queue job excludes workspace creation. A running or unsafe workspace excludes queue execution.
+
+The native allocation journal remains authoritative. Worker restart challenges the surviving document and checks the current native allocation incarnation. Phase revisions can advance during execution. Missing, abandoned, replaced or unreadable native authority requires containment before adoption fails.
+
+Stop closes workspace request admission synchronously. It waits for the creation workflow and response bodies to drain. A stopped allocation incarnation cannot restart in that document. A new native allocation requires its own identity. Safe terminal failure permits an explicit retry against the current native revision.
+
+Permission queries check the native allocation incarnation and selected origin without the coordinator queue or connection lock. The request owner checks exact phase and revision around permission admission. Permission removal and erasure revoke the allocation lifetime across phase revisions. Ordinary journal commands retain exact revision checks.
+
+The security-only lifecycle fixture can start workspace creation. Production Settings enrollment and start ingress remain disabled. This execution boundary does not install a profile or connection.

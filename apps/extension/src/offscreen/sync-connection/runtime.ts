@@ -10,6 +10,7 @@ function isSyncCommandCandidate(message: unknown): message is Record<string, unk
   if (!isRecord(message)) return false;
   return (
     message['type'] === MessageType.OFFSCREEN_SYNC_START ||
+    message['type'] === MessageType.OFFSCREEN_SYNC_WORKSPACE_START ||
     message['type'] === MessageType.OFFSCREEN_SYNC_INSPECT ||
     message['type'] === MessageType.OFFSCREEN_SYNC_STOP
   );
@@ -29,7 +30,11 @@ export function registerOffscreenSyncMessageListener(
     });
     if (!authorized.authorized) return false;
     const parsed = parseSyncConnectionRuntimeMessage(authorized.message);
-    if (!parsed || parsed.type === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION) {
+    if (
+      !parsed ||
+      parsed.type === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION ||
+      parsed.type === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION
+    ) {
       sendResponse({ success: false, error: 'Sync executor command refused' });
       return false;
     }
@@ -39,6 +44,8 @@ export function registerOffscreenSyncMessageListener(
         message: parsed,
         execute: () => {
           if (parsed.type === MessageType.OFFSCREEN_SYNC_START) return executor.start(parsed);
+          if (parsed.type === MessageType.OFFSCREEN_SYNC_WORKSPACE_START)
+            return executor.startWorkspace(parsed);
           if (parsed.type === MessageType.OFFSCREEN_SYNC_INSPECT) return executor.inspect(parsed);
           return executor.stop(parsed);
         },

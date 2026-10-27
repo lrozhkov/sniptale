@@ -289,7 +289,7 @@ The provider test suite requires an explicit loopback Nextcloud endpoint and a s
 
 ## Sync runtime containment
 
-Sync runtime messages contain selected native identities and bounded status codes only. The offscreen executor reads encrypted local credentials through the native connection owner. Credentials, Authorization headers, provider addresses and response bodies must not enter diagnostics.
+Queue runtime messages contain selected native identities and bounded status codes. Queue execution reads encrypted local credentials through the native connection owner. Pre-enrollment creation accepts bounded authentication through the authenticated background-to-offscreen channel. Credentials, Authorization headers, provider addresses and response bodies must not enter diagnostics.
 
 Every HTTP request checks current durable authorization and the optional origin grant. The permission query performs independent reads. It does not wait for the caller-held admission lock. Expected authentication, DAV and cancellation failures remain inside the sync executor. They do not mark the shared offscreen document as failed.
 
@@ -318,7 +318,7 @@ The native remote-connection owner retains one allocation plan under workspace-a
 
 Each journal command checks its exact incarnation and revision. Opening commands capture the prepared database handle synchronously before waiting for connection admission. The canonical mutation permit orders their transactions. Erasure closes the retained handle, so a delayed opening cannot recreate selected account metadata. The handle capture never initializes storage. It also refuses an installed capture profile or connection. Explicit abandonment permits a new plan without remote cleanup. Uncertain allocation never authorizes adoption or deletion of an existing folder. Provider errors contain fixed codes and numeric statuses only.
 
-The exclusive root operation uses the existing WebDAV authentication and guarded request adapter. It omits cookies and refuses redirects. Its caller must preserve the plan before dispatch and control request cancellation and drain. The explicit test harness supplies this caller. Production creation and enrollment remain disabled pending their lifecycle checks.
+The exclusive root operation uses the existing WebDAV authentication and guarded request adapter. It omits cookies and refuses redirects. Its caller must preserve the plan before dispatch and control request cancellation and drain. The shared offscreen runtime supplies this caller. The security-only test Port proves its lifecycle. Production enrollment and start ingress remain disabled.
 
 
 ## Workspace marker creation boundary
@@ -327,7 +327,7 @@ The remote marker contains public protocol fields and random workspace identifie
 
 The native journal freezes marker bytes before any metadata write. Conditional creation cannot fall back to an overwrite. Unknown metadata and mismatched markers refuse creation without deletion or cleanup. A missing marker in ready state cannot authorize reinitialization. Journal completion requires the exact current native revision and checked remote identity.
 
-The provider preserves the existing HTTPS, origin, path, cookie and redirect restrictions. The explicit test caller rechecks current permission and journal identity before each HTTP dispatch. A checked marker grants no credentials or execution authority. Production request cancellation, credential lifetime, enrollment and privacy containment remain separate release gates.
+The provider preserves the existing HTTPS, origin, path, cookie and redirect restrictions. The explicit test caller rechecks current permission and journal identity before each HTTP dispatch. A checked marker grants no credentials or execution authority. The shared runtime supplies request cancellation, credential lifetime and privacy containment. Enrollment remains a separate release gate.
 
 
 ## Creation execution containment
@@ -336,4 +336,20 @@ Workspace creation uses the existing request and response-body tracker with nati
 
 The execution accepts detached authentication input and checks it against the native account. It writes no credentials to the allocation journal. One in-memory credential reference serves all phase clients and becomes unavailable after drain. Error results contain fixed codes only. This lifetime rule does not erase strings that the JavaScript engine or the caller retains.
 
-Close aborts and drains issued headers and response bodies before it reports containment. A failed cancellation cannot report successful closure. Closing after a remote write preserves native uncertainty or completed native evidence. It promises no remote rollback. Production privacy and permission owners still need to contain every producer, including surviving offscreen documents, before enrollment or erasure flows can be enabled.
+Close aborts and drains issued headers and response bodies before it reports containment. A failed cancellation cannot report successful closure. Closing after a remote write preserves native uncertainty or completed native evidence. It promises no remote rollback. The shared privacy and permission owners contain surviving offscreen producers. Production enrollment remains disabled until its separate release gates pass.
+
+
+## Pre-enrollment runtime credentials
+
+Workspace start detaches bounded authentication before command admission. The authenticated background gateway sends it to the exact offscreen document. The executor constructs the creation handle synchronously before acknowledgement. Its job retains the execution handle and safe status only.
+
+The allocation journal contains no authentication. Runtime snapshots and idempotency records contain no credentials, selected URLs, account names or raw error text. The background clears its credential reference after command settlement. The execution clears its credential reference after request drain. These rules cannot erase strings that callers or the JavaScript engine retain.
+
+Origin removal and local-data erasure revoke the exact allocation lifetime before containment. Phase advancement does not escape revocation. A failed native revocation still requires a containment attempt and prevents successful privacy completion. Missing native authority cannot authorize adoption of a surviving producer.
+
+The security-only test Port accepts workspace start for lifecycle proof. Production pages receive no workspace start authority from this change. Profile activation, enrollment and credential persistence remain separate release gates.
+
+
+## Temporary allocation refusal
+
+Workspace creation distinguishes an explicit 423 refusal from an unknown remote outcome. Only exact native refusal evidence restores the same plan for another exclusive MKCOL. The transition grants no ownership and cannot select a different root. A later collision preserves the remote folder and its files. Unknown outcomes cannot adopt an existing folder.

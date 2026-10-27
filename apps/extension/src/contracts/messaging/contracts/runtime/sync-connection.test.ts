@@ -28,11 +28,31 @@ const permission = {
   authorization,
   origin: 'https://dav.example',
 };
+const workspaceStart = {
+  type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+  ...envelope,
+  ...target,
+  allocation: authorization,
+  authentication: { kind: 'basic', username: 'account', password: 'private-password' },
+};
+const workspacePermission = {
+  type: MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION,
+  requestId: id,
+  allocationIncarnation: id,
+  origin: 'https://dav.example',
+};
+const workspace = {
+  allocationIncarnation: id,
+  selectionRevision: 1,
+  state: 'running',
+  failureCode: null,
+};
 const snapshot = {
   offscreenStartupId: id,
   ...target,
   phase: 'running',
   binding: { scope, authorization },
+  workspace: null,
   jobs: [
     {
       operationId: 'operation',
@@ -46,8 +66,8 @@ const snapshot = {
 };
 
 describe('sync lifecycle runtime boundary', () => {
-  it('parses the four safe commands and reconstructs independent values', () => {
-    for (const input of [start, inspect, stop, permission]) {
+  it('parses the six commands and reconstructs independent values', () => {
+    for (const input of [start, inspect, stop, permission, workspaceStart, workspacePermission]) {
       const parsed = parseSyncConnectionRuntimeMessage(input);
       expect(parsed).toEqual(input);
       expect(parsed).not.toBe(input);
@@ -59,7 +79,7 @@ describe('sync lifecycle runtime boundary', () => {
   });
 
   it('refuses secret-bearing fields at every command boundary', () => {
-    for (const input of [start, inspect, stop, permission]) {
+    for (const input of [start, inspect, stop, permission, workspaceStart, workspacePermission]) {
       for (const field of ['password', 'headers', 'body', 'accessToken']) {
         expect(parseSyncConnectionRuntimeMessage({ ...input, [field]: 'private' })).toBeNull();
       }
@@ -77,7 +97,8 @@ describe('sync lifecycle runtime boundary', () => {
 
   it('refuses invalid identities, revisions, operation selections and capabilities', () => {
     for (const field of ['requestId', 'offscreenStartupId', 'executorId']) {
-      expect(parseSyncConnectionRuntimeMessage({ ...start, [field]: 'arbitrary' })).toBeNull();
+      for (const input of [start, workspaceStart])
+        expect(parseSyncConnectionRuntimeMessage({ ...input, [field]: 'arbitrary' })).toBeNull();
     }
     for (const field of ['expectedRevision', 'executorRevision']) {
       for (const value of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1, '1']) {
@@ -110,11 +131,139 @@ describe('sync lifecycle runtime boundary', () => {
       'https://dav.example:443',
       '*',
     ]) {
-      expect(parseSyncConnectionRuntimeMessage({ ...permission, origin })).toBeNull();
+      for (const input of [permission, workspacePermission])
+        expect(parseSyncConnectionRuntimeMessage({ ...input, origin })).toBeNull();
     }
     expect(
       parseSyncConnectionRuntimeMessage({ ...permission, origin: 'https://dav.example:8443' })
     ).not.toBeNull();
+  });
+
+  it('bounds workspace authentication and reconstructs detached credential values', () => {
+    const parsed = parseSyncConnectionRuntimeMessage(workspaceStart);
+    if (parsed?.type !== MessageType.OFFSCREEN_SYNC_WORKSPACE_START)
+      throw new Error('Missing workspace start');
+    expect(parsed.allocation).not.toBe(workspaceStart.allocation);
+    expect(parsed.authentication).not.toBe(workspaceStart.authentication);
+    const bearer = { kind: 'bearer', accessToken: 'private-token' };
+    expect(
+      parseSyncConnectionRuntimeMessage({ ...workspaceStart, authentication: bearer })
+    ).toEqual({ ...workspaceStart, authentication: bearer });
+    for (const authentication of [
+      null,
+      { kind: 'basic', password: 'private' },
+      { kind: 'basic', username: 1, password: 'private' },
+      { kind: 'basic', username: '', password: 'private' },
+      { kind: 'basic', username: 'bad:account', password: 'private' },
+      { kind: 'basic', username: 'x'.repeat(1025), password: 'private' },
+      { kind: 'basic', username: 'account', password: '' },
+      { kind: 'basic', username: 'account', password: 'private\nheader' },
+      { kind: 'basic', username: 'account', password: 'x'.repeat(8193) },
+      { kind: 'basic', username: 'account', password: 'private', extra: true },
+      { kind: 'bearer', accessToken: '' },
+      { kind: 'bearer', accessToken: 'private\rheader' },
+      { kind: 'bearer', accessToken: 'x'.repeat(8193) },
+      { kind: 'bearer', accessToken: 'private', username: 'account' },
+      { kind: 'future', accessToken: 'private' },
+    ]) {
+      expect(parseSyncConnectionRuntimeMessage({ ...workspaceStart, authentication })).toBeNull();
+    }
+    expect(
+      parseSyncConnectionRuntimeMessage({
+        ...workspaceStart,
+        authentication: { kind: 'basic', username: 'x'.repeat(1024), password: 'x'.repeat(8192) },
+      })
+    ).not.toBeNull();
+    expect(
+      parseSyncConnectionRuntimeMessage({
+        ...workspaceStart,
+        authentication: { kind: 'bearer', accessToken: 'x'.repeat(8192) },
+      })
+    ).not.toBeNull();
+    for (const allocation of [
+      null,
+      { incarnation: id },
+      { incarnation: id, revision: 0 },
+      { ...authorization, password: 'private' },
+    ]) {
+      expect(parseSyncConnectionRuntimeMessage({ ...workspaceStart, allocation })).toBeNull();
+    }
+    expect(
+      parseSyncConnectionRuntimeMessage({
+        ...workspacePermission,
+        allocationIncarnation: 'arbitrary',
+      })
+    ).toBeNull();
+    for (const input of [workspaceStart, workspacePermission]) {
+      for (const omitted of Object.keys(input)) {
+        const incomplete = Object.fromEntries(
+          Object.entries(input).filter(([field]) => field !== omitted)
+        );
+        expect(parseSyncConnectionRuntimeMessage(incomplete)).toBeNull();
+      }
+    }
+  });
+
+  it('requires a bounded workspace projection and excludes credentials and mixed active jobs', () => {
+    const workspaceSnapshot = { ...snapshot, jobs: [], workspace };
+    const parsed = parseSyncExecutorSnapshot(workspaceSnapshot);
+    expect(parsed).toEqual(workspaceSnapshot);
+    expect(parsed?.workspace).not.toBe(workspace);
+    const { workspace: omittedWorkspace, ...missingWorkspace } = snapshot;
+    expect(omittedWorkspace).toBeNull();
+    expect(parseSyncExecutorSnapshot(missingWorkspace)).toBeNull();
+    expect(parseSyncExecutorSnapshot({ ...snapshot, workspace })).toBeNull();
+    for (const field of [
+      'authentication',
+      'username',
+      'password',
+      'accessToken',
+      'headers',
+      'body',
+      'rootUrl',
+    ]) {
+      expect(
+        parseSyncExecutorSnapshot({
+          ...workspaceSnapshot,
+          workspace: { ...workspace, [field]: 'private' },
+        })
+      ).toBeNull();
+    }
+    for (const value of [
+      { ...workspace, allocationIncarnation: 'arbitrary' },
+      { ...workspace, selectionRevision: 0 },
+      { ...workspace, selectionRevision: Number.MAX_SAFE_INTEGER + 1 },
+      { ...workspace, selectionRevision: 1.5 },
+      { ...workspace, state: 'future' },
+      { ...workspace, failureCode: 'private exception' },
+    ]) {
+      expect(parseSyncExecutorSnapshot({ ...workspaceSnapshot, workspace: value })).toBeNull();
+    }
+    for (const state of ['running', 'ready', 'failed', 'interrupted']) {
+      expect(
+        parseSyncExecutorSnapshot({ ...workspaceSnapshot, workspace: { ...workspace, state } })
+      ).not.toBeNull();
+    }
+    for (const failureCode of [
+      'temporary',
+      'authentication',
+      'access-denied',
+      'storage-full',
+      'invalid-workspace',
+      'interrupted',
+      'internal',
+    ]) {
+      expect(
+        parseSyncExecutorSnapshot({
+          ...workspaceSnapshot,
+          workspace: { ...workspace, state: 'failed', failureCode },
+        })
+      ).not.toBeNull();
+    }
+    expect(
+      parseSyncExecutorSnapshot({ ...snapshot, workspace: { ...workspace, state: 'ready' } })
+    ).not.toBeNull();
+    expect(JSON.stringify(parsed)).not.toContain('private-password');
   });
 
   it('bounds and reconstructs live snapshots without replacing native evidence', () => {
@@ -223,6 +372,44 @@ describe('sync lifecycle runtime boundary', () => {
         })
       ).toThrow();
     }
+    const workspaceStartContract =
+      runtimeSyncConnectionMessageContracts[MessageType.OFFSCREEN_SYNC_WORKSPACE_START];
+    const workspacePermissionContract =
+      runtimeSyncConnectionMessageContracts[MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION];
+    expect(workspaceStartContract.parseRequest(workspaceStart)).toEqual(workspaceStart);
+    expect(workspacePermissionContract.parseRequest(workspacePermission)).toEqual(
+      workspacePermission
+    );
+    expect(
+      workspaceStartContract.parseResponse({ success: true, result: 'accepted', ...target })
+    ).toEqual({ success: true, result: 'accepted', ...target });
+    expect(workspacePermissionContract.parseResponse({ success: true, allowed: true })).toEqual({
+      success: true,
+      allowed: true,
+    });
+    expect(
+      workspaceStartContract.parseResponse({
+        success: false,
+        error: 'Sync executor command refused',
+      })
+    ).toEqual({ success: false, error: 'Sync executor command refused' });
+    expect(
+      workspacePermissionContract.parseResponse({
+        success: false,
+        error: 'Sync origin permission query refused',
+      })
+    ).toEqual({ success: false, error: 'Sync origin permission query refused' });
+    for (const contract of [workspaceStartContract, workspacePermissionContract]) {
+      expect(() => contract.parseResponse({ success: true })).toThrow();
+      expect(() =>
+        contract.parseResponse({ success: false, error: 'private exception' })
+      ).toThrow();
+      expect(() =>
+        contract.parseResponse({ success: true, allowed: true, authentication: 'private' })
+      ).toThrow();
+    }
+    expect(() => workspaceStartContract.parseRequest(start)).toThrow();
+    expect(() => workspacePermissionContract.parseRequest(permission)).toThrow();
     expect(() => startContract.parseRequest(inspect)).toThrow();
     expect(() =>
       stopContract.parseResponse({ success: true, result: 'accepted', ...target })

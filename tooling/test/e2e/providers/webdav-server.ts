@@ -233,10 +233,12 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
             const remainder = chunk.subarray(split);
             const resume = () => {
               if (release === resume) release = undefined;
-              if (!downstream.destroyed && !response.destroyed) {
-                downstream.write(remainder);
-                response.pipe(downstream);
-              }
+              if (downstream.destroyed) return;
+              downstream.write(remainder);
+              // A complete one-chunk response can end while its saved remainder is held.
+              if (response.readableEnded) downstream.end();
+              else if (response.destroyed) downstream.destroy();
+              else response.pipe(downstream);
             };
             release = resume;
             markReached();

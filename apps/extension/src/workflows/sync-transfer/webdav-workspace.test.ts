@@ -13,12 +13,14 @@ const native = vi.hoisted(() => ({
   prepare: vi.fn(),
   command: vi.fn(),
   complete: vi.fn(),
+  refusal: vi.fn(),
 }));
 vi.mock('../../composition/persistence/remote-connection/workspace-allocation', () => ({
   loadSyncWorkspaceAllocation: native.load,
   prepareSyncWorkspaceMarker: native.prepare,
   commandSyncWorkspaceAllocation: native.command,
   completeSyncWorkspaceMarker: native.complete,
+  recordSyncWorkspaceAllocationRefusal: native.refusal,
 }));
 
 const lifecycle = vi.hoisted(() => ({ allocate: vi.fn(), writer: vi.fn(), requests: vi.fn() }));
@@ -107,6 +109,11 @@ function fixture(phase: SyncWorkspaceAllocation['phase'] = 'allocated') {
     const current = cas(expected, ['preparing-marker', 'publishing-marker']);
     events.push('reserve');
     return advance(current, 'publishing-marker');
+  });
+  native.refusal.mockImplementation(async (expected: unknown, status: unknown) => {
+    expect(status).toBe(423);
+    events.push('refusal');
+    return advance(cas(expected, ['allocating']), 'planned');
   });
   native.complete.mockImplementation(async (expected: unknown, evidence: unknown) => {
     const current = cas(expected, ['publishing-marker']);
@@ -602,4 +609,54 @@ it('close waits for an in-flight marker read and prevents late native completion
   expect(native.complete).not.toHaveBeenCalled();
   expect(io.current()?.phase).toBe('publishing-marker');
   expect(io.publishMarker).not.toHaveBeenCalled();
+});
+
+it('preserves a retryable native plan after explicit MKCOL 423 and completes the same root on retry', async () => {
+  const io = creationFixture('planned');
+  const original = structuredClone(io.current());
+  lifecycle.allocate.mockRejectedValueOnce(new SyncRemoteError('temporary', 423));
+  await expect(io.execution.run()).rejects.toMatchObject({ code: 'temporary', status: 423 });
+  await io.execution.close();
+  expect(io.current()?.phase).toBe('planned');
+  expect(native.refusal).toHaveBeenCalledOnce();
+  expect(lifecycle.writer).not.toHaveBeenCalled();
+  const retry = createWebdavWorkspaceCreation({
+    identity: io.current()?.identity,
+    authentication: io.authentication,
+    hasOriginPermission: async () => true,
+  });
+  await expect(retry.run()).resolves.toMatchObject({ allocation: { phase: 'ready' } });
+  expect(io.current()?.rootUrl).toBe(original?.rootUrl);
+  expect(io.current()?.bootstrapId).toBe(original?.bootstrapId);
+  expect(io.current()?.spaceId).toBe(original?.spaceId);
+  expect(lifecycle.allocate).toHaveBeenCalledTimes(2);
+});
+
+it.each([
+  new SyncRemoteError('transport'),
+  new SyncRemoteError('temporary', 500),
+  new SyncRemoteError('collision', 405),
+])(
+  'keeps allocation uncertain without explicit temporary refusal evidence: $code $status',
+  async (error) => {
+    const io = creationFixture('planned');
+    lifecycle.allocate.mockRejectedValueOnce(error);
+    await expect(io.execution.run()).rejects.toMatchObject({
+      code: error.code,
+      status: error.status,
+    });
+    expect(io.current()?.phase).toBe('allocating');
+    expect(native.refusal).not.toHaveBeenCalled();
+    expect(lifecycle.writer).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses completion when native refusal evidence cannot commit', async () => {
+  const io = creationFixture('planned');
+  native.refusal.mockRejectedValueOnce(new Error('Native refusal is stale'));
+  lifecycle.allocate.mockRejectedValueOnce(new SyncRemoteError('temporary', 423));
+  await expect(io.execution.run()).rejects.toMatchObject({ code: 'allocation-refused' });
+  expect(native.refusal).toHaveBeenCalledOnce();
+  expect(lifecycle.writer).not.toHaveBeenCalled();
+  expect(io.close).toHaveBeenCalledOnce();
 });

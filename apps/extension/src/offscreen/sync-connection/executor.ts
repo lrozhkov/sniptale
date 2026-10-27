@@ -12,7 +12,13 @@ import type {
   SyncStartResponse,
   SyncStopRequest,
   SyncStopResponse,
+  SyncWorkspaceStartRequest,
+  SyncWorkspaceJobSnapshot,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import type {
+  SyncConnectionIdentity,
+  SyncConnectionAuthentication,
+} from '../../composition/persistence/remote-connection/model';
 
 type TerminalSnapshot = Omit<
   SyncExecutorJobSnapshot,
@@ -41,11 +47,35 @@ export interface SyncExecutorExecution {
   drain(): Promise<void>;
 }
 
+/** One workspace selection; credentials belong only to the synchronously constructed handle. */
+export interface SyncWorkspaceExecutionInput {
+  allocation: SyncConnectionIdentity;
+  authentication: SyncConnectionAuthentication;
+}
+
+/** Safe terminal projection and explicit resource containment. */
+export interface SyncWorkspaceExecutionResult {
+  snapshot: Pick<SyncWorkspaceJobSnapshot, 'failureCode'> & {
+    state: Exclude<SyncWorkspaceJobSnapshot['state'], 'running'>;
+  };
+  containment: 'contained' | 'unsafe';
+}
+
+interface WorkspaceJob {
+  snapshot: SyncWorkspaceJobSnapshot;
+  execution: { run(): Promise<SyncWorkspaceExecutionResult>; drain(): Promise<void> };
+  completion: Promise<void>;
+  active: boolean;
+  unsafe: boolean;
+  stopped: boolean;
+}
+
 /** All execution authority is injected; the disposable executor never opens durable storage. */
 export interface SyncExecutorPorts {
   executorId: string;
   offscreenStartupId: string;
   createExecution(input: SyncExecutionInput): SyncExecutorExecution;
+  createWorkspaceExecution(input: SyncWorkspaceExecutionInput): WorkspaceJob['execution'];
 }
 
 interface Job {
@@ -65,7 +95,7 @@ function sameBinding(left: SyncExecutorBinding, right: SyncExecutorBinding) {
 }
 
 function matchesTarget(
-  request: SyncStartRequest | SyncStopRequest,
+  request: SyncStartRequest | SyncWorkspaceStartRequest | SyncStopRequest,
   ports: Pick<SyncExecutorPorts, 'offscreenStartupId' | 'executorId'>,
   revision: number | null
 ): boolean {
@@ -82,6 +112,8 @@ const refused = () => ({ success: false as const, error: 'Sync executor command 
 export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
   const jobs = new Map<string, Job>();
   let binding: SyncExecutorBinding | null = null;
+  let workspace: WorkspaceJob | null = null;
+  const stoppedWorkspaceIncarnations = new Set<string>();
   let executorRevision = 1;
   let phase: SyncExecutorSnapshot['phase'] = 'idle';
   let stopping: Promise<SyncStopResponse> | null = null;
@@ -94,11 +126,12 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
       executorRevision,
       phase,
       binding,
+      workspace: workspace?.snapshot ?? null,
       jobs: [...jobs.values()].map((job) => job.snapshot),
     });
   }
 
-  function failed(job: Job) {
+  function failed(job: Job | WorkspaceJob) {
     job.unsafe = true;
     job.snapshot.state = 'failed';
     job.snapshot.failureCode = 'internal';
@@ -139,14 +172,92 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
     }
   }
 
+  async function runWorkspace(job: WorkspaceJob) {
+    try {
+      if (job.stopped) {
+        job.snapshot.state = 'interrupted';
+        job.snapshot.failureCode = 'interrupted';
+        return;
+      }
+      const result = await job.execution.run();
+      if (result.containment === 'unsafe') failed(job);
+      else if (!job.stopped) Object.assign(job.snapshot, result.snapshot);
+      else {
+        job.snapshot.state = 'interrupted';
+        job.snapshot.failureCode = 'interrupted';
+      }
+    } catch {
+      failed(job);
+    } finally {
+      job.active = false;
+      if (phase === 'running') phase = 'idle';
+    }
+  }
+
+  function startWorkspace(request: SyncWorkspaceStartRequest): SyncStartResponse {
+    if (
+      !matchesTarget(request, ports, executorRevision) ||
+      stopping ||
+      phase === 'stopping' ||
+      phase === 'failed' ||
+      stoppedWorkspaceIncarnations.has(request.allocation.incarnation) ||
+      [...jobs.values()].some((job) => job.active || job.unsafe)
+    )
+      return refused();
+    if (workspace?.active) {
+      if (
+        workspace.snapshot.allocationIncarnation !== request.allocation.incarnation ||
+        workspace.snapshot.selectionRevision !== request.allocation.revision
+      )
+        return refused();
+      return { success: true, result: 'accepted', executorId: ports.executorId, executorRevision };
+    }
+    if (workspace?.unsafe) return refused();
+    let execution: WorkspaceJob['execution'];
+    try {
+      execution = ports.createWorkspaceExecution({
+        allocation: structuredClone(request.allocation),
+        authentication: structuredClone(request.authentication),
+      });
+    } catch {
+      return refused();
+    }
+    const job: WorkspaceJob = {
+      snapshot: {
+        allocationIncarnation: request.allocation.incarnation,
+        selectionRevision: request.allocation.revision,
+        state: 'running',
+        failureCode: null,
+      },
+      execution,
+      completion: Promise.resolve(),
+      active: true,
+      unsafe: false,
+      stopped: false,
+    };
+    binding = null;
+    jobs.clear();
+    workspace = job;
+    executorRevision += 1;
+    phase = 'running';
+    job.completion = Promise.resolve().then(() => runWorkspace(job));
+    return { success: true, result: 'accepted', executorId: ports.executorId, executorRevision };
+  }
+
   function start(request: SyncStartRequest): SyncStartResponse {
     if (
       !matchesTarget(request, ports, executorRevision) ||
       stopping ||
       phase === 'stopping' ||
-      phase === 'failed'
+      phase === 'failed' ||
+      workspace?.active ||
+      workspace?.unsafe
     )
       return refused();
+    if (workspace) {
+      workspace = null;
+      phase = 'idle';
+    }
     const selected = structuredClone({
       scope: request.scope,
       authorization: request.authorization,
@@ -223,6 +334,20 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
     executorRevision += 1;
     phase = 'stopping';
     const pending = [...jobs.values()];
+    const pendingWorkspace = workspace;
+    const workspaceWasUnsafe = pendingWorkspace?.unsafe ?? false;
+    let workspaceDrain: Promise<void> | null = null;
+    if (pendingWorkspace) {
+      pendingWorkspace.stopped = true;
+      stoppedWorkspaceIncarnations.add(pendingWorkspace.snapshot.allocationIncarnation);
+      // Close admission and abort issued IO before Stop yields to any detached run.
+      try {
+        workspaceDrain = pendingWorkspace.execution.drain();
+      } catch (error) {
+        workspaceDrain = Promise.reject(error);
+      }
+      void workspaceDrain.catch(() => undefined);
+    }
     const unsafeBeforeStop = new Set(pending.filter((job) => job.unsafe));
     for (const job of pending) job.controller.abort();
     stopping = (async (): Promise<SyncStopResponse> => {
@@ -233,7 +358,9 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
           if (job.execution) await job.execution.drain();
         })
       );
+      const workspaceDrained = await Promise.allSettled(workspaceDrain ? [workspaceDrain] : []);
       await Promise.all(pending.map((job) => job.completion));
+      if (pendingWorkspace) await pendingWorkspace.completion;
       let contained = true;
       for (let index = 0; index < pending.length; index += 1) {
         const job = pending[index]!;
@@ -245,6 +372,15 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
           contained = false;
         } else job.unsafe = false;
       }
+      if (pendingWorkspace) {
+        if (
+          workspaceDrained[0]?.status === 'rejected' ||
+          (pendingWorkspace.unsafe && !workspaceWasUnsafe)
+        ) {
+          failed(pendingWorkspace);
+          contained = false;
+        } else pendingWorkspace.unsafe = false;
+      }
       if (!contained) return refused();
       phase = 'stopped';
       return { success: true, result: 'stopped', executorId: ports.executorId, executorRevision };
@@ -254,5 +390,5 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
     return stopping;
   }
 
-  return { start, inspect, stop };
+  return { start, startWorkspace, inspect, stop };
 }

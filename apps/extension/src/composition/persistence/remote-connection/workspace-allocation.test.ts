@@ -8,6 +8,8 @@ import {
   loadSyncWorkspaceAllocation,
   prepareSyncWorkspaceMarker,
   completeSyncWorkspaceMarker,
+  revokeSyncWorkspaceAllocation,
+  recordSyncWorkspaceAllocationRefusal,
 } from './workspace-allocation';
 import { withSyncConnectionAdmissionLock } from './coordination';
 import { connectionUuid } from './model';
@@ -79,6 +81,7 @@ function setup() {
   let failCommit = false;
   let aborts = 0;
   let drains = 0;
+  let writes = 0;
   const makeDatabase = () => {
     const database = {
       closed: false,
@@ -103,6 +106,7 @@ function setup() {
                 if (!isRecord(value) || typeof value['key'] !== 'string')
                   throw new Error('Invalid fixture row');
                 table.set(value['key'], structuredClone(value));
+                writes += 1;
               },
             };
           },
@@ -145,6 +149,7 @@ function setup() {
     },
     aborted: () => aborts,
     drained: () => drains,
+    writes: () => writes,
   };
 }
 it('creates a native singleton plan without credentials or capture enrollment', async () => {
@@ -690,4 +695,368 @@ it('checks installed profile and connection before marker mutation in the same t
     expect(f.rows).toEqual(before);
     f.table(store).delete(key);
   }
+});
+
+it('revokes the current lifetime after a queued phase advance and preserves frozen evidence', async () => {
+  setup();
+  const prepared = await prepareSyncWorkspaceMarker((await allocatedWorkspace()).identity);
+  const entered = deferred();
+  const release = deferred();
+  const held = withSyncConnectionAdmissionLock(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const advance = commandSyncWorkspaceAllocation(prepared.identity, 'publish-marker');
+  const revoke = revokeSyncWorkspaceAllocation(prepared.identity.incarnation);
+  release.resolve();
+  await held;
+  const publishing = await advance;
+  const abandoned = await revoke;
+  expect(abandoned).toEqual({
+    ...publishing,
+    phase: 'abandoned',
+    identity: { ...publishing.identity, revision: publishing.identity.revision + 1 },
+  });
+  expect(await loadSyncWorkspaceAllocation()).toEqual(abandoned);
+  await expect(commandSyncWorkspaceAllocation(prepared.identity, 'abandon')).rejects.toThrow(
+    'refused'
+  );
+});
+
+it('serializes revocation before a concurrent late completion and refuses that completion', async () => {
+  const f = setup();
+  const prepared = await prepareSyncWorkspaceMarker((await allocatedWorkspace()).identity);
+  const publishing = await commandSyncWorkspaceAllocation(prepared.identity, 'publish-marker');
+  const entered = deferred();
+  const release = deferred();
+  const held = withSyncConnectionAdmissionLock(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const revoked = revokeSyncWorkspaceAllocation(publishing.identity.incarnation);
+  const completion = completeSyncWorkspaceMarker(
+    publishing.identity,
+    parseSyncWorkspaceMarker(publishing.marker?.text)
+  );
+  const observed = completion.then(
+    () => 'written',
+    () => 'refused'
+  );
+  release.resolve();
+  await held;
+  const abandoned = await revoked;
+  expect(await observed).toBe('refused');
+  expect(await loadSyncWorkspaceAllocation()).toEqual(abandoned);
+  expect(f.table().get('workspace-allocation')).toEqual(abandoned);
+});
+
+it('revokes ready state and repeats revocation without another write or revision', async () => {
+  const f = setup();
+  const prepared = await prepareSyncWorkspaceMarker((await allocatedWorkspace()).identity);
+  const publishing = await commandSyncWorkspaceAllocation(prepared.identity, 'publish-marker');
+  const ready = await completeSyncWorkspaceMarker(
+    publishing.identity,
+    parseSyncWorkspaceMarker(publishing.marker?.text)
+  );
+  const abandoned = await revokeSyncWorkspaceAllocation(ready.identity.incarnation);
+  expect(abandoned).toEqual({
+    ...ready,
+    phase: 'abandoned',
+    identity: { ...ready.identity, revision: ready.identity.revision + 1 },
+  });
+  const writes = f.writes();
+  expect(await revokeSyncWorkspaceAllocation(ready.identity.incarnation)).toEqual(abandoned);
+  expect(f.writes()).toBe(writes);
+  expect(io.database).not.toHaveBeenCalled();
+});
+
+it('refuses queued lifetime revocation after erasure and recreation without reopening storage', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const entered = deferred();
+  const release = deferred();
+  const held = withSyncConnectionAdmissionLock(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const queued = deferred();
+  lockObserved = (name) => {
+    if (name === 'sniptale.sync-connection.admission') queued.resolve();
+  };
+  const pending = revokeSyncWorkspaceAllocation(planned.identity.incarnation);
+  const observed = pending.then(
+    () => 'written',
+    () => 'refused'
+  );
+  await queued.promise;
+  await runWithPersistentDataErasureBarrier(() => f.erase());
+  const replacement = {
+    ...planned,
+    identity: { incarnation: crypto.randomUUID(), revision: 1 },
+  };
+  f.table().set('workspace-allocation', replacement);
+  const before = structuredClone(f.rows);
+  release.resolve();
+  await held;
+  expect(await observed).toBe('refused');
+  expect(f.rows).toEqual(before);
+  expect(io.database).not.toHaveBeenCalled();
+});
+
+it('aborts and drains failed revocation before explicit retry from unchanged state', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const before = structuredClone(f.rows);
+  f.failCommit();
+  await expect(revokeSyncWorkspaceAllocation(planned.identity.incarnation)).rejects.toThrow(
+    'Late backend failure'
+  );
+  expect(f.rows).toEqual(before);
+  expect(f.aborted()).toBe(1);
+  expect(f.drained()).toBe(1);
+  const abandoned = await revokeSyncWorkspaceAllocation(planned.identity.incarnation);
+  expect(abandoned.phase).toBe('abandoned');
+  expect(abandoned.identity.revision).toBe(planned.identity.revision + 1);
+});
+
+it('refuses missing foreign replaced and malformed lifetime revocation without repair', async () => {
+  const f = setup();
+  const missing = crypto.randomUUID();
+  await expect(revokeSyncWorkspaceAllocation(missing)).rejects.toThrow('refused');
+  expect(f.table().size).toBe(0);
+  const planned = await createSyncWorkspaceAllocation(input);
+  for (const invalid of [null, {}, planned.identity, 'not-a-uuid', missing]) {
+    const before = structuredClone(f.rows);
+    await expect(revokeSyncWorkspaceAllocation(invalid)).rejects.toThrow('refused');
+    expect(f.rows).toEqual(before);
+  }
+  const abandoned = await revokeSyncWorkspaceAllocation(planned.identity.incarnation);
+  const replacement = await createSyncWorkspaceAllocation(input, abandoned.identity);
+  await expect(revokeSyncWorkspaceAllocation(planned.identity.incarnation)).rejects.toThrow(
+    'refused'
+  );
+  expect(await loadSyncWorkspaceAllocation()).toEqual(replacement);
+  f.table().set('workspace-allocation', { ...replacement, extra: true });
+  const before = structuredClone(f.rows);
+  await expect(revokeSyncWorkspaceAllocation(replacement.identity.incarnation)).rejects.toThrow(
+    'refused'
+  );
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses lifetime revocation with installed profile or connection in the same transaction', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  for (const store of ['sync_capture', 'sync_connection']) {
+    const key = store === 'sync_capture' ? 'profile' : 'connection';
+    f.table(store).set(key, { installed: true });
+    const before = structuredClone(f.rows);
+    await expect(revokeSyncWorkspaceAllocation(planned.identity.incarnation)).rejects.toThrow(
+      'refused'
+    );
+    expect(f.rows).toEqual(before);
+    f.table(store).delete(key);
+  }
+  expect((await revokeSyncWorkspaceAllocation(planned.identity.incarnation)).phase).toBe(
+    'abandoned'
+  );
+});
+
+it('records explicit MKCOL 423 refusal and retries the same native plan with a fresh revision', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+  await expect(commandSyncWorkspaceAllocation(allocating.identity, 'allocate')).rejects.toThrow(
+    'refused'
+  );
+  const retryable = await recordSyncWorkspaceAllocationRefusal(allocating.identity, 423);
+  expect(retryable).toEqual({
+    ...allocating,
+    phase: 'planned',
+    identity: { ...allocating.identity, revision: allocating.identity.revision + 1 },
+  });
+  await expect(commandSyncWorkspaceAllocation(allocating.identity, 'confirm')).rejects.toThrow(
+    'refused'
+  );
+  const retry = await commandSyncWorkspaceAllocation(retryable.identity, 'allocate');
+  expect(retry).toEqual({
+    ...allocating,
+    identity: { ...allocating.identity, revision: retryable.identity.revision + 1 },
+  });
+  const allocated = await commandSyncWorkspaceAllocation(retry.identity, 'confirm');
+  expect(allocated.phase).toBe('allocated');
+  const before = structuredClone(f.rows);
+  await expect(recordSyncWorkspaceAllocationRefusal(allocated.identity, 423)).rejects.toThrow(
+    'refused'
+  );
+  expect(f.rows).toEqual(before);
+});
+
+it('serializes parallel MKCOL 423 callbacks and rejects stale revision and phase evidence', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+  const outcomes = await Promise.allSettled([
+    recordSyncWorkspaceAllocationRefusal(allocating.identity, 423),
+    recordSyncWorkspaceAllocationRefusal(allocating.identity, 423),
+  ]);
+  expect(outcomes.map((outcome) => outcome.status)).toEqual(['fulfilled', 'rejected']);
+  const retryable = await loadSyncWorkspaceAllocation();
+  expect(retryable?.identity.revision).toBe(allocating.identity.revision + 1);
+  const before = structuredClone(f.rows);
+  await expect(recordSyncWorkspaceAllocationRefusal(planned.identity, 423)).rejects.toThrow(
+    'refused'
+  );
+  await expect(recordSyncWorkspaceAllocationRefusal(retryable?.identity, 423)).rejects.toThrow(
+    'refused'
+  );
+  expect(f.rows).toEqual(before);
+});
+
+it.each(['abandon', 'erase', 'recreate'] as const)(
+  'refuses a delayed MKCOL 423 callback after %s without resurrection',
+  async (change) => {
+    const f = setup();
+    const planned = await createSyncWorkspaceAllocation(input);
+    const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+    const entered = deferred();
+    const release = deferred();
+    const pending = (async () => {
+      entered.resolve();
+      await release.promise;
+      return recordSyncWorkspaceAllocationRefusal(allocating.identity, 423);
+    })();
+    await entered.promise;
+    if (change === 'erase') await runWithPersistentDataErasureBarrier(() => f.erase());
+    else {
+      const abandoned = await revokeSyncWorkspaceAllocation(allocating.identity.incarnation);
+      if (change === 'recreate') await createSyncWorkspaceAllocation(input, abandoned.identity);
+    }
+    const before = structuredClone(f.rows);
+    release.resolve();
+    await expect(pending).rejects.toThrow('refused');
+    expect(f.rows).toEqual(before);
+    expect(io.database).not.toHaveBeenCalled();
+  }
+);
+
+it('detaches MKCOL refusal identity and captures native admission before awaiting its lock', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+  const entered = deferred();
+  const release = deferred();
+  const held = withSyncConnectionAdmissionLock(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const expected = { ...allocating.identity };
+  const captures = io.capture.mock.calls.length;
+  const pending = recordSyncWorkspaceAllocationRefusal(expected, 423);
+  expect(io.capture).toHaveBeenCalledTimes(captures + 1);
+  expected.incarnation = crypto.randomUUID();
+  expected.revision = 99;
+  release.resolve();
+  await held;
+  expect(await pending).toEqual({
+    ...allocating,
+    phase: 'planned',
+    identity: { ...allocating.identity, revision: allocating.identity.revision + 1 },
+  });
+  expect(f.writes()).toBe(3);
+  expect(io.database).not.toHaveBeenCalled();
+});
+
+it('refuses queued MKCOL refusal after native erasure and recreation through its captured handle', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+  const entered = deferred();
+  const release = deferred();
+  const held = withSyncConnectionAdmissionLock(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const queued = deferred();
+  lockObserved = (name) => {
+    if (name === 'sniptale.sync-connection.admission') queued.resolve();
+  };
+  const pending = recordSyncWorkspaceAllocationRefusal(allocating.identity, 423);
+  const observed = pending.then(
+    () => 'written',
+    () => 'refused'
+  );
+  await queued.promise;
+  await runWithPersistentDataErasureBarrier(() => f.erase());
+  f.table().set('workspace-allocation', structuredClone(allocating));
+  const before = structuredClone(f.rows);
+  release.resolve();
+  await held;
+  expect(await observed).toBe('refused');
+  expect(f.rows).toEqual(before);
+  expect(io.database).not.toHaveBeenCalled();
+});
+
+it('aborts and drains failed MKCOL refusal recording and allows an explicit unchanged-state retry', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+  const before = structuredClone(f.rows);
+  f.failCommit();
+  await expect(recordSyncWorkspaceAllocationRefusal(allocating.identity, 423)).rejects.toThrow(
+    'Late backend failure'
+  );
+  expect(f.rows).toEqual(before);
+  expect(f.aborted()).toBe(1);
+  expect(f.drained()).toBe(1);
+  const retryable = await recordSyncWorkspaceAllocationRefusal(allocating.identity, 423);
+  expect(retryable.phase).toBe('planned');
+  expect(retryable.identity.revision).toBe(allocating.identity.revision + 1);
+});
+
+it('refuses malformed and non-423 allocation refusal evidence before native mutation', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+  const before = structuredClone(f.rows);
+  const writes = f.writes();
+  const captures = io.capture.mock.calls.length;
+  for (const status of [undefined, null, '423', { status: 423 }, 0, 201, 403, 409, 429, 500, NaN])
+    await expect(recordSyncWorkspaceAllocationRefusal(allocating.identity, status)).rejects.toThrow(
+      'refused'
+    );
+  for (const expected of [
+    null,
+    {},
+    allocating.identity.incarnation,
+    { ...allocating.identity, extra: true },
+  ])
+    await expect(recordSyncWorkspaceAllocationRefusal(expected, 423)).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
+  expect(f.writes()).toBe(writes);
+  expect(io.capture).toHaveBeenCalledTimes(captures);
+});
+
+it('refuses MKCOL refusal recording after profile or connection installation', async () => {
+  const f = setup();
+  const planned = await createSyncWorkspaceAllocation(input);
+  const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+  for (const store of ['sync_capture', 'sync_connection']) {
+    const key = store === 'sync_capture' ? 'profile' : 'connection';
+    f.table(store).set(key, { installed: true });
+    const before = structuredClone(f.rows);
+    await expect(recordSyncWorkspaceAllocationRefusal(allocating.identity, 423)).rejects.toThrow(
+      'refused'
+    );
+    expect(f.rows).toEqual(before);
+    f.table(store).delete(key);
+  }
+  expect((await recordSyncWorkspaceAllocationRefusal(allocating.identity, 423)).phase).toBe(
+    'planned'
+  );
 });

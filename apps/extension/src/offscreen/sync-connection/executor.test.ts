@@ -6,11 +6,13 @@ import type {
   SyncInspectRequest,
   SyncStartRequest,
   SyncStopRequest,
+  SyncWorkspaceStartRequest,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import {
   createSyncConnectionExecutor,
   type SyncExecutorExecution,
   type SyncExecutorPorts,
+  type SyncWorkspaceExecutionResult,
 } from './executor';
 
 function deferred<T>() {
@@ -55,10 +57,25 @@ function fixture() {
     pending.push({ input, result, drainage, drain });
     return { run: () => result.promise, drain };
   });
+  const workspacePending: Array<{
+    result: ReturnType<typeof deferred<SyncWorkspaceExecutionResult>>;
+    drainage: ReturnType<typeof deferred<void>>;
+    run: ReturnType<typeof vi.fn<() => Promise<SyncWorkspaceExecutionResult>>>;
+    drain: ReturnType<typeof vi.fn<() => Promise<void>>>;
+  }> = [];
+  const createWorkspaceExecution = vi.fn<SyncExecutorPorts['createWorkspaceExecution']>(() => {
+    const result = deferred<SyncWorkspaceExecutionResult>();
+    const drainage = deferred<void>();
+    const run = vi.fn(() => result.promise);
+    const drain = vi.fn(() => drainage.promise);
+    workspacePending.push({ result, drainage, run, drain });
+    return { run, drain };
+  });
   const executor = createSyncConnectionExecutor({
     executorId,
     offscreenStartupId,
     createExecution,
+    createWorkspaceExecution,
   });
   const inspectRequest: SyncInspectRequest = {
     ...base,
@@ -89,7 +106,28 @@ function fixture() {
       ...overrides,
     });
   }
-  return { executor, createExecution, pending, inspect, start, stop, inspectRequest };
+  function startWorkspace(overrides: Partial<SyncWorkspaceStartRequest> = {}) {
+    return executor.startWorkspace({
+      ...base,
+      type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+      executorRevision: inspect().executorRevision,
+      allocation: binding.authorization,
+      authentication: { kind: 'bearer', accessToken: 'workspace-private-token' },
+      ...overrides,
+    });
+  }
+  return {
+    executor,
+    createExecution,
+    createWorkspaceExecution,
+    workspacePending,
+    startWorkspace,
+    pending,
+    inspect,
+    start,
+    stop,
+    inspectRequest,
+  };
 }
 
 async function settleWorkflow() {
@@ -313,5 +351,148 @@ describe('disposable sync executor', () => {
     await settleWorkflow();
     test.pending[0]!.result.resolve(published);
     await settleWorkflow();
+  });
+});
+
+describe('workspace slot in the shared sync executor', () => {
+  const ready: SyncWorkspaceExecutionResult = {
+    snapshot: { state: 'ready', failureCode: null },
+    containment: 'contained',
+  };
+
+  it('constructs a credential-owning handle before ACK and inspects held IO without exposing credentials', async () => {
+    const test = fixture();
+    expect(test.startWorkspace()).toMatchObject({ success: true, executorRevision: 2 });
+    expect(test.createWorkspaceExecution).toHaveBeenCalledOnce();
+    expect(test.workspacePending[0]!.run).not.toHaveBeenCalled();
+    expect(test.inspect()).toMatchObject({
+      phase: 'running',
+      binding: null,
+      jobs: [],
+      workspace: {
+        allocationIncarnation: binding.authorization.incarnation,
+        selectionRevision: 1,
+        state: 'running',
+        failureCode: null,
+      },
+    });
+    expect(JSON.stringify(test.inspect())).not.toContain('workspace-private-token');
+    expect(JSON.stringify(test.inspect())).not.toContain('authentication');
+    await settleWorkflow();
+    expect(test.workspacePending[0]!.run).toHaveBeenCalledOnce();
+    test.workspacePending[0]!.result.resolve(ready);
+    await settleWorkflow();
+    expect(test.inspect().workspace?.state).toBe('ready');
+  });
+
+  it('joins exact active selections and refuses changed selections and queue overlap', async () => {
+    const test = fixture();
+    expect(test.startWorkspace().success).toBe(true);
+    expect(test.startWorkspace().success).toBe(true);
+    expect(
+      test.startWorkspace({ allocation: { ...binding.authorization, revision: 2 } }).success
+    ).toBe(false);
+    expect(test.start().success).toBe(false);
+    expect(test.createWorkspaceExecution).toHaveBeenCalledOnce();
+    await settleWorkflow();
+    test.workspacePending[0]!.result.resolve(ready);
+    await settleWorkflow();
+    expect(test.start().success).toBe(true);
+    expect(test.inspect().workspace).toBeNull();
+    expect(test.startWorkspace().success).toBe(false);
+    await settleWorkflow();
+    test.pending[0]!.result.resolve(published);
+    await settleWorkflow();
+    expect(test.startWorkspace().success).toBe(true);
+    expect(test.inspect().binding).toBeNull();
+    expect(test.inspect().jobs).toEqual([]);
+    await settleWorkflow();
+    test.workspacePending[1]!.result.resolve(ready);
+    await settleWorkflow();
+  });
+
+  it('closes a reserved handle synchronously before the detached workspace can run', async () => {
+    const test = fixture();
+    test.startWorkspace();
+    const stopped = test.stop();
+    expect(test.workspacePending[0]!.drain).toHaveBeenCalledOnce();
+    expect(test.startWorkspace().success).toBe(false);
+    test.workspacePending[0]!.drainage.resolve();
+    expect(await stopped).toMatchObject({ success: true });
+    expect(test.workspacePending[0]!.run).not.toHaveBeenCalled();
+    expect(test.inspect().workspace?.state).toBe('interrupted');
+    expect(test.startWorkspace().success).toBe(false);
+    expect(
+      test.startWorkspace({
+        allocation: {
+          ...binding.authorization,
+          incarnation: '66666666-6666-4666-8666-666666666666',
+        },
+      }).success
+    ).toBe(true);
+    await settleWorkflow();
+    test.workspacePending[1]!.result.resolve(ready);
+    await settleWorkflow();
+  });
+
+  it('waits for both workspace IO drain and workflow settlement before stopped', async () => {
+    const test = fixture();
+    test.startWorkspace();
+    await settleWorkflow();
+    let finished = false;
+    const stopped = test.stop().then((response) => {
+      finished = true;
+      return response;
+    });
+    test.workspacePending[0]!.drainage.resolve();
+    await settleWorkflow();
+    expect(finished).toBe(false);
+    expect(test.inspect().phase).toBe('stopping');
+    test.workspacePending[0]!.result.resolve(ready);
+    expect(await stopped).toMatchObject({ success: true });
+    expect(test.inspect().workspace?.state).toBe('interrupted');
+  });
+
+  it('retains unsafe workspace containment and refuses all new execution', async () => {
+    const test = fixture();
+    test.startWorkspace();
+    await settleWorkflow();
+    const stopped = test.stop();
+    test.workspacePending[0]!.drainage.reject(new Error('Private cancellation failure'));
+    test.workspacePending[0]!.result.resolve({ ...ready, containment: 'unsafe' });
+    expect(await stopped).toMatchObject({ success: false });
+    expect(test.inspect()).toMatchObject({
+      phase: 'failed',
+      workspace: { state: 'failed', failureCode: 'internal' },
+    });
+    expect(test.start().success).toBe(false);
+    expect(test.startWorkspace().success).toBe(false);
+  });
+
+  it('permits an explicit fresh command after contained failure with the current native revision', async () => {
+    const test = fixture();
+    test.startWorkspace();
+    await settleWorkflow();
+    test.workspacePending[0]!.result.resolve({
+      snapshot: { state: 'failed', failureCode: 'temporary' },
+      containment: 'contained',
+    });
+    await settleWorkflow();
+    expect(
+      test.startWorkspace({ allocation: { ...binding.authorization, revision: 4 } }).success
+    ).toBe(true);
+    expect(test.inspect().workspace?.selectionRevision).toBe(4);
+    await settleWorkflow();
+    test.workspacePending[1]!.result.resolve(ready);
+    await settleWorkflow();
+  });
+
+  it('refuses a factory failure before accepted acknowledgement without retaining secrets', () => {
+    const test = fixture();
+    test.createWorkspaceExecution.mockImplementationOnce(() => {
+      throw new Error('private-token');
+    });
+    expect(test.startWorkspace().success).toBe(false);
+    expect(test.inspect()).toMatchObject({ phase: 'idle', workspace: null, executorRevision: 1 });
   });
 });

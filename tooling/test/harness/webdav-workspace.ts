@@ -2,9 +2,13 @@ import {
   createSyncWorkspaceAllocation,
   loadSyncWorkspaceAllocation,
   commandSyncWorkspaceAllocation,
+  recordSyncWorkspaceAllocationRefusal,
 } from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-allocation';
 import { withSyncConnectionAdmissionLock } from '../../../apps/extension/src/composition/persistence/remote-connection/coordination';
-import { sameSyncConnectionIdentity } from '../../../apps/extension/src/composition/persistence/remote-connection/model';
+import {
+  sameSyncConnectionIdentity,
+  type SyncConnectionIdentity,
+} from '../../../apps/extension/src/composition/persistence/remote-connection/model';
 import {
   allocateWebdavWorkspaceRoot,
   createWebdavWorkspaceWriter,
@@ -64,6 +68,7 @@ export function createWebdavWorkspaceHarness() {
     inspect: () => loadSyncWorkspaceAllocation(),
     abandon: (identity: unknown) => commandSyncWorkspaceAllocation(identity, 'abandon'),
     async allocate(credentials: Credentials, identity: unknown) {
+      let reservedIdentity: SyncConnectionIdentity | null = null;
       try {
         const plan = await loadSyncWorkspaceAllocation();
         if (
@@ -73,6 +78,7 @@ export function createWebdavWorkspaceHarness() {
         )
           throw new SyncRemoteError('invalid-configuration');
         const reserved = await commandSyncWorkspaceAllocation(identity, 'allocate');
+        reservedIdentity = reserved.identity;
         const base = options({ ...credentials, rootUrl: reserved.rootUrl });
         await allocateWebdavWorkspaceRoot(
           {
@@ -97,6 +103,9 @@ export function createWebdavWorkspaceHarness() {
         const allocated = await commandSyncWorkspaceAllocation(reserved.identity, 'confirm');
         return { code: 'success', status: null, allocation: allocated };
       } catch (error) {
+        // Only an explicit refusal proves that this MKCOL did not create the child.
+        if (reservedIdentity && error instanceof SyncRemoteError && error.status === 423)
+          await recordSyncWorkspaceAllocationRefusal(reservedIdentity, error.status);
         return { ...failure(error), allocation: await loadSyncWorkspaceAllocation() };
       }
     },

@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createRuntimePortFixture } from '../../../../../tooling/test/support/chrome-runtime-port';
+import type { SecurityE2ESyncWorkspaceSelection } from '.';
 
 const { connectListener } = vi.hoisted(() => ({
   connectListener: { current: null as ((port: chrome.runtime.Port) => void) | null },
@@ -115,6 +116,10 @@ const syncSelection = {
   operationId: '55555555-5555-4555-8555-555555555555',
   expectedRevision: 1,
 };
+const workspaceSelection = {
+  allocation: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 2 },
+  authentication: { kind: 'basic' as const, username: 'alice', password: 'synthetic-secret' },
+};
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
@@ -127,12 +132,17 @@ function deferred<T>() {
 function syncRuntime() {
   return {
     start: vi.fn(async (_selection: typeof syncSelection) => ({ executorId, executorRevision: 2 })),
+    startWorkspace: vi.fn(async (_selection: SecurityE2ESyncWorkspaceSelection) => ({
+      executorId,
+      executorRevision: 2,
+    })),
     inspect: vi.fn(async () => ({
       offscreenStartupId: startupId,
       executorId,
       executorRevision: 2,
       phase: 'idle' as const,
       binding: null,
+      workspace: null,
       jobs: [],
     })),
     reserveErasure: vi.fn(() => ({ quiesce: vi.fn(async () => {}), release: vi.fn() })),
@@ -202,6 +212,7 @@ it('returns only the parsed safe executor snapshot', async () => {
       executorRevision: 2,
       phase: 'idle',
       binding: null,
+      workspace: null,
       jobs: [],
     },
   });
@@ -302,10 +313,15 @@ it('keeps lifecycle commands behind the exact security harness sender and port n
   ]) {
     const port = createRuntimePortFixture(options);
     connectListener.current?.(port.port);
-    port.onMessage.emit({ type: 'sync-start', requestId: syncRequestId, payload: syncSelection });
+    for (const command of [
+      { type: 'sync-start', payload: syncSelection },
+      { type: 'sync-workspace-start', payload: workspaceSelection },
+    ])
+      port.onMessage.emit({ ...command, requestId: syncRequestId });
     expect(port.postMessage).not.toHaveBeenCalled();
   }
   expect(runtime.start).not.toHaveBeenCalled();
+  expect(runtime.startWorkspace).not.toHaveBeenCalled();
 });
 
 it('does not register a lifecycle ingress when the security E2E build flag is disabled', async () => {
@@ -316,4 +332,89 @@ it('does not register a lifecycle ingress when the security E2E build flag is di
   const control = await import('.');
   control.registerSecurityE2EControl(syncRuntime());
   expect(connectListener.current).toBeNull();
+});
+
+it.each([
+  workspaceSelection.authentication,
+  { kind: 'bearer' as const, accessToken: 'synthetic-token' },
+])(
+  'starts workspace creation with detached bounded credentials and returns only a receipt',
+  async (authentication) => {
+    const control = await import('.');
+    const runtime = syncRuntime();
+    const receipt = deferred<{ executorId: string; executorRevision: number }>();
+    runtime.startWorkspace.mockReturnValueOnce(receipt.promise);
+    control.registerSecurityE2EControl(runtime);
+    const port = syncPort();
+    const payload = { allocation: { ...workspaceSelection.allocation }, authentication };
+    port.onMessage.emit({ type: 'sync-workspace-start', requestId: syncRequestId, payload });
+    expect(runtime.startWorkspace).toHaveBeenCalledExactlyOnceWith(payload);
+    expect(runtime.startWorkspace.mock.calls[0]?.[0].allocation).not.toBe(payload.allocation);
+    expect(runtime.startWorkspace.mock.calls[0]?.[0].authentication).not.toBe(authentication);
+    expect(port.postMessage).not.toHaveBeenCalled();
+    payload.allocation.revision = 99;
+    expect(runtime.startWorkspace.mock.calls[0]?.[0].allocation.revision).toBe(2);
+    receipt.resolve({ executorId, executorRevision: 2 });
+    await expect(port.answer).resolves.toEqual({
+      ok: true,
+      requestId: syncRequestId,
+      sync: { executorId, executorRevision: 2 },
+    });
+    expect(runtime.start).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  null,
+  {},
+  { ...workspaceSelection, extra: true },
+  { ...workspaceSelection, allocation: { ...workspaceSelection.allocation, revision: 0 } },
+  { ...workspaceSelection, allocation: { ...workspaceSelection.allocation, extra: true } },
+  { ...workspaceSelection, authentication: { ...workspaceSelection.authentication, extra: true } },
+  { ...workspaceSelection, authentication: { ...workspaceSelection.authentication, username: '' } },
+  {
+    ...workspaceSelection,
+    authentication: { ...workspaceSelection.authentication, username: 'x'.repeat(1025) },
+  },
+  {
+    ...workspaceSelection,
+    authentication: { ...workspaceSelection.authentication, password: 'x'.repeat(8193) },
+  },
+  {
+    ...workspaceSelection,
+    authentication: { ...workspaceSelection.authentication, password: 'bad\nsecret' },
+  },
+  { ...workspaceSelection, authentication: { kind: 'bearer', accessToken: 'x'.repeat(8193) } },
+  { ...workspaceSelection, authentication: { kind: 'bearer', accessToken: 'bad\ntoken' } },
+])('refuses malformed workspace starts before invoking the runtime', async (payload) => {
+  const control = await import('.');
+  const runtime = syncRuntime();
+  control.registerSecurityE2EControl(runtime);
+  const port = syncPort();
+  port.onMessage.emit({ type: 'sync-workspace-start', requestId: syncRequestId, payload });
+  await expect(port.answer).resolves.toEqual({ ok: false, requestId: syncRequestId, sync: null });
+  expect(runtime.startWorkspace).not.toHaveBeenCalled();
+});
+
+it('does not expose workspace credential failure text and refuses extra command fields', async () => {
+  const control = await import('.');
+  const runtime = syncRuntime();
+  control.registerSecurityE2EControl(runtime);
+  const extra = syncPort();
+  extra.onMessage.emit({
+    type: 'sync-workspace-start',
+    requestId: syncRequestId,
+    payload: workspaceSelection,
+    extra: true,
+  });
+  await expect(extra.answer).resolves.toEqual({ ok: false, requestId: syncRequestId, sync: null });
+  expect(runtime.startWorkspace).not.toHaveBeenCalled();
+  const port = syncPort();
+  runtime.startWorkspace.mockRejectedValueOnce(new Error('synthetic-private-password'));
+  port.onMessage.emit({
+    type: 'sync-workspace-start',
+    requestId: syncRequestId,
+    payload: workspaceSelection,
+  });
+  await expect(port.answer).resolves.toEqual({ ok: false, requestId: syncRequestId, sync: null });
 });

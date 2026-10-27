@@ -270,6 +270,53 @@ export async function loadSyncWorkspaceAllocation(): Promise<SyncWorkspaceAlloca
     throw error;
   }
 }
+/** Revoke one allocation lifetime after privacy or permission closure, regardless of phase advances. */
+export async function revokeSyncWorkspaceAllocation(
+  incarnationInput: unknown
+): Promise<SyncWorkspaceAllocation> {
+  const incarnation: unknown = structuredClone(incarnationInput);
+  if (!connectionUuid(incarnation)) return refused();
+  return mutate(async (tx) => {
+    const current = await readAllocation(tx);
+    if (!current || current.identity.incarnation !== incarnation) return refused();
+    if (current.phase === 'abandoned') return current;
+    const revision = current.identity.revision + 1;
+    if (!Number.isSafeInteger(revision)) return refused();
+    const allocation: SyncWorkspaceAllocation = {
+      ...current,
+      identity: { incarnation, revision },
+      phase: 'abandoned',
+    };
+    await tx.objectStore(SYNC_CONNECTION_STORE).put(allocation);
+    return allocation;
+  });
+}
+/** Retain the same plan for explicit retry after a checked MKCOL 423 response. */
+export async function recordSyncWorkspaceAllocationRefusal(
+  expectedInput: unknown,
+  statusInput: unknown
+): Promise<SyncWorkspaceAllocation> {
+  const identity = parseSyncConnectionIdentity(structuredClone(expectedInput));
+  if (!identity || statusInput !== 423 || !Number.isSafeInteger(identity.revision + 1))
+    return refused();
+  return mutate(async (tx) => {
+    const current = await readAllocation(tx);
+    if (
+      !current ||
+      current.phase !== 'allocating' ||
+      current.marker !== null ||
+      !sameSyncConnectionIdentity(current.identity, identity)
+    )
+      return refused();
+    const allocation: SyncWorkspaceAllocation = {
+      ...current,
+      phase: 'planned',
+      identity: { incarnation: identity.incarnation, revision: identity.revision + 1 },
+    };
+    await tx.objectStore(SYNC_CONNECTION_STORE).put(allocation);
+    return allocation;
+  });
+}
 /** Apply one exact CAS transition. Retrying a successful command is a refusal. */
 export async function commandSyncWorkspaceAllocation(
   identityInput: unknown,

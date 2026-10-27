@@ -17,6 +17,7 @@ type OffscreenIdempotencyMessageType =
   | HandledOffscreenRuntimeMessageType
   | VoiceInputCommandMessageType
   | typeof MessageType.OFFSCREEN_SYNC_START
+  | typeof MessageType.OFFSCREEN_SYNC_WORKSPACE_START
   | typeof MessageType.OFFSCREEN_SYNC_INSPECT
   | typeof MessageType.OFFSCREEN_SYNC_STOP;
 
@@ -48,6 +49,10 @@ const MAX_RETAINED_KEYS = 500;
 const executedCommandKeys = new Map<string, CommandEntry>();
 
 const idempotencyPolicyByType = {
+  [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: {
+    idempotent: true,
+    reason: 'workspace admission and its acknowledgement bind one signed request',
+  },
   [MessageType.OFFSCREEN_SYNC_START]: {
     idempotent: true,
     reason: 'sync admission and its acknowledgement bind one signed request',

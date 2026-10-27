@@ -5,6 +5,7 @@ vi.mock('../../../ai/audio/port', () => ({ registerAudioJobPorts: vi.fn() }));
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { SyncConnectionMetadata } from '../../../../composition/persistence/remote-connection/model';
+import type { SyncWorkspaceAllocation } from '../../../../composition/persistence/remote-connection/workspace-allocation';
 
 const {
   configureDownloadPort,
@@ -52,6 +53,7 @@ const syncWiring = vi.hoisted(() => ({
     vi.fn<typeof import('../../../sync-connection/offscreen-gateway').createSyncOffscreenGateway>(),
   inspect: vi.fn().mockResolvedValue(null),
   start: vi.fn(),
+  startWorkspace: vi.fn(),
   reserveErasure: vi.fn(),
   permissionsRemoved: vi.fn<(isAffected: (origin: string) => boolean) => Promise<void>>(),
   quiesce: vi.fn().mockResolvedValue(undefined),
@@ -59,6 +61,7 @@ const syncWiring = vi.hoisted(() => ({
   ensureDocument: vi.fn().mockResolvedValue('11111111-1111-4111-8111-111111111111'),
   inspectExecutor: vi.fn().mockResolvedValue({ kind: 'absent' }),
   startExecutor: vi.fn(),
+  startWorkspaceExecutor: vi.fn(),
   stopExecutor: vi.fn(),
   ensureOffscreen: vi.fn().mockResolvedValue(false),
   waitReady: vi.fn().mockResolvedValue(undefined),
@@ -66,6 +69,8 @@ const syncWiring = vi.hoisted(() => ({
   send: vi.fn().mockResolvedValue({ success: true }),
   loadConnection: vi.fn<() => Promise<SyncConnectionMetadata | null>>().mockResolvedValue(null),
   commandConnection: vi.fn().mockResolvedValue(undefined),
+  loadWorkspace: vi.fn<() => Promise<SyncWorkspaceAllocation | null>>().mockResolvedValue(null),
+  revokeWorkspace: vi.fn().mockResolvedValue(undefined),
   contains: vi.fn().mockResolvedValue(true),
   subscribeRemoved:
     vi.fn<(listener: (permissions: chrome.permissions.Permissions) => void) => () => void>(),
@@ -111,6 +116,16 @@ vi.mock('../../../../composition/persistence/remote-connection/store', async (or
   loadSyncConnection: syncWiring.loadConnection,
   commandSyncConnection: syncWiring.commandConnection,
 }));
+vi.mock(
+  '../../../../composition/persistence/remote-connection/workspace-allocation',
+  async (original) => ({
+    ...(await original<
+      typeof import('../../../../composition/persistence/remote-connection/workspace-allocation')
+    >()),
+    loadSyncWorkspaceAllocation: syncWiring.loadWorkspace,
+    revokeSyncWorkspaceAllocation: syncWiring.revokeWorkspace,
+  })
+);
 vi.mock('@sniptale/platform/observability/logger', async (original) => {
   const actual = await original<typeof import('@sniptale/platform/observability/logger')>();
   return {
@@ -194,11 +209,13 @@ beforeEach(() => {
     ensureDocument: syncWiring.ensureDocument,
     inspectExecutor: syncWiring.inspectExecutor,
     startExecutor: syncWiring.startExecutor,
+    startWorkspaceExecutor: syncWiring.startWorkspaceExecutor,
     stopExecutor: syncWiring.stopExecutor,
   });
   syncWiring.createCoordinator.mockReturnValue({
     inspect: syncWiring.inspect,
     start: syncWiring.start,
+    startWorkspace: syncWiring.startWorkspace,
     reserveErasure: syncWiring.reserveErasure,
     permissionsRemoved: syncWiring.permissionsRemoved,
   });
@@ -210,6 +227,9 @@ beforeEach(() => {
   syncWiring.permissionsRemoved.mockResolvedValue(undefined);
   syncWiring.getContexts.mockResolvedValue([]);
   syncWiring.loadConnection.mockResolvedValue(null);
+  syncWiring.loadWorkspace.mockResolvedValue(null);
+  syncWiring.revokeWorkspace.mockResolvedValue(undefined);
+  syncWiring.quiesce.mockResolvedValue(undefined);
   syncWiring.contains.mockResolvedValue(true);
   syncWiring.commandConnection.mockResolvedValue(undefined);
   syncWiring.subscribeRemoved.mockReturnValue(vi.fn());
@@ -327,6 +347,24 @@ function nativeConnection(): SyncConnectionMetadata {
   };
 }
 
+function nativeWorkspace(): SyncWorkspaceAllocation {
+  return {
+    version: 2,
+    kind: 'sync-workspace-allocation',
+    key: 'workspace-allocation',
+    provider: 'webdav',
+    parentUrl: 'https://dav.example.test/',
+    rootUrl: 'https://dav.example.test/Sniptale-22222222-2222-4222-8222-222222222222/',
+    accountId: 'alice',
+    spaceId: '11111111-1111-4111-8111-111111111111',
+    bootstrapId: '22222222-2222-4222-8222-222222222222',
+    createdAt: 1,
+    identity: { incarnation: '33333333-3333-4333-8333-333333333333', revision: 3 },
+    phase: 'allocated',
+    marker: null,
+  };
+}
+
 it('exposes synchronous privacy reservation while startup adoption is still pending', async () => {
   const adoption = deferred<null>();
   syncWiring.inspect.mockReturnValueOnce(adoption.promise);
@@ -435,7 +473,7 @@ it('permission removal checks the retained origin and revokes only that origin a
   expect(syncWiring.permissionsRemoved).toHaveBeenCalledOnce();
 });
 
-it('permission removal preserves an unaffected grant and does not activate absent native authority', async () => {
+it('permission removal preserves an unaffected grant without reading workspace authority', async () => {
   initializeBackgroundRuntime(createModeState());
   const checked = deferred<void>();
   syncWiring.loadConnection.mockResolvedValueOnce(nativeConnection());
@@ -447,15 +485,8 @@ it('permission removal preserves an unaffected grant and does not activate absen
   await checked.promise;
   await Promise.resolve();
   expect(syncWiring.permissionsRemoved).not.toHaveBeenCalled();
-  const read = deferred<void>();
-  syncWiring.loadConnection.mockImplementationOnce(async () => {
-    read.resolve();
-    return null;
-  });
-  removedPermissionListener()({ origins: ['https://dav.example.test/*'] });
-  await read.promise;
-  await Promise.resolve();
   expect(syncWiring.contains).toHaveBeenCalledOnce();
+  expect(syncWiring.loadWorkspace).not.toHaveBeenCalled();
   expect(syncWiring.start).not.toHaveBeenCalled();
 });
 
@@ -516,3 +547,115 @@ it.each([true, false])(
     expect(await completion).toBe(success);
   }
 );
+
+it('injects native workspace authority and the shared gateway into the same coordinator', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  initializeBackgroundRuntime(createModeState());
+  const deps = coordinatorDependencies();
+  expect(deps.loadWorkspace).toBe(syncWiring.loadWorkspace);
+  expect(deps.startWorkspaceExecutor).toBe(syncWiring.startWorkspaceExecutor);
+  const allocation = nativeWorkspace();
+  const committed = deferred<void>();
+  syncWiring.revokeWorkspace.mockReturnValueOnce(committed.promise);
+  let settled = false;
+  const revocation = deps.revokeWorkspace(allocation.identity.incarnation).then(() => {
+    settled = true;
+  });
+  expect(syncWiring.revokeWorkspace).toHaveBeenCalledExactlyOnceWith(
+    allocation.identity.incarnation
+  );
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  committed.resolve();
+  await revocation;
+  expect(settled).toBe(true);
+  syncWiring.revokeWorkspace.mockRejectedValueOnce(new Error('Native lifetime refusal'));
+  await expect(deps.revokeWorkspace(allocation.identity.incarnation)).rejects.toThrow(
+    'Native lifetime refusal'
+  );
+  const control = registerSecurityE2EControl.mock.calls[0]?.[0];
+  expect(control.startWorkspace).toBe(syncWiring.startWorkspace);
+});
+
+it('revokes a pre-enrollment workspace when its current origin grant is removed', async () => {
+  initializeBackgroundRuntime(createModeState());
+  syncWiring.loadWorkspace.mockResolvedValue(nativeWorkspace());
+  syncWiring.contains.mockResolvedValueOnce(false);
+  const revoked = deferred<void>();
+  syncWiring.permissionsRemoved.mockImplementationOnce(async (isAffected) => {
+    expect(isAffected('https://dav.example.test')).toBe(true);
+    expect(isAffected('https://unrelated.example.test')).toBe(false);
+    revoked.resolve();
+  });
+  removedPermissionListener()({ origins: ['https://dav.example.test/*'] });
+  await revoked.promise;
+  expect(syncWiring.contains).toHaveBeenCalledExactlyOnceWith({
+    origins: ['https://dav.example.test/*'],
+  });
+  expect(syncWiring.permissionsRemoved).toHaveBeenCalledOnce();
+  expect(syncWiring.startWorkspace).not.toHaveBeenCalled();
+});
+
+it('contains a surviving executor after permission removal with missing native authority', async () => {
+  initializeBackgroundRuntime(createModeState());
+  const contained = deferred<void>();
+  syncWiring.permissionsRemoved.mockImplementationOnce(async (isAffected) => {
+    expect(isAffected('https://dav.example.test')).toBe(true);
+    expect(isAffected('https://other.example.test')).toBe(true);
+    contained.resolve();
+  });
+  removedPermissionListener()({ origins: ['https://dav.example.test/*'] });
+  await contained.promise;
+  expect(syncWiring.contains).not.toHaveBeenCalled();
+  expect(syncWiring.startWorkspace).not.toHaveBeenCalled();
+});
+
+it.each(['connection', 'workspace', 'permission'] as const)(
+  'contains uncertain authority after %s read failure and waits for drain before release',
+  async (failure) => {
+    initializeBackgroundRuntime(createModeState());
+    if (failure === 'connection')
+      syncWiring.loadConnection.mockRejectedValueOnce(new Error('private-native-error'));
+    else if (failure === 'workspace')
+      syncWiring.loadWorkspace.mockRejectedValueOnce(new Error('private-native-error'));
+    else {
+      syncWiring.loadWorkspace.mockResolvedValueOnce(nativeWorkspace());
+      syncWiring.contains.mockRejectedValueOnce(new Error('private-permission-error'));
+    }
+    const entered = deferred<void>();
+    const drained = deferred<void>();
+    syncWiring.quiesce.mockImplementationOnce(async () => {
+      entered.resolve();
+      await drained.promise;
+    });
+    const logged = deferred<void>();
+    syncWiring.warn.mockImplementationOnce((message: string) => {
+      expect(message).toBe('Sync permission revocation failed');
+      logged.resolve();
+    });
+    removedPermissionListener()({ origins: ['https://dav.example.test/*'] });
+    await entered.promise;
+    expect(syncWiring.reserveErasure).toHaveBeenCalledOnce();
+    expect(syncWiring.release).not.toHaveBeenCalled();
+    drained.resolve();
+    await logged.promise;
+    expect(syncWiring.release).toHaveBeenCalledOnce();
+    expect(syncWiring.permissionsRemoved).not.toHaveBeenCalled();
+    expect(syncWiring.startWorkspace).not.toHaveBeenCalled();
+  }
+);
+
+it('releases failed containment and reports only the fixed permission diagnostic', async () => {
+  initializeBackgroundRuntime(createModeState());
+  syncWiring.loadWorkspace.mockRejectedValueOnce(new Error('private-native-error'));
+  syncWiring.quiesce.mockRejectedValueOnce(new Error('private-drain-error'));
+  const logged = deferred<void>();
+  syncWiring.warn.mockImplementationOnce((message: string) => {
+    expect(message).toBe('Sync permission revocation failed');
+    logged.resolve();
+  });
+  removedPermissionListener()({ origins: ['https://dav.example.test/*'] });
+  await logged.promise;
+  expect(syncWiring.release).toHaveBeenCalledOnce();
+  expect(syncWiring.permissionsRemoved).not.toHaveBeenCalled();
+});

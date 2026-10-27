@@ -3,7 +3,10 @@ import {
   sameSyncConnectionIdentity,
   type SyncConnectionIdentity,
   type SyncConnectionMetadata,
+  type SyncConnectionAuthentication,
+  parseSyncConnectionIdentity,
 } from '../../composition/persistence/remote-connection/model';
+import type { SyncWorkspaceAllocation } from '../../composition/persistence/remote-connection/workspace-allocation';
 import type { SyncQueueScope } from '../../composition/persistence/sync-capture/queue-model';
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { createGenerationTrackedMutationExclusion } from '../mutation-exclusion/gate';
@@ -19,6 +22,10 @@ interface StartSelection {
   operationId: string;
   expectedRevision: number;
 }
+interface WorkspaceSelection {
+  allocation: SyncConnectionIdentity;
+  authentication: SyncConnectionAuthentication;
+}
 interface ExecutorReceipt {
   executorId: string;
   executorRevision: number;
@@ -30,6 +37,8 @@ type Observation =
 /** The gateway establishes document identity and positive absence; transport failure must reject. */
 export interface SyncConnectionCoordinatorDependencies {
   loadConnection(): Promise<SyncConnectionMetadata | null>;
+  loadWorkspace(): Promise<SyncWorkspaceAllocation | null>;
+  revokeWorkspace(incarnation: string): Promise<void>;
   /** Resolve only after durable revocation commits and its native admission lock releases. */
   revokeConnection(identity: SyncConnectionIdentity): Promise<void>;
   ensureDocument(): Promise<string>;
@@ -37,6 +46,7 @@ export interface SyncConnectionCoordinatorDependencies {
   inspectExecutor(startupId: string | null, challenge: string): Promise<Observation>;
   startExecutor(input: StartSelection & ExecutorTarget): Promise<ExecutorReceipt>;
   stopExecutor(target: ExecutorTarget): Promise<ExecutorReceipt>;
+  startWorkspaceExecutor(input: WorkspaceSelection & ExecutorTarget): Promise<ExecutorReceipt>;
   createChallenge(): string;
 }
 
@@ -103,7 +113,41 @@ export function createSyncConnectionCoordinator(deps: SyncConnectionCoordinatorD
   }
   async function revokeCurrent() {
     const metadata = await deps.loadConnection();
-    if (metadata && metadata.phase !== 'paused') await deps.revokeConnection(metadata.identity);
+    if (metadata) {
+      if (metadata.phase !== 'paused') await deps.revokeConnection(metadata.identity);
+      return;
+    }
+    const workspace = await deps.loadWorkspace();
+    if (workspace && workspace.phase !== 'abandoned')
+      await deps.revokeWorkspace(workspace.identity.incarnation);
+  }
+
+  async function revokeAndObserve(revoke: () => Promise<void> = revokeCurrent) {
+    let failed = false;
+    try {
+      await revoke();
+    } catch {
+      failed = true;
+    }
+    return { snapshot: await observe(null), failed };
+  }
+  async function finishContainment(result: {
+    snapshot: SyncExecutorSnapshot | null;
+    failed: boolean;
+  }) {
+    await contain(result.snapshot);
+    if (result.failed) refused();
+  }
+  function matchesWorkspace(
+    workspace: SyncWorkspaceAllocation | null,
+    allocation: SyncConnectionIdentity
+  ) {
+    return (
+      !!workspace &&
+      workspace.phase !== 'abandoned' &&
+      workspace.phase !== 'allocating' &&
+      sameSyncConnectionIdentity(workspace.identity, allocation)
+    );
   }
 
   return {
@@ -123,7 +167,13 @@ export function createSyncConnectionCoordinator(deps: SyncConnectionCoordinatorD
         checkGeneration();
         const snapshot = await observe(startupId);
         checkGeneration();
-        if (!snapshot || snapshot.phase === 'stopping' || snapshot.phase === 'failed') refused();
+        if (
+          !snapshot ||
+          snapshot.phase === 'stopping' ||
+          snapshot.phase === 'failed' ||
+          snapshot.workspace?.state === 'running'
+        )
+          refused();
         const metadata = await deps.loadConnection();
         checkGeneration();
         if (
@@ -140,11 +190,87 @@ export function createSyncConnectionCoordinator(deps: SyncConnectionCoordinatorD
         return receipt;
       }).finally(release);
     },
+    startWorkspace(input: WorkspaceSelection): Promise<ExecutorReceipt> {
+      const allocation = parseSyncConnectionIdentity(structuredClone(input.allocation));
+      let authentication: SyncConnectionAuthentication | null = structuredClone(
+        input.authentication
+      );
+      const release = exclusion.acquirePermit();
+      if (!release) return Promise.reject(new Error('Sync coordinator operation refused'));
+      const generation = exclusion.getGeneration();
+      const checkGeneration = () => {
+        if (generation !== exclusion.getGeneration()) refused();
+      };
+      return enqueue(async () => {
+        checkGeneration();
+        if (!allocation || (await deps.loadConnection())) refused();
+        if (!matchesWorkspace(await deps.loadWorkspace(), allocation)) refused();
+        checkGeneration();
+        const startupId = await deps.ensureDocument();
+        checkGeneration();
+        const snapshot = await observe(startupId);
+        checkGeneration();
+        if (
+          !snapshot ||
+          snapshot.phase === 'stopping' ||
+          snapshot.phase === 'failed' ||
+          snapshot.jobs.some((job) => job.state === 'running')
+        )
+          refused();
+        if (
+          !matchesWorkspace(await deps.loadWorkspace(), allocation) ||
+          (await deps.loadConnection())
+        )
+          refused();
+        checkGeneration();
+        if (!authentication) refused();
+        const receipt = await deps.startWorkspaceExecutor({
+          allocation,
+          authentication,
+          ...target(snapshot),
+        });
+        if (
+          receipt.executorId !== snapshot.executorId ||
+          receipt.executorRevision < snapshot.executorRevision
+        )
+          refused();
+        return receipt;
+      }).finally(() => {
+        authentication = null;
+        release();
+      });
+    },
     inspect(): Promise<SyncExecutorSnapshot | null> {
       return enqueue(async () => {
         const snapshot = await observe(null);
         if (!snapshot) return null;
-        const metadata = await deps.loadConnection();
+        let metadata: SyncConnectionMetadata | null;
+        try {
+          metadata = await deps.loadConnection();
+        } catch {
+          await contain(snapshot);
+          refused();
+        }
+        if (
+          snapshot.workspace &&
+          (snapshot.workspace.state === 'running' || snapshot.phase === 'failed')
+        ) {
+          let workspace: SyncWorkspaceAllocation | null = null;
+          try {
+            workspace = await deps.loadWorkspace();
+          } catch {
+            /* Refuse adoption of uncheckable native state. */
+          }
+          if (
+            metadata ||
+            !workspace ||
+            workspace.phase === 'abandoned' ||
+            workspace.identity.incarnation !== snapshot.workspace.allocationIncarnation
+          ) {
+            await contain(snapshot);
+            refused();
+          }
+        }
         if (!boundToCurrent(snapshot, metadata)) refused();
         return snapshot;
       });
@@ -156,10 +282,7 @@ export function createSyncConnectionCoordinator(deps: SyncConnectionCoordinatorD
       return {
         release: reservation.release,
         quiesce(): Promise<void> {
-          quiescence ??= enqueue(async () => {
-            await revokeCurrent();
-            return observe(null);
-          }).then(contain);
+          quiescence ??= enqueue(() => revokeAndObserve()).then(finishContainment);
           return quiescence;
         },
       };
@@ -167,15 +290,35 @@ export function createSyncConnectionCoordinator(deps: SyncConnectionCoordinatorD
     async permissionsRemoved(isAffected: (origin: string) => boolean): Promise<void> {
       const held: { release?: () => void } = {};
       try {
-        const snapshot = await enqueue(async () => {
-          const metadata = await deps.loadConnection();
-          if (!metadata || !isAffected(new URL(metadata.binding.rootUrl).origin)) return null;
+        const result = await enqueue(async () => {
+          let metadata: SyncConnectionMetadata | null;
+          let workspace: SyncWorkspaceAllocation | null;
+          try {
+            metadata = await deps.loadConnection();
+            workspace = metadata ? null : await deps.loadWorkspace();
+          } catch {
+            const reservation = exclusion.reserveExclusion();
+            held.release = reservation.release;
+            return revokeAndObserve(async () => {
+              refused();
+            });
+          }
+          const origin = metadata
+            ? new URL(metadata.binding.rootUrl).origin
+            : workspace
+              ? new URL(workspace.rootUrl).origin
+              : null;
+          if (origin && !isAffected(origin)) return { snapshot: null, failed: false };
           const reservation = exclusion.reserveExclusion();
           held.release = reservation.release;
-          if (metadata.phase !== 'paused') await deps.revokeConnection(metadata.identity);
-          return observe(null);
+          return revokeAndObserve(async () => {
+            if (metadata && metadata.phase !== 'paused')
+              await deps.revokeConnection(metadata.identity);
+            else if (workspace && workspace.phase !== 'abandoned')
+              await deps.revokeWorkspace(workspace.identity.incarnation);
+          });
         });
-        await contain(snapshot);
+        await finishContainment(result);
       } finally {
         held.release?.();
       }

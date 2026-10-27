@@ -1,5 +1,9 @@
 declare module './' {
   export namespace MessageType {
+    type OFFSCREEN_SYNC_WORKSPACE_START =
+      typeof import('./').MessageType.OFFSCREEN_SYNC_WORKSPACE_START;
+    type SYNC_WORKSPACE_ORIGIN_PERMISSION =
+      typeof import('./').MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION;
     type OFFSCREEN_SYNC_START = typeof import('./').MessageType.OFFSCREEN_SYNC_START;
     type OFFSCREEN_SYNC_INSPECT = typeof import('./').MessageType.OFFSCREEN_SYNC_INSPECT;
     type OFFSCREEN_SYNC_STOP = typeof import('./').MessageType.OFFSCREEN_SYNC_STOP;

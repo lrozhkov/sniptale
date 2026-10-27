@@ -15,12 +15,18 @@ import {
 } from '../../../apps/extension/src/composition/persistence/remote-connection/store';
 import {
   connectionUuid,
+  type SyncConnectionIdentity,
   parseConnectionAuthentication,
 } from '../../../apps/extension/src/composition/persistence/remote-connection/model';
 import {
+  commandSyncQueueOperation,
   enqueueSyncQueueOperation,
   loadSyncQueue,
 } from '../../../apps/extension/src/composition/persistence/sync-capture/queue';
+import {
+  createSyncWorkspaceAllocation,
+  loadSyncWorkspaceAllocation,
+} from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-allocation';
 import { queueOrdinal } from '../../../apps/extension/src/composition/persistence/sync-capture/queue-model';
 import { prepareCapturedOutgoing } from '../../../apps/extension/src/workflows/sync-transfer/outgoing';
 import { readAssetFile } from '../../../apps/extension/src/composition/persistence/assets';
@@ -32,7 +38,7 @@ import type { SecurityE2ESyncSelection } from '../../../apps/extension/src/platf
 interface LifecycleControl {
   disconnectLegacy(): void;
   command(
-    type: 'sync-start' | 'sync-inspect' | 'sync-stop' | 'sync-erase',
+    type: 'sync-start' | 'sync-workspace-start' | 'sync-inspect' | 'sync-stop' | 'sync-erase',
     payload?: unknown
   ): Promise<unknown>;
 }
@@ -43,6 +49,7 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     throw new Error('The native lifecycle fixture has no page-owned DAV client.');
   });
   let selection: SecurityE2ESyncSelection | null = null;
+  let workspaceSelection: SyncConnectionIdentity | null = null;
   let sourceIds: { mediaId: string; projectId: string } | null = null;
   let knownObjects: AssetRef[] = [];
 
@@ -112,6 +119,62 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     };
   }
 
+  async function prepareWorkspace(input: { rootUrl: string; authentication: unknown }) {
+    control.disconnectLegacy();
+    if (!isRecord(input.authentication) || typeof input.authentication['username'] !== 'string')
+      throw new Error('Native workspace fixture authentication is invalid.');
+    const authentication = parseConnectionAuthentication(
+      input.authentication,
+      input.authentication['username']
+    );
+    if (!authentication || authentication.kind !== 'basic')
+      throw new Error('Native workspace fixture authentication is invalid.');
+    // Prepare storage before the native command captures its existing database handle.
+    await loadSyncWorkspaceAllocation();
+    const allocation = await createSyncWorkspaceAllocation({
+      parentUrl: input.rootUrl,
+      accountId: authentication.username,
+    });
+    workspaceSelection = structuredClone(allocation.identity);
+    return {
+      allocation: { identity: allocation.identity, phase: allocation.phase },
+      rootKey: allocation.rootUrl.slice(allocation.parentUrl.length),
+    };
+  }
+
+  async function startWorkspace(authentication: unknown) {
+    if (!workspaceSelection) throw new Error('Native workspace fixture is not prepared.');
+    const receipt = await control.command('sync-workspace-start', {
+      allocation: workspaceSelection,
+      authentication,
+    });
+    if (
+      !isRecord(receipt) ||
+      !connectionUuid(receipt['executorId']) ||
+      !queueOrdinal(receipt['executorRevision']) ||
+      receipt['executorRevision'] < 1
+    )
+      throw new Error('Native workspace start receipt is invalid.');
+    return {
+      ok: true,
+      sync: { executorId: receipt['executorId'], executorRevision: receipt['executorRevision'] },
+    };
+  }
+
+  async function workspaceState() {
+    const databasePresent = (await indexedDB.databases()).some((db) => db.name === DB_NAME);
+    if (!databasePresent)
+      return { databasePresent: false, allocation: null, profiles: 0, connections: 0 };
+    const db = await initDB();
+    const allocation = await loadSyncWorkspaceAllocation();
+    return {
+      databasePresent,
+      allocation: allocation ? { identity: allocation.identity, phase: allocation.phase } : null,
+      profiles: await db.count(SYNC_CAPTURE_STORE),
+      connections: (await db.getKey(SYNC_CONNECTION_STORE, 'connection')) === undefined ? 0 : 1,
+    };
+  }
+
   async function start(operation?: { operationId: string; expectedRevision: number }) {
     if (!selection) throw new Error('Native lifecycle fixture is not prepared.');
     const receipt = await control.command('sync-start', {
@@ -129,6 +192,21 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
       ok: true,
       sync: { executorId: receipt['executorId'], executorRevision: receipt['executorRevision'] },
     };
+  }
+  async function retry() {
+    if (!selection) throw new Error('Native lifecycle fixture is not prepared.');
+    const selected = selection;
+    const queue = await loadSyncQueue(selected.scope);
+    const current = queue.operations.find((row) => row.operationId === selected.operationId);
+    if (!current || current.status !== 'failed' || current.failureCode !== 'temporary')
+      throw new Error('Native lifecycle temporary retry is unavailable.');
+    const retried = await commandSyncQueueOperation(
+      selected.scope,
+      current.operationId,
+      current.revision,
+      'retry'
+    );
+    return { operationId: retried.operationId, expectedRevision: retried.revision };
   }
   async function inspect() {
     const value = await control.command('sync-inspect');
@@ -238,7 +316,11 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
   }
   return {
     prepare,
+    prepareWorkspace,
+    startWorkspace,
+    workspaceState,
     start,
+    retry,
     inspect,
     stop: async () => {
       await control.command('sync-stop');

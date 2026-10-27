@@ -1,6 +1,9 @@
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { SyncConnectionIdentity } from '../../../../composition/persistence/remote-connection/model';
+import type {
+  SyncConnectionAuthentication,
+  SyncConnectionIdentity,
+} from '../../../../composition/persistence/remote-connection/model';
 import type {
   SyncQueueFailureCode,
   SyncQueueScope,
@@ -23,6 +26,24 @@ export interface SyncExecutorJobSnapshot {
   runId: string | null;
 }
 
+/** Fixed workspace outcome codes exclude provider details and credentials. */
+export type SyncWorkspaceFailureCode =
+  | 'temporary'
+  | 'authentication'
+  | 'access-denied'
+  | 'storage-full'
+  | 'invalid-workspace'
+  | 'interrupted'
+  | 'internal';
+
+/** Safe projection of the selected workspace allocation; carries no authentication. */
+export interface SyncWorkspaceJobSnapshot {
+  allocationIncarnation: string;
+  selectionRevision: number;
+  state: 'running' | 'ready' | 'failed' | 'interrupted';
+  failureCode: SyncWorkspaceFailureCode | null;
+}
+
 /** Inspect is independent of active IO; this projection conveys no durable authority. */
 export interface SyncExecutorSnapshot {
   offscreenStartupId: string;
@@ -31,6 +52,7 @@ export interface SyncExecutorSnapshot {
   phase: 'idle' | 'running' | 'stopping' | 'stopped' | 'failed';
   binding: SyncExecutorBinding | null;
   jobs: SyncExecutorJobSnapshot[];
+  workspace: SyncWorkspaceJobSnapshot | null;
 }
 
 interface SyncCommandEnvelope {
@@ -44,6 +66,14 @@ export interface SyncStartRequest extends SyncCommandEnvelope, SyncExecutorBindi
   executorRevision: number;
   operationId: string;
   expectedRevision: number;
+}
+/** Bounded credentials live only in this disposable capability command. */
+export interface SyncWorkspaceStartRequest extends SyncCommandEnvelope {
+  type: typeof MessageType.OFFSCREEN_SYNC_WORKSPACE_START;
+  executorId: string;
+  executorRevision: number;
+  allocation: SyncConnectionIdentity;
+  authentication: SyncConnectionAuthentication;
 }
 export interface SyncInspectRequest extends SyncCommandEnvelope {
   type: typeof MessageType.OFFSCREEN_SYNC_INSPECT;
@@ -59,6 +89,13 @@ export interface SyncOriginPermissionRequest {
   type: typeof MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION;
   requestId: string;
   authorization: SyncConnectionIdentity;
+  origin: string;
+}
+/** Background checks the exact native allocation and canonical HTTPS root origin. */
+export interface SyncWorkspaceOriginPermissionRequest {
+  type: typeof MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION;
+  requestId: string;
+  allocationIncarnation: string;
   origin: string;
 }
 export type SyncStartResponse = RuntimeMessageResponse<{
@@ -77,17 +114,23 @@ export type SyncStopResponse = RuntimeMessageResponse<{
 }>;
 export type SyncOriginPermissionResponse = RuntimeMessageResponse<{ allowed: boolean }>;
 export type SyncConnectionRuntimeRequest =
+  | SyncWorkspaceStartRequest
+  | SyncWorkspaceOriginPermissionRequest
   | SyncStartRequest
   | SyncInspectRequest
   | SyncStopRequest
   | SyncOriginPermissionRequest;
 export type RuntimeSyncConnectionRequestByType = {
+  [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: SyncWorkspaceStartRequest;
+  [MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION]: SyncWorkspaceOriginPermissionRequest;
   [MessageType.OFFSCREEN_SYNC_START]: SyncStartRequest;
   [MessageType.OFFSCREEN_SYNC_INSPECT]: SyncInspectRequest;
   [MessageType.OFFSCREEN_SYNC_STOP]: SyncStopRequest;
   [MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION]: SyncOriginPermissionRequest;
 };
 export type RuntimeSyncConnectionResponseByType = {
+  [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: SyncStartResponse;
+  [MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION]: SyncOriginPermissionResponse;
   [MessageType.OFFSCREEN_SYNC_START]: SyncStartResponse;
   [MessageType.OFFSCREEN_SYNC_INSPECT]: SyncInspectResponse;
   [MessageType.OFFSCREEN_SYNC_STOP]: SyncStopResponse;

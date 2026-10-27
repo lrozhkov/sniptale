@@ -3,6 +3,7 @@ import { MessageContractError } from '@sniptale/runtime-contracts/messaging/pars
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   connectionUuid,
+  parseConnectionAuthentication,
   parseSyncConnectionIdentity,
 } from '../../../../composition/persistence/remote-connection/model';
 import {
@@ -20,6 +21,7 @@ import type {
   SyncExecutorBinding,
   SyncExecutorJobSnapshot,
   SyncExecutorSnapshot,
+  SyncWorkspaceJobSnapshot,
 } from '../runtime-message/sync-connection.types';
 import type { PartialRuntimeRegistry } from '../runtime-message.registry';
 
@@ -69,6 +71,37 @@ function job(input: unknown): SyncExecutorJobSnapshot | null {
     runId: input['runId'],
   };
 }
+function workspace(input: unknown): SyncWorkspaceJobSnapshot | null {
+  if (
+    !isRecord(input) ||
+    !exact(input, ['allocationIncarnation', 'selectionRevision', 'state', 'failureCode']) ||
+    !connectionUuid(input['allocationIncarnation']) ||
+    !positive(input['selectionRevision']) ||
+    !member(['running', 'ready', 'failed', 'interrupted'] as const, input['state']) ||
+    !(
+      input['failureCode'] === null ||
+      member(
+        [
+          'temporary',
+          'authentication',
+          'access-denied',
+          'storage-full',
+          'invalid-workspace',
+          'interrupted',
+          'internal',
+        ] as const,
+        input['failureCode']
+      )
+    )
+  )
+    return null;
+  return {
+    allocationIncarnation: input['allocationIncarnation'],
+    selectionRevision: input['selectionRevision'],
+    state: input['state'],
+    failureCode: input['failureCode'],
+  };
+}
 /** Parse the complete disposable projection without admitting provider or source payloads. */
 export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot | null {
   if (
@@ -80,6 +113,7 @@ export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot 
       'phase',
       'binding',
       'jobs',
+      'workspace',
     ]) ||
     !connectionUuid(input['offscreenStartupId']) ||
     !connectionUuid(input['executorId']) ||
@@ -91,6 +125,8 @@ export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot 
     return null;
   const parsedBinding = input['binding'] === null ? null : binding(input['binding']);
   if (input['binding'] !== null && !parsedBinding) return null;
+  const parsedWorkspace = input['workspace'] === null ? null : workspace(input['workspace']);
+  if (input['workspace'] !== null && !parsedWorkspace) return null;
   const jobs: SyncExecutorJobSnapshot[] = [];
   const identities = new Set<string>();
   for (const value of input['jobs']) {
@@ -100,6 +136,8 @@ export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot 
     jobs.push(parsed);
   }
   if (jobs.filter((item) => item.state === 'running').length > 2) return null;
+  if (parsedWorkspace?.state === 'running' && jobs.some((item) => item.state === 'running'))
+    return null;
   return {
     offscreenStartupId: input['offscreenStartupId'],
     executorId: input['executorId'],
@@ -107,6 +145,7 @@ export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot 
     phase: input['phase'],
     binding: parsedBinding,
     jobs,
+    workspace: parsedWorkspace,
   };
 }
 function canonicalOrigin(input: unknown): input is string {
@@ -124,6 +163,20 @@ export function parseSyncConnectionRuntimeMessage(
 ): SyncConnectionRuntimeRequest | null {
   if (!isRecord(input) || !connectionUuid(input['requestId'])) return null;
   const requestId = input['requestId'];
+  if (input['type'] === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION) {
+    if (
+      !exact(input, ['type', 'requestId', 'allocationIncarnation', 'origin']) ||
+      !connectionUuid(input['allocationIncarnation']) ||
+      !canonicalOrigin(input['origin'])
+    )
+      return null;
+    return {
+      type: input['type'],
+      requestId,
+      allocationIncarnation: input['allocationIncarnation'],
+      origin: input['origin'],
+    };
+  }
   if (input['type'] === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION) {
     const authorization = parseSyncConnectionIdentity(input['authorization']);
     if (
@@ -151,6 +204,30 @@ export function parseSyncConnectionRuntimeMessage(
   if (input['type'] === MessageType.OFFSCREEN_SYNC_STOP) {
     if (!exact(input, [...envelope, 'executorId', 'executorRevision'])) return null;
     return { type: input['type'], ...common, ...target };
+  }
+  if (input['type'] === MessageType.OFFSCREEN_SYNC_WORKSPACE_START) {
+    const allocation = parseSyncConnectionIdentity(input['allocation']);
+    const rawAuthentication = input['authentication'];
+    if (!isRecord(rawAuthentication)) return null;
+    const username = rawAuthentication['username'];
+    if (rawAuthentication['kind'] === 'basic' && typeof username !== 'string') return null;
+    const authentication = parseConnectionAuthentication(
+      rawAuthentication,
+      typeof username === 'string' ? username : ''
+    );
+    if (
+      !exact(input, [
+        ...envelope,
+        'executorId',
+        'executorRevision',
+        'allocation',
+        'authentication',
+      ]) ||
+      !allocation ||
+      !authentication
+    )
+      return null;
+    return { type: input['type'], ...common, ...target, allocation, authentication };
   }
   if (input['type'] === MessageType.OFFSCREEN_SYNC_START) {
     const scope = parseScope(input['scope']);
@@ -193,7 +270,8 @@ function response<T extends keyof RuntimeSyncConnectionResponseByType>(
   if (!isRecord(input)) return invalid();
   if (input['success'] === false) {
     const error =
-      type === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION
+      type === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION ||
+      type === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION
         ? 'Sync origin permission query refused'
         : 'Sync executor command refused';
     if (!exact(input, ['success', 'error']) || input['error'] !== error) return invalid();
@@ -232,6 +310,21 @@ function requestFor<T extends keyof RuntimeSyncConnectionRequestByType>(
   return matches(parsed) ? parsed : invalid();
 }
 export const runtimeSyncConnectionMessageContracts = {
+  [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: contract(
+    MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+    (value) =>
+      exact(value, ['success', 'result', 'executorId', 'executorRevision']) &&
+      value['result'] === 'accepted' &&
+      connectionUuid(value['executorId']) &&
+      positive(value['executorRevision'])
+        ? {
+            success: true,
+            result: 'accepted',
+            executorId: value['executorId'],
+            executorRevision: value['executorRevision'],
+          }
+        : null
+  ),
   [MessageType.OFFSCREEN_SYNC_START]: contract(MessageType.OFFSCREEN_SYNC_START, (value) =>
     exact(value, ['success', 'result', 'executorId', 'executorRevision']) &&
     value['result'] === 'accepted' &&
@@ -268,6 +361,13 @@ export const runtimeSyncConnectionMessageContracts = {
   ),
   [MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION]: contract(
     MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION,
+    (value) =>
+      exact(value, ['success', 'allowed']) && typeof value['allowed'] === 'boolean'
+        ? { success: true, allowed: value['allowed'] }
+        : null
+  ),
+  [MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION]: contract(
+    MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION,
     (value) =>
       exact(value, ['success', 'allowed']) && typeof value['allowed'] === 'boolean'
         ? { success: true, allowed: value['allowed'] }

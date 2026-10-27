@@ -924,4 +924,20 @@ The named creation execution owns one run promise, one controller and one reques
 
 Creation credentials stay in memory and use a callback that reads the execution's current credential reference. The execution clears its own reference after drain. This does not promise physical erasure of JavaScript strings or copies that another caller owns. Successful run results contain checked workspace evidence only.
 
-This owner enables no production ingress or enrollment. Its production caller must close and drain it before reporting privacy or permission closure. Background and offscreen lifecycle integration, worker recovery and atomic native enrollment remain release gates. Closing one execution does not revoke a different execution's authority.
+This owner enables no production ingress or enrollment. Its production caller must close and drain it before reporting privacy or permission closure. The shared runtime integrates background and offscreen lifecycle ownership and worker recovery. Atomic native enrollment remains a separate release gate. Closing one execution does not revoke a different execution's authority.
+
+
+### Allocation lifetime revocation
+
+Workspace creation can advance its native journal revision while an offscreen execution remains active. Privacy revocation selects the exact current allocation incarnation. It abandons that lifetime at its current revision under the existing admission lock, mutation permit and transaction. Repeated revocation of the same abandoned lifetime performs no write.
+
+A missing, replaced or malformed allocation refuses revocation. An installed profile or connection also refuses this pre-enrollment operation. The command captures its prepared database handle before its first wait. Erasure closes that handle and prevents delayed recreation. Ordinary allocation commands retain exact revision checks.
+
+Runtime workspace snapshots are disposable projections. They do not replace native journal evidence or grant enrollment authority. No new store or persistent credential record supports this execution boundary.
+
+
+### Explicit workspace allocation refusal
+
+An explicit MKCOL 423 response grants no ownership. The creation owner records that refusal against the exact allocating revision. The native transaction restores planned with the same root, lifetime and workspace identifiers. It advances the revision and creates no new allocation. A later attempt still requires its own positive 201 response. A 405 collision never authorizes adoption or cleanup.
+
+Only numeric status 423 admits this refusal transition. Missing responses, transport failures and other statuses cannot invoke it. A lost acknowledgement therefore retains allocating uncertainty. Native replacement, abandonment, enrollment and erasure refuse delayed refusal callbacks.
