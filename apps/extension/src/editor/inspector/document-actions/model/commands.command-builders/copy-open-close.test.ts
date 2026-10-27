@@ -1,4 +1,4 @@
-import { ClipboardCopy, FilePlus2, X } from 'lucide-react';
+import { Copy, FilePlus2, X } from 'lucide-react';
 import { expect, it } from 'vitest';
 
 import { translate } from '../../../../../platform/i18n';
@@ -24,7 +24,7 @@ it('builds the close, copy, and open commands', () => {
     id: 'copy-png',
     kind: 'command',
     label: translate('editor.documentActions.copyPng'),
-    icon: ClipboardCopy,
+    icon: Copy,
     emphasis: 'secondary',
     disabled: true,
     disabledReason: 'unsupported',

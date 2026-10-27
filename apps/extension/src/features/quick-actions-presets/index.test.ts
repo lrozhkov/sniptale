@@ -187,7 +187,7 @@ describe('quick-actions-presets bundled normalization', () => {
         afterCapture: 'copy',
         bundledId: 'default-visible-copy',
         delay: null,
-        icon: 'ClipboardCopy',
+        icon: 'Copy',
         id: 'default-visible-copy',
         name: 'translated:shared.defaults.quickActionVisibleCopy',
         origin: 'bundled',

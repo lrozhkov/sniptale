@@ -1,5 +1,5 @@
 import { createOutputFilename } from '../../../workflows/file-naming';
-import { Check, ClipboardCopy, Download, ArrowLeft, FolderInput, Save, X } from 'lucide-react';
+import { Check, Copy, Download, ArrowLeft, FolderInput, Save, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FloatingChromeDivider } from '@sniptale/ui/floating-chrome';
@@ -241,7 +241,7 @@ function CopyPngQuickAction(props: {
       {copyStatus === 'saved' ? (
         <Check size={18} strokeWidth={2.2} />
       ) : (
-        <ClipboardCopy size={18} strokeWidth={2} />
+        <Copy size={18} strokeWidth={2} />
       )}
     </ContentToolbarButton>
   );

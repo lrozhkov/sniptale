@@ -1,8 +1,9 @@
+import { Copy, createElement } from 'lucide';
 import type { CaptureActionType } from '../../../../../contracts/settings';
 
 type IconDefinition = { name: string; paths: string[] };
 
-const CAPTURE_ACTION_ICONS: Record<CaptureActionType, IconDefinition> = {
+const CAPTURE_ACTION_ICONS: Record<Exclude<CaptureActionType, 'copy'>, IconDefinition> = {
   download_default: {
     name: 'download',
     paths: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'm7 10 5 5 5-5', 'M12 15V3'],
@@ -26,7 +27,6 @@ const CAPTURE_ACTION_ICONS: Record<CaptureActionType, IconDefinition> = {
       'M7 3v5h8',
     ],
   },
-  copy: { name: 'copy', paths: ['M8 8h12v12H8z', 'M16 8V4H4v12h4'] },
   scenario: {
     name: 'file-stack',
     paths: [
@@ -72,6 +72,11 @@ export function createSelectionCaptureActionIcon(
   action: CaptureActionType,
   size = 16
 ): SVGSVGElement {
+  if (action === 'copy') {
+    const icon = createSelectionToolbarSvg([], size, 'copy');
+    icon.append(...Array.from(createElement(Copy).childNodes));
+    return icon;
+  }
   const definition = CAPTURE_ACTION_ICONS[action];
   return createSelectionToolbarSvg(definition.paths, size, definition.name);
 }

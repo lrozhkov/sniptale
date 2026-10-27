@@ -2,7 +2,9 @@ import { useContext, useEffect, useState, type CSSProperties } from 'react';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import {
   ArrowDown,
+  ArrowDownToLine,
   ArrowUp,
+  ArrowUpToLine,
   ChevronsDown,
   ChevronsLeft,
   ChevronsRight,
@@ -142,10 +144,10 @@ export function DrawingSelectionActions(props: {
       : 'content.toolbar.drawingShowSelectionActions'
   );
   const moves = [
-    { direction: 'front', icon: ChevronsUp, label: translate('editor.toolbar.frontLayer') },
+    { direction: 'front', icon: ArrowUpToLine, label: translate('editor.toolbar.frontLayer') },
     { direction: 'forward', icon: ArrowUp, label: translate('editor.toolbar.raiseSelection') },
     { direction: 'backward', icon: ArrowDown, label: translate('editor.toolbar.lowerSelection') },
-    { direction: 'back', icon: ChevronsDown, label: translate('editor.toolbar.backLayer') },
+    { direction: 'back', icon: ArrowDownToLine, label: translate('editor.toolbar.backLayer') },
   ] as const;
   return (
     <div

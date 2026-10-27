@@ -103,7 +103,7 @@ it('admits optional hotkeys and appends missing defaults after the accepted stor
   )();
   expect(actions.slice(0, 2)).toEqual([
     { id: 'custom', name: 'Custom', status: true, hotkey: null },
-    { id: 'default-visible-copy', icon: 'ClipboardCopy', status: false, hotkey: null },
+    { id: 'default-visible-copy', icon: 'Copy', status: false, hotkey: null },
   ]);
   expect(actions).toHaveLength(8);
   expect(actions.filter((action) => action.id === 'default-visible-copy')).toHaveLength(1);

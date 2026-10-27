@@ -27,7 +27,7 @@ export const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
   },
   {
     id: 'default-visible-copy',
-    icon: 'ClipboardCopy',
+    icon: 'Copy',
     nameKey: 'shared.defaults.quickActionVisibleCopy',
     screenshotMode: 'visible',
     afterCapture: 'copy',

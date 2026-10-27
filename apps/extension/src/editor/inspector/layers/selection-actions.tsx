@@ -1,8 +1,8 @@
 import {
   ArrowDown,
   ArrowUp,
-  ChevronsDown,
-  ChevronsUp,
+  ArrowDownToLine,
+  ArrowUpToLine,
   Copy,
   Group,
   Layers3,
@@ -46,7 +46,7 @@ function buildReorderActions(
   return [
     {
       enabled: canReorder,
-      icon: ChevronsUp,
+      icon: ArrowUpToLine,
       label: translate('editor.toolbar.frontLayer'),
       onClick: () => controller.bringSelectionToFront(),
     },
@@ -64,7 +64,7 @@ function buildReorderActions(
     },
     {
       enabled: canReorder,
-      icon: ChevronsDown,
+      icon: ArrowDownToLine,
       label: translate('editor.toolbar.backLayer'),
       onClick: () => controller.sendSelectionToBack(),
     },
