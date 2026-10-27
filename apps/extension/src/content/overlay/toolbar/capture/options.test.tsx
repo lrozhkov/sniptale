@@ -279,3 +279,39 @@ it.each(['visible', 'full'] as const)(
     expect(container?.querySelector('.sniptale-screenshot-menu')).not.toBeNull();
   }
 );
+
+it.each(['visible', 'full'] as const)(
+  'keeps %s quick actions available beside initially collapsed parameters',
+  async (mode) => {
+    const onTakeScreenshot = vi.fn();
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    await act(async () =>
+      root?.render(<InteractiveCaptureButtons onTakeScreenshot={onTakeScreenshot} />)
+    );
+    act(() =>
+      container!
+        .querySelector<HTMLButtonElement>(
+          `[data-ui="content.toolbar.capture-${mode}-settings-button"]`
+        )!
+        .click()
+    );
+    const details = container!.querySelector<HTMLDetailsElement>(
+      `[data-ui="content.toolbar.${mode}-capture-parameters"]`
+    )!;
+    expect(details).not.toBeNull();
+    expect(details.open).toBe(false);
+    const action = container!.querySelector<HTMLButtonElement>(
+      `[data-ui="content.toolbar.capture-${mode}-action.download_default"]`
+    )!;
+    expect(details.contains(action)).toBe(false);
+    expect(onTakeScreenshot).not.toHaveBeenCalled();
+    act(() => action.click());
+    expect(onTakeScreenshot).toHaveBeenCalledExactlyOnceWith(
+      mode,
+      { kind: 'trusted-content-event' },
+      { captureAction: 'download_default' }
+    );
+  }
+);

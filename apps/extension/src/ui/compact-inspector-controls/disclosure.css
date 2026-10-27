@@ -70,3 +70,16 @@
   font: inherit;
   text-align: start;
 }
+
+.sniptale-disclosure-label,
+.sniptale-disclosure-value {
+  display: block;
+}
+.sniptale-disclosure-value {
+  color: var(--sniptale-color-text-primary);
+  font-weight: 400;
+  line-height: 1.4;
+}
+.sniptale-disclosure:has(.sniptale-disclosure-value) > summary {
+  padding-block: 4px;
+}

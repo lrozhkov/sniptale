@@ -1,3 +1,5 @@
+import { mkdir, readdir, readFile } from 'node:fs/promises';
+import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
@@ -113,6 +115,34 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             const menu = page.locator(
               `[data-ui="content.toolbar.${mode === 'full' ? 'full' : 'visible'}-page-menu"]`
             );
+            const disclosure = menu.locator(
+              `[data-ui="content.toolbar.${mode}-capture-parameters"]`
+            );
+            const summary = disclosure.locator('summary');
+            const savedBefore = await popup.evaluate(
+              async () => (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
+            );
+            await expect(disclosure).not.toHaveAttribute('open');
+            await expect(summary).toContainText('PNG');
+            await expect(menu.getByRole('button', { name: 'JPEG', exact: true })).toBeHidden();
+            await page.screenshot({
+              path: info.outputPath(`${orientation}-${mode}-collapsed.png`),
+              fullPage: false,
+              animations: 'disabled',
+            });
+            await summary.focus();
+            await summary.press('Enter');
+            await expect(disclosure).toHaveAttribute('open');
+            await summary.press('Space');
+            await expect(disclosure).not.toHaveAttribute('open');
+            expect(
+              await popup.evaluate(
+                async () =>
+                  (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
+              )
+            ).toEqual(savedBefore);
+            await summary.click();
+            await expect(disclosure).toHaveAttribute('open');
             const icons = menu.locator('.sniptale-capture-action-icons button');
             await expect(icons).toHaveCount(6);
             await icons.first().hover();
@@ -146,6 +176,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
                 )
               )
               .toBe('jpeg');
+            await expect(summary).toContainText(/JPEG.*(83|76)%/u);
             const input = menu.getByRole('textbox', {
               name: /Image quality|Качество изображения/u,
             });
@@ -194,6 +225,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             await page.screenshot({
               path: info.outputPath(`${orientation}-${mode}-quality-focus.png`),
               fullPage: false,
+              animations: 'disabled',
             });
             const accepted = await input.inputValue();
             await input.fill('77');
@@ -210,9 +242,16 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
                 )
               )
               .toBe(76);
+            await expect(summary).toContainText(/JPEG.*76%/u);
+            await summary.click();
+            await expect(input).toBeHidden();
+            await expect(summary).toContainText(/JPEG.*76%/u);
+            await summary.press('Enter');
+            await expect(input).toHaveValue('76');
             await page.screenshot({
               path: info.outputPath(`${orientation}-${mode}-quality.png`),
               fullPage: false,
+              animations: 'disabled',
             });
             await menu.getByRole('button', { name: 'PNG', exact: true }).click();
             await expect(input).toHaveCount(0);
@@ -235,11 +274,41 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             await page.screenshot({
               path: info.outputPath(`${orientation}-${mode}.png`),
               fullPage: false,
+              animations: 'disabled',
             });
             await icons.first().focus();
             await page.keyboard.press('Escape');
             await expect(menu).toHaveCount(0);
             await expect(trigger).toBeFocused();
+            await trigger.click();
+            await expect(disclosure).toHaveAttribute('open');
+            await summary.click();
+            await expect(disclosure).not.toHaveAttribute('open');
+            if (mode === 'full') {
+              const value = summary.locator('.sniptale-disclosure-value');
+              const original = await value.textContent();
+              await value.evaluate((node, text) => {
+                node.textContent = `${text} · ${text}`;
+                node.style.fontSize = '16.25px';
+              }, original);
+              await expect(value).toHaveCSS('font-size', '16.25px');
+              expect(await value.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(
+                true
+              );
+              const expandedBox = (await summary.boundingBox())!;
+              expect(expandedBox.x + expandedBox.width).toBeLessThanOrEqual(size.width);
+              await page.screenshot({
+                path: info.outputPath(`${orientation}-parameters-expanded-text.png`),
+                fullPage: false,
+                animations: 'disabled',
+              });
+              await value.evaluate((node, text) => {
+                node.textContent = text;
+                node.style.fontSize = '';
+              }, original);
+            }
+            await page.keyboard.press('Escape');
+            await expect(menu).toHaveCount(0);
           }
           await page.locator('[data-ui="content.toolbar.capture-action-button"]').click();
           const defaults = page.locator('[data-ui="content.toolbar.capture-action-menu"]');
@@ -261,6 +330,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           await page.screenshot({
             path: info.outputPath(`${orientation}-after-capture-list.png`),
             fullPage: false,
+            animations: 'disabled',
           });
           await defaults.locator('[data-ui="content.toolbar.capture-action-option.copy"]').click();
           await expect(defaults).toHaveCount(0);
@@ -450,6 +520,179 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     } finally {
       await page.close();
       await popup.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`collapsed screenshot parameters retain real capture output ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+    launchedExtension,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    page.setDefaultTimeout(10000);
+    const locale = size.width === 1280 ? 'en' : 'ru';
+    const directory = info.outputPath('parameter-downloads');
+    await mkdir(directory, { recursive: true });
+    const session = await launchedExtension.browser.newBrowserCDPSession();
+    await session.send('Browser.setDownloadBehavior', {
+      behavior: 'allow',
+      downloadPath: directory,
+    });
+    try {
+      await popup.evaluate(async (locale) => {
+        const current = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
+        await chrome.storage.sync.set({
+          sniptale_settings: {
+            ...current,
+            imageFormat: 'png',
+            imageQuality: 83,
+            pageLaunch: {
+              enabled: true,
+              hoverOnly: false,
+              corner: 'bottom-right',
+              quickActionsCorner: true,
+              quickActionsToolbar: true,
+            },
+            fullPageCapture: {
+              preloadLazyContent: true,
+              freezeMotion: true,
+              floatingElements: 'once',
+            },
+          },
+        });
+        await chrome.storage.local.set({
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': locale === 'ru' ? 'dark' : 'light',
+        });
+      }, locale);
+      await page.reload();
+      await page.bringToFront();
+      await page
+        .locator('#sniptale-page-launcher')
+        .getByRole('button', { name: /Open page toolbar|Открыть панель страницы/u })
+        .click();
+      await page.evaluate(() => {
+        document.body.style.minHeight = '1200px';
+        const marker = document.createElement('div');
+        marker.id = 'capture-floating-proof';
+        marker.style.cssText =
+          'position:fixed;right:20px;top:20px;width:50px;height:50px;background:#ff00ff;z-index:1000000';
+        document.body.append(marker);
+      });
+      for (const [mode, format] of [
+        ['visible', 'webp'],
+        ['full', 'jpeg'],
+      ] as const) {
+        const root = page.locator('[data-ui="content.toolbar.root"]');
+        await expect(root).toBeVisible();
+        await page.locator(`[data-ui="content.toolbar.capture-${mode}-settings-button"]`).click();
+        const menu = page.locator(
+          `[data-ui="content.toolbar.${mode === 'full' ? 'full' : 'visible'}-page-menu"]`
+        );
+        const details = menu.locator('details');
+        const summary = details.locator('summary');
+        await expect(details).not.toHaveAttribute('open');
+        await summary.click();
+        await menu
+          .getByRole('button', { name: format === 'webp' ? 'WebP' : 'JPEG', exact: true })
+          .click();
+        const input = menu.getByRole('textbox', { name: /Image quality|Качество изображения/u });
+        await input.fill('76');
+        await input.press('Enter');
+        if (mode === 'full') {
+          for (const key of ['fullPageLazyContent', 'fullPageFreezeMotion'] as const)
+            await menu
+              .getByRole('button')
+              .filter({ hasText: translate(`content.toolbar.${key}`, locale) })
+              .click();
+          await menu.locator('[data-ui="content.toolbar.full-page-floating.hide"]').click();
+        }
+        await expect
+          .poll(() =>
+            popup.evaluate(async () => {
+              const value = (await chrome.storage.sync.get('sniptale_settings'))[
+                'sniptale_settings'
+              ];
+              return {
+                format: value.imageFormat,
+                quality: value.imageQuality,
+                full: value.fullPageCapture,
+              };
+            })
+          )
+          .toEqual({
+            format,
+            quality: 76,
+            full: {
+              preloadLazyContent: mode !== 'full',
+              freezeMotion: mode !== 'full',
+              floatingElements: mode === 'full' ? 'hide' : 'once',
+            },
+          });
+        await summary.click();
+        await expect(details).not.toHaveAttribute('open');
+        await expect(summary).toContainText(format === 'webp' ? 'WebP' : 'JPEG');
+        await expect(summary).toContainText('76%');
+        await page.screenshot({
+          path: info.outputPath(`${mode}-accepted-collapsed.png`),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        const previous = new Set(await readdir(directory));
+        await menu
+          .locator(`[data-ui="content.toolbar.capture-${mode}-action.download_default"]`)
+          .click();
+        let downloaded: string | undefined;
+        await expect
+          .poll(
+            async () => {
+              downloaded = (await readdir(directory)).find(
+                (file) =>
+                  !previous.has(file) &&
+                  (file.endsWith(`.${format}`) || (format === 'jpeg' && file.endsWith('.jpg')))
+              );
+              return Boolean(downloaded);
+            },
+            { timeout: 30000 }
+          )
+          .toBe(true);
+        const bytes = await readFile(`${directory}/${downloaded!}`);
+        if (format === 'webp') {
+          expect(bytes.subarray(0, 4).toString()).toBe('RIFF');
+          expect(bytes.subarray(8, 12).toString()).toBe('WEBP');
+        } else expect(Array.from(bytes.subarray(0, 3))).toEqual([255, 216, 255]);
+        const result = await page.evaluate(
+          async ({ data, mime }) => {
+            const bitmap = await createImageBitmap(
+              new Blob([new Uint8Array(data)], { type: mime })
+            );
+            const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(bitmap, 0, 0);
+            const pixel = Array.from(ctx.getImageData(bitmap.width - 45, 45, 1, 1).data);
+            const dimensions = { width: bitmap.width, height: bitmap.height };
+            bitmap.close();
+            return { ...dimensions, pixel };
+          },
+          { data: Array.from(bytes), mime: `image/${format}` }
+        );
+        expect(result.width).toBe(size.width);
+        expect(result.height).toBeGreaterThanOrEqual(size.height);
+        if (mode === 'visible') {
+          expect(result.pixel[0]).toBeGreaterThan(230);
+          expect(result.pixel[1]).toBeLessThan(30);
+          expect(result.pixel[2]).toBeGreaterThan(230);
+        } else expect(result.pixel[1]).toBeGreaterThan(200);
+        await expect(page.locator('#capture-floating-proof')).toBeVisible();
+      }
+    } finally {
+      await session.detach();
+      await popup.close();
+      await page.close();
     }
   });
 }

@@ -6,6 +6,7 @@ import type { InspectorDisclosureProps } from './shared';
 export function InspectorDisclosureView(
   props: Omit<InspectorDisclosureProps, 'preferenceId' | 'initiallyOpen'> & {
     dataUi: string;
+    summary?: string;
     variant?: 'structural' | 'information';
     bodyClassName: string;
     open: boolean;
@@ -31,7 +32,16 @@ export function InspectorDisclosureView(
         {props.variant === 'information' ? (
           <span>{props.label}</span>
         ) : (
-          <Heading>{props.label}</Heading>
+          <Heading>
+            {props.summary ? (
+              <>
+                <span className="sniptale-disclosure-label">{props.label}</span>
+                <span className="sniptale-disclosure-value">{props.summary}</span>
+              </>
+            ) : (
+              props.label
+            )}
+          </Heading>
         )}
         <ChevronDown size={level === 'section' ? 16 : 14} aria-hidden="true" />
       </summary>

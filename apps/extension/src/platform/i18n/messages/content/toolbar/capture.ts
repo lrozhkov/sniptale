@@ -7,6 +7,12 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     ru: 'Параметры снимка видимой области',
     en: 'Visible-area screenshot options',
   },
+  captureOptionOn: { ru: 'вкл.', en: 'on' },
+  captureOptionOff: { ru: 'выкл.', en: 'off' },
+  captureFullParametersSummary: {
+    ru: '{image} · Загрузка {lazy}, пауза {motion} · Плавающие: {floating}',
+    en: '{image} · Preload {lazy}, freeze {motion} · Floating: {floating}',
+  },
   captureParameters: { ru: 'Параметры', en: 'Options' },
   captureQuickActionsTitle: { ru: 'Сделать снимок', en: 'Take screenshot' },
   captureDownloadLabel: {

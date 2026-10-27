@@ -1,12 +1,16 @@
-import { useCallback, useContext, useRef, type MouseEventHandler, type ReactNode } from 'react';
+import {
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+  type MouseEventHandler,
+  type ReactNode,
+} from 'react';
 import { AppWindow, ChevronDown, UnfoldVertical } from 'lucide-react';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import {
-  ProductToolbarMenu,
-  ProductToolbarMenuDivider,
-  ProductToolbarMenuGroupLabel,
-} from '@sniptale/ui/product-menus/toolbar';
+import { ProductToolbarMenu, ProductToolbarMenuDivider } from '@sniptale/ui/product-menus/toolbar';
+import { InspectorDisclosureView } from '../../../../ui/compact-inspector-controls/disclosure';
 import { translate } from '../../../../platform/i18n';
 import type { ToolbarMenuState } from '../state/menu';
 import {
@@ -72,6 +76,7 @@ const CAPTURE_MODES = {
 
 export function ScreenshotCaptureSplitButton(props: {
   mode: 'visible' | 'full';
+  parametersSummary: string;
   compactMenus: boolean;
   disabled: boolean;
   displayMode: 'horizontal' | 'vertical';
@@ -80,6 +85,7 @@ export function ScreenshotCaptureSplitButton(props: {
   quickActions?: ReactNode;
   children: ReactNode;
 }) {
+  const [parametersOpen, setParametersOpen] = useState(false);
   const full = props.mode === 'full';
   const config = CAPTURE_MODES[props.mode];
   const { menuType, Icon } = config;
@@ -158,10 +164,17 @@ export function ScreenshotCaptureSplitButton(props: {
           >
             {props.quickActions}
             <ProductToolbarMenuDivider />
-            <ProductToolbarMenuGroupLabel>
-              {translate('content.toolbar.captureParameters')}
-            </ProductToolbarMenuGroupLabel>
-            {props.children}
+            <InspectorDisclosureView
+              dataUi={`content.toolbar.${props.mode}-capture-parameters`}
+              variant="structural"
+              label={translate('content.toolbar.captureParameters')}
+              summary={props.parametersSummary}
+              open={parametersOpen}
+              onOpenChange={setParametersOpen}
+              bodyClassName="pt-2"
+            >
+              {props.children}
+            </InspectorDisclosureView>
           </ProductToolbarMenu>
         </ToolbarMenuDropdown>
       ) : null}

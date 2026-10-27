@@ -8,10 +8,18 @@ import { FullPageCaptureSplitButton } from './full-page-menu';
 import { useToolbarMenuState } from '../state/menu';
 import type { FullPageCapturePreferences } from '../../../../contracts/full-page-capture';
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
-  translate: (key: string) => key,
-}));
+vi.mock('../../../../platform/i18n', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../platform/i18n')>();
+  return {
+    ...original,
+    translate: (key: Parameters<typeof original.translate>[0]) =>
+      /captureFullParametersSummary|captureOption(On|Off)|fullPageFloating(Hide|Once|Repeat)$/u.test(
+        key
+      )
+        ? original.translate(key, 'en')
+        : key,
+  };
+});
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -41,6 +49,7 @@ function Harness(props: {
       </button>
       <output data-ui="test.active-menu">{menu.activeMenuType ?? 'none'}</output>
       <FullPageCaptureSplitButton
+        imageSummary="PNG"
         compactMenus={props.compactMenus ?? false}
         currentViewport={props.currentViewport ?? null}
         disabled={false}
@@ -98,6 +107,16 @@ it('keeps primary capture and preference-menu activation separate', () => {
   expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).not.toBeNull();
 });
 
+function expandParameters(view: HTMLDivElement) {
+  const details = view.querySelector<HTMLDetailsElement>(
+    '[data-ui="content.toolbar.full-capture-parameters"]'
+  )!;
+  act(() => {
+    details.open = true;
+    details.dispatchEvent(new Event('toggle'));
+  });
+}
+
 it('shows lazy loading and motion controls before floating-element behavior', () => {
   const view = render(<Harness />);
   act(() => {
@@ -106,6 +125,7 @@ it('shows lazy loading and motion controls before floating-element behavior', ()
       ?.click();
   });
 
+  expandParameters(view);
   const menuText = view.querySelector('.sniptale-full-page-menu')?.textContent ?? '';
   expect(menuText.indexOf('content.toolbar.fullPageLazyContent')).toBeLessThan(
     menuText.indexOf('content.toolbar.fullPageFloatingTitle')
@@ -126,6 +146,7 @@ it('updates floating mode and exposes the custom viewport hint', async () => {
       ?.click();
   });
 
+  expandParameters(view);
   await act(async () => {
     const item = view.querySelector<HTMLElement>(
       '[data-ui="content.toolbar.full-page-floating.hide"]'
@@ -158,6 +179,7 @@ it.each([
       .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.capture-full-settings-button"]')
       ?.click();
   });
+  expandParameters(view);
   const item = dataUi
     ? view.querySelector<HTMLButtonElement>(`[data-ui="${dataUi}"]`)
     : Array.from(view.querySelectorAll<HTMLButtonElement>('.sniptale-full-page-menu button')).find(
@@ -276,6 +298,7 @@ it('keeps the preference menu available and mounted while a save is pending', as
       .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.capture-full-settings-button"]')
       ?.click();
   });
+  expandParameters(view);
   const menu = view.querySelector('[data-ui="content.toolbar.full-page-menu"]');
   expect(menu).not.toBeNull();
   act(() => {
@@ -301,4 +324,59 @@ it('keeps the preference menu available and mounted while a save is pending', as
   });
   expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).toBe(menu);
   expect(menu?.querySelectorAll('button:disabled')).toHaveLength(0);
+});
+
+it('starts parameters collapsed and preserves expansion across menu reopening without changing preferences', () => {
+  const onUpdate = vi.fn().mockResolvedValue(undefined);
+  const view = render(<Harness onUpdate={onUpdate} />);
+  const trigger = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.capture-full-settings-button"]'
+  )!;
+  act(() => trigger.click());
+  let details = view.querySelector<HTMLDetailsElement>(
+    '[data-ui="content.toolbar.full-capture-parameters"]'
+  )!;
+  expect(details).not.toBeNull();
+  expect(details.open).toBe(false);
+  act(() => {
+    details.open = true;
+    details.dispatchEvent(new Event('toggle'));
+  });
+  expect(details.open).toBe(true);
+  act(() => trigger.click());
+  act(() => trigger.click());
+  details = view.querySelector<HTMLDetailsElement>(
+    '[data-ui="content.toolbar.full-capture-parameters"]'
+  )!;
+  expect(details.open).toBe(true);
+  expect(onUpdate).not.toHaveBeenCalled();
+});
+
+it('keeps the full-page summary current after edits and collapse', async () => {
+  const onUpdate = vi.fn().mockResolvedValue(undefined);
+  const view = render(<Harness onUpdate={onUpdate} />);
+  act(() =>
+    view
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.capture-full-settings-button"]')!
+      .click()
+  );
+  const details = view.querySelector<HTMLDetailsElement>('details')!;
+  const summary = details.querySelector('summary')!;
+  expect(summary.textContent).toContain('PNG · Preload on, freeze on · Floating: Show once');
+  expandParameters(view);
+  await act(async () =>
+    view
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.full-page-floating.hide"]')!
+      .click()
+  );
+  const lazy = Array.from(details.querySelectorAll('button')).find((button) =>
+    button.textContent?.includes('fullPageLazyContent')
+  )!;
+  await act(async () => lazy.click());
+  act(() => {
+    details.open = false;
+    details.dispatchEvent(new Event('toggle'));
+  });
+  expect(summary.textContent).toContain('PNG · Preload off, freeze on · Floating: Hide');
+  expect(onUpdate).toHaveBeenCalledTimes(2);
 });

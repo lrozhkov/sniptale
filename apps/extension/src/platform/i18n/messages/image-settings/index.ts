@@ -2,6 +2,11 @@ import { defineMessageSource } from '../source';
 
 export const imageSettingsMessages = defineMessageSource({
   section: {
+    outputSummaryLossless: { ru: 'PNG · без потерь', en: 'PNG · lossless' },
+    outputSummaryLossy: {
+      ru: '{format} · качество {quality}%',
+      en: '{format} · quality {quality}%',
+    },
     title: {
       ru: 'Настройки изображений',
       en: 'Image settings',
