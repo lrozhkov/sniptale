@@ -125,7 +125,13 @@ async function mode(page: Page, name: string) {
 }
 async function expectSeparators(page: Page) {
   const dividers = ui(page, 'root').locator('.sniptale-divider');
-  for (const divider of await dividers.all()) await expect(divider).toBeVisible();
+  for (const divider of await dividers.all()) {
+    const adjacent = await divider.evaluate((element) =>
+      element.previousElementSibling?.classList.contains('sniptale-divider')
+    );
+    if (adjacent) await expect(divider).toBeHidden();
+    else await expect(divider).toBeVisible();
+  }
 }
 
 async function enableOptionalToolbarControls(popup: Page) {
@@ -800,7 +806,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         path: info.outputPath('fresh-toolbar-defaults.png'),
         fullPage: false,
       });
+      const adjacent = ui(page, 'root').locator('.sniptale-divider + .sniptale-divider');
+      expect(await adjacent.count()).toBeGreaterThan(0);
+      for (const divider of await adjacent.all()) await expect(divider).toBeHidden();
       await customize(page);
+      for (const divider of await separators.all()) await expect(divider).toBeVisible();
       for (const control of Object.keys(optional)) {
         const choice = ui(page, `visibility.${control}`);
         await expect(choice).toHaveAttribute('aria-pressed', 'false');

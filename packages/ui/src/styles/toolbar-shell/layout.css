@@ -23,6 +23,9 @@
   user-select: none;
 }
 
+.sniptale-toolbar[data-page-controls='true']:not([data-page-customizing='true'])
+  > .sniptale-divider
+  + .sniptale-divider,
 .sniptale-toolbar[data-page-controls='true'] .sniptale-toolbar-annotation-group:empty {
   display: none;
 }
