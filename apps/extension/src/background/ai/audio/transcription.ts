@@ -11,7 +11,8 @@ function isCompatible(type: AIProviderType): boolean {
 /** Maps only documented SDK options without accessing credentials or performing network effects. */
 export function getTranscriptionProviderOptions(
   type: AIProviderType,
-  params: AITranscriptionModelParameters
+  params: AITranscriptionModelParameters,
+  segmentFallback = true
 ): Record<string, JSONObject> {
   const granularity = params.timestampGranularity;
   if (isCompatible(type))
@@ -20,7 +21,9 @@ export function getTranscriptionProviderOptions(
         responseFormat: params.responseFormat,
         timestampGranularities:
           granularity === 'word'
-            ? ['word', 'segment']
+            ? segmentFallback
+              ? ['word', 'segment']
+              : ['word']
             : granularity === 'segment'
               ? ['segment']
               : [],

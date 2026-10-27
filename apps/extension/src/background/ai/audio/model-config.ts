@@ -1,9 +1,11 @@
 import {
   getAIProviderDefinition,
-  getAIProviderOperations,
   type AIProviderType,
 } from '../../../contracts/settings/ai-provider';
-import { supportsAIModelOperation } from '../../../contracts/settings/model-operation';
+import {
+  supportsAIModelOperation,
+  supportsAIProviderModelOperation,
+} from '../../../contracts/settings/model-operation';
 import {
   initializeAiStorageAccess,
   loadAIModels,
@@ -32,6 +34,8 @@ export interface AudioModelConfig {
   modelCode: string;
   transcriptionInstructions?: string;
   transcription?: AITranscriptionModelParameters;
+  /** Restricts synthesized word timing to explicitly supported segment fallback. */
+  transcriptionSegmentFallback?: boolean;
   speech?: AISpeechModelParameters;
 }
 
@@ -54,21 +58,35 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   if (
     !model ||
     !supportsAIModelOperation(model, args.operation) ||
-    model.operation !== args.operation ||
     !isValidAIModelOperationConfiguration(model)
   )
     throw new Error('model-unavailable');
+  if (
+    args.operation === 'speech' &&
+    !isValidAIModelOperationConfiguration({ operation: 'speech', audio: { speech: args.profile } })
+  )
+    throw new Error('invalid-request');
   if (args.approvedProviderId !== undefined && args.approvedProviderId !== model.providerId)
     throw new Error('model-unavailable');
   const provider = providers.find((entry) => entry.id === model.providerId);
-  if (
-    !provider ||
-    provider.enabled === false ||
-    !getAIProviderOperations(provider.connectionType).includes(args.operation)
-  )
+  if (!provider || !supportsAIProviderModelOperation(model, provider, args.operation))
     throw new Error('model-unavailable');
-  const chat =
-    args.operation === 'transcription' && model.audio?.transcription?.transport === 'audio-chat';
+  const granularity =
+    model.capabilities?.features['word-timestamps'] === 'supported'
+      ? 'word'
+      : model.capabilities?.features['segment-timestamps'] === 'supported' &&
+          provider.connectionType !== 'google' &&
+          provider.connectionType !== 'elevenlabs'
+        ? 'segment'
+        : 'none';
+  const transcription: AITranscriptionModelParameters | undefined =
+    args.operation === 'transcription'
+      ? (model.audio?.transcription ?? {
+          responseFormat: granularity === 'none' ? 'json' : 'verbose_json',
+          timestampGranularity: granularity,
+        })
+      : undefined;
+  const chat = transcription?.transport === 'audio-chat';
   if (chat && (!args.approvedProviderId || provider.connectionType !== 'openai-compatible'))
     throw new Error('model-unavailable');
   if (
@@ -109,8 +127,12 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
     apiKey,
     modelCode: model.modelCode,
     ...(instructions === undefined ? {} : { transcriptionInstructions: instructions }),
-    ...(args.operation === 'transcription' && model.audio?.transcription
-      ? { transcription: model.audio.transcription }
+    ...(transcription ? { transcription } : {}),
+    ...(transcription && !model.audio?.transcription && granularity === 'word'
+      ? {
+          transcriptionSegmentFallback:
+            model.capabilities?.features['segment-timestamps'] === 'supported',
+        }
       : {}),
     ...(args.operation === 'speech' && args.profile ? { speech: args.profile } : {}),
   };

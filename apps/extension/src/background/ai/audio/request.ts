@@ -329,7 +329,11 @@ async function transcribeWithProviderSdk(args: TranscriptionInput): Promise<Audi
     throw new Error('too-large');
   const params = args.config.transcription;
   if (!params) throw new Error('invalid-request');
-  const providerOptions = getTranscriptionProviderOptions(args.config.connectionType, params);
+  const providerOptions = getTranscriptionProviderOptions(
+    args.config.connectionType,
+    params,
+    args.config.transcriptionSegmentFallback
+  );
   let bytes: Uint8Array<ArrayBuffer>;
   try {
     bytes = new Uint8Array(await args.input.arrayBuffer());

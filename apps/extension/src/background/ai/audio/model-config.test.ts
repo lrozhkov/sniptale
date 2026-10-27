@@ -11,6 +11,8 @@ import type { AudioJobServerMessage, AudioJobStart } from '../../../contracts/ai
 import { resolveAudioModelConfig, resolveTranscriptionModelConfig } from './model-config';
 import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 import { createAudioJobService } from './service';
+import { requestAudio } from './request';
+import { getAIProviderDefinition } from '../../../contracts/settings/ai-provider';
 
 vi.mock('../../../composition/persistence/ai-settings', () => ({
   initializeAiStorageAccess: vi.fn(),
@@ -515,5 +517,192 @@ it.each([
         new AbortController().signal
       )
     ).rejects.toThrow('model-unavailable');
+  }
+);
+
+function managedAudioModel(): AIModel {
+  return {
+    id: model.id,
+    providerId: provider.id,
+    modelCode: 'declared-multimodal',
+    displayName: 'Declared model',
+    source: 'catalog',
+    capabilities: {
+      operations: { text: 'supported', speech: 'supported', transcription: 'supported' },
+      input: { text: 'supported', audio: 'supported' },
+      output: { text: 'supported', audio: 'supported' },
+      features: {},
+    },
+  };
+}
+
+it('executes declared catalog speech without a stored primary operation or voice profile', async () => {
+  vi.mocked(loadAIModels).mockResolvedValue([managedAudioModel()]);
+  vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, management: 'automatic' }]);
+  await expect(resolveAudioModelConfig(authoredRequest)).resolves.toMatchObject({
+    modelCode: 'declared-multimodal',
+    speech: authoredRequest.profile,
+  });
+});
+
+it.each(['word', 'segment', 'none'] as const)(
+  'resolves declared catalog ASR with only supported %s timing options',
+  async (timing) => {
+    const candidate = managedAudioModel();
+    candidate.capabilities!.features = {
+      'word-timestamps': timing === 'word' ? 'supported' : 'unknown',
+      'segment-timestamps': timing === 'segment' ? 'supported' : 'unsupported',
+    };
+    vi.mocked(loadAIModels).mockResolvedValue([candidate]);
+    vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, management: 'automatic' }]);
+    await expect(
+      resolveAudioModelConfig({
+        type: 'start',
+        requestId: 'catalog-asr',
+        operation: 'transcription',
+        modelId: model.id,
+        scope: request.scope,
+      })
+    ).resolves.toMatchObject({
+      transcription: {
+        responseFormat: timing === 'none' ? 'json' : 'verbose_json',
+        timestampGranularity: timing,
+      },
+    });
+  }
+);
+
+it('does not execute a dormant catalog record after switching its provider to manual management', async () => {
+  vi.mocked(loadAIModels).mockResolvedValue([{ ...model, source: 'catalog' }]);
+  vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, management: 'manual' }]);
+  await expect(resolveAudioModelConfig(authoredRequest)).rejects.toThrow('model-unavailable');
+  expect(permission).not.toHaveBeenCalled();
+  expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+});
+
+it('rejects an invalid explicit speech voice profile before permission and secret activation', async () => {
+  await expect(
+    resolveAudioModelConfig({
+      ...authoredRequest,
+      profile: { ...authoredRequest.profile, voiceId: '' },
+    })
+  ).rejects.toThrow('invalid-request');
+  expect(permission).not.toHaveBeenCalled();
+  expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+});
+
+it.each(['unknown', 'unsupported'] as const)(
+  'refuses %s catalog speech capability without secret activation',
+  async (support) => {
+    const candidate = managedAudioModel();
+    candidate.capabilities!.operations.speech = support;
+    vi.mocked(loadAIModels).mockResolvedValue([candidate]);
+    vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, management: 'automatic' }]);
+    await expect(resolveAudioModelConfig(authoredRequest)).rejects.toThrow('model-unavailable');
+    expect(permission).not.toHaveBeenCalled();
+    expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+  }
+);
+
+it('uses declared secondary audio operations on a text-primary model', async () => {
+  vi.mocked(loadAIModels).mockResolvedValue([
+    { ...managedAudioModel(), source: 'manual', operation: 'text' },
+  ]);
+  await expect(resolveAudioModelConfig(authoredRequest)).resolves.toMatchObject({
+    speech: authoredRequest.profile,
+  });
+  await expect(
+    resolveAudioModelConfig({
+      type: 'start',
+      requestId: 'secondary-asr',
+      operation: 'transcription',
+      modelId: model.id,
+      scope: request.scope,
+    })
+  ).resolves.toMatchObject({
+    transcription: { responseFormat: 'json', timestampGranularity: 'none' },
+  });
+});
+
+it.each(['supported', 'unknown', 'unsupported'] as const)(
+  'bounds synthesized word fallback by segment support %s',
+  async (support) => {
+    const candidate = managedAudioModel();
+    candidate.capabilities!.features = {
+      'word-timestamps': 'supported',
+      'segment-timestamps': support,
+    };
+    vi.mocked(loadAIModels).mockResolvedValue([candidate]);
+    vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, management: 'automatic' }]);
+    await expect(
+      resolveAudioModelConfig({
+        type: 'start',
+        requestId: 'word-only',
+        operation: 'transcription',
+        modelId: model.id,
+        scope: request.scope,
+      })
+    ).resolves.toMatchObject({
+      transcription: { timestampGranularity: 'word' },
+      transcriptionSegmentFallback: support === 'supported',
+    });
+  }
+);
+
+it.each(
+  (['google', 'elevenlabs'] as const).flatMap((connectionType) =>
+    (['supported', 'unknown', 'unsupported'] as const).map((wordSupport) => ({
+      connectionType,
+      wordSupport,
+    }))
+  )
+)(
+  'bounds synthesized native timing from catalog to wire: $connectionType / $wordSupport',
+  async ({ connectionType, wordSupport }) => {
+    const candidate = managedAudioModel();
+    candidate.capabilities!.features = {
+      'word-timestamps': wordSupport,
+      'segment-timestamps': 'supported',
+    };
+    const baseUrl = getAIProviderDefinition(connectionType).baseUrl;
+    vi.mocked(loadAIModels).mockResolvedValue([candidate]);
+    vi.mocked(loadAIProviders).mockResolvedValue([
+      { ...provider, connectionType, baseUrl, management: 'automatic' },
+    ]);
+    const response =
+      connectionType === 'google'
+        ? { steps: [{ content: [{ type: 'text', text: 'hello' }] }] }
+        : { text: 'hello', language_code: 'en', language_probability: 1, words: [] };
+    const post = vi.fn<typeof fetch>(async () => Response.json(response));
+    vi.stubGlobal('fetch', post);
+    const start: AudioJobStart = {
+      type: 'start',
+      requestId: 'native-timing',
+      operation: 'transcription',
+      modelId: model.id,
+      scope: request.scope,
+    };
+    const config = await resolveAudioModelConfig(start);
+    await requestAudio({
+      request: start,
+      config,
+      input: new File(['synthetic'], 'audio.wav', { type: 'audio/wav' }),
+      signal: new AbortController().signal,
+      onReceiving() {},
+    });
+    expect(post).toHaveBeenCalledOnce();
+    const body = post.mock.calls[0]![1]!.body;
+    if (connectionType === 'google') {
+      if (typeof body !== 'string') throw new Error('Expected SDK JSON');
+      const mode = JSON.parse(body).generation_config.transcription_config.mode;
+      expect(mode.timestamp_granularities).toEqual(
+        wordSupport === 'supported' ? ['word'] : undefined
+      );
+    } else {
+      if (!(body instanceof FormData)) throw new Error('Expected SDK multipart');
+      expect(body.get('timestamps_granularity')).toBe(
+        wordSupport === 'supported' ? 'word' : 'none'
+      );
+    }
   }
 );

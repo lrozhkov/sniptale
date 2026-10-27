@@ -206,3 +206,21 @@ it('refuses a native SDK timing outside the admitted source duration', async () 
   ).rejects.toThrow('invalid-response');
   expect(post).toHaveBeenCalledOnce();
 });
+
+it.each([false, true])(
+  'sends only admitted compatible timing granularities with segment fallback %s',
+  async (fallback) => {
+    const post = vi.fn<typeof fetch>(async () =>
+      Response.json({ text: 'hello', words: [{ word: 'hello', start: 0, end: 1 }] })
+    );
+    vi.stubGlobal('fetch', post);
+    const configuration = { ...config, transcriptionSegmentFallback: fallback };
+    await expect(run(configuration)).resolves.toMatchObject({ text: 'hello' });
+    const body = post.mock.calls[0]![1]!.body;
+    if (!(body instanceof FormData)) throw new Error('Expected SDK multipart body');
+    expect(body.getAll('timestamp_granularities[]')).toEqual(
+      fallback ? ['word', 'segment'] : ['word']
+    );
+    expect(post).toHaveBeenCalledOnce();
+  }
+);
