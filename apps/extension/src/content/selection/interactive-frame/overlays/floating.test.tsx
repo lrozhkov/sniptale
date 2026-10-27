@@ -203,3 +203,20 @@ describe('InteractiveFrameFloatingUi', () => {
     act(() => root.unmount());
   });
 });
+
+it.each(['callout', 'step-badge'] as const)(
+  'does not show frame actions for a standalone %s',
+  (annotationKind) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const props = createProps();
+    props.frame = { ...props.frame, annotationKind };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => root.render(<InteractiveFrameFloatingUi {...props} />));
+    expect(host.querySelector('[data-ui="test.frame-trigger-visibility"]')).toBeNull();
+    expect(host.querySelector('[data-ui="test.selected-frame-toolbar-visibility"]')).toBeNull();
+    act(() => root.unmount());
+    host.remove();
+  }
+);

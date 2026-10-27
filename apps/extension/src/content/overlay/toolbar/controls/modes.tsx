@@ -497,8 +497,7 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
         !/^[1-6]$/u.test(event.key) ||
         !mode ||
         pending ||
-        (props.toolbarMenuState.activeMenuType !== null &&
-          props.toolbarMenuState.activeMenuType !== 'mode') ||
+        !open ||
         (props.videoRecordingModeLocked && mode !== 'video-recording') ||
         !acceptsModeDigit(event, triggerRef.current)
       )
@@ -509,7 +508,7 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [props, pending, selectedMode]);
+  }, [props, pending, selectedMode, open]);
 
   useToolbarFloatingMenuDismissal({
     menuRef,

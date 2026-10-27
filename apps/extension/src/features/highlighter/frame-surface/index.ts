@@ -42,6 +42,7 @@ function resolveNonNegative(value: number, fallback = 0): number {
 }
 
 function resolveDecorationVisible(frame: FrameAnnotationVisualState): boolean {
+  if (frame.annotationKind !== undefined) return false;
   switch (frame.effectMode ?? 'border') {
     case 'blur':
       return frame.blurSettings?.showBorder ?? false;

@@ -330,9 +330,12 @@ type LinkedReconcileArgs = {
 
 function measureLinkedFrame(args: LinkedReconcileArgs, binding: AnchorBinding) {
   const node = binding.node!;
-  return args.frame.offset
+  const measured = args.frame.offset
     ? applyFrameOffsetToElement(node, args.frame.offset)
     : calculateFrameViewportCoords(node, args.frame.borderSettings);
+  return args.frame.annotationKind === undefined
+    ? measured
+    : { ...measured, width: args.frame.width, height: args.frame.height };
 }
 
 function projectLinkedFrameGeometry(args: LinkedReconcileArgs, binding: AnchorBinding): FrameData {

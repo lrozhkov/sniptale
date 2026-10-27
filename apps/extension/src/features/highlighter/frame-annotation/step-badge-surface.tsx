@@ -150,16 +150,13 @@ export function StepBadgeValue(props: {
   return (
     <span
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        height: '100%',
+        display: 'block',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         fontSize: 'inherit',
         fontWeight: 'inherit',
         lineHeight: 1,
-        transform: 'translateY(-1px)',
+        textBoxTrim: 'trim-both',
+        textBoxEdge: 'cap alphabetic',
         ...props.customStyle,
       }}
     >

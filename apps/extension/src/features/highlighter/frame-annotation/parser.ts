@@ -45,6 +45,13 @@ export function parseFrameAnnotationSnapshot(value: unknown): FrameAnnotationSna
   ) {
     return null;
   }
+  const annotationKind = value['annotationKind'];
+  if (
+    annotationKind !== undefined &&
+    annotationKind !== 'callout' &&
+    annotationKind !== 'step-badge'
+  )
+    return null;
   const effectMode = value['effectMode'];
   if (effectMode !== undefined && !EFFECT_MODES.has(effectMode as string)) return null;
   if (!isBoundedJsonRecord(value, 0, new Set())) return null;
@@ -73,6 +80,7 @@ export function parseFrameAnnotationSnapshot(value: unknown): FrameAnnotationSna
     y: value['y'],
     width: value['width'],
     height: value['height'],
+    ...(annotationKind === undefined ? {} : { annotationKind }),
     ...(effectMode === undefined ? {} : { effectMode: effectMode as 'border' | 'blur' | 'focus' }),
     ...(borderSettings === undefined ? {} : { borderSettings }),
     ...(blurSettings === undefined ? {} : { blurSettings }),

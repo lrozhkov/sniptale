@@ -1,6 +1,9 @@
 import { defineMessageSource } from '../source';
 
 export const contentInteractiveFrameMessages = defineMessageSource({
+  annotationPlacement: { ru: 'Размещение', en: 'Placement' },
+  annotationPlacementElement: { ru: 'На элементе', en: 'On element' },
+  annotationPlacementFree: { ru: 'Свободно', en: 'Free' },
   effectBorder: {
     ru: 'Рамка',
     en: 'Border',

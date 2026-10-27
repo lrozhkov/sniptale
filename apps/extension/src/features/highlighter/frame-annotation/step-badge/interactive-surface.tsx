@@ -23,6 +23,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
   isSettingsOpen?: boolean;
   onClick?: () => void;
   onPositionChange?: (placement: StepBadgeManualPlacement) => void;
+  onFramePositionChange?: (point: { x: number; y: number }) => void;
   onSettingsClick?: () => void;
   portalTheme: AppTheme | null;
   settings: StepBadgeSettings;
@@ -39,9 +40,11 @@ export function FrameStepBadgeInteractiveSurface(props: {
     frameRect: props.frameRect,
     isSettingsOpen: props.isSettingsOpen,
     onPositionChange: props.onPositionChange,
+    ...(props.onFramePositionChange ? { onFramePositionChange: props.onFramePositionChange } : {}),
     settings: props.settings,
   });
   if (!props.settings.enabled) return null;
+  const frameRect = interaction.effectiveFrameRect ?? props.frameRect;
   const badge = (
     <FrameStepBadgeSurface
       borderColor={props.borderColor}
@@ -67,10 +70,10 @@ export function FrameStepBadgeInteractiveSurface(props: {
           className="sniptale-step-badge-layer"
           style={{
             position: 'fixed',
-            top: props.frameRect.y,
-            left: props.frameRect.x,
-            width: props.frameRect.width,
-            height: props.frameRect.height,
+            top: frameRect.y,
+            left: frameRect.x,
+            width: frameRect.width,
+            height: frameRect.height,
             pointerEvents: 'none',
             zIndex: FRAME_ANNOTATION_Z_INDEX.stepBadge,
           }}

@@ -286,3 +286,94 @@ it('excludes trailing whitespace across inline nodes and replays the trimmed ran
   history.redo('page-editing');
   expect(list().map((item) => item.text)).toEqual(['First second']);
 });
+
+it('excludes both edge whitespace across inline nodes and preserves internal spaces', () => {
+  const html = target.innerHTML;
+  expect(controller.add(rangeAt(target, 5, 13), '#ffdf0066')).toBe(true);
+  expect(list().map((item) => item.text)).toEqual(['second']);
+  expect(target.innerHTML).toBe(html);
+  history.undo('page-editing');
+  expect(list()).toEqual([]);
+  history.redo('page-editing');
+  expect(list().map((item) => item.text)).toEqual(['second']);
+});
+
+it.each(['left-first', 'right-first'])(
+  'paints an explicitly selected gap when the second selection joins an existing marker: %s',
+  (order) => {
+    target.textContent = 'left right tail';
+    const first = order === 'left-first' ? [0, 4] : [5, 10];
+    const second = order === 'left-first' ? [4, 11] : [0, 5];
+    controller.add(rangeAt(target, first[0]!, first[1]!), '#ffdf0066');
+    controller.add(rangeAt(target, second[0]!, second[1]!), '#ffdf0066');
+    expect(list().map((item) => item.text)).toEqual(['left right']);
+    history.undo('page-editing');
+    expect(list().map((item) => item.text)).toEqual([order === 'left-first' ? 'left' : 'right']);
+    history.redo('page-editing');
+    expect(list().map((item) => item.text)).toEqual(['left right']);
+  }
+);
+
+it('keeps an unselected gap and only joins it after explicit selection between two markers', () => {
+  target.textContent = 'left right';
+  controller.add(rangeAt(target, 0, 4), '#ffdf0066');
+  controller.add(rangeAt(target, 5, 10), '#ffdf0066');
+  expect(list().map((item) => item.text)).toEqual(['left', 'right']);
+  controller.add(rangeAt(target, 4, 5), '#ffdf0066');
+  expect(list().map((item) => item.text)).toEqual(['left right']);
+  history.undo('page-editing');
+  expect(list().map((item) => item.text)).toEqual(['left', 'right']);
+  history.redo('page-editing');
+  expect(list().map((item) => item.text)).toEqual(['left right']);
+  controller.add(rangeAt(target, 4, 5), '#00000000');
+  expect(list().map((item) => item.text)).toEqual(['left', 'right']);
+});
+
+it('does not bridge a partially selected whitespace gap or a gap with only one neighbor', () => {
+  target.textContent = 'left   right';
+  controller.add(rangeAt(target, 0, 4), '#ffdf0066');
+  const begin = vi.spyOn(history, 'beginTransaction');
+  controller.add(rangeAt(target, 4, 7), '#ffdf0066');
+  expect(begin).not.toHaveBeenCalled();
+  controller.add(rangeAt(target, 7, 12), '#ffdf0066');
+  begin.mockClear();
+  controller.add(rangeAt(target, 4, 6), '#ffdf0066');
+  expect(begin).not.toHaveBeenCalled();
+  expect(list().map((item) => item.text)).toEqual(['left', 'right']);
+  controller.add(rangeAt(target, 4, 7), '#ffdf0066');
+  expect(list().map((item) => item.text)).toEqual(['left   right']);
+});
+
+it('joins neighboring paint across nested annotation anchors without changing the DOM', () => {
+  target.replaceChildren(
+    Object.assign(document.createElement('span'), { textContent: 'left' }),
+    ' right '
+  );
+  const child = target.firstElementChild!;
+  annotations.setTextMarkerGroups([
+    {
+      target: child,
+      evidence: createBrowserAnnotationTargetEvidence(child),
+      markers: [{ id: 'nested-marker', source: 'left', start: 0, end: 4, color: '#ff0000' }],
+    },
+  ]);
+  const html = target.innerHTML;
+  controller.add(rangeAt(target, 4, 11), '#ffdf0066');
+  expect(list()).toEqual([
+    { color: '#ff0000', text: 'left' },
+    { color: '#ffdf0066', text: ' right' },
+  ]);
+  expect(target.innerHTML).toBe(html);
+});
+
+it.each(['#ffdf0066', '#00000000'])(
+  'keeps an isolated whitespace selection a no-op even on an unsupported editable target: %s',
+  (color) => {
+    target.textContent = ' ';
+    target.setAttribute('contenteditable', 'true');
+    const begin = vi.spyOn(history, 'beginTransaction');
+    expect(controller.add(rangeAt(target, 0, 1), color)).toBe(true);
+    expect(begin).not.toHaveBeenCalled();
+    expect(list()).toEqual([]);
+  }
+);

@@ -56,7 +56,7 @@ export interface FrameMutations {
     skippedCount: number;
   };
   addFrame: (element: HTMLElement) => FrameData | null;
-  addFreeFrame: (input: FreeFrameInput) => FrameData;
+  addFreeFrame: (input: FreeFrameInput, sourceElement?: HTMLElement) => FrameData;
   clearAutoBlurFrames: (input: AutoBlurClearInput) => { removedCount: number };
   clearFrames: () => void;
   pinFrameAtLastPlacement: (frameId: string) => boolean;

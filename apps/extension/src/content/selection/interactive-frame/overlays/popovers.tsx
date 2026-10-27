@@ -38,6 +38,7 @@ export interface InteractiveFramePopoversProps {
   clearSelection: () => void;
   handleEffectModeSelect?: (mode: EffectMode) => void;
   onUpdate: (frame: FrameData) => void;
+  onDeleteAnnotation?: () => void;
 }
 
 function applyFrameSettingsPatch(
@@ -120,6 +121,9 @@ function createStepBadgeProps(props: InteractiveFramePopoversProps) {
   const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isStepBadgePopoverOpen && !!stepBadge?.enabled,
+    ...(props.currentFrame.annotationKind === 'step-badge' && props.onDeleteAnnotation
+      ? { onDisable: props.onDeleteAnnotation }
+      : {}),
     onClose: () => dismissSettingsPopover(props),
     frameId: props.frame.id,
     frameRect: props.currentFrame,
@@ -158,6 +162,11 @@ function createCalloutSettingsProps(props: InteractiveFramePopoversProps) {
       );
     },
     onDelete: () => {
+      if (props.currentFrame.annotationKind === 'callout' && props.onDeleteAnnotation) {
+        props.onDeleteAnnotation();
+        props.setIsCalloutEditing(false);
+        return;
+      }
       if (!props.stageCalloutFrame) return;
       props.stageCalloutFrame(
         (current) => removeFrameCallout(current, activeCalloutIndex) as FrameData
@@ -189,6 +198,7 @@ function renderCalloutOverlay(props: InteractiveFramePopoversProps) {
       setTempFrame={props.setTempFrame}
       {...(props.stageCalloutFrame ? { stageCalloutFrame: props.stageCalloutFrame } : {})}
       onUpdate={props.onUpdate}
+      {...(props.onDeleteAnnotation ? { onDeleteAnnotation: props.onDeleteAnnotation } : {})}
     />
   ));
 }

@@ -211,8 +211,10 @@ for (const { name, size, locale } of PRIMARY_BROWSER_VIEWPORTS.flatMap(({ name, 
       await page.keyboard.press('1');
       await expect(ui(page, 'mode-option.cursor')).toHaveCount(0);
       await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'cursor');
-      await expect(trigger.locator('.sniptale-mode-selector-label')).toHaveText(labels[0]!);
-      await expect(trigger.locator('.sniptale-mode-selector-label')).toBeVisible();
+      await expect(trigger).toHaveAttribute('aria-label', labels[0]!);
+      await expect(trigger).toHaveText('');
+      await page.keyboard.press('2');
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'cursor');
       await page.evaluate(() => {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true }));
         const input = document.createElement('input');
@@ -240,14 +242,17 @@ for (const { name, size, locale } of PRIMARY_BROWSER_VIEWPORTS.flatMap(({ name, 
       await expect(ui(page, 'settings-button')).toHaveAttribute('aria-expanded', 'true');
       await page.keyboard.press('Escape');
       for (const [index, mode] of modes.entries()) {
+        await trigger.click();
         await page.keyboard.press(String(index + 1));
         if (mode === 'video-recording')
           await expect(ui(page, 'root')).toHaveAttribute('data-video-recording', 'true');
         else await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', mode);
         await expect(trigger).toHaveAttribute('aria-label', labels[index]!);
-        await expect(trigger.locator('.sniptale-mode-selector-label')).toBeVisible();
+        await expect(trigger).toHaveText('');
+        await expect(ui(page, 'mode-option.cursor')).toHaveCount(0);
         await expect(trigger).toBeEnabled();
       }
+      await trigger.click();
       await page.keyboard.press('6');
       await expect(ui(page, 'root')).toHaveAttribute('data-video-recording', 'true');
       const customize = ui(page, 'video-recording.customize');
@@ -263,49 +268,11 @@ for (const { name, size, locale } of PRIMARY_BROWSER_VIEWPORTS.flatMap(({ name, 
       });
       await customize.click();
       await expect(trigger).toBeEnabled();
+      await trigger.click();
       await page.keyboard.press('2');
       await expect(ui(page, 'root')).not.toHaveAttribute('data-video-recording');
       await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'drawing');
       await page.screenshot({ path: info.outputPath('mode-digit-caption.png'), fullPage: false });
-      const stress = await trigger.evaluate((button) => {
-        const label = button.querySelector<HTMLElement>('.sniptale-mode-selector-label')!;
-        const original = label.textContent!;
-        const expanded = `${original} ${original} — ${original}`;
-        label.textContent = expanded;
-        button.setAttribute('aria-label', expanded);
-        button.title = expanded;
-        return { original, expanded };
-      });
-      await expect(trigger).toHaveAttribute('aria-label', stress.expanded);
-      await expect(trigger).toHaveAttribute('title', stress.expanded);
-      await expect
-        .poll(() =>
-          trigger
-            .locator('.sniptale-mode-selector-label')
-            .evaluate((node) => node.scrollWidth > node.clientWidth)
-        )
-        .toBe(true);
-      expect((await trigger.boundingBox())!.width).toBeLessThanOrEqual(180);
-      await page.screenshot({
-        path: info.outputPath('mode-digit-expanded-label.png'),
-        fullPage: false,
-      });
-      await trigger.evaluate((button) => {
-        button.style.fontSize = '26px';
-      });
-      await expect(trigger).toHaveCSS('font-size', '26px');
-      await expect(trigger.locator('svg')).toBeVisible();
-      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-        size.width
-      );
-      await page.screenshot({ path: info.outputPath('mode-digit-text-zoom.png'), fullPage: false });
-      await trigger.evaluate((button, original) => {
-        button.querySelector('.sniptale-mode-selector-label')!.textContent = original;
-        button.setAttribute('aria-label', original);
-        button.title = original;
-        button.style.fontSize = '';
-      }, stress.original);
-
       const grip = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
       const box = (await grip.boundingBox())!;
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -313,7 +280,10 @@ for (const { name, size, locale } of PRIMARY_BROWSER_VIEWPORTS.flatMap(({ name, 
       await page.mouse.move(8, size.height / 2, { steps: 8 });
       await page.mouse.up();
       await expect(ui(page, 'root')).toHaveAttribute('data-display-mode', 'vertical');
-      await expect(trigger.locator('.sniptale-mode-selector-label')).toBeHidden();
+      await expect(trigger).toHaveText('');
+      await page.keyboard.press('3');
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'drawing');
+      await trigger.click();
       await page.keyboard.press('3');
       await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'highlighter');
       await expect(trigger).toHaveAttribute('aria-label', labels[2]!);

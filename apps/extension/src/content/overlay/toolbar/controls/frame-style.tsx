@@ -212,6 +212,10 @@ export function FutureFrameStyleControls(props: {
               props.futureFrameStepBadgeActions?.set(next.stepBadge);
             }
           }}
+          onStandaloneCreationChange={(options) => {
+            if (options) setHighlighterCreationEnabled(true, options);
+            else setHighlighterCreationEnabled(false);
+          }}
           onFrameActiveChange={(active) => {
             setHighlighterCreationEnabled(active);
             setFrameActive(active);

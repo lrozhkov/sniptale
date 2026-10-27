@@ -17,6 +17,7 @@ import {
 vi.mock('../../step-badge', () => ({
   StepBadge: (props: {
     onPositionChange: (placement: { position: number; side: 'bottom' }) => void;
+    onFramePositionChange?: (point: { x: number; y: number }) => void;
     onSettingsClick: () => void;
     showSettingsHandle: boolean;
   }) => (
@@ -27,6 +28,13 @@ vi.mock('../../step-badge', () => ({
         onClick={() => props.onPositionChange({ position: 0.7, side: 'bottom' })}
       />
       <button type="button" data-ui="step-settings" onClick={props.onSettingsClick} />
+      {props.onFramePositionChange ? (
+        <button
+          type="button"
+          data-ui="move-point"
+          onClick={() => props.onFramePositionChange?.({ x: 500, y: 600 })}
+        />
+      ) : null}
     </div>
   ),
 }));
@@ -230,4 +238,45 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     });
     cleanupStepBadgeListener();
   });
+});
+
+it('renders a standalone badge without frame chrome and commits free point geometry', () => {
+  const frame = createFrameDataFixture('standalone', {
+    annotationKind: 'step-badge',
+    x: 30,
+    y: 40,
+    width: 1,
+    height: 1,
+    stepBadge: createStepBadgeSettingsFixture(),
+  });
+  const onUpdate = vi.fn();
+  act(() =>
+    root.render(
+      <InteractiveFrameFrameShell
+        borderColor="#111"
+        borderWidth={3}
+        containerRef={{ current: null }}
+        currentFrame={frame}
+        frame={frame}
+        frameRef={{ current: null }}
+        frameStyle={{}}
+        fillStyle={{}}
+        strokeStyle={{}}
+        frameZIndex={100}
+        handleMouseDown={vi.fn()}
+        handleResizeStart={vi.fn()}
+        isResizeHovered
+        isStepBadgePopoverOpen={false}
+        state="idle"
+        stepBadgePopoverAnchorRef={{ current: null }}
+        tempFrame={frame}
+        onUpdate={onUpdate}
+      />
+    )
+  );
+  expect(host.querySelector('.sniptale-interactive-frame')).toBeNull();
+  expect(resizeHandleOwner.props).toBeNull();
+  expect(host.querySelector('[data-ui="step-badge"]')).not.toBeNull();
+  act(() => host.querySelector<HTMLButtonElement>('[data-ui="move-point"]')!.click());
+  expect(onUpdate).toHaveBeenCalledWith({ ...frame, x: 500, y: 600 });
 });

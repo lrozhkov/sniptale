@@ -13,6 +13,14 @@ import { getFrameSessionBorderPreset } from '../session/border-preset';
 import { getFutureFrameCallout } from '../session/future-callout';
 import { cloneStepBadgeSettings } from '../session/step-badge-defaults';
 import {
+  createDefaultFrameCallout,
+  createDefaultFrameStepBadge,
+} from '../../../../features/highlighter/frame-annotation/defaults';
+import {
+  resolveStandaloneCalloutSettings,
+  resolveStandaloneStepBadgeSettings,
+} from '../../../../features/highlighter/frame-annotation/model';
+import {
   resolveFrameCalloutTemplate,
   resolveFrameStepBadgeTemplate,
 } from '../session/linked-annotation-templates';
@@ -129,5 +137,48 @@ function buildStepBadgeSettings(template: StepBadgeSettings | null, isAutoMode: 
   return {
     ...cloneStepBadgeSettings(template),
     value: isAutoMode ? '' : template.value,
+  };
+}
+
+/** Builds standalone content from its own toolbar template without resolving a frame template. */
+export function buildStandaloneAnnotationForAdd(
+  args: Pick<BuildFrameForAddArgs, 'sessionStepBadgeTemplateRef' | 'globalStepBadgeAutoModeRef'> & {
+    annotationKind: NonNullable<FrameData['annotationKind']>;
+    generateFrameId: () => string;
+    input: FreeFrameInput;
+  }
+): FrameData {
+  const base: FrameData = {
+    id: args.generateFrameId(),
+    annotationKind: args.annotationKind,
+    x: args.input.x,
+    y: args.input.y,
+    width: args.input.width,
+    height: args.input.height,
+    pagePlacement: {
+      ...args.input.pagePlacement,
+      iframePath: [...args.input.pagePlacement.iframePath],
+    },
+  };
+  if (args.annotationKind === 'callout') {
+    const callout = getFutureFrameCallout() ?? createDefaultFrameCallout();
+    return {
+      ...base,
+      callout: resolveStandaloneCalloutSettings({ ...structuredClone(callout), enabled: true }),
+    };
+  }
+  const template = args.sessionStepBadgeTemplateRef.current ?? createDefaultFrameStepBadge();
+  const stepBadge = buildStepBadgeSettings(
+    { ...template, enabled: true },
+    args.globalStepBadgeAutoModeRef.current
+  )!;
+  return {
+    ...base,
+    stepBadge: resolveStandaloneStepBadgeSettings({
+      ...stepBadge,
+      anchor: 'center',
+      offsetDirections: [],
+      manualPlacement: undefined,
+    }),
   };
 }

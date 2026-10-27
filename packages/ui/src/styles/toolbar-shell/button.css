@@ -538,30 +538,9 @@
   }
 }
 
-/* Current mode names remain readable while the vertical toolbar keeps its icon target. */
-.sniptale-mode-selector-btn {
-  width: auto;
-  max-width: 180px;
-  gap: 6px;
-  padding-inline: 8px 12px;
-}
-.sniptale-mode-selector-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .sniptale-toolbar-menu-shortcut {
   margin-inline-start: auto;
   font: inherit;
   font-variant-numeric: tabular-nums;
   color: var(--sniptale-color-text-secondary);
-}
-.sniptale-toolbar[data-display-mode='vertical'] .sniptale-mode-selector-btn {
-  width: var(--sniptale-toolbar-button-size);
-  min-width: var(--sniptale-toolbar-button-size);
-  padding: 0;
-}
-.sniptale-toolbar[data-display-mode='vertical'] .sniptale-mode-selector-label {
-  display: none;
 }

@@ -392,3 +392,23 @@ it('registers drawing with the existing mode authority through stable compositio
     enable.mockRestore();
   }
 });
+
+it('passes only an accepted standalone source element to its DOM binding owner', () => {
+  renderSurface();
+  const [, addFreeFrame] = runtimeMocks.registerFrameCallbacks.mock.calls.at(-1)!;
+  const accepted = iframe!.contentDocument!.createElement('button');
+  const outside = document.createElement('button');
+  const point = {
+    annotationKind: 'step-badge' as const,
+    x: 20,
+    y: 30,
+    width: 1,
+    height: 1,
+    pagePlacement: { iframePath: [], pageX: 20, pageY: 30 },
+  };
+  addFreeFrame(point, outside);
+  expect(runtimeMocks.frameManager.addFreeFrame).not.toHaveBeenCalled();
+  addFreeFrame(point, accepted);
+  expect(runtimeMocks.frameManager.addFreeFrame).toHaveBeenCalledOnce();
+  expect(runtimeMocks.frameManager.addFreeFrame).toHaveBeenCalledWith(point, accepted);
+});

@@ -630,3 +630,48 @@ it('uses the current effect icon and dimension icon for annotation geometry comm
   expect(markup).toContain('lucide-scaling');
   expect(markup).not.toContain('lucide-pencil');
 });
+
+it('exports standalone number and comment content without frame paint or interactive controls', async () => {
+  const callout = createDefaultFrameCallout();
+  callout.content.bodyHtml = '<p>Standalone export comment</p>';
+  const snapshots = [
+    createFrameAnnotationSnapshot(
+      {
+        id: 'number',
+        annotationKind: 'step-badge',
+        x: 100,
+        y: 100,
+        width: 1,
+        height: 1,
+        stepBadge: { ...createDefaultFrameStepBadge(), value: '9' },
+      },
+      0
+    ),
+    createFrameAnnotationSnapshot(
+      { id: 'comment', annotationKind: 'callout', x: 250, y: 150, width: 1, height: 1, callout },
+      1
+    ),
+  ];
+  const html = await renderExportSurface({
+    baseImageUrl: 'blob:base',
+    width: 600,
+    height: 400,
+    snapshots,
+  });
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  expect(document.querySelector('.sniptale-step-badge')?.textContent).toBe('9');
+  expect(document.querySelector('.sniptale-callout')?.textContent).toContain(
+    'Standalone export comment'
+  );
+  for (const stroke of document.querySelectorAll<HTMLElement>(
+    '.sniptale-interactive-frame-stroke'
+  )) {
+    expect(['', 'none', 'hidden']).toContain(stroke.style.borderStyle);
+  }
+  for (const fill of document.querySelectorAll('.sniptale-interactive-frame-fill')) {
+    expect(fill.getAttribute('style')).toContain('background: transparent');
+  }
+  expect(document.querySelector('[contenteditable="true"]')).toBeNull();
+  expect(html).not.toContain('sniptale-step-badge-move-handle');
+  expect(html).not.toContain('sniptale-step-badge-settings-handle');
+});

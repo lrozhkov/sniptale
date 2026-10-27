@@ -1,3 +1,7 @@
+import {
+  AnnotationCreationPlacement,
+  type AnnotationPlacementControl,
+} from '../creation-placement';
 import type {
   CalloutAnchor,
   CalloutPlacement,
@@ -53,6 +57,7 @@ export function CalloutSettingsPopoverContent(props: {
   onNestedLayerChange?: ((open: boolean) => void) | undefined;
   onApplyToFuture?: () => void;
   templateSourceControl?: TemplateSourceControl;
+  creationPlacement?: AnnotationPlacementControl;
 }) {
   const workflow = useTemplateForkWorkflow({
     ...(props.localSettings.sourcePresetId
@@ -101,6 +106,9 @@ export function CalloutSettingsPopoverContent(props: {
         onClose={props.onClose}
         title={translate('content.callout.settingsTitle')}
       />
+      {props.creationPlacement ? (
+        <AnnotationCreationPlacement {...props.creationPlacement} />
+      ) : null}
       {applyToFuture.confirming ? (
         <ApplyToFutureFramesGuard
           onCancel={applyToFuture.cancel}

@@ -144,6 +144,30 @@ function rangeStartOffset(range: Range): number {
   prefix.setEnd(range.startContainer, range.startOffset);
   return prefix.toString().length;
 }
+function resolveMarkerWhitespace(annotations: MarkerSession, selection: Range) {
+  const text = selection.toString();
+  const start = text.length - text.trimStart().length;
+  const end = text.trimEnd().length;
+  if (start === 0 && end === text.length) return { start, end };
+  const selectionStart = rangeStartOffset(selection);
+  const selectionEnd = selectionStart + text.length;
+  let joinsBefore = false;
+  let joinsAfter = false;
+  for (const record of annotations.captureSnapshot().domRecords) {
+    const target = annotations.getLiveTarget(record.annotationId);
+    if (!target || target.ownerDocument !== selection.startContainer.ownerDocument) continue;
+    for (const marker of record.textMarkers ?? []) {
+      const range = restoreTextMarkerRange(target, marker);
+      if (!range) continue;
+      const paintedStart = rangeStartOffset(range);
+      const paintedEnd = paintedStart + range.toString().length;
+      joinsBefore ||= paintedStart < selectionStart && paintedEnd >= selectionStart;
+      joinsAfter ||= paintedStart <= selectionEnd && paintedEnd > selectionEnd;
+    }
+  }
+  if (!text.trim() && !(joinsBefore && joinsAfter)) return null;
+  return { start: joinsBefore ? 0 : start, end: joinsAfter ? text.length : end };
+}
 function subtractPaint(target: Element, markers: MarkerRange[], selection: Range): MarkerRange[] {
   const start = rangeStartOffset(selection);
   const end = start + selection.toString().length;
@@ -215,7 +239,8 @@ export function createTextMarkerController(deps: {
       typeof Highlight !== 'undefined' && typeof CSS !== 'undefined' && 'highlights' in CSS,
     add: (range: Range, value: string): boolean => {
       const selectedText = range.toString();
-      if (!selectedText.trim()) return true;
+      if (!selectedText.length) return true;
+      const whitespaceOnly = !selectedText.trim();
       const color = normalizeColor(value);
       const common = range.commonAncestorContainer;
       const ElementType = common.ownerDocument?.defaultView?.Element ?? Element;
@@ -226,9 +251,15 @@ export function createTextMarkerController(deps: {
         if (ancestor instanceof HTMLElementType && isQuickEditTextElement(ancestor))
           target = ancestor;
       }
-      if (!color || !target || !target.isConnected || isContentOwnedElement(target)) return false;
+      if (!color || !target || !target.isConnected || isContentOwnedElement(target))
+        return whitespaceOnly;
       if (target.closest('script,style,noscript,textarea,input,[contenteditable="true"]'))
-        return false;
+        return whitespaceOnly;
+      const erasing = parseColor(color)?.alpha === 0;
+      const bounds = erasing
+        ? { start: 0, end: selectedText.length }
+        : resolveMarkerWhitespace(deps.annotations, range);
+      if (!bounds) return true;
       const prefix = target.ownerDocument.createRange();
       prefix.selectNodeContents(target);
       prefix.setEnd(range.startContainer, range.startOffset);
@@ -237,17 +268,12 @@ export function createTextMarkerController(deps: {
         id: crypto.randomUUID(),
         color,
         source: target.textContent ?? '',
-        start,
-        end: start + selectedText.trimEnd().length,
+        start: start + bounds.start,
+        end: start + bounds.end,
       };
-      return mutate(
-        planMarkerPaint(
-          deps.annotations,
-          range,
-          target,
-          parseColor(color)?.alpha === 0 ? null : marker
-        )
-      );
+      const paintRange = erasing ? range : restoreTextMarkerRange(target, marker);
+      if (!paintRange) return false;
+      return mutate(planMarkerPaint(deps.annotations, paintRange, target, erasing ? null : marker));
     },
     dispose: projection.dispose,
   };

@@ -29,6 +29,7 @@ interface InteractiveFrameFrameShellProps {
   isStepBadgePopoverOpen: boolean;
   stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   tempFrame: FrameData;
+  onUpdate?: (frame: FrameData) => void;
   handleMouseDown: (event: React.PointerEvent) => void;
   handleResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }
@@ -54,42 +55,45 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
       ref={props.containerRef as React.RefObject<HTMLDivElement>}
       className="sniptale-frame-container"
       data-frame-id={props.frame.id}
+      data-annotation-kind={props.currentFrame.annotationKind}
       style={getFrameAnnotationContainerStyle(props.currentFrame)}
     >
-      <div
-        ref={props.frameRef as React.RefObject<HTMLDivElement>}
-        className="sniptale-interactive-frame"
-        data-frame-id={props.frame.id}
-        onPointerDown={props.handleMouseDown}
-        style={{
-          ...props.frameStyle,
-          position: 'relative',
-          top: 0,
-          left: 0,
-          zIndex: props.frameZIndex,
-        }}
-      >
-        <FrameAnnotationDecoration
-          frameId={props.frame.id}
-          hideDuringCapture={isFrameHiddenDuringCapture(props.currentFrame)}
-          fillRef={fillRef}
-          strokeRef={strokeRef}
-          fillStyle={props.fillStyle}
-          strokeStyle={props.strokeStyle}
-        />
-        <InteractiveFrameResizeHandles
-          state={props.state}
-          isResizeHovered={props.isResizeHovered}
-          tempFrame={
-            props.state === 'editing' || props.state === 'resizing'
-              ? props.tempFrame
-              : props.currentFrame
-          }
-          borderColor={props.borderColor}
-          borderWidth={props.borderWidth}
-          onResizeStart={props.handleResizeStart}
-        />
-      </div>
+      {props.currentFrame.annotationKind === undefined ? (
+        <div
+          ref={props.frameRef as React.RefObject<HTMLDivElement>}
+          className="sniptale-interactive-frame"
+          data-frame-id={props.frame.id}
+          onPointerDown={props.handleMouseDown}
+          style={{
+            ...props.frameStyle,
+            position: 'relative',
+            top: 0,
+            left: 0,
+            zIndex: props.frameZIndex,
+          }}
+        >
+          <FrameAnnotationDecoration
+            frameId={props.frame.id}
+            hideDuringCapture={isFrameHiddenDuringCapture(props.currentFrame)}
+            fillRef={fillRef}
+            strokeRef={strokeRef}
+            fillStyle={props.fillStyle}
+            strokeStyle={props.strokeStyle}
+          />
+          <InteractiveFrameResizeHandles
+            state={props.state}
+            isResizeHovered={props.isResizeHovered}
+            tempFrame={
+              props.state === 'editing' || props.state === 'resizing'
+                ? props.tempFrame
+                : props.currentFrame
+            }
+            borderColor={props.borderColor}
+            borderWidth={props.borderWidth}
+            onResizeStart={props.handleResizeStart}
+          />
+        </div>
+      ) : null}
       {props.currentFrame.stepBadge?.enabled && (
         <StepBadge
           settings={props.currentFrame.stepBadge}
@@ -99,6 +103,13 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
             ? { fillColor: getRepresentativeColor(props.currentFrame.borderSettings.fillPaint) }
             : {})}
           frameRect={props.currentFrame}
+          {...(props.currentFrame.annotationKind === 'step-badge' && props.onUpdate
+            ? {
+                onFramePositionChange: (point: { x: number; y: number }) =>
+                  props.onUpdate?.({ ...props.currentFrame, ...point }),
+                onClick: () => useFrameUIStore.getState().selectFrame(props.frame.id),
+              }
+            : {})}
           isSettingsOpen={props.isStepBadgePopoverOpen}
           onPositionChange={(manualPlacement) => {
             dispatchFrameStepBadgeChanged({

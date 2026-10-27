@@ -1,3 +1,4 @@
+import { getEffectiveStepBadgeVisualStyle } from '../step-badge-presets/style';
 import type {
   AppliedBorderSettings,
   BlurSettings,
@@ -21,6 +22,8 @@ export interface FrameAnnotationRect {
 /** Visual state shared by page preparation, the editor projection, and export. */
 export interface FrameAnnotationVisualState extends FrameAnnotationRect {
   id: string;
+  /** Standalone content; omission retains the legacy frame and its attached annotations. */
+  annotationKind?: 'callout' | 'step-badge';
   effectMode?: EffectMode;
   borderSettings?: AppliedBorderSettings;
   blurSettings?: BlurSettings;
@@ -38,6 +41,46 @@ export interface FrameAnnotationSnapshotV1 extends FrameAnnotationVisualState {
 }
 
 export type FrameAnnotationSnapshot = FrameAnnotationSnapshotV1;
+
+/** Resolves standalone colors and size from their own stored values. */
+export function resolveStandaloneStepBadgeSettings(settings: StepBadgeSettings): StepBadgeSettings {
+  const style = getEffectiveStepBadgeVisualStyle(settings);
+  return {
+    ...settings,
+    style: {
+      ...style,
+      sizeSource: 'custom',
+      backgroundColorSource: 'custom',
+      textColorSource: 'custom',
+      outlineColorSource: style.outlineColorSource === 'surface' ? 'surface' : 'custom',
+    },
+  };
+}
+
+/** Keeps standalone callout styling independent of frame color bindings. */
+export function resolveStandaloneCalloutSettings(settings: CalloutSettings): CalloutSettings {
+  return {
+    ...settings,
+    style: {
+      ...settings.style,
+      colorBindings: {
+        ...settings.style.colorBindings,
+        accent: 'custom',
+        connector: 'custom',
+        surfaceBackground: 'custom',
+        surfaceBorder: 'custom',
+      },
+      badge: {
+        ...settings.style.badge,
+        backgroundColorSource:
+          settings.style.badge.backgroundColorSource === 'accent' ? 'accent' : 'custom',
+        textColorSource: settings.style.badge.textColorSource === 'accent' ? 'accent' : 'custom',
+        borderColorSource:
+          settings.style.badge.borderColorSource === 'accent' ? 'accent' : 'custom',
+      },
+    },
+  };
+}
 
 export function createFrameAnnotationSnapshot(
   frame: FrameAnnotationVisualState,
@@ -62,6 +105,23 @@ export function normalizeFrameAnnotationSnapshot(
     height: normalizeNonNegative(snapshot.height),
     ordering: Math.max(0, Math.trunc(normalizeFinite(snapshot.ordering))),
     ...callouts,
+    ...(snapshot.annotationKind === undefined
+      ? {}
+      : {
+          ...(snapshot.stepBadge
+            ? { stepBadge: resolveStandaloneStepBadgeSettings(snapshot.stepBadge) }
+            : {}),
+          ...(callouts.callout
+            ? { callout: resolveStandaloneCalloutSettings(callouts.callout) }
+            : {}),
+          ...(callouts.additionalCallouts
+            ? {
+                additionalCallouts: callouts.additionalCallouts.map(
+                  resolveStandaloneCalloutSettings
+                ),
+              }
+            : {}),
+        }),
   };
 }
 

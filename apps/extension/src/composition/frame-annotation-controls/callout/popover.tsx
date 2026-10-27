@@ -1,3 +1,4 @@
+import type { AnnotationPlacementControl } from '../creation-placement';
 import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState } from 'react';
 
@@ -37,6 +38,7 @@ export function FutureCalloutSettingsPopover(props: {
   headerContext?: SettingsPopoverContext;
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
+  creationPlacement?: AnnotationPlacementControl;
   frameColors?: CalloutFrameColors;
 }) {
   const inspector = useInspectorLayout();
@@ -147,6 +149,7 @@ export function FutureCalloutSettingsPopover(props: {
       style={{ ...presentation.style, width: SETTINGS_POPOVER_WIDTH }}
     >
       <CalloutSettingsPopoverContent
+        {...(props.creationPlacement ? { creationPlacement: props.creationPlacement } : {})}
         {...(props.frameColors ? { frameColors: props.frameColors } : {})}
         handleDelete={props.onDisable}
         handleSettingChange={handleSettingChange}

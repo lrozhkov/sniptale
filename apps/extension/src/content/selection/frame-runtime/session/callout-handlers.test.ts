@@ -146,3 +146,29 @@ it('updates and deletes an addressed additional callout without mutating the pri
   expect(frames.getFrames()[0]?.additionalCallouts).toEqual([]);
   expect(frames.getFrames()[0]?.callout?.enabled).toBe(true);
 });
+
+it('keeps standalone callout preset updates independent of frame color bindings', () => {
+  const frames = createFramesHarness([
+    createFrame({ annotationKind: 'callout', callout: baseCallout }),
+  ]);
+  createCalloutPopoverSettingsHandler({ setFrames: frames.setFrames })({
+    frameId: 'frame-1',
+    settings: {
+      style: {
+        colorBindings: {
+          accent: 'frame-border',
+          connector: 'frame-border',
+          surfaceBackground: 'frame-fill',
+          surfaceBorder: 'frame-border',
+        },
+      },
+    },
+  });
+  expect(frames.getFrames()[0]?.callout?.style.colorBindings).toMatchObject({
+    accent: 'custom',
+    connector: 'custom',
+    surfaceBackground: 'custom',
+    surfaceBorder: 'custom',
+  });
+  expect(frames.getFrames()[0]?.callout?.content).toEqual(baseCallout.content);
+});

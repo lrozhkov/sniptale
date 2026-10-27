@@ -1,3 +1,4 @@
+import type { StandaloneAnnotationCreationOptions } from '../../../features/highlighter/contracts';
 import type { createLogger } from '@sniptale/platform/observability/logger';
 import type { HoverController } from '../highlighter-hover-preview';
 import type { HighlighterRuntimeState } from './state';
@@ -16,6 +17,7 @@ export interface HighlighterControllerDeps {
       isModeEnabled: () => boolean;
       isPaused: () => boolean;
       isFrameEditing: () => boolean;
+      getStandaloneCreation?: () => StandaloneAnnotationCreationOptions | undefined;
     }
   ) => HoverController;
   createState?: () => HighlighterRuntimeState;
@@ -49,6 +51,6 @@ export interface HighlighterController {
   ) => void;
   removeHighlight: (id: string) => void;
   resume: () => void;
-  setCreationEnabled: (enabled: boolean) => void;
+  setCreationEnabled: (enabled: boolean, standalone?: StandaloneAnnotationCreationOptions) => void;
   setFrameEditing: () => void;
 }

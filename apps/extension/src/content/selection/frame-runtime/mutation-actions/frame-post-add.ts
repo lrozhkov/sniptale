@@ -1,10 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type {
-  AppliedBorderSettings,
-  BlurSettings,
-  FocusSettings,
-  FrameData,
-} from '../../../../features/highlighter/contracts';
+import type { FrameData } from '../../../../features/highlighter/contracts';
 import { invalidateFrameCache } from '../../highlighter';
 import type { MutableRef } from './types';
 
@@ -17,12 +12,7 @@ export function applyAddedFrameSideEffects(args: {
 }) {
   invalidateFrameCache();
   initializeStepBadgeValue(args.frameData, args.isAutoMode, args.recalculateStepBadgesRef);
-  logAddedFrame(
-    args.frameData,
-    args.frameData.borderSettings!,
-    args.frameData.blurSettings!,
-    args.frameData.focusSettings!
-  );
+  logAddedFrame(args.frameData);
 }
 
 function initializeStepBadgeValue(
@@ -37,22 +27,17 @@ function initializeStepBadgeValue(
   recalculateStepBadgesRef.current();
 }
 
-function logAddedFrame(
-  frameData: FrameData,
-  borderSettings: AppliedBorderSettings,
-  blurSettings: BlurSettings,
-  focusSettings: FocusSettings
-) {
+function logAddedFrame(frameData: FrameData) {
   logger.log(
     'Frame added',
     frameData.id,
     'effectMode',
     frameData.effectMode,
     'borderPreset',
-    borderSettings.sourcePresetName ?? 'manual',
+    frameData.borderSettings?.sourcePresetName ?? 'manual',
     'blurSettings',
-    blurSettings,
+    frameData.blurSettings,
     'focusSettings',
-    focusSettings
+    frameData.focusSettings
   );
 }

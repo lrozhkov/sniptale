@@ -1,3 +1,4 @@
+import type { AnnotationPlacementControl } from '../creation-placement';
 import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState } from 'react';
 
@@ -52,6 +53,7 @@ export function FutureStepBadgeSettingsPopover(props: {
   headerContext?: SettingsPopoverContext;
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
+  creationPlacement?: AnnotationPlacementControl;
 }) {
   const inspector = useInspectorLayout();
   const locale = useAppLocale();
@@ -130,6 +132,7 @@ export function FutureStepBadgeSettingsPopover(props: {
       style={{ ...presentation.style, width: SETTINGS_POPOVER_WIDTH }}
     >
       <StepBadgePopoverContent
+        {...(props.creationPlacement ? { creationPlacement: props.creationPlacement } : {})}
         frameId={FUTURE_ID}
         frameVisuals={props.frameVisuals}
         headerContext={headerContext}

@@ -27,12 +27,10 @@ export function ModeSelectorButton(props: {
         props.onToggle();
       }}
       aria-label={props.label}
-      aria-keyshortcuts="1 2 3 4 5 6"
       aria-haspopup="menu"
       aria-expanded={props.open}
     >
       {props.children}
-      <span className="sniptale-mode-selector-label">{props.label}</span>
     </ContentToolbarButton>
   );
 }

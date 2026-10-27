@@ -1,3 +1,4 @@
+import type { StandaloneAnnotationCreationOptions } from '../../../features/highlighter/contracts';
 import type { HighlighterLogger, HoverController } from './controller.types';
 import { dispatchFrameEditingChanged } from '../../platform/page-context/mode-events';
 import {
@@ -100,10 +101,17 @@ export function createHighlighterStateActions(props: {
       props.state.isPaused = false;
       props.logger.log('Highlighter resumed');
     },
-    setCreationEnabled: (enabled: boolean) => {
-      if (props.state.isCreationEnabled === enabled) return;
+    setCreationEnabled: (enabled: boolean, standalone?: StandaloneAnnotationCreationOptions) => {
+      const previous = props.state.standaloneCreation;
+      const next = enabled ? standalone : undefined;
+      const changedTool =
+        previous?.annotationKind !== next?.annotationKind ||
+        previous?.placement !== next?.placement;
+      if (props.state.isCreationEnabled === enabled && !changedTool) return;
       props.state.isCreationEnabled = enabled;
-      if (!enabled) suspendHighlighterCreationUi(props.hoverController);
+      if (next) props.state.standaloneCreation = { ...next };
+      else delete props.state.standaloneCreation;
+      if (!enabled || changedTool) suspendHighlighterCreationUi(props.hoverController);
       props.logger.log(`Highlighter frame creation ${enabled ? 'enabled' : 'disabled'}`);
     },
     setFrameEditing: () => {

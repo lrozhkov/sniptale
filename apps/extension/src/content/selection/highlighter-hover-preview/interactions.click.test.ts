@@ -2,7 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const targetResolver = vi.hoisted(() => ({ resolveSelectablePageHtmlElement: vi.fn() }));
+const targetResolver = vi.hoisted(() => ({
+  resolveSelectablePageHtmlElement: vi.fn(),
+  resolveDrawablePageHtmlElement: vi.fn(),
+}));
 const targetPolicy = vi.hoisted(() => ({
   hasBlockingHighlighterPopover: vi.fn(() => false),
   isInsideExistingFrame: vi.fn(() => false),
@@ -197,3 +200,46 @@ describe('highlighter hover click interaction', () => {
     expect(hideHoverOverlay).toHaveBeenCalledOnce();
   });
 });
+
+it.each(['element', 'free'] as const)(
+  'creates standalone content with %s placement instead of another frame',
+  (placement) => {
+    const target = document.createElement('div');
+    document.body.append(target);
+    vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: 100, y: 200, width: 200, height: 100 })
+    );
+    if (placement === 'free')
+      targetResolver.resolveDrawablePageHtmlElement.mockReturnValueOnce(target);
+    else targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(target);
+    const addFrame = vi.fn();
+    const addFreeFrame = vi.fn();
+    const session = createHoverSession();
+    const handlers = createHoverInteractionHandlers({
+      getCallbacks: () => ({ addFrame, addFreeFrame, hasFrameForElement: () => true }),
+      getState: {
+        isFrameEditing: () => false,
+        isModeEnabled: () => true,
+        isPaused: () => false,
+        getStandaloneCreation: () => ({ annotationKind: 'step-badge', placement }),
+      },
+      hoverThrottleMs: 100,
+      overlayActions: { hideHoverOverlay: vi.fn(), showHoverOverlay: vi.fn() },
+      session,
+    });
+    handlers.handleClick(createClickEvent(140, 220));
+    expect(addFrame).not.toHaveBeenCalled();
+    expect(addFreeFrame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        annotationKind: 'step-badge',
+        width: 1,
+        height: 1,
+        x: placement === 'element' ? 200 : 140,
+        y: placement === 'element' ? 250 : 220,
+        pagePlacement: expect.any(Object),
+      }),
+      target
+    );
+    target.remove();
+  }
+);

@@ -1,3 +1,7 @@
+import {
+  createDefaultFrameCallout,
+  createDefaultFrameStepBadge,
+} from '../../features/highlighter/frame-annotation/defaults';
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -184,3 +188,79 @@ function createRect(width: number, height: number): DOMRect {
     toJSON: () => ({}),
   } as DOMRect;
 }
+
+it.each(['callout', 'step-badge'] as const)(
+  'removes an empty standalone %s through the existing history command',
+  (annotationKind) => {
+    const object = createFrameAnnotationProxy({
+      frame: {
+        id: 'standalone',
+        annotationKind,
+        x: 20,
+        y: 30,
+        width: 1,
+        height: 1,
+        ...(annotationKind === 'callout'
+          ? { callout: createDefaultFrameCallout() }
+          : { stepBadge: createDefaultFrameStepBadge() }),
+      },
+      label: 'Standalone',
+      ordering: 0,
+    });
+    const other = createFrameAnnotationProxy({
+      frame: {
+        id: 'other',
+        x: 100,
+        y: 100,
+        width: 80,
+        height: 60,
+        stepBadge: { ...createDefaultFrameStepBadge(), value: '2' },
+      },
+      label: 'Other',
+      ordering: 1,
+    });
+    fabricCanvas = new Canvas(undefined, { renderOnAddRemove: false });
+    fabricCanvas.add(object, other);
+    fabricCanvas.requestRenderAll = vi.fn();
+    const controller: EditorFrameAnnotationPlaneController = {
+      canvas: fabricCanvas,
+      canvasDocumentSize: { width: 400, height: 300 },
+      commitHistory: vi.fn(),
+      prepareObject: vi.fn(),
+      syncRuntimeState: vi.fn(),
+    };
+    function Harness() {
+      const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+      const interaction = useFrameAnnotationInteraction({
+        activeTool: 'frame-annotation',
+        canvasRef,
+        controller,
+      });
+      return (
+        <>
+          <canvas ref={canvasRef} />
+          <button
+            onClick={() => {
+              const snapshot = readFrameAnnotationSnapshot(object)!;
+              interaction.objectActions.commitSnapshot(object, {
+                ...snapshot,
+                ...(annotationKind === 'callout'
+                  ? { callout: { ...snapshot.callout!, enabled: false } }
+                  : { stepBadge: { ...snapshot.stepBadge!, enabled: false } }),
+              });
+            }}
+          />
+        </>
+      );
+    }
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    act(() => root?.render(<Harness />));
+    act(() => host?.querySelector('button')?.click());
+    expect(fabricCanvas.getObjects()).toEqual([other]);
+    expect(readFrameAnnotationSnapshot(other)?.stepBadge?.value).toBe('1');
+    expect(controller.commitHistory).toHaveBeenCalledOnce();
+    expect(controller.syncRuntimeState).toHaveBeenCalledOnce();
+  }
+);

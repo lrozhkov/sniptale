@@ -6,6 +6,7 @@ import type { AnchorPresentation } from '../host-layout/service';
 import { createCalloutRenderKey } from '../../../../features/highlighter/frame-annotation/callout/model';
 
 export type FrameRenderDescriptor = {
+  annotationKind: FrameData['annotationKind'];
   blurAmount: number | undefined;
   blurType: string | undefined;
   blurShowBorder: boolean | undefined;
@@ -98,6 +99,7 @@ function buildFrameRenderDescriptor(
     blurShowBorder: frame.blurSettings?.showBorder,
     blurType: frame.blurSettings?.blurType,
     effectMode: frame.effectMode,
+    annotationKind: frame.annotationKind,
     focusBlurAmount: frame.focusSettings?.blurAmount,
     focusOpacity: frame.focusSettings?.opacity,
     focusShowBorder: frame.focusSettings?.showBorder,

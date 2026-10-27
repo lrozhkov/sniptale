@@ -109,6 +109,7 @@ export function areInteractiveFramePropsEqual(
   nextProps: InteractiveFrameProps
 ): boolean {
   if (prevProps.frame.id !== nextProps.frame.id) return false;
+  if (prevProps.frame.annotationKind !== nextProps.frame.annotationKind) return false;
   if (prevProps.frame.effectMode !== nextProps.frame.effectMode) return false;
   if (prevProps.defaultEffectMode !== nextProps.defaultEffectMode) return false;
   if (hasMeaningfulRectChange(prevProps, nextProps)) return false;

@@ -42,7 +42,10 @@ export function useStepBadgeControlPosition(args: {
 }
 
 export function FrameStepBadgeControls(props: {
-  drag: ReturnType<typeof useStepBadgeBoundaryDrag>;
+  drag: Pick<
+    ReturnType<typeof useStepBadgeBoundaryDrag>,
+    'isDragging' | 'handlePointerDown' | 'handleKeyDown'
+  >;
   visibility: ReturnType<typeof useTransientControlVisibility>;
   onSettingsClick?: () => void;
   portalTarget: Element | DocumentFragment;

@@ -3,8 +3,13 @@ import type {
   FrameData,
   FreeFrameInput,
 } from '../../../../features/highlighter/contracts';
-import { createFrameDataFromElement } from '../manager/coords';
-import { buildFrameForAdd, buildFreeFrameForAdd } from './frame-build';
+import { createFrameDataFromElement, calculateFrameOffsetFromElement } from '../manager/coords';
+import { createCompositeSelector } from '../../../platform/frame/selectors';
+import {
+  buildFrameForAdd,
+  buildFreeFrameForAdd,
+  buildStandaloneAnnotationForAdd,
+} from './frame-build';
 import { applyAddedFrameSideEffects } from './frame-post-add';
 import type { UseFrameMutationActionHelperOptions } from './types';
 import { requestFrameCalloutEdit, useFrameUIStore } from '../state/frame-ui.store';
@@ -114,8 +119,8 @@ export function createAddFreeFrameHandler(
     generateFrameId: () => string;
   }
 ) {
-  return (input: FreeFrameInput) => {
-    const frameData = buildFreeFrameForAdd({
+  return (input: FreeFrameInput, sourceElement?: HTMLElement) => {
+    const buildArgs = {
       globalEffectModeRef: args.globalEffectModeRef,
       globalStepBadgeAutoModeRef: args.globalStepBadgeAutoModeRef,
       sessionBlurSettingsRef: args.sessionBlurSettingsRef,
@@ -123,7 +128,15 @@ export function createAddFreeFrameHandler(
       sessionStepBadgeTemplateRef: args.sessionStepBadgeTemplateRef,
       generateFrameId: args.generateFrameId,
       input,
-    });
+    };
+    const built =
+      input.annotationKind === undefined
+        ? buildFreeFrameForAdd(buildArgs)
+        : buildStandaloneAnnotationForAdd({ ...buildArgs, annotationKind: input.annotationKind });
+    const frameData =
+      built.annotationKind && sourceElement
+        ? linkStandaloneAnnotation(built, sourceElement, args.hostLayoutServiceRef.current)
+        : built;
     if (frameData.callout?.enabled) {
       requestFrameCalloutEdit(frameData.id);
     }
@@ -145,5 +158,35 @@ export function createAddFreeFrameHandler(
     });
     useFrameUIStore.getState().clearSelection();
     return frameData;
+  };
+}
+
+function linkStandaloneAnnotation(
+  frame: FrameData,
+  element: HTMLElement,
+  hostLayout: CreateAddFrameHandlerArgs['hostLayoutServiceRef']['current']
+): FrameData {
+  if (!element.isConnected || !frame.pagePlacement) return frame;
+  const selector = createCompositeSelector(element);
+  const linkedElementSelector = selector.iframeSelector
+    ? `${selector.iframeSelector} => ${selector.elementSelector}`
+    : selector.elementSelector;
+  const accepted = hostLayout.link(
+    frame.id,
+    element,
+    linkedElementSelector,
+    {
+      pagePlacement: frame.pagePlacement,
+      rect: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+    },
+    { requireAcceptedInitial: true }
+  );
+  if (!accepted) return frame;
+  return {
+    ...frame,
+    ...accepted.rect,
+    pagePlacement: accepted.pagePlacement,
+    linkedElementSelector,
+    offset: calculateFrameOffsetFromElement(frame, element),
   };
 }

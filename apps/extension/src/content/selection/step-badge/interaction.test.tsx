@@ -15,9 +15,15 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('../../../features/highlighter/frame-annotation/step-badge/drag', () => ({
-  useStepBadgeBoundaryDrag: mocks.useStepBadgeBoundaryDrag,
-}));
+vi.mock(
+  '../../../features/highlighter/frame-annotation/step-badge/drag',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../features/highlighter/frame-annotation/step-badge/drag')
+    >()),
+    useStepBadgeBoundaryDrag: mocks.useStepBadgeBoundaryDrag,
+  })
+);
 vi.mock(
   '../../../features/highlighter/frame-annotation/step-badge/controls',
   async (importOriginal) => ({

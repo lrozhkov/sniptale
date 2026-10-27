@@ -252,3 +252,13 @@ describe('areInteractiveFramePropsEqual', () => {
     expect(areInteractiveFramePropsEqual(prevProps, nextProps)).toBe(false);
   });
 });
+
+it('renders a changed annotation kind even when the stored geometry is unchanged', () => {
+  const previous = createProps();
+  expect(
+    areInteractiveFramePropsEqual(previous, {
+      ...previous,
+      frame: { ...previous.frame, annotationKind: 'callout' },
+    })
+  ).toBe(false);
+});

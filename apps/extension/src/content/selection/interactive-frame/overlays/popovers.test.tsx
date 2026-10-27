@@ -372,3 +372,31 @@ describe('InteractiveFramePopovers', () => {
     expect(stagedFrame.additionalCallouts?.[0]?.content.bodyHtml).toBe('<p>Updated extra</p>');
   });
 });
+
+it.each(['callout', 'step-badge'] as const)(
+  'routes standalone %s deletion to the owner command',
+  (annotationKind) => {
+    const frame = createFrameDataFixture('standalone', {
+      annotationKind,
+      callout: createDefaultCalloutSettings(),
+      stepBadge: { enabled: true, type: 'number', value: '1' },
+    });
+    const onDeleteAnnotation = vi.fn();
+    renderNode(
+      <InteractiveFramePopovers
+        {...createPopoversProps({ frame, currentFrame: frame })}
+        onDeleteAnnotation={onDeleteAnnotation}
+      />
+    );
+    const props =
+      annotationKind === 'callout'
+        ? calloutSettingsPopoverMock.mock.calls.at(-1)![0]
+        : stepBadgePopoverMock.mock.calls.at(-1)![0];
+    const remove = annotationKind === 'callout' ? props['onDelete'] : props['onDisable'];
+    expect(typeof remove).toBe('function');
+    act(() => {
+      if (typeof remove === 'function') remove();
+    });
+    expect(onDeleteAnnotation).toHaveBeenCalledOnce();
+  }
+);

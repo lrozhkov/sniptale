@@ -1,3 +1,4 @@
+import type { StandaloneAnnotationCreationOptions } from '../../../features/highlighter/contracts';
 import { createLazyContentDefaultOwner } from '../../application/default-owner';
 import { registerContentMode } from '../../application/mode-session';
 import { createHighlighterController } from './controller';
@@ -64,8 +65,13 @@ export function resumeHighlighter(): void {
   highlighterControllerOwner.getOwner().resume();
 }
 
-export function setHighlighterCreationEnabled(enabled: boolean): void {
-  highlighterControllerOwner.getOwner().setCreationEnabled(enabled);
+export function setHighlighterCreationEnabled(
+  enabled: boolean,
+  standalone?: StandaloneAnnotationCreationOptions
+): void {
+  const owner = highlighterControllerOwner.getOwner();
+  if (standalone) owner.setCreationEnabled(enabled, standalone);
+  else owner.setCreationEnabled(enabled);
 }
 
 export function setFrameEditing(): void {

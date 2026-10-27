@@ -1,3 +1,5 @@
+import type { StandaloneAnnotationCreationOptions } from '../../../features/highlighter/contracts';
+
 type HighlighterFrameCallbacks = {
   addFrame: ((element: HTMLElement) => void) | null;
   addFreeFrame: import('../../../features/highlighter/contracts').AddFreeFrameCallback | null;
@@ -9,6 +11,7 @@ type HighlighterFrameCallbacks = {
 export type HighlighterRuntimeState = {
   isModeEnabled: boolean;
   isCreationEnabled: boolean;
+  standaloneCreation?: StandaloneAnnotationCreationOptions;
   isPaused: boolean;
   isFrameEditing: boolean;
   cleanupEventListeners: (() => void) | null;
@@ -51,6 +54,7 @@ export function createHighlighterStateGetters(state: HighlighterRuntimeState) {
     isModeEnabled: () => state.isModeEnabled,
     isPaused: () => state.isPaused || !state.isCreationEnabled,
     isFrameEditing: () => state.isFrameEditing,
+    getStandaloneCreation: () => state.standaloneCreation,
   };
 }
 

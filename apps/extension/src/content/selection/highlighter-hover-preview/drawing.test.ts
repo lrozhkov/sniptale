@@ -49,7 +49,10 @@ import { useFrameUIStore } from '../frame-runtime/state/frame-ui.store';
 import { setFrameSessionBorderPreset } from '../frame-runtime/session/border-preset';
 import { DEFAULT_BORDER_PRESET } from '../../../features/highlighter/style/defaults';
 import { createFrameSelectionEventHandlers } from '../frame-runtime/ui-controller/activation';
-import type { FrameData } from '../../../features/highlighter/contracts';
+import type {
+  FrameData,
+  StandaloneAnnotationCreationOptions,
+} from '../../../features/highlighter/contracts';
 
 class TestPointerEvent extends MouseEvent implements FreeFramePointerEvent {
   readonly pointerId: number;
@@ -101,7 +104,7 @@ function createMouseMoveEvent(x: number, y: number, target: HTMLElement): MouseE
   return event;
 }
 
-function createFixture() {
+function createFixture(standalone?: StandaloneAnnotationCreationOptions) {
   const session = createHoverSession();
   const addFrame = vi.fn();
   const addFreeFrame = vi.fn();
@@ -109,6 +112,7 @@ function createFixture() {
   const showHoverOverlay = vi.fn(() => true);
   const getCallbacks = () => ({ addFrame, addFreeFrame, hasFrameForElement: null });
   const getState = {
+    getStandaloneCreation: () => standalone,
     isFrameEditing: () => false,
     isModeEnabled: () => true,
     isPaused: () => false,
@@ -611,3 +615,19 @@ describe('free frame drawing cancellation and continuity', () => {
     expect(document.querySelector('.sniptale-free-frame-draft-portal')).toBeNull();
   });
 });
+
+it.each(['callout', 'step-badge'] as const)(
+  'does not create a frame drag while the standalone %s tool is selected',
+  (annotationKind) => {
+    const { handlers, session, addFreeFrame } = createFixture({
+      annotationKind,
+      placement: 'free',
+    });
+    const target = document.createElement('div');
+    handlers.handlePointerDown(createPointerEvent('pointerdown', 20, 20, target));
+    handlers.handlePointerMove(createPointerEvent('pointermove', 150, 150, target));
+    handlers.handlePointerUp(createPointerEvent('pointerup', 150, 150, target));
+    expect(session.freeDraw.gesture).toBeNull();
+    expect(addFreeFrame).not.toHaveBeenCalled();
+  }
+);

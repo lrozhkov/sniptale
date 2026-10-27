@@ -59,9 +59,13 @@ export function InteractiveFrameFloatingUi(props: InteractiveFrameFloatingUiProp
   });
   return (
     <>
-      <InteractiveFrameToolbar {...getToolbarProps(props, captureVisibility)} />
-      <InteractiveFrameToolbarTrigger {...getTriggerProps(props, captureVisibility)} />
-      <InteractiveFrameSizePanel {...getSizePanelProps(props)} />
+      {props.frame.annotationKind === undefined ? (
+        <>
+          <InteractiveFrameToolbar {...getToolbarProps(props, captureVisibility)} />
+          <InteractiveFrameToolbarTrigger {...getTriggerProps(props, captureVisibility)} />
+          <InteractiveFrameSizePanel {...getSizePanelProps(props)} />
+        </>
+      ) : null}
       <InteractiveFrameBlockingOverlays {...getOverlayProps(props)} />
     </>
   );

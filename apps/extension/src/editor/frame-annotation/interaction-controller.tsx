@@ -291,6 +291,22 @@ function createObjectSnapshotActions(input: ObjectActionInput) {
       input.pendingHistoryRef.current = false;
       input.pendingPreviewObjectRef.current = null;
       input.updateDraft(null);
+      const emptyStandalone =
+        snapshot.annotationKind !== undefined &&
+        !snapshot.stepBadge?.enabled &&
+        !snapshot.callout?.enabled &&
+        !snapshot.additionalCallouts?.some((callout) => callout.enabled);
+      if (emptyStandalone) {
+        runCommand({
+          command: 'delete',
+          controller: props.controller,
+          forceRender: input.forceRender,
+          object,
+          setSelectedId: input.setSelectedId,
+          snapshot,
+        });
+        return;
+      }
       commitFrameAnnotationProxy(object, snapshot);
       synchronizeFrameAnnotationAutoStepBadges(props.controller.canvas?.getObjects?.() ?? []);
       props.controller.canvas?.requestRenderAll();

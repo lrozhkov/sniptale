@@ -29,6 +29,7 @@ interface InteractiveFrameCalloutOverlayProps {
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
   onUpdate: (frame: FrameData) => void;
+  onDeleteAnnotation?: () => void;
 }
 
 function createCalloutActions(args: {
@@ -59,6 +60,11 @@ function createCalloutActions(args: {
     apply: args.apply,
     callout: args.callout,
     onDelete: () => {
+      if (args.props.currentFrame.annotationKind === 'callout' && args.props.onDeleteAnnotation) {
+        args.props.onDeleteAnnotation();
+        args.props.setIsCalloutEditing(false);
+        return;
+      }
       const nextFrame = args.props.stageCalloutFrame
         ? args.props.stageCalloutFrame(
             (current) => removeFrameCallout(current, args.props.calloutIndex ?? 0) as FrameData

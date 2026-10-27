@@ -216,6 +216,7 @@ function canStartDrawing(props: {
     !props.getState.isModeEnabled() ||
     props.getState.isPaused() ||
     props.getState.isFrameEditing() ||
+    props.getState.getStandaloneCreation?.() !== undefined ||
     hasBlockingHighlighterPopover()
   ) {
     return null;
