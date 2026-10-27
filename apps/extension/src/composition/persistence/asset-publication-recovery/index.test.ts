@@ -791,3 +791,32 @@ it('retains logical-only intent when objects are absent and authority is ambiguo
   expect(harness.get('asset_operations', operation.operationId)).toEqual(operation);
   expect(mocks.deleteObject).not.toHaveBeenCalled();
 });
+
+it('selects the registered replica adapter and continues after a deferred replica', async () => {
+  const { recoverStandaloneAssetPublications } = await import('../assets/recovery');
+  const { recordingAssetPublicationAdapter } = await import('../recordings/asset-publication');
+  const harness = createDbHarness([]);
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  mocks.recoverStandalone.mockImplementation(recoverStandaloneAssetPublications);
+  const failedReplica = {
+    assetRefs: [],
+    createdAt: 1,
+    domain: 'sync-replica',
+    journalId: 'retained-replica',
+    payload: { kind: 'media', input: null },
+  };
+  const recording = {
+    assetRefs: [],
+    createdAt: 1,
+    domain: 'recording-assets',
+    journalId: 'recording',
+    payload: {},
+  };
+  mocks.journals.mockResolvedValue([failedReplica, recording]);
+  await expect(recoverPendingAssetPublications()).resolves.toBe(1);
+  expect(recordingAssetPublicationAdapter.publish).toHaveBeenCalledWith(
+    recording,
+    expect.anything()
+  );
+  expect(mocks.deleteJournal.mock.calls).toEqual([['recording']]);
+});

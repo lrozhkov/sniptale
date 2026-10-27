@@ -1,3 +1,4 @@
+import { syncReplicaPublicationAdapter } from '../sync-capture/replica-publication';
 import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
 import { completePhysicalDeleteOperations } from '../assets/operations';
@@ -549,6 +550,7 @@ async function recoverPublications(
             scenarioHtmlPublicationAdapter,
             imageWorkspacePublicationAdapter,
             webSnapshotPublicationAdapter,
+            syncReplicaPublicationAdapter,
           ],
           transitionPermit
         )

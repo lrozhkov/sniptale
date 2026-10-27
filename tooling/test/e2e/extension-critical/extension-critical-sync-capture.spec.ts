@@ -256,3 +256,67 @@ test('native media source revision crosses isolated browser profiles and survive
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+test('prepared replica recovery survives restart before and after native commit', async ({}, info) => {
+  test.setTimeout(120_000);
+  const host = await startHostServer();
+  let context: BrowserContext | undefined;
+  const options = { viewport: { width: 1920, height: 900 }, deviceScaleFactor: 1, headless: true };
+  try {
+    context = await chromium.launchPersistentContext(
+      info.outputPath('recovery-source-profile'),
+      options
+    );
+    const source = await context.newPage();
+    await applyHarnessBootstrap(source, { preserveMediaLibrary: true });
+    await source.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await source.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const payload = await source.evaluate(() => window.syncCaptureHarness.mediaSourceProof());
+    await context.close();
+    const results = [];
+    for (const commitBeforeRestart of [false, true]) {
+      const profile = info.outputPath(
+        commitBeforeRestart ? 'recovery-committed-profile' : 'recovery-prepared-profile'
+      );
+      context = await chromium.launchPersistentContext(profile, options);
+      const page = await context.newPage();
+      await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
+      await page.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+      await page.waitForFunction(() => Boolean(window.syncCaptureHarness));
+      const staged = await page.evaluate(
+        ({ payload, commitBeforeRestart }) =>
+          window.syncCaptureHarness.stageMediaReplicaForRecovery(payload, commitBeforeRestart),
+        { payload, commitBeforeRestart }
+      );
+      await context.close();
+      context = await chromium.launchPersistentContext(profile, options);
+      const restarted = await context.newPage();
+      await applyHarnessBootstrap(restarted, { preserveMediaLibrary: true });
+      await restarted.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+      await restarted.waitForFunction(() => Boolean(window.syncCaptureHarness));
+      const recovered = await restarted.evaluate(
+        ({ mediaId, journalId }) =>
+          window.syncCaptureHarness.recoverMediaReplicaProof(mediaId, journalId),
+        staged
+      );
+      expect(recovered).toMatchObject({
+        hash: payload.hash,
+        noEcho: true,
+        stableReplay: true,
+        journalSettled: true,
+        cleanupWithHeldPermit: true,
+      });
+      expect(recovered.basis).toEqual([payload.capture.operationId]);
+      results.push({ staged, recovered, fullBrowserRestart: true });
+      await context.close();
+    }
+    await writeFile(
+      info.outputPath('replica-recovery-proof.json'),
+      JSON.stringify(results, null, 2)
+    );
+  } finally {
+    await context?.close();
+    host.server.closeAllConnections();
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

@@ -1,3 +1,10 @@
+import { publishReadyJournalWithRetry } from '../../../apps/extension/src/composition/persistence/assets';
+import {
+  createPreparedReplicaJournal,
+  publishPreparedReplicaJournal,
+} from '../../../apps/extension/src/composition/persistence/sync-capture/replica-publication';
+import { recoverAssetPublications } from '../../../apps/extension/src/composition/persistence/asset-publication-recovery';
+import { listReadyJournals } from '../../../apps/extension/src/composition/persistence/assets';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { applyPreparedMediaReplica } from '../../../apps/extension/src/composition/persistence/sync-capture/apply-media';
 import { harnessReady } from './browser-mocks/browser-mocks';
@@ -921,8 +928,8 @@ async function mediaSourceProof() {
   };
 }
 
-/** Exercise native ingestion without claiming provider or durable staging recovery proof. */
-async function mediaReplicaProof(payload: unknown) {
+/** Verify source bytes and prepare a local binding in this disposable profile. */
+async function prepareTransferredMediaReplica(payload: unknown) {
   await harnessReady;
   check(
     isRecord(payload) &&
@@ -971,6 +978,13 @@ async function mediaReplicaProof(payload: unknown) {
     connectionGeneration: 1,
     expectedLocalGeneration: 0,
   };
+  return { input, hash: payload['hash'] };
+}
+
+/** Exercise native ingestion without claiming provider transfer proof. */
+async function mediaReplicaProof(payload: unknown) {
+  const { input, hash } = await prepareTransferredMediaReplica(payload);
+  const { rows } = input;
   const db = await initDB();
   check(
     (await db.get('media_library', rows.media.id)) === undefined,
@@ -998,10 +1012,10 @@ async function mediaReplicaProof(payload: unknown) {
     'Accepted source replay was not a duplicate.'
   );
   check((await changes()).length === 0, 'Incoming source application emitted an outgoing capture.');
-  await releaseAssetReadyProtection([prepared.ref.assetId]);
+  await releaseAssetReadyProtection([rows.ref.assetId]);
   return {
     mediaId: rows.media.id,
-    hash: payload['hash'],
+    hash,
     rollback: true,
     parallel: true,
     duplicate: true,
@@ -1029,7 +1043,157 @@ async function verifyMediaReplicaPersistence(mediaId: string) {
   return { hash: await sha(await readAssetFile(ref, media.filename)), basis: state.basis };
 }
 
+/** Leave the real ready journal at a controlled restart boundary. */
+async function stageMediaReplicaForRecovery(payload: unknown, commitBeforeRestart: boolean) {
+  const { input, hash } = await prepareTransferredMediaReplica(payload);
+  const journal = await createPreparedReplicaJournal({ kind: 'media', input });
+  check(journal.operationId === undefined, 'A replica journal was treated as a backup session.');
+  if (commitBeforeRestart) await publishPreparedReplicaJournal(journal);
+  const db = await initDB();
+  const exists = (await db.get('media_library', input.rows.media.id)) !== undefined;
+  check(exists === commitBeforeRestart, 'The restart boundary has an unexpected native source.');
+  check(
+    (await listReadyJournals()).some((entry) => entry.journalId === journal.journalId),
+    'The prepared source has no durable recovery journal.'
+  );
+  check(
+    (await sha(await readAssetFile(input.rows.ref, input.rows.media.filename))) === hash,
+    'The journal did not preserve the verified source bytes.'
+  );
+  return { mediaId: input.rows.media.id, journalId: journal.journalId, hash, commitBeforeRestart };
+}
+
+/** Exercise detached cleanup while the canonical retry owner holds its lifecycle permit. */
+async function replacePreparedProjectUnderJournal() {
+  const file = await coloredSource('rgb(20,80,240)');
+  const prepared = await writeBlobToAsset(file, { mimeType: file.type });
+  const privateId = crypto.randomUUID();
+  const candidate = createEmptyVideoProject('Disposable recovered project');
+  candidate.assets = [
+    createVideoProjectAsset(
+      'Disposable private source',
+      VideoProjectAssetType.IMAGE,
+      { kind: 'project-asset', projectAssetId: privateId },
+      {
+        width: 24,
+        height: 24,
+        duration: null,
+        mimeType: file.type,
+        size: file.size,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    ),
+  ];
+  const root = {
+    entry: {
+      id: candidate.id,
+      project: candidate,
+      createdAt: candidate.createdAt,
+      updatedAt: candidate.updatedAt,
+    },
+    assets: [
+      {
+        entry: {
+          id: privateId,
+          assetId: prepared.ref.assetId,
+          mimeType: file.type,
+          size: file.size,
+          createdAt: Date.now(),
+        },
+        ref: prepared.ref,
+        filename: 'disposable.png',
+        publishToLibrary: false,
+      },
+    ],
+  };
+  const first = await createPreparedReplicaJournal({
+    kind: 'video-project',
+    input: {
+      root,
+      operationId: crypto.randomUUID(),
+      sourceDigest: await sha(new Blob([JSON.stringify(root)])),
+      connectionGeneration: 1,
+      expectedLocalGeneration: 0,
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  candidate.name = 'Later draft outside the prepared revision';
+  await publishReadyJournalWithRetry(first, publishPreparedReplicaJournal);
+  const current = await project(candidate.id);
+  check(
+    current.project.name === 'Disposable recovered project',
+    'Prepared journal followed a later caller draft.'
+  );
+  check(
+    typeof current.workspaceRevision === 'number',
+    'The admitted project has no native revision.'
+  );
+  const replacement = {
+    entry: { ...current, project: { ...current.project, assets: [] } },
+    assets: [],
+  };
+  const next = await createPreparedReplicaJournal({
+    kind: 'video-project',
+    input: {
+      root: replacement,
+      operationId: crypto.randomUUID(),
+      sourceDigest: await sha(new Blob([JSON.stringify(replacement)])),
+      connectionGeneration: 1,
+      expectedLocalGeneration: 1,
+      expectedWorkspaceRevision: current.workspaceRevision,
+      dependencies: [],
+    },
+  });
+  await publishReadyJournalWithRetry(next, publishPreparedReplicaJournal);
+  const db = await initDB();
+  check(
+    (await project(candidate.id)).project.assets.length === 0 &&
+      (await db.get('project_assets', privateId)) === undefined &&
+      (await db.get('asset_refs', prepared.ref.assetId)) === undefined,
+    'Project replacement did not release only its detached private source.'
+  );
+  await refused(() => readAssetFile(prepared.ref, 'disposable.png'));
+  check(
+    (await changes()).length === 0,
+    'Recovered project publication emitted an outgoing capture.'
+  );
+  return true;
+}
+
+async function recoverMediaReplicaProof(mediaId: string, journalId: string) {
+  await harnessReady;
+  await recoverAssetPublications();
+  check(
+    !(await listReadyJournals()).some((entry) => entry.journalId === journalId),
+    'The accepted replica journal did not settle after recovery.'
+  );
+  check((await changes()).length === 0, 'Replica recovery emitted an outgoing capture.');
+  const first = await verifyMediaReplicaPersistence(mediaId);
+  await recoverAssetPublications();
+  const second = await verifyMediaReplicaPersistence(mediaId);
+  check(
+    JSON.stringify(first) === JSON.stringify(second),
+    'Repeated recovery changed the admitted source.'
+  );
+  const cleanupWithHeldPermit = await replacePreparedProjectUnderJournal();
+  check(
+    (await verifyMediaReplicaPersistence(mediaId)).hash === second.hash,
+    'Detached cleanup removed an unrelated Library source.'
+  );
+  return {
+    ...second,
+    noEcho: true,
+    stableReplay: true,
+    journalSettled: true,
+    cleanupWithHeldPermit,
+  };
+}
+
 const syncCaptureHarness = {
+  stageMediaReplicaForRecovery,
+  recoverMediaReplicaProof,
   mediaSourceProof,
   mediaReplicaProof,
   verifyMediaReplicaPersistence,

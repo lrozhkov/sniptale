@@ -1,4 +1,5 @@
 import type { IDBPTransaction } from 'idb';
+import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -491,7 +492,8 @@ async function publishApplication(
 
 /** Caller retains staged bytes and verifies sourceDigest before this native command. */
 export async function applyPreparedVideoProjectRevision(
-  input: ApplyPreparedVideoProjectRevisionInput
+  input: ApplyPreparedVideoProjectRevisionInput,
+  lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<{ status: 'applied' | 'duplicate'; generation: number }> {
   if (
     !input.operationId ||
@@ -546,6 +548,6 @@ export async function applyPreparedVideoProjectRevision(
     }
   });
   if (operation.assetIds.length || operation.privateSources?.length)
-    await completePhysicalDeleteOperation(operation).catch(() => undefined);
+    await completePhysicalDeleteOperation(operation, lifecyclePermit).catch(() => undefined);
   return result;
 }

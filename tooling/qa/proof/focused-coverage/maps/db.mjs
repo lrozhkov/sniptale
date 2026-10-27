@@ -1,5 +1,18 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'sync-replica-durable-native-admission',
+    productionFile:
+      'apps/extension/src/composition/persistence/sync-capture/replica-publication.ts',
+    reason:
+      'Delayed replica recovery must preserve native concurrency, deletion, recreation and retry guards. ' +
+      'The existing media, project and journal suites prove these admission boundaries.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/replica-publication.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-canonical-media-deletion',
     productionFile: 'apps/extension/src/composition/persistence/media-library/delete-cascade.ts',
     reason:

@@ -2761,6 +2761,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "ff8afcaca7bcc58159b143fadf5f6c69e04c776ad2ac2d87a69be63ebd08ac67",
       "signatureHash": "8f851fd09dd55225e411bc30cf58bf55a7bed33ed76d1d5a5206557829c1e22c"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/asset-publication-recovery/index.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: This existing recovery fixture adds one deferred replica case at the same recovery seam. The case retains the failed journal while normal recording recovery completes. It uses the existing database harness and mock receiver. No new fixture implementation, production authority or shared test lifetime appears. File score2/delta0 and owners1/effects1/state1/cohesion1 remain unchanged. Splitting by length would separate proof of the same recovery owner. Fresh final architecture review must independently verify this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess a new fixture lifetime, independent mutation receiver, transaction owner or unrelated recovery responsibility. Remove when the analyzer recognizes this cohesive recovery proof boundary. Fresh final architecture review must verify the classification before closeout.",
+      "reviewDate": "2026-10-27",
+      "astHash": "4cc609ad5b5acb78c71603f765c8efa95faba302d67e7dedd69c51875704b429",
+      "signatureHash": "0ece55c51959c99f26c9a34d41fd6f591a383d1de0c56ee9ebefb3d6950ef887"
     }
   ]
 }

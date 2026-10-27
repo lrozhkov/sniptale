@@ -252,6 +252,17 @@ Favicon acquisition requires the configured option and an invoked capture. It us
 
 ## Experimental sync capture retention
 
-The local `sync_capture` store retains frozen project metadata, dependency descriptors and asset references. It can contain filenames and source metadata already admitted by native domain parsers. Do not retain credentials, authorization headers, or media Blobs in capture records. Do not copy capture payloads into logs or diagnostics. The project-owned `video_project_revisions` store retains only local project identifiers and admission counters.
+The local `sync_capture` store retains frozen project and media metadata, dependency descriptors and asset references. It can contain filenames and source metadata already admitted by native domain parsers. Do not retain credentials, authorization headers, or media Blobs in capture records. Do not copy capture payloads into logs or diagnostics. The project-owned `video_project_revisions` store retains only local project identifiers and admission counters.
 
 Pending capture claims protect source bytes after domain references disappear. Do not expire these claims without a verified settlement transition. The experiment has no remote settlement transition and therefore keeps its pending claims. Malformed capture records make physical retention authority invalid and prevent cleanup. Whole-local-data erasure must remove both stores with the canonical database and OPFS objects. The test harness exists only in `test-e2e` builds. It does not add a remote apply route to the release.
+
+
+## Prepared sync replica recovery
+
+Prepared replicas use the existing asset ready journal and OPFS protection. A journal retains exact local asset references until native publication commits or an explicit retention-aware cancellation removes its claim. Project dependencies can share protected references without changing their native owners.
+
+The bounded payload contains parsed native media or project metadata and the remote operation identity. It contains no credentials, authorization headers, media Blobs or binary sidecars. The caller must verify original bytes and the source digest before creating the journal. Metadata hashes alone do not establish physical integrity.
+
+The logical operation identity stays inside the replica payload. The outer journal has no backup operation identity. Canonical startup recovery uses the registered replica adapter. A refused item retains its journal and files, then defers without blocking unrelated recovery. Diagnostics contain a static event code, never payloads, filenames, addresses or raw exception text. Diagnostics do not own publication state.
+
+Native publication commits source records, ownership, causal state and receipt atomically. Recovery after commit uses the receipt to avoid another publication. The existing journal owner removes the ready journal after success. Project cleanup reuses the caller's active lifecycle permit and remains outside the native transaction. Canonical local-data erasure removes these journals and objects through the existing lifecycle authority.

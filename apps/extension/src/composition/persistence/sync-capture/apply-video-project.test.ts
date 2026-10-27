@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
   createVideoProjectEntryWithMediaClip,
@@ -451,7 +452,10 @@ it('releases only detached private assets after publication and retains the nati
   expect(fixture.table('asset_refs').has(entry.assetId)).toBe(false);
   expect(fixture.table('asset_refs').get(fixture.ref.assetId)).toEqual(fixture.ref);
   expect(io.cleanup).toHaveBeenCalledOnce();
-  expect(io.cleanup).toHaveBeenCalledWith(expect.objectContaining({ assetIds: [entry.assetId] }));
+  expect(io.cleanup).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: [entry.assetId] }),
+    undefined
+  );
 });
 
 function privateCopy(
@@ -551,4 +555,22 @@ it('refuses malformed prepared assets and trashed incoming projects', async () =
     });
     expect(fixture.rows).toEqual(before);
   }
+});
+
+it('forwards the active lifecycle permit to detached cleanup after commit', async () => {
+  const fixture = setup();
+  await applyPreparedVideoProjectRevision(privateCopy(fixture.input));
+  const replacement = structuredClone(fixture.input);
+  replacement.operationId = 'replacement-with-held-lifecycle';
+  replacement.expectedLocalGeneration = 1;
+  replacement.expectedWorkspaceRevision = 1;
+  await runWithDurableAssetLifecycleLock(async (permit) => {
+    await applyPreparedVideoProjectRevision(replacement, permit);
+    expect(io.cleanup).toHaveBeenCalledWith(
+      expect.objectContaining({ assetIds: ['private-body'] }),
+      permit
+    );
+    expect(fixture.table('video_projects').get(projectId)).toMatchObject({ workspaceRevision: 2 });
+    expect(fixture.table('project_assets').has('private-copy')).toBe(false);
+  });
 });
