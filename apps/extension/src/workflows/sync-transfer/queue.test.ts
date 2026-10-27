@@ -552,3 +552,32 @@ it.each([
   expect(remote.calls.map(({ method }) => method)).toEqual(['write', 'read']);
   expect(f.nativeSources()).toEqual(source);
 });
+
+it('executes and recovers a selected operation with more than 128 unrelated queued operations', async () => {
+  const f = setup();
+  for (let i = 0; i < 129; i++) await enqueueSyncQueueOperation(f.capture(`other-${i}`));
+  const capture = f.capture('selected');
+  await enqueueSyncQueueOperation(capture);
+  const source = f.nativeSources();
+  const abandoned = await beginSyncQueueRun(scope, capture.operationId, 1);
+  const recovered = await recoverInterruptedSyncQueueOperation(
+    scope,
+    capture.operationId,
+    abandoned.revision
+  );
+  expect(recovered).toMatchObject({ status: 'finished', operation: { status: 'interrupted' } });
+  if (recovered.status !== 'finished') throw new Error('Expected recovered operation.');
+  const retry = await commandSyncQueueOperation(
+    scope,
+    capture.operationId,
+    recovered.operation.revision,
+    'retry'
+  );
+  const remote = memoryRemote();
+  expect(await execute(capture, remote.adapter, retry.revision)).toMatchObject({
+    status: 'finished',
+    operation: { status: 'published', outcome: 'verified' },
+  });
+  expect(remote.writes()).toHaveLength(1);
+  expect(f.nativeSources()).toEqual(source);
+});

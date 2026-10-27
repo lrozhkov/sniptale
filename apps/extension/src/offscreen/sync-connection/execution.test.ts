@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SyncConnectionMetadata } from '../../composition/persistence/remote-connection/model';
-import type {
-  SyncQueueConnection,
-  SyncQueueOperation,
-} from '../../composition/persistence/sync-capture/queue-model';
+import type { SyncQueueOperation } from '../../composition/persistence/sync-capture/queue-model';
 import type {
   loadSyncConnection,
   loadSyncConnectionAuthentication,
 } from '../../composition/persistence/remote-connection/store';
-import type { loadSyncQueue } from '../../composition/persistence/sync-capture/queue';
+import type { loadSyncQueueOperation } from '../../composition/persistence/sync-capture/queue';
 import type { createSyncConnectionRequests } from '../../workflows/sync-transfer/connection-requests';
 import type { runSyncQueueOperation } from '../../workflows/sync-transfer/queue';
 import type { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
@@ -21,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn<(store: string, key: string) => Promise<unknown>>(),
   connection: vi.fn<typeof loadSyncConnection>(),
   authentication: vi.fn<typeof loadSyncConnectionAuthentication>(),
-  queue: vi.fn<typeof loadSyncQueue>(),
+  queue: vi.fn<typeof loadSyncQueueOperation>(),
   requests: vi.fn<typeof createSyncConnectionRequests>(),
   request: vi.fn<ReturnType<typeof createSyncConnectionRequests>['request']>(),
   close: vi.fn<() => Promise<void>>(),
@@ -36,7 +33,9 @@ vi.mock('../../composition/persistence/remote-connection/store', () => ({
   loadSyncConnection: mocks.connection,
   loadSyncConnectionAuthentication: mocks.authentication,
 }));
-vi.mock('../../composition/persistence/sync-capture/queue', () => ({ loadSyncQueue: mocks.queue }));
+vi.mock('../../composition/persistence/sync-capture/queue', () => ({
+  loadSyncQueueOperation: mocks.queue,
+}));
 vi.mock('../../workflows/sync-transfer/connection-requests', () => ({
   createSyncConnectionRequests: mocks.requests,
 }));
@@ -104,17 +103,6 @@ function operation(overrides: Partial<SyncQueueOperation> = {}): SyncQueueOperat
     ...overrides,
   };
 }
-const queueConnection: SyncQueueConnection = {
-  ...input().scope,
-  version: 1,
-  kind: 'queue-connection',
-  key: 'queue-connection',
-  revision: 1,
-  paused: false,
-  eventSequence: 0,
-  pendingTransitions: [],
-  droppedTransitions: 0,
-};
 const capture = { nativeCapture: 'frozen-source' };
 const remote: SyncRemoteStore = {
   list: vi.fn(async () => ({ objects: [], prefixes: [], nextCursor: null })),
@@ -127,7 +115,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.connection.mockResolvedValue(connection());
   mocks.authentication.mockResolvedValue({ kind: 'bearer', accessToken: 'first' });
-  mocks.queue.mockResolvedValue({ connection: queueConnection, operations: [operation()] });
+  mocks.queue.mockResolvedValue(operation());
   mocks.database.mockResolvedValue({ get: mocks.get });
   mocks.get.mockResolvedValue(capture);
   mocks.close.mockResolvedValue(undefined);
@@ -153,7 +141,7 @@ describe('native sync execution adapter', () => {
       containment: 'contained',
       snapshot: { state: 'published', stage: 'published', runId: null, failureCode: null },
     });
-    expect(mocks.queue).toHaveBeenCalledExactlyOnceWith(selected.scope);
+    expect(mocks.queue).toHaveBeenCalledExactlyOnceWith(selected.scope, selected.operationId);
     expect(mocks.get).toHaveBeenCalledExactlyOnceWith('sync_capture', 'native-capture');
     expect(mocks.webdav).toHaveBeenCalledExactlyOnceWith(
       {
@@ -240,10 +228,11 @@ describe('native sync execution adapter', () => {
     }
   );
 
-  it.each([{ operations: [] }, { operations: [operation({ revision: 4 })] }])(
+  it.each(['missing', 'stale'] as const)(
     'refuses a missing or stale queue selection',
-    async ({ operations }) => {
-      mocks.queue.mockResolvedValue({ connection: queueConnection, operations });
+    async (state) => {
+      if (state === 'missing') mocks.queue.mockRejectedValue(new Error('Missing queue operation.'));
+      else mocks.queue.mockResolvedValue(operation({ revision: 4 }));
       expect(await createSyncQueueExecution(input(), async () => true).run()).toMatchObject({
         containment: 'contained',
         snapshot: { state: 'failed', failureCode: 'internal' },

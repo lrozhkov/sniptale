@@ -823,6 +823,10 @@ Physical database version 43 advances syncCapture to contract version 4. The mig
 
 The sync-capture owner stores queue controls and verified manifest results under disjoint keys in sync_outbox. Connection controls bind the space, namespace generation and profile creation timestamp. Operation controls also bind the retained capture digest. Owner revisions reject stale commands. Each execution receives a fresh run ID. Stage events preserve that command revision.
 
+The native queue offers bounded pages and an exact operation reader. Each read checks the current profile and retained capture joins. A page contains at most 128 operations and an explicit continuation cursor. The reader checks one additional row to determine continuation. The cursor binds the enrollment lifetime and last operation key. It grants no mutation authority.
+
+Each page uses one readonly transaction. Multiple pages do not share a snapshot. Refresh from the beginning to discover later insertions before the cursor. Changed enrollment refuses an old cursor. Selected execution and recovery read only the requested operation. Unrelated invalid rows cannot prevent that selection. The legacy pilot projection retains its explicit 128-entry refusal.
+
 Queue pause does not disable capture enrollment. Accepted local edits and tombstones still enter native capture while transfer is paused. Operation pause and cancellation fence late callbacks. They preserve captures, preparations, physical attempts, checked files and source claims. An issued write can retain an unknown outcome. Cancellation promises no remote rollback.
 
 The transfer workflow holds one native exclusive lock per operation. Independent operations can execute concurrently. Recovery requires an available lock and the exact interrupted run. A timer cannot prove that a server writer stopped. Lock identities encode scope primitives in a fixed order.

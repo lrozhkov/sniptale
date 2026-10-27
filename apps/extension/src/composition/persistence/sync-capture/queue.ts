@@ -179,6 +179,75 @@ export async function loadSyncQueue(
   await tx.done;
   return { connection, operations };
 }
+/** Continuation within one enrollment lifetime. Pages are live reads, not a shared snapshot. */
+interface SyncQueueCursor {
+  scope: SyncQueueScope;
+  afterOperationId: string;
+}
+/** Read one exact retained capture join without scanning unrelated operations. */
+export async function loadSyncQueueOperation(
+  value: SyncQueueScope,
+  operationId: string
+): Promise<SyncQueueOperation> {
+  const scope = scopeInput(value);
+  if (!queueIdentity(operationId)) throw new Error('Invalid sync queue operation identity.');
+  const db = await initDB();
+  const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
+  await checkProfile(tx, scope);
+  const operation = await readOperation(tx, scope, operationId);
+  await tx.done;
+  return operation;
+}
+function pageInput(scope: SyncQueueScope, options: unknown) {
+  const input: unknown = structuredClone(options);
+  if (!isRecord(input)) throw new Error('Invalid sync queue page.');
+  const limit = input['limit'] === undefined ? 50 : input['limit'];
+  if (!queueOrdinal(limit) || limit < 1 || limit > 128)
+    throw new Error('Invalid sync queue page limit.');
+  const cursor = input['cursor'];
+  let afterOperationId: string | null = null;
+  if (cursor !== undefined && cursor !== null) {
+    const cursorScope = isRecord(cursor) ? parseSyncQueueScope(cursor['scope']) : null;
+    if (
+      !isRecord(cursor) ||
+      !cursorScope ||
+      !sameQueueScope(scope, cursorScope) ||
+      !queueIdentity(cursor['afterOperationId'])
+    )
+      throw new Error('Invalid sync queue cursor.');
+    afterOperationId = cursor['afterOperationId'];
+  }
+  return { limit, afterOperationId };
+}
+/** Read bounded native pages. Refresh from the beginning to discover earlier insertions. */
+export async function loadSyncQueuePage(value: SyncQueueScope, options: unknown = {}) {
+  const scope = scopeInput(value);
+  const { limit, afterOperationId } = pageInput(scope, options);
+  const db = await initDB();
+  const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
+  await checkProfile(tx, scope);
+  const connection = await readConnection(tx, scope);
+  const prefix = queueOperationPrefix(scope);
+  const range = IDBKeyRange.bound(
+    afterOperationId === null ? prefix : queueOperationKey(scope, afterOperationId),
+    `${prefix}\uffff`,
+    afterOperationId !== null
+  );
+  const rows: unknown[] = await tx.objectStore(SYNC_OUTBOX_STORE).getAll(range, limit + 1);
+  const operations: SyncQueueOperation[] = [];
+  for (const raw of rows) {
+    const row = parseSyncQueueOperation(raw);
+    if (!row || !sameQueueScope(row, scope)) throw new Error('Invalid sync queue operation.');
+    operations.push(await readOperation(tx, scope, row.operationId));
+  }
+  await tx.done;
+  const more = operations.length > limit;
+  if (more) operations.pop();
+  const last = operations.at(-1);
+  const nextCursor: SyncQueueCursor | null =
+    more && last ? { scope, afterOperationId: last.operationId } : null;
+  return { connection, operations, nextCursor };
+}
 /** Freeze the exact retained native capture identity; repeated enqueue is idempotent. */
 export async function enqueueSyncQueueOperation(value: unknown): Promise<SyncQueueOperation> {
   const capture = parseSyncCaptureRecord(structuredClone(value));

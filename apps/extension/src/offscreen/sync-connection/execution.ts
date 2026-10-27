@@ -10,7 +10,7 @@ import {
   sameConnectionScope,
   sameSyncConnectionIdentity,
 } from '../../composition/persistence/remote-connection/model';
-import { loadSyncQueue } from '../../composition/persistence/sync-capture/queue';
+import { loadSyncQueueOperation } from '../../composition/persistence/sync-capture/queue';
 import { createSyncConnectionRequests } from '../../workflows/sync-transfer/connection-requests';
 import { runSyncQueueOperation } from '../../workflows/sync-transfer/queue';
 import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
@@ -79,9 +79,8 @@ export function createSyncQueueExecution(
       };
       try {
         const connection = await current();
-        const queue = await loadSyncQueue(selection.scope);
-        const operation = queue.operations.find((row) => row.operationId === operationId);
-        if (!operation || operation.revision !== expectedRevision)
+        const operation = await loadSyncQueueOperation(selection.scope, operationId);
+        if (operation.revision !== expectedRevision)
           throw new Error('Sync queue selection refused.');
         const db = await initDB();
         const capture: unknown = await db.get(SYNC_CAPTURE_STORE, operation.captureKey);

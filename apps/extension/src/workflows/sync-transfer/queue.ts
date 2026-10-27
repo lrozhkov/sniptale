@@ -4,7 +4,7 @@ import {
   beginSyncQueueRun,
   completeSyncQueueRun,
   failSyncQueueRun,
-  loadSyncQueue,
+  loadSyncQueueOperation,
   recoverSyncQueueRun,
   type SyncQueueOperation,
   type SyncQueueRun,
@@ -61,11 +61,6 @@ function failureCode(error: unknown): SyncQueueFailureCode {
   }
   return 'internal';
 }
-async function operation(scope: SyncQueueScope, id: string) {
-  const row = (await loadSyncQueue(scope)).operations.find((item) => item.operationId === id);
-  if (!row) throw new Error('Sync queue operation missing.');
-  return row;
-}
 
 /** Recover only after the native live runner lock is available. No timer establishes this fact. */
 export async function recoverInterruptedSyncQueueOperation(
@@ -79,7 +74,7 @@ export async function recoverInterruptedSyncQueueOperation(
     { mode: 'exclusive', ifAvailable: true },
     async (lock) => {
       if (!lock) return { status: 'busy' };
-      const row = await operation(frozen, operationId);
+      const row = await loadSyncQueueOperation(frozen, operationId);
       if (row.status !== 'running' || row.revision !== expectedRevision || !row.runId)
         throw new Error('Sync queue recovery refused.');
       const recovered = await recoverSyncQueueRun({
@@ -127,7 +122,7 @@ export async function runSyncQueueOperation(input: {
     { mode: 'exclusive', ifAvailable: true },
     async (lock) => {
       if (!lock) return { status: 'busy' };
-      const current = await operation(scope, operationId);
+      const current = await loadSyncQueueOperation(scope, operationId);
       if (current.revision !== expectedRevision) throw new Error('Stale sync queue execution.');
       if (current.status === 'published') return { status: 'finished', operation: current };
       const run = await beginSyncQueueRun(scope, operationId, expectedRevision, authorization);
@@ -214,7 +209,7 @@ async function finishFailure(run: SyncQueueRun, code: SyncQueueFailureCode): Pro
   try {
     return { status: 'finished', operation: await failSyncQueueRun(run, code) };
   } catch {
-    const current = await operation(run.scope, run.operationId);
+    const current = await loadSyncQueueOperation(run.scope, run.operationId);
     if (current.runId === run.runId && current.revision === run.revision)
       throw new Error('Sync queue failure could not persist.');
     return { status: 'finished', operation: current };
