@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { reconcileManagedCatalog } from '../../../composition/persistence/ai-settings/catalog-reconciliation';
+import { supportsAIModelOperation } from '../../../contracts/settings/model-operation';
 import type { AIProvider } from '../../../contracts/settings';
 import {
   getAIProviderDefinition,
@@ -323,3 +325,134 @@ describe('managed refresh flights', () => {
     });
   });
 });
+
+it.each(['retired', 'active'])(
+  'does not publish executable facts from conflicting cursor pages: %s',
+  async (status) => {
+    const transport = vi
+      .fn()
+      .mockResolvedValueOnce(
+        json({
+          models: [{ name: 'models/m', supportedGenerationMethods: ['generateContent'] }],
+          nextPageToken: 'next',
+        })
+      )
+      .mockResolvedValueOnce(
+        json({ models: [{ name: 'models/m', supportedGenerationMethods: [], status }] })
+      );
+    const page = await readProviderCatalog({
+      provider: provider('google'),
+      apiKey: 'fixture-secret',
+      now: 1,
+      beforeSend: async () => undefined,
+      transport,
+    });
+    expect(page.complete).toBe(false);
+    expect(page.models[0]?.facts.lifecycle).toBe(status === 'retired' ? 'retired' : 'unknown');
+    const result = reconcileManagedCatalog({
+      providerId: 'provider',
+      scope: 'scope',
+      models: [],
+      observations: page.models,
+      complete: page.complete,
+      now: 1,
+      referencedModelIds: new Set(),
+      createId: () => 'stable',
+    });
+    expect(supportsAIModelOperation(result.models[0]!, 'text')).toBe(false);
+    expect(transport).toHaveBeenCalledTimes(2);
+    const recovery = reconcileManagedCatalog({
+      providerId: 'provider',
+      scope: 'scope',
+      models: result.models,
+      observations: [
+        {
+          modelCode: 'm',
+          facts: {
+            ...page.models[0]!.facts,
+            lifecycle: 'active',
+            capabilities: {
+              operations: { text: 'supported' },
+              input: {},
+              output: {},
+              features: {},
+            },
+          },
+        },
+      ],
+      complete: true,
+      now: 2,
+      referencedModelIds: new Set(),
+      createId: () => 'must-not-recreate',
+    });
+    expect(recovery.models[0]?.id).toBe('stable');
+    expect(supportsAIModelOperation(recovery.models[0]!, 'text')).toBe(true);
+  }
+);
+
+it.each(['active', 'retired'])(
+  'does not replace conflicted Ollama facts with enrichment: %s',
+  async (status) => {
+    const transport = vi.fn(async (input) =>
+      String(input).endsWith('/show')
+        ? json({ capabilities: ['completion'] })
+        : json({
+            models: [
+              { name: 'local', capabilities: ['completion'] },
+              { name: 'local', capabilities: [], status },
+            ],
+          })
+    );
+    const page = await readProviderCatalog({
+      provider: provider('ollama'),
+      apiKey: '',
+      now: 1,
+      beforeSend: async () => undefined,
+      transport,
+    });
+    expect(page.complete).toBe(false);
+    expect(page.models[0]?.facts.lifecycle).toBe(status === 'retired' ? 'retired' : 'unknown');
+    expect(page.models[0]?.facts.capabilities.operations).toEqual({});
+    expect(transport).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps identical cursor duplicates complete and executable without duplicating records', async () => {
+  const entry = { name: 'models/m', supportedGenerationMethods: ['generateContent'] };
+  const transport = vi
+    .fn()
+    .mockResolvedValueOnce(json({ models: [entry], nextPageToken: 'next' }))
+    .mockResolvedValueOnce(json({ models: [entry] }));
+  const page = await readProviderCatalog({
+    provider: provider('google'),
+    apiKey: 'fixture-secret',
+    now: 1,
+    beforeSend: async () => undefined,
+    transport,
+  });
+  expect(page.complete).toBe(true);
+  expect(page.models).toHaveLength(1);
+  expect(page.models[0]?.facts.capabilities.operations.text).toBe('supported');
+  expect(transport).toHaveBeenCalledTimes(2);
+});
+
+it.each([null, 42])(
+  'keeps unknown Ollama detail metadata unavailable for execution: %j',
+  async (details) => {
+    const transport = vi
+      .fn()
+      .mockResolvedValueOnce(json({ models: [{ name: 'local' }] }))
+      .mockResolvedValueOnce(json(details));
+    const page = await readProviderCatalog({
+      provider: provider('ollama'),
+      apiKey: '',
+      now: 1,
+      beforeSend: async () => undefined,
+      transport,
+    });
+    expect(page.models).toHaveLength(1);
+    expect(page.models[0]?.modelCode).toBe('local');
+    expect(page.models[0]?.facts.capabilities.operations).toEqual({});
+    expect(transport).toHaveBeenCalledTimes(2);
+  }
+);

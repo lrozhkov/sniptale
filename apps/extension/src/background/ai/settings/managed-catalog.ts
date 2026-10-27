@@ -13,6 +13,7 @@ import { createProviderSdkFetch } from '../llm/transport/http';
 import { AIProviderRequestError, classifyAIProviderFailure } from '../providers';
 import {
   parseAICatalogPage,
+  mergeConflictingCatalogModels,
   type ParsedCatalogPage,
   type ParsedCatalogModel,
 } from './catalog-parser';
@@ -141,9 +142,10 @@ async function collectCatalogPages(
     for (let model of page.models) {
       model = await enrichCatalogModel(model, baseUrl, protocol, now, jsonRequest);
       const previous = models.get(model.modelCode);
-      if (previous && JSON.stringify(previous.facts) !== JSON.stringify(model.facts))
+      if (previous && JSON.stringify(previous.facts) !== JSON.stringify(model.facts)) {
         complete = false;
-      else models.set(model.modelCode, model);
+        models.set(model.modelCode, mergeConflictingCatalogModels(previous, model));
+      } else models.set(model.modelCode, model);
       if (models.size > MAX_MODELS) throw new AIProviderRequestError('unknown');
     }
     cursor = page.nextCursor;
@@ -161,7 +163,12 @@ async function enrichCatalogModel(
   now: number,
   jsonRequest: CatalogReader
 ): Promise<ParsedCatalogModel> {
-  if (protocol !== 'ollama') return model;
+  if (
+    protocol !== 'ollama' ||
+    model.facts.lifecycle === 'unknown' ||
+    model.facts.lifecycle === 'retired'
+  )
+    return model;
   const details = await jsonRequest(`${baseUrl}/show`, { model: model.modelCode });
   if (typeof details !== 'object' || details === null || Array.isArray(details)) return model;
   return (

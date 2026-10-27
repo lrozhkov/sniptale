@@ -1,5 +1,16 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'background-managed-catalog-receiver',
+    productionFile: 'apps/extension/src/background/ai/settings/managed-catalog.ts',
+    reason:
+      'Parser, bounded reader and runtime consumers cover catalog conflicts, native metadata enrichment, credential preparation, scoped failure observations and refresh admission.',
+    testFiles: [
+      'apps/extension/src/background/ai/settings/catalog-parser.test.ts',
+      'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
+      'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
+    ],
+  },
+  {
     owner: 'background-audio-job-coordinator',
     productionFile: 'apps/extension/src/background/ai/audio/service.ts',
     exclusive: true,

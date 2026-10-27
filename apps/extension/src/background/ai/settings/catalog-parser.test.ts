@@ -172,3 +172,63 @@ describe('provider catalog metadata', () => {
     ]);
   });
 });
+
+it.each([
+  { statuses: ['active', 'retired'] },
+  { statuses: ['retired', 'active'] },
+  { statuses: ['active', 'retired', 'active'] },
+])(
+  'retains retirement and removes disputed capabilities for duplicate rows $statuses',
+  ({ statuses }) => {
+    const page = parseAICatalogPage(
+      {
+        data: statuses.map((status) => ({
+          id: 'exact-id',
+          type: 'chat',
+          status,
+          name: 'Disputed label',
+          expiration_date: status === 'retired' ? '2020-01-01T00:00:00Z' : '2030-01-01T00:00:00Z',
+        })),
+      },
+      'openai',
+      Date.parse('2026-01-01T00:00:00Z')
+    );
+    expect(page.complete).toBe(false);
+    expect(page.models).toHaveLength(1);
+    expect(page.models[0]).toMatchObject({
+      modelCode: 'exact-id',
+      facts: {
+        displayName: 'exact-id',
+        lifecycle: 'retired',
+        retirementAt: Date.parse('2020-01-01T00:00:00Z'),
+        capabilities: { operations: {}, input: {}, output: {}, features: {} },
+      },
+    });
+  }
+);
+
+it('keeps identical duplicate facts complete and clears contradictory operation claims', () => {
+  const entry = { id: 'm', type: 'chat' };
+  expect(parseAICatalogPage({ data: [entry, entry] }, 'openai', 1)).toMatchObject({
+    complete: true,
+    models: [
+      { facts: { lifecycle: 'active', capabilities: { operations: { text: 'supported' } } } },
+    ],
+  });
+  const page = parseAICatalogPage(
+    { data: [entry, { id: 'm', type: 'embedding' }, entry] },
+    'openai',
+    1
+  );
+  expect(page).toMatchObject({
+    complete: false,
+    models: [
+      {
+        facts: {
+          lifecycle: 'unknown',
+          capabilities: { operations: {}, input: {}, output: {}, features: {} },
+        },
+      },
+    ],
+  });
+});

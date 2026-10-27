@@ -230,6 +230,29 @@ function parseModel(
   };
 }
 
+/** Preserves retirement evidence and clears disputed capabilities for the same exact remote identity. */
+export function mergeConflictingCatalogModels(
+  previous: ParsedCatalogModel,
+  incoming: ParsedCatalogModel
+): ParsedCatalogModel {
+  const dates = [previous.facts.retirementAt, incoming.facts.retirementAt].filter(
+    (date): date is number => date !== undefined
+  );
+  return {
+    modelCode: incoming.modelCode,
+    facts: {
+      displayName: incoming.modelCode,
+      observedAt: Math.max(previous.facts.observedAt, incoming.facts.observedAt),
+      lifecycle:
+        previous.facts.lifecycle === 'retired' || incoming.facts.lifecycle === 'retired'
+          ? 'retired'
+          : 'unknown',
+      capabilities: { operations: {}, input: {}, output: {}, features: {} },
+      ...(dates.length ? { retirementAt: Math.min(...dates) } : {}),
+    },
+  };
+}
+
 /** Parses untrusted provider metadata. Partial results never authorize catalog deletion. */
 export function parseAICatalogPage(
   value: unknown,
@@ -248,9 +271,10 @@ export function parseAICatalogPage(
       continue;
     }
     const previous = models.get(parsed.modelCode);
-    if (previous && JSON.stringify(previous.facts) !== JSON.stringify(parsed.facts))
+    if (previous && JSON.stringify(previous.facts) !== JSON.stringify(parsed.facts)) {
       complete = false;
-    else models.set(parsed.modelCode, parsed);
+      models.set(parsed.modelCode, mergeConflictingCatalogModels(previous, parsed));
+    } else models.set(parsed.modelCode, parsed);
   }
   const pagination = record(root['pagination']) ? root['pagination'] : {};
   const nextCursor = boundedString(
