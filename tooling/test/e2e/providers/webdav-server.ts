@@ -300,8 +300,8 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
     armFault(fault: Fault) {
       if (closed || armed || reached || release)
         throw new Error('DAV lab fault is already active.');
-      if (fault.kind === 'lost-response' && fault.method !== 'PUT' && fault.method !== 'MKCOL') {
-        throw new Error('Lost-response faults require PUT or MKCOL.');
+      if (fault.kind === 'lost-response' && !['PUT', 'MKCOL', 'GET'].includes(fault.method)) {
+        throw new Error('Lost-response faults require PUT, MKCOL or GET.');
       }
       if (
         fault.status !== undefined &&

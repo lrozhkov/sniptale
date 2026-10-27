@@ -9,6 +9,10 @@ import {
   loadSyncWorkspaceAllocation,
   type SyncWorkspaceAllocation,
 } from '../../composition/persistence/remote-connection/workspace-allocation';
+import {
+  loadSyncWorkspaceJoin,
+  type SyncWorkspaceJoin,
+} from '../../composition/persistence/remote-connection/workspace-join';
 import { SyncRemoteError } from './remote-store';
 
 interface ActiveRequest {
@@ -95,6 +99,66 @@ export function createSyncWorkspaceRequests(options: {
           value.phase !== 'preparing-marker' &&
           value.phase !== 'publishing-marker' &&
           value.phase !== 'ready')
+      )
+        throw new SyncRemoteError('authentication');
+      return value;
+    }
+    return tracker.request(signal, issue, async (check) => {
+      const before = await current();
+      check();
+      if (!(await hasOriginPermission(new URL(before.rootUrl).origin)))
+        throw new SyncRemoteError('access-denied');
+      await current();
+      check();
+    });
+  }
+  return { request, close: tracker.close };
+}
+
+/** Own reads and response bodies for one exact native checking JOIN revision. */
+export function createSyncWorkspaceJoinRequests(options: {
+  intent: SyncWorkspaceJoin;
+  hasOriginPermission: (origin: string) => Promise<boolean>;
+}) {
+  let intent: SyncWorkspaceJoin;
+  try {
+    intent = structuredClone(options.intent);
+  } catch {
+    throw new SyncRemoteError('invalid-configuration');
+  }
+  const hasOriginPermission = options.hasOriginPermission;
+  const tracker = createIssuedRequests();
+  async function request(
+    expectedIdentity: unknown,
+    signal: AbortSignal,
+    issue: (signal: AbortSignal) => Promise<Response>
+  ) {
+    let expected: SyncConnectionIdentity | null;
+    try {
+      expected = parseSyncConnectionIdentity(structuredClone(expectedIdentity));
+    } catch {
+      throw new SyncRemoteError('authentication');
+    }
+    async function current() {
+      const value = await loadSyncWorkspaceJoin();
+      if (
+        !expected ||
+        !value ||
+        intent.phase !== 'checking' ||
+        value.phase !== 'checking' ||
+        value.version !== intent.version ||
+        value.kind !== intent.kind ||
+        value.key !== intent.key ||
+        value.provider !== intent.provider ||
+        value.rootUrl !== intent.rootUrl ||
+        value.accountId !== intent.accountId ||
+        value.createdAt !== intent.createdAt ||
+        !sameSyncConnectionIdentity(expected, intent.identity) ||
+        !sameSyncConnectionIdentity(value.identity, expected) ||
+        value.expected?.spaceId !== intent.expected?.spaceId ||
+        value.expected?.bootstrapId !== intent.expected?.bootstrapId ||
+        value.expected?.fingerprint !== intent.expected?.fingerprint ||
+        value.workspace !== null
       )
         throw new SyncRemoteError('authentication');
       return value;

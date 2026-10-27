@@ -67,6 +67,7 @@ export function extensionRollupInputs(layout: ExtensionBuildLayout, mode: string
           input.mode === 'always' ||
           (input.mode === 'non-release' && mode !== 'release') ||
           (input.mode === 'test-e2e' && mode === 'test-e2e') ||
+          (input.mode === 'e2e' && (mode === 'test-e2e' || mode === 'security-e2e')) ||
           (input.mode === 'security-e2e' && mode === 'security-e2e')
       )
       .map((input) => [input.rollupName, input.virtualAbsolutePath])

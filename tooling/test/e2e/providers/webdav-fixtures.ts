@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { readFile, writeFile } from 'node:fs/promises';
 import { test as base, expect, type TestInfo } from '@playwright/test';
 import { launchExtensionBrowser } from '../support/extension-browser-launch';
@@ -108,9 +109,15 @@ export const test = base.extend<{ lab: Lab }>({
   },
 });
 
-export async function openProvider(lab: Lab, info: TestInfo, name: string, connect = true) {
+export async function openProvider(
+  lab: Lab,
+  info: TestInfo,
+  name: string,
+  connect = true,
+  extensionBuildDir = process.env['SNIPTALE_EXTENSION_BUILD_DIR'] ?? '.tmp/e2e-builds/test'
+) {
   const loaded = await launchExtensionBrowser({
-    extensionBuildDir: process.env['SNIPTALE_EXTENSION_BUILD_DIR'] ?? '.tmp/e2e-builds/test',
+    extensionBuildDir,
     userDataDir: info.outputPath(name),
     viewport: { width: 1280, height: 560 },
     ignoreHTTPSErrors: true,
@@ -121,6 +128,39 @@ export async function openProvider(lab: Lab, info: TestInfo, name: string, conne
       `chrome-extension://${loaded.extensionId}/tooling/test/harness/webdav-transfer.html`
     );
     await page.waitForFunction(() => Boolean(window.webdavTransferHarness));
+    const origin = new URL(lab.proxy.rootUrl).origin;
+    if (
+      !(await page.evaluate(
+        (selected) => chrome.permissions.contains({ origins: [`${selected}/*`] }),
+        origin
+      ))
+    ) {
+      // Chrome's extension settings grant the actual optional host without a headless prompt.
+      const settings = await loaded.context.newPage();
+      try {
+        await settings.goto('chrome://extensions/');
+        await settings.waitForFunction('Boolean(chrome.developerPrivate?.addHostPermission)');
+        const session = await loaded.context.newCDPSession(settings);
+        try {
+          const result: unknown = await session.send('Runtime.evaluate', {
+            expression: `new Promise((resolve,reject)=>chrome.developerPrivate.addHostPermission(${JSON.stringify(loaded.extensionId)},${JSON.stringify(origin + '/*')},()=>chrome.runtime.lastError?reject(new Error('Origin grant refused')):resolve(true)))`,
+            awaitPromise: true,
+            returnByValue: true,
+          });
+          if (
+            !isRecord(result) ||
+            result['exceptionDetails'] !== undefined ||
+            !isRecord(result['result']) ||
+            result['result']['value'] !== true
+          )
+            throw new Error('Chrome extension settings refused the optional provider origin.');
+        } finally {
+          await session.detach();
+        }
+      } finally {
+        await settings.close();
+      }
+    }
     await page.evaluate((origin) => {
       const button = document.createElement('button');
       button.textContent = 'Grant provider test origin';

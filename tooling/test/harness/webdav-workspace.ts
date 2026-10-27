@@ -1,3 +1,10 @@
+import {
+  createSyncWorkspaceJoin,
+  loadSyncWorkspaceJoin,
+  abandonSyncWorkspaceJoin,
+} from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-join';
+import { createWebdavWorkspaceJoin } from '../../../apps/extension/src/workflows/sync-transfer/webdav-workspace-join';
+import { createSyncAttempt } from '../../../apps/extension/src/workflows/sync-transfer/wire-record';
 import { enrollSyncWorkspaceConnection } from '../../../apps/extension/src/composition/persistence/remote-connection/store';
 import {
   createSyncWorkspaceAllocation,
@@ -53,7 +60,95 @@ function options(credentials: Credentials) {
 /** Explicit test-only allocation ingress. It installs no profile and enables no capture. */
 export function createWebdavWorkspaceHarness() {
   let active: ReturnType<typeof createWebdavWorkspaceCreation> | null = null;
+  let activeJoin: ReturnType<typeof createWebdavWorkspaceJoin> | null = null;
   return {
+    async planJoin(credentials: Credentials, expected: unknown = null, previous: unknown = null) {
+      await loadSyncWorkspaceJoin();
+      return createSyncWorkspaceJoin(
+        { rootUrl: credentials.rootUrl, accountId: credentials.username, expected },
+        previous
+      );
+    },
+    inspectJoin: () => loadSyncWorkspaceJoin(),
+    abandonJoin: (identity: unknown) => abandonSyncWorkspaceJoin(identity),
+    async stopJoin() {
+      await activeJoin?.close();
+      return { code: 'contained' };
+    },
+    async checkJoin(credentials: Credentials, identity: unknown) {
+      let execution: ReturnType<typeof createWebdavWorkspaceJoin> | null = null;
+      try {
+        if (activeJoin) throw new SyncRemoteError('invalid-configuration');
+        execution = createWebdavWorkspaceJoin({
+          identity,
+          authentication: {
+            kind: 'basic',
+            username: credentials.username,
+            password: credentials.password,
+          },
+          hasOriginPermission: (origin) =>
+            chrome.permissions.contains({ origins: [`${origin}/*`] }),
+        });
+        activeJoin = execution;
+        const result = await execution.run();
+        return {
+          code: 'success',
+          status: null,
+          intent: result.intent,
+          identity: result.identity,
+          operationIds: [...result.catalog.operations.keys()],
+        };
+      } catch (error) {
+        return {
+          ...failure(error),
+          intent: await loadSyncWorkspaceJoin().catch(() => null),
+          identity: null,
+          operationIds: [],
+        };
+      } finally {
+        if (execution) {
+          try {
+            await execution.close();
+          } finally {
+            if (activeJoin === execution) activeJoin = null;
+          }
+        }
+      }
+    },
+    async enrollJoin(credentials: Credentials, identity: unknown) {
+      try {
+        const connection = await enrollSyncWorkspaceConnection(
+          { kind: 'join', identity },
+          { kind: 'basic', username: credentials.username, password: credentials.password }
+        );
+        return { code: 'success', connection };
+      } catch (error) {
+        return { ...failure(error), connection: null };
+      }
+    },
+    async seedJoinRecord(credentials: Credentials, spaceId: string) {
+      const operationId = crypto.randomUUID();
+      const physical = await createSyncAttempt(
+        JSON.stringify({
+          format: 'sniptale-sync-operation',
+          version: 1,
+          spaceId,
+          operationId,
+          rootKind: 'media',
+          rootId: 'join-fixture-root',
+          kind: 'delete',
+          parents: [],
+          dependencies: [],
+          envelope: null,
+          objects: [],
+        }),
+        crypto.randomUUID()
+      );
+      const signal = new AbortController().signal;
+      const remote = await createWebdavRemoteStore(options(credentials), signal);
+      await remote.write(physical.recordKey, new Blob([physical.recordText]), signal);
+      return { operationId, recordKey: physical.recordKey };
+    },
     async stop() {
       await active?.close();
       return { code: 'contained' };

@@ -169,7 +169,10 @@ function parseAllocation(value: unknown): SyncWorkspaceAllocation | null {
     return null;
   }
 }
-async function readAllocation(tx: AllocationTransaction): Promise<SyncWorkspaceAllocation | null> {
+/** Read allocation evidence without repair inside the caller transaction. */
+export async function readSyncWorkspaceAllocation(
+  tx: AllocationTransaction
+): Promise<SyncWorkspaceAllocation | null> {
   const raw: unknown = await tx.objectStore(SYNC_CONNECTION_STORE).get('workspace-allocation');
   return raw === undefined ? null : (parseAllocation(raw) ?? refused());
 }
@@ -178,7 +181,7 @@ export async function readReadySyncWorkspaceAllocation(
   tx: AllocationTransaction,
   expected: SyncConnectionIdentity
 ): Promise<SyncWorkspaceAllocation> {
-  const current = await readAllocation(tx);
+  const current = await readSyncWorkspaceAllocation(tx);
   if (
     !current ||
     current.phase !== 'ready' ||
@@ -191,7 +194,8 @@ export async function readReadySyncWorkspaceAllocation(
 async function checkUnenrolled(tx: AllocationTransaction): Promise<void> {
   const profile: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get('profile');
   const connection: unknown = await tx.objectStore(SYNC_CONNECTION_STORE).get('connection');
-  if (profile !== undefined || connection !== undefined) refused();
+  const join: unknown = await tx.objectStore(SYNC_CONNECTION_STORE).get('workspace-join');
+  if (profile !== undefined || connection !== undefined || join !== undefined) refused();
 }
 async function mutate(
   operation: (
@@ -241,7 +245,7 @@ export async function createSyncWorkspaceAllocation(
   if (!parentUrl) return refused();
   const accountId = detached['accountId'];
   return mutate(async (tx) => {
-    const current = await readAllocation(tx);
+    const current = await readSyncWorkspaceAllocation(tx);
     if (
       current
         ? current.phase !== 'abandoned' ||
@@ -277,7 +281,7 @@ export async function loadSyncWorkspaceAllocation(): Promise<SyncWorkspaceAlloca
   const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE], 'readonly');
   try {
     await checkUnenrolled(tx);
-    const allocation = await readAllocation(tx);
+    const allocation = await readSyncWorkspaceAllocation(tx);
     await tx.done;
     return allocation;
   } catch (error) {
@@ -292,7 +296,7 @@ export async function revokeSyncWorkspaceAllocation(
   const incarnation: unknown = structuredClone(incarnationInput);
   if (!connectionUuid(incarnation)) return refused();
   return mutate(async (tx) => {
-    const current = await readAllocation(tx);
+    const current = await readSyncWorkspaceAllocation(tx);
     if (!current || current.identity.incarnation !== incarnation) return refused();
     if (current.phase === 'abandoned') return current;
     const revision = current.identity.revision + 1;
@@ -315,7 +319,7 @@ export async function recordSyncWorkspaceAllocationRefusal(
   if (!identity || statusInput !== 423 || !Number.isSafeInteger(identity.revision + 1))
     return refused();
   return mutate(async (tx) => {
-    const current = await readAllocation(tx);
+    const current = await readSyncWorkspaceAllocation(tx);
     if (
       !current ||
       current.phase !== 'allocating' ||
@@ -347,7 +351,7 @@ export async function commandSyncWorkspaceAllocation(
   )
     return refused();
   return mutate(async (tx) => {
-    const current = await readAllocation(tx);
+    const current = await readSyncWorkspaceAllocation(tx);
     if (
       !current ||
       !sameSyncConnectionIdentity(current.identity, identity) ||
@@ -387,7 +391,7 @@ export async function prepareSyncWorkspaceMarker(
   const identity = parseSyncConnectionIdentity(structuredClone(expectedInput));
   if (!identity || !Number.isSafeInteger(identity.revision + 1)) return refused();
   return mutate(async (tx) => {
-    const current = await readAllocation(tx);
+    const current = await readSyncWorkspaceAllocation(tx);
     if (
       !current ||
       current.phase !== 'allocated' ||
@@ -421,7 +425,7 @@ export async function completeSyncWorkspaceMarker(
   }
   if (!identity || !evidence || !Number.isSafeInteger(identity.revision + 1)) return refused();
   return mutate(async (tx) => {
-    const current = await readAllocation(tx);
+    const current = await readSyncWorkspaceAllocation(tx);
     if (
       !current ||
       current.version !== 2 ||

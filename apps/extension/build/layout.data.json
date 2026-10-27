@@ -198,7 +198,7 @@
       "outputPath": "tooling/test/harness/webdav-transfer.html",
       "sourcePath": "tooling/test/harness/webdav-transfer.html",
       "rollupName": "testHarnessWebdavTransfer",
-      "mode": "test-e2e"
+      "mode": "e2e"
     }
   ],
   "requiredReleaseArtifacts": [

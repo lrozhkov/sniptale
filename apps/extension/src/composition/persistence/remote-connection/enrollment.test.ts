@@ -12,6 +12,7 @@ import {
   loadSyncConnectionAuthentication,
 } from './store';
 import { withSyncConnectionAdmissionLock } from './coordination';
+import { revokeSyncWorkspaceJoin, type SyncWorkspaceJoin } from './workspace-join';
 import {
   revokeSyncWorkspaceAllocation,
   type SyncWorkspaceAllocation,
@@ -115,6 +116,11 @@ function setup() {
             return {
               get: async (key: string) => structuredClone(table.get(key)),
               count: async () => table.size,
+              getAllKeys: async () => [...table.keys()],
+              delete: async (key: string) => {
+                if (mode !== 'readwrite') throw new Error('Readonly deletion');
+                table.delete(key);
+              },
               put: async (value: unknown) => {
                 if (mode !== 'readwrite') throw new Error('Readonly write');
                 writes += 1;
@@ -504,4 +510,114 @@ it('detaches inputs before asynchronous enrollment work', async () => {
   callerAuth.password = 'changed-password';
   const active = await pending;
   expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(authentication);
+});
+
+function joined(retainAbandonedAllocation = false) {
+  const f = setup();
+  const workspace = {
+    spaceId: f.allocation.spaceId,
+    bootstrapId: f.allocation.bootstrapId,
+    fingerprint: f.allocation.marker!.fingerprint,
+  };
+  const intent: SyncWorkspaceJoin = {
+    version: 1,
+    kind: 'sync-workspace-join',
+    key: 'workspace-join',
+    provider: 'webdav',
+    rootUrl: 'https://dav.example.test/Existing-Space/',
+    accountId: 'alice',
+    createdAt: 2,
+    identity: { incarnation: crypto.randomUUID(), revision: 3 },
+    phase: 'ready',
+    expected: workspace,
+    workspace,
+  };
+  if (retainAbandonedAllocation)
+    f.table().set('workspace-allocation', { ...f.allocation, phase: 'abandoned' });
+  else f.table().delete('workspace-allocation');
+  f.table().set(intent.key, structuredClone(intent));
+  return { ...f, intent, source: { kind: 'join', identity: structuredClone(intent.identity) } };
+}
+it('replays joined enrollment without replacing credentials', async () => {
+  const f = joined();
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication);
+  expect(active.binding.rootUrl).toBe(f.intent.rootUrl);
+  expect(active.workspace).toEqual(f.intent.workspace);
+  expect(f.table('sync_capture').size).toBe(1);
+  const before = structuredClone(f.rows);
+  io.encrypt.mockClear();
+  expect(
+    await enrollSyncWorkspaceConnection(f.source, {
+      ...authentication,
+      password: 'different-password',
+    })
+  ).toEqual(active);
+  expect(io.encrypt).not.toHaveBeenCalled();
+  expect(f.rows).toEqual(before);
+  expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(authentication);
+});
+it('enrolls JOIN with retained abandoned allocation without adopting its root', async () => {
+  const f = joined(true);
+  const before = structuredClone(f.table().get('workspace-allocation'));
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication);
+  expect(active.binding.rootUrl).toBe(f.intent.rootUrl);
+  expect(active.binding.rootUrl).not.toBe(f.allocation.rootUrl);
+  expect(f.table().size).toBe(5);
+  expect(f.table().get('workspace-allocation')).toEqual(before);
+  expect(await enrollSyncWorkspaceConnection(f.source, authentication)).toEqual(active);
+});
+it.each([1, 2, 3, 4])('preserves joined ready evidence after write %s fails', async (index) => {
+  const f = joined();
+  const before = structuredClone(f.rows);
+  f.failWrite(index);
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
+  f.failWrite(0);
+  expect((await enrollSyncWorkspaceConnection(f.source, authentication)).workspace).toEqual(
+    f.intent.workspace
+  );
+});
+it('refuses joined publication after lifetime revocation during crypto', async () => {
+  const f = joined();
+  const held = holdEncryption();
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+  await held.entered;
+  await revokeSyncWorkspaceJoin(f.intent.identity.incarnation);
+  const before = structuredClone(f.rows);
+  held.release();
+  await expect(pending).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
+});
+it('cannot enroll joined evidence in recreated storage after crypto', async () => {
+  const f = joined();
+  const held = holdEncryption();
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+  await held.entered;
+  f.erase();
+  f.table().set('workspace-join', structuredClone(f.intent));
+  const before = structuredClone(f.rows);
+  held.release();
+  await expect(pending).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
+});
+it('refuses a receipt whose source kind differs from the joined source', async () => {
+  const f = joined();
+  await enrollSyncWorkspaceConnection(f.source, authentication);
+  const receipt = f.table().get('workspace-enrollment');
+  if (!isRecord(receipt)) throw new Error('Missing fixture receipt');
+  f.table().set('workspace-enrollment', {
+    ...receipt,
+    source: { kind: 'allocation', identity: f.source.identity },
+  });
+  const before = structuredClone(f.rows);
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
+});
+it.each(['planned', 'checking'])('refuses joined %s evidence before enrollment', async (phase) => {
+  const f = joined();
+  f.table().set('workspace-join', { ...f.intent, phase, workspace: null });
+  const before = structuredClone(f.rows);
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
+  expect(io.encrypt).not.toHaveBeenCalled();
 });

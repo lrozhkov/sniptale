@@ -963,3 +963,14 @@ The transaction installs the capture profile, connection metadata, protected cre
 The receipt identifies a repeated successful source without replacing credentials or rotating identity. The connection retains the checked workspace spaceId, bootstrapId and marker fingerprint. Legacy experimental metadata lacks this identity and retains its previous decoding behavior. Legacy decoding does not establish checked enrollment.
 
 JOIN must produce a native ready source through its selected-root verification workflow before it uses this activation boundary. A read-only catalog snapshot or structurally valid identity cannot activate a connection. Production ingress and remaining release gates remain closed.
+
+
+## Existing workspace JOIN readiness
+
+The remote-connection owner records one selected JOIN root and account under workspace-join in sync_connection. Its planned, checking and ready phases use native incarnation and revision checks. The row contains no credentials or catalog payload. CREATE refuses a present JOIN intent. JOIN permits only absent or valid abandoned CREATE evidence.
+
+Only exact checking evidence can become ready after the existing marker, catalog, marker verification. A repeated check retains the previously checked workspace identity as its expectation. Explicit abandonment or lifetime revocation erases this read-only intent without remote cleanup. Source absence, replacement and erased database handles refuse delayed completion.
+
+Ready JOIN uses the existing atomic connection installer and receipt. It derives endpoint, account and workspace identity from native evidence. Retained abandoned allocation evidence cannot select the joined root or adopt old outbox data. Receipt replay checks source kind as well as identity and binding.
+
+The read-only workflow drains issued requests before it records readiness. Active close revokes the intent, aborts and drains IO. A settled, contained failure retains checking for explicit retry. Production producer registration and activation handoff remain separate required release gates.

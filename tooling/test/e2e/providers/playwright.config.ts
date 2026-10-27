@@ -12,6 +12,7 @@ export default defineConfig({
     'webdav-connection.spec.ts',
     'webdav-workspace.spec.ts',
     'webdav-enrollment.spec.ts',
+    'webdav-join.spec.ts',
   ],
   testIgnore: [],
   outputDir: path.resolve('.tmp/webdav-provider-results'),

@@ -134,7 +134,9 @@ function htmlInputShapeErrors(policy) {
     if (canonicalRelativePath(entry.outputPath) === null) {
       errors.push(`invalid HTML output path: ${String(entry.outputPath)}`);
     }
-    if (!['always', 'manifest', 'non-release', 'security-e2e', 'test-e2e'].includes(entry.mode)) {
+    if (
+      !['always', 'manifest', 'non-release', 'security-e2e', 'test-e2e', 'e2e'].includes(entry.mode)
+    ) {
       errors.push(`unsupported HTML input mode: ${String(entry.mode)}`);
     }
     if (

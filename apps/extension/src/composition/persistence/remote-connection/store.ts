@@ -11,11 +11,16 @@ import {
 } from '@sniptale/platform/security/local-secret-crypto';
 import { capturePreparedDatabase, initDB } from '../infrastructure/indexed-db/core';
 import { runWithPersistenceMutationPermit } from '../infrastructure/mutation-barrier';
-import { parseSyncWorkspaceMarker } from '../../../contracts/sync-workspace';
+import {
+  parseSyncWorkspaceMarker,
+  type SyncWorkspaceIdentity,
+} from '../../../contracts/sync-workspace';
 import {
   readReadySyncWorkspaceAllocation,
+  readSyncWorkspaceAllocation,
   type SyncWorkspaceAllocation,
 } from './workspace-allocation';
+import { readReadySyncWorkspaceJoin, type SyncWorkspaceJoin } from './workspace-join';
 import {
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
@@ -291,37 +296,73 @@ export async function commitSyncConnectionAuthentication(
   });
 }
 interface EnrollmentSource {
-  kind: 'allocation';
+  kind: 'allocation' | 'join';
   identity: SyncConnectionIdentity;
 }
 function parseEnrollmentSource(value: unknown): EnrollmentSource {
-  if (!isRecord(value) || Object.keys(value).length !== 2 || value['kind'] !== 'allocation')
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 2 ||
+    (value['kind'] !== 'allocation' && value['kind'] !== 'join')
+  )
     return refused();
   const identity = parseSyncConnectionIdentity(value['identity']);
   if (!identity) return refused();
-  return { kind: 'allocation', identity };
+  return { kind: value['kind'], identity };
+}
+interface ReadyEnrollmentSelection {
+  native: SyncWorkspaceAllocation | SyncWorkspaceJoin;
+  rootUrl: string;
+  accountId: string;
+  workspace: SyncWorkspaceIdentity;
+  nativeRows: number;
 }
 interface EnrollmentEvidence {
-  allocation: SyncWorkspaceAllocation;
+  selection: ReadyEnrollmentSelection;
   connection: SyncConnectionMetadata | null;
+}
+async function readReadyEnrollmentSelection(
+  tx: ConnectionTransaction,
+  source: EnrollmentSource
+): Promise<ReadyEnrollmentSelection> {
+  if (source.kind === 'allocation') {
+    const native = await readReadySyncWorkspaceAllocation(tx, source.identity);
+    if (!native.marker) return refused();
+    return {
+      native,
+      rootUrl: native.rootUrl,
+      accountId: native.accountId,
+      workspace: parseSyncWorkspaceMarker(native.marker.text),
+      nativeRows: 1,
+    };
+  }
+  const native = await readReadySyncWorkspaceJoin(tx, source.identity);
+  const allocation = await readSyncWorkspaceAllocation(tx);
+  if (!native.workspace || (allocation && allocation.phase !== 'abandoned')) return refused();
+  return {
+    native,
+    rootUrl: native.rootUrl,
+    accountId: native.accountId,
+    workspace: native.workspace,
+    nativeRows: allocation ? 2 : 1,
+  };
 }
 async function readEnrollmentEvidence(
   tx: ConnectionTransaction,
   source: EnrollmentSource
 ): Promise<EnrollmentEvidence> {
-  const allocation = await readReadySyncWorkspaceAllocation(tx, source.identity);
-  if (!allocation.marker) return refused();
-  const workspace = parseSyncWorkspaceMarker(allocation.marker.text);
+  const selection = await readReadyEnrollmentSelection(tx, source);
+  const { workspace } = selection;
   const rows = tx.objectStore(SYNC_CONNECTION_STORE);
   const receipt: unknown = await rows.get('workspace-enrollment');
   if (receipt === undefined) {
     if (
       (await tx.objectStore(SYNC_CAPTURE_STORE).count()) !== 0 ||
       (await tx.objectStore(SYNC_OUTBOX_STORE).count()) !== 0 ||
-      (await rows.count()) !== 1
+      (await rows.count()) !== selection.nativeRows
     )
       return refused();
-    return { allocation, connection: null };
+    return { selection, connection: null };
   }
   if (
     !isRecord(receipt) ||
@@ -335,14 +376,15 @@ async function readEnrollmentEvidence(
   const enrolled = parseConnectionMetadata(receipt['connection']);
   const current = await readMetadata(tx);
   if (
+    recordedSource.kind !== source.kind ||
     !sameSyncConnectionIdentity(recordedSource.identity, source.identity) ||
     !enrolled ||
     enrolled.phase !== 'active' ||
     enrolled.identity.revision !== 1 ||
     !enrolled.workspace ||
-    enrolled.binding.rootUrl !== allocation.rootUrl ||
-    enrolled.binding.accountId !== allocation.accountId ||
-    enrolled.binding.spaceId !== allocation.spaceId ||
+    enrolled.binding.rootUrl !== selection.rootUrl ||
+    enrolled.binding.accountId !== selection.accountId ||
+    enrolled.binding.spaceId !== workspace.spaceId ||
     enrolled.binding.connectionGeneration !== 1 ||
     JSON.stringify(enrolled.workspace) !== JSON.stringify(workspace) ||
     !current ||
@@ -351,16 +393,16 @@ async function readEnrollmentEvidence(
     current.identity.revision < enrolled.identity.revision ||
     !sameConnectionBinding(current.binding, enrolled.binding) ||
     JSON.stringify(current.workspace) !== JSON.stringify(workspace) ||
-    (await rows.count()) !== 4
+    (await rows.count()) !== selection.nativeRows + 3
   )
     return refused();
   await checkProfile(tx, current.binding);
   parseCredential(await rows.get('credential'), current);
-  return { allocation, connection: current };
+  return { selection, connection: current };
 }
 
 /**
- * Enroll one exact native ready CREATE source atomically. Cold admission never opens storage.
+ * Enroll one exact native ready CREATE or JOIN source atomically. Cold admission never opens storage.
  * Replaying its receipt returns the current same-binding enrollment without replacing secrets.
  */
 export async function enrollSyncWorkspaceConnection(
@@ -390,26 +432,25 @@ export async function enrollSyncWorkspaceConnection(
     );
     const authentication = parseConnectionAuthentication(
       detachedAuthentication,
-      initial.allocation.accountId
+      initial.selection.accountId
     );
     if (!authentication) return refused();
     if (initial.connection) return initial.connection;
-    const allocation = initial.allocation;
-    if (!allocation.marker) return refused();
+    const selection = initial.selection;
     const profile = parseSyncCaptureRecord({
       version: 1,
       kind: 'profile',
       key: 'profile',
       createdAt: Date.now(),
       enabled: true,
-      spaceId: allocation.spaceId,
+      spaceId: selection.workspace.spaceId,
       connectionGeneration: 1,
     });
     if (!profile || profile.kind !== 'profile') return refused();
     const binding: SyncConnectionBinding = {
-      provider: allocation.provider,
-      rootUrl: allocation.rootUrl,
-      accountId: allocation.accountId,
+      provider: 'webdav',
+      rootUrl: selection.rootUrl,
+      accountId: selection.accountId,
       spaceId: profile.spaceId,
       connectionGeneration: profile.connectionGeneration,
       profileCreatedAt: profile.createdAt,
@@ -420,7 +461,7 @@ export async function enrollSyncWorkspaceConnection(
       kind: 'sync-connection',
       key: 'connection',
       binding,
-      workspace: parseSyncWorkspaceMarker(allocation.marker.text),
+      workspace: selection.workspace,
       identity: { incarnation: crypto.randomUUID(), revision: 1 },
       phase: 'active',
       updateNonce: null,
@@ -435,7 +476,7 @@ export async function enrollSyncWorkspaceConnection(
         );
         try {
           const current = await readEnrollmentEvidence(tx, source);
-          if (JSON.stringify(current.allocation) !== JSON.stringify(allocation)) return refused();
+          if (JSON.stringify(current.selection) !== JSON.stringify(selection)) return refused();
           if (current.connection) {
             await tx.done;
             return current.connection;

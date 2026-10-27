@@ -373,3 +373,14 @@ New checked connections retain the exact workspace identity. Credential addition
 The enrollment receipt contains native identity and binding metadata only. It contains no authentication, raw provider error, catalog payload or media. It remains in sync_connection under existing backup, Settings transfer, diagnostics and remote-export exclusions. Verified local-data erasure removes the receipt with the connection.
 
 Activation requires the owner-controlled native ready source. The browser fixture supplies explicit test-only ingress after creation requests drain. No production Settings or Start authority enters through this fixture. JOIN readiness and runtime activation remain separate gates.
+
+
+## JOIN selection and credential lifetime
+
+The native JOIN intent contains only selected endpoint, account, local lifetime and bounded workspace identity. Existing sync_connection export exclusions and erasure ownership apply. Credentials remain in the read-only workflow until issued IO drains. They never enter native readiness, catalog results or fixed errors.
+
+Each request checks exact native checking authority and current origin permission before dispatch. Permission waits cannot preserve stale native authority. The workflow checks permission again after drain and before readiness completion. Active close revokes its native lifetime even if its checking revision advanced. Failed revocation does not excuse request drain or permit a clean containment result.
+
+A drained failed check retains retryable native evidence. A cancelled check cannot authorize enrollment. The common atomic installer accepts only exact native ready sources and retains the workspace-bound credential context. Structural identity supplied by a caller does not establish remote verification.
+
+No production ingress enters through the JOIN test fixture. Runtime producer containment, permission events and activation handoff remain closed release gates. Native readiness records a checked observation, not a guarantee against later hostile server changes.
