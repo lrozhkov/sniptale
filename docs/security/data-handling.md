@@ -70,6 +70,16 @@ Only successful rendering records an observation. Unavailable storage or coordin
 - Block HTTP and syntactically private or local redirect hops. Treat DNS rebinding as a residual browser limitation because fetch and Declarative Net Request do not expose the resolved IP.
 - Keep links inert in the embedded Web Snapshot viewer. Open a checked HTTP(S) target there only after the user enables the default-off control and clicks the link. Downloaded standalone HTML may expose checked HTTP(S) links in a new tab with `noopener noreferrer` and same-file fragment links. It must not load external assets or run page scripts.
 
+### AI SDK and catalog boundaries
+
+The registered background factory supplies explicit provider objects and guarded fetch to admitted SDK adapters. Do not pass plain model strings that can select an implicit gateway. Keep credential-bearing origins and header owners in the existing machine network inventory. Origin permission, destination binding, redirects, byte limits, deadlines and cancellation remain product transport checks.
+
+Catalog access uses metadata endpoints, not a paid inference probe. Automatic maintenance uses only an existing host grant and available secret. Catalog success proves that metadata operation only. It does not prove access to every model or operation. Cached capability and lifecycle facts grant no source approval. A manual retirement override does not bypass provider or destination admission.
+
+Parsed SDK error metadata remains inside the bounded background receiver. Only fixed quota code/type evidence changes HTTP 429 classification. Unknown or malformed evidence retains the status-only reason. Never retain raw SDK messages, causes, response bodies, headers, prompts or credential fields in product errors, observations or diagnostics. An access error does not establish model retirement. Failure adds no hidden paid retry or provider replacement.
+
+Settings transfer excludes credentials, local observations, cached catalog facts and runtime approval state. Export retains a disabled flag for known lifecycle blocks when it omits catalog evidence. Imported configuration carries no request approval. See [AI persistence](../architecture/persistence-contracts.md#ai-settings-graph-and-alpha-reset) for alpha reset and transfer admission.
+
 ## Import and export
 
 Media backup payload layouts `library-folders-v2`, `library-folders-v3` and `library-folders-v4` treat authored strings as text rather than binary signatures. Canonical domain owners check resource roles and portable references. Image-document Canvas source/background/blur slots still require declared object references. Restrict PNG window-header transport to the existing normalized PNG/64-pixel decoration profile. Import revalidates the declared JSON/PNG inventory, MIME, UTF-8 and expanded metadata limits directly in the ZIP before runtime staging.

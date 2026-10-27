@@ -34,6 +34,16 @@ Propagate authoritative write failure to the recovery owner. Apply fail-soft beh
 Use `StateManager` only for a domain that needs registered adapters, key revisions, and durable stale-write rejection. Move a domain and remove its previous authority together in the same change. Do not move secrets, temporary capabilities, bounded advisory history, or page-local state into `StateManager` for consistency alone.
 
 
+## AI configuration and mounted choices
+
+The [AI graph owner](../../apps/extension/src/composition/persistence/ai-settings/graph-mutations.ts) owns saved providers, model configuration and scenario selections. Manual properties, enabled state and explicit retirement permission remain user configuration. Canonical voice preferences retain their existing settings owner. Pages do not maintain a second durable graph or global-default authority.
+
+The graph retains catalog facts as provider evidence. They constrain capability and lifecycle eligibility without authorizing source access, credential use or egress. Do not discard known lifecycle evidence in a read path. Refresh and reconciliation use the existing graph commands. Operation observations are advisory feedback. They do not disable configuration or prove model retirement.
+
+Persisted revisions, incarnations and generations supply ordering authority across runtime restart. Runtime request coalescing is advisory and can disappear with the worker.
+
+The mounted interface choice and request approval are disposable. Their lifetime ends with that interface. A remembered unavailable name is presentation data with no execution context. Another window's preference cannot replace the mounted choice. See [AI persistence](persistence-contracts.md#ai-settings-graph-and-alpha-reset) for reset and reconciliation rules.
+
 ## Page recovery
 
 The background recovery owner stores one opaque set for each tab with native session proof. Its local key is `sniptale_page_recovery`. The session key `sniptale_page_recovery_claims` binds native tab and document identities to private nonces and producer leases. Content cannot select these native identities or read another tab's set.

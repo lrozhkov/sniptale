@@ -158,6 +158,24 @@ Use `sniptale-video-db` only in alpha-reset and privacy-erasure inventories. Und
 
 Do not fix or reset on read. Gallery may offer retry for blocked or insufficient-space states and confirmed reset for corrupt or unsupported data. Never downgrade a future-version database. Reset preserves browser-storage preferences and removes IndexedDB, OPFS, and transition metadata.
 
+### AI settings graph and alpha reset
+
+AI browser storage uses AI_STORAGE_VERSION 4, independently of the physical IndexedDB version. [Alpha reset](../../apps/extension/src/composition/persistence/ai-settings/alpha-reset.ts) writes a durable reset marker before cleanup and removes it only after completion. Retry resumes an interrupted reset. AI initialization remains unavailable after failure. Unrelated product data stays usable.
+
+Reset removes incompatible AI providers, models, secrets, cached observations and scenario selections. It clears the legacy global default and dependent voice model references. It preserves valid independent prompts, projects, media and unrelated settings.
+
+Affected model voice input and correction become disabled. The recognition backend remains unchanged. Reset does not select Chrome as a fallback. The command replaces incompatible configuration without migrating old records.
+
+[Graph commands](../../apps/extension/src/composition/persistence/ai-settings/graph-mutations.ts) serialize configuration mutations under existing persistence permits. A catalog refresh captures provider incarnation, configuration revision, credential revision, destination scope and generation before network access. Commit reloads current state and rejects stale receipts after mutation, deletion, recreation, restore or a newer refresh. Advisory network work stays outside the graph mutation permit.
+
+[Reconciliation](../../apps/extension/src/composition/persistence/ai-settings/catalog-reconciliation.ts) computes a semantic diff by provider and exact model code. Equal records and stable configured identities remain. Manual properties and referenced unavailable models survive refresh. Failure, incomplete results and a changed scope cannot establish absence in the previous scope. Unreferenced catalog-owned records permit cleanup after 30 days of absence and at least two observations separated by 24 hours.
+
+Known retirement evidence and deadlines constrain eligibility. An explicit manual retirement override permits an attempt without guaranteeing availability.
+
+Provider and model-operation observations contain fixed reasons and timestamps. Their current-generation checks remain separate. Late or refused publication cannot resurrect state after deletion or overwrite a newer result. Explicit retry uses the current owner admission. Observations do not change model eligibility or establish retirement from an HTTP error.
+
+[Portable model metadata](../../apps/extension/src/contracts/settings-transfer/model-metadata.ts) excludes cached catalog facts and observations. It preserves blocked models as disabled without that evidence. Imported configuration supplies no local credential or source approval.
+
 ## Change proof
 
 For a database or domain version change, update the registry, retained source fixture, target fixture, and contiguous descriptor. Prove deterministic output, interruption and rerun, quota handling, backup or refusal, and affected runtime and UI behavior.
