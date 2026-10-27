@@ -108,3 +108,16 @@ it('strictly parses bounded settings history commands and metadata responses', a
     })
   ).toBeNull();
 });
+
+it('retains bounded provider evidence in failed history without admitting raw fields', () => {
+  expect(
+    parseVoiceHistoryEntry({ ...entry, status: 'failed', failureCode: 'provider-quota-exceeded' })
+  ).toMatchObject({ failureCode: 'provider-quota-exceeded' });
+  expect(
+    parseVoiceHistoryEntry({
+      ...entry,
+      status: 'failed',
+      failureCode: 'provider-private response body',
+    })
+  ).toBeNull();
+});

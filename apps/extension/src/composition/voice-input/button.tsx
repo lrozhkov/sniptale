@@ -5,6 +5,7 @@ import { usePushToTalk } from '@sniptale/ui/voice-input/use-push-to-talk';
 import { isTrustedMouseEvent, isTrustedPointerEvent } from './trusted-events';
 import type { VoiceInputState } from './session';
 import { translate } from '../../platform/i18n';
+import { getVoiceInputProviderErrorKey } from './provider-error-copy';
 
 type VoiceInputButtonProps = {
   appearance?: 'contrast' | 'default';
@@ -21,7 +22,10 @@ type VoiceInputButtonProps = {
 
 function resolveVoiceButtonLabel(props: VoiceInputButtonProps): string {
   if (props.state.pending) return translate('settings.voiceInput.cancel');
-  if (props.state.errorCode !== null) return props.labels.error;
+  if (props.state.errorCode !== null) {
+    const providerKey = getVoiceInputProviderErrorKey(props.state.errorCode);
+    return providerKey ? translate(providerKey) : props.labels.error;
+  }
   return props.state.active ? props.labels.stop : props.labels.start;
 }
 

@@ -1,3 +1,4 @@
+import { getVoiceInputProviderErrorKey } from '../../../../composition/voice-input/provider-error-copy';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { AlertCircle, ChevronDown, Download, Info, Mic, Square } from 'lucide-react';
 import { AudioAmplitudeBars } from '@sniptale/ui/audio-amplitude-bars';
@@ -154,6 +155,8 @@ function resolveErrorNoticeMessage(args: {
   if (args.errorCode === 'storage-failed' || args.errorCode === 'too-large')
     return translate('settings.voiceInput.historyError');
   if (args.errorCode === 'timeout') return translate('settings.voiceInput.errorTimeout');
+  const providerKey = getVoiceInputProviderErrorKey(args.errorCode);
+  if (providerKey) return translate(providerKey);
   if (args.error === 'permission') return translate('settings.voiceInput.permissionError');
   if (args.error === 'install') return translate('settings.voiceInput.installError');
   if (args.error === 'runtime') return translate('settings.voiceInput.runtimeError');

@@ -16,6 +16,22 @@ import { loadVoiceInputCorrectionSystemPrompt } from '../../composition/persiste
 import { resolveTranscriptionModelConfig } from '../ai/audio/model-config';
 import { requestTranscription } from '../ai/audio/request';
 import { correctVoiceTranscript } from '../ai/llm/voice-correction';
+import { AIProviderRequestError } from '../ai/providers';
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
+
+const PROVIDER_FAILURE_CODES: Partial<Record<AIConnectionReason, VoiceInputErrorCode>> = {
+  'invalid-credential': 'provider-invalid-credential',
+  'permission-denied': 'provider-permission-denied',
+  'quota-exceeded': 'provider-quota-exceeded',
+  'rate-limited': 'provider-rate-limited',
+  'service-error': 'provider-service-error',
+  'host-permission-required': 'provider-host-permission-required',
+  'secret-locked': 'provider-secret-locked',
+  'provider-unavailable': 'provider-unavailable',
+  'model-unavailable': 'model-unavailable',
+  network: 'network',
+  timeout: 'timeout',
+};
 
 type ProcessingHistory = Pick<
   VoiceInputHistory,
@@ -81,6 +97,8 @@ async function transcribeVoiceAudio(args: VoiceTranscriptionInput): Promise<stri
 /** Maps failures to fixed public codes without exposing provider or storage error bodies. */
 export function getVoiceInputProcessingErrorCode(error: unknown): VoiceInputErrorCode {
   if (error instanceof VoiceHistoryError) return error.code;
+  if (error instanceof AIProviderRequestError)
+    return PROVIDER_FAILURE_CODES[error.reason] ?? 'provider-failed';
   if (error instanceof DOMException && error.name === 'AbortError') return 'aborted';
   if (!(error instanceof Error)) return 'provider-failed';
   if (isVoiceInputErrorCode(error.message)) return error.message;

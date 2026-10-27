@@ -436,3 +436,19 @@ it('stops the compact active microphone control on a real pointer press', () => 
   act(() => stop?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })));
   expect(controller.actions.stop).toHaveBeenCalledOnce();
 });
+
+it.each([
+  ['provider-invalid-credential', 'providerStatusInvalidKey'],
+  ['provider-permission-denied', 'providerStatusDenied'],
+  ['provider-quota-exceeded', 'providerStatusQuota'],
+  ['provider-rate-limited', 'providerStatusRate'],
+  ['provider-service-error', 'providerStatusUnavailable'],
+  ['provider-host-permission-required', 'providerStatusPermission'],
+  ['provider-secret-locked', 'providerStatusLocked'],
+  ['provider-unavailable', 'providerStatusUnavailable'],
+] as const)('explains %s in the existing Settings alert', (errorCode, key) => {
+  render(createController({ status: { snapshot: { errorCode, phase: 'error' } } }));
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+    `settings.aiProviders.${key}`
+  );
+});

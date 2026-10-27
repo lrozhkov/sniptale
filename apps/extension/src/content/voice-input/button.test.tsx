@@ -20,6 +20,8 @@ vi.mock('../../composition/voice-input/trusted-events', async (importOriginal) =
 }));
 
 import { ContentVoiceInputButton } from './button';
+import type { VoiceInputErrorCode } from '@sniptale/runtime-contracts/voice-input';
+import { translate } from '../../platform/i18n';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -37,7 +39,12 @@ afterEach(() => {
   container = null;
 });
 
-async function renderButton(active: boolean, onStart = vi.fn(), onStop = vi.fn()) {
+async function renderButton(
+  active: boolean,
+  onStart = vi.fn(),
+  onStop = vi.fn(),
+  errorCode: VoiceInputErrorCode | null = null
+) {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -53,7 +60,7 @@ async function renderButton(active: boolean, onStart = vi.fn(), onStop = vi.fn()
           active,
           pending: false,
           audioLevel: active ? 0.5 : 0,
-          errorCode: null,
+          errorCode,
           phase: active ? 'listening' : 'idle',
         }}
       />
@@ -330,3 +337,23 @@ it('stops a click recording exactly once when the content activation bridge is i
     vi.mocked(isTrustedMouseEvent).mockReturnValue(true);
   }
 });
+
+it.each([
+  ['provider-invalid-credential', 'settings.aiProviders.providerStatusInvalidKey'],
+  ['provider-permission-denied', 'settings.aiProviders.providerStatusDenied'],
+  ['provider-quota-exceeded', 'settings.aiProviders.providerStatusQuota'],
+  ['provider-rate-limited', 'settings.aiProviders.providerStatusRate'],
+  ['provider-service-error', 'settings.aiProviders.providerStatusUnavailable'],
+  ['network', 'settings.aiProviders.providerStatusNetwork'],
+  ['timeout', 'settings.aiProviders.providerStatusTimeout'],
+] as const)(
+  'explains %s without automatic retry or changing explicit activation',
+  async (code, key) => {
+    const f = await renderButton(false, vi.fn(), vi.fn(), code);
+    expect(f.button.getAttribute('aria-label')).toBe(translate(key));
+    expect(f.button.title).toBe(translate(key));
+    expect(f.onStart).not.toHaveBeenCalled();
+    act(() => f.button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 })));
+    expect(f.onStart).toHaveBeenCalledOnce();
+  }
+);

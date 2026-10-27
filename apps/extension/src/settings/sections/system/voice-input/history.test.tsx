@@ -244,3 +244,15 @@ it('expands overflowing text without changing the full copy value', async () => 
     visible.mockRestore();
   }
 });
+
+it('explains retained quota failure while keeping accepted text and explicit retry', async () => {
+  const f = fixture();
+  f.client.list.mockResolvedValueOnce([
+    { ...entry, status: 'failed', failureCode: 'provider-quota-exceeded' },
+  ]);
+  await f.render(0, true);
+  expect(container.textContent).toContain('settings.aiProviders.providerStatusQuota');
+  expect(container.textContent).toContain('accepted');
+  expect(button('retry').disabled).toBe(false);
+  expect(f.client.retry).not.toHaveBeenCalled();
+});
