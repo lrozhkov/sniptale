@@ -302,6 +302,9 @@ it.each(['visible', 'full'] as const)(
     )!;
     expect(details).not.toBeNull();
     expect(details.open).toBe(false);
+    expect(details.querySelector('summary')?.textContent).toBe('content.toolbar.captureParameters');
+    expect(details.dataset['collapsedChevron']).toBe('right');
+    expect(details.dataset['animated']).toBe('true');
     const action = container!.querySelector<HTMLButtonElement>(
       `[data-ui="content.toolbar.capture-${mode}-action.download_default"]`
     )!;

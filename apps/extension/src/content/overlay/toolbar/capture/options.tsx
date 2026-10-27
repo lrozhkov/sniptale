@@ -153,12 +153,6 @@ export function ToolbarCaptureButtons(props: {
     />
   );
   const imageParameters = <CaptureImageParameters image={image} />;
-  const imageSummary =
-    image.imageFormat === 'png'
-      ? translate('imageSettings.section.outputSummaryLossless')
-      : translate('imageSettings.section.outputSummaryLossy')
-          .replace('{format}', image.imageFormat === 'jpeg' ? 'JPEG' : 'WebP')
-          .replace('{quality}', String(image.imageQuality));
 
   return (
     <>
@@ -168,7 +162,6 @@ export function ToolbarCaptureButtons(props: {
       >
         <ScreenshotCaptureSplitButton
           mode="visible"
-          parametersSummary={imageSummary}
           compactMenus={props.compactMenus}
           displayMode={props.displayMode}
           disabled={disabled}
@@ -189,7 +182,6 @@ export function ToolbarCaptureButtons(props: {
           onUpdate={fullPage.updatePreferences}
           quickActions={quickActions('full')}
           imageParameters={imageParameters}
-          imageSummary={imageSummary}
           preferences={fullPage.preferences}
           saving={fullPage.saving}
           toolbarMenuState={props.toolbarMenuState}

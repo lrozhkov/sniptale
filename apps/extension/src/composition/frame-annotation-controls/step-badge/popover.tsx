@@ -51,6 +51,7 @@ export function FutureStepBadgeSettingsPopover(props: {
   settings: StepBadgeSettings;
   portalTarget?: Element | DocumentFragment;
   headerContext?: SettingsPopoverContext;
+  hideDisableAction?: boolean;
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
   creationPlacement?: AnnotationPlacementControl;
@@ -136,6 +137,7 @@ export function FutureStepBadgeSettingsPopover(props: {
         frameId={FUTURE_ID}
         frameVisuals={props.frameVisuals}
         headerContext={headerContext}
+        hideDisableAction={Boolean(props.creationPlacement) || Boolean(props.hideDisableAction)}
         {...(presentation.drag ? { headerDrag: presentation.drag } : {})}
         isAuto={local.auto !== false}
         localStepBadgeSettings={local}

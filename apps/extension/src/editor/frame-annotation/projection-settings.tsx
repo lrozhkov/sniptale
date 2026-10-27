@@ -43,6 +43,7 @@ export function FrameProjectionSettings(props: {
         <FutureCalloutSettingsPopover
           anchorEl={props.anchor}
           headerContext="element"
+          hideDisableAction={props.snapshot.annotationKind !== undefined}
           isOpen={props.menu === 'callout'}
           onChange={(callout) =>
             props.onPreview(setFrameCallout(props.snapshot, props.activeCalloutIndex, callout))
@@ -87,6 +88,7 @@ export function FrameProjectionSettings(props: {
               : {}),
           }}
           headerContext="element"
+          hideDisableAction={props.snapshot.annotationKind !== undefined}
           isOpen={props.menu === 'step'}
           onChange={(stepBadge) => props.onPreview({ ...props.snapshot, stepBadge })}
           onClose={closeDraft}

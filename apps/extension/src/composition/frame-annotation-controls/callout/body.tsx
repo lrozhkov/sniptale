@@ -40,6 +40,7 @@ export function createCalloutAnchorPlacement(
 export function CalloutSettingsPopoverContent(props: {
   handleDelete: () => void;
   headerContext: SettingsPopoverContext;
+  hideDisableAction?: boolean;
   headerDrag?: FloatingPopoverDrag;
   handleSettingChange: (patch: CalloutSettingsPatch) => void;
   frameColors?: CalloutFrameColors;
@@ -88,10 +89,14 @@ export function CalloutSettingsPopoverContent(props: {
           : {})}
         closeLabel={translate('content.callout.closeSettings')}
         context={props.headerContext}
-        destructiveAction={{
-          label: translate('content.callout.disableButton'),
-          onClick: props.handleDelete,
-        }}
+        {...(!props.hideDisableAction
+          ? {
+              destructiveAction: {
+                label: translate('content.callout.disableButton'),
+                onClick: props.handleDelete,
+              },
+            }
+          : {})}
         {...(props.templateSourceControl
           ? {
               sourceControl: createTemplateSourceHeaderControl(props.templateSourceControl, {

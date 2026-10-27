@@ -125,6 +125,7 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
     <Callout
       {...(props.currentFrame.annotationKind === 'callout'
         ? {
+            ...(props.onDeleteAnnotation ? { onDeleteControl: props.onDeleteAnnotation } : {}),
             onAnchorPositionChange: (point, placement) => {
               const update = (current: FrameData) => ({
                 ...current,

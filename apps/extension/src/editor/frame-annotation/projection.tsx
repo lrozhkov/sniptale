@@ -254,6 +254,9 @@ function FrameCalloutOverlay(props: FrameProjectionOverlayProps) {
   return getFrameCallouts(props.snapshot).map((callout, calloutIndex) =>
     callout.enabled ? (
       <EditorFrameCallout
+        {...(props.snapshot.annotationKind === 'callout'
+          ? { onDelete: () => props.onCommand('delete') }
+          : {})}
         calloutIndex={calloutIndex}
         coordinateSpace={props.coordinateSpace}
         object={object}
@@ -291,6 +294,7 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       frameRect={props.frameRect}
       {...(props.snapshot.annotationKind === 'step-badge'
         ? {
+            onDelete: () => props.onCommand('delete'),
             onFramePositionChange: (point: { x: number; y: number }) =>
               props.onSnapshotChange({ ...props.snapshot, ...point }),
           }

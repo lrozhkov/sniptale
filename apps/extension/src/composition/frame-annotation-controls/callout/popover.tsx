@@ -36,6 +36,7 @@ export function FutureCalloutSettingsPopover(props: {
   settings: CalloutSettings;
   portalTarget?: Element | DocumentFragment;
   headerContext?: SettingsPopoverContext;
+  hideDisableAction?: boolean;
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
   creationPlacement?: AnnotationPlacementControl;
@@ -154,6 +155,7 @@ export function FutureCalloutSettingsPopover(props: {
         handleDelete={props.onDisable}
         handleSettingChange={handleSettingChange}
         headerContext={headerContext}
+        hideDisableAction={Boolean(props.creationPlacement) || Boolean(props.hideDisableAction)}
         {...(presentation.drag ? { headerDrag: presentation.drag } : {})}
         localSettings={localSettings}
         onApplyPreset={applyPreset}

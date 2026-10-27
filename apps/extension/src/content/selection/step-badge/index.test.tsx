@@ -419,3 +419,48 @@ it.each(['Enter', 'Escape'])('keeps %s owned by the active IME composition', (ke
   act(() => root.unmount());
   document.body.replaceChildren();
 });
+
+it('routes the standalone mini delete command once without starting a page gesture', async () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onDelete = vi.fn();
+  const onPositionChange = vi.fn();
+  const surroundingGesture = vi.fn();
+  document.addEventListener('pointerdown', surroundingGesture);
+  document.addEventListener('click', surroundingGesture);
+  try {
+    await act(async () =>
+      root.render(
+        <FrameStepBadgeInteractiveSurface
+          controlsPortalTarget={host}
+          surfacePortalTarget={host}
+          portalTheme={null}
+          settings={createStepBadgeSettingsFixture({ value: '7' })}
+          borderColor="#000"
+          borderWidth={2}
+          frameRect={{ x: 100, y: 100, width: 100, height: 80 }}
+          onPositionChange={onPositionChange}
+          onDelete={onDelete}
+          showSettingsHandle
+        />
+      )
+    );
+    const button = document.querySelector<HTMLButtonElement>('.sniptale-step-badge-delete-handle')!;
+    expect(button).not.toBeNull();
+    expect(button.getAttribute('aria-label')).toBe('common.actions.delete');
+    const pointer = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+    act(() => button.dispatchEvent(pointer));
+    expect(pointer.defaultPrevented).toBe(true);
+    expect(onDelete).not.toHaveBeenCalled();
+    act(() => button.click());
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith();
+    expect(onPositionChange).not.toHaveBeenCalled();
+    expect(surroundingGesture).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    document.removeEventListener('pointerdown', surroundingGesture);
+    document.removeEventListener('click', surroundingGesture);
+  }
+});

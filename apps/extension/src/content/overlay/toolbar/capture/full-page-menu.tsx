@@ -19,7 +19,6 @@ import { PopoverCheckIcon } from '../../icons/icons';
 type FullPageMenuProps = {
   quickActions?: React.ReactNode;
   imageParameters?: React.ReactNode;
-  imageSummary: string;
   compactMenus: boolean;
   currentViewport: { height: number; width: number } | null;
   disabled: boolean;
@@ -116,31 +115,8 @@ function BooleanPreferenceItem(props: {
 }
 
 export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
-  const floating = FLOATING_OPTIONS.find(
-    (option) => option.value === props.preferences.floatingElements
-  )!;
-  const summary = translate('content.toolbar.captureFullParametersSummary')
-    .replace('{image}', props.imageSummary)
-    .replace(
-      '{lazy}',
-      translate(
-        props.preferences.preloadLazyContent
-          ? 'content.toolbar.captureOptionOn'
-          : 'content.toolbar.captureOptionOff'
-      )
-    )
-    .replace(
-      '{motion}',
-      translate(
-        props.preferences.freezeMotion
-          ? 'content.toolbar.captureOptionOn'
-          : 'content.toolbar.captureOptionOff'
-      )
-    )
-    .replace('{floating}', translate(`content.toolbar.${floating.translationKey}`));
   return (
     <ScreenshotCaptureSplitButton
-      parametersSummary={summary}
       compactMenus={props.compactMenus}
       disabled={props.disabled}
       displayMode={props.displayMode}

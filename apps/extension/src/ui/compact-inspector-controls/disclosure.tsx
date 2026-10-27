@@ -7,6 +7,8 @@ export function InspectorDisclosureView(
   props: Omit<InspectorDisclosureProps, 'preferenceId' | 'initiallyOpen'> & {
     dataUi: string;
     summary?: string;
+    collapsedChevron?: 'down' | 'right';
+    animated?: boolean;
     variant?: 'structural' | 'information';
     bodyClassName: string;
     open: boolean;
@@ -22,6 +24,8 @@ export function InspectorDisclosureView(
       className={props.variant ? 'sniptale-disclosure' : undefined}
       data-variant={props.variant ?? 'structural'}
       data-level={level}
+      data-collapsed-chevron={props.collapsedChevron}
+      data-animated={props.animated ? 'true' : undefined}
       open={props.open}
       onToggle={(event) => {
         if (event.currentTarget.open !== props.open) props.onOpenChange(event.currentTarget.open);

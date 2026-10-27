@@ -24,6 +24,7 @@ import { ApplyToFutureFramesGuard, useApplyToFutureFrames } from '../popover/app
 type StepBadgePopoverContentProps = {
   frameId: string;
   headerContext: SettingsPopoverContext;
+  hideDisableAction?: boolean;
   headerDrag?: FloatingPopoverDrag;
   isAuto: boolean;
   localStepBadgeSettings: StepBadgeSettings;
@@ -92,10 +93,14 @@ export function StepBadgePopoverContent(props: StepBadgePopoverContentProps) {
           : {})}
         closeLabel={translate('content.stepBadge.closeSettings')}
         context={props.headerContext}
-        destructiveAction={{
-          label: translate('content.stepBadge.disableButton'),
-          onClick: props.onDisable,
-        }}
+        {...(!props.hideDisableAction
+          ? {
+              destructiveAction: {
+                label: translate('content.stepBadge.disableButton'),
+                onClick: props.onDisable,
+              },
+            }
+          : {})}
         {...(props.templateSourceControl
           ? {
               sourceControl: createTemplateSourceHeaderControl(props.templateSourceControl, {

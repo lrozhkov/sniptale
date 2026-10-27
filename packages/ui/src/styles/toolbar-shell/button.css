@@ -88,15 +88,17 @@
   background: var(--sniptale-color-surface-hover) !important;
   color: var(--sniptale-color-text-primary) !important;
 }
-.sniptale-annotation-menu-control:has(
-    > .sniptale-annotation-properties-arrow:enabled:is(
-        :hover,
-        :focus-visible,
-        [aria-expanded='true']
-      )
-  )
-  > button[aria-pressed]:not([data-content-tool='true']) {
-  background: transparent !important;
+@layer utilities {
+  .sniptale-annotation-menu-control:has(
+      > .sniptale-annotation-properties-arrow:enabled:is(
+          :hover,
+          :focus-visible,
+          [aria-expanded='true']
+        )
+    )
+    > button {
+    background: transparent !important;
+  }
 }
 
 .sniptale-annotation-menu-control > button[data-content-tool='true'][aria-pressed='true'] {

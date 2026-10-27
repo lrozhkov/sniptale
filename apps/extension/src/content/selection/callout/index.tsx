@@ -36,6 +36,7 @@ interface CalloutProps {
   onTitleChange: (titleText: string) => void;
   onTitleEnabledChange: (enabled: boolean) => void;
   onDelete: () => void;
+  onDeleteControl?: () => void;
   onSettingsClick: () => void;
   onPositionChange: (
     placement: NonNullable<CalloutSettings['placement']['manualPlacement']>,
@@ -74,9 +75,7 @@ export const Callout: React.FC<CalloutProps> = (props) => {
   return (
     <FrameCalloutInteractiveSurface
       chromeScale={chromeScale}
-      {...(props.onAnchorPositionChange
-        ? { onAnchorPositionChange: props.onAnchorPositionChange }
-        : {})}
+      onAnchorPositionChange={props.onAnchorPositionChange}
       editing={{
         events: {
           applyFormatting: editing.applyFormatting,
@@ -106,6 +105,7 @@ export const Callout: React.FC<CalloutProps> = (props) => {
       onBadgeTextChange={props.onBadgeTextChange}
       onPositionChange={props.onPositionChange}
       onSettingsClick={props.onSettingsClick}
+      onDelete={props.onDeleteControl}
       onStartEditing={props.onStartEditing}
       onTailBaseRangeChange={props.onTailBaseRangeChange}
       onTailFramePositionChange={props.onTailFramePositionChange}

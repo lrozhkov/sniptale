@@ -29,7 +29,8 @@ function createAdjacentControlStyles(
   showSettingsHandle: boolean,
   viewport: { height: number; width: number },
   coordinateSpace?: FrameAnnotationCoordinateSpace,
-  uiScale = 1
+  uiScale = 1,
+  showDeleteHandle = false
 ) {
   const logicalRect = {
     x: layout.calloutPos.x,
@@ -45,7 +46,7 @@ function createAdjacentControlStyles(
     top: projected.y,
   };
   const position = getAdjacentControlGroupPosition({
-    controlCount: showSettingsHandle ? 3 : 2,
+    controlCount: (showSettingsHandle ? 3 : 2) + (showDeleteHandle ? 1 : 0),
     targetRect,
     uiScale,
     viewport,
@@ -189,6 +190,7 @@ export function createCalloutHandleStyles(args: {
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   layout: CalloutLayout;
   showSettingsHandle: boolean;
+  showDeleteHandle?: boolean;
   uiScale?: number;
   viewport: { height: number; width: number };
 }) {
@@ -198,7 +200,8 @@ export function createCalloutHandleStyles(args: {
       args.showSettingsHandle,
       args.viewport,
       args.coordinateSpace,
-      args.uiScale
+      args.uiScale,
+      args.showDeleteHandle
     ),
     ...createConnectorControlStyles(args.layout, args.coordinateSpace, args.uiScale),
     ...createResizeHandleStyles(args.layout, args.coordinateSpace),

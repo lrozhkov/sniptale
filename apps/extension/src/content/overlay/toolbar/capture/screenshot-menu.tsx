@@ -76,7 +76,6 @@ const CAPTURE_MODES = {
 
 export function ScreenshotCaptureSplitButton(props: {
   mode: 'visible' | 'full';
-  parametersSummary: string;
   compactMenus: boolean;
   disabled: boolean;
   displayMode: 'horizontal' | 'vertical';
@@ -168,7 +167,8 @@ export function ScreenshotCaptureSplitButton(props: {
               dataUi={`content.toolbar.${props.mode}-capture-parameters`}
               variant="structural"
               label={translate('content.toolbar.captureParameters')}
-              summary={props.parametersSummary}
+              collapsedChevron="right"
+              animated
               open={parametersOpen}
               onOpenChange={setParametersOpen}
               bodyClassName="pt-2"

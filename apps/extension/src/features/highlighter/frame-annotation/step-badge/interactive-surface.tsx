@@ -27,6 +27,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
   onFramePositionChange?: (point: { x: number; y: number }) => void;
   onSettingsClick?: () => void;
   onValueChange?: (value: string) => void;
+  onDelete?: () => void;
   portalTheme: AppTheme | null;
   settings: StepBadgeSettings;
   settingsAnchorRef?: React.RefObject<HTMLButtonElement | null>;
@@ -39,6 +40,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
   const editAnchorRef = React.useRef<HTMLButtonElement | null>(null);
   const interaction = useStepBadgeInteraction({
     canEditValue: Boolean(props.onValueChange),
+    canDelete: Boolean(props.onDelete),
     borderWidth: props.borderWidth,
     ...(props.chromeScale === undefined ? {} : { chromeScale: props.chromeScale }),
     ...(props.coordinateSpace ? { coordinateSpace: props.coordinateSpace } : {}),
@@ -108,6 +110,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
           isEditingValue={isEditingValue}
           {...(props.onValueChange ? { onEditValue: () => setIsEditingValue(true) } : {})}
           visibility={interaction.visibility}
+          {...(props.onDelete ? { onDelete: props.onDelete } : {})}
           portalTarget={props.controlsPortalTarget}
           portalTheme={props.portalTheme}
           position={interaction.controlPosition}

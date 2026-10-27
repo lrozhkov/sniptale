@@ -49,7 +49,6 @@ function Harness(props: {
       </button>
       <output data-ui="test.active-menu">{menu.activeMenuType ?? 'none'}</output>
       <FullPageCaptureSplitButton
-        imageSummary="PNG"
         compactMenus={props.compactMenus ?? false}
         currentViewport={props.currentViewport ?? null}
         disabled={false}
@@ -352,7 +351,7 @@ it('starts parameters collapsed and preserves expansion across menu reopening wi
   expect(onUpdate).not.toHaveBeenCalled();
 });
 
-it('keeps the full-page summary current after edits and collapse', async () => {
+it('keeps the full-page header concise after edits and collapse', async () => {
   const onUpdate = vi.fn().mockResolvedValue(undefined);
   const view = render(<Harness onUpdate={onUpdate} />);
   act(() =>
@@ -362,7 +361,7 @@ it('keeps the full-page summary current after edits and collapse', async () => {
   );
   const details = view.querySelector<HTMLDetailsElement>('details')!;
   const summary = details.querySelector('summary')!;
-  expect(summary.textContent).toContain('PNG · Preload on, freeze on · Floating: Show once');
+  expect(summary.textContent).toBe('content.toolbar.captureParameters');
   expandParameters(view);
   await act(async () =>
     view
@@ -377,6 +376,6 @@ it('keeps the full-page summary current after edits and collapse', async () => {
     details.open = false;
     details.dispatchEvent(new Event('toggle'));
   });
-  expect(summary.textContent).toContain('PNG · Preload off, freeze on · Floating: Hide');
+  expect(summary.textContent).toBe('content.toolbar.captureParameters');
   expect(onUpdate).toHaveBeenCalledTimes(2);
 });

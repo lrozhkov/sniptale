@@ -317,7 +317,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
               async () => (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
             );
             await expect(disclosure).not.toHaveAttribute('open');
-            await expect(summary).toContainText('PNG');
+            await expect(summary).toHaveText(/^(Options|Параметры)$/u);
+            await expect(summary.locator('svg').last()).toHaveCSS(
+              'transform',
+              'matrix(0, -1, 1, 0, 0, 0)'
+            );
             await expect(menu.getByRole('button', { name: 'JPEG', exact: true })).toBeHidden();
             await page.screenshot({
               path: info.outputPath(`${orientation}-${mode}-collapsed.png`),
@@ -327,6 +331,10 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             await summary.focus();
             await summary.press('Enter');
             await expect(disclosure).toHaveAttribute('open');
+            await expect(summary.locator('svg').last()).toHaveCSS(
+              'transform',
+              'matrix(1, 0, 0, 1, 0, 0)'
+            );
             await summary.press('Space');
             await expect(disclosure).not.toHaveAttribute('open');
             expect(
@@ -335,8 +343,23 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
                   (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
               )
             ).toEqual(savedBefore);
+            await page.emulateMedia({ reducedMotion: 'no-preference' });
+            const expansion = await disclosure.evaluate((node) => {
+              const style = getComputedStyle(node, '::details-content');
+              return { properties: style.transitionProperty, duration: style.transitionDuration };
+            });
+            expect(expansion.properties).toContain('block-size');
+            expect(expansion.duration).toBe('0.16s, 0.16s');
             await summary.click();
             await expect(disclosure).toHaveAttribute('open');
+            await expect(menu.getByRole('button', { name: 'JPEG', exact: true })).toBeVisible();
+            await page.emulateMedia({ reducedMotion: 'reduce' });
+            expect(
+              await disclosure.evaluate(
+                (node) => getComputedStyle(node, '::details-content').transitionDuration
+              )
+            ).toBe('0s');
+            await page.emulateMedia({ reducedMotion: 'no-preference' });
             const icons = menu.locator('.sniptale-capture-action-icons button');
             await expect(icons).toHaveCount(6);
             await icons.first().hover();
@@ -370,7 +393,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
                 )
               )
               .toBe('jpeg');
-            await expect(summary).toContainText(/JPEG.*(83|76)%/u);
+            await expect(summary).toHaveText(/^(Options|Параметры)$/u);
             const input = menu.getByRole('textbox', {
               name: /Image quality|Качество изображения/u,
             });
@@ -436,10 +459,10 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
                 )
               )
               .toBe(76);
-            await expect(summary).toContainText(/JPEG.*76%/u);
+            await expect(summary).toHaveText(/^(Options|Параметры)$/u);
             await summary.click();
             await expect(input).toBeHidden();
-            await expect(summary).toContainText(/JPEG.*76%/u);
+            await expect(summary).toHaveText(/^(Options|Параметры)$/u);
             await summary.press('Enter');
             await expect(input).toHaveValue('76');
             await page.screenshot({
@@ -479,7 +502,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             await summary.click();
             await expect(disclosure).not.toHaveAttribute('open');
             if (mode === 'full') {
-              const value = summary.locator('.sniptale-disclosure-value');
+              const value = summary.locator('h4');
               const original = await value.textContent();
               await value.evaluate((node, text) => {
                 node.textContent = `${text} · ${text}`;
@@ -527,6 +550,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             animations: 'disabled',
           });
           await defaults.locator('[data-ui="content.toolbar.capture-action-option.copy"]').click();
+          await page.setViewportSize({ width: 1000, height: size.height });
+          await expect
+            .poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth))
+            .toBeLessThanOrEqual(1);
+          await page.setViewportSize(size);
           await expect(defaults).toHaveCount(0);
           await expect
             .poll(() =>
@@ -829,8 +857,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           });
         await summary.click();
         await expect(details).not.toHaveAttribute('open');
-        await expect(summary).toContainText(format === 'webp' ? 'WebP' : 'JPEG');
-        await expect(summary).toContainText('76%');
+        await expect(summary).toHaveText(/^(Options|Параметры)$/u);
         await page.screenshot({
           path: info.outputPath(`${mode}-accepted-collapsed.png`),
           fullPage: false,

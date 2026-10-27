@@ -83,3 +83,32 @@
 .sniptale-disclosure:has(.sniptale-disclosure-value) > summary {
   padding-block: 4px;
 }
+
+.sniptale-disclosure[data-collapsed-chevron='right'] > summary > svg:last-child {
+  transform: rotate(-90deg);
+}
+.sniptale-disclosure[data-collapsed-chevron='right'][open] > summary > svg:last-child {
+  transform: rotate(0deg);
+}
+.sniptale-disclosure[data-animated='true'] {
+  interpolate-size: allow-keywords;
+}
+.sniptale-disclosure[data-animated='true'] > summary > svg:last-child {
+  transition: transform 160ms ease-out;
+}
+.sniptale-disclosure[data-animated='true']::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition:
+    block-size 160ms ease-out,
+    content-visibility 160ms allow-discrete;
+}
+.sniptale-disclosure[data-animated='true'][open]::details-content {
+  block-size: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sniptale-disclosure[data-animated='true'] > summary > svg:last-child,
+  .sniptale-disclosure[data-animated='true']::details-content {
+    transition: none;
+  }
+}

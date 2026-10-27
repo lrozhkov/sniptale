@@ -121,6 +121,7 @@ function createStepBadgeProps(props: InteractiveFramePopoversProps) {
   const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isStepBadgePopoverOpen && !!stepBadge?.enabled,
+    hideDisableAction: props.currentFrame.annotationKind === 'step-badge',
     ...(props.currentFrame.annotationKind === 'step-badge' && props.onDeleteAnnotation
       ? { onDisable: props.onDeleteAnnotation }
       : {}),
@@ -149,6 +150,7 @@ function createCalloutSettingsProps(props: InteractiveFramePopoversProps) {
   const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isCalloutPopoverOpen && !!callout?.enabled,
+    hideDisableAction: props.currentFrame.annotationKind === 'callout',
     calloutIndex: activeCalloutIndex,
     onClose: () => dismissSettingsPopover(props),
     frameId: props.frame.id,

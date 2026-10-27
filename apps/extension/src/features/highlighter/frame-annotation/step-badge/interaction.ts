@@ -14,6 +14,7 @@ export function useStepBadgeInteraction(args: {
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   borderWidth: number;
   canEditValue?: boolean;
+  canDelete?: boolean;
   chromeScale?: number;
   frameRect: StepBadgeFrameRect | undefined;
   isSettingsOpen: boolean | undefined;
@@ -53,7 +54,7 @@ export function useStepBadgeInteraction(args: {
       : args.settings;
   const controlPosition = useStepBadgeControlPosition({
     badgeRef,
-    controlCount: args.canEditValue ? 3 : 2,
+    controlCount: (args.canEditValue ? 3 : 2) + (args.canDelete ? 1 : 0),
     isEnabled: hasControls,
     placementKey: JSON.stringify({
       anchor: effectiveSettings.anchor,

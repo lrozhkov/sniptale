@@ -75,8 +75,50 @@ async function verifyCompoundHover(page: Page, toolbar: Locator, info: TestInfo,
     )
       expect(Math.abs(bounds.width - 14)).toBeLessThanOrEqual(1);
   }
+  for (const group of await toolbar.locator('.sniptale-annotation-menu-control').all()) {
+    await group.locator('.sniptale-annotation-properties-arrow').hover();
+    await expect(group).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect
+      .poll(() =>
+        group
+          .locator(':scope > button')
+          .evaluateAll((buttons) =>
+            buttons.map((button) => getComputedStyle(button).backgroundColor)
+          )
+      )
+      .toEqual(['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)']);
+  }
   await arrows.last().hover();
   await capture(page, info, `${name}-menu-hover.png`);
+}
+
+async function deleteStandalone(
+  page: Page,
+  object: Locator,
+  kind: 'callout' | 'step-badge',
+  info: TestInfo
+) {
+  await object.hover();
+  const action = page.locator(`.sniptale-${kind}-delete-handle`).last();
+  await expect(action).toBeVisible();
+  await action.hover();
+  await expect
+    .poll(() =>
+      action.evaluate((button) => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--sniptale-color-danger)';
+        button.append(probe);
+        const expected = getComputedStyle(probe).color;
+        probe.remove();
+        return getComputedStyle(button).color === expected;
+      })
+    )
+    .toBe(true);
+  const bounds = (await action.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(-1);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+  await capture(page, info, `${kind}-delete-hover.png`);
+  await action.click();
 }
 
 async function verifyCreation(page: Page, toolbar: Locator, info: TestInfo) {
@@ -509,6 +551,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expect.soft(numberTool).toHaveCSS('color', toolAccent);
     await expect.soft(numberTool).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge.menu"]').click();
+    await expect(panel(page).locator('[data-settings-action="disable"]')).toHaveCount(0);
     const initialPlacement = page.locator('[data-ui="content.annotation.creation-placement"]');
     await expect
       .soft(initialPlacement.getByRole('button', { name: /^(Free|Свободно)$/u }))
@@ -608,9 +651,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expectAnnotationCenter(number, moved);
     await number.hover();
     await page.locator('.sniptale-step-badge-settings-handle').click();
-    await page
-      .locator('.sniptale-step-badge-popover:visible [data-settings-action="disable"]')
-      .click();
+    await expect(
+      page.locator('.sniptale-step-badge-popover:visible [data-settings-action="disable"]')
+    ).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await deleteStandalone(page, number, 'step-badge', info);
     await expect(owners).toHaveCount(0);
     await undo.click();
     await expect(owners).toHaveCount(1);
@@ -642,9 +687,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await verifyFreeCommentTail(page, comment, undo, redo);
     await comment.hover();
     await page.locator('.sniptale-callout-settings-handle').click();
-    await page
-      .locator('.sniptale-callout-settings-popover:visible [data-settings-action="disable"]')
-      .click();
+    await expect(
+      page.locator('.sniptale-callout-settings-popover:visible [data-settings-action="disable"]')
+    ).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await deleteStandalone(page, comment, 'callout', info);
     await expect(
       page.locator('.sniptale-frame-container[data-annotation-kind="callout"]')
     ).toHaveCount(0);
@@ -698,6 +745,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expect(toolbar.locator('[data-frame-effect][aria-pressed="true"]')).toHaveCount(0);
     await toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge.menu"]').click();
     await expect(panel(page)).toBeVisible();
+    await expect(panel(page).locator('[data-settings-action="disable"]')).toHaveCount(0);
     await expect(page.locator('[data-ui="content.annotation.creation-placement"]')).toHaveCount(0);
     await toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge.menu"]').click();
     const plane = (await page.locator('[data-ui="editor.frame-annotation-plane"]').boundingBox())!;
@@ -723,6 +771,40 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     const undo = page.locator('[data-ui="editor.floating.tool-rail.history.undo"]');
     const redo = page.locator('[data-ui="editor.floating.tool-rail.history.redo"]');
     await verifyFreeCommentTail(page, comment, undo, redo);
+    await comment.hover();
+    const title = page.locator('.sniptale-callout-title-toggle-handle');
+    await title.hover();
+    await expect
+      .poll(() =>
+        title.evaluate((button) => {
+          const probe = document.createElement('span');
+          probe.style.color = 'var(--sniptale-color-accent)';
+          button.append(probe);
+          const expected = getComputedStyle(probe).color;
+          probe.remove();
+          return getComputedStyle(button).color === expected;
+        })
+      )
+      .toBe(true);
+    await page.locator('.sniptale-callout-settings-handle').click();
+    await expect(panel(page).locator('[data-settings-action="disable"]')).toHaveCount(0);
+    await panel(page).locator('[data-settings-action="close"]').click();
+    await deleteStandalone(page, comment, 'callout', info);
+    await expect(comment).toHaveCount(0);
+    await undo.click();
+    await expect(comment).toContainText('Created editor comment');
+    await redo.click();
+    await expect(comment).toHaveCount(0);
+    await undo.click();
+    await expect(comment).toHaveCount(1);
+    await badge.hover();
+    await page.locator('.sniptale-step-badge-settings-handle').click();
+    await expect(panel(page).locator('[data-settings-action="disable"]')).toHaveCount(0);
+    await panel(page).locator('[data-settings-action="close"]').click();
+    await deleteStandalone(page, badge, 'step-badge', info);
+    await expect(badge).toHaveCount(0);
+    await undo.click();
+    await expect(badge).toHaveText('9');
     await capture(page, info, 'standalone-editor-created.png');
     for (const width of [1000, 1438, 1439, 1440, 1498, 1499, 1500, 1638, 1639, 1640]) {
       await page.setViewportSize({ width, height: size.height });

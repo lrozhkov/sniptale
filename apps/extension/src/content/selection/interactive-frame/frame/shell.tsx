@@ -30,6 +30,7 @@ interface InteractiveFrameFrameShellProps {
   stepBadgePopoverAnchorRef: React.RefObject<HTMLButtonElement | null>;
   tempFrame: FrameData;
   onUpdate?: (frame: FrameData) => void;
+  handleDelete?: () => void;
   handleMouseDown: (event: React.PointerEvent) => void;
   handleResizeStart: (event: React.PointerEvent, direction: ResizeDirection) => void;
 }
@@ -96,6 +97,9 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
       ) : null}
       {props.currentFrame.stepBadge?.enabled && (
         <StepBadge
+          {...(props.currentFrame.annotationKind === 'step-badge' && props.handleDelete
+            ? { onDelete: props.handleDelete }
+            : {})}
           settings={props.currentFrame.stepBadge}
           borderColor={props.borderColor}
           borderWidth={props.borderWidth}

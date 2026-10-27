@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Move, Pencil, Settings2 } from 'lucide-react';
+import { Move, Pencil, Settings2, Trash2 } from 'lucide-react';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import type { AppTheme } from '@sniptale/ui/theme/types';
 import { translate } from '../../../../platform/i18n';
@@ -50,6 +50,7 @@ export function FrameStepBadgeControls(props: {
   visibility: ReturnType<typeof useTransientControlVisibility>;
   onSettingsClick?: () => void;
   onEditValue?: () => void;
+  onDelete?: () => void;
   isEditingValue?: boolean;
   editAnchorRef?: React.RefObject<HTMLButtonElement | null>;
   portalTarget: Element | DocumentFragment;
@@ -152,6 +153,30 @@ export function FrameStepBadgeControls(props: {
             onBlur={props.visibility.handleBlur}
           >
             <Settings2 size={15} aria-hidden="true" />
+          </button>
+        ) : null}
+        {props.onDelete ? (
+          <button
+            type="button"
+            className="sniptale-step-badge-delete-handle"
+            aria-label={translate('common.actions.delete')}
+            title={translate('common.actions.delete')}
+            style={{ ...buttonStyle, cursor: 'pointer' }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              event.nativeEvent.stopImmediatePropagation();
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              event.nativeEvent.stopImmediatePropagation();
+              props.onDelete?.();
+            }}
+            onFocus={props.visibility.handleFocus}
+            onBlur={props.visibility.handleBlur}
+          >
+            <Trash2 size={14} aria-hidden="true" />
           </button>
         ) : null}
       </div>

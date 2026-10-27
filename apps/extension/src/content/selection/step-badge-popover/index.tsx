@@ -22,6 +22,7 @@ interface StepBadgePopoverProps {
   frameId: string;
   frameRect: { x: number; y: number; width: number; height: number };
   isOpen: boolean;
+  hideDisableAction?: boolean;
   onClose: () => void;
   onDisable?: () => void;
   stepBadge?: StepBadgeSettings;
@@ -85,6 +86,7 @@ function StepBadgePopoverSurface(props: {
         frameId={frameId}
         frameVisuals={props.visuals}
         headerContext="element"
+        hideDisableAction={props.request.hideDisableAction ?? false}
         headerDrag={props.presentation.drag}
         isAuto={props.state.isAuto}
         localStepBadgeSettings={props.state.localStepBadgeSettings}

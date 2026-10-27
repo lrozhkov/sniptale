@@ -44,3 +44,19 @@
   border-color: var(--sniptale-color-accent) !important;
   box-shadow: 0 0 6px 1px color-mix(in srgb, var(--sniptale-color-accent) 24%, transparent) !important;
 }
+
+.sniptale-callout-title-toggle-handle:is(:hover, :focus-visible) {
+  color: var(--sniptale-color-accent) !important;
+  border-color: var(--sniptale-color-accent) !important;
+  outline: none !important;
+}
+.sniptale-callout-delete-handle > svg,
+.sniptale-step-badge-delete-handle > svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.75;
+}
+.sniptale-callout-delete-handle:is(:hover, :focus-visible),
+.sniptale-step-badge-delete-handle:is(:hover, :focus-visible) {
+  color: var(--sniptale-color-danger) !important;
+}

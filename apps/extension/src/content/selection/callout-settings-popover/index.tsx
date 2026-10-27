@@ -24,6 +24,7 @@ import { createDefaultCalloutSettings } from '../../../features/highlighter/fram
 interface CalloutSettingsPopoverProps {
   calloutIndex?: number;
   isOpen: boolean;
+  hideDisableAction?: boolean;
   onClose: () => void;
   frameId: string;
   frameColors?: CalloutFrameColors;
@@ -75,6 +76,7 @@ function CalloutSettingsPopoverSurface(props: {
             {...(frameColors ? { frameColors } : {})}
             handleDelete={props.handleDelete}
             headerContext="element"
+            hideDisableAction={props.request.hideDisableAction ?? false}
             headerDrag={props.presentation.drag}
             handleSettingChange={props.state.handleSettingChange}
             localSettings={props.state.localSettings}

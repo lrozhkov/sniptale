@@ -52,7 +52,7 @@ export type FrameCalloutInteractiveSurfaceProps = {
   isEditing: boolean;
   isFrameEditing: boolean;
   isSettingsOpen: boolean;
-  onAnchorPositionChange?: CalloutAnchorChange;
+  onAnchorPositionChange?: CalloutAnchorChange | undefined;
   onContentChange?: (htmlContent: string) => void;
   onBadgeTextChange: (text: string) => void;
   onMoveEnd?: () => void;
@@ -62,6 +62,7 @@ export type FrameCalloutInteractiveSurfaceProps = {
     behavior: CalloutDragBehavior
   ) => void;
   onSettingsClick: () => void;
+  onDelete?: (() => void) | undefined;
   onStartEditing: () => void;
   onTailBaseRangeChange: (position: number, width: number, attachment?: CalloutAttachment) => void;
   onTailFramePositionChange: (position: number, attachment?: CalloutAttachment) => void;
@@ -193,6 +194,7 @@ function createCalloutHandleCallbacks(args: BodyArgs) {
   const { interaction } = args;
   return {
     handleSettingsClick: args.props.onSettingsClick,
+    ...(args.props.onDelete ? { onDelete: args.props.onDelete } : {}),
     handleTitleToggleClick: () => {
       const enabled = args.interaction.effectiveSettings.style.title.enabled;
       args.props.onTitleEnabledChange(!enabled);
@@ -316,6 +318,7 @@ function createCalloutBodyProps(args: BodyArgs) {
       coordinateSpace: args.coordinateSpace,
       layout,
       showSettingsHandle: args.props.showSettingsHandle,
+      showDeleteHandle: Boolean(args.props.onDelete),
       uiScale: args.props.chromeScale,
       viewport: args.coordinateSpace.viewport,
     }),
