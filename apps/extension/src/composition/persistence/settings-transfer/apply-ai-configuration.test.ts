@@ -142,7 +142,16 @@ it('applies provider management and disabled configuration without imported loca
   await applySettingsTransferDomains({ domains, summary: emptySummary() });
   expect(mocks.localSet).toHaveBeenCalledWith(
     {
-      sniptale_ai_providers: [{ ...provider, hasStoredApiKey: false }],
+      sniptale_ai_providers: [
+        expect.objectContaining({
+          ...provider,
+          hasStoredApiKey: false,
+          incarnation: expect.any(String),
+          revision: 1,
+          credentialRevision: 0,
+          observation: expect.objectContaining({ status: 'unverified', revision: 1 }),
+        }),
+      ],
       sniptale_ai_provider_secrets: {},
     },
     undefined

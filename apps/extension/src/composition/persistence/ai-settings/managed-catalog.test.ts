@@ -112,6 +112,10 @@ describe('serialized managed catalog commits', () => {
       });
       await restore.commit();
     });
+    const restored = (storage.state.local[AI_PROVIDERS_KEY] as (typeof provider)[])[0]!;
+    expect(restored.incarnation).toBe(provider.incarnation);
+    expect(restored.revision).toBeGreaterThan(beforeRestore.token.revision);
+    expect(restored.refreshGeneration).toBeUndefined();
     expect(await commitStoredAICatalogRefresh(beforeRestore.token, catalog, 1300)).toBe(false);
     expect(models()).toEqual([]);
   });

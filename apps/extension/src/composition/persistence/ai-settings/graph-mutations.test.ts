@@ -277,8 +277,11 @@ it('clears provider secrets only for existing providers and deletes their graph'
   ).rejects.toThrow('Provider missing-provider not found');
   await mutateStoredAISettings({ operation: 'delete-provider', providerId: 'provider-1' });
 
-  expect(coreMocks.clearAIProviderSecret).toHaveBeenCalledWith('provider-1');
-  expect(coreMocks.deleteAIProviderGraphRecord).toHaveBeenCalledWith('provider-1');
+  expect(coreMocks.clearAIProviderSecret).toHaveBeenCalledWith('provider-1', expect.any(Object));
+  expect(coreMocks.deleteAIProviderGraphRecord).toHaveBeenCalledWith(
+    'provider-1',
+    expect.any(Object)
+  );
 });
 
 it('cascades provider deletion and keeps the queue usable after a rejected write', async () => {

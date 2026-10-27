@@ -12,6 +12,7 @@ export const AUDIT_STORAGE_OWNER_MAPPINGS = [
       'apps/extension/src/contracts/messaging/contracts/ai-settings-schemas.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/model-graph.integration.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-transfer.integration.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/catalog-reconciliation.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/alpha-reset.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',

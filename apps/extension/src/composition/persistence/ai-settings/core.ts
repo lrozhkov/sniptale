@@ -79,9 +79,12 @@ export async function saveAIProviders(providers: AIProvider[]): Promise<void> {
   return saveStoredAIProviders(providers);
 }
 
-export async function upsertAIProviderRecord(input: AIProviderUpsertInput): Promise<void> {
+export async function upsertAIProviderRecord(
+  input: AIProviderUpsertInput,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   await initializeAiStorageAccess();
-  return upsertStoredAIProviderRecord(input);
+  return upsertStoredAIProviderRecord(input, permit);
 }
 
 export async function deleteAIProviderRecord(providerId: string): Promise<void> {
@@ -89,7 +92,10 @@ export async function deleteAIProviderRecord(providerId: string): Promise<void> 
   return deleteStoredAIProviderRecord(providerId);
 }
 
-export async function deleteAIProviderGraphRecord(providerId: string): Promise<void> {
+export async function deleteAIProviderGraphRecord(
+  providerId: string,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   await initializeAiStorageAccess();
   const [providers, secrets, models, defaultModelId] = await Promise.all([
     readStoredProviderMetadata(),
@@ -105,18 +111,23 @@ export async function deleteAIProviderGraphRecord(providerId: string): Promise<v
     defaultModelId && deletedModelIds.has(defaultModelId) ? null : defaultModelId;
   const { [providerId]: _removedSecret, ...remainingSecrets } = secrets;
 
-  await browserStorage.local.set({
+  const payload = {
     [AI_DEFAULT_MODEL_KEY]: nextDefaultModelId,
     [AI_MODELS_KEY]: nextModels,
     [AI_PROVIDERS_KEY]: providers.filter((provider) => provider.id !== providerId),
     [AI_PROVIDER_SECRETS_KEY]: remainingSecrets,
-  });
-  await removeTransparentKeyIfUnused(Object.keys(remainingSecrets).length);
+  };
+  if (permit) await browserStorage.local.set(payload, permit);
+  else await browserStorage.local.set(payload);
+  await removeTransparentKeyIfUnused(Object.keys(remainingSecrets).length, permit);
 }
 
-export async function clearAIProviderSecret(providerId: string): Promise<void> {
+export async function clearAIProviderSecret(
+  providerId: string,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   await initializeAiStorageAccess();
-  return clearStoredAIProviderSecret(providerId);
+  return clearStoredAIProviderSecret(providerId, permit);
 }
 
 export async function loadAISecretProtectionStatus(): Promise<AISecretProtectionStatus> {

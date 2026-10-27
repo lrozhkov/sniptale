@@ -232,7 +232,9 @@ describe('serialized provider enabled commands', () => {
   it('refuses an old incarnation after metadata restore without writes', async () => {
     await runWithExclusivePersistenceMutationPermit(async (permit) => {
       const restore = await prepareAIProviderTransferMutation({
-        importedProviders: [{ ...provider, incarnation: 'restored-incarnation' }],
+        importedProviders: [
+          { ...provider, baseUrl: 'https://changed.example/v1', incarnation: 'untrusted-import' },
+        ],
         permit,
       });
       await restore.commit();

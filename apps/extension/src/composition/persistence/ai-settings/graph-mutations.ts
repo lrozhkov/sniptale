@@ -90,28 +90,37 @@ async function assertModelProviderExists(
   return provider;
 }
 
-async function addProvider(command: { provider: AIProviderUpsertInput }): Promise<void> {
+async function addProvider(
+  command: { provider: AIProviderUpsertInput },
+  permit: PersistenceMutationPermit
+): Promise<void> {
   const providers = await loadAIProviders();
   if (providers.some((provider) => provider.id === command.provider.id)) {
     throw new Error(`Provider ${command.provider.id} already exists`);
   }
-  await upsertAIProviderRecord(command.provider);
+  await upsertAIProviderRecord(command.provider, permit);
 }
 
-async function updateProvider(command: { provider: AIProviderUpsertInput }): Promise<void> {
+async function updateProvider(
+  command: { provider: AIProviderUpsertInput },
+  permit: PersistenceMutationPermit
+): Promise<void> {
   const providers = await loadAIProviders();
   if (!providers.some((provider) => provider.id === command.provider.id)) {
     throw new Error(`Provider ${command.provider.id} not found`);
   }
-  await upsertAIProviderRecord(command.provider);
+  await upsertAIProviderRecord(command.provider, permit);
 }
 
-async function clearProviderSecret(providerId: string): Promise<void> {
+async function clearProviderSecret(
+  providerId: string,
+  permit: PersistenceMutationPermit
+): Promise<void> {
   const providers = await loadAIProviders();
   if (!providers.some((provider) => provider.id === providerId)) {
     throw new Error(`Provider ${providerId} not found`);
   }
-  await clearAIProviderSecret(providerId);
+  await clearAIProviderSecret(providerId, permit);
 }
 
 async function resolveModelProperties(
@@ -258,25 +267,45 @@ async function saveDefaultModel(defaultModelId: string | null): Promise<void> {
   await saveDefaultModelId(defaultModelId);
 }
 
-type ModelGraphCommand = Extract<
+type GraphCommand = Extract<
   AISettingsMutationCommand,
   {
-    operation: 'add-model' | 'update-model' | 'delete-model' | 'move-model';
+    operation:
+      | 'add-model'
+      | 'update-model'
+      | 'delete-model'
+      | 'move-model'
+      | 'add-provider'
+      | 'update-provider'
+      | 'clear-provider-secret'
+      | 'delete-provider';
   }
 >;
-function isModelGraphCommand(command: AISettingsMutationCommand): command is ModelGraphCommand {
+function isGraphCommand(command: AISettingsMutationCommand): command is GraphCommand {
   return (
     command.operation === 'add-model' ||
     command.operation === 'update-model' ||
     command.operation === 'delete-model' ||
-    command.operation === 'move-model'
+    command.operation === 'move-model' ||
+    command.operation === 'add-provider' ||
+    command.operation === 'update-provider' ||
+    command.operation === 'clear-provider-secret' ||
+    command.operation === 'delete-provider'
   );
 }
-async function applyModelGraphMutation(
-  command: ModelGraphCommand,
+async function applyGraphMutation(
+  command: GraphCommand,
   permit: PersistenceMutationPermit
 ): Promise<void> {
   switch (command.operation) {
+    case 'add-provider':
+      return addProvider(command, permit);
+    case 'update-provider':
+      return updateProvider(command, permit);
+    case 'clear-provider-secret':
+      return clearProviderSecret(command.providerId, permit);
+    case 'delete-provider':
+      return deleteAIProviderGraphRecord(command.providerId, permit);
     case 'add-model':
       return addModel(command.model, permit, command.providerIncarnation);
     case 'update-model':
@@ -287,7 +316,7 @@ async function applyModelGraphMutation(
       return moveModel(command.modelId, command.beforeModelId, permit);
   }
 }
-async function mutateModelGraph(command: ModelGraphCommand): Promise<void> {
+async function mutateGraph(command: GraphCommand): Promise<void> {
   await runWithAtomicPersistenceMutationPermit(async (permit) => {
     const state = await browserStorage.local.get([
       AI_STORAGE_VERSION_KEY,
@@ -297,15 +326,15 @@ async function mutateModelGraph(command: ModelGraphCommand): Promise<void> {
       state[AI_STORAGE_VERSION_KEY] !== AI_STORAGE_VERSION ||
       state[AI_STORAGE_RESET_PHASE_KEY] !== undefined
     )
-      throw new Error('AI settings are not ready for model publication');
+      throw new Error('AI settings are not ready for graph publication');
     await assertAISettingsGraphInvariants();
-    await applyModelGraphMutation(command, permit);
+    await applyGraphMutation(command, permit);
     await assertAISettingsGraphInvariants();
   });
 }
 
 async function applyAISettingsMutation(
-  command: Exclude<AISettingsMutationCommand, ModelGraphCommand>
+  command: Exclude<AISettingsMutationCommand, GraphCommand>
 ): Promise<void> {
   switch (command.operation) {
     case 'remember-scenario-selection':
@@ -316,14 +345,6 @@ async function applyAISettingsMutation(
       return runWithExclusivePersistenceMutationPermit((permit) =>
         setStoredAIProviderEnabled(command, permit)
       );
-    case 'add-provider':
-      return addProvider(command);
-    case 'update-provider':
-      return updateProvider(command);
-    case 'clear-provider-secret':
-      return clearProviderSecret(command.providerId);
-    case 'delete-provider':
-      return deleteAIProviderGraphRecord(command.providerId);
     case 'save-default-model':
       return saveDefaultModel(command.defaultModelId);
     case 'save-voice-input-correction-prompt':
@@ -375,8 +396,8 @@ export function mutateStoredAISettings(command: AISettingsMutationCommand): Prom
     const lease = await transition;
     try {
       await initializeAiStorageAccess();
-      if (isModelGraphCommand(command)) {
-        await mutateModelGraph(command);
+      if (isGraphCommand(command)) {
+        await mutateGraph(command);
         return;
       }
       await assertAISettingsGraphInvariants();

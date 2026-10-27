@@ -1,4 +1,5 @@
 import type { AIProvider } from '../../../contracts/settings';
+import { selectSettingsTransferProviderMetadata } from '../../../contracts/settings-transfer/provider-metadata';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -66,14 +67,34 @@ export async function prepareAIProviderTransferMutation(args: {
   const missingProviderIds: string[] = [];
   const nextProviders = args.importedProviders.map((imported) => {
     const current = currentProviders.find((provider) => provider.id === imported.id);
-    const bindingMatches = current ? !hasAIProviderSecretBindingChanged(current, imported) : false;
+    const portable = selectSettingsTransferProviderMetadata(imported);
+    const bindingMatches = current
+      ? !hasAIProviderSecretBindingChanged(current, {
+          ...portable,
+          incarnation: current.incarnation,
+        })
+      : false;
+    const revision = (current?.revision ?? 0) + 1;
+    const nextProvider: AIProvider = {
+      ...portable,
+      management: portable.management ?? 'automatic',
+      enabled: portable.enabled ?? true,
+      incarnation:
+        bindingMatches && current?.incarnation ? current.incarnation : crypto.randomUUID(),
+      revision,
+      credentialRevision: bindingMatches ? (current?.credentialRevision ?? 0) : 0,
+      hasStoredApiKey: false,
+      observation: { status: 'unverified', scope: 'credentials', checkedAt: Date.now(), revision },
+    };
     const preservesSecret = Boolean(
-      current?.hasStoredApiKey && bindingMatches && currentSecrets[imported.id]
+      current?.hasStoredApiKey &&
+      !hasAIProviderSecretBindingChanged(current, nextProvider) &&
+      currentSecrets[imported.id]
     );
     if (current?.hasStoredApiKey && !preservesSecret) clearedProviderIds.push(current.id);
     if (!preservesSecret) missingProviderIds.push(imported.id);
     return {
-      ...imported,
+      ...nextProvider,
       hasStoredApiKey: preservesSecret,
     };
   });
@@ -208,7 +229,10 @@ export async function setStoredAIProviderEnabled(
   );
 }
 
-export async function upsertStoredAIProviderRecord(input: AIProviderUpsertInput): Promise<void> {
+export async function upsertStoredAIProviderRecord(
+  input: AIProviderUpsertInput,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   const [providers, secrets] = await Promise.all([
     readStoredProviderMetadata(),
     readStoredProviderSecrets(),
@@ -229,9 +253,10 @@ export async function upsertStoredAIProviderRecord(input: AIProviderUpsertInput)
     payload[AI_LOCAL_SECRET_KEY_STORAGE_KEY] = plan.nextKeyMaterial;
   }
 
-  await browserStorage.local.set(payload);
+  if (permit) await browserStorage.local.set(payload, permit);
+  else await browserStorage.local.set(payload);
   if (plan.remainingSecretCountAfterRemoval !== undefined) {
-    await removeTransparentKeyIfUnused(plan.remainingSecretCountAfterRemoval);
+    await removeTransparentKeyIfUnused(plan.remainingSecretCountAfterRemoval, permit);
   }
 }
 
@@ -247,7 +272,10 @@ export async function deleteStoredAIProviderRecord(providerId: string): Promise<
   await removeTransparentKeyIfUnused(removal.remainingSecretCount);
 }
 
-export async function clearStoredAIProviderSecret(providerId: string): Promise<void> {
+export async function clearStoredAIProviderSecret(
+  providerId: string,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   const [providers, secrets] = await Promise.all([
     readStoredProviderMetadata(),
     readStoredProviderSecrets(),
@@ -270,8 +298,9 @@ export async function clearStoredAIProviderSecret(providerId: string): Promise<v
   );
   const removal = createProviderSecretRemovalPayload({ nextProviders, providerId, secrets });
 
-  await browserStorage.local.set(removal.payload);
-  await removeTransparentKeyIfUnused(removal.remainingSecretCount);
+  if (permit) await browserStorage.local.set(removal.payload, permit);
+  else await browserStorage.local.set(removal.payload);
+  await removeTransparentKeyIfUnused(removal.remainingSecretCount, permit);
 }
 
 function createProviderSecretRemovalPayload({

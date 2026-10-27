@@ -190,9 +190,10 @@ it('delegates provider persistence helpers to the provider-secret store seam', a
 
   expect(saveStoredAIProvidersMock).toHaveBeenCalledWith([]);
   expect(upsertStoredAIProviderRecordMock).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'provider-1' })
+    expect.objectContaining({ id: 'provider-1' }),
+    undefined
   );
-  expect(clearStoredAIProviderSecretMock).toHaveBeenCalledWith('provider-1');
+  expect(clearStoredAIProviderSecretMock).toHaveBeenCalledWith('provider-1', undefined);
   expect(deleteStoredAIProviderRecordMock).toHaveBeenCalledWith('provider-1');
 });
 

@@ -73,6 +73,7 @@ describe('settings transfer AI owner transaction', () => {
       sniptale_ai_providers: [
         {
           id: 'provider-a',
+          incarnation: 'current-local-incarnation',
           name: 'Provider',
           connectionType: 'openai-compatible',
           baseUrl: 'https://private.example',
