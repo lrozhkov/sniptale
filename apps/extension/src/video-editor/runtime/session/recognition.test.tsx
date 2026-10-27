@@ -7,11 +7,14 @@ import {
   createVideoProjectAsset,
 } from '../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import { getVideoProject } from '../../../composition/persistence/projects';
 import { readVideoProjectAudioSource } from '../../../composition/persistence/projects/audio-source';
 import { runReviewSpeechJob } from '../../../workflows/audio-jobs/client';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import { planReviewSpeechChunks } from '../../../workflows/video-review/speech-audio';
+import {
+  requestAIScenarioModelSelection,
+  rememberAIScenarioModelSelection,
+} from '../../../workflows/ai-settings/query';
 import { waitForVideoEditorSave } from './save-readiness';
 import { useVideoEditorStore } from '../../state/store';
 import { useVideoProjectRecognition, type VideoProjectRecognitionController } from './recognition';
@@ -29,13 +32,16 @@ vi.mock('../../../workflows/video-review/speech-audio', () => ({
   reviewSpeechWavIsSilent: vi.fn(async () => false),
 }));
 vi.mock('../../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: vi.fn(),
+  requestAIScenarioModelSelection: vi.fn(),
+  rememberAIScenarioModelSelection: vi.fn(),
 }));
 vi.mock('./save-readiness', () => ({ waitForVideoEditorSave: vi.fn() }));
 
-const catalog: AIModelSelectionBootstrapPayload = {
-  chromeAiEnabled: false,
-  defaultModelId: 'model',
+type Catalog = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
+const catalog: Catalog = {
+  scenario: 'video-transcription',
+  remembered: null,
+  resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
   globalSystemPrompt: '',
   models: [
     {
@@ -52,6 +58,8 @@ const catalog: AIModelSelectionBootstrapPayload = {
       id: 'provider',
       name: 'Provider',
       connectionType: 'openai-compatible',
+      incarnation: 'initial',
+      destinationBinding: `sha256:${'a'.repeat(64)}`,
       hasStoredApiKey: true,
       createdAt: 1,
       destinationKind: 'external',
@@ -120,7 +128,8 @@ beforeEach(() => {
     if (JSON.stringify(durable) !== JSON.stringify(project)) revision++;
     durable = structuredClone(project);
   });
-  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValue(catalog);
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(catalog);
+  vi.mocked(rememberAIScenarioModelSelection).mockResolvedValue(undefined);
   vi.mocked(readVideoProjectAudioSource).mockResolvedValue(new Blob(['audio']));
   vi.mocked(runReviewSpeechJob).mockResolvedValue({
     type: 'transcript',
@@ -146,7 +155,7 @@ async function recognize() {
   await act(async () =>
     current().recognize({
       clipId: project.clips[0]!.id,
-      modelId: 'model',
+      modelId: current().modelId,
       approvedProviderId: 'provider',
       start: 0,
       end: 8,
@@ -245,12 +254,12 @@ it('can close an unacknowledged result without deleting the accepted local text 
 });
 it('admits the first catalog response when the remembered recognition section mounts with its owner', async () => {
   await act(async () => root.render(<Harness autoLoad />));
-  expect(current().catalog?.defaultModelId).toBe('model');
+  expect(current().modelId).toBe('model');
 });
 it('keeps the latest catalog response and retains it after a failed refresh', async () => {
   await act(async () => root.render(<Harness />));
-  let release: ((value: AIModelSelectionBootstrapPayload) => void) | undefined;
-  vi.mocked(requestAIModelSelectionBootstrap).mockImplementationOnce(
+  let release: ((value: Catalog) => void) | undefined;
+  vi.mocked(requestAIScenarioModelSelection).mockImplementationOnce(
     () =>
       new Promise((resolve) => {
         release = resolve;
@@ -261,15 +270,200 @@ it('keeps the latest catalog response and retains it after a failed refresh', as
     first = current().loadModels();
   });
   const latest = { ...catalog, globalSystemPrompt: 'latest' };
-  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValueOnce(latest);
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValueOnce(latest);
   await act(async () => current().loadModels());
   await act(async () => {
     release?.(catalog);
     await first;
   });
   expect(current().catalog).toEqual(latest);
-  vi.mocked(requestAIModelSelectionBootstrap).mockRejectedValueOnce(new Error('unavailable'));
+  vi.mocked(requestAIScenarioModelSelection).mockRejectedValueOnce(new Error('unavailable'));
   await act(async () => current().loadModels());
   expect(current().catalog).toEqual(latest);
-  expect(current().error).toBe('model');
+  expect(current().configurationFailed).toBe(true);
 });
+
+it('pins the approved destination before a deferred recognition Save', async () => {
+  await mount();
+  const save = Promise.withResolvers<void>();
+  vi.mocked(waitForVideoEditorSave).mockImplementationOnce(() => save.promise);
+  await recognize();
+  const changed = {
+    ...catalog,
+    providers: catalog.providers.map((provider) => ({
+      ...provider,
+      destinationBinding: `sha256:${'b'.repeat(64)}`,
+    })),
+  };
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(changed);
+  await act(async () => save.resolve());
+  expect(runReviewSpeechJob).toHaveBeenCalledWith(
+    expect.objectContaining({
+      approvedSelection: {
+        modelId: 'model',
+        approvedProviderId: 'provider',
+        approvedModelCode: 'stt',
+        approvedDestination: `sha256:${'a'.repeat(64)}`,
+      },
+    }),
+    expect.anything()
+  );
+});
+
+function expectNoRecognitionWork() {
+  expect(waitForVideoEditorSave).not.toHaveBeenCalled();
+  expect(readVideoProjectAudioSource).not.toHaveBeenCalled();
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+  expect(useVideoEditorStore.getState().project!.textDocuments).toBeUndefined();
+}
+it('opens and refreshes only the video transcription context without preference or project writes', async () => {
+  await mount();
+  await act(async () => current().loadModels());
+  expect(requestAIScenarioModelSelection).toHaveBeenCalledWith('video-transcription');
+  expect(rememberAIScenarioModelSelection).not.toHaveBeenCalled();
+  expect(current().modelId).toBe('model');
+  expectNoRecognitionWork();
+});
+it('remembers explicit model choice without source Save or provider work', async () => {
+  await mount();
+  await act(async () => current().setModelId('model'));
+  expect(rememberAIScenarioModelSelection).toHaveBeenCalledWith(
+    catalog,
+    'video-transcription',
+    'model',
+    'explicit'
+  );
+  expectNoRecognitionWork();
+});
+it('blocks source Save on preference refusal and permits an explicit retry', async () => {
+  await mount();
+  vi.mocked(rememberAIScenarioModelSelection).mockRejectedValueOnce(new Error('refused'));
+  await recognize();
+  expect(current().selectionFailed).toBe(true);
+  expectNoRecognitionWork();
+  await recognize();
+  expect(current().selectionFailed).toBe(false);
+  expect(waitForVideoEditorSave).toHaveBeenCalledOnce();
+  expect(runReviewSpeechJob).toHaveBeenCalledOnce();
+});
+it('blocks source Save after a failed catalog admission', async () => {
+  await mount();
+  vi.mocked(requestAIScenarioModelSelection).mockRejectedValueOnce(new Error('offline'));
+  await recognize();
+  expect(current().configurationFailed).toBe(true);
+  expect(rememberAIScenarioModelSelection).not.toHaveBeenCalled();
+  expectNoRecognitionWork();
+});
+it.each(['destination', 'model', 'incarnation'] as const)(
+  'requires explicit replacement after a changed %s before Save',
+  async (change) => {
+    await mount();
+    const next = structuredClone(catalog);
+    if (change === 'model') next.models[0]!.modelCode = 'changed';
+    else if (change === 'incarnation') next.providers[0]!.incarnation = 'recreated';
+    else next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+    vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(next);
+    await recognize();
+    expect(current().selectionUnavailable).toBe(true);
+    expect(current().modelId).toBe('');
+    expectNoRecognitionWork();
+    await act(async () => current().setModelId('model'));
+    await recognize();
+    expect(current().proposal).not.toBeNull();
+  }
+);
+it('keeps a removed choice unresolved until explicit replacement', async () => {
+  await mount();
+  const next = structuredClone(catalog);
+  next.models[0]!.id = 'replacement';
+  next.resolution.modelId = 'replacement';
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(next);
+  await act(async () => current().loadModels());
+  expect(current().selectionUnavailable).toBe(true);
+  expect(current().modelId).toBe('');
+  expect(rememberAIScenarioModelSelection).not.toHaveBeenCalled();
+  await act(async () => current().setModelId('replacement'));
+  expect(current().modelId).toBe('replacement');
+  expectNoRecognitionWork();
+});
+it.each([
+  ['catalog', 'cancel'],
+  ['catalog', 'project'],
+  ['catalog', 'close'],
+  ['preference', 'cancel'],
+  ['preference', 'project'],
+  ['preference', 'close'],
+] as const)('prevents late Save when %s admission settles after %s', async (phase, action) => {
+  await mount();
+  const admission = Promise.withResolvers<Catalog>();
+  const preference = Promise.withResolvers<void>();
+  if (phase === 'catalog')
+    vi.mocked(requestAIScenarioModelSelection).mockImplementationOnce(() => admission.promise);
+  else vi.mocked(rememberAIScenarioModelSelection).mockImplementationOnce(() => preference.promise);
+  await recognize();
+  expect(current().running).toBe(true);
+  if (action === 'cancel') await act(async () => current().cancel());
+  else if (action === 'project')
+    await act(async () =>
+      useVideoEditorStore.getState().setProject(createEmptyVideoProject('Other'))
+    );
+  else await act(async () => root.unmount());
+  await act(async () => {
+    if (phase === 'catalog') admission.resolve(catalog);
+    else preference.resolve();
+  });
+  expectNoRecognitionWork();
+});
+it('admits native capability-only transcription without stored audio parameters', async () => {
+  const next = structuredClone(catalog);
+  next.providers[0]!.connectionType = 'deepgram';
+  delete next.models[0]!.audio;
+  delete next.models[0]!.operation;
+  next.models[0]!.capabilities = {
+    operations: { transcription: 'supported' },
+    input: { audio: 'supported' },
+    output: { text: 'supported' },
+    features: {},
+  };
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(next);
+  await mount();
+  await recognize();
+  expect(runReviewSpeechJob).toHaveBeenCalledOnce();
+  expect(current().proposal).not.toBeNull();
+});
+it('preserves a completed proposal and Apply after later admission refusal', async () => {
+  await mount();
+  await recognize();
+  const proposal = current().proposal;
+  vi.mocked(requestAIScenarioModelSelection).mockRejectedValueOnce(new Error('offline'));
+  await recognize();
+  expect(current().proposal).toBe(proposal);
+  expect(runReviewSpeechJob).toHaveBeenCalledOnce();
+  await act(async () => current().apply('add'));
+  expect(current().accepted).toBe(true);
+  expect(durable.textDocuments).toHaveLength(1);
+});
+it.each(['model', 'parameters'] as const)(
+  'does not reuse completed chunks after same-ID %s replacement',
+  async (change) => {
+    await mount();
+    vi.mocked(planReviewSpeechChunks).mockResolvedValueOnce([
+      { start: 0, end: 4 },
+      { start: 4, end: 8 },
+    ]);
+    vi.mocked(runReviewSpeechJob)
+      .mockResolvedValueOnce({ type: 'transcript', result: { text: 'Old.' } })
+      .mockRejectedValueOnce(new Error('network-failed'));
+    await recognize();
+    expect(current().error).toBe('network-failed');
+    const next = structuredClone(catalog);
+    if (change === 'model') next.models[0]!.modelCode = 'new';
+    else next.models[0]!.audio!.transcription!.language = 'ru';
+    vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(next);
+    await act(async () => current().loadModels());
+    await act(async () => current().setModelId('model'));
+    await recognize();
+    expect(current().proposal?.entry.document.fragments[0]?.text).toBe('Recognized.');
+    expect(runReviewSpeechJob).toHaveBeenCalledTimes(3);
+  }
+);

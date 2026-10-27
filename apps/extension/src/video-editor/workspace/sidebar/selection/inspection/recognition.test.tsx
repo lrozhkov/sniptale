@@ -48,9 +48,21 @@ function createController(): VideoProjectRecognitionController {
     completed: 0,
     total: 0,
     proposal: null,
+    modelId: 'speech-model',
+    setModelId: vi.fn(),
+    configurationFailed: false,
+    selectionFailed: false,
+    selectionUnavailable: false,
+    selectionPending: false,
     catalog: {
-      chromeAiEnabled: false,
-      defaultModelId: 'speech-model',
+      scenario: 'video-transcription',
+      remembered: null,
+      resolution: {
+        status: 'initial',
+        modelId: 'speech-model',
+        previousSelection: null,
+        reason: null,
+      },
       globalSystemPrompt: '',
       models: [
         {
@@ -265,7 +277,7 @@ describe('project recognition inspector', () => {
     const props = createProps(controller);
     open(props);
     expect(host.querySelector('[data-ui="video-editor.recognition.panel"]')).not.toBeNull();
-    expect(controller.loadModels).toHaveBeenCalledOnce();
+    expect(controller.loadModels).not.toHaveBeenCalled();
     expect(controller.recognize).not.toHaveBeenCalled();
     expect(
       host.querySelector('[role="group"][aria-label="gallery.videoReview.recognitionGrouping"]')
@@ -301,7 +313,7 @@ describe('project recognition inspector', () => {
     setInput('gallery.videoReview.textFragmentStart', '5');
     click('gallery.videoReview.recognitionStart');
     expect(host.querySelector('fieldset')?.disabled).toBe(true);
-    controller.catalog = { ...controller.catalog!, defaultModelId: 'another-model', models: [] };
+    controller.catalog = { ...controller.catalog!, models: [] };
     render(props);
     expect(
       host.querySelector('[data-ui="video-editor.recognition.consent"]')?.textContent
@@ -338,7 +350,7 @@ describe('project recognition inspector', () => {
     open(props);
     expect(button('gallery.videoReview.recognitionStart').disabled).toBe(true);
     click('gallery.videoReview.speechReloadModels');
-    expect(controller.loadModels).toHaveBeenCalledTimes(2);
+    expect(controller.loadModels).toHaveBeenCalledOnce();
     controller.catalog = { ...createController().catalog!, providers: [] };
     render(props);
     expect(button('gallery.videoReview.recognitionStart').disabled).toBe(true);
@@ -469,4 +481,48 @@ describe('project recognition inspector', () => {
     expect(host.textContent).toContain('videoEditor.sidebar.recognitionSaveRetry');
     expect(host.textContent).toContain('videoEditor.sidebar.recognitionFailed');
   });
+});
+
+it.each(['configurationFailed', 'selectionFailed', 'selectionUnavailable'] as const)(
+  'retains range drafts with visible %s recovery',
+  (failure) => {
+    const controller = createController();
+    const props = createProps(controller);
+    open(props);
+    setInput('gallery.videoReview.textFragmentStart', '5');
+    controller[failure] = true;
+    if (failure === 'selectionUnavailable') {
+      controller.modelId = '';
+      controller.catalog = { ...controller.catalog!, models: [] };
+    }
+    render(props);
+    const expected =
+      failure === 'configurationFailed'
+        ? 'aiModal.modelCatalogFailed'
+        : failure === 'selectionFailed'
+          ? 'aiModal.modelSelectionSaveFailed'
+          : 'aiModal.modelSelectionUnavailable';
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(expected);
+    expect(
+      host.querySelector<HTMLInputElement>(
+        'input[aria-label="gallery.videoReview.textFragmentStart"]'
+      )?.value
+    ).toBe('5');
+    expect(controller.recognize).not.toHaveBeenCalled();
+  }
+);
+it('locks model controls during preference admission without clearing the source range', () => {
+  const controller = createController();
+  const props = createProps(controller);
+  open(props);
+  setInput('gallery.videoReview.textFragmentStart', '5');
+  controller.selectionPending = true;
+  render(props);
+  expect(host.querySelector('fieldset')?.disabled).toBe(true);
+  expect(host.querySelector('[role="status"]')?.textContent).toContain('common.states.saving');
+  expect(
+    host.querySelector<HTMLInputElement>(
+      'input[aria-label="gallery.videoReview.textFragmentStart"]'
+    )?.value
+  ).toBe('5');
 });

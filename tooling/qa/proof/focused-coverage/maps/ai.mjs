@@ -1,5 +1,66 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'montage-contextual-recognition',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/recognition.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted native recognition, canonical workflow and selector consumers cover admission and recovery. Existing persistence and background participants cover concurrent choices and approved execution before secret access.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/recognition.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
+      'apps/extension/src/workflows/video/project-recognition.test.ts',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+      'apps/extension/src/background/ai/audio/model-config.test.ts',
+      'apps/extension/src/contracts/ai/audio.test.ts',
+      'apps/extension/src/workflows/audio-jobs/client.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-contextual-recognition',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted native recognition, canonical workflow and selector consumers cover admission and recovery. Existing persistence and background participants cover concurrent choices and approved execution before secret access.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/recognition.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
+      'apps/extension/src/workflows/video/project-recognition.test.ts',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+      'apps/extension/src/background/ai/audio/model-config.test.ts',
+      'apps/extension/src/contracts/ai/audio.test.ts',
+      'apps/extension/src/workflows/audio-jobs/client.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-contextual-recognition',
+    productionFile: 'apps/extension/src/workflows/video/project-recognition.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted native recognition, canonical workflow and selector consumers cover admission and recovery. Existing persistence and background participants cover concurrent choices and approved execution before secret access.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/recognition.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
+      'apps/extension/src/workflows/video/project-recognition.test.ts',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+      'apps/extension/src/background/ai/audio/model-config.test.ts',
+      'apps/extension/src/contracts/ai/audio.test.ts',
+      'apps/extension/src/workflows/audio-jobs/client.test.ts',
+    ],
+  },
+  {
     owner: 'gallery-contextual-recognition',
     productionFile: 'apps/extension/src/gallery/video-review/use-recognition.ts',
     exclusive: true,

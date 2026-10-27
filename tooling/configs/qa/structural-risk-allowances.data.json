@@ -2772,6 +2772,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "032c6485490cc69f6317aedce3ed67e02764dd81b47d84a1e776e47c21bb1a77",
       "signatureHash": "8e58752272e0524870e7b65e1c3bcee81b73dcc35914240ca0a335adcd71f173"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/runtime/session/recognition.ts",
+      "symbol": "useVideoProjectRecognition",
+      "owner": "extension:video-editor:runtime",
+      "reason": "tool-noise: The mounted Montage recognition coordinator retains one project lifetime for source admission, cancellation, proposals, explicit retries, history and save acknowledgement. Shared selection and existing workflows own catalog, preferences, source Save, extraction, egress and publication. The 156-line body has 15 statements, cyclomatic 2, cognitive 1, nesting 0 and score 1 with delta 0. Its source/project ports and callbacks share that lifetime. Line-only extraction would distribute one registered operation. Controlled refusal, cancellation, replacement, parameter-retry, history and browser proof support Keep, subject to independent architecture review.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new independent state receiver, request controller, persistence writer, consent, retry, history or publication authority. Remove when the analyzer models this cohesive coordinator.",
+      "reviewDate": "2026-10-27",
+      "astHash": "049e46bd5a2dbb46980bf1668967946cef23e7f0e6eec735bbcd7a80041dfe7a",
+      "signatureHash": "244a6f71f8761ae14a154a5611135a3a0a58bd0e2d84eca6c943ce77b68d4c48"
     }
   ]
 }

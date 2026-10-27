@@ -1,5 +1,5 @@
 import { chooseInspectorValue } from '../support/inspector-utilities';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { aiSettingsQueryResponseSchema } from '../../../../apps/extension/src/contracts/messaging/contracts/ai-settings-schemas';
@@ -138,6 +138,55 @@ const recognitionModels = aiSettingsQueryResponseSchema.parse({
   },
 });
 
+async function recoverRecognitionSave(
+  page: Page,
+  panel: Locator,
+  baselineText: NonNullable<Awaited<ReturnType<typeof savedProject>>>['textDocuments'],
+  label: (key: Parameters<typeof translate>[0]) => string,
+  capture: (name: string) => string
+) {
+  const proposal = panel.locator('[data-ui="video-editor.recognition.proposal"]');
+  const apply = proposal.getByRole('button', {
+    name: label('gallery.videoReview.recognitionApply'),
+    exact: true,
+  });
+  await expect(panel.getByRole('alert')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await panel.getByRole('alert').scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: capture('recognition-save-error.png'),
+    fullPage: false,
+  });
+  expect((await savedProject(page))?.textDocuments ?? []).toEqual(baselineText ?? []);
+  await expect(proposal.getByRole('textbox').first()).toBeDisabled();
+  const close = proposal.getByRole('button', {
+    name: label('videoEditor.sidebar.recognitionClose'),
+    exact: true,
+  });
+  await close.scrollIntoViewIfNeeded();
+  await expect(close).toBeEnabled();
+  await expect(apply).toBeEnabled();
+  await page.screenshot({
+    path: capture('recognition-save-retry.png'),
+    fullPage: false,
+  });
+  await proposal
+    .getByText(label('videoEditor.sidebar.recognitionSaveRetry'), { exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: capture('recognition-save-instructions.png'),
+    fullPage: false,
+  });
+  await page.evaluate(() => {
+    if (
+      'allowMontageRecognitionSave' in window &&
+      typeof window.allowMontageRecognitionSave === 'function'
+    )
+      window.allowMontageRecognitionSave();
+  });
+  await apply.click();
+}
+
 const variants = [
   { size: PRIMARY_BROWSER_VIEWPORTS[0].size, locale: 'en', theme: 'dark' },
   { size: PRIMARY_BROWSER_VIEWPORTS[1].size, locale: 'ru', theme: 'light' },
@@ -163,7 +212,10 @@ for (const variant of variants) {
           'sniptale-locale-preference': variant.locale,
           'sniptale-theme-preference': variant.theme,
         },
-        runtimeResponses: { AI_SETTINGS_QUERY: recognitionModels },
+        runtimeResponses: {
+          AI_SETTINGS_QUERY: { ...recognitionModels, scenarioSelection: null },
+          AI_SETTINGS_MUTATION: { success: true },
+        },
       });
       await page.addInitScript(
         (locale) => localStorage.setItem('sniptale-locale-preference', locale),
@@ -264,43 +316,10 @@ for (const variant of variants) {
       await page.screenshot({ path: info.outputPath('recognition-proposal.png'), fullPage: false });
       if (recovery) await refuseProjectSave(page);
       await apply.click();
-      if (recovery) {
-        await expect(panel.getByRole('alert')).toBeVisible();
-        await page.keyboard.press('Escape');
-        await panel.getByRole('alert').scrollIntoViewIfNeeded();
-        await page.screenshot({
-          path: info.outputPath('recognition-save-error.png'),
-          fullPage: false,
-        });
-        expect((await savedProject(page))?.textDocuments ?? []).toEqual(before.textDocuments ?? []);
-        await expect(proposal.getByRole('textbox').first()).toBeDisabled();
-        const close = proposal.getByRole('button', {
-          name: label('videoEditor.sidebar.recognitionClose'),
-          exact: true,
-        });
-        await close.scrollIntoViewIfNeeded();
-        await expect(close).toBeEnabled();
-        await expect(apply).toBeEnabled();
-        await page.screenshot({
-          path: info.outputPath('recognition-save-retry.png'),
-          fullPage: false,
-        });
-        await proposal
-          .getByText(label('videoEditor.sidebar.recognitionSaveRetry'), { exact: true })
-          .scrollIntoViewIfNeeded();
-        await page.screenshot({
-          path: info.outputPath('recognition-save-instructions.png'),
-          fullPage: false,
-        });
-        await page.evaluate(() => {
-          if (
-            'allowMontageRecognitionSave' in window &&
-            typeof window.allowMontageRecognitionSave === 'function'
-          )
-            window.allowMontageRecognitionSave();
-        });
-        await apply.click();
-      }
+      if (recovery)
+        await recoverRecognitionSave(page, panel, before.textDocuments, label, (name) =>
+          info.outputPath(name)
+        );
       await expect
         .poll(
           async () => (await savedProject(page))?.textDocuments?.[0]?.document.fragments[0]?.text
@@ -340,6 +359,9 @@ for (const variant of variants) {
         .getByRole('button', { name: label('videoEditor.sidebar.textDocuments'), exact: true })
         .click();
       const textPanel = page.locator('[data-ui="video-editor.text.panel"]');
+      await textPanel
+        .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+        .click();
       await textPanel.locator('article > button').first().click();
       const field = textPanel
         .getByRole('textbox', { name: label('gallery.videoReview.speechText'), exact: true })
