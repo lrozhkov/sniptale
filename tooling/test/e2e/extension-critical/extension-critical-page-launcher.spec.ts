@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { triggerExtensionAction } from '../support/recording-action';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
@@ -709,3 +709,294 @@ test('native corner quick action captures after its menu group is hidden', async
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`quick action digit capture main collapsed shim ${name}`, async ({}, info) => {
+    test.setTimeout(120000);
+    const host = await startHostServer();
+    const browser = await launchExtensionBrowser({ viewport: size });
+    const logs: string[] = [];
+    browser.context.on('console', (message) => logs.push(message.text()));
+    const worker =
+      browser.context.serviceWorkers()[0] ?? (await browser.context.waitForEvent('serviceworker'));
+    await worker.evaluate(() => {
+      const observed: string[] = [];
+      Reflect.set(globalThis, '__digitQuickActionIds', observed);
+      chrome.runtime.onMessage.addListener((message: unknown) => {
+        if (
+          message &&
+          typeof message === 'object' &&
+          'type' in message &&
+          message.type === 'TRIGGER_QUICK_ACTION' &&
+          'actionId' in message &&
+          typeof message.actionId === 'string'
+        )
+          observed.push(message.actionId);
+      });
+    });
+    const observedIds = () =>
+      worker.evaluate(() => {
+        const value: unknown = Reflect.get(globalThis, '__digitQuickActionIds');
+        if (!Array.isArray(value)) throw new Error('Digit command observations missing');
+        return value.map((entry: unknown) => {
+          if (typeof entry !== 'string') throw new Error('Invalid digit command identity');
+          return entry;
+        });
+      });
+    const directory = info.outputPath('digit-downloads');
+    await mkdir(directory, { recursive: true });
+    const session = await browser.browser.newBrowserCDPSession();
+    await session.send('Browser.setDownloadBehavior', {
+      behavior: 'allow',
+      downloadPath: directory,
+    });
+    try {
+      const page = await browser.context.newPage();
+      await page.goto(host.origin);
+      const popup = await browser.context.newPage();
+      await popup.goto(
+        `chrome-extension://${browser.extensionId}/apps/extension/src/popup/index.html`
+      );
+      await grantOrigin(popup, host.origin);
+      await page.reload();
+      await popup.evaluate(async (origin) => {
+        const tab = (await chrome.tabs.query({})).find((entry) => entry.url === `${origin}/`);
+        if (tab?.id === undefined) throw new Error('Digit proof page missing');
+        const registered = await chrome.runtime.sendMessage({
+          type: 'PAGE_ACCESS',
+          operation: 'register-granted-site',
+          tabId: tab.id,
+          __sniptaleRuntimeFreshness: { issuedAtEpochMs: Date.now(), nonce: crypto.randomUUID() },
+        });
+        if (!registered?.success) throw new Error('Digit proof site registration failed');
+      }, host.origin);
+      await popup.evaluate(async (wide) => {
+        const saved = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
+        await chrome.storage.sync.set({
+          sniptale_settings: {
+            ...saved,
+            pageLaunch: {
+              enabled: true,
+              hoverOnly: false,
+              corner: 'bottom-right',
+              quickActionsCorner: true,
+              quickActionsToolbar: true,
+            },
+          },
+        });
+        const action = {
+          icon: 'Camera',
+          screenshotMode: 'visible',
+          afterCapture: 'download_default',
+          exitAfterCapture: true,
+          imageQuality: 100,
+          customized: true,
+          hotkey: null,
+        };
+        await chrome.storage.local.set({
+          'sniptale-locale-preference': wide ? 'ru' : 'en',
+          'sniptale-theme-preference': wide ? 'dark' : 'light',
+          sniptale_quick_actions: [
+            {
+              ...action,
+              id: 'digit-disabled',
+              name: 'Disabled choice',
+              status: false,
+              imageFormat: 'jpeg',
+            },
+            ...Array.from({ length: 11 }, (_, index) => ({
+              ...action,
+              id: `digit-choice-${index}`,
+              name: `Choice ${index + 1}`,
+              status: true,
+              imageFormat: 'png',
+            })),
+          ],
+        });
+      }, size.width === 1920);
+      await page.reload();
+      await page.bringToFront();
+      await page
+        .locator('#sniptale-page-launcher')
+        .getByRole('button', { name: /Open page toolbar|Открыть панель страницы/u })
+        .click();
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+      await page.evaluate(() => {
+        document.body.style.background = '#c8e4d9';
+        for (const child of document.body.children)
+          if (child instanceof HTMLElement && child.id !== 'sniptale-extension-root')
+            child.style.visibility = 'hidden';
+      });
+      const launcher = page.locator('#sniptale-page-launcher');
+      for (const [surface, key, actionId] of [
+        ['main', '0', 'digit-choice-9'],
+        ['collapsed', '1', 'digit-choice-0'],
+        ['shim', '0', 'digit-choice-9'],
+      ] as const) {
+        if (surface === 'collapsed') {
+          await page.locator('[data-ui="content.toolbar.navigation.collapse"]').click();
+        }
+        const captureDirectory = `${directory}/${surface}`;
+        await mkdir(captureDirectory, { recursive: true });
+        await session.send('Browser.setDownloadBehavior', {
+          behavior: 'allow',
+          downloadPath: captureDirectory,
+        });
+        const trigger =
+          surface === 'shim'
+            ? launcher.getByRole('button', { name: /Quick actions|Быстрые действия/u })
+            : page.locator('[data-ui="content.quick-actions.trigger"]:visible');
+        await trigger.click();
+        const menu =
+          surface === 'shim'
+            ? launcher.getByRole('menu')
+            : page.locator('[data-ui="content.quick-actions.dropdown"] .sniptale-popover-menu');
+        const rows =
+          surface === 'shim'
+            ? menu.getByRole('menuitem')
+            : menu.locator('.sniptale-toolbar-menu-item');
+        await expect(rows.first()).toContainText('Choice 1');
+        await expect(menu.locator('kbd')).toHaveText([
+          '1',
+          '2',
+          '3',
+          '4',
+          '5',
+          '6',
+          '7',
+          '8',
+          '9',
+          '0',
+        ]);
+        await expect(rows.nth(10).locator('kbd')).toHaveCount(0);
+        await expect(menu).not.toContainText('Disabled choice');
+        const before = new Set(await readdir(captureDirectory));
+        const previousIds = await observedIds();
+        await rows.first().evaluate((element) =>
+          element.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              key: '0',
+              bubbles: true,
+              composed: true,
+              cancelable: true,
+            })
+          )
+        );
+        await expect(menu).toBeVisible();
+        expect(await readdir(captureDirectory)).toEqual([...before]);
+        await page.evaluate(() => {
+          const host = document.createElement('section');
+          host.id = 'quick-digit-field';
+          host.style.cssText = 'position:fixed;left:8px;top:8px';
+          const input = document.createElement('input');
+          host.attachShadow({ mode: 'open' }).append(input);
+          document.body.append(host);
+          input.focus({ preventScroll: true });
+        });
+        await page.keyboard.type(key);
+        await expect(page.locator('#quick-digit-field input')).toHaveValue(key);
+        expect(await observedIds()).toEqual(previousIds);
+        if (surface === 'shim') await expect(menu).toBeVisible();
+        else {
+          await expect(menu).toHaveCount(0);
+          await trigger.click();
+        }
+        await rows.first().focus();
+        await page.evaluate(() => document.querySelector('#quick-digit-field')?.remove());
+        const menuBounds = (await menu.boundingBox())!;
+        const menuPoint = {
+          x: Math.floor(menuBounds.x + menuBounds.width / 2),
+          y: Math.floor(menuBounds.y + menuBounds.height / 2),
+        };
+        await page.screenshot({
+          path: info.outputPath(`digit-menu-${surface}.png`),
+          fullPage: false,
+        });
+        await page.keyboard.press(key);
+        await expect(menu).toHaveCount(0);
+        await expect.poll(observedIds).toEqual([...previousIds, actionId]);
+        await expect
+          .poll(
+            async () =>
+              (await readdir(captureDirectory)).filter(
+                (file) => !before.has(file) && file.endsWith('.png')
+              ).length
+          )
+          .toBe(1);
+        const file = (await readdir(captureDirectory)).find(
+          (file) => !before.has(file) && file.endsWith('.png')
+        )!;
+        const bytes = await readFile(`${captureDirectory}/${file}`);
+        const raster = await popup.evaluate(
+          async ({ dataUrl, menuPoint }) => {
+            const image = new Image();
+            image.src = dataUrl;
+            await image.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            const context = canvas.getContext('2d')!;
+            context.drawImage(image, 0, 0);
+            return {
+              width: image.width,
+              height: image.height,
+              toolbar: [...context.getImageData(Math.floor(image.width / 2), 30, 1, 1).data],
+              corner: [...context.getImageData(image.width - 40, image.height - 40, 1, 1).data],
+              menu: [...context.getImageData(menuPoint.x, menuPoint.y, 1, 1).data],
+            };
+          },
+          { dataUrl: `data:image/png;base64,${bytes.toString('base64')}`, menuPoint }
+        );
+        expect(raster).toEqual({
+          width: size.width,
+          height: size.height,
+          toolbar: [200, 228, 217, 255],
+          corner: [200, 228, 217, 255],
+          menu: [200, 228, 217, 255],
+        });
+        if (surface === 'main') {
+          await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveAttribute(
+            'data-page-mode',
+            'cursor'
+          );
+        } else {
+          if (surface === 'collapsed') {
+            await page.locator('[data-ui="content.collapsed-panels.restore-toolbar"]').click();
+            await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+            await page.getByText(/^(Clear and close|Очистить и закрыть)$/u).click();
+          }
+          await expect(page.locator('#sniptale-extension-root')).toHaveCount(0);
+          await expect(
+            launcher.getByRole('button', { name: /Open page toolbar|Открыть панель страницы/u })
+          ).toBeVisible();
+        }
+      }
+    } catch (error) {
+      await writeFile(
+        info.outputPath('digit-diagnostics.json'),
+        JSON.stringify(
+          {
+            logs: logs.slice(-60),
+            downloads: await worker.evaluate(async () =>
+              (await chrome.downloads.search({})).map(({ id, state, mime, filename, error }) => ({
+                id,
+                state,
+                mime,
+                filename,
+                error,
+              }))
+            ),
+          },
+          null,
+          2
+        )
+      );
+      throw error;
+    } finally {
+      await session.detach();
+      await closeExtensionBrowser(browser);
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

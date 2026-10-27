@@ -8,12 +8,19 @@ import type { ShimLauncherOptions } from './launcher';
 let launcher: ReturnType<typeof createShimLauncher> | undefined;
 beforeEach(() => {
   trusted.mockReturnValue(false);
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue({
+    length: 1,
+    0: new DOMRect(0, 0, 32, 32),
+    item: () => new DOMRect(0, 0, 32, 32),
+    [Symbol.iterator]: () => [new DOMRect(0, 0, 32, 32)][Symbol.iterator](),
+  });
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
 });
 afterEach(() => {
   launcher?.dispose();
   document.body.replaceChildren();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 function options(): ShimLauncherOptions {
   return {
@@ -83,7 +90,7 @@ it('hides the menu group before delivery and permits retry after failure', async
   const shadow = currentShadow();
   namedButton('Quick actions').click();
   const item = shadow.querySelector<HTMLButtonElement>('[role="menuitem"]')!;
-  expect(item.textContent).toBe('<script>unsafe</script>');
+  expect(item.querySelector('span')?.textContent).toBe('<script>unsafe</script>');
   expect(shadow.querySelector('script')).toBeNull();
   item.click();
   expect(shadow.querySelector('[role="menu"]')).toBeNull();
@@ -185,15 +192,17 @@ it('refreshes accepted actions and locale without closing and preserves logical 
   };
   launcher.update(next);
   expect(currentShadow().querySelector('[role="menu"]')).toBe(menu);
-  expect(currentShadow().activeElement?.textContent).toBe('Renamed second');
+  expect(currentShadow().activeElement?.querySelector('span')?.textContent).toBe('Renamed second');
   expect(
-    [...currentShadow().querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
+    [...currentShadow().querySelectorAll('[role="menuitem"]')].map(
+      (item) => item.querySelector('span')?.textContent
+    )
   ).toEqual(['Renamed second', 'Third']);
   currentShadow().querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[1]!.focus();
   launcher.update({ ...next, presentation: { ...next.presentation, locale: 'ru' } });
   expect(currentShadow().querySelector('[role="menu"]')).toBe(menu);
   expect(namedButton('Быстрые действия').getAttribute('aria-expanded')).toBe('true');
-  expect(currentShadow().activeElement?.textContent).toBe('Third');
+  expect(currentShadow().activeElement?.querySelector('span')?.textContent).toBe('Third');
   currentShadow().querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
   await flush();
   expect(source.trigger).toHaveBeenCalledWith(next.actions[0], expect.any(Event));
@@ -213,7 +222,7 @@ it('falls back to the nearest surviving item or trigger after removal without st
   currentShadow().querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[1]!.focus();
   const next = { ...source, actions: [source.actions[0]!, source.actions[2]!] };
   launcher.update(next);
-  expect(currentShadow().activeElement?.textContent).toBe('third');
+  expect(currentShadow().activeElement?.querySelector('span')?.textContent).toBe('third');
   launcher.update({ ...source, actions: [] });
   expect(currentShadow().querySelector('[role="menu"]')).not.toBeNull();
   expect(currentShadow().activeElement).toBe(namedButton('Quick actions'));
@@ -241,6 +250,107 @@ it('refreshes decorative glyphs on icon-only updates while retaining focused act
   });
   expect(item().querySelector('svg')!.innerHTML).not.toBe(originalGlyph);
   expect(currentShadow().activeElement).toBe(item());
-  expect(item().textContent).toBe('<script>unsafe</script>');
+  expect(item().querySelector('span')?.textContent).toBe('<script>unsafe</script>');
   expect(currentShadow().querySelector('script')).toBeNull();
+});
+
+function shimDigit(key: string, init: KeyboardEventInit = {}) {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+  (currentShadow().activeElement ?? namedButton('Quick actions')).dispatchEvent(event);
+  return event;
+}
+it('assigns first10 enabled ordinals and forwards original trusted0 keyboard event', async () => {
+  trusted.mockReturnValue(true);
+  const source = options();
+  source.actions = [
+    { id: 'disabled', name: 'Disabled', status: false, hotkey: null },
+    ...Array.from({ length: 11 }, (_, index) => ({
+      id: `digit-${index}`,
+      name: `Choice ${index + 1}`,
+      status: true,
+      hotkey: null,
+    })),
+  ];
+  launcher = createShimLauncher(source);
+  namedButton('Quick actions').click();
+  expect([...currentShadow().querySelectorAll('kbd')].map((node) => node.textContent)).toEqual([
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '0',
+  ]);
+  const event = shimDigit('0');
+  expect(event.defaultPrevented).toBe(true);
+  expect(source.trigger).toHaveBeenCalledWith(source.actions[10], event);
+  expect(currentShadow().querySelector('[role="menu"]')).toBeNull();
+  await flush();
+  namedButton('Quick actions').click();
+  const next = { ...source, actions: [source.actions[5]!, source.actions[3]!] };
+  launcher.update(next);
+  const reordered = shimDigit('1');
+  expect(source.trigger).toHaveBeenLastCalledWith(next.actions[0], reordered);
+});
+it('ignores modified, repeated, composing, untrusted, unavailable and consumed shim digits', async () => {
+  trusted.mockReturnValue(true);
+  const source = options();
+  launcher = createShimLauncher(source);
+  namedButton('Quick actions').click();
+  for (const init of [
+    { ctrlKey: true },
+    { altKey: true },
+    { metaKey: true },
+    { shiftKey: true },
+    { repeat: true },
+    { isComposing: true },
+  ]) {
+    expect(shimDigit('1', init).defaultPrevented).toBe(false);
+  }
+  expect(shimDigit('0').defaultPrevented).toBe(false);
+  trusted.mockReturnValue(false);
+  expect(shimDigit('1').defaultPrevented).toBe(false);
+  trusted.mockReturnValue(true);
+  const event = new KeyboardEvent('keydown', { key: '1', bubbles: true, cancelable: true });
+  event.preventDefault();
+  currentShadow().activeElement!.dispatchEvent(event);
+  expect(source.trigger).not.toHaveBeenCalled();
+  shimDigit('1');
+  await flush();
+  expect(source.trigger).toHaveBeenCalledOnce();
+});
+
+it('retains shim key guards for inherited disable, hidden and inert controls, then permits retry', async () => {
+  trusted.mockReturnValue(true);
+  const source = options();
+  source.trigger = vi.fn().mockRejectedValueOnce(new Error('Refused')).mockResolvedValue(undefined);
+  launcher = createShimLauncher(source);
+  namedButton('Quick actions').click();
+  const trigger = namedButton('Quick actions');
+  const fieldset = document.createElement('fieldset');
+  trigger.parentElement!.append(fieldset);
+  fieldset.append(trigger);
+  fieldset.disabled = true;
+  expect(shimDigit('1').defaultPrevented).toBe(false);
+  fieldset.disabled = false;
+  trigger.style.visibility = 'hidden';
+  expect(shimDigit('1').defaultPrevented).toBe(false);
+  trigger.style.visibility = '';
+  const host = document.getElementById('sniptale-page-launcher')!;
+  host.setAttribute('inert', '');
+  expect(shimDigit('1').defaultPrevented).toBe(false);
+  host.removeAttribute('inert');
+  expect(source.trigger).not.toHaveBeenCalled();
+  shimDigit('1');
+  await flush();
+  expect(currentShadow().querySelector('[role="alert"]')).not.toBeNull();
+  namedButton('Quick actions').click();
+  shimDigit('1');
+  await flush();
+  expect(source.trigger).toHaveBeenCalledTimes(2);
+  expect(currentShadow().querySelector('[role="alert"]')).toBeNull();
 });

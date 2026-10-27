@@ -239,7 +239,7 @@ class ShimLauncherView {
     this.menu.replaceChildren();
     const enabled = this.options.actions.filter((action) => action.status);
     if (!enabled.length) this.menu.textContent = this.label('empty');
-    for (const action of enabled) {
+    for (const [index, action] of enabled.entries()) {
       const item = document.createElement('button');
       item.type = 'button';
       item.setAttribute('role', 'menuitem');
@@ -250,6 +250,13 @@ class ShimLauncherView {
       const label = document.createElement('span');
       label.textContent = getShimQuickActionName(action, this.options.presentation.locale);
       item.append(glyph, label);
+      if (index < 10) {
+        const digit = String(index === 9 ? 0 : index + 1);
+        const shortcut = document.createElement('kbd');
+        shortcut.textContent = digit;
+        item.setAttribute('aria-keyshortcuts', digit);
+        item.append(shortcut);
+      }
       item.addEventListener('click', (click) => {
         void this.run(click, () => this.options.trigger(action, click));
       });
@@ -291,6 +298,38 @@ class ShimLauncherView {
   };
   private key = (event: Event) => {
     if (!(event instanceof KeyboardEvent)) return;
+    if (this.menu && /^[0-9]$/.test(event.key)) {
+      const action = this.options.actions.filter((entry) => entry.status)[
+        event.key === '0' ? 9 : Number(event.key) - 1
+      ];
+      const trigger = this.elements.actions;
+      if (
+        !action ||
+        !isTrustedDomEvent(event) ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        this.pending ||
+        this.options.busy ||
+        this.disposed ||
+        this.dragState.dragging ||
+        this.dragState.pending ||
+        trigger.matches(':disabled') ||
+        trigger.getClientRects().length === 0 ||
+        getComputedStyle(trigger).visibility === 'hidden' ||
+        this.elements.host.closest('[inert]')
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      trigger.focus({ preventScroll: true });
+      void this.run(event, () => this.options.trigger(action, event));
+      return;
+    }
     if (event.key === 'Escape' && this.menu) {
       event.preventDefault();
       this.closeMenu(true);

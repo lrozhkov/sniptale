@@ -259,6 +259,8 @@ overflow-wrap:anywhere}
 
 .menu button span{min-width:0}
 
+.menu button kbd{margin-inline-start:auto;flex-shrink:0;font:inherit;font-variant-numeric:tabular-nums}
+
 .error{
 
 position:fixed;

@@ -1,4 +1,6 @@
 import { flushSync } from 'react-dom';
+import { isEditableElementTarget } from '../../../ui/keyboard/editable-target';
+import { isTrustedKeyboardEvent } from '../../platform/trusted-events';
 import {
   projectClientRectToContentUi,
   readContentUiScaleCompensation,
@@ -32,9 +34,10 @@ export function usePageQuickActionsMenu(props: {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const open = menus.activeMenuType === 'quick-actions';
+  const closeMenu = menus.closeMenu;
   const close = useCallback(() => {
-    menus.closeMenu('quick-actions');
-  }, [menus]);
+    closeMenu('quick-actions');
+  }, [closeMenu]);
   useEffect(() => {
     if (open && keyboardOpening.current)
       menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
@@ -101,30 +104,52 @@ export function usePageQuickActionsMenu(props: {
   };
   const dropdown = resolveLayout();
   const side = useToolbarMenuDirection(resolveLayout);
-  const trigger = async (action: QuickAction, event: Event) => {
-    if (pending.current) return;
-    const services = getContentRuntimeServices();
-    const source = services.contentActionIntent.createTrustedContentActionIntentSource(event);
-    if (!source) return;
-    pending.current = true;
-    flushSync(() => {
-      setBusy(true);
-      close();
-    });
-    try {
-      const message = await services.contentActionIntent.attachContentActionIntent(
-        { type: MessageType.TRIGGER_QUICK_ACTION, actionId: action.id },
-        source
-      );
-      const result = await services.messaging.sendRuntimeMessage(message);
-      if (!result?.success) throw new Error('Quick action was refused');
-    } catch {
-      showToast(translate('content.pageLauncher.failed'), 'error');
-    } finally {
-      pending.current = false;
-      setBusy(false);
-    }
-  };
+  const trigger = useCallback(
+    async (action: QuickAction, event: Event) => {
+      if (pending.current) return;
+      const services = getContentRuntimeServices();
+      const source = services.contentActionIntent.createTrustedContentActionIntentSource(event);
+      if (!source) return;
+      pending.current = true;
+      flushSync(() => {
+        setBusy(true);
+        close();
+      });
+      try {
+        const message = await services.contentActionIntent.attachContentActionIntent(
+          { type: MessageType.TRIGGER_QUICK_ACTION, actionId: action.id },
+          source
+        );
+        const result = await services.messaging.sendRuntimeMessage(message);
+        if (!result?.success) throw new Error('Quick action was refused');
+      } catch {
+        showToast(translate('content.pageLauncher.failed'), 'error');
+      } finally {
+        pending.current = false;
+        setBusy(false);
+      }
+    },
+    [close]
+  );
+  useEffect(() => {
+    if (!open || busy) return;
+    const onKey = (event: KeyboardEvent) => {
+      const action = actions[event.key === '0' ? 9 : Number(event.key) - 1];
+      if (
+        !/^[0-9]$/.test(event.key) ||
+        !action ||
+        pending.current ||
+        !acceptsQuickActionDigit(event, triggerRef.current, menuRef.current)
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      triggerRef.current?.focus({ preventScroll: true });
+      void trigger(action, event);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [actions, open, busy, trigger]);
   const title = translate('content.pageLauncher.actions');
   return {
     title,
@@ -141,4 +166,38 @@ export function usePageQuickActionsMenu(props: {
       menus.toggleMenu('quick-actions');
     },
   };
+}
+
+function acceptsQuickActionDigit(
+  event: KeyboardEvent,
+  trigger: HTMLButtonElement | null,
+  menu: HTMLDivElement | null
+): boolean {
+  if (
+    !isTrustedKeyboardEvent(event) ||
+    event.defaultPrevented ||
+    event.repeat ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    event.shiftKey ||
+    event.composedPath().some(isEditableElementTarget) ||
+    !trigger ||
+    trigger.matches(':disabled') ||
+    trigger.getClientRects().length === 0 ||
+    getComputedStyle(trigger).visibility === 'hidden' ||
+    trigger.closest('[inert], [data-page-customizing="true"], [data-dragging="true"]') ||
+    !menu ||
+    menu.getClientRects().length === 0 ||
+    getComputedStyle(menu).visibility === 'hidden'
+  )
+    return false;
+  const root = trigger.getRootNode();
+  if (!(root instanceof Document || root instanceof ShadowRoot)) return false;
+  return ![
+    ...root.querySelectorAll<HTMLElement>('[aria-modal="true"], [role="dialog"], [role="listbox"]'),
+  ].some(
+    (layer) => layer.getClientRects().length > 0 && getComputedStyle(layer).visibility !== 'hidden'
+  );
 }

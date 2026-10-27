@@ -62,7 +62,7 @@ export function PageQuickActionsMenu(props: {
                 <ProductToolbarMenuItemCopy label={translate('content.pageLauncher.empty')} />
               </ProductToolbarMenuItem>
             ) : null}
-            {actions.map((action) => (
+            {actions.map((action, index) => (
               <ProductToolbarMenuItem
                 key={action.id}
                 onClick={(event) => {
@@ -71,6 +71,11 @@ export function PageQuickActionsMenu(props: {
               >
                 <Icon iconNode={getQuickActionIconNode(action.icon)} size={18} aria-hidden="true" />
                 <ProductToolbarMenuItemCopy label={getQuickActionDisplayName(action)} />
+                {index < 10 ? (
+                  <kbd className="sniptale-toolbar-menu-shortcut">
+                    {index === 9 ? '0' : index + 1}
+                  </kbd>
+                ) : null}
               </ProductToolbarMenuItem>
             ))}
           </ProductToolbarMenu>
