@@ -1,3 +1,5 @@
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
 import {
   parseVoiceProviderSelection,
   type VoiceProviderSelection,
@@ -24,14 +26,22 @@ export function scenarioNarrationTargetKey(target: { slideId: string; objectId: 
   return JSON.stringify([target.slideId, target.objectId]);
 }
 type Ready = { preview: ScenarioNarrationPreview; accepted: boolean };
+type NarrationFailure = { code: string; providerReason: AIConnectionReason | null };
+function narrationFailure(error: unknown): NarrationFailure {
+  return {
+    code: error instanceof Error ? error.message : 'failed',
+    providerReason: error instanceof AudioJobProviderError ? error.reason : null,
+  };
+}
 type State = {
   ready: Ready[];
-  errors: Record<string, string>;
+  errors: Record<string, NarrationFailure>;
   running: boolean;
   applying: boolean;
   completed: number;
   total: number;
   failed: boolean;
+  providerFailureReason: AIConnectionReason | null;
 };
 
 /** One form owns its sequential attempts and disposable previews through cancellation and explicit Apply. */
@@ -52,6 +62,7 @@ export function useScenarioNarrationAI(
     completed: 0,
     total: 0,
     failed: false,
+    providerFailureReason: null,
   });
   const owner = useRef({
     mounted: true,
@@ -93,12 +104,19 @@ export function useScenarioNarrationAI(
     const frozenProfile = structuredClone(profile);
     const approved = parseVoiceProviderSelection(approvedSelection);
     if (!approved || approved.modelId !== frozenProfile.modelId) {
-      update({ failed: true });
+      update({ failed: true, providerFailureReason: null });
       return;
     }
     const controller = new AbortController();
     lifetime.active = controller;
-    update({ running: true, failed: false, errors: {}, completed: 0, total: selected.length });
+    update({
+      running: true,
+      failed: false,
+      providerFailureReason: null,
+      errors: {},
+      completed: 0,
+      total: selected.length,
+    });
     try {
       await lifetime.prepareSelection?.(frozenProfile, { ...approved }, controller.signal);
       controller.signal.throwIfAborted();
@@ -132,14 +150,15 @@ export function useScenarioNarrationAI(
               ...current,
               errors: {
                 ...current.errors,
-                [key]: error instanceof Error ? error.message : 'failed',
+                [key]: narrationFailure(error),
               },
             }));
         }
         update({ completed: index + 1 });
       }
-    } catch {
-      if (!controller.signal.aborted) update({ failed: true });
+    } catch (error) {
+      if (!controller.signal.aborted)
+        update({ failed: true, providerFailureReason: narrationFailure(error).providerReason });
     } finally {
       if (lifetime.active === controller) lifetime.active = null;
       update({ running: false });
@@ -150,7 +169,7 @@ export function useScenarioNarrationAI(
     if (lifetime.active || !lifetime.mounted) return;
     const controller = new AbortController();
     lifetime.active = controller;
-    update({ applying: true, failed: false });
+    update({ applying: true, failed: false, providerFailureReason: null });
     try {
       for (const preview of selected) {
         if (controller.signal.aborted) break;
@@ -175,7 +194,7 @@ export function useScenarioNarrationAI(
               ...current,
               errors: {
                 ...current.errors,
-                [key]: error instanceof Error ? error.message : 'failed',
+                [key]: narrationFailure(error),
               },
             }));
           break;
@@ -195,7 +214,14 @@ export function useScenarioNarrationAI(
       if (lifetime.active || !lifetime.mounted) return false;
       const discarded = lifetime.ready.filter((entry) => !entry.accepted);
       lifetime.ready = lifetime.ready.filter((entry) => entry.accepted);
-      update({ ready: lifetime.ready, errors: {}, failed: false, completed: 0, total: 0 });
+      update({
+        ready: lifetime.ready,
+        errors: {},
+        failed: false,
+        providerFailureReason: null,
+        completed: 0,
+        total: 0,
+      });
       for (const entry of discarded)
         void cleanupScenarioNarrationPreview(entry.preview).catch(() => undefined);
       return true;

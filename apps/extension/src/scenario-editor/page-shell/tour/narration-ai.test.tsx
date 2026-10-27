@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { TourNarrationAI } from './narration-ai';
@@ -171,15 +172,18 @@ it('requires provider approval and explicit Apply before changing the current na
 it('retains ready batch previews when a later provider request fails', async () => {
   io.generate
     .mockImplementationOnce(async (source: ScenarioNarrationBasis) => result(source))
-    .mockRejectedValueOnce(new Error('provider-failed'));
+    .mockRejectedValueOnce(new AudioJobProviderError('quota-exceeded', 'provider-failed'));
   await start();
   expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(2);
-  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    createTranslator('en')('settings.aiProviders.providerStatusQuota')
+  );
   expect(access.applyNarration).not.toHaveBeenCalled();
   await act(async () => button('[data-ai-generate]').click());
   expect(io.generate).toHaveBeenCalledTimes(4);
   expect(io.generate.mock.calls[3]![0].scope.target.objectId).toBe('b');
   expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(3);
+  expect(host.querySelector('[role="alert"]')).toBeNull();
 });
 it('disables Apply All until generation settles and all ready results contain Blobs', async () => {
   let finish!: (value: ScenarioNarrationPreview) => void;
@@ -671,3 +675,46 @@ it.each(['destination', 'model-code'] as const)(
     );
   }
 );
+
+it.each([
+  ['invalid-credential', 'providerStatusInvalidKey'],
+  ['permission-denied', 'providerStatusDenied'],
+  ['model-unavailable', 'providerStatusModelUnavailable'],
+  ['rate-limited', 'providerStatusRate'],
+  ['network', 'providerStatusNetwork'],
+  ['timeout', 'providerStatusTimeout'],
+  ['service-error', 'providerStatusUnavailable'],
+] as const)('explains %s without applying or replaying narration', async (reason, key) => {
+  io.generate.mockRejectedValueOnce(new AudioJobProviderError(reason, 'provider-failed'));
+  await start();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    createTranslator('en')(`settings.aiProviders.${key}`)
+  );
+  expect(io.generate).toHaveBeenCalledTimes(3);
+  expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(2);
+  expect(access.applyNarration).not.toHaveBeenCalled();
+});
+
+it('explains a typed preparation failure and clears it after explicit successful retry', async () => {
+  vi.mocked(access.prepareNarration).mockRejectedValueOnce(
+    new AudioJobProviderError('invalid-credential', 'provider-failed')
+  );
+  await start();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    createTranslator('en')('settings.aiProviders.providerStatusInvalidKey')
+  );
+  expect(io.generate).not.toHaveBeenCalled();
+  await act(async () => button('[data-ai-generate]').click());
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(3);
+});
+
+it('keeps unknown provider evidence generic and excludes arbitrary server text', async () => {
+  io.generate.mockRejectedValueOnce(new Error('PRIVATE_SERVER_ERROR_BODY'));
+  await start();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    createTranslator('en')('scenario.editor.guideOperationFailed')
+  );
+  expect(host.textContent).not.toContain('PRIVATE_SERVER_ERROR_BODY');
+  expect(io.generate).toHaveBeenCalledTimes(3);
+});

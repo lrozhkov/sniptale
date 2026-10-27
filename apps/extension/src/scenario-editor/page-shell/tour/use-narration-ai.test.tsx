@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { useScenarioNarrationAI, type ScenarioNarrationAccess } from './use-narration-ai';
@@ -85,14 +86,18 @@ afterEach(async () => {
 it('keeps ready batch previews and retries only missing targets after a provider failure', async () => {
   io.generate
     .mockImplementationOnce(async (source: ScenarioNarrationBasis) => preview(source))
-    .mockRejectedValueOnce(new Error('provider-failed'));
+    .mockRejectedValueOnce(new AudioJobProviderError('quota-exceeded', 'provider-failed'));
   await act(async () => operation.generate(profile, approvedSelection));
   expect(operation.ready.map((entry) => entry.preview.scope.target.objectId)).toEqual(['a', 'c']);
-  expect(operation.errors).toHaveProperty('["s","b"]');
+  expect(operation.errors).toHaveProperty('["s","b"]', {
+    code: 'provider-failed',
+    providerReason: 'quota-exceeded',
+  });
   await act(async () => operation.generate(profile, approvedSelection));
   expect(io.generate).toHaveBeenCalledTimes(4);
   expect(io.generate.mock.calls[3]![0].scope.target.objectId).toBe('b');
   expect(operation.ready).toHaveLength(3);
+  expect(operation.errors).toEqual({});
   expect(access.applyNarration).not.toHaveBeenCalled();
 });
 it('retains completed previews and waits for cancellation settlement before enabling Apply', async () => {
