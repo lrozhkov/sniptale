@@ -81,6 +81,7 @@ vi.mock('../../ui/video-text/speech/profile', () => ({
           {responseFormat}
         </button>
       ))}
+      <button onClick={() => onSelectModel?.('model1')}>Provider One</button>
       <button onClick={() => onSelectModel?.('model2')}>Provider Two</button>
       <input
         aria-label="voice"
@@ -191,6 +192,12 @@ async function click(label: string) {
   if (!button) throw new Error(`Missing button ${label}`);
   await act(async () => button.click());
 }
+const approvedSelection = {
+  modelId: 'model1',
+  approvedProviderId: 'provider1',
+  approvedModelCode: 'code1',
+  approvedDestination: `sha256:${'a'.repeat(64)}`,
+};
 const start = () => click('gallery.videoReview.textVoiceSaveStart');
 const approve = () => click('gallery.videoReview.speechConsentContinue');
 beforeEach(() => {
@@ -208,6 +215,7 @@ beforeEach(() => {
         id: `provider${id}`,
         name: id === '1' ? 'Provider One' : 'Provider Two',
         incarnation: id,
+        destinationBinding: `sha256:${(id === '1' ? 'a' : 'b').repeat(64)}`,
         connectionType: 'openai-compatible',
       })),
       models: ['1', '2'].map((id) => ({
@@ -260,7 +268,7 @@ it('generates after consent and preparation, keeps a preview, and only applies o
     'first',
     expect.objectContaining({ modelId: 'model1' }),
     expect.any(AbortSignal),
-    'provider1',
+    approvedSelection,
     expect.objectContaining({ fragment: expect.objectContaining({ id: 'first' }) })
   );
   expect(host.querySelector('audio')?.getAttribute('src')).toBe('blob:first');
@@ -422,7 +430,7 @@ it('requires a new provider consent and preserves parameters after a failed atte
     'first',
     expect.objectContaining({ modelId: 'model2' }),
     expect.any(AbortSignal),
-    'provider2',
+    expect.objectContaining({ approvedProviderId: 'provider2' }),
     expect.objectContaining({ fragment: expect.objectContaining({ id: 'first' }) })
   );
 });
@@ -793,4 +801,66 @@ it('admits capability-only catalog speech after explicit voice entry', async () 
     modelId: 'model1',
     voiceId: 'catalog voice',
   });
+});
+
+it.each(['destination', 'model-code'] as const)(
+  'requires new remembered consent after same-ID %s replacement',
+  async (change) => {
+    mocks.generate.mockRejectedValueOnce(new Error('provider-failed'));
+    await render();
+    await start();
+    await approve();
+    expect(mocks.generate).toHaveBeenCalledOnce();
+    const next = await mocks.catalog();
+    if (change === 'destination') next.providers[0].destinationBinding = `sha256:${'c'.repeat(64)}`;
+    else next.models[0].modelCode = 'replacement-code';
+    mocks.catalog.mockResolvedValue(next);
+    await click('Refresh model catalog');
+    await click('Provider One');
+    await start();
+    expect(mocks.generate).toHaveBeenCalledOnce();
+    expect(
+      host.querySelector('[aria-label="gallery.videoReview.speechConsentContinue"]')
+    ).not.toBeNull();
+    await approve();
+    expect(mocks.generate).toHaveBeenCalledTimes(2);
+    expect(mocks.generate.mock.calls[1]?.[4]).toMatchObject({
+      approvedModelCode: next.models[0].modelCode,
+      approvedDestination: next.providers[0].destinationBinding,
+    });
+  }
+);
+it.each(['destination', 'model-code'] as const)(
+  'refuses changed %s after disclosure before editor flush or Save',
+  async (change) => {
+    const { beforeRequest } = await render();
+    await start();
+    const next = await mocks.catalog();
+    if (change === 'destination') next.providers[0].destinationBinding = `sha256:${'c'.repeat(64)}`;
+    else next.models[0].modelCode = 'replacement-code';
+    mocks.catalog.mockResolvedValue(next);
+    await approve();
+    expect(beforeRequest).not.toHaveBeenCalled();
+    expect(mocks.generate).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  }
+);
+it('retains one approved snapshot across a deferred editor flush and queued phrases', async () => {
+  const { beforeRequest } = await render(['first', 'second']);
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  beforeRequest.mockImplementationOnce(() => hold);
+  await start();
+  await approve();
+  expect(beforeRequest).toHaveBeenCalledOnce();
+  expect(mocks.generate).not.toHaveBeenCalled();
+  const next = await mocks.catalog();
+  next.providers[0].destinationBinding = `sha256:${'c'.repeat(64)}`;
+  next.models[0].modelCode = 'replacement-code';
+  mocks.catalog.mockResolvedValue(next);
+  await act(async () => release());
+  expect(mocks.generate).toHaveBeenCalledTimes(2);
+  for (const call of mocks.generate.mock.calls) expect(call[4]).toEqual(approvedSelection);
 });

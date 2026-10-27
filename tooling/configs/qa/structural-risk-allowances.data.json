@@ -2783,6 +2783,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "049e46bd5a2dbb46980bf1668967946cef23e7f0e6eec735bbcd7a80041dfe7a",
       "signatureHash": "244a6f71f8761ae14a154a5611135a3a0a58bd0e2d84eca6c943ce77b68d4c48"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/text-voice-panel.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This mounted Gallery narration suite uses one React root, one review session fixture and the existing mocked catalog and operation boundaries. The added consent, same-ID replacement and deferred-flush cases use the same fixture. No import owner, runtime effect or production authority is added. The 867-line file has seven existing owner groups, one UI effect family, cohesion 1.00 and score 6 with delta 0. The remaining blocker is the test-file line limit. The analyzer counts separate test-local catalog snapshots as state receivers. A fixture extraction would distribute the same mounted-form state across test modules without an independent change reason. Main inspected the complete fixture and all new cases. Independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent fixture, runtime, effect lifetime, state owner or test subject. Remove when the analyzer models this cohesive mounted-form fixture. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-27",
+      "astHash": "7df14bc4a665165e15d47c0efa38b3a213900e1a1a11dd90b6eba34787507ba2",
+      "signatureHash": "031afdb9ec7d9e870b41c1dc68a59e04af8d2157a0bd9f7d088e4385730745e6"
     }
   ]
 }

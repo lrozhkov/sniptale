@@ -1,3 +1,7 @@
+import {
+  parseVoiceProviderSelection,
+  type VoiceProviderSelection,
+} from '@sniptale/runtime-contracts/voice-input';
 import { runSpeechQueue } from '../../workflows/audio-jobs/speech-queue';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
@@ -365,13 +369,20 @@ export function useReviewTextVoiceOperation(props: Options) {
     },
     generate: (
       profile: ReviewSpeechProfile,
-      approvedProviderId: string,
-      prepareSelection?: ((signal: AbortSignal) => Promise<void>) | undefined
+      approvedSelection: VoiceProviderSelection,
+      prepareSelection?:
+        | ((signal: AbortSignal, approved: VoiceProviderSelection) => Promise<void>)
+        | undefined
     ) => {
       const selected = [...remainingIds];
       const captured = structuredClone(profile);
+      const approved = parseVoiceProviderSelection(approvedSelection);
+      if (!approved || approved.modelId !== captured.modelId) {
+        attempt.modelError();
+        return;
+      }
       void command(async (signal) => {
-        await prepareSelection?.(signal);
+        await prepareSelection?.(signal, { ...approved });
         signal.throwIfAborted();
         if (!attempt.isCurrent()) throw new DOMException('Unmounted', 'AbortError');
         await attempt.beforeRequest();
@@ -390,7 +401,7 @@ export function useReviewTextVoiceOperation(props: Options) {
                 basis.fragment.id,
                 captured,
                 activeSignal,
-                approvedProviderId,
+                approved,
                 basis
               ),
             cleanup: (preview) => cleanupReviewTextVoicePreview(props.access.session, preview),

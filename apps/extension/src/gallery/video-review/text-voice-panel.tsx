@@ -1,3 +1,4 @@
+import type { VoiceProviderSelection } from '@sniptale/runtime-contracts/voice-input';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import { SegmentedRow, ToggleField } from '../../ui/compact-inspector-controls';
@@ -188,10 +189,20 @@ function useTextVoiceProfile(operation: VoiceOperation) {
   ]);
   const model = catalog?.models.find((entry) => entry.id === profile?.modelId);
   const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
-  const prepareSelection = async (signal: AbortSignal) => {
+  const prepareSelection = async (signal: AbortSignal, approved: VoiceProviderSelection) => {
     const prepared = await selection.prepareModelSelection(signal);
     const current = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
-    if (prepared.modelId !== profile?.modelId || current?.providerId !== provider?.id)
+    const currentProvider = prepared.catalog.providers.find(
+      (entry) => entry.id === current?.providerId
+    );
+    if (
+      !current ||
+      prepared.modelId !== profile?.modelId ||
+      prepared.modelId !== approved.modelId ||
+      current.providerId !== approved.approvedProviderId ||
+      current.modelCode !== approved.approvedModelCode ||
+      currentProvider?.destinationBinding !== approved.approvedDestination
+    )
       throw new Error('model-unavailable');
   };
   return {
@@ -221,36 +232,58 @@ function TextVoiceSettings(props: {
   autosaveEnabled: boolean;
 }) {
   const settings = useTextVoiceProfile(props.operation);
-  const [consenting, setConsenting] = useState(false);
+  const [consent, setConsent] = useState<{
+    selection: VoiceProviderSelection;
+    profile: ReviewSpeechProfile;
+    providerName: string;
+    modelName: string;
+  } | null>(null);
   const approved = useRef(new Set<string>());
   const { profile, provider, model } = settings;
   const start = () => {
     if (
       !profile?.voiceId.trim() ||
-      !provider ||
+      !provider?.destinationBinding ||
+      !model ||
       props.disabled ||
       settings.selectionPending ||
       profile.modelId !== settings.modelId
     )
       return;
-    if (approved.current.has(provider.id))
-      props.operation.generate(profile, provider.id, settings.prepareSelection);
-    else setConsenting(true);
+    const next = {
+      selection: {
+        modelId: model.id,
+        approvedProviderId: provider.id,
+        approvedModelCode: model.modelCode,
+        approvedDestination: provider.destinationBinding,
+      },
+      profile: structuredClone(profile),
+      providerName: provider.name,
+      modelName: model.displayName,
+    };
+    if (approved.current.has(JSON.stringify(next.selection)))
+      props.operation.generate(next.profile, next.selection, settings.prepareSelection);
+    else setConsent(next);
   };
   return (
     <>
-      <TextVoiceParameters {...props} settings={settings} consenting={consenting} start={start} />
-      {consenting && provider && profile && (
+      <TextVoiceParameters
+        {...props}
+        settings={settings}
+        consenting={consent !== null}
+        start={start}
+      />
+      {consent && (
         <TextVoiceConsent
-          providerName={provider.name}
-          modelName={model?.displayName}
-          instructions={!!profile.instructions}
+          providerName={consent.providerName}
+          modelName={consent.modelName}
+          instructions={!!consent.profile.instructions}
           disabled={props.disabled}
-          onCancel={() => setConsenting(false)}
+          onCancel={() => setConsent(null)}
           onContinue={() => {
-            approved.current.add(provider.id);
-            setConsenting(false);
-            props.operation.generate(profile, provider.id, settings.prepareSelection);
+            approved.current.add(JSON.stringify(consent.selection));
+            setConsent(null);
+            props.operation.generate(consent.profile, consent.selection, settings.prepareSelection);
           }}
         />
       )}
