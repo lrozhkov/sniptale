@@ -32,6 +32,20 @@ export interface CapturedVideoProjectRows {
   exports: StoredProjectExportEntry[];
   media: Omit<MediaLibraryEntry, 'blob'>[];
   refs: AssetRef[];
+  /** Missing on legacy records, which have no admitted dependency evidence. */
+  mediaDependencies?: CapturedMediaDependency[];
+}
+
+export interface CapturedMediaRows {
+  media: Omit<MediaLibraryEntry, 'blob'>;
+  projectAsset: StoredProjectAssetEntry;
+  ref: AssetRef;
+}
+
+export interface CapturedMediaDependency {
+  mediaId: string;
+  generation: number;
+  basis: string[];
 }
 
 /** A deleted native identity retains its generation and causal predecessor. */
@@ -46,6 +60,8 @@ export interface SyncCaptureRootState {
   rootKey: string;
   generation: number;
   basis: string[];
+  /** Digest of the normalized native media snapshot, including its local immutable ref. */
+  nativeDigest?: string;
 }
 
 /** Pending snapshots retain their bytes until a future verified settlement owner admits release. */
@@ -64,7 +80,10 @@ export interface CapturedChange {
   basis: string[];
   origin: CaptureOrigin;
   publicationId: string | null;
-  change: { kind: 'video-project'; rows: CapturedVideoProjectRows } | { kind: 'tombstone' };
+  change:
+    | { kind: 'video-project'; rows: CapturedVideoProjectRows }
+    | { kind: 'media'; rows: CapturedMediaRows }
+    | { kind: 'tombstone' };
 }
 
 /** The local receipt records one checked application and prevents an outgoing echo. */

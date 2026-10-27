@@ -359,3 +359,85 @@ it('refuses invalid or repeated profile setup without erasing pending captures',
   ).rejects.toThrow('already configured');
   expect(fixture.rows).toEqual(before);
 });
+
+async function publishDependency() {
+  const { publishProjectAssetJournal, PROJECT_ASSET_PUBLICATION_DOMAIN } =
+    await import('../projects/asset-publication');
+  const entry = {
+    id: 'dependency-asset',
+    assetId: 'dependency-bytes',
+    createdAt: 1,
+    mimeType: 'video/webm',
+    size: 1024,
+  };
+  await publishProjectAssetJournal({
+    journalId: 'dependency-journal',
+    domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
+    createdAt: 1,
+    assetRefs: [
+      {
+        assetId: entry.assetId,
+        createdAt: 1,
+        mimeType: entry.mimeType,
+        size: entry.size,
+        sha256: null,
+        location: { kind: 'opfs', objectKey: `objects/${entry.assetId}` },
+      },
+    ],
+    payload: { entry, filename: 'dependency.webm' },
+  });
+  const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
+  const project = createVideoProjectEntryWithMediaClip().project;
+  project.id = projectId;
+  const placement = project.assets[0]!;
+  placement.source = { kind: 'library-asset', mediaId: `project-asset:${entry.id}` };
+  placement.metadata.mimeType = entry.mimeType;
+  placement.metadata.size = entry.size;
+  return { entry, project, mediaId: `project-asset:${entry.id}` };
+}
+
+it('captures the exact accepted Library dependency head with the project after-image', async () => {
+  const data = await publishDependency();
+  const mediaCapture = captures()[0]!;
+  expect(mediaCapture.change.kind).toBe('media');
+  await saveVideoProject(data.project, { expectedWorkspaceRevision: null });
+  const projectCapture = captures().find((row) => row.rootKind === 'video-project');
+  if (projectCapture?.change.kind !== 'video-project') throw new Error('Expected project capture');
+  expect(projectCapture.change.rows.mediaDependencies).toEqual([
+    {
+      mediaId: data.mediaId,
+      generation: mediaCapture.generation,
+      basis: [mediaCapture.operationId],
+    },
+  ]);
+  expect(projectCapture.operationId).not.toBe(mediaCapture.operationId);
+  const parsed = parseSyncCaptureRecord(projectCapture);
+  expect(parsed).toMatchObject({
+    change: { rows: { mediaDependencies: projectCapture.change.rows.mediaDependencies } },
+  });
+});
+
+it('refuses changed Library metadata instead of reusing its previous causal head', async () => {
+  const data = await publishDependency();
+  const current = table('media_library').get(data.mediaId);
+  if (typeof current !== 'object' || current === null) throw new Error('Missing dependency');
+  table('media_library').set(data.mediaId, { ...current, tags: ['untracked-change'] });
+  const before = structuredClone(fixture.rows);
+  await expect(
+    saveVideoProject(data.project, { expectedWorkspaceRevision: null })
+  ).rejects.toMatchObject({ name: 'UnsupportedSyncCaptureGraphError' });
+  expect(fixture.rows).toEqual(before);
+  expect(captures()).toHaveLength(1);
+});
+
+it('refuses an untracked pre-profile Library dependency without inventing its revision', async () => {
+  table('sync_capture').clear();
+  const data = await publishDependency();
+  await installExperimentalCaptureProfile(profile());
+  const before = structuredClone(fixture.rows);
+  await expect(
+    saveVideoProject(data.project, { expectedWorkspaceRevision: null })
+  ).rejects.toMatchObject({ name: 'UnsupportedSyncCaptureGraphError' });
+  expect(fixture.rows).toEqual(before);
+  expect(captures()).toEqual([]);
+});

@@ -7,7 +7,12 @@ import {
   createVideoProjectRestoreTransaction,
 } from '../projects/index.test-support';
 import type { AssetRef } from '../assets/contracts';
-import { freezeVideoProjectInTransaction, UnsupportedSyncCaptureGraphError } from './freeze';
+import {
+  freezeVideoProjectInTransaction,
+  freezeMediaInTransaction,
+  digestCapturedMediaRows,
+  UnsupportedSyncCaptureGraphError,
+} from './freeze';
 
 function memoryStore() {
   const rows = new Map<string, unknown>();
@@ -255,5 +260,52 @@ it('does not inspect unrelated roots or sidecars', async () => {
   await expect(freezeVideoProjectInTransaction(data.tx, data.project.id)).resolves.toHaveProperty(
     'project.id',
     data.project.id
+  );
+});
+
+function originalOnlyMediaFixture() {
+  const data = fixture();
+  const { originMediaId: _origin, ...asset } = data.asset;
+  data.stores.assets.seed(asset.id, asset);
+  return { ...data, asset };
+}
+
+it('freezes one original-only media publication without reading unrelated roots', async () => {
+  const data = originalOnlyMediaFixture();
+  const rows = await freezeMediaInTransaction(data.tx, data.mirror.id);
+  expect(rows).toMatchObject({
+    media: data.mirror,
+    projectAsset: data.asset,
+    ref: { assetId: data.asset.assetId, size: data.asset.size, mimeType: data.asset.mimeType },
+  });
+  expect(data.stores.projects.get).not.toHaveBeenCalled();
+  expect(data.stores.exports.get).not.toHaveBeenCalled();
+  for (const store of Object.values(data.stores)) expect(store.getAll).not.toHaveBeenCalled();
+});
+
+it('hashes normalized native media facts and detects metadata or local ref changes', async () => {
+  const data = originalOnlyMediaFixture();
+  const rows = await freezeMediaInTransaction(data.tx, data.mirror.id);
+  const digest = digestCapturedMediaRows(rows);
+  expect(digest).toMatch(/^[a-f0-9]{64}$/u);
+  const reordered = { ref: rows.ref, projectAsset: rows.projectAsset, media: rows.media };
+  expect(digestCapturedMediaRows(reordered)).toBe(digest);
+  expect(
+    digestCapturedMediaRows({ ...rows, media: { ...rows.media, tags: ['changed'] } })
+  ).not.toBe(digest);
+  expect(
+    digestCapturedMediaRows({ ...rows, ref: { ...rows.ref, sha256: 'a'.repeat(64) } })
+  ).not.toBe(digest);
+});
+
+it('refuses media sidecars and origin relations that have no bounded publication owner', async () => {
+  const unsupported = fixture();
+  await expect(
+    freezeMediaInTransaction(unsupported.tx, unsupported.mirror.id)
+  ).rejects.toBeInstanceOf(UnsupportedSyncCaptureGraphError);
+  const data = originalOnlyMediaFixture();
+  data.stores.thumbnails.seed(data.mirror.id, { blob: new Blob(['preview']) });
+  await expect(freezeMediaInTransaction(data.tx, data.mirror.id)).rejects.toBeInstanceOf(
+    UnsupportedSyncCaptureGraphError
   );
 });

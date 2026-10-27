@@ -1,10 +1,9 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { applyPreparedMediaReplica } from '../../../apps/extension/src/composition/persistence/sync-capture/apply-media';
 import { harnessReady } from './browser-mocks/browser-mocks';
 import { createVideoClipFromAsset } from '../../../apps/extension/src/features/video/project/factories/clip';
 import { applyPreparedVideoProjectRevision } from '../../../apps/extension/src/composition/persistence/sync-capture/apply-video-project';
-import {
-  captureRootKey,
-  type SyncCaptureRootState,
-} from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
+import { captureRootKey } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
 import { parseMediaLibraryEntry } from '../../../apps/extension/src/composition/persistence/media-library/read-guards';
 import { parseAssetRef } from '../../../apps/extension/src/composition/persistence/assets/guards';
 import { listMediaAssetProjectUsage } from '../../../apps/extension/src/composition/persistence/media-library/usage';
@@ -396,11 +395,12 @@ async function cascadeProof() {
     'Cascade did not detach only the borrowed source.'
   );
   const projectChanges = await changes(entry.id);
-  const tombstones = await changes(mediaId);
+  const sourceChanges = await changes(mediaId);
+  const tombstones = sourceChanges.filter((capture) => capture.change.kind === 'tombstone');
   check(
     projectChanges.length === 3 &&
-      tombstones.length === 1 &&
-      tombstones[0]!.change.kind === 'tombstone',
+      sourceChanges.some((capture) => capture.change.kind === 'media') &&
+      tombstones.length === 1,
     'Cascade did not capture both affected roots.'
   );
   return { rollback: true, detach: true, tombstone: true };
@@ -673,21 +673,14 @@ async function applicationProof() {
   check(media && typeof child?.assetId === 'string', 'The native borrowed source is missing.');
   const borrowedRef = parseAssetRef(await db.get('asset_refs', child.assetId));
   check(borrowedRef, 'The native borrowed source has no physical reference.');
-  // Fixture boundary: replica admission precedes this native apply proof, not a product ingress API.
   const rootKey = captureRootKey(spaceId, 'media', mediaId);
-  const dependency: SyncCaptureRootState = {
-    version: 1,
-    kind: 'root-state',
-    key: JSON.stringify(['root-state', rootKey]),
-    createdAt: Date.now(),
-    spaceId,
-    rootKind: 'media',
-    rootId: mediaId,
-    rootKey,
-    generation: 1,
-    basis: ['accepted-native-source'],
-  };
-  await db.put(SYNC_CAPTURE_STORE, dependency);
+  const dependency = parseSyncCaptureRecord(
+    await db.get(SYNC_CAPTURE_STORE, JSON.stringify(['root-state', rootKey]))
+  );
+  check(
+    dependency?.kind === 'root-state' && dependency.nativeDigest,
+    'The native source writer did not capture its independent causal head.'
+  );
   const candidate = createEmptyVideoProject('Native applied project', 1280, 720);
   const metadata = {
     width: 24,
@@ -904,7 +897,142 @@ async function verifyAppliedSourcePersistence(projectId: string) {
   return hashes;
 }
 
-export const syncCaptureHarness = {
+export /** Export a real source capture from this disposable browser profile. */
+async function mediaSourceProof() {
+  await harnessReady;
+  await installExperimentalCaptureProfile({
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: Date.now(),
+    enabled: true,
+    spaceId: 'native-media-space',
+    connectionGeneration: 1,
+  });
+  const file = await coloredSource('rgb(20,180,60)');
+  const id = crypto.randomUUID();
+  await saveProjectAsset(id, file, file.type, 'independent-source.png');
+  const capture = (await changes(`project-asset:${id}`))[0];
+  check(capture?.change.kind === 'media', 'The native source has no media capture.');
+  return {
+    capture,
+    bytes: Array.from(new Uint8Array(await file.arrayBuffer())),
+    hash: await sha(file),
+  };
+}
+
+/** Exercise native ingestion without claiming provider or durable staging recovery proof. */
+async function mediaReplicaProof(payload: unknown) {
+  await harnessReady;
+  check(
+    isRecord(payload) &&
+      Array.isArray(payload['bytes']) &&
+      payload['bytes'].length <= 1024 * 1024 &&
+      typeof payload['hash'] === 'string',
+    'The disposable media transfer payload is invalid.'
+  );
+  const bytes: unknown[] = payload['bytes'];
+  check(
+    bytes.every(
+      (value) => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 255
+    ),
+    'The disposable source bytes are invalid.'
+  );
+  const capture = parseSyncCaptureRecord(payload['capture']);
+  check(
+    capture?.kind === 'captured-change' && capture.change.kind === 'media',
+    'The transferred source capture is invalid.'
+  );
+  await installExperimentalCaptureProfile({
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: Date.now(),
+    enabled: true,
+    spaceId: capture.spaceId,
+    connectionGeneration: 1,
+  });
+  const file = new Blob(
+    [Uint8Array.from(bytes.filter((value): value is number => typeof value === 'number'))],
+    { type: capture.change.rows.ref.mimeType }
+  );
+  check(
+    file.size === capture.change.rows.ref.size && (await sha(file)) === payload['hash'],
+    'The transferred source bytes failed verification.'
+  );
+  const prepared = await writeBlobToAsset(file, { mimeType: file.type });
+  const rows = structuredClone(capture.change.rows);
+  rows.ref = { ...prepared.ref, sha256: payload['hash'] };
+  rows.projectAsset.assetId = rows.ref.assetId;
+  const input = {
+    rows,
+    operationId: capture.operationId,
+    sourceDigest: await sha(new Blob([JSON.stringify(capture)])),
+    connectionGeneration: 1,
+    expectedLocalGeneration: 0,
+  };
+  const db = await initDB();
+  check(
+    (await db.get('media_library', rows.media.id)) === undefined,
+    'The target profile is not empty.'
+  );
+  await withCaptureWriteFailure('applied-operation', 1, () =>
+    refused(() => applyPreparedMediaReplica(input))
+  );
+  check(
+    (await db.get('media_library', rows.media.id)) === undefined,
+    'Failed native admission published a source.'
+  );
+  const alternatives = [input, { ...input, operationId: crypto.randomUUID() }];
+  const attempts = await Promise.allSettled(
+    alternatives.map((candidate) => applyPreparedMediaReplica(candidate))
+  );
+  check(
+    attempts.filter((result) => result.status === 'fulfilled').length === 1,
+    'Two native source applications accepted the same absent predecessor.'
+  );
+  const winner = alternatives[attempts.findIndex((result) => result.status === 'fulfilled')];
+  check(winner, 'The source application did not complete.');
+  check(
+    (await applyPreparedMediaReplica(winner)).status === 'duplicate',
+    'Accepted source replay was not a duplicate.'
+  );
+  check((await changes()).length === 0, 'Incoming source application emitted an outgoing capture.');
+  await releaseAssetReadyProtection([prepared.ref.assetId]);
+  return {
+    mediaId: rows.media.id,
+    hash: payload['hash'],
+    rollback: true,
+    parallel: true,
+    duplicate: true,
+    noEcho: true,
+    actualNativeSource: true,
+  };
+}
+
+async function verifyMediaReplicaPersistence(mediaId: string) {
+  const db = await initDB();
+  const media = parseMediaLibraryEntry(await db.get('media_library', mediaId));
+  check(media?.source.kind === 'project-asset', 'The admitted Library source is missing.');
+  const child = parseProjectAssetEntry(await db.get('project_assets', media.source.projectAssetId));
+  check(child, 'The admitted source child is missing.');
+  const ref = parseAssetRef(await db.get('asset_refs', child.assetId));
+  check(ref, 'The admitted physical ref is missing.');
+  const rootKey = captureRootKey('native-media-space', 'media', mediaId);
+  const state = parseSyncCaptureRecord(
+    await db.get(SYNC_CAPTURE_STORE, JSON.stringify(['root-state', rootKey]))
+  );
+  check(
+    state?.kind === 'root-state' && state.nativeDigest,
+    'The admitted source causal state is missing.'
+  );
+  return { hash: await sha(await readAssetFile(ref, media.filename)), basis: state.basis };
+}
+
+const syncCaptureHarness = {
+  mediaSourceProof,
+  mediaReplicaProof,
+  verifyMediaReplicaPersistence,
   verifyAppliedSourcePersistence,
   applicationProof,
   applicationAfterEditorProof,

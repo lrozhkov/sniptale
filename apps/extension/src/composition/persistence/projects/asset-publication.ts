@@ -1,4 +1,7 @@
-import { captureVideoProjectInTransaction } from '../sync-capture/capture';
+import {
+  captureVideoProjectInTransaction,
+  captureMediaInTransaction,
+} from '../sync-capture/capture';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import type { IDBPTransaction } from 'idb';
 import {
@@ -236,6 +239,10 @@ async function publishProjectMediaAsset(args: {
         const currentMedia = parseMediaLibraryEntry(await mediaStore.get(mediaEntry.id));
         if (currentMedia?.lifecycle) mediaEntry.lifecycle = currentMedia.lifecycle;
         await tx.objectStore(MEDIA_LIBRARY_STORE).put(mediaEntry);
+        if (args.storeName === PROJECT_ASSETS_STORE)
+          await captureMediaInTransaction(tx, mediaEntry.id, {
+            publicationId: args.journal.journalId,
+          });
       }
       if (physicalDelete.assetIds.length > 0) {
         await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);

@@ -1,3 +1,4 @@
+import type { MediaLibraryEntry } from '../media-library/contracts';
 import type { VideoProject } from '../../../features/video/project/types';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseAssetRef } from '../assets/guards';
@@ -12,6 +13,8 @@ import {
   MAX_CAPTURE_METADATA_BYTES,
   MAX_CAPTURE_ROWS,
   type CapturedVideoProjectRows,
+  type CapturedMediaRows,
+  type CapturedMediaDependency,
   type CapturedChange,
   type SyncCaptureAppliedOperation,
   type SyncCaptureProfile,
@@ -119,6 +122,62 @@ function boundedMetadata(value: unknown): boolean {
   );
 }
 
+/** Admit the original-only Library mirror that the native project asset publisher owns. */
+export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null {
+  if (!isRecord(value) || !boundedMetadata(value)) return null;
+  const media = parseMediaLibraryEntry(value['media']);
+  const projectAsset = parseProjectAssetEntry(value['projectAsset']);
+  const ref = parseAssetRef(value['ref']);
+  if (!media || !projectAsset || !ref) return null;
+  const rows = { media, projectAsset, ref };
+  return isOriginalOnlyCapturedMedia(media) && hasExactMediaSourceBinding(rows) ? rows : null;
+}
+
+/** The bounded source revision does not describe editable workspaces or inline bytes. */
+function isOriginalOnlyCapturedMedia(media: MediaLibraryEntry): boolean {
+  return (
+    media.blob === undefined &&
+    media.recordingMetadata === undefined &&
+    media.recordingGroup === undefined &&
+    media.workspaceRevision === 0 &&
+    media.imageContentState !== 'edited' &&
+    media.lifecycle?.trashedAt === undefined
+  );
+}
+
+/** A Library mirror, its native child, and its immutable ref must describe one source. */
+function hasExactMediaSourceBinding({ media, projectAsset, ref }: CapturedMediaRows): boolean {
+  return (
+    projectAsset.originMediaId === undefined &&
+    media.source.kind === 'project-asset' &&
+    media.source.projectAssetId === projectAsset.id &&
+    media.id === `project-asset:${projectAsset.id}` &&
+    projectAsset.assetId === ref.assetId &&
+    media.size === ref.size &&
+    projectAsset.size === ref.size &&
+    media.mimeType === ref.mimeType &&
+    projectAsset.mimeType === ref.mimeType
+  );
+}
+
+function parseMediaDependencies(value: unknown): CapturedMediaDependency[] | null {
+  return parseRows(value, (item) => {
+    if (
+      !isRecord(item) ||
+      !identity(item['mediaId']) ||
+      !ordinal(item['generation']) ||
+      item['generation'] === 0 ||
+      !Array.isArray(item['basis']) ||
+      item['basis'].length === 0 ||
+      item['basis'].length > MAX_CAPTURE_ROWS ||
+      !item['basis'].every(identity) ||
+      new Set(item['basis']).size !== item['basis'].length
+    )
+      return null;
+    return { mediaId: item['mediaId'], generation: item['generation'], basis: item['basis'] };
+  });
+}
+
 /** Parse accepted native rows again when they cross the persistence boundary. */
 export function parseCapturedVideoProjectRows(value: unknown): CapturedVideoProjectRows | null {
   if (!isRecord(value) || !boundedMetadata(value)) return null;
@@ -146,7 +205,29 @@ export function parseCapturedVideoProjectRows(value: unknown): CapturedVideoProj
     exports.some((entry) => entry.projectId !== project.id)
   )
     return null;
-  const parsed = { project, assets, exports, media, refs };
+  const dependencies =
+    value['mediaDependencies'] === undefined
+      ? undefined
+      : parseMediaDependencies(value['mediaDependencies']);
+  if (dependencies === null) return null;
+  if (dependencies !== undefined) {
+    const dependencyIds = new Set(dependencies.map((row) => row.mediaId));
+    const editingMedia = media.filter((row) => row.source.kind !== 'project-export');
+    if (
+      dependencyIds.size !== dependencies.length ||
+      dependencyIds.size !== editingMedia.length ||
+      editingMedia.some((row) => !dependencyIds.has(row.id))
+    )
+      return null;
+  }
+  const parsed = {
+    project,
+    assets,
+    exports,
+    media,
+    refs,
+    ...(dependencies === undefined ? {} : { mediaDependencies: dependencies }),
+  };
   if (!isSupportedCaptureProject(project.project) || !completeCapturedGraph(parsed)) return null;
   if (new TextEncoder().encode(JSON.stringify(parsed)).byteLength > MAX_CAPTURE_METADATA_BYTES)
     return null;
@@ -390,11 +471,14 @@ function parseCapturedChange(
   const change = value['change'];
   const rows =
     change['kind'] === 'video-project' ? parseCapturedVideoProjectRows(change['rows']) : null;
-  if (
-    change['kind'] !== 'tombstone' &&
-    (!rows || rows.project.id !== root.rootId || root.rootKind !== 'video-project')
-  )
-    return null;
+  const mediaRows = change['kind'] === 'media' ? parseCapturedMediaRows(change['rows']) : null;
+  let parsedChange: CapturedChange['change'];
+  if (change['kind'] === 'tombstone') parsedChange = { kind: 'tombstone' };
+  else if (rows && rows.project.id === root.rootId && root.rootKind === 'video-project')
+    parsedChange = { kind: 'video-project', rows };
+  else if (mediaRows && mediaRows.media.id === root.rootId && root.rootKind === 'media')
+    parsedChange = { kind: 'media', rows: mediaRows };
+  else return null;
   return {
     ...header,
     ...root,
@@ -403,7 +487,30 @@ function parseCapturedChange(
     connectionGeneration: value['connectionGeneration'],
     origin: value['origin'],
     publicationId: value['publicationId'],
-    change: rows ? { kind: 'video-project', rows } : { kind: 'tombstone' },
+    change: parsedChange,
+  };
+}
+
+/** Legacy root states have no native digest; new media states retain their admitted fingerprint. */
+function parseCaptureRootState(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): SyncCaptureRootState | null {
+  const root = parseCaptureRoot(value, header);
+  if (!root) return null;
+  const nativeDigest = value['nativeDigest'];
+  if (
+    nativeDigest !== undefined &&
+    (typeof nativeDigest !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(nativeDigest) ||
+      root.rootKind !== 'media')
+  )
+    return null;
+  return {
+    ...header,
+    ...root,
+    kind: 'root-state',
+    ...(nativeDigest === undefined ? {} : { nativeDigest }),
   };
 }
 
@@ -417,10 +524,8 @@ export function parseSyncCaptureRecord(value: unknown): SyncCaptureRecord | null
       return parseCaptureProfile(value, header);
     case 'applied-operation':
       return parseAppliedOperation(value, header);
-    case 'root-state': {
-      const root = parseCaptureRoot(value, header);
-      return root ? { ...header, ...root, kind: 'root-state' } : null;
-    }
+    case 'root-state':
+      return parseCaptureRootState(value, header);
     case 'captured-change':
       return parseCapturedChange(value, header);
     default:

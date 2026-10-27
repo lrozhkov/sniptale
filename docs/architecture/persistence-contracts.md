@@ -743,3 +743,16 @@ The bounded sync command requires an enabled experimental profile and the prepar
 A dependency that lacks local bytes requires hydration before application. A tombstone, conflicting revision or different incarnation requires explicit resolution. Matching bytes alone do not authorize a different logical dependency. The command preserves Library relationships and refuses hidden source substitution.
 
 Project publication, detached private-resource release and the application receipt commit together. Failure preserves current roots and the prepared candidate. A repeated accepted operation returns its receipt before checking later dependency changes. Pending local project changes refuse incoming replacement. This bounded command adds no product network route or automatic historical binding.
+
+
+### Experimental media replica admission
+
+The enabled experimental profile captures a published project-asset Library source in its native publication transaction. The capture has an independent operation identity. Pending media captures retain their physical files through the existing asset retention authority.
+
+Project capture records the causal heads of its editing dependencies in the same transaction. It compares the current normalized source snapshot with the digest of the accepted media head. A metadata change without a matching media revision causes refusal. Legacy experimental captures remain readable for retention, but do not supply this new dependency evidence.
+
+The media replica command accepts a prepared original-only project-asset source whose native identity is absent. It publishes the Library row, child, ref, owner, causal state and receipt atomically. An exact receipt retry returns a duplicate. A retained deleted identity, existing native source, local pending change or changed connection causes refusal. This command does not replace existing roots or release staged files. The caller must verify bytes and retain durable staging protection until publication commits.
+
+The media source publication participant also serves backup restoration. Backup retains conflict policy, transaction completion, sidecars and cleanup. Its publication order remains Library source, thumbnail, project child, then other sidecars. The participant does not start transactions or transfer files.
+
+This bounded integration does not implement all media writers, existing-data bootstrap, remote catalog admission or network transfer. The experimental profile remains disabled by default.

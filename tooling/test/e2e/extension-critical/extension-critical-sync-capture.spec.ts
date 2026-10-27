@@ -199,3 +199,60 @@ for (const viewport of [
     }
   });
 }
+
+test('native media source revision crosses isolated browser profiles and survives restart', async ({}, info) => {
+  test.setTimeout(120_000);
+  const host = await startHostServer();
+  let context: BrowserContext | undefined;
+  const targetProfile = info.outputPath('media-target-profile');
+  const options = { viewport: { width: 1920, height: 900 }, deviceScaleFactor: 1, headless: true };
+  try {
+    context = await chromium.launchPersistentContext(
+      info.outputPath('media-source-profile'),
+      options
+    );
+    const source = await context.newPage();
+    await applyHarnessBootstrap(source, { preserveMediaLibrary: true });
+    await source.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await source.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const payload = await source.evaluate(() => window.syncCaptureHarness.mediaSourceProof());
+    await context.close();
+    context = await chromium.launchPersistentContext(targetProfile, options);
+    const target = await context.newPage();
+    await applyHarnessBootstrap(target, { preserveMediaLibrary: true });
+    await target.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await target.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const admitted = await target.evaluate(
+      (payload) => window.syncCaptureHarness.mediaReplicaProof(payload),
+      payload
+    );
+    expect(admitted).toMatchObject({
+      rollback: true,
+      parallel: true,
+      duplicate: true,
+      noEcho: true,
+      actualNativeSource: true,
+    });
+    expect(admitted.hash).toBe(payload.hash);
+    await context.close();
+    context = await chromium.launchPersistentContext(targetProfile, options);
+    const restarted = await context.newPage();
+    await applyHarnessBootstrap(restarted, { preserveMediaLibrary: true });
+    await restarted.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await restarted.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const persisted = await restarted.evaluate(
+      (id) => window.syncCaptureHarness.verifyMediaReplicaPersistence(id),
+      admitted.mediaId
+    );
+    expect(persisted.hash).toBe(payload.hash);
+    expect(persisted.basis).toHaveLength(1);
+    await writeFile(
+      info.outputPath('media-replica-proof.json'),
+      JSON.stringify({ admitted, persisted, isolatedProfiles: true }, null, 2)
+    );
+  } finally {
+    await context?.close();
+    host.server.closeAllConnections();
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

@@ -138,11 +138,11 @@
       "file": "apps/extension/src/composition/persistence/projects/asset-publication.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One existing publication/recovery test receiver now also materializes real workspace head/history rows and asserts direct consuming-transaction claim denial/abort before any owner writes. Missing/purged/source-changed/unreferenced/resource-changed cases use the same mutation fixture; disabled redo/current retention cases preserve the exact existing claim contract. The correction adds no production authority or duplicated recovery receiver. File score2/delta0, owners4/effects0/state6/cohesion1 remain unchanged; line-only extraction would split this same participant proof. Fresh final architecture review independently accepted the preceding body; corrected exact body independently reinspected and its one-row binding supported by the read-only preliminary investigator; mandatory fresh final complete-candidate review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when project publication/recovery adapters, exact ready-claim/current-transaction admission or the workspace head/history mutation test receiver change. Remove when the analyzer models this cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate before closeout.",
-      "reviewDate": "2026-10-11",
-      "astHash": "8218dbab6b97b91a1388cd26bd770ad50406f2946ea593d2d51b0a7fa2dc69a6",
-      "signatureHash": "a485c2c79f6dc53202da4eb0b117ec35fb63bb0f889f7d1b8e0f7cc428d0bb2c"
+      "reason": "tool-noise: This publication suite adds source capture, rollback, retry and replay proof at its existing mutation seam. Two cases use the existing shared transaction fixture instead of the local receiver. Each case has separate store snapshots. Existing publication entry points and journal/ref helpers remain. No new fixture implementation or production authority appears. File score2/delta0 and owners4/effects0/state6/cohesion1 remain unchanged. Splitting by length would separate participant proof without isolating an independent responsibility. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess changes to publication adapters, mutation receivers, shared fixture lifetime, transaction ownership or independent recovery responsibilities. Remove when the analyzer recognizes this cohesive publication proof boundary. Fresh final architecture review must verify the classification before closeout.",
+      "reviewDate": "2026-10-27",
+      "astHash": "bb960ff10c9187bbb5f80d2f2bb335a321f38dcfb206de8250fc8ae3b69846be",
+      "signatureHash": "70cb0e3f142d7170cf9a8de4a5285d780bba809ee031b8969a92f7229b484770"
     },
     {
       "rule": "structural-function-risk",
@@ -2756,10 +2756,10 @@
       "file": "apps/extension/src/composition/persistence/projects/asset-publication.ts",
       "symbol": "publishProjectMediaAsset",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The existing publication transaction owns one commit and abort lifetime. Capture records its accepted after-image in that transaction. Capture mechanics stay in their named owner. No independent commit or recovery lifetime appears. Fresh read-only capture_structural_classification inspected this exact scope. Final candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state authority, commit, recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry, transaction, or proof fixture.",
+      "reason": "tool-noise: The existing publication transaction records the Library source after-image before commit. Capture mechanics remain in sync-capture. One transaction retains publication, capture, commit and abort authority. Physical cleanup stays after commit. The call adds no independent writer or recovery lifetime. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new transaction, independent writer, state authority, recovery lifetime or public contract. Remove when the analyzer recognizes this cohesive transaction boundary. Fresh final architecture review must verify the classification before closeout.",
       "reviewDate": "2026-10-27",
-      "astHash": "318562ac2e9ea1f92490803a5e5b0ec12afb0e102554422250617ffcaf0c455d",
+      "astHash": "ff8afcaca7bcc58159b143fadf5f6c69e04c776ad2ac2d87a69be63ebd08ac67",
       "signatureHash": "8f851fd09dd55225e411bc30cf58bf55a7bed33ed76d1d5a5206557829c1e22c"
     }
   ]

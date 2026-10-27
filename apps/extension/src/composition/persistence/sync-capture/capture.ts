@@ -9,9 +9,16 @@ import {
   type CapturedChange,
   type SyncCaptureProfile,
   type SyncCaptureRootState,
+  type CapturedVideoProjectRows,
+  type CapturedMediaDependency,
 } from './contracts';
 import { parseSyncCaptureRecord } from './guards';
-import { freezeVideoProjectInTransaction } from './freeze';
+import {
+  freezeVideoProjectInTransaction,
+  freezeMediaInTransaction,
+  digestCapturedMediaRows,
+  UnsupportedSyncCaptureGraphError,
+} from './freeze';
 
 type CaptureTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
@@ -43,6 +50,7 @@ export async function captureVideoProjectInTransaction(
   );
   if (replay) return replay;
   const rows = await freezeVideoProjectInTransaction(tx, projectId);
+  rows.mediaDependencies = await captureMediaDependencies(tx, profile, rows);
   return appendCapture(
     tx,
     profile,
@@ -51,6 +59,72 @@ export async function captureVideoProjectInTransaction(
     { kind: 'video-project', rows },
     options
   );
+}
+
+/** Capture the native Library publication before the caller commits its source transaction. */
+export async function captureMediaInTransaction(
+  tx: CaptureTransaction,
+  mediaId: string,
+  options: { origin?: CaptureOrigin; publicationId?: string } = {}
+): Promise<CapturedChange | null> {
+  const profile = await readEnabledCaptureProfile(tx);
+  if (!profile) return null;
+  const replay = await readPublicationReplay(tx, profile, 'media', mediaId, options.publicationId);
+  if (replay) return replay;
+  const rows = await freezeMediaInTransaction(tx, mediaId);
+  return appendCapture(tx, profile, 'media', mediaId, { kind: 'media', rows }, options);
+}
+
+/** Native metadata must still match the independent revision that supplied its causal head. */
+async function captureMediaDependencies(
+  tx: CaptureTransaction,
+  profile: SyncCaptureProfile,
+  rows: CapturedVideoProjectRows
+): Promise<CapturedMediaDependency[]> {
+  const dependencies: CapturedMediaDependency[] = [];
+  const editingMedia = collectEditingMediaIds(rows);
+  for (const media of rows.media) {
+    if (media.source.kind === 'project-export') {
+      if (editingMedia.has(media.id)) throw new UnsupportedSyncCaptureGraphError();
+      continue;
+    }
+    dependencies.push(await readAcceptedMediaDependency(tx, profile, media.id));
+  }
+  return dependencies;
+}
+
+/** Independent export mirrors are outside the editing dependency set. */
+function collectEditingMediaIds(rows: CapturedVideoProjectRows): Set<string> {
+  const mediaIds = new Set<string>();
+  for (const asset of rows.project.project.assets) {
+    if (asset.source.kind === 'library-asset') mediaIds.add(asset.source.mediaId);
+    if (asset.source.kind === 'project-asset' && asset.source.originMediaId)
+      mediaIds.add(asset.source.originMediaId);
+  }
+  for (const asset of rows.assets) if (asset.originMediaId) mediaIds.add(asset.originMediaId);
+  return mediaIds;
+}
+
+/** A causal head is usable only for the native snapshot that its owner admitted. */
+async function readAcceptedMediaDependency(
+  tx: CaptureTransaction,
+  profile: SyncCaptureProfile,
+  mediaId: string
+): Promise<CapturedMediaDependency> {
+  const rootKey = captureRootKey(profile.spaceId, 'media', mediaId);
+  const state = parseSyncCaptureRecord(
+    await tx.objectStore(SYNC_CAPTURE_STORE).get(JSON.stringify(['root-state', rootKey]))
+  );
+  const frozen = await freezeMediaInTransaction(tx, mediaId);
+  if (
+    !state ||
+    state.kind !== 'root-state' ||
+    state.rootKey !== rootKey ||
+    state.basis.length === 0 ||
+    state.nativeDigest !== digestCapturedMediaRows(frozen)
+  )
+    throw new UnsupportedSyncCaptureGraphError();
+  return { mediaId, generation: state.generation, basis: [...state.basis] };
 }
 
 /** A tombstone preserves identity and predecessors after the native row is removed. */
@@ -158,6 +232,7 @@ async function appendCapture(
     rootKey,
     generation,
     basis: [operationId],
+    ...(change.kind === 'media' ? { nativeDigest: digestCapturedMediaRows(change.rows) } : {}),
   };
   await store.add(record);
   await store.put(state);

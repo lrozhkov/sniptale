@@ -1,4 +1,5 @@
 import type { IDBPTransaction } from 'idb';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { parseAssetRef } from '../assets/guards';
 import type { AssetRef } from '../assets/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -26,8 +27,16 @@ import {
   VIDEO_WORKSPACE_DRAFTS_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
 } from '../infrastructure/indexed-db/core.stores';
-import { MAX_CAPTURE_ROWS, type CapturedVideoProjectRows } from './contracts';
-import { isSupportedCaptureProject, parseCapturedVideoProjectRows } from './guards';
+import {
+  MAX_CAPTURE_ROWS,
+  type CapturedVideoProjectRows,
+  type CapturedMediaRows,
+} from './contracts';
+import {
+  isSupportedCaptureProject,
+  parseCapturedVideoProjectRows,
+  parseCapturedMediaRows,
+} from './guards';
 
 /** The pilot refuses relations whose native rows it does not capture. */
 export class UnsupportedSyncCaptureGraphError extends Error {
@@ -62,6 +71,35 @@ function frozenNativeRow<T>(value: unknown, admit: (value: unknown) => value is 
   requireSupported(admit(value));
   // Admission uses the native owner parser; cloning retains the accepted after-image, not its projection.
   return structuredClone(value);
+}
+
+/** Hash normalized native metadata synchronously so the caller retains its live IDB transaction. */
+export function digestCapturedMediaRows(rows: CapturedMediaRows): string {
+  const normalized = parseCapturedMediaRows(rows);
+  requireSupported(normalized !== null);
+  const digest = sha256(new TextEncoder().encode(JSON.stringify(normalized)));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Freeze one original-only Library source through the caller's transaction. */
+export async function freezeMediaInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  mediaId: string
+): Promise<CapturedMediaRows> {
+  const media = frozenNativeRow(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId), admitMedia);
+  requireSupported(media.id === mediaId && media.source.kind === 'project-asset');
+  const projectAsset = frozenNativeRow(
+    await tx.objectStore(PROJECT_ASSETS_STORE).get(media.source.projectAssetId),
+    admitAsset
+  );
+  const ref = frozenNativeRow(
+    await tx.objectStore(ASSET_REFS_STORE).get(projectAsset.assetId),
+    admitRef
+  );
+  const rows = parseCapturedMediaRows({ media, projectAsset, ref });
+  requireSupported(rows !== null);
+  await rejectUncapturedSidecars(tx, new Set([mediaId]));
+  return structuredClone(rows);
 }
 
 /** Freeze one admitted graph through the caller's native transaction, without opening another transaction. */

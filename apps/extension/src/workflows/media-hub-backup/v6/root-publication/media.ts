@@ -1,4 +1,8 @@
 import {
+  publishPreparedMediaSourceInTransaction,
+  publishPreparedMediaProjectChildInTransaction,
+} from '../../../../composition/persistence/media-library/source-publication';
+import {
   createLibraryLifecycle,
   promoteLibraryLifecycle,
 } from '../../../../composition/persistence/library-lifecycle/contracts';
@@ -491,37 +495,15 @@ async function detectMediaConflicts(stores: MediaRestoreStores, prepared: Prepar
   };
 }
 
-async function publishProjectVideo(prepared: PreparedMediaRoot, stores: MediaRestoreStores) {
-  const child = prepared.projectAsset ?? prepared.projectExport;
-  if (!child) return;
-  await stores.refs.put(prepared.original.ref);
-  await stores.owners.put({
-    assetId: child.assetId,
-    ownerId: child.id,
-    ownerKind: prepared.projectAsset ? 'project-asset' : 'project-export',
-    role: 'body',
-  });
-  await (prepared.projectAsset ? stores.projectAssets : stores.projectExports).put(child);
-}
-
 async function publishPreparedMedia(args: {
   metadata: PortableMedia;
   objects: StagedObjectMap;
   prepared: PreparedMediaRoot;
   stores: MediaRestoreStores;
 }) {
-  await args.stores.media.put(args.prepared.media);
-  if (args.prepared.media.source.kind === 'stored-asset') {
-    await args.stores.refs.put(args.prepared.original.ref);
-    await args.stores.owners.put({
-      assetId: args.prepared.original.ref.assetId,
-      ownerId: args.prepared.media.id,
-      ownerKind: 'media-library',
-      role: 'source',
-    });
-  }
+  await publishPreparedMediaSourceInTransaction(args.prepared, args.stores);
   if (args.prepared.thumbnail) await args.stores.thumbnails.put(args.prepared.thumbnail);
-  await publishProjectVideo(args.prepared, args.stores);
+  await publishPreparedMediaProjectChildInTransaction(args.prepared, args.stores);
   await publishMediaReviewAssets(args.prepared.reviewAssets, args.stores);
   if (args.prepared.videoReview) {
     await promoteReviewSourceLifecycles(

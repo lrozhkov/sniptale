@@ -14,7 +14,12 @@ export function collectSyncCaptureClaims(raw: unknown): {
       valid = false;
       continue;
     }
-    if (record.kind === 'captured-change' && record.change.kind === 'video-project')
+    if (record.kind !== 'captured-change') continue;
+    if (record.change.kind === 'media') {
+      assetIds.add(record.change.rows.ref.assetId);
+      continue;
+    }
+    if (record.change.kind === 'video-project')
       for (const ref of record.change.rows.refs) assetIds.add(ref.assetId);
   }
   return { valid, assetIds };
