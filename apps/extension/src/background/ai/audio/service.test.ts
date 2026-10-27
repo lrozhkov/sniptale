@@ -30,6 +30,8 @@ const request: AudioJobStart = {
   profile: { voiceId: 'voice', responseFormat: 'mp3' },
 };
 const config = {
+  connectionType: 'openai-compatible' as const,
+  baseUrl: 'https://example.test/v1',
   url: 'https://example.test/v1/audio/speech',
   apiKey: 'test-secret',
   modelCode: 'speech',

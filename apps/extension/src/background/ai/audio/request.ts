@@ -1,4 +1,10 @@
+import { generateSpeech, NoSpeechGeneratedError } from 'ai';
+import { APICallError, InvalidResponseDataError, TypeValidationError } from '@ai-sdk/provider';
+import { createAIProviderRuntime } from '../providers';
+import { createProviderSdkFetch } from '../llm/transport/http';
 import {
+  parseAudioJobFailureCode,
+  AUDIO_JOB_TIMEOUT_MS,
   AUDIO_INPUT_MAX_BYTES,
   AUDIO_INPUT_MAX_SECONDS,
   type AudioRecognitionOptions,
@@ -148,19 +154,6 @@ async function encodeTranscription(
   return body;
 }
 
-function encodeSpeech(args: AudioRequest): string {
-  const params = args.config.speech;
-  if (args.request.operation !== 'speech' || !params) throw new Error('invalid-request');
-  return JSON.stringify({
-    model: args.config.modelCode,
-    input: args.request.text,
-    voice: params.voiceId,
-    response_format: params.responseFormat,
-    ...(params.speed === undefined ? {} : { speed: params.speed }),
-    ...(params.instructions ? { instructions: params.instructions } : {}),
-  });
-}
-
 async function assertResponseStatus(response: Response): Promise<void> {
   if (response.ok) return;
   await response.body?.cancel().catch(() => undefined);
@@ -302,10 +295,115 @@ export async function requestAudio(args: AudioRequest) {
       result: await performTranscription(transcriptionInput(args)),
     };
   }
-  const headers = {
-    Authorization: `Bearer ${args.config.apiKey}`,
-    'Content-Type': 'application/json',
-  };
-  const response = await postAudioProvider(args, headers, encodeSpeech(args));
-  return decodeResponse(response, args);
+  return requestSpeech(args);
+}
+
+async function requestSpeech(args: AudioRequest) {
+  const params = args.config.speech;
+  if (args.request.operation !== 'speech' || !params) throw new Error('invalid-request');
+  const type = args.config.connectionType;
+  const compatible = ['openai-compatible', 'openai', 'neuraldeep', 'lm-studio'].includes(type);
+  if (
+    (!compatible && params.responseFormat === 'pcm') ||
+    (type === 'google' && params.responseFormat !== 'wav') ||
+    (type === 'elevenlabs' && params.responseFormat !== 'mp3')
+  )
+    throw new Error('provider-request');
+  let contentType: string | null = null;
+  const transport = createProviderSdkFetch({
+    baseUrl: args.config.baseUrl,
+    timeoutMs: AUDIO_JOB_TIMEOUT_MS,
+    maxResponseBytes:
+      type === 'google' || type === 'mistral'
+        ? Math.ceil(AUDIO_OUTPUT_MAX_BYTES / 3) * 4 + 65536
+        : params.responseFormat === 'pcm'
+          ? AUDIO_OUTPUT_MAX_BYTES - PCM_WAV_HEADER_BYTES
+          : AUDIO_OUTPUT_MAX_BYTES,
+    signal: args.signal,
+    ...(args.beforeSend ? { beforeSend: args.beforeSend } : {}),
+    transport: async (input, init) => {
+      let response: Response;
+      try {
+        response = await fetch(input, init);
+      } catch {
+        args.signal.throwIfAborted();
+        throw new Error('network-failed');
+      }
+      await assertResponseStatus(response);
+      contentType = await admitSpeechResponse(response, type, params.responseFormat);
+      args.onReceiving();
+      return response;
+    },
+  });
+  try {
+    const provider = createAIProviderRuntime({
+      type,
+      baseUrl: args.config.baseUrl,
+      apiKey: args.config.apiKey,
+      fetch: transport,
+      operation: 'speech',
+    });
+    const speechModel = provider.speechModel?.(args.config.modelCode);
+    if (!speechModel) throw new Error('model-unavailable');
+    const result = await generateSpeech({
+      model: speechModel,
+      text: args.request.text,
+      voice: params.voiceId,
+      outputFormat: params.responseFormat,
+      maxRetries: 0,
+      abortSignal: args.signal,
+      ...(params.speed === undefined ? {} : { speed: params.speed }),
+      ...(params.instructions ? { instructions: params.instructions } : {}),
+    });
+    args.signal.throwIfAborted();
+    const sdkMime = result.audio.mediaType === 'audio/mp3' ? 'audio/mpeg' : result.audio.mediaType;
+    const mime = type === 'google' || type === 'mistral' ? sdkMime : contentType;
+    return await decodeResponse(
+      new Response(new Uint8Array(result.audio.uint8Array), {
+        ...(mime ? { headers: { 'Content-Type': mime } } : {}),
+      }),
+      args
+    );
+  } catch (error) {
+    return speechFailure(error, args.signal);
+  }
+}
+
+function speechFailure(error: unknown, signal: AbortSignal): never {
+  signal.throwIfAborted();
+  const code = error instanceof Error ? error.message : '';
+  if (code === 'provider-response-too-large') throw new Error('too-large');
+  if (code === 'provider-redirect-refused') throw new Error('network-failed');
+  if (parseAudioJobFailureCode(code)) throw new Error(code);
+  if (
+    NoSpeechGeneratedError.isInstance(error) ||
+    InvalidResponseDataError.isInstance(error) ||
+    TypeValidationError.isInstance(error) ||
+    APICallError.isInstance(error)
+  )
+    throw new Error('invalid-response');
+  if (error instanceof Error && error.name === 'AbortError') throw new Error('timeout');
+  throw new Error('network-failed');
+}
+
+async function admitSpeechResponse(
+  response: Response,
+  type: AudioModelConfig['connectionType'],
+  format: NonNullable<AudioModelConfig['speech']>['responseFormat']
+): Promise<string | null> {
+  const contentType = response.headers.get('Content-Type');
+  const mime = contentType?.split(';')[0]?.trim().toLowerCase();
+  const valid =
+    type === 'google' || type === 'mistral'
+      ? mime === 'application/json'
+      : format === 'pcm'
+        ? isSupportedPcmContentType(contentType)
+        : format === 'wav'
+          ? mime === 'audio/wav' || mime === 'audio/x-wav'
+          : mime === 'audio/mpeg';
+  if (!valid) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error('invalid-response');
+  }
+  return contentType;
 }

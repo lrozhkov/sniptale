@@ -8,6 +8,8 @@ const options: AudioRecognitionOptions = {
   prompt: '',
 };
 const config: AudioModelConfig = {
+  connectionType: 'openai-compatible',
+  baseUrl: 'https://provider.test/v1/chat/completions',
   url: 'https://provider.test/v1/chat/completions',
   apiKey: 'unused',
   modelCode: 'declared',

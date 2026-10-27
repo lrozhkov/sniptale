@@ -35,6 +35,8 @@ const transcription: AudioJobStart = {
   scope,
 };
 const speechConfig: AudioModelConfig = {
+  connectionType: 'openai-compatible',
+  baseUrl: 'https://example.test',
   url: 'https://example.test/audio/speech',
   apiKey: 'fixture',
   modelCode: 'speech',
@@ -86,7 +88,13 @@ it.each([
 it('rejects an incomplete operation before fetch or an already cancelled request', async () => {
   const fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal('fetch', fetchMock);
-  const noParameters = { url: speechConfig.url, apiKey: 'fixture', modelCode: 'model' };
+  const noParameters: AudioModelConfig = {
+    connectionType: speechConfig.connectionType,
+    baseUrl: speechConfig.baseUrl,
+    url: speechConfig.url,
+    apiKey: 'fixture',
+    modelCode: 'model',
+  };
   await expect(run(speech, noParameters)).rejects.toThrow('invalid-request');
   await expect(run(transcription, noParameters)).rejects.toThrow('invalid-request');
   await expect(

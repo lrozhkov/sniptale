@@ -135,6 +135,8 @@ describe('audio model operation and credential admission', () => {
 
   it('checks exact provider origin permission before resolving its bound secret', async () => {
     await expect(resolveAudioModelConfig(request)).resolves.toEqual({
+      connectionType: provider.connectionType,
+      baseUrl: provider.baseUrl,
       url: 'https://audio.example.test/custom/v1/audio/speech',
       apiKey: 'fixture-secret',
       modelCode: 'speech-model',
@@ -164,6 +166,8 @@ describe('audio model operation and credential admission', () => {
         modelId: model.id,
       })
     ).resolves.toEqual({
+      connectionType: provider.connectionType,
+      baseUrl: provider.baseUrl,
       url: 'https://audio.example.test/custom/v1/audio/transcriptions',
       apiKey: 'fixture-secret',
       modelCode: model.modelCode,
@@ -190,8 +194,8 @@ describe('audio model operation and credential admission', () => {
     }
   );
 
-  it('refuses native provider kinds before entering the legacy audio transport', async () => {
-    vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, connectionType: 'elevenlabs' }]);
+  it('refuses providers without an admitted speech adapter', async () => {
+    vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, connectionType: 'anthropic' }]);
     await expect(resolveAudioModelConfig(request)).rejects.toThrow('model-unavailable');
     expect(permission).not.toHaveBeenCalled();
     expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
@@ -431,5 +435,46 @@ it('does not activate a voice model for a cancelled operation', async () => {
   const controller = new AbortController();
   controller.abort();
   await expect(resolveTranscriptionModelConfig(selection, controller.signal)).rejects.toThrow();
+  expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+});
+
+it.each([
+  'openai',
+  'neuraldeep',
+  'lm-studio',
+  'google',
+  'elevenlabs',
+  'deepgram',
+  'mistral',
+  'xai',
+] as const)(
+  'admits %s speech through its SDK configuration after permission and secret checks',
+  async (connectionType) => {
+    vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, connectionType }]);
+    await expect(resolveAudioModelConfig(request)).resolves.toMatchObject({
+      connectionType,
+      baseUrl: provider.baseUrl,
+      modelCode: model.modelCode,
+      speech: request.profile,
+    });
+    expect(permission).toHaveBeenCalledBefore(vi.mocked(activateStoredAIProviderSecretForUse));
+  }
+);
+
+it('admits local LM Studio speech without a credential while retaining origin permission', async () => {
+  vi.mocked(loadAIProviders).mockResolvedValue([
+    {
+      ...provider,
+      connectionType: 'lm-studio',
+      baseUrl: 'http://localhost:1234/v1',
+      hasStoredApiKey: false,
+    },
+  ]);
+  await expect(resolveAudioModelConfig(request)).resolves.toMatchObject({
+    connectionType: 'lm-studio',
+    baseUrl: 'http://localhost:1234/v1',
+    apiKey: '',
+  });
+  expect(permission).toHaveBeenCalledWith({ origins: ['http://localhost:1234/*'] });
   expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
 });

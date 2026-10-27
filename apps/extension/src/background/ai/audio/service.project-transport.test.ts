@@ -61,6 +61,8 @@ function setup(mode: 'multipart' | 'audio-chat') {
       : {}),
   };
   const config: AudioModelConfig = {
+    connectionType: 'openai-compatible',
+    baseUrl: 'https://provider.test/audio',
     url: 'https://provider.test/audio',
     apiKey: 'fixture',
     modelCode: 'model',

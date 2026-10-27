@@ -231,6 +231,8 @@ it('reports a failed revision so cancellation can remove the admitted entry', as
   expect(onScope).toHaveBeenLastCalledWith(failed);
 });
 const config: AudioModelConfig = {
+  connectionType: 'openai-compatible',
+  baseUrl: 'https://provider.test/v1',
   url: 'https://provider.test/v1/audio/transcriptions',
   apiKey: 'fixture-secret',
   modelCode: 'whisper',

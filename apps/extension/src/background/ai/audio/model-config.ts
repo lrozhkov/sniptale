@@ -1,3 +1,8 @@
+import {
+  getAIProviderDefinition,
+  getAIProviderOperations,
+  type AIProviderType,
+} from '../../../contracts/settings/ai-provider';
 import { supportsAIModelOperation } from '../../../contracts/settings/model-operation';
 import {
   initializeAiStorageAccess,
@@ -20,6 +25,8 @@ import { isAudioSourceJobScope, type AudioJobStart } from '../../../contracts/ai
 import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 
 export interface AudioModelConfig {
+  connectionType: AIProviderType;
+  baseUrl: string;
   url: string;
   apiKey: string;
   modelCode: string;
@@ -54,8 +61,12 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   if (args.approvedProviderId !== undefined && args.approvedProviderId !== model.providerId)
     throw new Error('model-unavailable');
   const provider = providers.find((entry) => entry.id === model.providerId);
-  // Native audio execution is admitted by the separate SDK audio stage.
-  if (!provider || provider.enabled === false || provider.connectionType !== 'openai-compatible')
+  if (
+    !provider ||
+    provider.enabled === false ||
+    !getAIProviderOperations(provider.connectionType).includes(args.operation) ||
+    (args.operation === 'transcription' && provider.connectionType !== 'openai-compatible')
+  )
     throw new Error('model-unavailable');
   const chat =
     args.operation === 'transcription' && model.audio?.transcription?.transport === 'audio-chat';
@@ -80,16 +91,21 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
     (chat
       ? resolveAIProviderChatCompletionsUrl(provider.baseUrl)
       : resolveAIProviderAudioUrl(provider.baseUrl, args.operation));
-  if (!provider || !url || !provider.hasStoredApiKey) throw new Error('model-unavailable');
+  const requiresSecret = getAIProviderDefinition(provider.connectionType).credential !== 'none';
+  if (!url || (requiresSecret && !provider.hasStoredApiKey)) throw new Error('model-unavailable');
   if (!(await chrome.permissions.contains({ origins: [`${new URL(url).origin}/*`] })))
     throw new Error('permission-denied');
   args.signal?.throwIfAborted();
-  const apiKey = await activateStoredAIProviderSecretForUse(provider);
+  const apiKey = provider.hasStoredApiKey
+    ? await activateStoredAIProviderSecretForUse(provider)
+    : '';
   args.signal?.throwIfAborted();
-  if (!apiKey) throw new Error('secret-unavailable');
+  if (apiKey === null || (requiresSecret && !apiKey)) throw new Error('secret-unavailable');
   const instructions = chat ? await loadAudioTranscriptionSystemPrompt() : undefined;
   args.signal?.throwIfAborted();
   return {
+    connectionType: provider.connectionType,
+    baseUrl: provider.baseUrl,
     url,
     apiKey,
     modelCode: model.modelCode,
