@@ -1,4 +1,3 @@
-import { Unzlib } from 'fflate';
 import {
   assembleOptimizedPng,
   filterPngRow,
@@ -10,9 +9,10 @@ import {
 const MAX_SOURCE_BYTES = 32 * 1024 * 1024;
 const MAX_FILTERED_BYTES = 512 * 1024 * 1024;
 const MAX_OPTIMIZATION_MS = 8_000;
-// A small compressed input limits the decoder's allocation before its output callback runs.
-const INFLATE_INPUT_BYTES = 1024;
-const ADLER_MODULUS = 65521;
+const MAX_RECONSTRUCTED_BYTES = 32 * 1024 * 1024;
+// Small input chunks bound native decompression bursts before row-size admission.
+const INFLATE_INPUT_BYTES = 4 * 1024;
+const DEFLATE_BATCH_BYTES = 256 * 1024;
 
 type CheckBudget = () => void;
 type RowConsumer = (row: Uint8Array) => void;
@@ -25,21 +25,6 @@ function createBudget(signal?: AbortSignal): CheckBudget {
   };
 }
 
-function readAdlerTrailer(chunks: Uint8Array[]): number {
-  const trailer = new Uint8Array(4);
-  let length = 0;
-  for (const bytes of chunks) {
-    length += bytes.length;
-    if (bytes.length >= 4) trailer.set(bytes.subarray(-4));
-    else {
-      trailer.copyWithin(0, bytes.length);
-      trailer.set(bytes, 4 - bytes.length);
-    }
-  }
-  if (length < 6) throw new Error('Truncated PNG compressed stream.');
-  return new DataView(trailer.buffer).getUint32(0);
-}
-
 function createRowDecoder(png: BrowserPng, consumeRow: RowConsumer, checkBudget: CheckBudget) {
   const rowLength = png.width * png.channels + 1;
   const expectedBytes = rowLength * png.height;
@@ -47,23 +32,12 @@ function createRowDecoder(png: BrowserPng, consumeRow: RowConsumer, checkBudget:
   let previous = new Uint8Array(rowLength);
   let filled = 0;
   let decodedBytes = 0;
-  let adlerA = 1;
-  let adlerB = 0;
   return {
     receive(bytes: Uint8Array) {
       checkBudget();
       if (bytes.length > expectedBytes - decodedBytes)
         throw new Error('PNG decoded size mismatch.');
       decodedBytes += bytes.length;
-      for (let start = 0; start < bytes.length; start += 5552) {
-        const end = Math.min(bytes.length, start + 5552);
-        for (let index = start; index < end; index += 1) {
-          adlerA += bytes[index]!;
-          adlerB += adlerA;
-        }
-        adlerA %= ADLER_MODULUS;
-        adlerB %= ADLER_MODULUS;
-      }
       for (let offset = 0; offset < bytes.length;) {
         const size = Math.min(row.length - filled, bytes.length - offset);
         row.set(bytes.subarray(offset, offset + size), filled);
@@ -79,16 +53,58 @@ function createRowDecoder(png: BrowserPng, consumeRow: RowConsumer, checkBudget:
       }
     },
     finish() {
-      const adler = ((adlerB << 16) | adlerA) >>> 0;
-      if (
-        decodedBytes !== expectedBytes ||
-        filled !== 0 ||
-        adler !== readAdlerTrailer(png.imageData)
-      ) {
+      if (decodedBytes !== expectedBytes || filled !== 0) {
         throw new Error('PNG compressed stream integrity check failed.');
       }
     },
   };
+}
+
+async function decodePngData(
+  png: BrowserPng,
+  receiveBytes: (bytes: Uint8Array) => void,
+  checkBudget: CheckBudget,
+  flush?: () => Promise<void>
+) {
+  let chunk = 0;
+  let offset = 0;
+  const compressed = new ReadableStream<BufferSource>({
+    pull(controller) {
+      checkBudget();
+      while (chunk < png.imageData.length) {
+        const bytes = png.imageData[chunk]!;
+        if (offset < bytes.length) {
+          const end = Math.min(bytes.length, offset + INFLATE_INPUT_BYTES);
+          controller.enqueue(bytes.slice(offset, end));
+          offset = end;
+          return;
+        }
+        chunk += 1;
+        offset = 0;
+      }
+      controller.close();
+    },
+  });
+  const reader = compressed.pipeThrough(new DecompressionStream('deflate')).getReader();
+  let lastYield = performance.now();
+  try {
+    while (true) {
+      checkBudget();
+      const result = await reader.read();
+      if (result.done) break;
+      receiveBytes(result.value);
+      await flush?.();
+      if (performance.now() - lastYield >= 16) {
+        await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+        checkBudget();
+        lastYield = performance.now();
+      }
+    }
+    // Reading to completion validates Adler-32, truncation and trailing bytes natively.
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
 }
 
 async function decodeRows(
@@ -98,21 +114,7 @@ async function decodeRows(
   flush?: () => Promise<void>
 ) {
   const rows = createRowDecoder(png, consumeRow, checkBudget);
-  const decoder = new Unzlib((bytes) => rows.receive(bytes));
-  let lastYield = performance.now();
-  for (const bytes of png.imageData) {
-    for (let offset = 0; offset < bytes.length; offset += INFLATE_INPUT_BYTES) {
-      checkBudget();
-      decoder.push(bytes.subarray(offset, offset + INFLATE_INPUT_BYTES), false);
-      await flush?.();
-      if (performance.now() - lastYield >= 16) {
-        await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
-        checkBudget();
-        lastYield = performance.now();
-      }
-    }
-  }
-  decoder.push(new Uint8Array(), true);
+  await decodePngData(png, rows.receive, checkBudget, flush);
   rows.finish();
 }
 
@@ -156,8 +158,8 @@ function createNativeCandidate(maxBytes: number) {
       readError = error;
     }
   })();
-  const flush = async () => {
-    if (!pendingBytes) return;
+  const flush = async (force = false) => {
+    if (!pendingBytes || (!force && pendingBytes < DEFLATE_BATCH_BYTES)) return;
     const bytes = new Uint8Array(pendingBytes);
     let offset = 0;
     for (const row of pending) {
@@ -171,12 +173,12 @@ function createNativeCandidate(maxBytes: number) {
   return {
     push(row: Uint8Array) {
       if (!active) return;
-      pending.push(row.slice());
+      pending.push(row);
       pendingBytes += row.length;
     },
     flush,
     async finish(): Promise<Uint8Array[] | null> {
-      await flush();
+      await flush(true);
       await writer.close();
       await drained;
       if (readError) throw readError;
@@ -186,6 +188,39 @@ function createNativeCandidate(maxBytes: number) {
       await Promise.allSettled([writer.abort(), reader.cancel(), drained]);
     },
   };
+}
+
+async function recompressFilteredPng(
+  png: BrowserPng,
+  maxBytes: number,
+  checkBudget: CheckBudget
+): Promise<Blob[]> {
+  const candidate = createNativeCandidate(maxBytes);
+  const rowLength = png.width * png.channels + 1;
+  const expectedBytes = rowLength * png.height;
+  let decodedBytes = 0;
+  try {
+    await decodePngData(
+      png,
+      (bytes) => {
+        if (bytes.length > expectedBytes - decodedBytes)
+          throw new Error('PNG decoded size mismatch.');
+        const firstFilter = (rowLength - (decodedBytes % rowLength)) % rowLength;
+        for (let index = firstFilter; index < bytes.length; index += rowLength) {
+          if (bytes[index]! > 4) throw new Error('Invalid PNG row filter.');
+        }
+        decodedBytes += bytes.length;
+        candidate.push(bytes);
+      },
+      checkBudget,
+      () => candidate.flush()
+    );
+    if (decodedBytes !== expectedBytes) throw new Error('PNG decoded size mismatch.');
+    const compressed = await candidate.finish();
+    return compressed ? [assembleOptimizedPng(png, png.channels, compressed)] : [];
+  } finally {
+    await candidate.dispose();
+  }
 }
 
 async function encodeCandidates(
@@ -212,7 +247,7 @@ async function encodeCandidates(
           }
           row = rgb;
         }
-        none.push(row);
+        none.push(row.slice());
         adaptive.push(filterPngRow(row, previous, channels));
         previous.set(row);
       },
@@ -242,7 +277,8 @@ export async function optimizePngBlob(blob: Blob, signal?: AbortSignal): Promise
   if (
     blob.type !== 'image/png' ||
     blob.size > MAX_SOURCE_BYTES ||
-    typeof CompressionStream !== 'function'
+    typeof CompressionStream !== 'function' ||
+    typeof DecompressionStream !== 'function'
   )
     return blob;
   const checkBudget = createBudget(signal);
@@ -251,8 +287,17 @@ export async function optimizePngBlob(blob: Blob, signal?: AbortSignal): Promise
     checkBudget();
     const png = readBrowserPng(bytes, MAX_FILTERED_BYTES);
     if (!png) return blob;
-    const channels = await resolveOutputChannels(png, checkBudget);
-    const candidates = await encodeCandidates(png, channels, blob.size, checkBudget);
+    const filteredBytes = (png.width * png.channels + 1) * png.height;
+    // Large rasters retain their filters and channels to avoid extra pixel traversals.
+    const candidates =
+      filteredBytes > MAX_RECONSTRUCTED_BYTES
+        ? await recompressFilteredPng(png, blob.size, checkBudget)
+        : await encodeCandidates(
+            png,
+            await resolveOutputChannels(png, checkBudget),
+            blob.size,
+            checkBudget
+          );
     checkBudget();
     return candidates.reduce(
       (smallest, candidate) => (candidate.size < smallest.size ? candidate : smallest),

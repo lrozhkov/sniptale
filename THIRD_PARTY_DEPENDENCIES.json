@@ -151,19 +151,6 @@
       "version": "7.4.0"
     },
     {
-      "archivePath": "LICENSES/dependencies/fflate-0.8.3.txt",
-      "licenseExpression": "MIT",
-      "licenseSource": "node_modules/fflate/LICENSE",
-      "licenseSourceKind": "installed-file",
-      "licenseStorageKind": "generated-copy",
-      "packageName": "fflate",
-      "packagePath": "node_modules/fflate",
-      "selectedLicense": "MIT",
-      "sha256": "0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551",
-      "sourceUrl": "https://github.com/101arrowz/fflate",
-      "version": "0.8.3"
-    },
-    {
       "archivePath": "LICENSES/dependencies/hachure-fill-0.5.2.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/hachure-fill/LICENSE",

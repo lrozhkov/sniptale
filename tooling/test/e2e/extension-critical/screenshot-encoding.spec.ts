@@ -11,7 +11,7 @@ test('final PNG preserves web, photo, mixed, tall and alpha pixels', async ({
   );
   await page.waitForFunction(() => 'screenshotEncodingProof' in window);
   const results = [];
-  for (const kind of ['text', 'photo', 'mixed', 'tall', 'alpha'] as const) {
+  for (const kind of ['text', 'photo', 'mixed', 'tall', 'alpha', 'tall-alpha'] as const) {
     const result = await page.evaluate(async (kind) => {
       const proof = Reflect.get(window, 'screenshotEncodingProof') as {
         pngProof(kind: string): Promise<{
@@ -28,8 +28,12 @@ test('final PNG preserves web, photo, mixed, tall and alpha pixels', async ({
     expect(result.exact, kind).toBe(true);
     expect(result.after, kind).toBeLessThanOrEqual(result.before);
     expect(result.width).toBe(1280);
-    expect(result.height).toBe(kind === 'tall' ? 18000 : 900);
-    if (kind === 'text') expect(result.after).toBeLessThan(result.before * 0.9);
+    expect(result.height).toBe(kind === 'tall' || kind === 'tall-alpha' ? 18000 : 900);
+    if (kind === 'text' || kind === 'tall' || kind === 'tall-alpha')
+      expect(
+        result.after,
+        `${kind} must finish compression within the optimization budget`
+      ).toBeLessThan(result.before * 0.9);
     results.push({ kind, ...result });
   }
   const matrixPath = info.outputPath('compression-matrix.json');

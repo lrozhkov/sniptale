@@ -163,6 +163,20 @@ describe('optimizePngBlob', () => {
     expect(await optimizePngBlob(corrupt)).toBe(corrupt);
   });
 
+  it.each(['truncated', 'trailing'] as const)(
+    'keeps the source for a %s zlib stream',
+    async (kind) => {
+      const decoded = await inspect(fixture());
+      const parts = decoded.chunks.map(({ type, data }) => {
+        if (type !== 'IDAT') return chunk(type, data);
+        const invalid = kind === 'truncated' ? data.subarray(0, -1) : Uint8Array.from([...data, 0]);
+        return chunk(type, invalid);
+      });
+      const source = new Blob([signature, ...parts], { type: 'image/png' });
+      expect(await optimizePngBlob(source)).toBe(source);
+    }
+  );
+
   it('handles IDAT boundaries splitting the zlib header and trailer', async () => {
     const source = fixture();
     const decoded = await inspect(source);
@@ -210,6 +224,14 @@ describe('optimizePngBlob', () => {
     vi.stubGlobal('CompressionStream', undefined);
     const source = fixture();
     expect(await optimizePngBlob(source)).toBe(source);
+  });
+
+  it('retains the source without reading when native decompression is unavailable', async () => {
+    vi.stubGlobal('DecompressionStream', undefined);
+    const source = fixture();
+    const reading = vi.spyOn(source, 'arrayBuffer');
+    expect(await optimizePngBlob(source)).toBe(source);
+    expect(reading).not.toHaveBeenCalled();
   });
 
   it('retains unreadable input and non-PNG blobs', async () => {
@@ -288,6 +310,14 @@ describe('optimizePngBlob', () => {
 
   it('rejects rows exceeding declared size without replacing source', async () => {
     const source = fixture({ width: 1, height: 1, raw: new Uint8Array(1024 * 1024) });
+    expect(await optimizePngBlob(source)).toBe(source);
+  });
+
+  it.each([
+    { name: 'truncated rows', raw: Uint8Array.from([0, 10]) },
+    { name: 'invalid row filter', raw: Uint8Array.from([5]) },
+  ])('rejects $name on the large-raster streaming path', async ({ raw }) => {
+    const source = fixture({ width: 4096, height: 2049, raw });
     expect(await optimizePngBlob(source)).toBe(source);
   });
 

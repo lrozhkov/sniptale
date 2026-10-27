@@ -243,7 +243,6 @@
     "@zumer/snapdom",
     "dompurify",
     "fabric",
-    "fflate",
     "idb",
     "jszip",
     "lucide",
