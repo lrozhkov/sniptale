@@ -13,6 +13,7 @@ import {
 import { loadSyncQueueOperation } from '../../composition/persistence/sync-capture/queue';
 import { createSyncConnectionRequests } from '../../workflows/sync-transfer/connection-requests';
 import { runSyncQueueOperation } from '../../workflows/sync-transfer/queue';
+import { createDiagnosticPortWriter } from '../../platform/runtime-messaging/diagnostic-capture';
 import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
 import { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
 import type { SyncExecutorBinding } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
@@ -109,6 +110,17 @@ export function createSyncQueueExecution(
       }
       try {
         await requests.close();
+        if (!signal.aborted) {
+          const history = createDiagnosticPortWriter();
+          history.send({
+            kind: 'sync-queue',
+            input: { scope: selection.scope, source: { kind: 'operation', operationId } },
+          });
+          history.send({
+            kind: 'sync-queue',
+            input: { scope: selection.scope, source: { kind: 'connection' } },
+          });
+        }
         return { snapshot, containment: 'contained' };
       } catch {
         return { snapshot, containment: 'unsafe' };

@@ -5,7 +5,11 @@ import {
 } from '@sniptale/platform/observability/logger';
 import { sanitizeStructuredDiagnosticExportData } from '@sniptale/platform/observability/diagnostics/sanitizer';
 import { browserStorage } from '../infrastructure/browser-storage';
-import { tryRunWithPersistenceMutationPermit } from '../infrastructure/mutation-barrier';
+import {
+  isActivePersistenceMutationPermit,
+  tryRunWithPersistenceMutationPermit,
+  type PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 import {
   appendRuntimeLog,
   parseRuntimeLog,
@@ -99,6 +103,42 @@ export function createRuntimeLog(dependencies: Dependencies = {}) {
   }
   return {
     append,
+    /** Confirm archive and recent-tail publication under the caller's admitted lifetime. */
+    async appendConfirmed(input: unknown, permit: PersistenceMutationPermit): Promise<boolean> {
+      if (!isActivePersistenceMutationPermit(permit)) return false;
+      const detached: unknown = structuredClone(input);
+      if (!Array.isArray(detached) || detached.length < 1 || detached.length > 65) return false;
+      const rows = detached.flatMap((raw: unknown) => {
+        const row = parseRuntimeLogEntry(raw);
+        return row ? [row] : [];
+      });
+      if (rows.length !== detached.length || recent(rows).length !== rows.length) return false;
+      let published = false;
+      try {
+        await withLock(async () => {
+          if (!isActivePersistenceMutationPermit(permit)) return;
+          const current = await area.get(RUNTIME_LOG_STORAGE_KEY);
+          const entries = appendRuntimeLog(
+            recent(parseRuntimeLog(current[RUNTIME_LOG_STORAGE_KEY])),
+            rows
+          );
+          if (!(await history.append(runtimeLogJsonl(rows), permit))) return;
+          await area.set(
+            {
+              [RUNTIME_LOG_STORAGE_KEY]: sanitizeStructuredDiagnosticExportData({
+                version: 1,
+                entries,
+              }),
+            },
+            permit
+          );
+          published = true;
+        });
+      } catch {
+        return false;
+      }
+      return published;
+    },
     async settled() {
       while (pending) await pending;
     },

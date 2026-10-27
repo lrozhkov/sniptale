@@ -1,5 +1,18 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'sync-queue-native-control-and-delivery',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/queue.ts',
+    reason:
+      'Transaction-scoped source admission shares native queue controls and retained capture joins. ' +
+      'Queue, pagination, history and transfer suites prove commands, publication and interrupted recovery.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/queue.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/queue-pagination.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/queue-history.test.ts',
+      'apps/extension/src/workflows/sync-transfer/queue.test.ts',
+    ],
+  },
+  {
     owner: 'sync-replica-durable-native-admission',
     productionFile:
       'apps/extension/src/composition/persistence/sync-capture/replica-publication.ts',

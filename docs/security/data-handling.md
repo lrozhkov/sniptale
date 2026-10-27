@@ -294,3 +294,12 @@ Sync runtime messages contain selected native identities and bounded status code
 Every HTTP request checks current durable authorization and the optional origin grant. The permission query performs independent reads. It does not wait for the caller-held admission lock. Expected authentication, DAV and cancellation failures remain inside the sync executor. They do not mark the shared offscreen document as failed.
 
 Local-data erasure reserves sync exclusion before entering its execution queue. It revokes durable authorization and drains the observed executor before destructive cleanup. Failed or uncertain containment prevents erasure success and preserves local files and credentials. Native queue recovery requires the operation lock. Elapsed time does not authorize source release.
+
+
+## Sync queue history delivery
+
+Queue history uses the existing runtime-log tail and event-history archive. Messages contain fixed codes, stages, source digests, sequence numbers and canonical attempt UUIDs. Gap rows contain bounded counters and the exact omitted sequence boundary. Messages exclude queue source keys, capture payloads, filenames, provider URLs, credentials, headers and raw exception text.
+
+A disjoint native delivery cursor records only the source digest and acknowledged sequence. It grants no transfer, settlement, retention-release or unload authority. Acknowledgement requires the current enrollment, retained source and active mutation permit. Failed delivery retains native evidence. A repeated row keeps its safe event identity.
+
+The caller holds one mutation permit through confirmed archive publication, recent-tail publication and native acknowledgement. Privacy erasure waits for that admitted work. Missing or replaced enrollment refuses delayed acknowledgement. Offscreen submits only scope and source hints through the existing bounded diagnostic Port. Background admits exact offscreen provenance and reloads native events before publication. Content cannot request queue delivery. The receiver admits at most four pending streams and coalesces duplicates. Ordinary offscreen cancellation defers submission. The existing archive retention and local-data erasure policies remain authoritative.

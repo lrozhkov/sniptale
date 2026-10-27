@@ -7,8 +7,10 @@ import type {
 } from '../../composition/persistence/remote-connection/store';
 import type { loadSyncQueueOperation } from '../../composition/persistence/sync-capture/queue';
 import type { createSyncConnectionRequests } from '../../workflows/sync-transfer/connection-requests';
+import type { createDiagnosticPortWriter } from '../../platform/runtime-messaging/diagnostic-capture';
 import type { runSyncQueueOperation } from '../../workflows/sync-transfer/queue';
 import type { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
+import { DIAGNOSTIC_LOG_PORT } from '../../contracts/diagnostics';
 import { SyncRemoteError, type SyncRemoteStore } from '../../workflows/sync-transfer/remote-store';
 import { createSyncQueueExecution } from './execution';
 import type { SyncExecutionInput } from './executor';
@@ -24,6 +26,8 @@ const mocks = vi.hoisted(() => ({
   close: vi.fn<() => Promise<void>>(),
   run: vi.fn<typeof runSyncQueueOperation>(),
   webdav: vi.fn<typeof createWebdavRemoteStore>(),
+  history: vi.fn<ReturnType<typeof createDiagnosticPortWriter>['send']>(),
+  writer: vi.fn<typeof createDiagnosticPortWriter>(),
 }));
 vi.mock('../../composition/persistence/infrastructure/indexed-db/core', () => ({
   initDB: mocks.database,
@@ -40,6 +44,9 @@ vi.mock('../../workflows/sync-transfer/connection-requests', () => ({
   createSyncConnectionRequests: mocks.requests,
 }));
 vi.mock('../../workflows/sync-transfer/queue', () => ({ runSyncQueueOperation: mocks.run }));
+vi.mock('../../platform/runtime-messaging/diagnostic-capture', () => ({
+  createDiagnosticPortWriter: mocks.writer,
+}));
 vi.mock('../../workflows/sync-transfer/webdav', () => ({ createWebdavRemoteStore: mocks.webdav }));
 
 function deferred<T>() {
@@ -119,6 +126,8 @@ beforeEach(() => {
   mocks.database.mockResolvedValue({ get: mocks.get });
   mocks.get.mockResolvedValue(capture);
   mocks.close.mockResolvedValue(undefined);
+  mocks.history.mockReturnValue(true);
+  mocks.writer.mockReturnValue({ send: mocks.history, dispose: vi.fn() });
   mocks.request.mockImplementation((signal, issue) => issue(signal));
   mocks.requests.mockReturnValue({ request: mocks.request, close: mocks.close });
   mocks.webdav.mockResolvedValue(remote);
@@ -333,4 +342,90 @@ describe('native sync execution adapter', () => {
     expect(mocks.run).toHaveBeenCalledOnce();
     expect(mocks.close).toHaveBeenCalledOnce();
   });
+});
+
+it('submits history hints after containment and preserves success when submission fails', async () => {
+  mocks.history.mockReturnValue(false);
+  mocks.history.mockImplementation(() => {
+    expect(mocks.close).toHaveBeenCalledOnce();
+    return false;
+  });
+  const selected = input();
+  expect(await createSyncQueueExecution(selected, async () => true).run()).toMatchObject({
+    snapshot: { state: 'published' },
+    containment: 'contained',
+  });
+  expect(mocks.history.mock.calls).toEqual([
+    [
+      {
+        kind: 'sync-queue',
+        input: {
+          scope: selected.scope,
+          source: { kind: 'operation', operationId: selected.operationId },
+        },
+      },
+    ],
+    [{ kind: 'sync-queue', input: { scope: selected.scope, source: { kind: 'connection' } } }],
+  ]);
+});
+it('does not begin history delivery after cancellation or failed request containment', async () => {
+  const selected = input();
+  mocks.close.mockRejectedValueOnce(new Error('Native reader did not drain.'));
+  expect(await createSyncQueueExecution(selected, async () => true).run()).toMatchObject({
+    containment: 'unsafe',
+  });
+  expect(mocks.history).not.toHaveBeenCalled();
+  mocks.close.mockResolvedValue(undefined);
+  const controller = new AbortController();
+  controller.abort();
+  await createSyncQueueExecution(
+    { ...selected, signal: controller.signal },
+    async () => true
+  ).run();
+  expect(mocks.history).not.toHaveBeenCalled();
+});
+
+it('submits through actual runtime IPC when offscreen has no chrome.storage', async () => {
+  const messages: unknown[] = [];
+  const disconnected: (() => void)[] = [];
+  const port = {
+    postMessage: (raw: unknown) => {
+      messages.push(raw);
+    },
+    disconnect: vi.fn(),
+    onDisconnect: {
+      addListener: (listener: () => void) => {
+        disconnected.push(listener);
+      },
+      removeListener: vi.fn(),
+    },
+  };
+  const connect = vi.fn(() => port);
+  vi.stubGlobal('chrome', { runtime: { connect } });
+  const actual = await vi.importActual<
+    typeof import('../../platform/runtime-messaging/diagnostic-capture')
+  >('../../platform/runtime-messaging/diagnostic-capture');
+  mocks.writer.mockImplementation(actual.createDiagnosticPortWriter);
+  try {
+    const selected = input();
+    expect(await createSyncQueueExecution(selected, async () => true).run()).toMatchObject({
+      containment: 'contained',
+      snapshot: { state: 'published' },
+    });
+    expect(connect).toHaveBeenCalledExactlyOnceWith({ name: DIAGNOSTIC_LOG_PORT });
+    expect(messages).toEqual([
+      {
+        kind: 'sync-queue',
+        input: {
+          scope: selected.scope,
+          source: { kind: 'operation', operationId: selected.operationId },
+        },
+      },
+      { kind: 'sync-queue', input: { scope: selected.scope, source: { kind: 'connection' } } },
+    ]);
+    expect(JSON.stringify(messages)).not.toContain('native-capture');
+    disconnected[0]!();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

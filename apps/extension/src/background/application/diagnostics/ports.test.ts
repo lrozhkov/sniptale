@@ -3,6 +3,7 @@ const mocks = vi.hoisted(() => ({
   subscribe: vi.fn(),
   append: vi.fn(),
   maintenance: vi.fn(),
+  history: vi.fn(),
   unsubscribe: vi.fn(),
 }));
 vi.mock('@sniptale/platform/browser/runtime', () => ({
@@ -17,6 +18,9 @@ vi.mock('../../../composition/persistence/diagnostics/runtime-log', () => ({
 }));
 vi.mock('../../../composition/persistence/library-lifecycle/maintenance-log', () => ({
   createMaintenanceLog: () => ({ append: mocks.maintenance }),
+}));
+vi.mock('../../../workflows/sync-transfer/queue-history', () => ({
+  deliverSyncQueueHistory: mocks.history,
 }));
 import { registerDiagnosticLogPorts } from './ports';
 import { DIAGNOSTIC_LOG_PORT } from '../../../contracts/diagnostics';
@@ -151,5 +155,96 @@ it('rejects structured maintenance from content even with valid fields', () => {
   f.send({ kind: 'maintenance', input: { operation: 'physical-delete', code: 'deleted' } });
   expect(mocks.maintenance).not.toHaveBeenCalled();
   expect(f.port.disconnect).toHaveBeenCalledOnce();
+  f.dispose();
+});
+
+function historyPort() {
+  const f = setup();
+  const offscreen = {
+    ...f.port,
+    sender: {
+      id: 'own',
+      documentId: 'offscreen',
+      url: 'chrome-extension://own/apps/extension/src/offscreen/offscreen.html',
+    },
+    onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+  };
+  f.accept(offscreen);
+  return {
+    ...f,
+    offscreen,
+    hint: (raw: unknown) => offscreen.onMessage.addListener.mock.calls[0]![0](raw),
+  };
+}
+const historyHint = {
+  kind: 'sync-queue',
+  input: {
+    scope: { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 0 },
+    source: { kind: 'operation', operationId: 'operation' },
+  },
+};
+it('admits offscreen source hints only and never accepts attached event payloads', async () => {
+  mocks.history.mockResolvedValue(true);
+  const f = historyPort();
+  f.hint({ ...historyHint, rows: ['private'], token: 'private' });
+  expect(mocks.history).toHaveBeenCalledWith(historyHint.input.scope, historyHint.input.source);
+  expect(mocks.append).not.toHaveBeenCalled();
+  expect(mocks.maintenance).not.toHaveBeenCalled();
+  await Promise.resolve();
+  f.dispose();
+});
+it('rejects source hints from content and closes malformed offscreen submissions', () => {
+  const f = setup();
+  f.send(historyHint);
+  expect(mocks.history).not.toHaveBeenCalled();
+  expect(f.port.disconnect).toHaveBeenCalledOnce();
+  f.dispose();
+  const g = historyPort();
+  g.hint({
+    ...historyHint,
+    input: { ...historyHint.input, source: { kind: 'operation', operationId: '' } },
+  });
+  expect(mocks.history).not.toHaveBeenCalled();
+  expect(g.offscreen.disconnect).toHaveBeenCalledOnce();
+  g.dispose();
+});
+it('coalesces duplicate hints, bounds pending delivery and permits retry after failure', async () => {
+  const pending: (() => void)[] = [];
+  mocks.history.mockImplementation(
+    () =>
+      new Promise<boolean>((resolve) => {
+        pending.push(() => resolve(false));
+      })
+  );
+  const f = historyPort();
+  f.hint(historyHint);
+  f.hint(historyHint);
+  for (let i = 1; i <= 4; i++)
+    f.hint({
+      ...historyHint,
+      input: { ...historyHint.input, source: { kind: 'operation', operationId: `operation-${i}` } },
+    });
+  expect(mocks.history).toHaveBeenCalledTimes(4);
+  pending[0]!();
+  await Promise.resolve();
+  await Promise.resolve();
+  f.hint(historyHint);
+  expect(mocks.history).toHaveBeenCalledTimes(5);
+  for (const release of pending) release();
+  await Promise.resolve();
+  await Promise.resolve();
+  f.dispose();
+});
+it('contains a rejected delivery promise and releases its bounded pending slot', async () => {
+  mocks.history.mockRejectedValue(new Error('storage unavailable'));
+  const f = historyPort();
+  f.hint(historyHint);
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  f.hint(historyHint);
+  expect(mocks.history).toHaveBeenCalledTimes(2);
+  await Promise.resolve();
+  await Promise.resolve();
   f.dispose();
 });

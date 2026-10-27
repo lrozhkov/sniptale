@@ -3,14 +3,20 @@ import { createMaintenanceLog } from '../../../composition/persistence/library-l
 import { parseMaintenanceLogInput } from '../../../composition/persistence/library-lifecycle/maintenance-log-model';
 import { resolveExtensionDocumentSenderUrl } from '../../../platform/runtime-messaging/document-sender';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
-import { DIAGNOSTIC_LOG_PORT, parseDiagnosticLogEvent } from '../../../contracts/diagnostics';
+import {
+  DIAGNOSTIC_LOG_PORT,
+  parseDiagnosticLogEvent,
+  parseSyncQueueDiagnosticHint,
+} from '../../../contracts/diagnostics';
 import { createRuntimeLog } from '../../../composition/persistence/diagnostics/runtime-log';
+import { deliverSyncQueueHistory } from '../../../workflows/sync-transfer/queue-history';
 
-/** Internal content/offscreen diagnostics have no read or action authority and bounded ingress resources. */
+/** Bounded diagnostic ingress. Source hints confer no transfer or source-release authority. */
 export function registerDiagnosticLogPorts(): () => void {
   const log = createRuntimeLog();
   const maintenance = createMaintenanceLog();
   const active = new Set<() => void>();
+  const pendingHistory = new Set<string>();
   const unsubscribe = browserRuntime.subscribeToConnections((port) => {
     if (port.name !== DIAGNOSTIC_LOG_PORT) return;
     const context = resolveDiagnosticContext(port.sender);
@@ -40,11 +46,18 @@ export function registerDiagnosticLogPorts(): () => void {
         return;
       }
       const submission = parseDiagnosticSubmission(raw);
-      if (!submission || (submission.kind === 'maintenance' && context !== 'offscreen')) {
+      if (!submission || (submission.kind !== 'runtime' && context !== 'offscreen')) {
         close();
         return;
       }
-      if (submission.kind === 'maintenance') void maintenance.append(submission.input);
+      if (submission.kind === 'sync-queue') {
+        const key = JSON.stringify(submission.input);
+        if (pendingHistory.has(key) || pendingHistory.size >= 4) return;
+        pendingHistory.add(key);
+        void deliverSyncQueueHistory(submission.input.scope, submission.input.source)
+          .catch(() => false)
+          .finally(() => pendingHistory.delete(key));
+      } else if (submission.kind === 'maintenance') void maintenance.append(submission.input);
       else log.append(submission.event, context);
     };
     const timeout = setTimeout(close, 3000);
@@ -88,6 +101,10 @@ function resolveDiagnosticContext(
 }
 
 function parseDiagnosticSubmission(raw: unknown) {
+  if (isRecord(raw) && raw['kind'] === 'sync-queue') {
+    const input = parseSyncQueueDiagnosticHint(raw['input']);
+    return input ? { kind: 'sync-queue' as const, input } : null;
+  }
   if (isRecord(raw) && raw['kind'] === 'maintenance') {
     const input = parseMaintenanceLogInput(raw['input']);
     return input ? { kind: 'maintenance' as const, input } : null;

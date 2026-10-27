@@ -837,6 +837,14 @@ A checked ready catalog can establish observed publication of the exact prepared
 
 Every queue mutation retains bounded diagnostic transition markers in the same transaction. Markers contain fixed codes, stages, sequence numbers, hashed operation references and safe attempt IDs. Overflow retains an explicit history-gap count. Later delivery must use the existing event-history owner. These markers do not create another archive.
 
+Queue history delivery stores one monotonic cursor per native source under a disjoint sync_outbox key. Existing queue rows and retained markers keep their formats. The cursor binds the source key digest and enrollment lifetime. Reads create no cursor. Acknowledgement joins the current profile, retained source and selected markers in one write transaction. It uses the caller's active mutation permit.
+
+The delivery workflow opens the database before it requests that permit. It publishes fixed runtime rows through the existing event-history archive and recent runtime-log tail. Both writes must succeed before acknowledgement. The archive keeps its existing retention policy. A failed archive, tail or acknowledgement leaves native delivery eligible for retry. Logging failure cannot change transfer success or release source bytes.
+
+Delivery is at least once. A restart after archive publication can repeat a row with the same source digest and sequence. The journal timestamp identifies delivery observation because native markers contain no original event timestamp. Explicit gap rows report markers outside bounded retention. The workflow preserves every retained native marker after acknowledgement.
+
+Selected offscreen execution sends source hints through the existing diagnostic Port after request containment. The background receiver admits exact offscreen provenance and reloads native transitions. It coalesces duplicate hints and admits at most four pending deliveries. A hint is not a delivery receipt. Cancellation does not start another submission. The workflow and its admitted writes finish before privacy erasure can pass its mutation barrier. Startup catch-up scheduling and the queue command interface remain separate release requirements.
+
 This experimental runner requires an explicitly admitted provider client. Production credentials, request authorization, offscreen lifecycle, Settings controls and event-history delivery remain separate release requirements. Capture enrollment is not network authorization. Future lifecycle admission must check its own revision at every actual HTTP request. The profile remains disabled by default.
 
 

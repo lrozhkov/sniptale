@@ -179,6 +179,18 @@ export async function loadSyncQueue(
   await tx.done;
   return { connection, operations };
 }
+/** Admit a native source inside a caller-owned queue transaction. This operation writes no rows. */
+export async function readSyncQueueSourceInTransaction(
+  tx: QueueTransaction,
+  value: SyncQueueScope,
+  operationId: string | null
+): Promise<SyncQueueConnection | SyncQueueOperation> {
+  const scope = scopeInput(value);
+  if (operationId !== null && !queueIdentity(operationId))
+    throw new Error('Invalid sync queue operation identity.');
+  await checkProfile(tx, scope);
+  return operationId === null ? readConnection(tx, scope) : readOperation(tx, scope, operationId);
+}
 /** Continuation within one enrollment lifetime. Pages are live reads, not a shared snapshot. */
 interface SyncQueueCursor {
   scope: SyncQueueScope;
