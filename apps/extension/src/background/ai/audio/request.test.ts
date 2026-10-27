@@ -75,10 +75,9 @@ it.each([
   [401, 'provider-auth', 'invalid-credential'],
   [403, 'provider-auth', 'permission-denied'],
   [402, 'provider-failed', 'quota-exceeded'],
-  [429, 'provider-rate-limit', 'rate-limited'],
   [500, 'provider-failed', 'service-error'],
 ] as const)(
-  'rejects HTTP %s without reading or exposing its error body',
+  'rejects non-429 HTTP %s without reading or exposing its error body',
   async (status, code, reason) => {
     const cancel = vi.fn();
     const body = new ReadableStream({ cancel });

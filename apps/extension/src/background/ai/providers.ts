@@ -98,7 +98,7 @@ export class AIProviderRequestError extends Error {
 export function classifyAIProviderFailure(error: unknown): AIConnectionReason {
   if (error instanceof AIProviderRequestError) return error.reason;
   if (APICallError.isInstance(error)) {
-    return classifyAIProviderHttpStatus(error.statusCode);
+    return classifyAIProviderHttpStatus(error.statusCode, error.data);
   }
   if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
     return 'timeout';
@@ -106,13 +106,35 @@ export function classifyAIProviderFailure(error: unknown): AIConnectionReason {
   return 'unknown';
 }
 
-/** Classifies documented HTTP evidence without reading a provider body or inferring retirement. */
-export function classifyAIProviderHttpStatus(status: number | undefined): AIConnectionReason {
+const QUOTA_ERROR_CODES = new Set([
+  'insufficient_quota',
+  'credit_balance_exhausted',
+  'organization_spend_limit_exceeded',
+  'project_spend_limit_exceeded',
+  'organization_usage_limit_exceeded',
+]);
+
+function hasQuotaEvidence(data: unknown): boolean {
+  if (typeof data !== 'object' || data === null || Array.isArray(data) || !('error' in data))
+    return false;
+  const error = data.error;
+  if (typeof error !== 'object' || error === null || Array.isArray(error)) return false;
+  return (
+    ('code' in error && typeof error.code === 'string' && QUOTA_ERROR_CODES.has(error.code)) ||
+    ('type' in error && error.type === 'insufficient_quota')
+  );
+}
+
+/** Classifies HTTP status and parsed quota evidence without using provider message text or inferring retirement. */
+export function classifyAIProviderHttpStatus(
+  status: number | undefined,
+  data?: unknown
+): AIConnectionReason {
   if (status === 401) return 'invalid-credential';
   if (status === 403) return 'permission-denied';
   if (status === 402) return 'quota-exceeded';
   if (status === 404) return 'model-unavailable';
-  if (status === 429) return 'rate-limited';
+  if (status === 429) return hasQuotaEvidence(data) ? 'quota-exceeded' : 'rate-limited';
   if ((status ?? 0) >= 500) return 'service-error';
   return 'unknown';
 }

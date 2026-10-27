@@ -148,3 +148,22 @@ it('does not classify an SDK deadline before native dispatch as a connection fai
     timeout.mockRestore();
   }
 });
+
+it('publishes parsed SDK quota evidence without private error fields or a retry', async () => {
+  fetchMock.mockImplementation(async () =>
+    Response.json(
+      {
+        error: {
+          message: 'private-provider-canary',
+          code: 'credit_balance_exhausted',
+          type: 'insufficient_quota',
+        },
+      },
+      { status: 429 }
+    )
+  );
+  await expect(requestChatCompletion(options)).rejects.toMatchObject({ reason: 'quota-exceeded' });
+  expect(commit).toHaveBeenCalledWith(token, { kind: 'failure', reason: 'quota-exceeded' });
+  expect(JSON.stringify(commit.mock.calls)).not.toContain('private-');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});

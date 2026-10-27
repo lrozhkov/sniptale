@@ -10,7 +10,11 @@ import type {
   AICatalogRefreshToken,
 } from '../../../composition/persistence/ai-settings/managed-catalog';
 import { createProviderSdkFetch } from '../llm/transport/http';
-import { AIProviderRequestError, classifyAIProviderFailure } from '../providers';
+import {
+  AIProviderRequestError,
+  classifyAIProviderFailure,
+  classifyAIProviderHttpStatus,
+} from '../providers';
 import {
   parseAICatalogPage,
   mergeConflictingCatalogModels,
@@ -107,16 +111,22 @@ function createCatalogReader(
       headers,
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    if (!response.ok) throw new AIProviderRequestError(catalogHttpFailure(response.status));
+    if (!response.ok && response.status !== 429)
+      throw new AIProviderRequestError(catalogHttpFailure(response.status));
     const bytes = await response.arrayBuffer();
     totalBytes += bytes.byteLength;
     if (totalBytes > MAX_TOTAL_BYTES) throw new AIProviderRequestError('unknown');
+    let value: unknown;
     try {
-      const value: unknown = JSON.parse(new TextDecoder().decode(bytes));
-      return value;
+      value = JSON.parse(new TextDecoder().decode(bytes));
     } catch {
-      throw new AIProviderRequestError('unknown');
+      throw new AIProviderRequestError(
+        response.ok ? 'unknown' : catalogHttpFailure(response.status)
+      );
     }
+    if (!response.ok)
+      throw new AIProviderRequestError(classifyAIProviderHttpStatus(response.status, value));
+    return value;
   };
 }
 

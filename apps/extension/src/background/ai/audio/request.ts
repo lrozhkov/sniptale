@@ -307,6 +307,7 @@ async function requestSpeech(args: AudioRequest & { transport?: typeof globalThi
         throw new Error('network-failed');
       }
       await assertResponseStatus(response);
+      if (!response.ok) return response;
       contentType = await admitSpeechResponse(response, type, params.responseFormat);
       args.onReceiving();
       return response;
@@ -434,6 +435,7 @@ function createTranscriptionSdkFetch(args: TranscriptionInput): typeof fetch {
         throw new Error('network-failed');
       }
       await assertResponseStatus(response);
+      if (!response.ok) return response;
       if (
         response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !==
         'application/json'

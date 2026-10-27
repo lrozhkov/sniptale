@@ -483,3 +483,181 @@ it.each([-1])(
     expect(transport).toHaveBeenCalledTimes(2);
   }
 );
+
+describe('catalog quota error receiving boundary', () => {
+  it.each([
+    [{ code: 'insufficient_quota' }, 'quota-exceeded'],
+    [{ code: 'credit_balance_exhausted' }, 'quota-exceeded'],
+    [{ code: 'organization_spend_limit_exceeded' }, 'quota-exceeded'],
+    [{ code: 'project_spend_limit_exceeded' }, 'quota-exceeded'],
+    [{ code: 'organization_usage_limit_exceeded' }, 'quota-exceeded'],
+    [{ type: 'insufficient_quota' }, 'quota-exceeded'],
+    [{ code: 'unknown_quota_code' }, 'rate-limited'],
+    [{ code: 429 }, 'rate-limited'],
+    [{ code: ['insufficient_quota'] }, 'rate-limited'],
+    [{ message: 'insufficient_quota' }, 'rate-limited'],
+  ] as const)(
+    'reads bounded HTTP 429 metadata %j as %s without replay',
+    async (metadata, reason) => {
+      const transport = vi.fn().mockResolvedValue(
+        json(
+          {
+            error: { privateDetail: 'private-response fixture-secret', ...metadata },
+          },
+          429
+        )
+      );
+      let failure: unknown;
+      try {
+        await readProviderCatalog({
+          provider: provider(),
+          apiKey: 'fixture-secret',
+          now: 1,
+          beforeSend: async () => undefined,
+          transport,
+        });
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(AIProviderRequestError);
+      expect(failure).toMatchObject({ reason, message: reason });
+      for (const field of [
+        'cause',
+        'data',
+        'responseBody',
+        'responseHeaders',
+        'requestBodyValues',
+      ]) {
+        expect(failure).not.toHaveProperty(field);
+      }
+      expect(JSON.stringify(failure)).not.toMatch(/private-|fixture-secret/);
+      expect(transport).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each(['not-json insufficient_quota', '{"error":', '', 'null', '[]'])(
+    'keeps malformed or absent HTTP 429 metadata rate-limited: %j',
+    async (body) => {
+      const transport = vi.fn().mockResolvedValue(new Response(body, { status: 429 }));
+      await expect(
+        readProviderCatalog({
+          provider: provider(),
+          apiKey: 'fixture-secret',
+          now: 1,
+          beforeSend: async () => undefined,
+          transport,
+        })
+      ).rejects.toMatchObject({ reason: 'rate-limited', message: 'rate-limited' });
+      expect(transport).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    [401, 'invalid-credential'],
+    [403, 'permission-denied'],
+    [402, 'quota-exceeded'],
+    [404, 'catalog-unsupported'],
+    [503, 'service-error'],
+  ])('keeps catalog HTTP %i authoritative over quota metadata', async (status, reason) => {
+    const transport = vi
+      .fn()
+      .mockResolvedValue(json({ error: { code: 'insufficient_quota' } }, status));
+    await expect(
+      readProviderCatalog({
+        provider: provider(),
+        apiKey: 'fixture-secret',
+        now: 1,
+        beforeSend: async () => undefined,
+        transport,
+      })
+    ).rejects.toMatchObject({ reason, message: reason });
+    expect(transport).toHaveBeenCalledOnce();
+  });
+
+  it('bounds and cancels streamed quota error bodies before interpreting metadata', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('{"error":{"code":"insufficient_quota","message":"')
+        );
+        controller.enqueue(new Uint8Array(2 * 1024 * 1024));
+      },
+      cancel,
+    });
+    const transport = vi.fn().mockResolvedValue(new Response(body, { status: 429 }));
+    await expect(
+      readProviderCatalog({
+        provider: provider(),
+        apiKey: 'fixture-secret',
+        now: 1,
+        beforeSend: async () => undefined,
+        transport,
+      })
+    ).rejects.toMatchObject({ reason: 'unknown', message: 'unknown' });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(transport).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['insufficient_quota', 'quota-exceeded'],
+    ['rate_limit_exceeded', 'rate-limited'],
+  ] as const)(
+    'publishes only a fixed failure after a real catalog HTTP 429: %s',
+    async (code, reason) => {
+      const admission: AICatalogRefreshAdmission = {
+        provider: provider(),
+        token: {
+          providerId: 'provider',
+          incarnation: 'incarnation',
+          revision: 1,
+          credentialRevision: 1,
+          generation: 'generation',
+          scope: 'scope',
+        },
+      };
+      const transport = vi.fn().mockResolvedValue(
+        json(
+          {
+            data: [{ id: 'must-not-publish', type: 'chat' }],
+            error: { code, message: 'private-response fixture-secret' },
+          },
+          429
+        )
+      );
+      const commit = vi.fn(async () => true);
+      const service = createManagedCatalogService({
+        readProviders: async () => [provider()],
+        admit: async () => admission,
+        prepare: async () => 'fixture-secret',
+        beforeSend: async () => undefined,
+        commit,
+        read: (options) => readProviderCatalog({ ...options, transport }),
+      });
+      expect(await service.refresh('provider')).toBe(true);
+      expect(commit).toHaveBeenCalledExactlyOnceWith(admission.token, { kind: 'failure', reason });
+      expect(JSON.stringify(commit.mock.calls)).not.toMatch(
+        /private-|fixture-secret|must-not-publish/
+      );
+      expect(transport).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('does not downgrade a successful complete catalog because a model contains an error-like field', async () => {
+    const transport = vi.fn().mockResolvedValue(
+      json({
+        data: [{ id: 'stable-model', type: 'chat', error: { code: 'insufficient_quota' } }],
+      })
+    );
+    const page = await readProviderCatalog({
+      provider: provider(),
+      apiKey: 'fixture-secret',
+      now: 1,
+      beforeSend: async () => undefined,
+      transport,
+    });
+    expect(page.complete).toBe(true);
+    expect(page.models.map((model) => model.modelCode)).toEqual(['stable-model']);
+    expect(transport).toHaveBeenCalledOnce();
+  });
+});

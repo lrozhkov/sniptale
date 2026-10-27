@@ -234,3 +234,21 @@ it.each(['speech', 'transcription'] as const)(
     }
   }
 );
+
+it('publishes native SDK quota evidence without private error fields or a retry', async () => {
+  fetchMock.mockImplementation(async () =>
+    Response.json(
+      {
+        error: { message: 'private-provider-canary', code: 'credit_balance_exhausted' },
+      },
+      { status: 429 }
+    )
+  );
+  await expect(speech()).rejects.toMatchObject({
+    reason: 'quota-exceeded',
+    message: 'provider-failed',
+  });
+  expect(commit).toHaveBeenCalledWith(receipt, { kind: 'failure', reason: 'quota-exceeded' });
+  expect(JSON.stringify(commit.mock.calls)).not.toContain('private-');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});

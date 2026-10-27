@@ -302,3 +302,75 @@ describe('provider admission and safe connection evidence', () => {
     ).toBe('unknown');
   });
 });
+
+describe('parsed provider quota evidence', () => {
+  it.each([
+    { code: 'insufficient_quota' },
+    { code: 'credit_balance_exhausted' },
+    { code: 'organization_spend_limit_exceeded' },
+    { code: 'project_spend_limit_exceeded' },
+    { code: 'organization_usage_limit_exceeded' },
+    { type: 'insufficient_quota' },
+  ])('classifies HTTP 429 parsed metadata %j as exhausted quota', (metadata) => {
+    const error = new APICallError({
+      message: 'private-provider-message',
+      url: 'https://provider.test/v1',
+      requestBodyValues: {},
+      statusCode: 429,
+      data: { error: { message: 'private-provider-message', ...metadata } },
+    });
+    expect(classifyAIProviderFailure(error)).toBe('quota-exceeded');
+  });
+
+  it.each([
+    undefined,
+    null,
+    429,
+    [],
+    { code: 'insufficient_quota' },
+    { error: null },
+    { error: 'insufficient_quota' },
+    { error: [{ code: 'insufficient_quota' }] },
+    { error: { code: 429 } },
+    { error: { code: ['insufficient_quota'] } },
+    { error: { code: 'unknown_quota_code' } },
+    { error: { code: 'rate_limit_exceeded' } },
+    { error: { code: 'INSUFFICIENT_QUOTA' } },
+    { error: { type: 'credit_balance_exhausted' } },
+    { error: { message: 'insufficient_quota credit_balance_exhausted' } },
+  ])('keeps HTTP 429 without admitted parsed quota evidence rate-limited: %j', (data) => {
+    expect(
+      classifyAIProviderFailure(
+        new APICallError({
+          message: 'insufficient_quota credit_balance_exhausted',
+          url: 'https://provider.test/v1',
+          requestBodyValues: {},
+          statusCode: 429,
+          responseBody: '{"error":{"code":"insufficient_quota"}}',
+          data,
+        })
+      )
+    ).toBe('rate-limited');
+  });
+
+  it.each([
+    [401, 'invalid-credential'],
+    [403, 'permission-denied'],
+    [402, 'quota-exceeded'],
+    [404, 'model-unavailable'],
+    [503, 'service-error'],
+    [400, 'unknown'],
+  ])('preserves HTTP %i authority over parsed quota metadata', (statusCode, reason) => {
+    expect(
+      classifyAIProviderFailure(
+        new APICallError({
+          message: 'private-provider-message',
+          url: 'https://provider.test/v1',
+          requestBodyValues: {},
+          statusCode,
+          data: { error: { code: 'insufficient_quota', type: 'insufficient_quota' } },
+        })
+      )
+    ).toBe(reason);
+  });
+});

@@ -1,5 +1,26 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'ai-provider-failure-consumers',
+    productionFile: 'apps/extension/src/background/ai/providers.ts',
+    allowCrossOwner: true,
+    reason:
+      'Fixed provider reasons are consumed by text, native and chat audio, catalog status and scoped observation publication. Existing publication suites cover ordering, deletion, restore, recreation and explicit retry.',
+    testFiles: [
+      'apps/extension/src/background/ai/providers.test.ts',
+      'apps/extension/src/background/ai/audio/failure.test.ts',
+      'apps/extension/src/background/ai/audio/request.test.ts',
+      'apps/extension/src/background/ai/audio/request.quota.test.ts',
+      'apps/extension/src/background/ai/audio/request.speech-sdk.test.ts',
+      'apps/extension/src/background/ai/audio/request.chat-sdk.test.ts',
+      'apps/extension/src/background/ai/audio/request.observations.test.ts',
+      'apps/extension/src/background/ai/llm/transport/request.status.test.ts',
+      'apps/extension/src/background/ai/llm/transport/request.observations.test.ts',
+      'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/operation-observations.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/operation-model-observations.test.ts',
+    ],
+  },
+  {
     owner: 'settings-model-form-consumers',
     exclusive: true,
     productionFile:
