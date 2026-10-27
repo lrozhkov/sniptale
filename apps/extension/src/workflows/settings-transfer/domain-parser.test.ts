@@ -81,7 +81,7 @@ it('round trips independent new material destinations without dropping categorie
   expect(parseSettingsTransferDomains(parseSettingsTransferDomains(input))).toEqual(input);
 });
 
-it('round trips audio model parameters while rejecting an audio text default', () => {
+it('round trips audio model parameters and rejects retired selection metadata', () => {
   const model = {
     id: 'audio',
     providerId: 'provider',
@@ -91,7 +91,7 @@ it('round trips audio model parameters while rejecting an audio text default', (
     audio: { speech: { voiceId: 'voice', responseFormat: 'mp3', speed: 1 } },
   };
   const payload = {
-    'ai.models': { schemaVersion: 1, data: { items: [model], defaultModelId: null } },
+    'ai.models': { schemaVersion: 1, data: { items: [model] } },
   };
   expect(parseSettingsTransferDomains(payload)).toEqual(payload);
   expect(() =>
@@ -234,7 +234,7 @@ it('retains model capabilities, ownership and independent audio blocks through d
     },
   };
   const input = {
-    'ai.models': { schemaVersion: 1, data: { items: [model], defaultModelId: null } },
+    'ai.models': { schemaVersion: 1, data: { items: [model] } },
   };
   expect(parseSettingsTransferDomains(input)).toEqual(input);
   expect(parseSettingsTransferDomains(parseSettingsTransferDomains(input))).toEqual(input);
@@ -270,3 +270,14 @@ it('round trips provider management and disabled state without admitting runtime
     expect(() => parseSettingsTransferDomains(domain({ ...provider, ...invalid }))).toThrow();
   }
 });
+
+it.each([null, 'configured-model'])(
+  'rejects retired global model selection %s at domain admission',
+  (defaultModelId) => {
+    expect(() =>
+      parseSettingsTransferDomains({
+        'ai.models': { schemaVersion: 1, data: { items: [], defaultModelId } },
+      })
+    ).toThrow();
+  }
+);

@@ -60,13 +60,12 @@ function modelConfigurationFixture() {
 it('applies model properties and both audio parameter blocks through domain admission', async () => {
   const model = modelConfigurationFixture();
   const domains = parseSettingsTransferDomains({
-    'ai.models': { schemaVersion: 1, data: { items: [model], defaultModelId: null } },
+    'ai.models': { schemaVersion: 1, data: { items: [model] } },
   });
   await applySettingsTransferDomains({ domains, summary: emptySummary() });
   expect(mocks.localSet).toHaveBeenCalledWith(
     {
       sniptale_ai_models: [model],
-      sniptale_ai_default_model: null,
     },
     undefined
   );
@@ -95,7 +94,7 @@ it('restores model configuration after a refused import write', async () => {
   };
   const stored: Record<string, unknown> = {
     sniptale_ai_models: [previous],
-    sniptale_ai_default_model: null,
+    sniptale_ai_default_model: 'unrelated-current-global',
   };
   const before = structuredClone(stored);
   mocks.localGet.mockImplementation(async (keys: string[]) =>
@@ -116,7 +115,7 @@ it('restores model configuration after a refused import write', async () => {
   });
   const model = modelConfigurationFixture();
   const domains = parseSettingsTransferDomains({
-    'ai.models': { schemaVersion: 1, data: { items: [model], defaultModelId: null } },
+    'ai.models': { schemaVersion: 1, data: { items: [model] } },
   });
   await expect(applySettingsTransferDomains({ domains, summary: emptySummary() })).rejects.toThrow(
     'Storage refused after publication'
@@ -124,6 +123,13 @@ it('restores model configuration after a refused import write', async () => {
   expect(stored).toEqual(before);
   await applySettingsTransferDomains({ domains, summary: emptySummary() });
   expect(stored['sniptale_ai_models']).toEqual([model]);
+  expect(stored['sniptale_ai_default_model']).toBe('unrelated-current-global');
+  for (const [values] of mocks.localSet.mock.calls) {
+    expect(values).not.toHaveProperty('sniptale_ai_default_model');
+  }
+  for (const [keys] of mocks.localGet.mock.calls) {
+    expect(keys).not.toContain('sniptale_ai_default_model');
+  }
 });
 
 it('applies provider management and disabled configuration without imported local authority', async () => {

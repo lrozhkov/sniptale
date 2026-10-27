@@ -200,7 +200,8 @@ it('reads every visible domain while removing secret and device-bound state', as
       expect.objectContaining({ id: 'slot-0', collectionNodeId: 'styles.palettes.items' }),
     ])
   );
-  expect(snapshot.dependencies['ai.models.default']).toEqual(['ai.models.items.model-a']);
+  expect(snapshot.domains['ai.models']?.data).not.toHaveProperty('defaultModelId');
+  expect(snapshot.dependencies).not.toHaveProperty('ai.models.default');
 });
 
 it('uses the current Settings locale for system item display names', async () => {
@@ -769,7 +770,6 @@ it('exports configured model properties and audio without catalog cache or desti
   const { catalog: _catalog, ...configuration } = model;
   expect(snapshot.domains['ai.models']?.data).toEqual({
     items: [configuration],
-    defaultModelId: null,
   });
   expect(parseSettingsTransferDomains(snapshot.domains)['ai.models']).toEqual(
     snapshot.domains['ai.models']
