@@ -2750,6 +2750,17 @@
       "reviewDate": "2026-10-26",
       "astHash": "44279cdf2a63f65c1218261119337cf4c77b067824d2490b0c9fd946e7ea2158",
       "signatureHash": "e334f60762c5cd84fd18aa0402084a7fdff701dfec12d1adcc97957992db825f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/content/overlay/toolbar/controls/page-layout-controller.tsx",
+      "symbol": "PageToolbarLayoutProvider",
+      "owner": "extension:content:overlay",
+      "reason": "tool-noise: Контроллер одного жеста разделяет provisional preview, захват указателя, отмену и единственный callback сохранения. Canonical settings writer остаётся в usePageToolbarControls. Блокируется только рост outer line-count: 199 строк, score1 delta0, 17 statements, cyclomatic6, cognitive5, nesting1, recovery0, durable state authorities0. Две группы — overlay и React, cohesion0.79. Вложенные обработчики используют один gesture receiver и один срок жизни. Текстовое представление возвращено в существующий view owner. Механическое разделение closure распределит ту же authority без независимой обязанности. Main проверил точное тело и negative/native proof. Независимое полное архитектурное ревью должно проверить эту классификацию.",
+      "removalCondition": "Удалить при изменении точного AST или signature. Пересмотреть при добавлении независимого runtime, receiver, durable writer, resource, recovery или gesture lifetime. Удалить, когда analyzer моделирует этот связный gesture closure. Независимое полное архитектурное ревью должно проверить классификацию.",
+      "reviewDate": "2026-10-27",
+      "astHash": "3c370f092739f18a98f663a8fce5d48186119c4323d899afdb178b01bd08d05b",
+      "signatureHash": "d37ee75ed607dc2d65a997c648dc58feb7aaabca0d6b5afc13f7f615ba5f75a5"
     }
   ]
 }

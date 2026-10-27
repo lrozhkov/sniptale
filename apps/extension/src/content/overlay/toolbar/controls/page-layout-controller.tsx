@@ -12,21 +12,27 @@ import {
 } from 'react';
 import type { PageToolbarLayoutItem, PageToolbarMode } from '../../../../contracts/settings';
 import { useContentUiScale } from '../../../platform/dom-host';
-import { movePageToolbarItem } from '../state/page-layout';
+import { movePageToolbarItem, isPageToolbarDividerPositionValid } from '../state/page-layout';
 import { PageToolbarControlsContext } from '../state/page-controls';
 
+type ClickSource = PageToolbarLayoutItem | 'add-divider';
 type Drop = {
   mode: PageToolbarMode;
   layout: PageToolbarLayoutItem[];
   source: PageToolbarLayoutItem;
   target: PageToolbarLayoutItem | null;
   before: boolean;
+  creating: boolean;
+  valid: boolean;
 };
 type Gesture = Drop & {
+  clickSource: ClickSource;
   original: PageToolbarLayoutItem[];
   pointerId: number;
   x: number;
   y: number;
+  lastX: number;
+  lastY: number;
   active: boolean;
 };
 export const PageToolbarLayoutContext = createContext<{
@@ -34,10 +40,12 @@ export const PageToolbarLayoutContext = createContext<{
   preview: PageToolbarLayoutItem[] | null;
   items: PageToolbarLayoutItem[];
   begin: (item: PageToolbarLayoutItem, event: PointerEvent<HTMLButtonElement>) => void;
+  beginNewSeparator: (event: PointerEvent<HTMLButtonElement>) => void;
+  addSeparator: () => void;
   move: (event: PointerEvent<HTMLButtonElement>) => void;
   finish: (event: PointerEvent<HTMLButtonElement>) => void;
   cancel: () => void;
-  consumeClick: (item: PageToolbarLayoutItem) => boolean;
+  consumeClick: (item: ClickSource) => boolean;
 } | null>(null);
 
 /** Uses the same short layout continuity as Settings collections, without persisting the preview. */
@@ -130,6 +138,8 @@ function movePageToolbarGesture(
   if (!current.active && Math.hypot(event.clientX - current.x, event.clientY - current.y) < 6)
     return null;
   current.active = true;
+  current.lastX = event.clientX;
+  current.lastY = event.clientY;
   const root = event.currentTarget.getRootNode();
   const hit =
     root instanceof ShadowRoot
@@ -142,24 +152,41 @@ function movePageToolbarGesture(
           (item) => item === slot.dataset['pageToolbarItem'] && item !== current.source
         ) ?? null)
       : null;
-  if (slot && target) {
+  if (slot?.dataset['pageToolbarItem'] === current.source) {
+    if (!current.source.startsWith('separator:')) return null;
+    current.valid =
+      current.target !== null &&
+      isPageToolbarDividerPositionValid(
+        current.layout.filter((item) => items.includes(item) || item === current.source),
+        current.source
+      );
+  } else if (slot && target) {
     current.target = target;
     const box = slot.getBoundingClientRect();
     current.before =
       toolbar?.dataset['displayMode'] === 'vertical'
         ? event.clientY < box.y + box.height / 2
         : event.clientX < box.x + box.width / 2;
+    const base = current.layout.includes(current.source)
+      ? current.layout
+      : [...current.layout, current.source];
+    current.layout = movePageToolbarItem(base, current.source, target, current.before);
+    current.valid = isPageToolbarDividerPositionValid(
+      current.layout.filter((item) => items.includes(item) || item === current.source),
+      current.source
+    );
+  } else {
+    if (!current.source.startsWith('separator:')) return null;
+    current.valid = false;
   }
-  if (!slot || !target) return null;
-  const next = movePageToolbarItem(current.layout, current.source, target, current.before);
-  if (next.every((item, index) => item === current.layout[index])) return null;
-  current.layout = next;
   return {
     mode: current.mode,
-    layout: next,
+    layout: current.layout,
     source: current.source,
-    target,
+    target: current.target,
     before: current.before,
+    creating: current.creating,
+    valid: current.valid,
   };
 }
 
@@ -177,7 +204,8 @@ export function PageToolbarLayoutProvider(props: {
   const [pendingDrop, setDrop] = useState<Drop | null>(null);
   const drop = pendingDrop?.mode === preferences?.mode ? pendingDrop : null;
   const gesture = useRef<Gesture | null>(null);
-  const suppressedClick = useRef<PageToolbarLayoutItem | null>(null);
+  const suppressedClick = useRef<ClickSource | null>(null);
+  const committing = useRef(false);
   usePageToolbarLayoutMotion(
     props.toolbarRef,
     drop?.layout ?? preferences?.layout,
@@ -185,13 +213,17 @@ export function PageToolbarLayoutProvider(props: {
     preferences?.mode
   );
 
+  const clearPresentation = useCallback(() => {
+    props.toolbarRef.current?.removeAttribute('data-page-reordering');
+    props.toolbarRef.current?.removeAttribute('data-page-drop-invalid');
+  }, [props.toolbarRef]);
   const cancel = useCallback(() => {
     if (!gesture.current) return;
-    suppressedClick.current = gesture.current.source;
+    suppressedClick.current = gesture.current.clickSource;
     gesture.current = null;
-    props.toolbarRef.current?.removeAttribute('data-page-reordering');
+    clearPresentation();
     setDrop(null);
-  }, [props.toolbarRef]);
+  }, [clearPresentation]);
   useEffect(() => {
     const current = gesture.current;
     if (current && !current.source.startsWith('separator:') && !present.includes(current.source))
@@ -205,10 +237,7 @@ export function PageToolbarLayoutProvider(props: {
     )
       cancel();
   }, [preferences?.layoutActive, preferences?.editing, preferences?.layout, cancel]);
-  useEffect(
-    () => () => props.toolbarRef.current?.removeAttribute('data-page-reordering'),
-    [props.toolbarRef]
-  );
+  useEffect(() => clearPresentation, [clearPresentation]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !gesture.current) return;
@@ -217,58 +246,137 @@ export function PageToolbarLayoutProvider(props: {
       cancel();
     };
     window.addEventListener('keydown', escape, true);
-    return () => window.removeEventListener('keydown', escape, true);
+    window.addEventListener('blur', cancel);
+    return () => {
+      window.removeEventListener('keydown', escape, true);
+      window.removeEventListener('blur', cancel);
+    };
   }, [cancel]);
   const items =
     (drop?.layout ?? preferences?.layout)?.filter(
       (item) => present.includes(item) || item.startsWith('separator:')
     ) ?? [];
+  const begin = (
+    source: PageToolbarLayoutItem,
+    event: PointerEvent<HTMLButtonElement>,
+    creating = false
+  ) => {
+    if (
+      event.button !== 0 ||
+      !preferences?.editing ||
+      preferences.pending ||
+      gesture.current ||
+      committing.current
+    )
+      return;
+    suppressedClick.current = null;
+    props.toolbarRef.current?.setAttribute('data-page-reordering', 'true');
+    gesture.current = {
+      mode: preferences.mode,
+      original: preferences.layout,
+      layout: [...preferences.layout],
+      source,
+      clickSource: creating ? 'add-divider' : source,
+      creating,
+      valid: false,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      active: false,
+      target: null,
+      before: true,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+  };
   return (
     <PageToolbarLayoutContext
       value={{
         drop,
         preview: drop?.layout ?? null,
         items,
-        begin: (source, event) => {
-          if (event.button !== 0 || !preferences?.editing || preferences.pending) return;
-          suppressedClick.current = null;
-          props.toolbarRef.current?.setAttribute('data-page-reordering', 'true');
-          gesture.current = {
-            mode: preferences.mode,
-            original: preferences.layout,
-            layout: [...preferences.layout],
-            source,
-            pointerId: event.pointerId,
-            x: event.clientX,
-            y: event.clientY,
-            active: false,
-            target: null,
-            before: true,
-          };
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-          event.stopPropagation();
+        begin,
+        beginNewSeparator: (event) => {
+          if (preferences?.canAddSeparator) begin(`separator:${crypto.randomUUID()}`, event, true);
+        },
+        addSeparator: () => {
+          if (
+            !preferences?.canAddSeparator ||
+            preferences.pending ||
+            committing.current ||
+            gesture.current
+          )
+            return;
+          let target = items.find(
+            (item, index) =>
+              index > 0 &&
+              !item.startsWith('separator:') &&
+              !items[index - 1]?.startsWith('separator:')
+          );
+          let before = true;
+          if (!target) {
+            target = items[0];
+            if (target?.startsWith('separator:')) {
+              target = items.at(-1);
+              before = false;
+            }
+          }
+          if (target && !target.startsWith('separator:'))
+            void preferences.addSeparator({
+              id: `separator:${crypto.randomUUID()}`,
+              target,
+              before,
+            });
         },
         move: (event) => {
           const current = gesture.current;
           if (!current) return;
           const next = movePageToolbarGesture(current, event, props.toolbarRef.current, items);
-          if (next) setDrop(next);
+          if (next) {
+            props.toolbarRef.current?.setAttribute('data-page-drop-invalid', String(!next.valid));
+            setDrop(next);
+          }
         },
         finish: (event) => {
           const current = gesture.current;
           if (!current || current.pointerId !== event.pointerId) return;
+          // Motion beneath a stationary pointer must not change the shown drop on release.
+          const final =
+            current.lastX === event.clientX && current.lastY === event.clientY
+              ? null
+              : movePageToolbarGesture(current, event, props.toolbarRef.current, items);
           gesture.current = null;
-          props.toolbarRef.current?.removeAttribute('data-page-reordering');
+          clearPresentation();
           if (!current.active) {
             setDrop(null);
             return;
           }
-          suppressedClick.current = current.source;
-          if (current.target && preferences)
-            void preferences
-              .moveItem(current.source, current.target, current.before)
-              .finally(() => setDrop(null));
-          else setDrop(null);
+          suppressedClick.current = current.clickSource;
+          if (
+            !current.valid ||
+            !current.target ||
+            !preferences ||
+            current.mode !== preferences.mode ||
+            current.original !== preferences.layout
+          ) {
+            setDrop(null);
+            return;
+          }
+          if (final) setDrop(final);
+          committing.current = true;
+          const save = current.creating
+            ? preferences.addSeparator({
+                id: current.source,
+                target: current.target,
+                before: current.before,
+              })
+            : preferences.moveItem(current.source, current.target, current.before);
+          void save.finally(() => {
+            committing.current = false;
+            setDrop(null);
+          });
         },
         cancel,
         consumeClick: (item) => {

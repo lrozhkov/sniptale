@@ -1,5 +1,6 @@
 import {
   PAGE_TOOLBAR_CONTROLS,
+  isPageToolbarLayoutItem,
   PAGE_TOOLBAR_LAYOUT_MAX_ITEMS,
   PAGE_TOOLBAR_LAYOUT_MAX_DIVIDERS,
   PAGE_TOOLBAR_OVERRIDE_MODES,
@@ -113,6 +114,20 @@ export function movePageToolbarItem(
   return result;
 }
 
+/** Validates only the moved divider; accepted legacy neighbors elsewhere are preserved. */
+export function isPageToolbarDividerPositionValid(
+  items: readonly PageToolbarLayoutItem[],
+  source: PageToolbarLayoutItem
+): boolean {
+  if (!source.startsWith('separator:')) return true;
+  const index = items.indexOf(source);
+  return (
+    index >= 0 &&
+    !items[index - 1]?.startsWith('separator:') &&
+    !items[index + 1]?.startsWith('separator:')
+  );
+}
+
 /** One settings patch restores every page mode without changing recording or shell placement. */
 export function createPageToolbarResetPatch(): Pick<
   ContentToolbarPreferences,
@@ -145,23 +160,35 @@ export function createPageToolbarLayoutCommands(
     canAddSeparator,
     moveItem: (source: PageToolbarLayoutItem, target: PageToolbarLayoutItem, before: boolean) => {
       const next = movePageToolbarItem(layout, source, target, before);
-      return next.every((item, index) => item === layout[index])
+      return !isPageToolbarDividerPositionValid(next, source) ||
+        next.every((item, index) => item === layout[index])
         ? Promise.resolve()
         : saveLayout(next);
     },
-    addSeparator: () => {
+    addSeparator: (position?: {
+      id: PageToolbarLayoutItem;
+      target: PageToolbarLayoutItem;
+      before: boolean;
+    }) => {
       if (!canAddSeparator) return Promise.resolve();
-      const next = [...layout];
-      const insertion = next.findIndex(
-        (item, index) =>
-          index > 0 && !item.startsWith('separator:') && !next[index - 1]?.startsWith('separator:')
-      );
-      next.splice(
-        insertion < 0 ? Math.max(0, next.indexOf('settings')) : insertion,
-        0,
-        `separator:${crypto.randomUUID()}`
-      );
-      return saveLayout(next);
+      const id: PageToolbarLayoutItem = position?.id ?? `separator:${crypto.randomUUID()}`;
+      if (!id.startsWith('separator:') || !isPageToolbarLayoutItem(id) || layout.includes(id))
+        return Promise.resolve();
+      let next: PageToolbarLayoutItem[];
+      if (position) {
+        if (!layout.includes(position.target)) return Promise.resolve();
+        next = movePageToolbarItem([...layout, id], id, position.target, position.before);
+      } else {
+        next = [...layout];
+        const insertion = next.findIndex(
+          (item, index) =>
+            index > 0 &&
+            !item.startsWith('separator:') &&
+            !next[index - 1]?.startsWith('separator:')
+        );
+        next.splice(insertion < 0 ? Math.max(0, next.indexOf('settings')) : insertion, 0, id);
+      }
+      return isPageToolbarDividerPositionValid(next, id) ? saveLayout(next) : Promise.resolve();
     },
     removeSeparator: (item: PageToolbarLayoutItem) =>
       item.startsWith('separator:')

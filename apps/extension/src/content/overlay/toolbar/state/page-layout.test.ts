@@ -1,6 +1,11 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import {
+  PAGE_TOOLBAR_LAYOUT_MAX_DIVIDERS,
+  type PageToolbarLayoutItem,
+} from '../../../../contracts/settings';
 import {
   createPageToolbarResetPatch,
+  createPageToolbarLayoutCommands,
   getPageToolbarLayout,
   movePageToolbarItem,
 } from './page-layout';
@@ -64,4 +69,57 @@ it('includes new editing and review tools in legacy layout migration and the uni
     }
     expect(migrated.indexOf('settings')).toBeLessThan(migrated.indexOf('mode'));
   }
+});
+
+it('inserts the provisional divider identity at its selected gap without recreating the source', async () => {
+  const save = vi.fn(async () => undefined);
+  const commands = createPageToolbarLayoutCommands(
+    ['mode', 'capture-visible', 'settings'],
+    'cursor',
+    save
+  );
+  await commands.addSeparator({ id: 'separator:draft', target: 'settings', before: true });
+  expect(save).toHaveBeenCalledExactlyOnceWith({
+    pageLayouts: { cursor: ['mode', 'capture-visible', 'separator:draft', 'settings'] },
+  });
+});
+it('refuses a divider final position adjacent to another divider', async () => {
+  const save = vi.fn(async () => undefined);
+  const commands = createPageToolbarLayoutCommands(
+    ['mode', 'separator:a', 'capture-visible', 'separator:b', 'settings'],
+    'cursor',
+    save
+  );
+  await commands.moveItem('separator:a', 'separator:b', false);
+  expect(save).not.toHaveBeenCalled();
+});
+
+it('refuses duplicate/malformed ids, unknown targets and adjacent copies without altering accepted items', async () => {
+  const save = vi.fn(async () => undefined);
+  const items: PageToolbarLayoutItem[] = ['mode', 'separator:a', 'capture-visible', 'settings'];
+  const commands = createPageToolbarLayoutCommands(items, 'cursor', save);
+  for (const position of [
+    { id: 'separator:a', target: 'settings', before: true },
+    { id: 'separator:<script>', target: 'settings', before: true },
+    { id: 'separator:new', target: 'separator:missing', before: true },
+    { id: 'separator:new', target: 'separator:a', before: false },
+  ] as const)
+    await commands.addSeparator(position);
+  expect(save).not.toHaveBeenCalled();
+  expect(items).toEqual(['mode', 'separator:a', 'capture-visible', 'settings']);
+});
+it('retains divider count limits for explicitly positioned copies', async () => {
+  const save = vi.fn(async () => undefined);
+  const items: PageToolbarLayoutItem[] = [
+    'mode',
+    ...Array.from(
+      { length: PAGE_TOOLBAR_LAYOUT_MAX_DIVIDERS },
+      (_, index): PageToolbarLayoutItem => `separator:${index}`
+    ),
+    'settings',
+  ];
+  const commands = createPageToolbarLayoutCommands(items, 'cursor', save);
+  expect(commands.canAddSeparator).toBe(false);
+  await commands.addSeparator({ id: 'separator:new', target: 'mode', before: true });
+  expect(save).not.toHaveBeenCalled();
 });

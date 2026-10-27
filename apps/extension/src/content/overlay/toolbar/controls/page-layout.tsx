@@ -11,6 +11,7 @@ import type { PageToolbarControl, PageToolbarLayoutItem } from '../../../../cont
 import { translate } from '../../../../platform/i18n';
 import { PageToolbarControlsContext } from '../state/page-controls';
 import { PageToolbarLayoutContext } from './page-layout-controller';
+import { movePageToolbarItem, isPageToolbarDividerPositionValid } from '../state/page-layout';
 export { PageToolbarLayoutProvider } from './page-layout-controller';
 
 /** Flattens only the customized page layout. Other surfaces retain the shared group. */
@@ -46,6 +47,9 @@ export function PageToolbarSlot(props: PageToolbarSlotProps) {
       data-page-toolbar-item={props.id}
       data-page-toolbar-dragging={layout?.drop?.source === props.id ? 'true' : undefined}
       data-page-toolbar-divider={props.id.startsWith('separator:') ? 'true' : undefined}
+      data-page-toolbar-invalid={
+        layout?.drop?.source === props.id && !layout.drop.valid ? 'true' : undefined
+      }
       className="sniptale-page-toolbar-slot"
       style={{ order: position < 0 ? preferences.layout.length : position }}
     >
@@ -116,9 +120,23 @@ function PageToolbarCustomizationControl(props: PageToolbarSlotProps) {
         event.stopPropagation();
         const direction = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
         const index = layout?.items.indexOf(props.id) ?? -1;
-        const target = index >= 0 ? layout?.items[index + direction] : undefined;
-        if (target && !preferences.pending)
+        if (!layout || index < 0 || preferences.pending) return;
+        for (
+          let nextIndex = index + direction;
+          nextIndex >= 0 && nextIndex < layout.items.length;
+          nextIndex += direction
+        ) {
+          const target = layout.items[nextIndex]!;
+          const next = movePageToolbarItem(
+            preferences.layout,
+            props.id,
+            target,
+            direction < 0
+          ).filter((item) => layout.items.includes(item));
+          if (!isPageToolbarDividerPositionValid(next, props.id)) continue;
           void preferences.moveItem(props.id, target, direction < 0);
+          break;
+        }
       }}
       onClick={(event) => {
         event.stopPropagation();
@@ -195,7 +213,13 @@ export function PageToolbarLayoutDecorations() {
   }
   return (
     <>
-      {separators.map((id) => (
+      {layout?.drop && !layout.drop.valid && layout.drop.source.startsWith('separator:') ? (
+        <span className="sr-only" role="status">
+          {translate('content.toolbar.pageDividerDropInvalid')}
+        </span>
+      ) : null}
+      {/* Stable DOM order preserves native pointer capture; CSS order owns placement. */}
+      {separators.sort().map((id) => (
         <PageToolbarSlot
           key={id}
           id={id}
@@ -210,12 +234,23 @@ export function PageToolbarLayoutDecorations() {
           type="button"
           tone="utility"
           dataUi="content.toolbar.customize-add-divider"
-          title={translate('content.toolbar.pageAddDivider')}
+          aria-label={translate('content.toolbar.pageAddDivider')}
+          aria-description={translate('content.toolbar.pageAddDividerHint')}
+          title={`${translate('content.toolbar.pageAddDivider')}\n${translate('content.toolbar.pageAddDividerHint')}`}
+          className="touch-none cursor-grab"
           disabled={!preferences.canAddSeparator}
           aria-disabled={preferences.pending}
           style={{ order: 2147483645 }}
-          onClick={() => {
-            if (!preferences.pending) void preferences.addSeparator();
+          onPointerDown={(event) => layout?.beginNewSeparator(event)}
+          onPointerMove={(event) => layout?.move(event)}
+          onPointerUp={(event) => layout?.finish(event)}
+          onPointerCancel={() => layout?.cancel()}
+          onLostPointerCapture={() => layout?.cancel()}
+          onKeyDown={() => layout?.consumeClick('add-divider')}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (layout?.consumeClick('add-divider') || preferences.pending) return;
+            if (event.detail === 0) layout?.addSeparator();
           }}
         >
           <SeparatorVertical size={18} />

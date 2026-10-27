@@ -406,6 +406,14 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Click to change visibility.',
   },
   pageAddDivider: { ru: 'Добавить разделитель', en: 'Add divider' },
+  pageAddDividerHint: {
+    ru: 'Перетащите новый разделитель на панель. Enter или пробел добавляет разделитель для перестановки с клавиатуры.',
+    en: 'Drag a new divider into the toolbar. Enter or Space adds one for keyboard reordering.',
+  },
+  pageDividerDropInvalid: {
+    ru: 'Здесь нельзя разместить разделитель. Выберите промежуток без соседнего разделителя или отпустите кнопку для отмены.',
+    en: 'Cannot place this divider here. Move to a gap without another divider, or release to cancel.',
+  },
   pageRemoveDivider: { ru: 'Удалить разделитель', en: 'Remove divider' },
   pageResetToolbar: { ru: 'Сбросить настройку панели', en: 'Reset toolbar customization' },
   pageResetToolbarHint: {
