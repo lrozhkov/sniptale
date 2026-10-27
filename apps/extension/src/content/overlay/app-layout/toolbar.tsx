@@ -1,3 +1,4 @@
+import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import { requestFullContentRuntimeRelease } from '../../runtime/entrypoint/markers';
 import {
   PageRecoveryContext,
@@ -280,13 +281,17 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
       )?.focus();
     }
   }, [toolbar.isToolbarVisible, toolbar.isCompletelyHidden]);
-  const handleHideToolbar = async (restoreFocus = false) => {
+  const handleHideToolbar = async (
+    restoreFocus = false,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => {
     try {
       if (toolbar.modes.videoRecordingMode) await toolbar.videoRecording?.onHide?.();
       await recovery.discard(() => {
         focusRestorePending.current = restoreFocus;
         useFrameUIStore.getState().dismissFrameUi();
-        toolbar.setPinnedToolbarVisible(false);
+        if (contentIntentSource) toolbar.setPinnedToolbarVisible(false, contentIntentSource);
+        else toolbar.setPinnedToolbarVisible(false);
       });
     } catch (error) {
       logger.error('Failed to hide video recording toolbar', error);

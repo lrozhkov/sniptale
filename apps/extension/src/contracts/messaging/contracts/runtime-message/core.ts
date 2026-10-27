@@ -166,6 +166,7 @@ type RuntimeCoreBaseRequestByType = RuntimePageLaunchRequestByType &
     [MessageType.CONTENT_RUNTIME_WAKEUP]: {
       contentIntent?: ContentPrivilegedActionCapability;
       pinToTab?: boolean;
+      autoPinToTab?: boolean;
       toolbarVisible?: boolean;
       type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
     };
@@ -243,6 +244,7 @@ type RuntimeCoreBaseResponseByType = RuntimePageLaunchResponseByType &
     [MessageType.CONTENT_RUNTIME_WAKEUP]: RuntimeMessageResponse<{
       pinToTab: boolean;
       pinToTabAvailable: boolean;
+      pinToTabAutomatic?: boolean;
       restored?: boolean;
       reason?: 'pin-to-tab' | 'scenario';
       toolbarVisible?: boolean;

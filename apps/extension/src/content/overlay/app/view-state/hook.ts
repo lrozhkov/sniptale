@@ -52,7 +52,7 @@ export function useContentAppViewModel(params: {
     [setPinToTab]
   );
   const autoBlurController = useAutoBlurController({
-    autoApplyAllowed: modeState.pinToTabConfirmed,
+    autoApplyAllowed: modeState.pinToTabConfirmed && !modeState.pinToTabAutomaticallyConfirmed,
     ensurePinned,
     frameManager,
     highlighterMode: modeState.highlighterMode,

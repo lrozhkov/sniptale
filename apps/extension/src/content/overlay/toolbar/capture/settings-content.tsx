@@ -143,7 +143,10 @@ type ToolbarSettingsUtilityItemsProps = {
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisableScreenshotMode: (activationEvent?: Event) => void;
-  onHide: (restoreFocus?: boolean) => void;
+  onHide: (
+    restoreFocus?: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
   onPinToTabChange: (
     value: boolean,
     contentIntentSource?: ContentPrivilegedActionIntentSource
@@ -205,7 +208,11 @@ function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsPro
         : renderActionItem({
             icon: <PanelBottomClose className="sniptale-popover-icon" />,
             label: translate('content.toolbar.hideToolbar'),
-            onAction: (event) => props.onHide(event.detail === 0),
+            onAction: (event) =>
+              props.onHide(
+                event.detail === 0,
+                createTrustedContentActionIntentSource(event.nativeEvent) ?? undefined
+              ),
             onClose: props.onClose,
           })}
       {renderDisableScreenshotModeItem(props)}

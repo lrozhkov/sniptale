@@ -767,3 +767,27 @@ it('admits only unambiguous offscreen raster preparation and correlated completi
     ).toThrow();
   }
 });
+
+it('parses the automatic-collapse request and its origin response', () => {
+  const request = {
+    type: MessageType.CONTENT_RUNTIME_WAKEUP,
+    autoPinToTab: true,
+    toolbarVisible: false,
+    contentIntent: { requestId: 'collapse-1', token: 'token-1' },
+  };
+  expect(contentRuntimeWakeupContract.parseRequest(request)).toEqual(request);
+  const response = {
+    success: true,
+    pinToTab: true,
+    pinToTabAvailable: true,
+    pinToTabAutomatic: true,
+    toolbarVisible: false,
+  };
+  expect(contentRuntimeWakeupContract.parseResponse(response)).toEqual(response);
+  expect(() =>
+    contentRuntimeWakeupContract.parseRequest({ ...request, autoPinToTab: 'yes' })
+  ).toThrow();
+  expect(() =>
+    contentRuntimeWakeupContract.parseResponse({ ...response, pinToTabAutomatic: 'yes' })
+  ).toThrow();
+});

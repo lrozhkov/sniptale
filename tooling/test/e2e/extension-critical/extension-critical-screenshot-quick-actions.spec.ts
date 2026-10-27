@@ -136,6 +136,114 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       }
     });
 
+    test(`collapsed toolbar pin lifecycle ${theme} ${name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      test.setTimeout(180_000);
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      page.setDefaultTimeout(10_000);
+      try {
+        await popup.evaluate(async (theme) => {
+          await chrome.storage.local.set({
+            'sniptale-theme-preference': theme,
+            'sniptale-locale-preference': theme === 'light' ? 'en' : 'ru',
+          });
+          const grant = document.createElement('button');
+          grant.textContent = 'Grant collapse proof';
+          grant.onclick = async () => {
+            grant.dataset['granted'] = String(
+              await chrome.permissions.request({ origins: ['<all_urls>'] })
+            );
+          };
+          document.body.append(grant);
+        }, theme);
+        const grant = popup.getByRole('button', { name: 'Grant collapse proof' });
+        await grant.click();
+        await expect(grant).toHaveAttribute('data-granted', 'true');
+        await configureToolbar(
+          popup,
+          page,
+          hostOrigin,
+          theme === 'light' ? 'horizontal' : 'vertical'
+        );
+        const tabId = await popup.evaluate(
+          async (origin) =>
+            (await chrome.tabs.query({})).find((tab) => tab.url === `${origin}/`)!.id!,
+          hostOrigin
+        );
+        const session = () =>
+          popup.evaluate(async (id) => {
+            const pin = `sniptale.content.pin-to-tab:tab:${id}`;
+            const automatic = `sniptale.content.pin-to-tab-automatic:tab:${id}`;
+            const visible = `sniptale.content.pin-to-tab-toolbar-visible:tab:${id}`;
+            const stored = await chrome.storage.session.get([pin, automatic, visible]);
+            return {
+              pin: stored[pin] === true,
+              automatic: stored[automatic] === true,
+              visible: stored[visible] !== false,
+            };
+          }, tabId);
+        const root = page.locator('[data-ui="content.toolbar.root"]');
+        const restore = page.locator('[data-ui="content.collapsed-panels.restore-toolbar"]');
+        const pin = page.locator('[data-ui="content.toolbar.navigation.pin-to-tab"]');
+        await expect(pin).toHaveAttribute('aria-pressed', 'false');
+        await page.locator('[data-ui="content.toolbar.navigation.collapse"]').click();
+        await expect.poll(session).toEqual({ pin: true, automatic: true, visible: false });
+        const crossSite = new URL(hostOrigin);
+        crossSite.hostname = 'localhost';
+        for (const destination of [page.url(), `${hostOrigin}/?collapsed=1`, crossSite.href]) {
+          await page.goto(destination);
+          await expect(restore).toBeVisible();
+          await expect(root).toBeHidden();
+          await expect.poll(session).toEqual({ pin: true, automatic: true, visible: false });
+        }
+        await page.screenshot({
+          path: info.outputPath('automatic-pin-collapsed.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await restore.click();
+        await expect(root).toBeVisible();
+        await expect.poll(session).toEqual({ pin: false, automatic: false, visible: true });
+        await expect(pin).toHaveAttribute('aria-pressed', 'false');
+        await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+        await page
+          .getByRole('button', {
+            name: translate('content.toolbar.hideToolbar', theme === 'light' ? 'en' : 'ru'),
+            exact: true,
+          })
+          .click();
+        await expect.poll(session).toEqual({ pin: true, automatic: true, visible: false });
+        await page.reload();
+        await expect(restore).toBeVisible();
+        await restore.press('Enter');
+        await expect(root).toBeVisible();
+        await expect.poll(session).toEqual({ pin: false, automatic: false, visible: true });
+        await pin.click();
+        await expect.poll(session).toEqual({ pin: true, automatic: false, visible: true });
+        await page.locator('[data-ui="content.toolbar.navigation.collapse"]').click();
+        await expect.poll(session).toEqual({ pin: true, automatic: false, visible: false });
+        await page.reload();
+        await expect(restore).toBeVisible();
+        await restore.click();
+        await expect(root).toBeVisible();
+        await expect.poll(session).toEqual({ pin: true, automatic: false, visible: true });
+        await expect(pin).toHaveAttribute('aria-pressed', 'true');
+        await page.screenshot({
+          path: info.outputPath('manual-pin-expanded.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await pin.click();
+        await expect.poll(session).toEqual({ pin: false, automatic: false, visible: true });
+      } finally {
+        await page.close();
+        await popup.close();
+      }
+    });
+
     test(`screenshot quick menus ${theme} ${name}`, async ({
       context,
       extensionId,

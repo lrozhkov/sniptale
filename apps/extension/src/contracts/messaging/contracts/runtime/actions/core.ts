@@ -192,6 +192,7 @@ function isEditableAggregateRef(value: unknown): value is {
 type ContentRuntimeWakeupResponse = RuntimeMessageResponse<{
   pinToTab: boolean;
   pinToTabAvailable: boolean;
+  pinToTabAutomatic?: boolean;
   reason?: 'pin-to-tab' | 'scenario';
   restored?: boolean;
   toolbarVisible?: boolean;
@@ -202,6 +203,7 @@ const isContentRuntimeWakeupResponseEnvelope =
     optional: {
       pinToTab: isBoolean,
       pinToTabAvailable: isBoolean,
+      pinToTabAutomatic: isBoolean,
       reason: isContentRuntimeWakeupReason,
       restored: isBoolean,
       toolbarVisible: isBoolean,
@@ -544,6 +546,7 @@ export const runtimeActionCoreMessageContracts = {
         optional: {
           contentIntent: isContentPrivilegedActionCapability,
           pinToTab: isBoolean,
+          autoPinToTab: isBoolean,
           toolbarVisible: isBoolean,
         },
       })

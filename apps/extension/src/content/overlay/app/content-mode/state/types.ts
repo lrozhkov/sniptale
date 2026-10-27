@@ -45,6 +45,8 @@ export type ContentAppVisibilityState = {
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   pinToTabConfirmed: boolean;
+  /** Automatic restoration retains the release guard without granting auto-apply. */
+  pinToTabAutomaticallyConfirmed?: boolean;
   pendingAutoStartCapture: PendingAutoStartCapture | null;
   quickActionToastCountdown: number | null;
   saveDialogState: { dataUrl: string; filename: string } | null;
@@ -54,7 +56,10 @@ export type ContentAppVisibilityState = {
   setIsCompletelyHidden: (hidden: boolean) => void;
   setIsToolbarVisible: (visible: boolean) => void;
   setNavigationLockEnabled: (enabled: boolean) => void;
-  setPinnedToolbarVisible: (visible: boolean) => void;
+  setPinnedToolbarVisible: (
+    visible: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
   setPinToTab: (
     value: boolean,
     contentIntentSource?: ContentPrivilegedActionIntentSource

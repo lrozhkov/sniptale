@@ -10,12 +10,14 @@ type ContentPinToTabSessionWriteGuard = () => boolean;
 type ContentPinToTabSessionWriteResult =
   | { pinToTabAvailable: boolean; status: 'acknowledged'; value: boolean }
   | { status: 'superseded' };
-type ContentPinToTabSessionState = {
+export type ContentPinToTabSessionState = {
+  pinToTabAutomatic?: boolean;
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   toolbarVisible: boolean;
 };
 type ContentPinToTabSessionMutation = {
+  autoPinToTab?: boolean;
   pinToTab?: boolean;
   toolbarVisible?: boolean;
 };
@@ -38,20 +40,22 @@ async function requestPinToTabSessionState(
 ): Promise<ContentPinToTabSessionState> {
   const baseMessage = { ...mutation, type: MessageType.CONTENT_RUNTIME_WAKEUP };
   const message =
-    mutation.pinToTab === true
+    mutation.pinToTab === true || mutation.autoPinToTab === true
       ? await attachContentActionIntent(baseMessage, contentIntentSource)
       : baseMessage;
   const response = await getContentRuntimeServices().messaging.sendRuntimeMessage(message);
   if (
     !response?.success ||
     typeof response.pinToTab !== 'boolean' ||
-    typeof response.pinToTabAvailable !== 'boolean'
+    typeof response.pinToTabAvailable !== 'boolean' ||
+    (response.pinToTabAutomatic !== undefined && typeof response.pinToTabAutomatic !== 'boolean')
   ) {
     throw new Error('Background pin-to-tab session owner returned an invalid response');
   }
 
   return {
     pinToTab: response.pinToTab,
+    ...(response.pinToTabAutomatic ? { pinToTabAutomatic: true } : {}),
     pinToTabAvailable: response.pinToTabAvailable,
     toolbarVisible: typeof response.toolbarVisible === 'boolean' ? response.toolbarVisible : true,
   };
@@ -105,11 +109,22 @@ export function writeContentPinToTabSessionState(
   });
 }
 
-export function writeContentPinToTabToolbarVisibilityState(value: boolean): Promise<void> {
+export function writeContentPinToTabToolbarVisibilityState(
+  value: boolean,
+  contentIntentSource?: ContentPrivilegedActionIntentSource,
+  onAccepted?: (state: ContentPinToTabSessionState) => void
+): Promise<void> {
   const writeOperation = pinToTabWriteChain
     .catch(() => undefined)
     .then(async () => {
-      await requestPinToTabSessionState({ toolbarVisible: value });
+      const state = await requestPinToTabSessionState(
+        {
+          toolbarVisible: value,
+          ...(!value && contentIntentSource ? { autoPinToTab: true } : {}),
+        },
+        contentIntentSource
+      );
+      onAccepted?.(state);
     });
 
   pinToTabWriteChain = writeOperation.then(

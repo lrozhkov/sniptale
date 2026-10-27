@@ -285,7 +285,7 @@ function authorizeContentRuntimeWakeupRoute(
     return reject(`Unauthorized content runtime wake-up sender: ${senderDecision.reason}`);
   }
   if (
-    request.message['pinToTab'] === true &&
+    (request.message['pinToTab'] === true || request.message['autoPinToTab'] === true) &&
     !consumeContentPrivilegedActionCapabilityBinding({
       actionType: MessageType.CONTENT_RUNTIME_WAKEUP,
       contentIntent: request.message['contentIntent'],

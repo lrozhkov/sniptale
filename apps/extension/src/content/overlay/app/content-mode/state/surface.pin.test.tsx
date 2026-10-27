@@ -403,3 +403,95 @@ it('uses a stale successful visibility acknowledgement when the current write fa
 
   expect(getLatestState().isToolbarVisible).toBe(false);
 });
+
+it('restores an automatic collapsed pin without granting confirmed auto-apply', async () => {
+  pinSessionMocks.load.mockResolvedValueOnce({
+    pinToTab: true,
+    pinToTabAutomatic: true,
+    pinToTabAvailable: true,
+    toolbarVisible: false,
+  });
+  await renderHarness();
+  expect(getLatestState().pinToTab).toBe(true);
+  expect(getLatestState().pinToTabConfirmed).toBe(true);
+  expect(getLatestState().pinToTabAutomaticallyConfirmed).toBe(true);
+  expect(getLatestState().isToolbarVisible).toBe(false);
+  pinSessionMocks.write.mockRejectedValueOnce(new Error('unpin failed'));
+  await act(async () => {
+    await getLatestState().setPinToTab(false);
+  });
+  expect(getLatestState().pinToTab).toBe(true);
+  expect(getLatestState().pinToTabConfirmed).toBe(true);
+  expect(getLatestState().pinToTabAutomaticallyConfirmed).toBe(true);
+});
+
+it('projects automatic collapse and its removal from acknowledged visibility writes', async () => {
+  pinSessionMocks.writeVisibility.mockImplementation(async (visible, _source, onAccepted) => {
+    onAccepted({
+      pinToTab: !visible,
+      pinToTabAutomatic: !visible,
+      pinToTabAvailable: true,
+      toolbarVisible: visible,
+    });
+  });
+  await renderHarness();
+  act(() => getLatestState().setIsToolbarVisible(true));
+  await act(async () => getLatestState().setPinnedToolbarVisible(false));
+  expect(getLatestState().pinToTab).toBe(true);
+  expect(getLatestState().pinToTabConfirmed).toBe(true);
+  expect(getLatestState().pinToTabAutomaticallyConfirmed).toBe(true);
+  await act(async () => getLatestState().setPinnedToolbarVisible(true));
+  expect(getLatestState().pinToTab).toBe(false);
+  expect(getLatestState().isToolbarVisible).toBe(true);
+});
+
+it('does not let an older visibility acknowledgement replace a newer explicit pin', async () => {
+  let acknowledge:
+    | ((state: { pinToTab: boolean; pinToTabAvailable: boolean; toolbarVisible: boolean }) => void)
+    | undefined;
+  const pending = createDeferred<void>();
+  pinSessionMocks.writeVisibility.mockImplementationOnce((_value, _source, onAccepted) => {
+    acknowledge = onAccepted;
+    return pending.promise;
+  });
+  await renderHarness();
+  act(() => getLatestState().setPinnedToolbarVisible(false));
+  await act(async () => {
+    await getLatestState().setPinToTab(true);
+  });
+  await act(async () => {
+    acknowledge?.({ pinToTab: false, pinToTabAvailable: true, toolbarVisible: false });
+    pending.resolve(undefined);
+  });
+  expect(getLatestState().pinToTab).toBe(true);
+  expect(getLatestState().pinToTabConfirmed).toBe(true);
+});
+
+it('keeps the effective release guard until an automatic unpin is acknowledged', async () => {
+  pinSessionMocks.load.mockResolvedValueOnce({
+    pinToTab: true,
+    pinToTabAutomatic: true,
+    pinToTabAvailable: true,
+    toolbarVisible: false,
+  });
+  await renderHarness();
+  const pending = createDeferred<{
+    status: 'acknowledged';
+    value: boolean;
+    pinToTabAvailable: boolean;
+  }>();
+  pinSessionMocks.write.mockReturnValueOnce(pending.promise);
+  let unpin: Promise<boolean> | undefined;
+  act(() => {
+    unpin = getLatestState().setPinToTab(false);
+  });
+  expect(getLatestState().pinToTab).toBe(false);
+  expect(getLatestState().pinToTabConfirmed).toBe(true);
+  expect(getLatestState().pinToTabAutomaticallyConfirmed).toBe(true);
+  await act(async () => {
+    pending.resolve({ status: 'acknowledged', value: false, pinToTabAvailable: true });
+    await unpin;
+  });
+  expect(getLatestState().pinToTabConfirmed).toBe(false);
+  expect(getLatestState().pinToTabAutomaticallyConfirmed).toBeUndefined();
+});

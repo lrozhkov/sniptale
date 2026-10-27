@@ -499,3 +499,11 @@ it('selects canonical scoped history and marker replay proof', async () => {
     ])
   );
 });
+
+it('retains serialized pin and toolbar visibility write proof for the content session owner', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/content/overlay/app/content-mode/state';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/pin-session.ts`)).toEqual(
+    expect.arrayContaining([`${root}/pin-session.test.ts`, `${root}/pin-session-writes.test.ts`])
+  );
+});

@@ -109,3 +109,34 @@ it('authorizes pin activation with a document-bound trusted-content capability',
     reason: 'Unauthorized pin-to-tab permission request',
   });
 });
+
+it('rejects automatic collapse activation without a trusted one-shot capability', () => {
+  const request = contentRuntimeWakeupRequest();
+  request.message = { ...request.message, autoPinToTab: true, toolbarVisible: false };
+  expect(authorizeBackgroundOwnedRoute(request)).toEqual({
+    authorized: false,
+    reason: 'Unauthorized pin-to-tab permission request',
+  });
+});
+
+it('admits automatic collapse only once with its document-bound capability', () => {
+  const contentIntent = issueContentPrivilegedActionCapability({
+    actionType: MessageType.CONTENT_RUNTIME_WAKEUP,
+    requestId: 'automatic-pin-1',
+    senderBinding: {
+      documentId: 'content-document-1',
+      frameId: 0,
+      senderUrl: 'https://example.test/page',
+      tabId: 7,
+    },
+  });
+  const request = contentRuntimeWakeupRequest(undefined, undefined, contentIntent);
+  request.message = { ...request.message, autoPinToTab: true, toolbarVisible: false };
+  expect(authorizeBackgroundOwnedRoute(request)).toEqual(
+    expect.objectContaining({ authorized: true })
+  );
+  expect(authorizeBackgroundOwnedRoute(request)).toEqual({
+    authorized: false,
+    reason: 'Unauthorized pin-to-tab permission request',
+  });
+});
