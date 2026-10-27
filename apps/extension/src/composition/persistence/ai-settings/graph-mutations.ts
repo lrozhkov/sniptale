@@ -1,4 +1,10 @@
 import { setStoredAIProviderEnabled } from './provider-secrets.store';
+import { browserStorage } from '../infrastructure/browser-storage';
+import {
+  AI_STORAGE_VERSION,
+  AI_STORAGE_VERSION_KEY,
+  AI_STORAGE_RESET_PHASE_KEY,
+} from './constants';
 import {
   getAIModelOperation,
   isValidAIModelOperationConfiguration,
@@ -6,7 +12,9 @@ import {
 import type { AIModel } from '../../../contracts/settings';
 import {
   runWithExclusivePersistenceMutationPermit,
+  runWithAtomicPersistenceMutationPermit,
   acquirePersistenceMutationTransition,
+  type PersistenceMutationPermit,
 } from '../infrastructure/mutation-barrier';
 import type { AIProviderUpsertInput } from './core';
 import {
@@ -94,16 +102,16 @@ async function clearProviderSecret(providerId: string): Promise<void> {
   await clearAIProviderSecret(providerId);
 }
 
-async function addModel(model: AIModel): Promise<void> {
+async function addModel(model: AIModel, permit: PersistenceMutationPermit): Promise<void> {
   await assertModelProviderExists(model);
   const models = await loadAIModels();
   if (models.some((current) => current.id === model.id)) {
     throw new Error(`Model ${model.id} already exists`);
   }
-  await saveAIModels([...models, model]);
+  await saveAIModels([...models, model], permit);
 }
 
-async function updateModel(model: AIModel): Promise<void> {
+async function updateModel(model: AIModel, permit: PersistenceMutationPermit): Promise<void> {
   await assertModelProviderExists(model);
   const models = await loadAIModels();
   const index = models.findIndex((current) => current.id === model.id);
@@ -127,20 +135,26 @@ async function updateModel(model: AIModel): Promise<void> {
   const defaultModelId = await loadDefaultModelId();
   await saveAIModelGraph(
     nextModels,
-    defaultModelId === model.id && getAIModelOperation(model) !== 'text' ? null : defaultModelId
+    defaultModelId === model.id && getAIModelOperation(model) !== 'text' ? null : defaultModelId,
+    permit
   );
 }
 
-async function deleteModel(modelId: string): Promise<void> {
+async function deleteModel(modelId: string, permit: PersistenceMutationPermit): Promise<void> {
   const models = await loadAIModels();
   const defaultModelId = await loadDefaultModelId();
   await saveAIModelGraph(
     models.filter((model) => model.id !== modelId),
-    defaultModelId === modelId ? null : defaultModelId
+    defaultModelId === modelId ? null : defaultModelId,
+    permit
   );
 }
 
-async function moveModel(modelId: string, beforeModelId: string | null): Promise<void> {
+async function moveModel(
+  modelId: string,
+  beforeModelId: string | null,
+  permit: PersistenceMutationPermit
+): Promise<void> {
   const models = await loadAIModels();
   const sourceIndex = models.findIndex((model) => model.id === modelId);
   if (sourceIndex < 0) {
@@ -160,7 +174,7 @@ async function moveModel(modelId: string, beforeModelId: string | null): Promise
       : nextModels.findIndex((model) => model.id === beforeModelId);
   nextModels.splice(targetIndex, 0, source);
   if (nextModels.every((model, index) => model.id === models[index]?.id)) return;
-  await saveAIModels(nextModels);
+  await saveAIModels(nextModels, permit);
 }
 
 async function saveDefaultModel(defaultModelId: string | null): Promise<void> {
@@ -175,7 +189,55 @@ async function saveDefaultModel(defaultModelId: string | null): Promise<void> {
   await saveDefaultModelId(defaultModelId);
 }
 
-async function applyAISettingsMutation(command: AISettingsMutationCommand): Promise<void> {
+type ModelGraphCommand = Extract<
+  AISettingsMutationCommand,
+  {
+    operation: 'add-model' | 'update-model' | 'delete-model' | 'move-model';
+  }
+>;
+function isModelGraphCommand(command: AISettingsMutationCommand): command is ModelGraphCommand {
+  return (
+    command.operation === 'add-model' ||
+    command.operation === 'update-model' ||
+    command.operation === 'delete-model' ||
+    command.operation === 'move-model'
+  );
+}
+async function applyModelGraphMutation(
+  command: ModelGraphCommand,
+  permit: PersistenceMutationPermit
+): Promise<void> {
+  switch (command.operation) {
+    case 'add-model':
+      return addModel(command.model, permit);
+    case 'update-model':
+      return updateModel(command.model, permit);
+    case 'delete-model':
+      return deleteModel(command.modelId, permit);
+    case 'move-model':
+      return moveModel(command.modelId, command.beforeModelId, permit);
+  }
+}
+async function mutateModelGraph(command: ModelGraphCommand): Promise<void> {
+  await runWithAtomicPersistenceMutationPermit(async (permit) => {
+    const state = await browserStorage.local.get([
+      AI_STORAGE_VERSION_KEY,
+      AI_STORAGE_RESET_PHASE_KEY,
+    ]);
+    if (
+      state[AI_STORAGE_VERSION_KEY] !== AI_STORAGE_VERSION ||
+      state[AI_STORAGE_RESET_PHASE_KEY] !== undefined
+    )
+      throw new Error('AI settings are not ready for model publication');
+    await assertAISettingsGraphInvariants();
+    await applyModelGraphMutation(command, permit);
+    await assertAISettingsGraphInvariants();
+  });
+}
+
+async function applyAISettingsMutation(
+  command: Exclude<AISettingsMutationCommand, ModelGraphCommand>
+): Promise<void> {
   switch (command.operation) {
     case 'remember-scenario-selection':
       return runWithExclusivePersistenceMutationPermit((permit) =>
@@ -193,14 +255,6 @@ async function applyAISettingsMutation(command: AISettingsMutationCommand): Prom
       return clearProviderSecret(command.providerId);
     case 'delete-provider':
       return deleteAIProviderGraphRecord(command.providerId);
-    case 'add-model':
-      return addModel(command.model);
-    case 'update-model':
-      return updateModel(command.model);
-    case 'delete-model':
-      return deleteModel(command.modelId);
-    case 'move-model':
-      return moveModel(command.modelId, command.beforeModelId);
     case 'save-default-model':
       return saveDefaultModel(command.defaultModelId);
     case 'save-voice-input-correction-prompt':
@@ -252,6 +306,10 @@ export function mutateStoredAISettings(command: AISettingsMutationCommand): Prom
     const lease = await transition;
     try {
       await initializeAiStorageAccess();
+      if (isModelGraphCommand(command)) {
+        await mutateModelGraph(command);
+        return;
+      }
       await assertAISettingsGraphInvariants();
       await applyAISettingsMutation(command);
       await assertAISettingsGraphInvariants();

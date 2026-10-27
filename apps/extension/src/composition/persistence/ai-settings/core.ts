@@ -1,4 +1,8 @@
 import type { AIModel, AIProvider } from '../../../contracts/settings';
+import {
+  isActivePersistenceMutationPermit,
+  type PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -56,8 +60,16 @@ export {
 
 const logger = createLogger({ namespace: 'SharedAiStorage' });
 
-function saveLocalValue<T>(key: string, value: T, logMessage: string): Promise<void> {
-  return browserStorage.local.set({ [key]: value }).then(() => {
+function saveLocalValue<T>(
+  key: string,
+  value: T,
+  logMessage: string,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
+  const publication = isActivePersistenceMutationPermit(permit)
+    ? browserStorage.local.set({ [key]: value }, permit)
+    : browserStorage.local.set({ [key]: value });
+  return publication.then(() => {
     logger.info(logMessage);
   });
 }
@@ -159,20 +171,25 @@ export async function loadAIModels(): Promise<AIModel[]> {
   return parsedModels.value;
 }
 
-export async function saveAIModels(models: AIModel[]): Promise<void> {
-  await initializeAiStorageAccess();
-  return saveLocalValue(AI_MODELS_KEY, models, `AI models saved: ${models.length}`);
+/** Publishes model records with an active caller permit or admits an independent write. */
+export async function saveAIModels(
+  models: AIModel[],
+  permit?: PersistenceMutationPermit
+): Promise<void> {
+  if (!isActivePersistenceMutationPermit(permit)) await initializeAiStorageAccess();
+  return saveLocalValue(AI_MODELS_KEY, models, `AI models saved: ${models.length}`, permit);
 }
 
+/** Publishes models and their default reference together under an active caller permit or independent write. */
 export async function saveAIModelGraph(
   models: AIModel[],
-  defaultModelId: string | null
+  defaultModelId: string | null,
+  permit?: PersistenceMutationPermit
 ): Promise<void> {
-  await initializeAiStorageAccess();
-  await browserStorage.local.set({
-    [AI_DEFAULT_MODEL_KEY]: defaultModelId,
-    [AI_MODELS_KEY]: models,
-  });
+  if (!isActivePersistenceMutationPermit(permit)) await initializeAiStorageAccess();
+  const values = { [AI_DEFAULT_MODEL_KEY]: defaultModelId, [AI_MODELS_KEY]: models };
+  if (isActivePersistenceMutationPermit(permit)) await browserStorage.local.set(values, permit);
+  else await browserStorage.local.set(values);
 }
 
 export async function loadDefaultModelId(): Promise<string | null> {

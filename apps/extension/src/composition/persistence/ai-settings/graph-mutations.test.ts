@@ -1,6 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import type { AIModel, AIProvider } from '../../../contracts/settings';
+vi.mock('../infrastructure/browser-storage', () => ({
+  browserStorage: { local: { get: vi.fn(async () => ({ sniptale_ai_storage_version: 4 })) } },
+}));
 
 const coreMocks = vi.hoisted(() => ({
   changeAISecretPassphraseProtection: vi.fn(),
@@ -199,7 +202,11 @@ it('updates models and default model in one graph write when deleting the defaul
 
   await mutateStoredAISettings({ modelId: 'model-1', operation: 'delete-model' });
 
-  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith([createModel('model-2')], null);
+  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith(
+    [createModel('model-2')],
+    null,
+    expect.anything()
+  );
   expect(models).toEqual([createModel('model-2')]);
   expect(defaultModelId).toBeNull();
 });
@@ -212,7 +219,11 @@ it('preserves an unrelated default and accepts valid default changes', async () 
   await mutateStoredAISettings({ defaultModelId: 'model-2', operation: 'save-default-model' });
   await mutateStoredAISettings({ defaultModelId: null, operation: 'save-default-model' });
 
-  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith([createModel('model-2')], 'model-2');
+  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith(
+    [createModel('model-2')],
+    'model-2',
+    expect.anything()
+  );
   expect(defaultModelId).toBeNull();
 });
 
@@ -293,7 +304,7 @@ it('atomically removes the text default and prompt when changing its operation t
     audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
   };
   await mutateStoredAISettings({ operation: 'update-model', model: speech });
-  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith([speech], null);
+  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith([speech], null, expect.anything());
   expect(defaultModelId).toBeNull();
   await expect(
     mutateStoredAISettings({ operation: 'save-default-model', defaultModelId: 'model-1' })
