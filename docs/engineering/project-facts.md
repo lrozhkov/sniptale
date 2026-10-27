@@ -119,6 +119,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/contracts/quick-action-appearance.ts`
 - `apps/extension/src/contracts/settings`
 - `apps/extension/src/contracts/settings-transfer`
+- `apps/extension/src/contracts/sync-workspace.test.ts`
+- `apps/extension/src/contracts/sync-workspace.ts`
 - `apps/extension/src/contracts/video`
 - `apps/extension/src/features/ai`
 - `apps/extension/src/features/autosave`

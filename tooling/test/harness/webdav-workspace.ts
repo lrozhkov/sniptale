@@ -5,14 +5,26 @@ import {
 } from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-allocation';
 import { withSyncConnectionAdmissionLock } from '../../../apps/extension/src/composition/persistence/remote-connection/coordination';
 import { sameSyncConnectionIdentity } from '../../../apps/extension/src/composition/persistence/remote-connection/model';
-import { allocateWebdavWorkspaceRoot } from '../../../apps/extension/src/workflows/sync-transfer/webdav';
+import {
+  allocateWebdavWorkspaceRoot,
+  createWebdavWorkspaceWriter,
+  createWebdavRemoteStore,
+} from '../../../apps/extension/src/workflows/sync-transfer/webdav';
+import { finishWebdavWorkspaceCreation } from '../../../apps/extension/src/workflows/sync-transfer/webdav-workspace';
+import {
+  prepareSyncWorkspaceJoin,
+  SyncWorkspaceError,
+} from '../../../apps/extension/src/workflows/sync-transfer/workspace';
+import type { SyncWorkspaceAllocation } from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-allocation';
 import { SyncRemoteError } from '../../../apps/extension/src/workflows/sync-transfer/remote-store';
 
 type Credentials = { rootUrl: string; username: string; password: string };
 function failure(error: unknown) {
   return error instanceof SyncRemoteError
     ? { code: error.code, status: error.status }
-    : { code: 'refused', status: null };
+    : error instanceof SyncWorkspaceError
+      ? { code: error.code, status: null }
+      : { code: 'refused', status: null };
 }
 function options(credentials: Credentials) {
   return {
@@ -31,6 +43,30 @@ function options(credentials: Credentials) {
         throw new SyncRemoteError('access-denied');
       return issue(signal);
     },
+  };
+}
+
+/** Bind each HTTP dispatch to the exact current local creation revision. */
+function writerOptions(credentials: Credentials, plan: SyncWorkspaceAllocation) {
+  if (plan.parentUrl !== credentials.rootUrl || plan.accountId !== credentials.username)
+    throw new SyncRemoteError('invalid-configuration');
+  const base = options({ ...credentials, rootUrl: plan.rootUrl });
+  return {
+    ...base,
+    request: (signal: AbortSignal, issue: (signal: AbortSignal) => Promise<Response>) =>
+      base.request(signal, (admittedSignal) =>
+        withSyncConnectionAdmissionLock(async () => {
+          const current = await loadSyncWorkspaceAllocation();
+          if (
+            !current ||
+            current.phase !== plan.phase ||
+            !sameSyncConnectionIdentity(current.identity, plan.identity)
+          )
+            throw new SyncRemoteError('invalid-configuration');
+          admittedSignal.throwIfAborted();
+          return { response: issue(admittedSignal) };
+        }).then((admitted) => admitted.response)
+      ),
   };
 }
 
@@ -82,6 +118,38 @@ export function createWebdavWorkspaceHarness() {
         return { code: 'success', status: null, allocation: allocated };
       } catch (error) {
         return { ...failure(error), allocation: await loadSyncWorkspaceAllocation() };
+      }
+    },
+    async finish(credentials: Credentials, identity: unknown) {
+      try {
+        const result = await finishWebdavWorkspaceCreation(
+          (plan, signal) => createWebdavWorkspaceWriter(writerOptions(credentials, plan), signal),
+          identity,
+          new AbortController().signal
+        );
+        return { code: 'success', status: null, ...result };
+      } catch (error) {
+        return { ...failure(error), allocation: await loadSyncWorkspaceAllocation() };
+      }
+    },
+    async join(credentials: Credentials, expected: unknown = null) {
+      try {
+        const signal = new AbortController().signal;
+        const remote = await createWebdavRemoteStore(options(credentials), signal);
+        const result = await prepareSyncWorkspaceJoin(remote, signal, expected);
+        return { code: 'success', status: null, ...result };
+      } catch (error) {
+        return failure(error);
+      }
+    },
+    async directPublish(credentials: Credentials, marker: unknown) {
+      try {
+        const signal = new AbortController().signal;
+        const writer = await createWebdavWorkspaceWriter(options(credentials), signal);
+        await writer.publishMarker(marker, signal);
+        return { code: 'success', status: null };
+      } catch (error) {
+        return failure(error);
       }
     },
     async directAllocate(credentials: Credentials) {

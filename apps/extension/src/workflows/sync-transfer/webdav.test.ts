@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { allocateWebdavWorkspaceRoot, createWebdavRemoteStore } from './webdav';
+import {
+  allocateWebdavWorkspaceRoot,
+  createWebdavRemoteStore,
+  createWebdavWorkspaceWriter,
+} from './webdav';
 import { SyncRemoteError } from './remote-store';
 
 const signal = () => new AbortController().signal;
@@ -678,3 +682,88 @@ it('retains a temporary lock failure without retry or ownership', async () => {
   await expect(allocate()).rejects.toMatchObject({ code: 'temporary', status: 423 });
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
+
+const markerText = JSON.stringify({
+  format: 'sniptale-sync-workspace',
+  version: 1,
+  protocol: 'immutable-records-v1',
+  protection: 'plaintext',
+  spaceId: '20000000-0000-4000-8000-000000000002',
+  bootstrapId: '10000000-0000-4000-8000-000000000001',
+});
+async function workspaceWriter() {
+  return createWebdavWorkspaceWriter(
+    {
+      rootUrl: allocationRoot,
+      authentication: auth,
+      request: (requestSignal, issue) => issue(requestSignal),
+    },
+    signal()
+  );
+}
+
+it('publishes only the fixed workspace marker through conditional library PUT', async () => {
+  const writer = await workspaceWriter();
+  fetchMock.mockClear();
+  fetchMock.mockResolvedValueOnce(new Response(null, { status: 201 }));
+  await writer.publishMarker(markerText, signal());
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  const [url, init] = fetchMock.mock.calls[0]!;
+  expect(url).toBe(`${allocationRoot}.sniptale/workspace.json`);
+  expect(init?.method).toBe('PUT');
+  expect(new Headers(init?.headers).get('if-none-match')).toBe('*');
+  expect(init?.body).toBeInstanceOf(Blob);
+  expect(await new Response(init?.body).text()).toBe(markerText);
+  expect(init?.credentials).toBe('omit');
+  expect(init?.redirect).toBe('error');
+});
+
+it('refuses conditional marker collision without unconditional fallback or cleanup', async () => {
+  const writer = await workspaceWriter();
+  fetchMock.mockClear();
+  fetchMock.mockResolvedValueOnce(new Response(null, { status: 412 }));
+  await expect(writer.publishMarker(markerText, signal())).rejects.toMatchObject({
+    code: 'collision',
+    status: 412,
+  });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it.each([200, 204])(
+  'does not accept marker update status %s as create acknowledgement',
+  async (status) => {
+    const writer = await workspaceWriter();
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(new Response(null, { status }));
+    await expect(writer.publishMarker(markerText, signal())).rejects.toMatchObject({
+      code: 'invalid-response',
+    });
+  }
+);
+
+it('creates only the planned metadata directory and never treats MKCOL 405 as success', async () => {
+  const writer = await workspaceWriter();
+  fetchMock.mockClear();
+  fetchMock.mockResolvedValueOnce(new Response(null, { status: 201 }));
+  await writer.createMetadataDirectory(signal());
+  expect(fetchMock.mock.calls[0]?.[0]).toBe(`${allocationRoot}.sniptale/`);
+  expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('MKCOL');
+  fetchMock.mockResolvedValueOnce(new Response(null, { status: 405 }));
+  await expect(writer.createMetadataDirectory(signal())).rejects.toMatchObject({
+    code: 'collision',
+    status: 405,
+  });
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+it.each(['{}', markerText.replace('10000000-', '30000000-'), `${markerText}\n`])(
+  'refuses invalid or mismatched marker before dispatch %#',
+  async (text) => {
+    const writer = await workspaceWriter();
+    fetchMock.mockClear();
+    await expect(writer.publishMarker(text, signal())).rejects.toMatchObject({
+      code: 'invalid-configuration',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  }
+);

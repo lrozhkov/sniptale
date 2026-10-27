@@ -6,9 +6,15 @@ import {
   commandSyncWorkspaceAllocation,
   createSyncWorkspaceAllocation,
   loadSyncWorkspaceAllocation,
+  prepareSyncWorkspaceMarker,
+  completeSyncWorkspaceMarker,
 } from './workspace-allocation';
 import { withSyncConnectionAdmissionLock } from './coordination';
 import { connectionUuid } from './model';
+import {
+  encodeSyncWorkspaceMarker,
+  parseSyncWorkspaceMarker,
+} from '../../../contracts/sync-workspace';
 import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
 
 const io = vi.hoisted(() => ({ database: vi.fn(), capture: vi.fn() }));
@@ -147,7 +153,8 @@ it('creates a native singleton plan without credentials or capture enrollment', 
   const planned = await createSyncWorkspaceAllocation(input);
   expect(planned).toMatchObject({
     ...input,
-    version: 1,
+    version: 2,
+    marker: null,
     kind: 'sync-workspace-allocation',
     key: 'workspace-allocation',
     provider: 'webdav',
@@ -313,7 +320,7 @@ it('refuses unknown persisted rows with readonly loads and no repair', async () 
   const planned = await createSyncWorkspaceAllocation(input);
   const corruptions = [
     { ...planned, extra: true },
-    { ...planned, version: 2 },
+    { ...planned, version: 3 },
     { ...planned, rootUrl: `${input.parentUrl}other/` },
     { ...planned, spaceId: 'caller' },
     { ...planned, identity: { ...planned.identity, extra: true } },
@@ -430,4 +437,257 @@ it('waits for ordinary database preparation without refusing a valid opening', a
   expect((await opening).phase).toBe('planned');
   expect(f.table().size).toBe(1);
   expect(io.database).not.toHaveBeenCalled();
+});
+
+async function allocatedWorkspace() {
+  const planned = await createSyncWorkspaceAllocation(input);
+  const allocating = await commandSyncWorkspaceAllocation(planned.identity, 'allocate');
+  return commandSyncWorkspaceAllocation(allocating.identity, 'confirm');
+}
+
+it('loads legacy v1 without writes and upgrades only on an explicit transition', async () => {
+  const f = setup();
+  const allocated = await allocatedWorkspace();
+  const { marker: _marker, ...fields } = allocated;
+  const legacy = { ...fields, version: 1 };
+  f.table().set('workspace-allocation', legacy);
+  f.modes.length = 0;
+  expect(await loadSyncWorkspaceAllocation()).toEqual(allocated);
+  expect(f.modes).toEqual(['readonly']);
+  expect(f.table().get('workspace-allocation')).toEqual(legacy);
+  const prepared = await prepareSyncWorkspaceMarker(allocated.identity);
+  expect(prepared).toMatchObject({
+    version: 2,
+    phase: 'preparing-marker',
+    spaceId: allocated.spaceId,
+    bootstrapId: allocated.bootstrapId,
+  });
+  expect(prepared.identity.incarnation).toBe(allocated.identity.incarnation);
+  expect(f.table().get('workspace-allocation')).toEqual(prepared);
+});
+
+it('serializes parallel marker preparation and freezes exactly one canonical payload', async () => {
+  setup();
+  const allocated = await allocatedWorkspace();
+  const results = await Promise.allSettled([
+    prepareSyncWorkspaceMarker(allocated.identity),
+    prepareSyncWorkspaceMarker(allocated.identity),
+  ]);
+  expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected']);
+  const prepared = await loadSyncWorkspaceAllocation();
+  expect(prepared?.marker).toEqual({
+    text: encodeSyncWorkspaceMarker(allocated.spaceId, allocated.bootstrapId).text,
+    fingerprint: encodeSyncWorkspaceMarker(allocated.spaceId, allocated.bootstrapId).identity
+      .fingerprint,
+  });
+  expect(prepared?.identity.revision).toBe(allocated.identity.revision + 1);
+});
+
+it('retries publication with a fresh revision and identical frozen bytes before exact completion', async () => {
+  setup();
+  const allocated = await allocatedWorkspace();
+  const prepared = await prepareSyncWorkspaceMarker(allocated.identity);
+  const evidence = parseSyncWorkspaceMarker(prepared.marker?.text);
+  await expect(completeSyncWorkspaceMarker(prepared.identity, evidence)).rejects.toThrow('refused');
+  const publishing = await commandSyncWorkspaceAllocation(prepared.identity, 'publish-marker');
+  const retry = await commandSyncWorkspaceAllocation(publishing.identity, 'publish-marker');
+  expect(retry.marker).toEqual(prepared.marker);
+  expect(retry.identity.revision).toBe(publishing.identity.revision + 1);
+  await expect(
+    commandSyncWorkspaceAllocation(publishing.identity, 'publish-marker')
+  ).rejects.toThrow('refused');
+  await expect(completeSyncWorkspaceMarker(publishing.identity, evidence)).rejects.toThrow(
+    'refused'
+  );
+  for (const invalid of [
+    null,
+    { ...evidence, extra: true },
+    { ...evidence, fingerprint: '0'.repeat(64) },
+    { ...evidence, spaceId: crypto.randomUUID() },
+    { ...evidence, bootstrapId: crypto.randomUUID() },
+  ]) {
+    await expect(completeSyncWorkspaceMarker(retry.identity, invalid)).rejects.toThrow('refused');
+  }
+  const ready = await completeSyncWorkspaceMarker(retry.identity, evidence);
+  expect(ready).toEqual({
+    ...retry,
+    phase: 'ready',
+    identity: { ...retry.identity, revision: retry.identity.revision + 1 },
+  });
+  await expect(completeSyncWorkspaceMarker(ready.identity, evidence)).rejects.toThrow('refused');
+  await expect(prepareSyncWorkspaceMarker(ready.identity)).rejects.toThrow('refused');
+});
+
+it.each(['prepare', 'complete'] as const)(
+  'refuses queued %s after native erasure and recreation',
+  async (operation) => {
+    const f = setup();
+    const allocated = await allocatedWorkspace();
+    const current =
+      operation === 'prepare'
+        ? allocated
+        : await commandSyncWorkspaceAllocation(
+            (await prepareSyncWorkspaceMarker(allocated.identity)).identity,
+            'publish-marker'
+          );
+    const entered = deferred();
+    const release = deferred();
+    const held = withSyncConnectionAdmissionLock(async () => {
+      entered.resolve();
+      await release.promise;
+    });
+    await entered.promise;
+    const pending =
+      operation === 'prepare'
+        ? prepareSyncWorkspaceMarker(current.identity)
+        : completeSyncWorkspaceMarker(
+            current.identity,
+            parseSyncWorkspaceMarker(current.marker?.text)
+          );
+    const observed = pending.then(
+      () => 'written',
+      () => 'refused'
+    );
+    await runWithPersistentDataErasureBarrier(() => f.erase());
+    release.resolve();
+    await held;
+    expect(await observed).toBe('refused');
+    expect(f.table().size).toBe(0);
+    const replacement = await createSyncWorkspaceAllocation(input);
+    expect(replacement.identity.incarnation).not.toBe(current.identity.incarnation);
+    expect(io.database).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['prepare', 'complete'] as const)(
+  'refuses delayed %s after abandonment and replacement',
+  async (operation) => {
+    const f = setup();
+    const allocated = await allocatedWorkspace();
+    const current =
+      operation === 'prepare'
+        ? allocated
+        : await commandSyncWorkspaceAllocation(
+            (await prepareSyncWorkspaceMarker(allocated.identity)).identity,
+            'publish-marker'
+          );
+    const release = deferred();
+    const pending = (async () => {
+      await release.promise;
+      return operation === 'prepare'
+        ? prepareSyncWorkspaceMarker(current.identity)
+        : completeSyncWorkspaceMarker(
+            current.identity,
+            parseSyncWorkspaceMarker(current.marker?.text)
+          );
+    })();
+    const abandoned = await commandSyncWorkspaceAllocation(current.identity, 'abandon');
+    await createSyncWorkspaceAllocation(input, abandoned.identity);
+    const before = structuredClone(f.rows);
+    release.resolve();
+    await expect(pending).rejects.toThrow('refused');
+    expect(f.rows).toEqual(before);
+  }
+);
+
+it('aborts marker writes on backend failure and permits explicit unchanged-state retry', async () => {
+  const f = setup();
+  const allocated = await allocatedWorkspace();
+  const before = structuredClone(f.rows);
+  f.failCommit();
+  await expect(prepareSyncWorkspaceMarker(allocated.identity)).rejects.toThrow(
+    'Late backend failure'
+  );
+  expect(f.rows).toEqual(before);
+  const prepared = await prepareSyncWorkspaceMarker(allocated.identity);
+  f.failCommit();
+  await expect(commandSyncWorkspaceAllocation(prepared.identity, 'publish-marker')).rejects.toThrow(
+    'Late backend failure'
+  );
+  expect(await loadSyncWorkspaceAllocation()).toEqual(prepared);
+  const publishing = await commandSyncWorkspaceAllocation(prepared.identity, 'publish-marker');
+  const evidence = parseSyncWorkspaceMarker(publishing.marker?.text);
+  f.failCommit();
+  await expect(completeSyncWorkspaceMarker(publishing.identity, evidence)).rejects.toThrow(
+    'Late backend failure'
+  );
+  expect(await loadSyncWorkspaceAllocation()).toEqual(publishing);
+  expect((await completeSyncWorkspaceMarker(publishing.identity, evidence)).phase).toBe('ready');
+  expect(f.aborted()).toBe(3);
+  expect(f.drained()).toBe(3);
+});
+
+it.each(['planned', 'allocating', 'allocated', 'abandoned'] as const)(
+  'preserves legacy %s phase and identities in readonly projection',
+  async (phase) => {
+    const f = setup();
+    const planned = await createSyncWorkspaceAllocation(input);
+    const { marker: _marker, ...fields } = planned;
+    const legacy = { ...fields, version: 1, phase };
+    f.table().set('workspace-allocation', legacy);
+    f.modes.length = 0;
+    expect(await loadSyncWorkspaceAllocation()).toEqual({ ...legacy, version: 2, marker: null });
+    expect(f.table().get('workspace-allocation')).toEqual(legacy);
+    expect(f.modes).toEqual(['readonly']);
+  }
+);
+
+it('refuses corrupted frozen evidence without repair and preserves all rows', async () => {
+  const f = setup();
+  const prepared = await prepareSyncWorkspaceMarker((await allocatedWorkspace()).identity);
+  const marker = prepared.marker;
+  if (!marker) throw new Error('Missing fixture marker');
+  for (const invalid of [
+    { ...prepared, marker: null },
+    { ...prepared, marker: { ...marker, fingerprint: '0'.repeat(64) } },
+    { ...prepared, marker: { ...marker, text: marker.text + '\n' } },
+    { ...prepared, marker: { ...marker, extra: true } },
+    {
+      ...prepared,
+      marker: {
+        text: encodeSyncWorkspaceMarker(crypto.randomUUID(), prepared.bootstrapId).text,
+        fingerprint: marker.fingerprint,
+      },
+    },
+    { ...prepared, phase: 'allocated' },
+  ]) {
+    f.table().set('workspace-allocation', invalid);
+    const before = structuredClone(f.rows);
+    await expect(loadSyncWorkspaceAllocation()).rejects.toThrow('refused');
+    await expect(
+      commandSyncWorkspaceAllocation(prepared.identity, 'publish-marker')
+    ).rejects.toThrow('refused');
+    expect(f.rows).toEqual(before);
+  }
+});
+
+it('checks installed profile and connection before marker mutation in the same transaction', async () => {
+  const f = setup();
+  const allocated = await allocatedWorkspace();
+  for (const store of ['sync_capture', 'sync_connection']) {
+    const key = store === 'sync_capture' ? 'profile' : 'connection';
+    f.table(store).set(key, { installed: true });
+    const before = structuredClone(f.rows);
+    await expect(prepareSyncWorkspaceMarker(allocated.identity)).rejects.toThrow('refused');
+    expect(f.rows).toEqual(before);
+    f.table(store).delete(key);
+  }
+  const prepared = await prepareSyncWorkspaceMarker(allocated.identity);
+  const publishing = await commandSyncWorkspaceAllocation(prepared.identity, 'publish-marker');
+  for (const store of ['sync_capture', 'sync_connection']) {
+    const key = store === 'sync_capture' ? 'profile' : 'connection';
+    f.table(store).set(key, { installed: true });
+    const before = structuredClone(f.rows);
+    await expect(
+      commandSyncWorkspaceAllocation(publishing.identity, 'publish-marker')
+    ).rejects.toThrow('refused');
+    await expect(
+      completeSyncWorkspaceMarker(
+        publishing.identity,
+        parseSyncWorkspaceMarker(publishing.marker?.text)
+      )
+    ).rejects.toThrow('refused');
+    expect(f.rows).toEqual(before);
+    f.table(store).delete(key);
+  }
 });

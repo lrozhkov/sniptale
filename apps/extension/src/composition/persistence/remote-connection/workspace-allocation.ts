@@ -1,4 +1,9 @@
 import type { IDBPTransaction } from 'idb';
+import {
+  encodeSyncWorkspaceMarker,
+  parseSyncWorkspaceIdentity,
+  parseSyncWorkspaceMarker,
+} from '../../../contracts/sync-workspace';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { capturePreparedDatabase, initDB } from '../infrastructure/indexed-db/core';
 import {
@@ -16,8 +21,7 @@ import {
 } from './model';
 
 /** Durable allocation evidence only; an allocated root does not install a capture profile. */
-interface SyncWorkspaceAllocation {
-  version: 1;
+interface AllocationFields {
   kind: 'sync-workspace-allocation';
   key: 'workspace-allocation';
   provider: 'webdav';
@@ -28,7 +32,13 @@ interface SyncWorkspaceAllocation {
   bootstrapId: string;
   createdAt: number;
   identity: SyncConnectionIdentity;
-  phase: 'planned' | 'allocating' | 'allocated' | 'abandoned';
+}
+type InitialPhase = 'planned' | 'allocating' | 'allocated' | 'abandoned';
+/** Native journal evidence; marker bytes become immutable before remote publication. */
+export interface SyncWorkspaceAllocation extends AllocationFields {
+  version: 2;
+  phase: InitialPhase | 'preparing-marker' | 'publishing-marker' | 'ready';
+  marker: { text: string; fingerprint: string } | null;
 }
 type AllocationTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
 function refused(): never {
@@ -65,8 +75,9 @@ function parseAllocation(value: unknown): SyncWorkspaceAllocation | null {
       'createdAt',
       'identity',
       'phase',
+      ...(value['version'] === 2 ? ['marker'] : []),
     ]) ||
-    value['version'] !== 1 ||
+    (value['version'] !== 1 && value['version'] !== 2) ||
     value['kind'] !== 'sync-workspace-allocation' ||
     value['key'] !== 'workspace-allocation' ||
     value['provider'] !== 'webdav' ||
@@ -90,11 +101,14 @@ function parseAllocation(value: unknown): SyncWorkspaceAllocation | null {
     (phase !== 'planned' &&
       phase !== 'allocating' &&
       phase !== 'allocated' &&
-      phase !== 'abandoned')
+      phase !== 'abandoned' &&
+      !(
+        value['version'] === 2 &&
+        (phase === 'preparing-marker' || phase === 'publishing-marker' || phase === 'ready')
+      ))
   )
     return null;
-  return {
-    version: 1,
+  const fields: AllocationFields = {
     kind: 'sync-workspace-allocation',
     key: 'workspace-allocation',
     provider: 'webdav',
@@ -105,8 +119,55 @@ function parseAllocation(value: unknown): SyncWorkspaceAllocation | null {
     bootstrapId: value['bootstrapId'],
     createdAt: value['createdAt'],
     identity,
-    phase,
   };
+  if (value['version'] === 1) {
+    if (
+      phase !== 'planned' &&
+      phase !== 'allocating' &&
+      phase !== 'allocated' &&
+      phase !== 'abandoned'
+    )
+      return null;
+    return { ...fields, version: 2, phase, marker: null };
+  }
+  const marker = value['marker'];
+  if (marker === null) {
+    if (
+      phase !== 'planned' &&
+      phase !== 'allocating' &&
+      phase !== 'allocated' &&
+      phase !== 'abandoned'
+    )
+      return null;
+    return { ...fields, version: 2, phase, marker: null };
+  }
+  if (
+    !isRecord(marker) ||
+    !exact(marker, ['text', 'fingerprint']) ||
+    typeof marker['text'] !== 'string'
+  )
+    return null;
+  try {
+    const parsed = parseSyncWorkspaceMarker(marker['text']);
+    if (
+      parsed.spaceId !== fields.spaceId ||
+      parsed.bootstrapId !== fields.bootstrapId ||
+      parsed.fingerprint !== marker['fingerprint'] ||
+      (phase !== 'preparing-marker' &&
+        phase !== 'publishing-marker' &&
+        phase !== 'ready' &&
+        phase !== 'abandoned')
+    )
+      return null;
+    return {
+      ...fields,
+      version: 2,
+      phase,
+      marker: { text: marker['text'], fingerprint: parsed.fingerprint },
+    };
+  } catch {
+    return null;
+  }
 }
 async function readAllocation(tx: AllocationTransaction): Promise<SyncWorkspaceAllocation | null> {
   const raw: unknown = await tx.objectStore(SYNC_CONNECTION_STORE).get('workspace-allocation');
@@ -176,7 +237,8 @@ export async function createSyncWorkspaceAllocation(
       return refused();
     const bootstrapId = crypto.randomUUID();
     const allocation = parseAllocation({
-      version: 1,
+      version: 2,
+      marker: null,
       kind: 'sync-workspace-allocation',
       key: 'workspace-allocation',
       provider: 'webdav',
@@ -216,7 +278,10 @@ export async function commandSyncWorkspaceAllocation(
   const identity = parseSyncConnectionIdentity(structuredClone(identityInput));
   if (
     !identity ||
-    (actionInput !== 'allocate' && actionInput !== 'confirm' && actionInput !== 'abandon')
+    (actionInput !== 'allocate' &&
+      actionInput !== 'confirm' &&
+      actionInput !== 'abandon' &&
+      actionInput !== 'publish-marker')
   )
     return refused();
   return mutate(async (tx) => {
@@ -227,18 +292,89 @@ export async function commandSyncWorkspaceAllocation(
       !Number.isSafeInteger(identity.revision + 1) ||
       current.phase === 'abandoned' ||
       (actionInput === 'allocate' && current.phase !== 'planned') ||
-      (actionInput === 'confirm' && current.phase !== 'allocating')
+      (actionInput === 'confirm' && current.phase !== 'allocating') ||
+      (actionInput === 'publish-marker' &&
+        current.phase !== 'preparing-marker' &&
+        current.phase !== 'publishing-marker')
     )
       return refused();
-    const allocation: SyncWorkspaceAllocation = {
+    const allocation = parseAllocation({
       ...current,
+      version: 2,
+      marker: current.marker ?? null,
       identity: { incarnation: identity.incarnation, revision: identity.revision + 1 },
       phase:
         actionInput === 'allocate'
           ? 'allocating'
           : actionInput === 'confirm'
             ? 'allocated'
-            : 'abandoned',
+            : actionInput === 'publish-marker'
+              ? 'publishing-marker'
+              : 'abandoned',
+    });
+    if (!allocation) return refused();
+    await tx.objectStore(SYNC_CONNECTION_STORE).put(allocation);
+    return allocation;
+  });
+}
+
+/** Freeze canonical marker bytes once, after positive root allocation evidence. */
+export async function prepareSyncWorkspaceMarker(
+  expectedInput: unknown
+): Promise<SyncWorkspaceAllocation> {
+  const identity = parseSyncConnectionIdentity(structuredClone(expectedInput));
+  if (!identity || !Number.isSafeInteger(identity.revision + 1)) return refused();
+  return mutate(async (tx) => {
+    const current = await readAllocation(tx);
+    if (
+      !current ||
+      current.phase !== 'allocated' ||
+      !sameSyncConnectionIdentity(current.identity, identity)
+    )
+      return refused();
+    const encoded = encodeSyncWorkspaceMarker(current.spaceId, current.bootstrapId);
+    const allocation: SyncWorkspaceAllocation = {
+      ...current,
+      version: 2,
+      identity: { incarnation: identity.incarnation, revision: identity.revision + 1 },
+      phase: 'preparing-marker',
+      marker: { text: encoded.text, fingerprint: encoded.identity.fingerprint },
+    };
+    await tx.objectStore(SYNC_CONNECTION_STORE).put(allocation);
+    return allocation;
+  });
+}
+
+/** Record checked publication evidence for this exact frozen marker and command revision. */
+export async function completeSyncWorkspaceMarker(
+  expectedInput: unknown,
+  evidenceInput: unknown
+): Promise<SyncWorkspaceAllocation> {
+  const identity = parseSyncConnectionIdentity(structuredClone(expectedInput));
+  let evidence;
+  try {
+    evidence = parseSyncWorkspaceIdentity(structuredClone(evidenceInput));
+  } catch {
+    return refused();
+  }
+  if (!identity || !evidence || !Number.isSafeInteger(identity.revision + 1)) return refused();
+  return mutate(async (tx) => {
+    const current = await readAllocation(tx);
+    if (
+      !current ||
+      current.version !== 2 ||
+      current.phase !== 'publishing-marker' ||
+      !current.marker ||
+      !sameSyncConnectionIdentity(current.identity, identity) ||
+      evidence.spaceId !== current.spaceId ||
+      evidence.bootstrapId !== current.bootstrapId ||
+      evidence.fingerprint !== current.marker.fingerprint
+    )
+      return refused();
+    const allocation: SyncWorkspaceAllocation = {
+      ...current,
+      identity: { incarnation: identity.incarnation, revision: identity.revision + 1 },
+      phase: 'ready',
     };
     await tx.objectStore(SYNC_CONNECTION_STORE).put(allocation);
     return allocation;

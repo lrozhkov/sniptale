@@ -318,4 +318,13 @@ The native remote-connection owner retains one allocation plan under workspace-a
 
 Each journal command checks its exact incarnation and revision. Opening commands capture the prepared database handle synchronously before waiting for connection admission. The canonical mutation permit orders their transactions. Erasure closes the retained handle, so a delayed opening cannot recreate selected account metadata. The handle capture never initializes storage. It also refuses an installed capture profile or connection. Explicit abandonment permits a new plan without remote cleanup. Uncertain allocation never authorizes adoption or deletion of an existing folder. Provider errors contain fixed codes and numeric statuses only.
 
-The exclusive root operation uses the existing WebDAV authentication and guarded request adapter. It omits cookies and refuses redirects. Its caller must preserve the plan before dispatch and control request cancellation and drain. The explicit test harness supplies this caller. Production creation, marker publication and enrollment remain disabled pending their lifecycle checks.
+The exclusive root operation uses the existing WebDAV authentication and guarded request adapter. It omits cookies and refuses redirects. Its caller must preserve the plan before dispatch and control request cancellation and drain. The explicit test harness supplies this caller. Production creation and enrollment remain disabled pending their lifecycle checks.
+
+
+## Workspace marker creation boundary
+
+The remote marker contains public protocol fields and random workspace identifiers. It contains no credentials, local account names or media. Original files and saved exports remain readable through an independent WebDAV client. Marker publication adds no mandatory remote encryption.
+
+The native journal freezes marker bytes before any metadata write. Conditional creation cannot fall back to an overwrite. Unknown metadata and mismatched markers refuse creation without deletion or cleanup. A missing marker in ready state cannot authorize reinitialization. Journal completion requires the exact current native revision and checked remote identity.
+
+The provider preserves the existing HTTPS, origin, path, cookie and redirect restrictions. The explicit test caller rechecks current permission and journal identity before each HTTP dispatch. A checked marker grants no credentials or execution authority. Production request cancellation, credential lifetime, enrollment and privacy containment remain separate release gates.

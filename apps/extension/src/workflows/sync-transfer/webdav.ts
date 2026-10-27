@@ -1,6 +1,10 @@
 import { createObject, getBasicAuthHeaders, makeCollection, propfind } from 'tsdav';
 
 import { SyncRemoteError } from './remote-store';
+import {
+  parseSyncWorkspaceMarker,
+  SYNC_WORKSPACE_MARKER_KEY,
+} from '../../contracts/sync-workspace';
 import type { SyncRemotePage, SyncRemoteStore } from './remote-store';
 
 /** Credentials are supplied by an authorized lifecycle owner and remain in this client only. */
@@ -502,6 +506,77 @@ export async function allocateWebdavWorkspaceRoot(
     signal.throwIfAborted();
   } catch (error) {
     if (statusOf(error) === 405 && !signal.aborted) throw new SyncRemoteError('collision', 405);
+    throw failure(error, signal);
+  }
+}
+
+/** Prepare only the allocated workspace root. Callers bind each request to its native revision. */
+export async function createWebdavWorkspaceWriter(
+  options: WebdavRemoteStoreOptions,
+  signal: AbortSignal
+) {
+  try {
+    const root = rootURL(options.rootUrl);
+    const bootstrapId = root.pathname
+      .split('/')
+      .at(-2)
+      ?.replace(/^Sniptale-/u, '');
+    if (
+      !bootstrapId ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(bootstrapId)
+    )
+      throw new SyncRemoteError('invalid-configuration');
+    if (!root.pathname.endsWith(`/Sniptale-${bootstrapId}/`))
+      throw new SyncRemoteError('invalid-configuration');
+    const remote = await createWebdavRemoteStore(options, signal);
+    const guardedFetch = clientFetch(root, options);
+    const creationFetch: typeof fetch = async (input, init) => {
+      const response = await guardedFetch(input, init);
+      if (response.status !== 201) throw new SyncRemoteError('invalid-response');
+      return response;
+    };
+    return {
+      remote,
+      async createMetadataDirectory(requestSignal: AbortSignal) {
+        try {
+          requestSignal.throwIfAborted();
+          await makeCollection({
+            url: new URL('.sniptale/', root).href,
+            fetchOptions: { signal: requestSignal },
+            fetch: creationFetch,
+          });
+          requestSignal.throwIfAborted();
+        } catch (error) {
+          if (statusOf(error) === 405 && !requestSignal.aborted)
+            throw new SyncRemoteError('collision', 405);
+          throw failure(error, requestSignal);
+        }
+      },
+      async publishMarker(textInput: unknown, requestSignal: AbortSignal) {
+        try {
+          requestSignal.throwIfAborted();
+          let marker;
+          try {
+            marker = parseSyncWorkspaceMarker(textInput);
+          } catch {
+            throw new SyncRemoteError('invalid-configuration');
+          }
+          if (typeof textInput !== 'string' || marker.bootstrapId !== bootstrapId)
+            throw new SyncRemoteError('invalid-configuration');
+          await createObject({
+            url: new URL(SYNC_WORKSPACE_MARKER_KEY, root).href,
+            data: new Blob([textInput], { type: 'application/json' }),
+            headers: { 'content-type': 'application/json', 'if-none-match': '*' },
+            fetchOptions: { signal: requestSignal },
+            fetch: creationFetch,
+          });
+          requestSignal.throwIfAborted();
+        } catch (error) {
+          throw failure(error, requestSignal);
+        }
+      },
+    };
+  } catch (error) {
     throw failure(error, signal);
   }
 }

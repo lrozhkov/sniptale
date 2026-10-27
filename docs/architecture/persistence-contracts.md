@@ -897,4 +897,18 @@ An error leaves allocating state unchanged. Restart and folder existence cannot 
 
 The provider primitive issues one MKCOL for the final child root. It refuses an occupied path and does not create parents or retry. The generic object store requires no collection allocation operation. Callers retain responsibility for current request authorization, cancellation and drain. The test harness checks the exact allocating identity before dispatch and records allocated state under that revision after success.
 
-Allocated state records root allocation only. Marker publication, enrollment and production request admission remain separate release requirements. Production ingress remains disabled.
+Allocated state records root allocation only. Production enrollment and request admission remain separate release requirements. Production ingress remains disabled.
+
+## Workspace marker publication
+
+The pure sync-workspace contract owns the fixed marker key, canonical bytes and exact workspace identity. Both the native writer and remote reader use that contract. Stream limits, cancellation and catalog inspection remain in the transfer workflow.
+
+Journal version 2 adds a frozen marker and the preparing-marker, publishing-marker and ready phases. A readonly load accepts version 1 and returns normalized state without changing storage. The next accepted command writes version 2. Older readers refuse version 2 without deleting it.
+
+Only allocated state permits marker preparation. The native owner freezes canonical text and its SHA before metadata directory creation or publication. A publication command reserves a fresh revision and preserves those exact bytes. Completion requires publishing-marker state and matching checked workspace, bootstrap and fingerprint values. Each command retains the native transaction, prepared-handle fence, revision check and mutation permit.
+
+The WebDAV workflow refuses unexpected files or child prefixes before initial publication. It can reuse only an empty expected metadata directory inside a positively allocated root. It never adopts an uncertain root. The provider uses the existing guarded tsdav adapter for metadata MKCOL and conditional marker PUT. Only HTTP 201 acknowledges creation. A collision permits no unconditional overwrite, cleanup or automatic retry.
+
+Recovery first reads the exact marker, scans the catalog and reads the marker again. Matching evidence permits native ready state without another PUT. Missing marker evidence in publishing-marker state permits an explicit fresh publication revision with the same frozen bytes. A collision or temporary transport failure permits one checked readback. Failed verification preserves uncertainty. Ready state permits inspection only. A missing ready marker never starts initialization.
+
+The explicit test harness binds every HTTP dispatch to its current native journal revision. This proof does not activate production enrollment or establish production credential containment. Browser replay can issue more than one HTTP request for one library invocation. All such requests must retain the same key and frozen body.
