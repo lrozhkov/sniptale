@@ -778,3 +778,22 @@ it.each(['destination', 'model', 'incarnation'] as const)(
     expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
   }
 );
+
+it('captures a stable non-secret operation binding and changes it after credential rotation', async () => {
+  const current = { ...provider, incarnation: 'incarnation', revision: 3, credentialRevision: 4 };
+  vi.mocked(loadAIProviders).mockResolvedValue([current]);
+  const first = await resolveAudioModelConfig(request);
+  expect(first.observationBinding).toEqual({
+    providerId: provider.id,
+    incarnation: 'incarnation',
+    revision: 3,
+    credentialRevision: 4,
+    destination: await createAIProviderDestinationBinding(current),
+  });
+  expect(JSON.stringify(first.observationBinding)).not.toContain('secret');
+  expect(await resolveAudioModelConfig(request)).toEqual(first);
+  vi.mocked(loadAIProviders).mockResolvedValue([{ ...current, credentialRevision: 5 }]);
+  expect((await resolveAudioModelConfig(request)).observationBinding).not.toEqual(
+    first.observationBinding
+  );
+});

@@ -11,15 +11,8 @@ import {
 } from '../../providers';
 import { createProviderSdkFetch } from './http';
 
-import {
-  admitStoredAIOperation,
-  commitStoredAIOperation,
-} from '../../../../composition/persistence/ai-settings/graph-mutations';
-import type {
-  AIOperationObservationBinding,
-  AIOperationObservationToken,
-  AIOperationObservationOutcome,
-} from '../../../../composition/persistence/ai-settings/operation-observations';
+import type { AIOperationObservationBinding } from '../../../../composition/persistence/ai-settings/operation-observations';
+import { createAIOperationObservation } from '../../operation-observation';
 
 const logger = createLogger({ namespace: 'BackgroundLlmHttp' });
 
@@ -126,30 +119,14 @@ function createChatFailure(error: unknown, options: ChatRequestOptions): Error {
   );
 }
 
-function createChatObservation(options: ChatRequestOptions) {
-  let receipt: AIOperationObservationToken | null = null;
-  let dispatched = false;
-  return {
-    admit: async () => {
-      if (options.observationBinding)
-        receipt = await admitStoredAIOperation(options.observationBinding).catch(() => null);
-    },
-    fetch: (input: RequestInfo | URL, init?: RequestInit) => {
-      dispatched = true;
-      return globalThis.fetch(input, init);
-    },
-    observe: async (outcome: AIOperationObservationOutcome) => {
-      if (!receipt || !dispatched || options.signal?.aborted) return;
-      await commitStoredAIOperation(receipt, outcome).catch(() => undefined);
-    },
-  };
-}
-
 async function sendChatRequest(options: ChatRequestOptions, content: UserContent): Promise<string> {
   if (!isAllowedAIProviderBaseUrl(options.baseUrl)) {
     throw new Error(translate('background.runtime.llmProviderBaseUrlHttpsRequired'));
   }
-  const observation = createChatObservation(options);
+  const observation = createAIOperationObservation({
+    binding: options.observationBinding,
+    signal: options.signal,
+  });
   let admissionFailed = false;
   let admissionFailure: unknown;
   try {

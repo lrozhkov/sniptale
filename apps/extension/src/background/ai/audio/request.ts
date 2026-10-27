@@ -1,7 +1,9 @@
 import { assertResponseStatus, failAudioProviderRequest } from './failure';
 import { getTranscriptionProviderOptions, admitSdkTranscript } from './transcription';
 import { generateSpeech } from 'ai';
-import { createAIProviderRuntime } from '../providers';
+import { createAIProviderRuntime, AIProviderRequestError } from '../providers';
+import { createAIOperationObservation } from '../operation-observation';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
 import { createProviderSdkFetch } from '../llm/transport/http';
 import {
   AUDIO_JOB_TIMEOUT_MS,
@@ -45,6 +47,7 @@ interface TranscriptionRequest {
 }
 
 type TranscriptionInput = Omit<TranscriptionRequest, 'beforeSend'> & {
+  transport?: typeof globalThis.fetch;
   beforeSend?: () => Promise<void>;
 };
 
@@ -213,7 +216,9 @@ export async function requestTranscription(
     (!wav && args.config.transcription?.transport === 'audio-chat')
   )
     throw new Error('invalid-request');
-  return performTranscription(args);
+  return observeAudioRequest(args, (beforeSend, transport) =>
+    performTranscription({ ...args, beforeSend, transport })
+  );
 }
 
 /** Editor callers retain their real source scope and existing coordinator admission. */
@@ -223,13 +228,53 @@ export async function requestAudio(args: AudioRequest) {
   if (args.request.operation === 'transcription') {
     return {
       kind: 'transcript' as const,
-      result: await performTranscription(transcriptionInput(args)),
+      result: await observeAudioRequest(args, (beforeSend, transport) =>
+        performTranscription({ ...transcriptionInput(args), beforeSend, transport })
+      ),
     };
   }
-  return requestSpeech(args);
+  return observeAudioRequest(args, (beforeSend, transport) =>
+    requestSpeech({ ...args, beforeSend, transport })
+  );
 }
 
-async function requestSpeech(args: AudioRequest) {
+function audioObservationReason(error: unknown): AIConnectionReason | undefined {
+  if (error instanceof AIProviderRequestError) return error.reason;
+  if (!(error instanceof Error)) return undefined;
+  if (error.message === 'network-failed') return 'network';
+  if (error.message === 'timeout') return 'timeout';
+  return undefined;
+}
+
+async function observeAudioRequest<Result>(
+  args: Pick<AudioRequest, 'config' | 'signal' | 'beforeSend'>,
+  run: (beforeSend: () => Promise<void>, transport: typeof globalThis.fetch) => Promise<Result>
+): Promise<Result> {
+  const observation = createAIOperationObservation({
+    binding: args.config.observationBinding,
+    signal: args.signal,
+  });
+  const beforeSend = async () => {
+    await args.beforeSend?.();
+    if (args.config.observationBinding) {
+      await observation.admit();
+      // Recheck source and provider authority after waiting for advisory graph admission.
+      await args.beforeSend?.();
+    }
+    args.signal.throwIfAborted();
+  };
+  try {
+    const result = await run(beforeSend, observation.fetch);
+    await observation.observe({ kind: 'success' });
+    return result;
+  } catch (error) {
+    const reason = audioObservationReason(error);
+    if (reason) await observation.observe({ kind: 'failure', reason });
+    throw error;
+  }
+}
+
+async function requestSpeech(args: AudioRequest & { transport?: typeof globalThis.fetch }) {
   const params = args.config.speech;
   if (args.request.operation !== 'speech' || !params) throw new Error('invalid-request');
   const type = args.config.connectionType;
@@ -255,9 +300,10 @@ async function requestSpeech(args: AudioRequest) {
     transport: async (input, init) => {
       let response: Response;
       try {
-        response = await fetch(input, init);
+        response = await (args.transport ?? globalThis.fetch)(input, init);
       } catch {
         args.signal.throwIfAborted();
+        if (init?.signal?.aborted) throw new Error('timeout');
         throw new Error('network-failed');
       }
       await assertResponseStatus(response);
@@ -381,9 +427,10 @@ function createTranscriptionSdkFetch(args: TranscriptionInput): typeof fetch {
     transport: async (input, init) => {
       let response: Response;
       try {
-        response = await fetch(input, init);
+        response = await (args.transport ?? globalThis.fetch)(input, init);
       } catch {
         args.signal.throwIfAborted();
+        if (init?.signal?.aborted) throw new Error('timeout');
         throw new Error('network-failed');
       }
       await assertResponseStatus(response);

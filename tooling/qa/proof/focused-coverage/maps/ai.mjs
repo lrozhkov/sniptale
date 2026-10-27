@@ -1,5 +1,17 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'ai-request-operation-observation',
+    productionFile: 'apps/extension/src/background/ai/operation-observation.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both native request consumers and existing persistence concurrency proof cover admission, dispatch, cancellation and fail-soft publication.',
+    testFiles: [
+      'apps/extension/src/background/ai/llm/transport/request.observations.test.ts',
+      'apps/extension/src/background/ai/audio/request.observations.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/operation-observations.test.ts',
+    ],
+  },
+  {
     owner: 'ai-catalog-boundary-contract',
     productionFile: 'apps/extension/src/contracts/settings/ai-catalog.ts',
     reason:

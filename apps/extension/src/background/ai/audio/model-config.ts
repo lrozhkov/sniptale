@@ -26,7 +26,10 @@ import {
 import { isAudioSourceJobScope, type AudioJobStart } from '../../../contracts/ai/audio';
 import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 
+import type { AIOperationObservationBinding } from '../../../composition/persistence/ai-settings/operation-observations';
+
 export interface AudioModelConfig {
+  observationBinding?: AIOperationObservationBinding | undefined;
   connectionType: AIProviderType;
   baseUrl: string;
   url: string;
@@ -123,6 +126,17 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   const instructions = chat ? await loadAudioTranscriptionSystemPrompt() : undefined;
   args.signal?.throwIfAborted();
   return {
+    ...(provider.incarnation
+      ? {
+          observationBinding: {
+            providerId: provider.id,
+            incarnation: provider.incarnation,
+            revision: provider.revision ?? 0,
+            credentialRevision: provider.credentialRevision ?? 0,
+            destination: await createAIProviderDestinationBinding(provider),
+          },
+        }
+      : {}),
     connectionType: provider.connectionType,
     baseUrl: provider.baseUrl,
     url,
