@@ -9,9 +9,16 @@ import {
   type ContextBoundEncryptedSecretEnvelope,
   type SecretAdditionalData,
 } from '@sniptale/platform/security/local-secret-crypto';
-import { initDB } from '../infrastructure/indexed-db/core';
+import { capturePreparedDatabase, initDB } from '../infrastructure/indexed-db/core';
+import { runWithPersistenceMutationPermit } from '../infrastructure/mutation-barrier';
+import { parseSyncWorkspaceMarker } from '../../../contracts/sync-workspace';
+import {
+  readReadySyncWorkspaceAllocation,
+  type SyncWorkspaceAllocation,
+} from './workspace-allocation';
 import {
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   SYNC_CONNECTION_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -26,6 +33,7 @@ import {
   sameConnectionBinding,
   sameConnectionScope,
   sameSyncConnectionIdentity,
+  type SyncConnectionBinding,
   type SyncConnectionScope,
   type SyncConnectionIdentity,
   type SyncConnectionMetadata,
@@ -94,7 +102,7 @@ function additionalData(
 ): SecretAdditionalData {
   const binding = metadata.binding;
   return {
-    version: 'sync-connection-secret:v1',
+    version: metadata.workspace ? 'sync-connection-secret:v2' : 'sync-connection-secret:v1',
     provider: binding.provider,
     rootUrl: binding.rootUrl,
     accountId: binding.accountId,
@@ -103,6 +111,9 @@ function additionalData(
     profileCreatedAt: String(binding.profileCreatedAt),
     incarnation: metadata.identity.incarnation,
     credentialId,
+    ...(metadata.workspace
+      ? { bootstrapId: metadata.workspace.bootstrapId, fingerprint: metadata.workspace.fingerprint }
+      : {}),
   };
 }
 function matchingAdditionalData(
@@ -172,6 +183,36 @@ function parseCredential(value: unknown, metadata: SyncConnectionMetadata): Cred
     envelope,
   };
 }
+async function protectAuthentication(
+  metadata: SyncConnectionMetadata,
+  authentication: SyncConnectionAuthentication,
+  credentialId: string
+): Promise<Credential> {
+  let credential: Credential;
+  try {
+    const { material } = await createAesGcmKeyMaterial();
+    const cryptoKey = await importAesGcmKey(material);
+    const envelope = await encryptSecret(
+      JSON.stringify(authentication),
+      cryptoKey,
+      additionalData(metadata, credentialId)
+    );
+    credential = parseCredential(
+      {
+        version: 1,
+        kind: 'sync-connection-credential',
+        key: 'credential',
+        credentialId,
+        cryptoKey,
+        envelope,
+      },
+      { ...metadata, credentialId }
+    );
+  } catch {
+    return refused();
+  }
+  return credential;
+}
 /** Metadata and profile reads have no repair or secret side effects. */
 export async function loadSyncConnection(): Promise<SyncConnectionMetadata | null> {
   const db = await initDB();
@@ -212,6 +253,7 @@ export async function beginSyncConnectionAuthUpdate(
       phase: 'updating-auth',
       updateNonce: crypto.randomUUID(),
       credentialId: current?.credentialId ?? null,
+      ...(current?.workspace ? { workspace: current.workspace } : {}),
     };
     await tx.objectStore(SYNC_CONNECTION_STORE).put(metadata);
     return metadata;
@@ -231,29 +273,7 @@ export async function commitSyncConnectionAuthentication(
   );
   if (!authentication) return refused();
   const credentialId = crypto.randomUUID();
-  let credential: Credential;
-  try {
-    const { material } = await createAesGcmKeyMaterial();
-    const cryptoKey = await importAesGcmKey(material);
-    const envelope = await encryptSecret(
-      JSON.stringify(authentication),
-      cryptoKey,
-      additionalData(reservation, credentialId)
-    );
-    credential = parseCredential(
-      {
-        version: 1,
-        kind: 'sync-connection-credential',
-        key: 'credential',
-        credentialId,
-        cryptoKey,
-        envelope,
-      },
-      { ...reservation, credentialId }
-    );
-  } catch {
-    return refused();
-  }
+  const credential = await protectAuthentication(reservation, authentication, credentialId);
   return mutate(async (tx) => {
     await checkProfile(tx, reservation.binding);
     const current = await readMetadata(tx);
@@ -270,6 +290,185 @@ export async function commitSyncConnectionAuthentication(
     return metadata;
   });
 }
+interface EnrollmentSource {
+  kind: 'allocation';
+  identity: SyncConnectionIdentity;
+}
+function parseEnrollmentSource(value: unknown): EnrollmentSource {
+  if (!isRecord(value) || Object.keys(value).length !== 2 || value['kind'] !== 'allocation')
+    return refused();
+  const identity = parseSyncConnectionIdentity(value['identity']);
+  if (!identity) return refused();
+  return { kind: 'allocation', identity };
+}
+interface EnrollmentEvidence {
+  allocation: SyncWorkspaceAllocation;
+  connection: SyncConnectionMetadata | null;
+}
+async function readEnrollmentEvidence(
+  tx: ConnectionTransaction,
+  source: EnrollmentSource
+): Promise<EnrollmentEvidence> {
+  const allocation = await readReadySyncWorkspaceAllocation(tx, source.identity);
+  if (!allocation.marker) return refused();
+  const workspace = parseSyncWorkspaceMarker(allocation.marker.text);
+  const rows = tx.objectStore(SYNC_CONNECTION_STORE);
+  const receipt: unknown = await rows.get('workspace-enrollment');
+  if (receipt === undefined) {
+    if (
+      (await tx.objectStore(SYNC_CAPTURE_STORE).count()) !== 0 ||
+      (await tx.objectStore(SYNC_OUTBOX_STORE).count()) !== 0 ||
+      (await rows.count()) !== 1
+    )
+      return refused();
+    return { allocation, connection: null };
+  }
+  if (
+    !isRecord(receipt) ||
+    Object.keys(receipt).length !== 5 ||
+    receipt['version'] !== 1 ||
+    receipt['kind'] !== 'sync-workspace-enrollment' ||
+    receipt['key'] !== 'workspace-enrollment'
+  )
+    return refused();
+  const recordedSource = parseEnrollmentSource(receipt['source']);
+  const enrolled = parseConnectionMetadata(receipt['connection']);
+  const current = await readMetadata(tx);
+  if (
+    !sameSyncConnectionIdentity(recordedSource.identity, source.identity) ||
+    !enrolled ||
+    enrolled.phase !== 'active' ||
+    enrolled.identity.revision !== 1 ||
+    !enrolled.workspace ||
+    enrolled.binding.rootUrl !== allocation.rootUrl ||
+    enrolled.binding.accountId !== allocation.accountId ||
+    enrolled.binding.spaceId !== allocation.spaceId ||
+    enrolled.binding.connectionGeneration !== 1 ||
+    JSON.stringify(enrolled.workspace) !== JSON.stringify(workspace) ||
+    !current ||
+    current.phase === 'updating-auth' ||
+    current.identity.incarnation !== enrolled.identity.incarnation ||
+    current.identity.revision < enrolled.identity.revision ||
+    !sameConnectionBinding(current.binding, enrolled.binding) ||
+    JSON.stringify(current.workspace) !== JSON.stringify(workspace) ||
+    (await rows.count()) !== 4
+  )
+    return refused();
+  await checkProfile(tx, current.binding);
+  parseCredential(await rows.get('credential'), current);
+  return { allocation, connection: current };
+}
+
+/**
+ * Enroll one exact native ready CREATE source atomically. Cold admission never opens storage.
+ * Replaying its receipt returns the current same-binding enrollment without replacing secrets.
+ */
+export async function enrollSyncWorkspaceConnection(
+  sourceInput: unknown,
+  authenticationInput: unknown
+): Promise<SyncConnectionMetadata> {
+  const db = capturePreparedDatabase();
+  if (!db) return refused();
+  try {
+    const source = parseEnrollmentSource(structuredClone(sourceInput));
+    const detachedAuthentication: unknown = structuredClone(authenticationInput);
+    const initial = await withSyncConnectionAdmissionLock(() =>
+      runWithPersistenceMutationPermit(async () => {
+        const tx = db.transaction(
+          [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, SYNC_OUTBOX_STORE],
+          'readonly'
+        );
+        try {
+          const evidence = await readEnrollmentEvidence(tx, source);
+          await tx.done;
+          return evidence;
+        } catch (error) {
+          await tx.done.catch(() => undefined);
+          throw error;
+        }
+      })
+    );
+    const authentication = parseConnectionAuthentication(
+      detachedAuthentication,
+      initial.allocation.accountId
+    );
+    if (!authentication) return refused();
+    if (initial.connection) return initial.connection;
+    const allocation = initial.allocation;
+    if (!allocation.marker) return refused();
+    const profile = parseSyncCaptureRecord({
+      version: 1,
+      kind: 'profile',
+      key: 'profile',
+      createdAt: Date.now(),
+      enabled: true,
+      spaceId: allocation.spaceId,
+      connectionGeneration: 1,
+    });
+    if (!profile || profile.kind !== 'profile') return refused();
+    const binding: SyncConnectionBinding = {
+      provider: allocation.provider,
+      rootUrl: allocation.rootUrl,
+      accountId: allocation.accountId,
+      spaceId: profile.spaceId,
+      connectionGeneration: profile.connectionGeneration,
+      profileCreatedAt: profile.createdAt,
+    };
+    const credentialId = crypto.randomUUID();
+    const metadata: SyncConnectionMetadata = {
+      version: 1,
+      kind: 'sync-connection',
+      key: 'connection',
+      binding,
+      workspace: parseSyncWorkspaceMarker(allocation.marker.text),
+      identity: { incarnation: crypto.randomUUID(), revision: 1 },
+      phase: 'active',
+      updateNonce: null,
+      credentialId,
+    };
+    const credential = await protectAuthentication(metadata, authentication, credentialId);
+    return await withSyncConnectionAdmissionLock(() =>
+      runWithPersistenceMutationPermit(async () => {
+        const tx = db.transaction(
+          [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, SYNC_OUTBOX_STORE],
+          'readwrite'
+        );
+        try {
+          const current = await readEnrollmentEvidence(tx, source);
+          if (JSON.stringify(current.allocation) !== JSON.stringify(allocation)) return refused();
+          if (current.connection) {
+            await tx.done;
+            return current.connection;
+          }
+          await tx.objectStore(SYNC_CAPTURE_STORE).put(profile);
+          const rows = tx.objectStore(SYNC_CONNECTION_STORE);
+          await rows.put(metadata);
+          await rows.put(credential);
+          await rows.put({
+            version: 1,
+            kind: 'sync-workspace-enrollment',
+            key: 'workspace-enrollment',
+            source,
+            connection: metadata,
+          });
+          await tx.done;
+          return metadata;
+        } catch (error) {
+          try {
+            tx.abort();
+          } catch {
+            /* Transaction can already be closed. */
+          }
+          await tx.done.catch(() => undefined);
+          throw error;
+        }
+      })
+    );
+  } catch {
+    return refused();
+  }
+}
+
 /** A pause preserves capture enrollment, namespace generation and the encrypted credential. */
 export async function commandSyncConnection(
   identityInput: unknown,

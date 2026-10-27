@@ -1,3 +1,7 @@
+import {
+  parseSyncWorkspaceIdentity,
+  type SyncWorkspaceIdentity,
+} from '../../../contracts/sync-workspace';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
 export interface SyncConnectionScope {
@@ -23,6 +27,7 @@ export interface SyncConnectionMetadata {
   phase: 'updating-auth' | 'active' | 'paused';
   updateNonce: string | null;
   credentialId: string | null;
+  workspace?: SyncWorkspaceIdentity;
 }
 export type SyncConnectionAuthentication =
   | { kind: 'basic'; username: string; password: string }
@@ -153,12 +158,22 @@ export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata 
       'phase',
       'updateNonce',
       'credentialId',
+      ...(Object.hasOwn(value, 'workspace') ? ['workspace'] : []),
     ]) ||
     value['version'] !== 1 ||
     value['kind'] !== 'sync-connection' ||
     value['key'] !== 'connection'
   )
     return null;
+  let workspace: SyncWorkspaceIdentity | null = null;
+  if (Object.hasOwn(value, 'workspace')) {
+    try {
+      workspace = parseSyncWorkspaceIdentity(value['workspace']);
+    } catch {
+      return null;
+    }
+    if (!workspace) return null;
+  }
   const binding = parseConnectionBinding(value['binding']);
   const identity = parseSyncConnectionIdentity(value['identity']);
   const phase = value['phase'];
@@ -166,6 +181,7 @@ export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata 
   const credentialId = value['credentialId'];
   if (
     !binding ||
+    (workspace !== null && workspace.spaceId !== binding.spaceId) ||
     !identity ||
     !['updating-auth', 'active', 'paused'].includes(typeof phase === 'string' ? phase : '') ||
     !(updateNonce === null || connectionUuid(updateNonce)) ||
@@ -183,6 +199,7 @@ export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata 
       phase,
       updateNonce,
       credentialId,
+      ...(workspace ? { workspace } : {}),
     };
   }
   if ((phase !== 'active' && phase !== 'paused') || updateNonce !== null || credentialId === null)
@@ -196,6 +213,7 @@ export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata 
     phase,
     updateNonce,
     credentialId,
+    ...(workspace ? { workspace } : {}),
   };
 }
 export function parseConnectionAuthentication(

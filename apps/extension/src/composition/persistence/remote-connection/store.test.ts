@@ -11,7 +11,12 @@ import {
   loadSyncConnectionAuthentication,
   checkSyncConnectionAdmission,
 } from './store';
-import { type SyncConnectionBinding, type SyncConnectionMetadata } from './model';
+import {
+  parseConnectionMetadata,
+  type SyncConnectionBinding,
+  type SyncConnectionMetadata,
+} from './model';
+import { encodeSyncWorkspaceMarker } from '../../../contracts/sync-workspace';
 import { withSyncConnectionAdmissionLock } from './coordination';
 
 const io = vi.hoisted(() => ({ database: vi.fn(), encrypt: vi.fn(), decrypt: vi.fn() }));
@@ -64,7 +69,7 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals());
 
 /** Atomic snapshot fixture commits only through done and includes structured-cloned CryptoKeys. */
-function setup() {
+function setup(spaceId = 'space') {
   const rows = new Map<string, Map<string, unknown>>([
     [
       'sync_capture',
@@ -77,7 +82,7 @@ function setup() {
             key: 'profile',
             createdAt: 1,
             enabled: true,
-            spaceId: 'space',
+            spaceId,
             connectionGeneration: 3,
           },
         ],
@@ -445,4 +450,101 @@ it('releases the admission lock after the short callback and fails closed withou
   expect(order).toEqual(['second']);
   vi.stubGlobal('navigator', {});
   expect(() => withSyncConnectionAdmissionLock(() => undefined)).toThrow();
+});
+
+it('preserves legacy metadata shape and credential context', async () => {
+  const f = setup();
+  const active = await activate();
+  expect(active).not.toHaveProperty('workspace');
+  expect(parseConnectionMetadata(active)).toEqual(active);
+  expect(credential(f)['envelope']).toMatchObject({
+    additionalData: {
+      version: 'sync-connection-secret:v1',
+      spaceId: binding.spaceId,
+    },
+  });
+  expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(basic);
+});
+it('binds checked workspace identity into credentials and auth rotation', async () => {
+  const workspace = encodeSyncWorkspaceMarker(crypto.randomUUID(), crypto.randomUUID()).identity;
+  const f = setup(workspace.spaceId);
+  const selectedBinding = { ...binding, spaceId: workspace.spaceId };
+  const initial = await beginSyncConnectionAuthUpdate(selectedBinding, null);
+  const reservation = { ...initial, workspace };
+  f.table().set('connection', structuredClone(reservation));
+  const active = await commitSyncConnectionAuthentication(reservation, basic);
+  expect(active.workspace).toEqual(workspace);
+  expect(credential(f)['envelope']).toMatchObject({
+    additionalData: {
+      version: 'sync-connection-secret:v2',
+      spaceId: workspace.spaceId,
+      bootstrapId: workspace.bootstrapId,
+      fingerprint: workspace.fingerprint,
+    },
+  });
+  expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(basic);
+  const update = await beginSyncConnectionAuthUpdate(selectedBinding, active.identity);
+  expect(update.workspace).toEqual(workspace);
+  const rotated = await commitSyncConnectionAuthentication(update, {
+    kind: 'bearer',
+    accessToken: 'replacement-token',
+  });
+  expect(rotated.workspace).toEqual(workspace);
+  expect(credential(f)['envelope']).toMatchObject({
+    additionalData: {
+      version: 'sync-connection-secret:v2',
+      bootstrapId: workspace.bootstrapId,
+      fingerprint: workspace.fingerprint,
+    },
+  });
+  expect(await loadSyncConnectionAuthentication(rotated.identity)).toEqual({
+    kind: 'bearer',
+    accessToken: 'replacement-token',
+  });
+});
+it('refuses null malformed and mismatched optional workspace identity', async () => {
+  const f = setup();
+  const active = await activate();
+  const workspace = encodeSyncWorkspaceMarker(crypto.randomUUID(), crypto.randomUUID()).identity;
+  for (const value of [null, undefined, {}, workspace, { ...workspace, fingerprint: 'invalid' }]) {
+    const malformed = { ...active, workspace: value };
+    expect(parseConnectionMetadata(malformed)).toBeNull();
+    f.table().set('connection', malformed);
+    const before = structuredClone(f.rows);
+    await expect(loadSyncConnection()).rejects.toThrow('refused');
+    expect(f.rows).toEqual(before);
+  }
+});
+it('refuses changed workspace identity and legacy context for enrolled credentials', async () => {
+  const workspace = encodeSyncWorkspaceMarker(crypto.randomUUID(), crypto.randomUUID()).identity;
+  const f = setup(workspace.spaceId);
+  const initial = await beginSyncConnectionAuthUpdate(
+    { ...binding, spaceId: workspace.spaceId },
+    null
+  );
+  const reservation = { ...initial, workspace };
+  f.table().set('connection', structuredClone(reservation));
+  const active = await commitSyncConnectionAuthentication(reservation, basic);
+  const original = credential(f);
+  for (const changed of [
+    { ...workspace, bootstrapId: crypto.randomUUID() },
+    { ...workspace, fingerprint: '0'.repeat(64) },
+  ]) {
+    f.table().set('connection', { ...active, workspace: changed });
+    await expect(loadSyncConnectionAuthentication(active.identity)).rejects.toThrow('refused');
+  }
+  f.table().set('connection', active);
+  const envelope = original['envelope'];
+  if (!isRecord(envelope) || !isRecord(envelope['additionalData']))
+    throw new Error('Missing fixture envelope');
+  f.table().set('credential', {
+    ...original,
+    envelope: {
+      ...envelope,
+      additionalData: { ...envelope['additionalData'], version: 'sync-connection-secret:v1' },
+    },
+  });
+  const before = structuredClone(f.rows);
+  await expect(loadSyncConnectionAuthentication(active.identity)).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
 });

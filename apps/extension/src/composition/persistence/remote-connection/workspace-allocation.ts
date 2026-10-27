@@ -173,6 +173,21 @@ async function readAllocation(tx: AllocationTransaction): Promise<SyncWorkspaceA
   const raw: unknown = await tx.objectStore(SYNC_CONNECTION_STORE).get('workspace-allocation');
   return raw === undefined ? null : (parseAllocation(raw) ?? refused());
 }
+/** Read one exact ready CREATE source inside the caller's enrollment transaction. */
+export async function readReadySyncWorkspaceAllocation(
+  tx: AllocationTransaction,
+  expected: SyncConnectionIdentity
+): Promise<SyncWorkspaceAllocation> {
+  const current = await readAllocation(tx);
+  if (
+    !current ||
+    current.phase !== 'ready' ||
+    !current.marker ||
+    !sameSyncConnectionIdentity(current.identity, expected)
+  )
+    return refused();
+  return current;
+}
 async function checkUnenrolled(tx: AllocationTransaction): Promise<void> {
   const profile: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get('profile');
   const connection: unknown = await tx.objectStore(SYNC_CONNECTION_STORE).get('connection');

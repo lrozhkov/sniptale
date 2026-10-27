@@ -362,3 +362,14 @@ Retry metadata contains native identities, deadlines, counters and cursor positi
 Every automatic claim requires current enrollment and exact active connection authority. A different connection incarnation cannot inherit old work. Recovery preserves unknown remote outcomes and requires the native operation lock. Local erasure prevents delayed maintenance from recreating native state.
 
 An alarm or a deadline grants no permission to send data. Temporary refusal receives a bounded delayed retry. Authentication, access, storage, source and internal failures require explicit action. All retained source evidence remains under existing queue ownership.
+
+
+## Checked enrollment credentials
+
+Checked enrollment derives its endpoint and account from one exact native ready source. It prepares credential protection outside IndexedDB transactions. Its final transaction rechecks source identity and readiness under connection admission and the persistence mutation permit. Crypto or transaction failure preserves source evidence without partial credential installation.
+
+New checked connections retain the exact workspace identity. Credential additional data binds that identity with the existing endpoint, account, profile and connection lifetime. Legacy experimental credentials retain their previous context. Same-binding authentication updates preserve checked workspace identity. Repeating enrollment cannot replace the installed credential.
+
+The enrollment receipt contains native identity and binding metadata only. It contains no authentication, raw provider error, catalog payload or media. It remains in sync_connection under existing backup, Settings transfer, diagnostics and remote-export exclusions. Verified local-data erasure removes the receipt with the connection.
+
+Activation requires the owner-controlled native ready source. The browser fixture supplies explicit test-only ingress after creation requests drain. No production Settings or Start authority enters through this fixture. JOIN readiness and runtime activation remain separate gates.

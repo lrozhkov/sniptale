@@ -952,3 +952,14 @@ The native queue owns deadlines, automatic retry counts and bounded schedule pro
 Native time and the existing operation lock control run admission. An alarm grants no authority. Temporary failures retain source evidence and store a delayed retry atomically. Retry delays start at30seconds, increase exponentially and stop after five automatic retries. A manual retry resets this budget. Permanent failures require explicit action.
 
 Running rows retain their exact run authorization and a future recovery-check time. Metadata deferral cannot change their command revision. Recovery requires the existing exclusive operation lock. Pause, cancel, replacement and erasure refuse stale claims. Published operations have no retry deadline.
+
+
+## Checked workspace enrollment
+
+The remote-connection owner installs checked workspace enrollment in one native transaction. The first source is an exact ready allocation. Callers select its native identity, not a root, account or purported checked marker. The owner derives the connection binding and workspace identity from retained native evidence.
+
+The transaction installs the capture profile, connection metadata, protected credential and narrow enrollment receipt together. It refuses existing capture, outbox, connection or orphan credential state. A failed transaction preserves ready evidence and installs nothing. The command captures its prepared database handle before crypto or admission waits. Erasure closes that handle and prevents delayed recreation.
+
+The receipt identifies a repeated successful source without replacing credentials or rotating identity. The connection retains the checked workspace spaceId, bootstrapId and marker fingerprint. Legacy experimental metadata lacks this identity and retains its previous decoding behavior. Legacy decoding does not establish checked enrollment.
+
+JOIN must produce a native ready source through its selected-root verification workflow before it uses this activation boundary. A read-only catalog snapshot or structurally valid identity cannot activate a connection. Production ingress and remaining release gates remain closed.

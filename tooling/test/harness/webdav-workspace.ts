@@ -1,3 +1,4 @@
+import { enrollSyncWorkspaceConnection } from '../../../apps/extension/src/composition/persistence/remote-connection/store';
 import {
   createSyncWorkspaceAllocation,
   loadSyncWorkspaceAllocation,
@@ -64,6 +65,17 @@ export function createWebdavWorkspaceHarness() {
         { parentUrl: credentials.rootUrl, accountId: credentials.username },
         expected
       );
+    },
+    async enroll(credentials: Credentials, identity: unknown) {
+      try {
+        const connection = await enrollSyncWorkspaceConnection(
+          { kind: 'allocation', identity },
+          { kind: 'basic', username: credentials.username, password: credentials.password }
+        );
+        return { code: 'success', connection };
+      } catch (error) {
+        return { ...failure(error), connection: null };
+      }
     },
     inspect: () => loadSyncWorkspaceAllocation(),
     abandon: (identity: unknown) => commandSyncWorkspaceAllocation(identity, 'abandon'),
