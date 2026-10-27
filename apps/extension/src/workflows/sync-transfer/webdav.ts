@@ -52,7 +52,9 @@ function segments(key: string, allowEmpty = false): string[] {
   const parts = key.split('/');
   if (
     parts.some((part) => {
-      if (!part || part === '.' || part === '..' || /[\\%?#:]/u.test(part)) return true;
+      if (!part || part === '.' || part === '..' || /[\\?#:]/u.test(part)) return true;
+      // Literal percent signs are names. Escaped routing delimiters remain inadmissible.
+      if (/%(?:25)*(?:2e|2f|5c|0[0-9a-f]|1[0-9a-f]|7f)/iu.test(part)) return true;
       for (const character of part) {
         const code = character.charCodeAt(0);
         if (code < 32 || code === 127) return true;

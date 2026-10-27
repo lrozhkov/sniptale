@@ -42,10 +42,13 @@ async function createLab() {
     proxy,
     credentials: { rootUrl: proxy.rootUrl, username, password },
     async externalProof(key: string) {
-      const response = await fetch(new URL(key, root), {
-        headers: { authorization },
-        redirect: 'error',
-      });
+      const response = await fetch(
+        new URL(key.split('/').map(encodeURIComponent).join('/'), root),
+        {
+          headers: { authorization },
+          redirect: 'error',
+        }
+      );
       if (!response.ok || !response.body)
         throw new Error(`External lab read failed (${response.status}).`);
       const reader = response.body.getReader();
@@ -155,7 +158,7 @@ test('ordinary originals and exports survive native Blob transfer and an empty b
       status: null,
     });
     image = await first.page.evaluate(() =>
-      window.webdavTransferHarness.uploadImage('Originals/снимок экрана.png')
+      window.webdavTransferHarness.uploadImage('Originals/снимок 100%25 экрана.png')
     );
     expect(
       await first.page.evaluate(() =>
@@ -163,7 +166,7 @@ test('ordinary originals and exports survive native Blob transfer and an empty b
       )
     ).toEqual(image);
     expect(await lab.externalProof('Originals/large.bin')).toEqual(prepared);
-    expect(await lab.externalProof('Originals/снимок экрана.png')).toEqual(image);
+    expect(await lab.externalProof('Originals/снимок 100%25 экрана.png')).toEqual(image);
     expect(await lab.externalProof('Exports/saved-export.png')).toEqual(image);
   } finally {
     await first.context.close();
@@ -175,7 +178,7 @@ test('ordinary originals and exports survive native Blob transfer and an empty b
     expect(listed.objects).toEqual(
       expect.arrayContaining([
         { key: 'Originals/large.bin', size: prepared.size },
-        { key: 'Originals/снимок экрана.png', size: image.size },
+        { key: 'Originals/снимок 100%25 экрана.png', size: image.size },
       ])
     );
     expect(listed.objects).toHaveLength(2);

@@ -130,6 +130,10 @@ it.each([
   'x//y',
   'https://elsewhere/x',
   'a%2fb',
+  'a%252fb',
+  '%25252e%25252e/x',
+  'a%255cb',
+  'a%2500b',
   'a\\b',
   'x?secret',
   'x#fragment',
@@ -355,4 +359,33 @@ it('accepts directory metadata when only irrelevant content length has a failed 
   await expect(remote.list('', { signal: signal() })).rejects.toMatchObject({
     code: 'invalid-response',
   });
+});
+
+it.each(['100%.png', 'literal%20.png', 'literal%2520.png'])(
+  'preserves the literal filename through DAV requests and listings: %s',
+  async (filename) => {
+    const remote = await store();
+    const encoded = encodeURIComponent(filename);
+    const body = new Blob(['literal file']);
+    fetchMock.mockImplementation(async (input, init) => {
+      expect(urlOf(input)).toBe(`https://dav.example/root/${encoded}`);
+      if (init?.method === 'PUT') return new Response(null, { status: 201 });
+      return new Response('literal file');
+    });
+    await remote.write(filename, body, signal());
+    expect(await new Response(await remote.read(filename, signal())).text()).toBe('literal file');
+    fetchMock.mockResolvedValueOnce(xml(entry('/root/') + entry(`/root/${encoded}`, false, '12')));
+    await expect(remote.list('', { signal: signal() })).resolves.toMatchObject({
+      objects: [{ key: filename, size: 12 }],
+    });
+  }
+);
+
+it('admits an encoded literal percent in the configured root without changing that root', async () => {
+  const remote = await store('https://dav.example/100%25/root/');
+  fetchMock.mockResolvedValueOnce(new Response('file'));
+  await remote.read('capture.png', signal());
+  expect(urlOf(fetchMock.mock.calls.at(-1)![0])).toBe(
+    'https://dav.example/100%25/root/capture.png'
+  );
 });

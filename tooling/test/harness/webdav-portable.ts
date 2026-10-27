@@ -295,7 +295,7 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
     await saveProjectAsset(privateId, privateFile, privateFile.type, 'private.png', Date.now(), {
       publishToLibrary: false,
     });
-    await saveProjectAsset(borrowedId, borrowedFile, borrowedFile.type, 'borrowed.png');
+    await saveProjectAsset(borrowedId, borrowedFile, borrowedFile.type, 'borrowed 100%.png');
     const mediaId = `project-asset:${borrowedId}`;
     const candidate = createEmptyVideoProject('WebDAV native portable project', 1280, 720);
     candidate.assets = [privateFile, borrowedFile].map((file, index) =>
