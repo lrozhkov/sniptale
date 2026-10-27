@@ -62,7 +62,8 @@ it('admits the database before a permit and acknowledges only after confirmed pu
   io.database.mockImplementation(async () => {
     order.push('database');
   });
-  io.load.mockImplementation(async () => {
+  io.load.mockImplementation(async (_scope, _source, permit) => {
+    expect(isActivePersistenceMutationPermit(permit)).toBe(true);
     order.push('load');
     return batch();
   });
@@ -75,6 +76,7 @@ it('admits the database before a permit and acknowledges only after confirmed pu
     expect(selected).toEqual(batch());
     expect(isActivePersistenceMutationPermit(permit)).toBe(true);
     expect(permit).toBe(io.append.mock.calls[0]![1]);
+    expect(permit).toBe(io.load.mock.calls[0]![2]);
     order.push('acknowledge');
   });
   expect(await deliverSyncQueueHistory(scope, source)).toBe(true);
@@ -162,7 +164,7 @@ it('detaches selection before delayed database admission', async () => {
   selectedSource.operationId = 'changed';
   release();
   expect(await pending).toBe(true);
-  expect(io.load).toHaveBeenCalledWith(scope, source);
+  expect(io.load).toHaveBeenCalledWith(scope, source, expect.any(Object));
 });
 
 it('exports actual confirmed sync rows through the existing runtime tail and history ZIP', async () => {

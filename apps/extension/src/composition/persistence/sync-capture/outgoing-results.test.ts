@@ -1,3 +1,5 @@
+import { collectSyncCaptureClaims } from './claims';
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
@@ -31,7 +33,7 @@ function preparedDraft(
   return {
     version: 1,
     key: preparedOutgoingOperationKey(capture.spaceId, capture.operationId),
-    createdAt: 2,
+    createdAt: capture.createdAt,
     spaceId: capture.spaceId,
     connectionGeneration: capture.connectionGeneration,
     captureKey: capture.key,
@@ -42,10 +44,9 @@ function preparedDraft(
     recordSha256: Array.from(sha256(new TextEncoder().encode(text)), (byte) =>
       byte.toString(16).padStart(2, '0')
     ).join(''),
-    attemptKey: `attempts/${capture.operationId}/record.json`,
     objects: refs.map((ref) => ({
       objectId: 'body',
-      remoteKey: 'objects/body',
+      filename: 'original.png',
       ref,
       sha256: 'b'.repeat(64),
     })),
@@ -54,7 +55,9 @@ function preparedDraft(
 
 function setup() {
   let fail = false;
-  const fixture = createReviewWorkspaceStoreFixture((name) => fail && name === 'sync_outbox');
+  const fixture = createReviewWorkspaceStoreFixture(
+    (name) => fail && (name === 'sync_outbox' || name === 'sync_capture')
+  );
   const table = (name: string) => fixture.rows.get(name)!;
   io.database.mockResolvedValue(fixture.database);
   table('sync_capture').set('profile', {
@@ -81,9 +84,9 @@ function setup() {
     size: ref.size,
     lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
   });
-  const capture: CapturedChange = {
+  const capture: CapturedChange = createNativeCapture({
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
     key: '["change","op"]',
     createdAt: 1,
     spaceId: 'space',
@@ -110,7 +113,7 @@ function setup() {
         },
       },
     },
-  };
+  });
   table('sync_capture').set(capture.key, structuredClone(capture));
   return {
     ...fixture,
@@ -126,7 +129,17 @@ const FIRST = '11111111-1111-4111-8111-111111111111';
 const SECOND = '22222222-2222-4222-8222-222222222222';
 
 function attempt(operationId = 'op', attemptId = FIRST): OutgoingDispatchAttemptDraft {
-  const recordText = JSON.stringify({ operationId, attemptId });
+  const objects = [{ objectId: 'body', remoteKey: `Originals/${attemptId}/original 100%.png` }];
+  const recordText = JSON.stringify({
+    format: 'sniptale-sync-attempt',
+    version: 1,
+    operationText: '{"record":1}',
+    operationSha256: Array.from(sha256(new TextEncoder().encode('{"record":1}')), (byte) =>
+      byte.toString(16).padStart(2, '0')
+    ).join(''),
+    attemptId,
+    objects,
+  });
   return {
     version: 1,
     spaceId: 'space',
@@ -155,7 +168,6 @@ import {
   commitVerifiedOutgoingResult,
   loadVerifiedOutgoingResult,
   parseVerifiedOutgoingResult,
-  verifiedOutgoingResultKey,
 } from './outgoing-results';
 
 async function ready() {
@@ -165,28 +177,39 @@ async function ready() {
   return { ...f, first: first.attempt, second: second.attempt };
 }
 
-it('accepts the first verified result and returns it for idempotent and alternative physical attempts', async () => {
+it('replaces the single prepared payload with compact publication and retains immutable pins', async () => {
   const f = await ready();
-  const before = structuredClone(f.rows);
   const accepted = await commitVerifiedOutgoingResult(f.accepted, f.first);
-  expect(accepted.created).toBe(true);
-  expect(accepted.result).toMatchObject({ attemptId: FIRST, remoteManifestKey: f.first.recordKey });
-  expect(await commitVerifiedOutgoingResult(f.accepted, f.first)).toEqual({
-    ...accepted,
-    created: false,
+  expect(accepted).toMatchObject({
+    created: true,
+    result: {
+      attemptId: FIRST,
+      publicationKind: 'verified',
+      captureSha256: f.capture.sourceSha256,
+    },
   });
+  expect(f.table('sync_capture').get(f.capture.key)).toMatchObject({
+    phase: 'published',
+    objects: [{ ref: f.accepted.objects[0]!.ref, pinned: true }],
+  });
+  const serialized = JSON.stringify([...f.rows.values()].flatMap((table) => [...table.values()]));
+  expect(serialized).not.toContain('recordText');
+  expect(serialized).not.toContain('"change":');
+  expect(collectSyncCaptureClaims([...f.table('sync_capture').values()]).assetIds).toEqual(
+    new Set(['body'])
+  );
   expect(await commitVerifiedOutgoingResult(f.accepted, f.second)).toEqual({
-    ...accepted,
+    result: accepted.result,
     created: false,
   });
-  expect(f.table('sync_capture')).toEqual(before.get('sync_capture'));
-  expect(f.table('sync_outbox').size).toBe(before.get('sync_outbox')!.size + 1);
+  f.table('sync_outbox').delete(f.first.key);
+  f.table('sync_outbox').delete(f.second.key);
   expect(await loadVerifiedOutgoingResult('space', 3, 'op')).toEqual(accepted.result);
 });
 
-it('serializes controlled parallel results with the first physical receipt winning', async () => {
+it('accepts the first publication under controlled parallel callbacks', async () => {
   const f = await ready();
-  let release: () => void = () => undefined;
+  let release!: () => void;
   io.database.mockResolvedValueOnce(f.database).mockImplementationOnce(
     () =>
       new Promise((resolve) => {
@@ -200,25 +223,25 @@ it('serializes controlled parallel results with the first physical receipt winni
   expect(await second).toEqual({ result: accepted.result, created: false });
 });
 
-it('detaches unknown inputs before delayed admission', async () => {
+it('detaches callback inputs before delayed admission', async () => {
   const f = await ready();
-  const expected = structuredClone(f.accepted);
+  const prepared = structuredClone(f.accepted);
   const physical = structuredClone(f.first);
-  let release: () => void = () => undefined;
+  let release!: () => void;
   io.database.mockImplementationOnce(
     () =>
       new Promise((resolve) => {
         release = () => resolve(f.database);
       })
   );
-  const pending = commitVerifiedOutgoingResult(expected, physical);
-  expected.captureSha256 = 'c'.repeat(64);
+  const pending = commitVerifiedOutgoingResult(prepared, physical);
+  prepared.captureSha256 = 'c'.repeat(64);
   physical.objects[0]!.remoteKey = 'changed';
   release();
-  expect(await pending).toMatchObject({ result: { attemptId: FIRST }, created: true });
+  expect(await pending).toMatchObject({ result: { attemptId: FIRST } });
 });
 
-it('aborts native write failure and permits exact retry without changing source claims', async () => {
+it('rolls back failed compaction and preserves prepared bytes for an exact retry', async () => {
   const f = await ready();
   const before = structuredClone(f.rows);
   f.failWrites(true);
@@ -226,14 +249,31 @@ it('aborts native write failure and permits exact retry without changing source 
   expect(f.rows).toEqual(before);
   f.failWrites(false);
   expect(await commitVerifiedOutgoingResult(f.accepted, f.first)).toMatchObject({ created: true });
-  expect(f.table('sync_capture')).toEqual(before.get('sync_capture'));
 });
 
-it.each(['disable', 'remove', 'rotate', 'recreate'])(
-  'refuses delayed result after profile %s without changing retained evidence',
+it('records a late acknowledgement after disabling capture without reopening controls', async () => {
+  const f = await ready();
+  f.table('sync_capture').set('profile', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: false,
+    spaceId: 'space',
+    connectionGeneration: 3,
+  });
+  const controls = { key: 'controls', kind: 'test-controls', status: 'cancelled', runId: null };
+  f.table('sync_outbox').set(controls.key, controls);
+  await commitVerifiedOutgoingResult(f.accepted, f.first);
+  expect(f.table('sync_outbox').get(controls.key)).toEqual(controls);
+  expect(f.table('sync_capture').get(f.capture.key)).toMatchObject({ phase: 'published' });
+});
+
+it.each(['remove', 'rotate', 'recreate'])(
+  'refuses a delayed publication after enrollment %s',
   async (kind) => {
     const f = await ready();
-    let release: () => void = () => undefined;
+    let release!: () => void;
     io.database.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -247,10 +287,10 @@ it.each(['disable', 'remove', 'rotate', 'recreate'])(
         version: 1,
         kind: 'profile',
         key: 'profile',
-        createdAt: kind === 'recreate' ? 9 : 1,
-        enabled: kind !== 'disable',
+        createdAt: kind === 'recreate' ? 99 : 1,
+        enabled: true,
         spaceId: 'space',
-        connectionGeneration: kind === 'disable' ? 3 : 4,
+        connectionGeneration: kind === 'rotate' ? 4 : 3,
       });
     const before = structuredClone(f.rows);
     release();
@@ -259,46 +299,37 @@ it.each(['disable', 'remove', 'rotate', 'recreate'])(
   }
 );
 
-it('keeps delayed publication bound to its retained capture after root deletion and recreation', async () => {
+it('keeps the old operation independent of same-root deletion and recreation', async () => {
   const f = await ready();
-  let release: () => void = () => undefined;
-  io.database.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        release = () => resolve(f.database);
-      })
-  );
-  const pending = commitVerifiedOutgoingResult(f.accepted, f.first);
-  f.table('sync_capture').set('deleted', {
+  const deletion = createNativeCapture({
     ...f.capture,
+    key: 'deleted',
     operationId: 'deleted',
     generation: 2,
     change: { kind: 'tombstone' },
   });
-  f.table('sync_capture').set('recreated', {
+  const recreated = createNativeCapture({
     ...f.capture,
+    key: 'recreated',
     operationId: 'recreated',
     generation: 3,
   });
-  const captures = structuredClone(f.table('sync_capture'));
-  release();
-  expect(await pending).toMatchObject({
-    result: { operationId: 'op', captureSha256: f.accepted.captureSha256 },
-  });
-  expect(f.table('sync_capture')).toEqual(captures);
+  f.table('sync_capture').set(deletion.key, deletion);
+  f.table('sync_capture').set(recreated.key, recreated);
+  await commitVerifiedOutgoingResult(f.accepted, f.first);
+  expect(f.table('sync_capture').get(recreated.key)).toEqual(recreated);
+  expect(f.table('sync_capture').get(deletion.key)).toEqual(deletion);
 });
 
-it.each(['capture', 'prepared', 'attempt', 'missing-attempt', 'foreign-generation'])(
-  'refuses exact stored %s mismatch even when an accepted result already exists',
+it.each(['source', 'missing-attempt', 'attempt', 'foreign-generation'])(
+  'refuses corrupted %s before compaction',
   async (kind) => {
     const f = await ready();
-    await commitVerifiedOutgoingResult(f.accepted, f.first);
-    if (kind === 'capture')
+    if (kind === 'source')
       f.table('sync_capture').set(f.capture.key, { ...f.capture, createdAt: 99 });
-    if (kind === 'prepared')
-      f.table('sync_outbox').set(f.accepted.key, { ...f.accepted, createdAt: 99 });
-    if (kind === 'attempt') f.table('sync_outbox').set(f.first.key, { ...f.first, createdAt: 99 });
     if (kind === 'missing-attempt') f.table('sync_outbox').delete(f.first.key);
+    if (kind === 'attempt')
+      f.table('sync_outbox').set(f.first.key, { ...f.first, recordSha256: 'a'.repeat(64) });
     const candidate =
       kind === 'foreign-generation' ? { ...f.first, connectionGeneration: 4 } : f.first;
     const before = structuredClone(f.rows);
@@ -307,54 +338,17 @@ it.each(['capture', 'prepared', 'attempt', 'missing-attempt', 'foreign-generatio
   }
 );
 
-it.each(['capture', 'prepared', 'attempt', 'receipt'])(
-  'validates the %s join on write-free reads',
-  async (kind) => {
-    const f = await ready();
-    const { result } = await commitVerifiedOutgoingResult(f.accepted, f.first);
-    f.table('sync_capture').delete('profile');
-    f.failWrites(true);
-    const before = structuredClone(f.rows);
-    expect(await loadVerifiedOutgoingResult('space', 3, 'op')).toEqual(result);
-    expect(f.rows).toEqual(before);
-    if (kind === 'capture') f.table('sync_capture').delete(f.capture.key);
-    if (kind === 'prepared')
-      f.table('sync_outbox').set(f.accepted.key, { ...f.accepted, recordText: 'corrupt' });
-    if (kind === 'attempt')
-      f.table('sync_outbox').set(f.first.key, { ...f.first, recordText: 'corrupt' });
-    if (kind === 'receipt')
-      f.table('sync_outbox').set(result.key, { ...result, attemptSha256: 'c'.repeat(64) });
-    const corrupt = structuredClone(f.rows);
-    await expect(loadVerifiedOutgoingResult('space', 3, 'op')).rejects.toThrow('Invalid');
-    expect(f.rows).toEqual(corrupt);
-  }
-);
-
-it('refuses contradictory receipts and prepared bytes without changing accepted evidence', async () => {
+it('parses compact receipts independently of property order and refuses invalid digests and paths', async () => {
   const f = await ready();
   const { result } = await commitVerifiedOutgoingResult(f.accepted, f.first);
-  f.table('sync_outbox').set(result.key, { ...result, preparedSha256: 'c'.repeat(64) });
-  const before = structuredClone(f.rows);
-  await expect(commitVerifiedOutgoingResult(f.accepted, f.second)).rejects.toThrow('Contradictory');
-  expect(f.rows).toEqual(before);
-  await expect(
-    commitVerifiedOutgoingResult({ ...f.accepted, recordText: 'changed' }, f.first)
-  ).rejects.toThrow('Invalid');
-  expect(f.rows).toEqual(before);
-});
-
-it('uses disjoint namespace keys and refuses malformed receipt metadata', async () => {
-  const f = await ready();
-  expect(await loadVerifiedOutgoingResult('space', 3, 'op')).toBeNull();
-  expect(verifiedOutgoingResultKey('space', 3, 'op')).not.toBe(
-    verifiedOutgoingResultKey('space', 4, 'op')
+  expect(parseVerifiedOutgoingResult(Object.fromEntries(Object.entries(result).reverse()))).toEqual(
+    result
   );
-  const { result } = await commitVerifiedOutgoingResult(f.accepted, f.first);
-  expect(parseVerifiedOutgoingResult(result)).toEqual(result);
   for (const invalid of [
     { ...result, attemptId: 'bad' },
     { ...result, remoteManifestKey: '../bad' },
     { ...result, key: 'bad' },
+    { ...result, preparedSha256: 'bad' },
     { ...result, acceptedAt: -1 },
   ])
     expect(parseVerifiedOutgoingResult(invalid)).toBeNull();

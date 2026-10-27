@@ -1,3 +1,4 @@
+import { createNativeCapture } from '../../composition/persistence/sync-capture/test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   capture,
@@ -24,11 +25,11 @@ it('persists exact logical and physical bytes before IO and verifies files befor
     new AbortController().signal
   );
   expect(dav.writes).toEqual([...attempt.objects.map((item) => item.remoteKey), attempt.recordKey]);
-  expect(attempt.recordKey).toBe(prepared.attemptKey);
-  expect((await parseSyncAttemptText(attempt.recordText)).operation.objects[0]?.sha256).toBe(
-    prepared.objects[0]?.sha256
-  );
-  expect(attempt.recordText).not.toContain('objects/native-file');
+  expect(
+    (await parseSyncAttemptText(await dav.objects.get(attempt.recordKey)!.text())).operation
+      .objects[0]?.sha256
+  ).toBe(prepared.objects[0]?.sha256);
+  expect(await dav.objects.get(attempt.recordKey)!.text()).not.toContain('objects/native-file');
 });
 it('keeps frozen bytes on explicit retry and reserves fresh physical keys after a lost response', async () => {
   const prepared = await prepareCapturedOutgoing(capture());
@@ -48,7 +49,9 @@ it('keeps frozen bytes on explicit retry and reserves fresh physical keys after 
   );
   expect(recovered.recordKey).not.toBe(first.recordKey);
   expect(recovered.objects[0]?.remoteKey).not.toBe(first.objects[0]?.remoteKey);
-  expect(JSON.parse(recovered.recordText)['operationText']).toBe(prepared.recordText);
+  expect(JSON.parse(await dav.objects.get(recovered.recordKey)!.text())['operationText']).toBe(
+    prepared.recordText
+  );
   expect(io.attempts.size).toBe(2);
 });
 it('uses independent physical attempts for concurrent explicit dispatches', async () => {
@@ -108,7 +111,7 @@ it('publishes a tombstone without reading or uploading original bytes', async ()
   const value = capture();
   value.change = { kind: 'tombstone' };
   value.basis = ['previous'];
-  const prepared = await prepareCapturedOutgoing(value);
+  const prepared = await prepareCapturedOutgoing(createNativeCapture(value));
   const dav = remote();
   const attempt = await dispatchPreparedOutgoing(
     'space',
@@ -119,7 +122,9 @@ it('publishes a tombstone without reading or uploading original bytes', async ()
   expect(io.read).not.toHaveBeenCalled();
   expect(attempt.objects).toEqual([]);
   expect(dav.writes).toEqual([attempt.recordKey]);
-  expect((await parseSyncAttemptText(attempt.recordText)).operation).toMatchObject({
+  expect(
+    (await parseSyncAttemptText(await dav.objects.get(attempt.recordKey)!.text())).operation
+  ).toMatchObject({
     kind: 'delete',
     parents: ['previous'],
     envelope: null,
@@ -130,13 +135,13 @@ it('retains explicit restore provenance and causal parents in the frozen logical
   const value = capture();
   value.origin = 'local-restore';
   value.basis = ['deleted-operation', 'other-head'];
-  const prepared = await prepareCapturedOutgoing(value);
+  const prepared = await prepareCapturedOutgoing(createNativeCapture(value));
   expect(JSON.parse(prepared.recordText)).toMatchObject({ kind: 'restore', parents: value.basis });
 });
 
 it('reuses unchanged files for a metadata-only revision without media GET or PUT', async () => {
   const firstCapture = capture();
-  const firstPrepared = await prepareCapturedOutgoing(firstCapture);
+  const firstPrepared = await prepareCapturedOutgoing(createNativeCapture(firstCapture));
   const dav = remote();
   const first = await dispatchPreparedOutgoing(
     'space',
@@ -152,7 +157,7 @@ it('reuses unchanged files for a metadata-only revision without media GET or PUT
   expect(nextCapture.change.kind).toBe('media');
   if (nextCapture.change.kind === 'media')
     nextCapture.change.rows.media.sourceTitle = 'Updated title';
-  const nextPrepared = await prepareCapturedOutgoing(nextCapture);
+  const nextPrepared = await prepareCapturedOutgoing(createNativeCapture(nextCapture));
   const previousReads = dav.reads.length;
   const previousWrites = dav.writes.length;
   const next = await dispatchPreparedOutgoing(
@@ -167,14 +172,15 @@ it('reuses unchanged files for a metadata-only revision without media GET or PUT
   expect(next.recordKey).not.toBe(first.recordKey);
   expect(next.objects[0]?.remoteKey).toBe(first.objects[0]?.remoteKey);
   expect(dav.writes.filter((key) => key.startsWith('Files/'))).toHaveLength(1);
-  expect((await parseSyncAttemptText(next.recordText)).operation.operationId).toBe(
-    'operation-next'
-  );
+  expect(
+    (await parseSyncAttemptText(await dav.objects.get(next.recordKey)!.text())).operation
+      .operationId
+  ).toBe('operation-next');
 });
 
 it('reuses unchanged originals and exports while changed export bytes get a fresh path', async () => {
   const captured = projectCapture();
-  await prepareCapturedOutgoing(captured);
+  await prepareCapturedOutgoing(createNativeCapture(captured));
   const dav = remote();
   const first = await dispatchPreparedOutgoing(
     'space',
@@ -185,7 +191,7 @@ it('reuses unchanged originals and exports while changed export bytes get a fres
   const metadata = nextRevision(captured);
   if (metadata.change.kind === 'video-project')
     metadata.change.rows.project.project.name = 'Updated name';
-  await prepareCapturedOutgoing(metadata);
+  await prepareCapturedOutgoing(createNativeCapture(metadata));
   const second = await dispatchPreparedOutgoing(
     'space',
     metadata.operationId,
@@ -206,7 +212,7 @@ it('reuses unchanged originals and exports while changed export bytes get a fres
         { type: ref.mimeType }
       )
   );
-  await prepareCapturedOutgoing(changed);
+  await prepareCapturedOutgoing(createNativeCapture(changed));
   const third = await dispatchPreparedOutgoing(
     'space',
     changed.operationId,
@@ -380,7 +386,7 @@ it('refuses failed completion admission without publishing a manifest and retrie
 it('persists manifest evidence only after acknowledged PUT and exact full readback', async () => {
   const value = capture();
   value.change = { kind: 'tombstone' };
-  const prepared = await prepareCapturedOutgoing(value);
+  const prepared = await prepareCapturedOutgoing(createNativeCapture(value));
   const dav = remote();
   dav.corrupt();
   await expect(
@@ -407,4 +413,36 @@ it('preserves prepared sources if receipt persistence fails after remote publica
   expect(dav.writes.at(-1)).toBe([...io.attempts.values()][0]!.recordKey);
   expect(io.prepared.get('operation')).toEqual(prepared);
   expect(io.completed.size).toBe(1);
+});
+
+it('refuses completed mappings from a foreign namespace before remote reuse checks', async () => {
+  const original = capture();
+  await prepareCapturedOutgoing(original);
+  const dav = remote();
+  const first = await dispatchPreparedOutgoing(
+    'space',
+    original.operationId,
+    dav.adapter,
+    new AbortController().signal
+  );
+  const foreignKey = first.objects[0]!.remoteKey.replace(
+    /Files\/[^/]+/u,
+    'Files/foreign-namespace'
+  );
+  const retained = io.attempts.get(first.attemptId)!;
+  retained.objects[0]!.remoteKey = foreignKey;
+  dav.objects.set(foreignKey, dav.objects.get(first.objects[0]!.remoteKey)!);
+  const next = nextRevision(original);
+  await prepareCapturedOutgoing(next);
+  dav.reads.length = 0;
+  dav.stats.length = 0;
+  const fresh = await dispatchPreparedOutgoing(
+    'space',
+    next.operationId,
+    dav.adapter,
+    new AbortController().signal
+  );
+  expect(fresh.objects[0]!.remoteKey).not.toBe(foreignKey);
+  expect(dav.reads).not.toContain(foreignKey);
+  expect(dav.stats).not.toContain(foreignKey);
 });

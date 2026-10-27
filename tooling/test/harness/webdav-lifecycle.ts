@@ -1,6 +1,7 @@
 import { reconcileSyncQueueCaptures } from '../../../apps/extension/src/composition/persistence/sync-capture/queue-reconciliation';
 import {
   saveProjectAsset,
+  getVideoProject,
   saveVideoProject,
 } from '../../../apps/extension/src/composition/persistence/projects';
 import {
@@ -27,6 +28,7 @@ import {
   beginSyncConnectionAuthUpdate,
   commitSyncConnectionAuthentication,
   loadSyncConnection,
+  loadSyncConnectionAuthentication,
 } from '../../../apps/extension/src/composition/persistence/remote-connection/store';
 import {
   connectionUuid,
@@ -35,17 +37,27 @@ import {
   type SyncWorkspaceSource,
 } from '../../../apps/extension/src/composition/persistence/remote-connection/model';
 import {
+  commandSyncQueue,
   commandSyncQueueOperation,
   enqueueSyncQueueOperation,
   loadSyncQueue,
+  loadSyncQueuePage,
+  loadSyncQueueOperation,
 } from '../../../apps/extension/src/composition/persistence/sync-capture/queue';
 import {
   createSyncWorkspaceAllocation,
   loadSyncWorkspaceAllocation,
 } from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-allocation';
 import { queueOrdinal } from '../../../apps/extension/src/composition/persistence/sync-capture/queue-model';
-import { loadPreparedOutgoingOperation } from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing';
-import { prepareCapturedOutgoing } from '../../../apps/extension/src/workflows/sync-transfer/outgoing';
+import { readOutgoingOperation } from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing';
+import {
+  prepareCapturedOutgoing,
+  releasePublishedOutgoing,
+} from '../../../apps/extension/src/workflows/sync-transfer/outgoing';
+import { createWebdavRemoteStore } from '../../../apps/extension/src/workflows/sync-transfer/webdav';
+import { createSyncConnectionRequests } from '../../../apps/extension/src/workflows/sync-transfer/connection-requests';
+import { verifySyncWorkspaceIdentity } from '../../../apps/extension/src/workflows/sync-transfer/workspace';
+import { deleteMediaAssetWithProjectCascade } from '../../../apps/extension/src/composition/persistence/media-library/delete-cascade';
 import { readAssetFile } from '../../../apps/extension/src/composition/persistence/assets';
 import type { AssetRef } from '../../../apps/extension/src/composition/persistence/assets/contracts';
 import { digestBackupObject } from '../../../apps/extension/src/workflows/media-hub-backup/v6/shared-objects';
@@ -110,7 +122,7 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     const capture = (await db.getAll(SYNC_CAPTURE_STORE))
       .flatMap((raw) => {
         const row = parseSyncCaptureRecord(raw);
-        return row?.kind === 'captured-change' &&
+        return row?.kind === 'sync-operation' &&
           row.rootKind === 'media' &&
           row.rootId === source.mediaId
           ? [row]
@@ -120,7 +132,8 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     if (!capture) throw new Error('Native lifecycle media capture is missing.');
     const prepared = await prepareCapturedOutgoing(capture);
     knownObjects = prepared.objects.map((object) => object.ref);
-    const queued = await enqueueSyncQueueOperation(capture);
+    const currentCapture: unknown = await db.get(SYNC_CAPTURE_STORE, capture.key);
+    const queued = await enqueueSyncQueueOperation(currentCapture);
     selection = {
       scope,
       authorization: connection.identity,
@@ -134,7 +147,6 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
         operationId: prepared.operationId,
         objects: prepared.objects.map((object) => ({
           objectId: object.objectId,
-          key: object.remoteKey,
           size: object.ref.size,
           sha256: object.sha256,
         })),
@@ -267,14 +279,14 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     const db = await initDB();
     const captures = (await db.getAll(SYNC_CAPTURE_STORE)).flatMap((raw) => {
       const capture = parseSyncCaptureRecord(raw);
-      return capture?.kind === 'captured-change' &&
+      return capture?.kind === 'sync-operation' &&
         capture.rootKind === 'media' &&
         capture.rootId === mediaId
         ? [capture]
         : [];
     });
     const capture = captures.sort((left, right) => right.generation - left.generation)[0];
-    if (!capture || capture.change.kind !== 'media')
+    if (!capture || capture.phase !== 'native' || capture.change.kind !== 'media')
       throw new Error('Enrolled source capture is missing.');
     if (input?.captureOnly) {
       knownObjects = [capture.change.rows.ref];
@@ -283,7 +295,7 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
           ? null
           : (await db.getAll(SYNC_CAPTURE_STORE)).flatMap((raw) => {
               const row = parseSyncCaptureRecord(raw);
-              return row?.kind === 'captured-change' &&
+              return row?.kind === 'sync-operation' &&
                 row.rootKind === 'video-project' &&
                 row.rootId === projectId
                 ? [row]
@@ -308,7 +320,8 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
       };
     }
     const prepared = await prepareCapturedOutgoing(capture);
-    const queued = await enqueueSyncQueueOperation(capture);
+    const currentCapture: unknown = await db.get(SYNC_CAPTURE_STORE, capture.key);
+    const queued = await enqueueSyncQueueOperation(currentCapture);
     const scope = {
       spaceId: connection.binding.spaceId,
       connectionGeneration: connection.binding.connectionGeneration,
@@ -324,11 +337,82 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     return {
       operationId: prepared.operationId,
       objects: prepared.objects.map((object) => ({
-        key: object.remoteKey,
         size: object.ref.size,
         sha256: object.sha256,
       })),
     };
+  }
+  async function capacityState(projectId?: string) {
+    const connection = await loadSyncConnection();
+    if (!connection?.workspace) throw new Error('Checked connection is required.');
+    const scope = {
+      spaceId: connection.binding.spaceId,
+      connectionGeneration: connection.binding.connectionGeneration,
+      profileCreatedAt: connection.binding.profileCreatedAt,
+    };
+    let page = await loadSyncQueuePage(scope, { limit: 128 });
+    const queue = page.connection;
+    const operations = [...page.operations];
+    for (let index = 1; page.nextCursor !== null && index < 4; index += 1) {
+      page = await loadSyncQueuePage(scope, { limit: 128, cursor: page.nextCursor });
+      operations.push(...page.operations);
+    }
+    if (page.nextCursor !== null) throw new Error('Capacity fixture exceeds its page budget.');
+    const db = await initDB();
+    const project: unknown =
+      projectId === undefined ? null : await db.get('video_projects', projectId);
+    return {
+      scope,
+      connection: queue,
+      operations,
+      captureCount: await db.countFromIndex(SYNC_CAPTURE_STORE, 'kind', 'sync-operation'),
+      project,
+    };
+  }
+  async function prepareCapacity() {
+    const initial = await capacityState();
+    await commandSyncQueue(initial.scope, initial.connection.revision, 'pause');
+    const source = await prepareEnrolledSource({ captureOnly: true });
+    const project = await saveVideoProject(createEmptyVideoProject('Offline 0', 1280, 720), {
+      expectedProject: null,
+      expectedWorkspaceRevision: null,
+    });
+    return { source, projectId: project.id, finalWorkspaceRevision: project.workspaceRevision };
+  }
+  async function appendCapacityRevision(input: { projectId: string; index: number }) {
+    if (!queueOrdinal(input.index) || input.index < 1 || input.index > 131)
+      throw new Error('Capacity revision index is invalid.');
+    const current = await getVideoProject(input.projectId);
+    if (current.status !== 'ready') throw new Error('Capacity project is unavailable.');
+    const accepted = await saveVideoProject(
+      { ...current.project, name: `Offline ${input.index}` },
+      {
+        expectedProject: current.project,
+        expectedWorkspaceRevision: current.workspaceRevision,
+      }
+    );
+    return { name: accepted.project.name, workspaceRevision: accepted.workspaceRevision };
+  }
+  async function capacityOperation(operationId: string) {
+    const connection = await loadSyncConnection();
+    if (!connection?.workspace) throw new Error('Checked connection is required.');
+    return loadSyncQueueOperation(
+      {
+        spaceId: connection.binding.spaceId,
+        connectionGeneration: connection.binding.connectionGeneration,
+        profileCreatedAt: connection.binding.profileCreatedAt,
+      },
+      operationId
+    );
+  }
+  async function resumeCapacityOriginal(operationId: string) {
+    const current = await capacityState();
+    for (const row of current.operations) {
+      if (row.operationId !== operationId && row.status === 'queued')
+        await commandSyncQueueOperation(current.scope, row.operationId, row.revision, 'pause');
+    }
+    await commandSyncQueue(current.scope, current.connection.revision, 'resume');
+    return loadSyncQueueOperation(current.scope, operationId);
   }
   async function reconcileCapturesInParallel() {
     const connection = await loadSyncConnection();
@@ -346,17 +430,92 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
   async function enrolledCaptureResult(operationId: string) {
     const connection = await loadSyncConnection();
     if (!connection?.workspace) throw new Error('Checked connection is required.');
-    const prepared = await loadPreparedOutgoingOperation(connection.binding.spaceId, operationId);
-    if (!prepared) return null;
+    const db = await initDB();
+    const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
+    const operation = await readOutgoingOperation(tx, connection.binding.spaceId, operationId);
+    await tx.done;
+    if (!operation || operation.phase !== 'published') return null;
     return {
-      operationId: prepared.operationId,
-      objects: prepared.objects.map((object) => ({
+      operationId: operation.operationId,
+      phase: operation.phase,
+      hasNativePayload: 'change' in operation,
+      hasPreparedPayload: 'prepared' in operation,
+      objects: operation.objects.map((object) => ({
         key: object.remoteKey,
         size: object.ref.size,
         sha256: object.sha256,
+        pinned: object.pinned,
       })),
     };
   }
+
+  async function retirePublishedOriginal(operationId: string) {
+    const connection = await loadSyncConnection();
+    if (!connection?.workspace || connection.phase !== 'active')
+      throw new Error('Checked connection is required.');
+    const db = await initDB();
+    const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
+    const operation = await readOutgoingOperation(tx, connection.binding.spaceId, operationId);
+    await tx.done;
+    if (!operation || operation.phase !== 'published' || operation.rootKind !== 'media')
+      throw new Error('Published original is required.');
+    const scope = {
+      spaceId: operation.spaceId,
+      connectionGeneration: operation.connectionGeneration,
+      profileCreatedAt: operation.profileCreatedAt,
+    };
+    const queue = await loadSyncQueue(scope);
+    await commandSyncQueue(scope, queue.connection.revision, 'pause');
+    const readable = () =>
+      Promise.all(
+        operation.objects.map(async (object) => {
+          try {
+            await readAssetFile(object.ref, object.filename);
+            return true;
+          } catch (error) {
+            if (error instanceof DOMException && error.name === 'NotFoundError') return false;
+            throw error;
+          }
+        })
+      );
+    const before = await readable();
+    await deleteMediaAssetWithProjectCascade(operation.rootId, []);
+    const protectedAfterNativeRemoval = await readable();
+    const requests = createSyncConnectionRequests({
+      identity: connection.identity,
+      hasOriginPermission: (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] }),
+    });
+    try {
+      const signal = new AbortController().signal;
+      const remote = await createWebdavRemoteStore(
+        {
+          rootUrl: connection.binding.rootUrl,
+          authentication: () => loadSyncConnectionAuthentication(connection.identity),
+          request: requests.request,
+        },
+        signal
+      );
+      await verifySyncWorkspaceIdentity(remote, connection.workspace, signal);
+      const released = await releasePublishedOutgoing(
+        operation.spaceId,
+        operationId,
+        connection.identity,
+        remote,
+        signal
+      );
+      return {
+        before,
+        protectedAfterNativeRemoval,
+        after: await readable(),
+        released: released.released.length,
+        publication: await enrolledCaptureResult(operationId),
+        nativeMediaRemoved: (await db.get('media_library', operation.rootId)) === undefined,
+      };
+    } finally {
+      await requests.close();
+    }
+  }
+
   async function workspaceState() {
     const databasePresent = (await indexedDB.databases()).some((db) => db.name === DB_NAME);
     if (!databasePresent)
@@ -441,7 +600,7 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     const db = await initDB();
     const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
     const captureCount = (await db.getAll(SYNC_CAPTURE_STORE)).filter(
-      (raw) => parseSyncCaptureRecord(raw)?.kind === 'captured-change'
+      (raw) => parseSyncCaptureRecord(raw)?.kind === 'sync-operation'
     ).length;
     const connection = profile?.kind === 'profile' ? await loadSyncConnection() : null;
     const queue =
@@ -519,7 +678,13 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     prepareJoin,
     enrollWorkspace,
     prepareEnrolledSource,
+    prepareCapacity,
+    appendCapacityRevision,
+    capacityState,
+    capacityOperation,
+    resumeCapacityOriginal,
     enrolledCaptureResult,
+    retirePublishedOriginal,
     reconcileCapturesInParallel,
     startWorkspace,
     workspaceState,

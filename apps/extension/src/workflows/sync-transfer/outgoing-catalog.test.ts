@@ -1,3 +1,4 @@
+import { createNativeCapture } from '../../composition/persistence/sync-capture/test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { capture, io, nextRevision, remote, resetOutgoingFixture } from './outgoing.test-support';
 import type { AssetRef } from '../../composition/persistence/assets';
@@ -22,7 +23,7 @@ async function publishedCatalog() {
   io.completed.clear();
   const next = nextRevision(original);
   if (next.change.kind === 'media') next.change.rows.media.sourceTitle = 'Other browser title';
-  await prepareCapturedOutgoing(next);
+  await prepareCapturedOutgoing(createNativeCapture(next));
   dav.reads.length = 0;
   dav.writes.length = 0;
   dav.stats.length = 0;

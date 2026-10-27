@@ -1,3 +1,4 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { expect, it } from 'vitest';
 import {
   createProjectAssetEntry,
@@ -38,9 +39,9 @@ function fixture(): CapturedVideoProjectRows {
 }
 function change(): CapturedChange {
   const rows = fixture();
-  return {
+  return createNativeCapture({
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
     key: '["change","operation-1"]',
     createdAt: 1,
     spaceId: 'space-1',
@@ -54,7 +55,7 @@ function change(): CapturedChange {
     origin: 'local-edit',
     publicationId: null,
     change: { kind: 'video-project', rows },
-  };
+  });
 }
 
 it('admits native metadata without placing media bytes in the capture store', () => {
@@ -127,13 +128,13 @@ function mediaFixture() {
 
 it('admits a source after-image and retains its ref after the native owner disappears', () => {
   const rows = mediaFixture();
-  const capture = {
+  const capture = createNativeCapture({
     ...change(),
     rootKind: 'media',
     rootId: rows.media.id,
     rootKey: captureRootKey('space-1', 'media', rows.media.id),
     change: { kind: 'media', rows },
-  };
+  });
   expect(parseSyncCaptureRecord(capture)).toMatchObject({ change: { kind: 'media', rows } });
   expect(collectSyncCaptureClaims([capture])).toEqual({
     valid: true,
@@ -194,4 +195,17 @@ it('retains a valid native digest and refuses malformed or project root digests'
       rootKey: captureRootKey('space-1', 'video-project', rows.media.id),
     })
   ).toBeNull();
+});
+
+it('preserves obsolete experiment and unknown phase rows while refusing sync and cleanup', () => {
+  const current = change();
+  for (const row of [
+    { ...current, kind: 'captured-change' },
+    { ...current, phase: 'future' },
+  ]) {
+    const before = structuredClone(row);
+    expect(parseSyncCaptureRecord(row)).toBeNull();
+    expect(collectSyncCaptureClaims([row]).valid).toBe(false);
+    expect(row).toEqual(before);
+  }
 });

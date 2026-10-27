@@ -1,3 +1,5 @@
+import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
+import { createNativeCapture } from '../../composition/persistence/sync-capture/test-support/frozen-snapshot-database';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../../composition/persistence/review-workspaces/store.test-support';
 import {
@@ -102,9 +104,9 @@ function setup() {
   });
   function capture(operationId = 'operation'): CapturedChange {
     const rootId = `root-${operationId}`;
-    const value: CapturedChange = {
+    const value: CapturedChange = createNativeCapture({
       version: 1,
-      kind: 'captured-change',
+      kind: 'sync-operation',
       key: JSON.stringify(['change', operationId]),
       createdAt: 2,
       spaceId: scope.spaceId,
@@ -118,7 +120,7 @@ function setup() {
       origin: 'local-edit',
       publicationId: null,
       change: { kind: 'tombstone' },
-    };
+    });
     table('sync_capture').set(value.key, structuredClone(value));
     return value;
   }
@@ -128,8 +130,27 @@ function setup() {
     role: 'source',
     assetId: 'original',
   });
-  const nativeSources = () =>
-    structuredClone(new Map([...fixture.rows].filter(([name]) => name !== 'sync_outbox')));
+  const nativeSources = () => {
+    const snapshot = structuredClone(
+      new Map([...fixture.rows].filter(([name]) => name !== 'sync_outbox'))
+    );
+    const captures = snapshot.get('sync_capture')!;
+    for (const [key, raw] of captures) {
+      const parsed = parseSyncCaptureRecord(raw);
+      if (!parsed) throw new Error('Invalid native test evidence.');
+      if (parsed.kind === 'sync-operation')
+        captures.set(
+          key,
+          Object.fromEntries(
+            Object.entries(parsed).filter(
+              ([field]) =>
+                !['phase', 'change', 'prepared', 'publication', 'objects'].includes(field)
+            )
+          )
+        );
+    }
+    return snapshot;
+  };
   return { ...fixture, table, capture, nativeSources };
 }
 
@@ -201,7 +222,6 @@ function execute(
   return runSyncQueueOperation({
     scope,
     operationId: capture.operationId,
-    capture,
     expectedRevision,
     remote,
     signal: new AbortController().signal,
@@ -241,7 +261,6 @@ it('keeps a live operation busy for both another runner and recovery until its c
     runSyncQueueOperation({
       scope: reorderedScope,
       operationId: capture.operationId,
-      capture,
       expectedRevision: row.revision,
       remote: remote.adapter,
       signal: new AbortController().signal,
@@ -303,6 +322,7 @@ it.each(['pause', 'cancel'] as const)(
       row.revision,
       command
     );
+    expect(await loadPreparedOutgoingOperation(scope.spaceId, capture.operationId)).not.toBeNull();
     expect(stopped).toMatchObject({
       status: command === 'pause' ? 'paused' : 'cancelled',
       outcome: 'unknown',
@@ -417,7 +437,7 @@ it('keeps a lost manifest response unknown and retries identical logical bytes o
   const nextKey = remote.writes()[1]!;
   expect(nextKey).not.toBe(firstKey);
   expect(await remote.bodies.get(firstKey)!.text()).toBe(firstBody);
-  expect(await loadPreparedOutgoingOperation(scope.spaceId, capture.operationId)).toEqual(prepared);
+  expect(await loadPreparedOutgoingOperation(scope.spaceId, capture.operationId)).toBeNull();
   const nextManifest: unknown = JSON.parse(await remote.bodies.get(nextKey)!.text());
   expect(nextManifest).toMatchObject({ operationText: prepared?.recordText });
   expect(f.nativeSources()).toEqual(source);
@@ -496,7 +516,7 @@ it('accepts observed lost-response publication without upload or an acknowledged
   expect(remote.calls).toEqual([]);
   expect(
     await loadVerifiedOutgoingResult(scope.spaceId, scope.connectionGeneration, capture.operationId)
-  ).toBeNull();
+  ).toMatchObject({ publicationKind: 'observed' });
   for (const [key, value] of outbox) {
     if (
       typeof value === 'object' &&

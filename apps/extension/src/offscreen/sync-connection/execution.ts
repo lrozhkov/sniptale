@@ -1,8 +1,4 @@
 import {
-  initDB,
-  SYNC_CAPTURE_STORE,
-} from '../../composition/persistence/infrastructure/indexed-db/core';
-import {
   loadSyncConnection,
   loadSyncConnectionAuthentication,
 } from '../../composition/persistence/remote-connection/store';
@@ -91,8 +87,6 @@ export function createSyncQueueExecution(
         const operation = await loadSyncQueueOperation(selection.scope, operationId);
         if (operation.revision !== expectedRevision)
           throw new Error('Sync queue selection refused.');
-        const db = await initDB();
-        const capture: unknown = await db.get(SYNC_CAPTURE_STORE, operation.captureKey);
         const remote = await createWebdavRemoteStore(
           {
             rootUrl: connection.binding.rootUrl,
@@ -106,7 +100,6 @@ export function createSyncQueueExecution(
           ...selection,
           operationId,
           expectedRevision,
-          capture,
           remote,
           signal,
           authorize: async () => {

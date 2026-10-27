@@ -130,7 +130,6 @@ function operation(overrides: Partial<SyncQueueOperation> = {}): SyncQueueOperat
     ...overrides,
   };
 }
-const capture = { nativeCapture: 'frozen-source' };
 const remote: SyncRemoteStore = {
   list: vi.fn(async () => ({ objects: [], prefixes: [], nextCursor: null })),
   stat: vi.fn(async () => ({ size: 0 })),
@@ -149,7 +148,6 @@ beforeEach(() => {
   mocks.authentication.mockResolvedValue({ kind: 'bearer', accessToken: 'first' });
   mocks.queue.mockResolvedValue(operation());
   mocks.database.mockResolvedValue({ get: mocks.get });
-  mocks.get.mockResolvedValue(capture);
   mocks.close.mockResolvedValue(undefined);
   mocks.history.mockReturnValue(true);
   mocks.writer.mockReturnValue({ send: mocks.history, dispose: vi.fn() });
@@ -176,7 +174,7 @@ describe('native sync execution adapter', () => {
       snapshot: { state: 'published', stage: 'published', runId: null, failureCode: null },
     });
     expect(mocks.queue).toHaveBeenCalledExactlyOnceWith(selected.scope, selected.operationId);
-    expect(mocks.get).toHaveBeenCalledExactlyOnceWith('sync_capture', 'native-capture');
+    expect(mocks.get).not.toHaveBeenCalled();
     expect(mocks.webdav).toHaveBeenCalledExactlyOnceWith(
       {
         rootUrl: 'https://dav.example/root/',
@@ -190,7 +188,6 @@ describe('native sync execution adapter', () => {
       authorization: selected.authorization,
       operationId: selected.operationId,
       expectedRevision: 3,
-      capture,
       remote,
       signal: selected.signal,
       authorize: expect.any(Function),

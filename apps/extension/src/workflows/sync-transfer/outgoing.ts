@@ -1,8 +1,16 @@
+import { releasePublishedOperationPins } from '../../composition/persistence/assets/operations';
+import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
+import {
+  SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
+} from '../../composition/persistence/infrastructure/indexed-db/core.stores';
+import type { SyncConnectionIdentity } from '../../composition/persistence/remote-connection/model';
 import { readAssetFile } from '../../composition/persistence/assets';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import {
   commitPreparedOutgoingOperation,
   loadPreparedOutgoingOperation,
+  readOutgoingOperation,
   preparedOutgoingOperationKey,
   type PreparedOutgoingOperation,
 } from '../../composition/persistence/sync-capture/outgoing';
@@ -20,7 +28,7 @@ import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
 import {
   createSyncAttempt,
   hashSyncText,
-  parseSyncAttemptText,
+  type parseSyncAttemptText,
   parseSyncOperationText,
 } from './wire-record';
 
@@ -40,13 +48,14 @@ async function hashFile(blob: Blob, signal?: AbortSignal) {
 /** Freeze the existing portable codec output and immutable source bindings before network IO. */
 export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedOutgoingOperation> {
   const parsed = parseSyncCaptureRecord(structuredClone(value));
-  check(parsed?.kind === 'captured-change');
+  check(parsed?.kind === 'sync-operation');
   const capture = parsed;
   const existing = await loadPreparedOutgoingOperation(capture.spaceId, capture.operationId);
   if (existing) {
     await parseSyncOperationText(existing.recordText);
     return commitPreparedOutgoingOperation(capture, existing);
   }
+  check(capture.phase === 'native');
   const portable =
     capture.change.kind === 'tombstone' ? null : await encodeCapturedPortableRoot(capture);
   const objects = [];
@@ -55,7 +64,12 @@ export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedO
     check(binding);
     const sha256 = await hashFile(object.blob);
     check(binding.ref.sha256 === null || binding.ref.sha256 === sha256);
-    objects.push({ objectId: object.ref.objectId, ref: binding.ref, sha256 });
+    objects.push({
+      objectId: object.ref.objectId,
+      ref: binding.ref,
+      sha256,
+      filename: object.ref.filename,
+    });
   }
   const recordText = JSON.stringify({
     format: 'sniptale-sync-operation',
@@ -78,7 +92,6 @@ export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedO
     envelope: portable?.envelope ?? null,
     objects: objects.map((item) => ({ objectId: item.objectId, sha256: item.sha256 })),
   });
-  const initial = await createSyncAttempt(recordText, crypto.randomUUID());
   const accepted = await commitPreparedOutgoingOperation(capture, {
     version: 1,
     key: preparedOutgoingOperationKey(capture.spaceId, capture.operationId),
@@ -91,39 +104,23 @@ export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedO
     operationId: capture.operationId,
     recordText,
     recordSha256: hashSyncText(recordText),
-    attemptKey: initial.recordKey,
-    objects: objects.map((object) => {
-      const key = initial.objects.find((item) => item.objectId === object.objectId);
-      check(key);
-      return { ...object, remoteKey: key.remoteKey };
-    }),
+    objects,
   });
-  check(accepted.recordText === recordText);
   return accepted;
 }
 
 async function reserveAttempt(prepared: PreparedOutgoingOperation, retained: Map<string, string>) {
-  const initialId = prepared.attemptKey.split('/').at(-1)?.slice(0, 36);
-  check(initialId);
-  const initial = await createSyncAttempt(prepared.recordText, initialId);
-  check(initial.recordKey === prepared.attemptKey);
-  check(
-    JSON.stringify(initial.objects) ===
-      JSON.stringify(prepared.objects.map(({ objectId, remoteKey }) => ({ objectId, remoteKey })))
-  );
   const admit = async (physical: Awaited<ReturnType<typeof createSyncAttempt>>) =>
     commitOutgoingDispatchAttempt(prepared, {
       version: 1,
       spaceId: prepared.spaceId,
       operationId: prepared.operationId,
       connectionGeneration: prepared.connectionGeneration,
+      profileCreatedAt: prepared.profileCreatedAt,
+      captureSha256: prepared.captureSha256,
       preparedSha256: prepared.recordSha256,
       ...physical,
     });
-  if (retained.size === 0) {
-    const first = await admit(initial);
-    if (first.created) return first.attempt;
-  }
   const fresh = await createSyncAttempt(prepared.recordText, crypto.randomUUID());
   const physical = await createSyncAttempt(
     prepared.recordText,
@@ -194,36 +191,7 @@ async function readDispatchSources(
   return files;
 }
 
-type CompletedFileCandidate = Awaited<ReturnType<typeof loadCompletedOutgoingFiles>>[number];
 type ParsedPhysicalAttempt = Awaited<ReturnType<typeof parseSyncAttemptText>>;
-
-async function readCompletedCandidate(
-  candidate: CompletedFileCandidate,
-  parsed: Map<string, ParsedPhysicalAttempt>
-) {
-  let physical = parsed.get(candidate.attempt.key);
-  if (!physical) {
-    physical = await parseSyncAttemptText(candidate.attempt.recordText);
-    check(
-      physical.recordKey === candidate.attempt.recordKey &&
-        physical.recordSha256 === candidate.attempt.recordSha256 &&
-        JSON.stringify(physical.objects) === JSON.stringify(candidate.attempt.objects) &&
-        JSON.stringify(physical.operation) === candidate.prepared.recordText &&
-        physical.operation.spaceId === candidate.attempt.spaceId &&
-        physical.operation.spaceId === candidate.prepared.spaceId &&
-        physical.operation.operationId === candidate.attempt.operationId &&
-        physical.operation.operationId === candidate.prepared.operationId
-    );
-    parsed.set(candidate.attempt.key, physical);
-  }
-  const object = physical.operation.envelope?.objects.find(
-    (item) => item.objectId === candidate.objectId
-  );
-  const digest = physical.operation.objects.find((item) => item.objectId === candidate.objectId);
-  const binding = physical.objects.find((item) => item.objectId === candidate.objectId);
-  check(object && digest && binding);
-  return { object, digest, binding };
-}
 
 async function canReuseRemoteFile(
   remote: SyncRemoteStore,
@@ -326,7 +294,10 @@ async function readCatalogCandidates(candidates: CatalogCandidate[], spaceId: st
 }
 
 type RetainedFileCandidate = {
-  object: NonNullable<ParsedPhysicalAttempt['operation']['envelope']>['objects'][number];
+  object: Pick<
+    NonNullable<ParsedPhysicalAttempt['operation']['envelope']>['objects'][number],
+    'objectId' | 'filename' | 'size' | 'mimeType'
+  >;
   digest: ParsedPhysicalAttempt['operation']['objects'][number];
   binding: ParsedPhysicalAttempt['objects'][number];
 };
@@ -337,9 +308,17 @@ async function readRetainedCandidates(
   catalog: CatalogCandidate[]
 ) {
   const candidates: RetainedFileCandidate[] = [];
-  const parsed = new Map<string, ParsedPhysicalAttempt>();
   for (const candidate of await loadCompletedOutgoingFiles(spaceId, connectionGeneration))
-    candidates.push(await readCompletedCandidate(candidate, parsed));
+    candidates.push({
+      object: {
+        objectId: candidate.objectId,
+        filename: candidate.filename,
+        size: candidate.ref.size,
+        mimeType: candidate.ref.mimeType,
+      },
+      digest: { objectId: candidate.objectId, sha256: candidate.sha256 },
+      binding: { objectId: candidate.objectId, remoteKey: candidate.remoteKey },
+    });
   for (const physical of await readCatalogCandidates(catalog, spaceId)) {
     for (const object of physical.operation.envelope?.objects ?? []) {
       const digest = physical.operation.objects.find((item) => item.objectId === object.objectId);
@@ -352,6 +331,7 @@ async function readRetainedCandidates(
 }
 
 async function selectRetainedFiles(
+  preparedText: string,
   spaceId: string,
   connectionGeneration: number,
   files: Awaited<ReturnType<typeof readDispatchSources>>,
@@ -361,6 +341,7 @@ async function selectRetainedFiles(
   checkReusedContents: boolean
 ) {
   const candidates = await readRetainedCandidates(spaceId, connectionGeneration, catalog);
+  const defaultBindings = await createSyncAttempt(preparedText, crypto.randomUUID());
   const retained = new Map<string, string>();
   const checked = new Map<string, boolean>();
   for (const source of files) {
@@ -374,6 +355,17 @@ async function selectRetainedFiles(
         object.filename !== source.expected.filename
       )
         continue;
+      try {
+        await createSyncAttempt(
+          preparedText,
+          defaultBindings.attemptId,
+          defaultBindings.objects.map((item) =>
+            item.objectId === source.objectId ? { ...item, remoteKey: binding.remoteKey } : item
+          )
+        );
+      } catch {
+        continue;
+      }
       const verificationKey = JSON.stringify([binding.remoteKey, object.size, digest.sha256]);
       let valid = checked.get(verificationKey);
       if (valid === undefined) {
@@ -417,6 +409,7 @@ export async function dispatchPreparedOutgoing(
   const files = await readDispatchSources(prepared, spaceId, operationId, signal);
   signal.throwIfAborted();
   const retained = await selectRetainedFiles(
+    prepared.recordText,
     spaceId,
     prepared.connectionGeneration,
     files,
@@ -439,7 +432,9 @@ export async function dispatchPreparedOutgoing(
     await commitCompletedOutgoingFile(prepared, attempt, binding.objectId);
   }
   signal.throwIfAborted();
-  const manifest = new Blob([attempt.recordText], { type: 'application/json' });
+  const physical = await createSyncAttempt(prepared.recordText, attempt.attemptId, attempt.objects);
+  check(physical.recordKey === attempt.recordKey && physical.recordSha256 === attempt.recordSha256);
+  const manifest = new Blob([physical.recordText], { type: 'application/json' });
   await remote.write(attempt.recordKey, manifest, signal);
   await verifyRemote(remote, attempt.recordKey, manifest.size, attempt.recordSha256, signal);
   signal.throwIfAborted();
@@ -451,7 +446,7 @@ export async function dispatchPreparedOutgoing(
 export async function findObservedOutgoingPublication(
   prepared: PreparedOutgoingOperation,
   catalog: OutgoingCatalog | undefined
-): Promise<OutgoingDispatchAttempt | null> {
+): Promise<(OutgoingDispatchAttempt & { recordText: string }) | null> {
   const candidates = snapshotCatalogCandidates(catalog, prepared.spaceId).filter(
     (item) =>
       item.operationId === prepared.operationId && item.operationText === prepared.recordText
@@ -473,10 +468,38 @@ export async function findObservedOutgoingPublication(
     operationId: prepared.operationId,
     connectionGeneration: prepared.connectionGeneration,
     preparedSha256: prepared.recordSha256,
+    profileCreatedAt: prepared.profileCreatedAt,
+    captureSha256: prepared.captureSha256,
     attemptId: physical.attemptId,
     recordText: physical.recordText,
     recordSha256: physical.recordSha256,
     recordKey: physical.recordKey,
     objects: physical.objects,
   };
+}
+
+/** Verify current remote bytes before asking the native asset owner to retire compact pins. */
+export async function releasePublishedOutgoing(
+  spaceId: string,
+  operationId: string,
+  authorization: SyncConnectionIdentity,
+  remote: SyncRemoteStore,
+  signal: AbortSignal
+) {
+  signal.throwIfAborted();
+  const db = await initDB();
+  const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
+  const operation = await readOutgoingOperation(tx, spaceId, operationId);
+  await tx.done;
+  check(operation?.phase === 'published');
+  return releasePublishedOperationPins(
+    operation,
+    authorization,
+    async (object) => {
+      signal.throwIfAborted();
+      await verifyRemote(remote, object.remoteKey, object.ref.size, object.sha256, signal);
+      signal.throwIfAborted();
+    },
+    signal
+  );
 }

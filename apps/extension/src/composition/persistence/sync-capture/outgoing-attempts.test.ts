@@ -1,3 +1,4 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
@@ -34,7 +35,7 @@ function preparedDraft(
   return {
     version: 1,
     key: preparedOutgoingOperationKey(capture.spaceId, capture.operationId),
-    createdAt: 2,
+    createdAt: capture.createdAt,
     spaceId: capture.spaceId,
     connectionGeneration: capture.connectionGeneration,
     captureKey: capture.key,
@@ -45,10 +46,9 @@ function preparedDraft(
     recordSha256: Array.from(sha256(new TextEncoder().encode(text)), (byte) =>
       byte.toString(16).padStart(2, '0')
     ).join(''),
-    attemptKey: `attempts/${capture.operationId}/record.json`,
     objects: refs.map((ref) => ({
       objectId: 'body',
-      remoteKey: 'objects/body',
+      filename: 'original.png',
       ref,
       sha256: 'b'.repeat(64),
     })),
@@ -84,9 +84,9 @@ function setup() {
     size: ref.size,
     lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
   });
-  const capture: CapturedChange = {
+  const capture: CapturedChange = createNativeCapture({
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
     key: '["change","op"]',
     createdAt: 1,
     spaceId: 'space',
@@ -113,7 +113,7 @@ function setup() {
         },
       },
     },
-  };
+  });
   table('sync_capture').set(capture.key, structuredClone(capture));
   return {
     ...fixture,
@@ -129,7 +129,17 @@ const FIRST = '11111111-1111-4111-8111-111111111111';
 const SECOND = '22222222-2222-4222-8222-222222222222';
 
 function attempt(operationId = 'op', attemptId = FIRST): OutgoingDispatchAttemptDraft {
-  const recordText = JSON.stringify({ operationId, attemptId });
+  const objects = [{ objectId: 'body', remoteKey: `Originals/${attemptId}/original 100%.png` }];
+  const recordText = JSON.stringify({
+    format: 'sniptale-sync-attempt',
+    version: 1,
+    operationText: '{"record":1}',
+    operationSha256: Array.from(sha256(new TextEncoder().encode('{"record":1}')), (byte) =>
+      byte.toString(16).padStart(2, '0')
+    ).join(''),
+    attemptId,
+    objects,
+  });
   return {
     version: 1,
     spaceId: 'space',
@@ -163,7 +173,10 @@ it('detaches the complete expected and draft evidence before awaiting admission'
   proposed.objects[0]!.remoteKey = 'changed';
   proposed.recordText = 'changed';
   f.accepted.captureSha256 = 'c'.repeat(64);
-  expect(await pending).toMatchObject({ attempt: expected, created: true });
+  expect(await pending).toMatchObject({
+    attempt: { attemptId: expected.attemptId, recordSha256: expected.recordSha256 },
+    created: true,
+  });
 });
 
 it('retains independent attempts from concurrent callers with controlled admission ordering', async () => {
@@ -198,9 +211,7 @@ it('returns exact accepted evidence on retry and refuses contradictory identity 
   });
   const before = structuredClone(f.rows);
   proposed.objects[0]!.remoteKey = 'Originals/different.png';
-  await expect(commitOutgoingDispatchAttempt(f.accepted, proposed)).rejects.toThrow(
-    'Contradictory'
-  );
+  await expect(commitOutgoingDispatchAttempt(f.accepted, proposed)).rejects.toThrow('Invalid');
   expect(f.rows).toEqual(before);
 });
 
@@ -221,7 +232,7 @@ it('retains old captured evidence after deletion and identity recreation', async
   });
   f.table('sync_capture').set('latest', { kind: 'root-state', generation: 3 });
   expect(await commitOutgoingDispatchAttempt(f.accepted, proposed)).toMatchObject({
-    attempt: proposed,
+    attempt: { attemptId: proposed.attemptId, recordSha256: proposed.recordSha256 },
     created: true,
   });
   const wrongOperation = { ...proposed, operationId: 'recreated' };
@@ -240,11 +251,11 @@ it('aborts a failed commit and permits exact retry without changing captures or 
   expect(f.rows).toEqual(before);
   f.failWrites(false);
   expect(await commitOutgoingDispatchAttempt(f.accepted, proposed)).toMatchObject({
-    attempt: proposed,
+    attempt: { attemptId: proposed.attemptId, recordSha256: proposed.recordSha256 },
     created: true,
   });
   expect(f.table('sync_capture')).toEqual(before.get('sync_capture'));
-  expect(f.table('sync_outbox').get(f.accepted.key)).toEqual(f.accepted);
+  expect(f.table('sync_outbox').get(f.accepted.key)).toMatchObject({ kind: 'operation-locator' });
 });
 
 it.each(['disabled', 'connection', 'space', 'capture', 'missing-capture', 'prepared'])(
@@ -270,7 +281,11 @@ it.each(['disabled', 'connection', 'space', 'capture', 'missing-capture', 'prepa
       f.table('sync_capture').set(f.capture.key, { ...f.capture, createdAt: 99 });
     if (kind === 'missing-capture') f.table('sync_capture').delete(f.capture.key);
     if (kind === 'prepared')
-      f.table('sync_outbox').set(f.accepted.key, { ...f.accepted, createdAt: 99 });
+      f.table('sync_capture').set(f.capture.key, {
+        ...f.capture,
+        phase: 'prepared',
+        prepared: { ...f.accepted, recordSha256: 'a'.repeat(64) },
+      });
     const before = structuredClone(f.rows);
     await expect(commitOutgoingDispatchAttempt(f.accepted, proposed)).rejects.toThrow('changed');
     expect(f.rows).toEqual(before);
@@ -327,7 +342,10 @@ it('loads retained evidence without writes or current profile authority and refu
   const before = structuredClone(f.rows);
   expect(await loadOutgoingDispatchAttempt('space', 'op', FIRST)).toEqual(accepted.attempt);
   expect(f.rows).toEqual(before);
-  f.table('sync_outbox').set(accepted.attempt.key, { ...accepted.attempt, recordText: 'corrupt' });
+  f.table('sync_outbox').set(accepted.attempt.key, {
+    ...accepted.attempt,
+    recordSha256: 'corrupt',
+  });
   await expect(loadOutgoingDispatchAttempt('space', 'op', FIRST)).rejects.toThrow('Invalid');
 });
 
@@ -354,6 +372,7 @@ async function completionFixture() {
 it('admits monotonic completion under controlled parallel writers without changing the attempt', async () => {
   const f = await completionFixture();
   const frozen = structuredClone(f.attempt);
+  expect(frozen).not.toHaveProperty('recordText');
   let release: () => void = () => undefined;
   io.database.mockResolvedValueOnce(f.database).mockImplementationOnce(
     () =>
@@ -369,7 +388,13 @@ it('admits monotonic completion under controlled parallel writers without changi
   expect(f.table('sync_outbox').size).toBe(3);
   expect(f.table('sync_outbox').get(f.attempt.key)).toEqual(frozen);
   expect(await loadCompletedOutgoingFiles('space', 3)).toEqual([
-    { prepared: f.accepted, attempt: frozen, objectId: 'body' },
+    expect.objectContaining({
+      operationId: 'op',
+      objectId: 'body',
+      ref: f.accepted.objects[0]!.ref,
+      filename: 'original.png',
+      remoteKey: frozen.objects[0]!.remoteKey,
+    }),
   ]);
 });
 it('keeps delayed completion with its retained capture after delete and restore', async () => {
@@ -409,8 +434,8 @@ it('keeps delayed completion with its retained capture after delete and restore'
   await expect(
     commitCompletedOutgoingFile({ ...f.accepted, operationId: 'recreated' }, f.attempt, 'body')
   ).rejects.toThrow('Invalid');
-  expect((await loadCompletedOutgoingFiles('space', 3))[0]?.prepared.operationId).toBe('op');
-  expect((await loadCompletedOutgoingFiles('space', 3))[0]?.prepared.captureSha256).toBe(
+  expect((await loadCompletedOutgoingFiles('space', 3))[0]?.operationId).toBe('op');
+  expect((await loadCompletedOutgoingFiles('space', 3))[0]?.captureSha256).toBe(
     f.accepted.captureSha256
   );
 });
@@ -454,26 +479,42 @@ it('refuses delayed completion after connection change and never exposes old con
   expect(await loadCompletedOutgoingFiles('space', 4)).toEqual([]);
   await expect(loadCompletedOutgoingFiles('space', 3)).rejects.toThrow('changed');
 });
-it.each(['capture', 'prepared', 'attempt', 'completion'])(
-  'refuses a corrupted %s completion join without read-side writes',
+it('reads self-contained completed facts after source payload and attempt removal', async () => {
+  const f = await completionFixture();
+  await commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
+  f.table('sync_capture').delete(f.capture.key);
+  f.table('sync_outbox').delete(f.accepted.key);
+  f.table('sync_outbox').delete(f.attempt.key);
+  const before = structuredClone(f.rows);
+  expect(await loadCompletedOutgoingFiles('space', 3)).toEqual([
+    expect.objectContaining({
+      objectId: 'body',
+      filename: 'original.png',
+      sha256: 'b'.repeat(64),
+      profileCreatedAt: 1,
+    }),
+  ]);
+  expect(f.rows).toEqual(before);
+});
+it.each(['sha256', 'ref', 'filename', 'lifetime'])(
+  'refuses corrupted self-contained completion %s without writes',
   async (kind) => {
     const f = await completionFixture();
     await commitCompletedOutgoingFile(f.accepted, f.attempt, 'body');
-    if (kind === 'capture')
-      f.table('sync_capture').set(f.capture.key, { ...f.capture, createdAt: 999 });
-    if (kind === 'prepared')
-      f.table('sync_outbox').set(f.accepted.key, { ...f.accepted, captureSha256: 'a'.repeat(64) });
-    if (kind === 'attempt')
-      f.table('sync_outbox').set(f.attempt.key, { ...f.attempt, recordSha256: 'a'.repeat(64) });
-    if (kind === 'completion')
-      for (const [key, value] of f.table('sync_outbox')) {
-        if (key.startsWith('completed-file:'))
-          f.table('sync_outbox').set(key, {
-            ...(typeof value === 'object' && value !== null ? value : {}),
-            captureSha256: 'a'.repeat(64),
-          });
-      }
-    f.failWrites(true);
+    for (const [key, value] of f.table('sync_outbox')) {
+      if (!key.startsWith('completed-file:') || typeof value !== 'object' || value === null)
+        continue;
+      f.table('sync_outbox').set(key, {
+        ...value,
+        ...(kind === 'sha256'
+          ? { sha256: 'bad' }
+          : kind === 'ref'
+            ? { ref: null }
+            : kind === 'filename'
+              ? { filename: '' }
+              : { profileCreatedAt: 99 }),
+      });
+    }
     const before = structuredClone(f.rows);
     await expect(loadCompletedOutgoingFiles('space', 3)).rejects.toThrow('Invalid');
     expect(f.rows).toEqual(before);

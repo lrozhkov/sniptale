@@ -2,17 +2,17 @@ import type { IDBPTransaction } from 'idb';
 import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import {
   captureRootKey,
-  MAX_PENDING_CAPTURES,
   SYNC_CAPTURE_PROFILE_KEY,
   type CaptureOrigin,
   type CaptureRootKind,
   type CapturedChange,
+  type CaptureOperation,
   type SyncCaptureProfile,
   type SyncCaptureRootState,
   type CapturedVideoProjectRows,
   type CapturedMediaDependency,
 } from './contracts';
-import { parseSyncCaptureRecord } from './guards';
+import { fingerprintNativeCapture, parseSyncCaptureRecord } from './guards';
 import {
   freezeVideoProjectInTransaction,
   freezeMediaInTransaction,
@@ -38,7 +38,7 @@ export async function captureVideoProjectInTransaction(
   tx: CaptureTransaction,
   projectId: string,
   options: { origin?: CaptureOrigin; publicationId?: string } = {}
-): Promise<CapturedChange | null> {
+): Promise<CaptureOperation | null> {
   const profile = await readEnabledCaptureProfile(tx);
   if (!profile) return null;
   const replay = await readPublicationReplay(
@@ -66,7 +66,7 @@ export async function captureMediaInTransaction(
   tx: CaptureTransaction,
   mediaId: string,
   options: { origin?: CaptureOrigin; publicationId?: string } = {}
-): Promise<CapturedChange | null> {
+): Promise<CaptureOperation | null> {
   const profile = await readEnabledCaptureProfile(tx);
   if (!profile) return null;
   const replay = await readPublicationReplay(tx, profile, 'media', mediaId, options.publicationId);
@@ -145,7 +145,7 @@ export async function captureDeletionInTransaction(
   rootKind: CaptureRootKind,
   rootId: string,
   origin: CaptureOrigin = 'local-edit'
-): Promise<CapturedChange | null> {
+): Promise<CaptureOperation | null> {
   const profile = await readEnabledCaptureProfile(tx);
   return profile
     ? appendCapture(tx, profile, rootKind, rootId, { kind: 'tombstone' }, { origin })
@@ -158,7 +158,7 @@ async function readPublicationReplay(
   rootKind: CaptureRootKind,
   rootId: string,
   publicationId?: string
-): Promise<CapturedChange | null> {
+): Promise<CaptureOperation | null> {
   if (publicationId === undefined) return null;
   const raw: unknown = await tx
     .objectStore(SYNC_CAPTURE_STORE)
@@ -167,11 +167,12 @@ async function readPublicationReplay(
   const record = parseSyncCaptureRecord(raw);
   if (
     !record ||
-    record.kind !== 'captured-change' ||
+    record.kind !== 'sync-operation' ||
     record.spaceId !== profile.spaceId ||
     record.rootKind !== rootKind ||
     record.rootId !== rootId ||
     record.publicationId !== publicationId ||
+    record.profileCreatedAt !== profile.createdAt ||
     record.connectionGeneration !== profile.connectionGeneration
   )
     throw new Error('Invalid sync capture publication receipt.');
@@ -196,8 +197,6 @@ async function appendCapture(
   options: { origin?: CaptureOrigin; publicationId?: string }
 ): Promise<CapturedChange> {
   const store = tx.objectStore(SYNC_CAPTURE_STORE);
-  if ((await store.index('kind').count('captured-change')) >= MAX_PENDING_CAPTURES)
-    throw new Error('The experimental sync capture queue is full.');
   const rootKey = captureRootKey(profile.spaceId, rootKind, rootId);
   const stateKey = JSON.stringify(['root-state', rootKey]);
   const previousRaw: unknown = await store.get(stateKey);
@@ -212,9 +211,21 @@ async function appendCapture(
   const generation = (previous?.generation ?? 0) + 1;
   const operationId = crypto.randomUUID();
   const createdAt = Date.now();
-  const record: CapturedChange = {
+  const input: Omit<CapturedChange, 'sourceSha256'> = {
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
+    phase: 'native',
+    profileCreatedAt: profile.createdAt,
+    source: {
+      changeKind: change.kind,
+      label:
+        (change.kind === 'media'
+          ? change.rows.media.filename
+          : change.kind === 'video-project'
+            ? change.rows.project.project.name
+            : rootId
+        ).trim() || rootId,
+    },
     key:
       options.publicationId === undefined
         ? JSON.stringify(['change', operationId])
@@ -232,6 +243,7 @@ async function appendCapture(
     publicationId: options.publicationId ?? null,
     change,
   };
+  const record: CapturedChange = { ...input, sourceSha256: fingerprintNativeCapture(input) };
   if (!parseSyncCaptureRecord(record)) throw new Error('Invalid accepted sync capture.');
   const state: SyncCaptureRootState = {
     version: 1,

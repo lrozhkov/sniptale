@@ -139,7 +139,7 @@ async function assertUnclaimedIdentity(
     .index('rootKey')
     .getAll(identity.rootKey)) {
     const record = parseSyncCaptureRecord(raw);
-    if (!record || record.kind === 'captured-change')
+    if (!record || (record.kind === 'sync-operation' && record.phase !== 'published'))
       throw new MediaReplicaConflictError('source-changed');
   }
 }

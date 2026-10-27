@@ -55,7 +55,7 @@ export async function deliverSyncQueueHistory(
     // Cold database admission precedes the shared mutation permit.
     await initDB();
     const result = await tryRunWithPersistenceMutationPermit(async (permit) => {
-      const batch = await loadSyncQueueHistoryBatch(selection.scope, selection.source);
+      const batch = await loadSyncQueueHistoryBatch(selection.scope, selection.source, permit);
       if (batch.throughSequence === batch.deliveredSequence) return true;
       const rows = journalRows(batch, new Date().toISOString());
       if (!(await createRuntimeLog().appendConfirmed(rows, permit))) return false;

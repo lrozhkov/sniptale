@@ -16,13 +16,17 @@ import {
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseSyncCaptureRecord } from './guards';
-import { type CapturedChange, type CaptureRootKind } from './contracts';
-import { matchesCapture, parsePrepared, preparedOutgoingOperationKey } from './outgoing';
-import { matchesOutgoingDispatchPrepared, parseOutgoingDispatchAttempt } from './outgoing-attempts';
+import { type CaptureOperation, type CapturedChange, type CaptureRootKind } from './contracts';
+import { parsePrepared } from './outgoing';
+import {
+  matchesOutgoingDispatchPrepared,
+  parseOutgoingDispatchAttempt,
+  validateOutgoingDispatchBytes,
+} from './outgoing-attempts';
 import {
   parseVerifiedOutgoingResult,
-  verifiedOutgoingResultKey,
-  matchesVerifiedOutgoingResult,
+  readPublishedOutgoingResult,
+  publishOutgoingInTransaction,
 } from './outgoing-results';
 import {
   parseSyncQueueScope,
@@ -32,7 +36,6 @@ import {
   queueOperationKey,
   queueOperationPrefix,
   sameQueueScope,
-  queueHash,
   queueOrdinal,
   queueIdentity,
   queueUuid,
@@ -117,7 +120,7 @@ async function readOperationCapture(
   tx: QueueTransaction,
   scope: SyncQueueScope,
   id: string
-): Promise<{ operation: SyncQueueOperation; capture: CapturedChange }> {
+): Promise<{ operation: SyncQueueOperation; capture: CaptureOperation }> {
   const row = parseSyncQueueOperation(
     await tx.objectStore(SYNC_OUTBOX_STORE).get(queueOperationKey(scope, id))
   );
@@ -128,13 +131,14 @@ async function readOperationCapture(
   );
   if (
     !capture ||
-    capture.kind !== 'captured-change' ||
+    capture.kind !== 'sync-operation' ||
     capture.operationId !== row.operationId ||
     capture.spaceId !== row.spaceId ||
     capture.connectionGeneration !== row.connectionGeneration ||
     capture.rootKey !== row.rootKey ||
     capture.generation !== row.generation ||
-    queueHash(JSON.stringify(capture)) !== row.captureSha256
+    capture.profileCreatedAt !== row.profileCreatedAt ||
+    capture.sourceSha256 !== row.captureSha256
   )
     throw new Error('Sync queue capture changed.');
   return { operation: row, capture };
@@ -256,19 +260,13 @@ interface SyncQueueSource {
   label: string;
   createdAt: number;
 }
-function queueSource(capture: CapturedChange): SyncQueueSource {
-  const label =
-    capture.change.kind === 'media'
-      ? capture.change.rows.media.filename
-      : capture.change.kind === 'video-project'
-        ? capture.change.rows.project.project.name
-        : capture.rootId;
+function queueSource(capture: CaptureOperation): SyncQueueSource {
   return {
     operationId: capture.operationId,
     rootKind: capture.rootKind,
     rootId: capture.rootId,
-    changeKind: capture.change.kind,
-    label: label.trim() || capture.rootId,
+    changeKind: capture.source.changeKind,
+    label: capture.source.label,
     createdAt: capture.createdAt,
   };
 }
@@ -310,7 +308,7 @@ export async function loadSyncQueuePage(value: SyncQueueScope, options: unknown 
 /** Admit a retained capture in the caller's mutation transaction. The caller owns commit and abort. */
 export async function enqueueSyncQueueCaptureInTransaction(
   tx: IDBPTransaction<unknown, string[], 'readwrite'>,
-  capture: CapturedChange
+  capture: CaptureOperation
 ): Promise<{ operation: SyncQueueOperation; existing: boolean }> {
   const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
   const current = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get(capture.key));
@@ -319,6 +317,7 @@ export async function enqueueSyncQueueCaptureInTransaction(
     profile.kind !== 'profile' ||
     profile.spaceId !== capture.spaceId ||
     profile.connectionGeneration !== capture.connectionGeneration ||
+    profile.createdAt !== capture.profileCreatedAt ||
     !current ||
     JSON.stringify(current) !== JSON.stringify(capture)
   )
@@ -341,6 +340,7 @@ export async function enqueueSyncQueueCaptureInTransaction(
     const accepted = await readOperation(tx, scope, capture.operationId);
     return { operation: accepted, existing: true };
   }
+  if (capture.phase === 'published') throw new Error('Published operation cannot be enqueued.');
   const row: SyncQueueOperation = recordQueueTransition(
     {
       ...scope,
@@ -349,7 +349,7 @@ export async function enqueueSyncQueueCaptureInTransaction(
       key,
       operationId: capture.operationId,
       captureKey: capture.key,
-      captureSha256: queueHash(JSON.stringify(capture)),
+      captureSha256: capture.sourceSha256,
       rootKey: capture.rootKey,
       generation: capture.generation,
       revision: 1,
@@ -381,8 +381,7 @@ export async function enqueueSyncQueueCaptureInTransaction(
 /** Freeze the exact retained native capture identity; repeated enqueue is idempotent. */
 export async function enqueueSyncQueueOperation(value: unknown): Promise<SyncQueueOperation> {
   const capture = parseSyncCaptureRecord(structuredClone(value));
-  if (!capture || capture.kind !== 'captured-change')
-    throw new Error('Invalid sync queue capture.');
+  if (!capture || capture.kind !== 'sync-operation') throw new Error('Invalid sync queue capture.');
   return withSyncQueueTransaction(
     async (tx) => (await enqueueSyncQueueCaptureInTransaction(tx, capture)).operation
   );
@@ -640,85 +639,7 @@ type SyncQueueCompletionWitness =
   | { kind: 'verified'; result: unknown }
   | { kind: 'observed'; prepared: unknown; attempt: unknown };
 
-async function readQueuePreparation(tx: QueueTransaction, current: SyncQueueOperation) {
-  const prepared = parsePrepared(
-    await tx
-      .objectStore(SYNC_OUTBOX_STORE)
-      .get(preparedOutgoingOperationKey(current.spaceId, current.operationId))
-  );
-  const capture = parseSyncCaptureRecord(
-    await tx.objectStore(SYNC_CAPTURE_STORE).get(current.captureKey)
-  );
-  if (
-    !prepared ||
-    !capture ||
-    capture.kind !== 'captured-change' ||
-    !matchesCapture(prepared, capture) ||
-    prepared.captureSha256 !== current.captureSha256 ||
-    prepared.operationId !== current.operationId ||
-    prepared.spaceId !== current.spaceId ||
-    prepared.connectionGeneration !== current.connectionGeneration
-  )
-    throw new Error('Sync queue completion source changed.');
-  return prepared;
-}
-
-type AcceptedQueueWitness =
-  | { kind: 'verified'; result: NonNullable<ReturnType<typeof parseVerifiedOutgoingResult>> }
-  | {
-      kind: 'observed';
-      prepared: NonNullable<ReturnType<typeof parsePrepared>>;
-      attempt: NonNullable<ReturnType<typeof parseOutgoingDispatchAttempt>>;
-    };
-async function readQueueCompletionAttempt(
-  tx: QueueTransaction,
-  prepared: NonNullable<ReturnType<typeof parsePrepared>>,
-  witness: AcceptedQueueWitness
-) {
-  const store = tx.objectStore(SYNC_OUTBOX_STORE);
-  const result = witness.kind === 'verified' ? witness.result : null;
-  const observedPrepared = witness.kind === 'observed' ? witness.prepared : null;
-  let attempt = witness.kind === 'observed' ? witness.attempt : null;
-  if (result) {
-    const stored = parseVerifiedOutgoingResult(
-      await store.get(
-        verifiedOutgoingResultKey(
-          prepared.spaceId,
-          prepared.connectionGeneration,
-          prepared.operationId
-        )
-      )
-    );
-    attempt = parseOutgoingDispatchAttempt(await store.get(result.attemptKey));
-    if (
-      !stored ||
-      JSON.stringify(stored) !== JSON.stringify(result) ||
-      !attempt ||
-      !matchesOutgoingDispatchPrepared(attempt, prepared) ||
-      !matchesVerifiedOutgoingResult(result, prepared, attempt)
-    )
-      throw new Error('Sync queue verified result changed.');
-  } else if (
-    !observedPrepared ||
-    !attempt ||
-    JSON.stringify(observedPrepared) !== JSON.stringify(prepared) ||
-    !matchesOutgoingDispatchPrepared(attempt, prepared)
-  ) {
-    throw new Error('Sync queue observed publication changed.');
-  }
-  if (!attempt) throw new Error('Invalid sync queue publication attempt.');
-  let physical: unknown;
-  try {
-    physical = JSON.parse(attempt.recordText);
-  } catch {
-    throw new Error('Invalid sync queue publication bytes.');
-  }
-  if (!isRecord(physical) || physical['operationText'] !== prepared.recordText)
-    throw new Error('Sync queue publication logical bytes changed.');
-  return attempt;
-}
-
-/** Complete an exact active run from native receipt joins or checked observed physical publication. */
+/** Complete from compact native publication; observed publication compacts in this transaction. */
 export async function completeSyncQueueRun(
   value: SyncQueueRun,
   witness: SyncQueueCompletionWitness
@@ -728,40 +649,61 @@ export async function completeSyncQueueRun(
   if (!isRecord(detached)) throw new Error('Invalid sync queue completion.');
   const result =
     detached['kind'] === 'verified' ? parseVerifiedOutgoingResult(detached['result']) : null;
-  const observedPrepared =
-    detached['kind'] === 'observed' ? parsePrepared(detached['prepared']) : null;
-  const observedAttempt =
+  const prepared = detached['kind'] === 'observed' ? parsePrepared(detached['prepared']) : null;
+  const attempt =
     detached['kind'] === 'observed' ? parseOutgoingDispatchAttempt(detached['attempt']) : null;
-  let acceptedWitness: AcceptedQueueWitness;
-  if (result) acceptedWitness = { kind: 'verified', result };
-  else if (
-    observedPrepared &&
-    observedAttempt &&
-    matchesOutgoingDispatchPrepared(observedAttempt, observedPrepared)
-  )
-    acceptedWitness = { kind: 'observed', prepared: observedPrepared, attempt: observedAttempt };
-  else throw new Error('Invalid sync queue completion witness.');
+  if (prepared && attempt && isRecord(detached['attempt']))
+    validateOutgoingDispatchBytes(detached['attempt']['recordText'], prepared, attempt);
+  if (!result && (!prepared || !attempt || !matchesOutgoingDispatchPrepared(attempt, prepared)))
+    throw new Error('Invalid sync queue completion witness.');
   return mutateQueue(run.scope, async (tx) => {
-    const current = await readRun(tx, run);
-    await checkSyncConnectionAdmission(tx, run.scope, current.authorization);
-    const store = tx.objectStore(SYNC_OUTBOX_STORE);
-    const prepared = await readQueuePreparation(tx, current);
-    const attempt = await readQueueCompletionAttempt(tx, prepared, acceptedWitness);
+    const current = await readOperation(tx, run.scope, run.operationId);
+    if (
+      current.runId === run.runId &&
+      current.revision === run.revision &&
+      JSON.stringify(current.authorization) !== JSON.stringify(run.authorization)
+    )
+      throw new Error('Stale sync queue run.');
+    let publication = await readPublishedOutgoingResult(tx, current.spaceId, current.operationId);
+    if (prepared && attempt)
+      publication = (await publishOutgoingInTransaction(tx, prepared, attempt, 'observed')).result;
+    if (
+      !publication ||
+      (result && JSON.stringify(publication) !== JSON.stringify(result)) ||
+      publication.captureSha256 !== current.captureSha256 ||
+      publication.profileCreatedAt !== current.profileCreatedAt
+    )
+      throw new Error('Sync queue publication changed.');
+    // A late acknowledgement may compact the operation, but cannot revive cancelled or revoked controls.
+    if (
+      current.status === 'published' ||
+      current.status !== 'running' ||
+      current.runId !== run.runId ||
+      current.revision !== run.revision
+    )
+      return current;
+    const connection = await readConnection(tx, run.scope);
+    if (connection.paused) return current;
+    try {
+      await checkSyncConnectionAdmission(tx, run.scope, current.authorization);
+    } catch {
+      return current;
+    }
     const row = recordQueueTransition(
       {
         ...current,
         status: 'published',
         nextDueAt: null,
         stage: 'published',
-        outcome: result ? 'verified' : 'observed',
+        outcome: publication.publicationKind,
         runId: null,
         revision: nextRevision(current.revision),
-        attemptId: attempt.attemptId,
+        attemptId: publication.attemptId,
         failureCode: null,
       },
       'published'
     );
-    await store.put(row);
+    await tx.objectStore(SYNC_OUTBOX_STORE).put(row);
     return row;
   });
 }

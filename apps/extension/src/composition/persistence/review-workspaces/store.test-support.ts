@@ -28,6 +28,34 @@ export function fixtureWorkspaceValue(
   );
 }
 
+function compareFixturePrimaryKey(left: string, right: IDBValidKey): number {
+  if (typeof right === 'string') return left < right ? -1 : left > right ? 1 : 0;
+  return typeof right === 'number' || right instanceof Date ? 1 : -1;
+}
+
+function fixturePrimaryKeys(
+  store: Map<string, unknown>,
+  query?: IDBValidKey | IDBKeyRange,
+  count?: number
+): IDBValidKey[] {
+  const keys = [...store.keys()].sort();
+  const selected = keys.filter((key) => {
+    if (query === undefined) return true;
+    if (typeof query === 'object' && query !== null && 'lower' in query) {
+      const lower = query.lower;
+      const upper = query.upper;
+      const low = lower === undefined ? 1 : compareFixturePrimaryKey(key, lower);
+      const high = upper === undefined ? -1 : compareFixturePrimaryKey(key, upper);
+      return (
+        (low > 0 || (low === 0 && !query.lowerOpen)) &&
+        (high < 0 || (high === 0 && !query.upperOpen))
+      );
+    }
+    return compareFixturePrimaryKey(key, query) === 0;
+  });
+  return structuredClone(selected.slice(0, count ?? selected.length));
+}
+
 /** Shared transactional fixture retains commit/abort and quota behavior. */
 export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) => boolean) {
   const id = 'recording:beta-v1-recording';
@@ -92,6 +120,8 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
           return {
             get: async (key: IDBValidKey) => structuredClone(store.get(keyOf(key))),
             getAll: async () => structuredClone([...store.values()]),
+            getAllKeys: async (query?: IDBValidKey | IDBKeyRange, count?: number) =>
+              fixturePrimaryKeys(store, query, count),
             count: async () => store.size,
             index: (indexName: string) => {
               if (

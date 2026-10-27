@@ -724,13 +724,15 @@ Restore preserves authored project content and timestamps. It allocates local ad
 
 ## Experimental immutable sync capture
 
-The `syncCapture` contract version 1 introduced `sync_capture` in physical database version 40. The additive migration creates empty stores and preserves released domain rows and immutable objects. Migration does not enable capture.
+The additive sync stores preserve released domain rows and immutable objects. An explicit profile enables the bounded capture path. The profile remains disabled by default.
 
-An explicit experimental profile enables capture for a bounded Montage graph. The domain transaction saves the accepted project and its immutable native source snapshot together. Publication replay retains its original snapshot under the stable publication identity. Capture root state retains generation and causal predecessors after ordinary deletion and recreation. Capture generation does not allocate native project admission revisions.
+The domain transaction saves its accepted change and one native sync operation together. The operation header retains enrollment lifetime, causal identity, source fingerprint and display metadata. Root state independently retains generation and predecessors after deletion and recreation. Capture generation does not allocate native project admission revisions.
 
-The experiment accepts at most 32 rows in each captured collection and 1 MiB of metadata per snapshot. It retains at most 128 pending captures and refuses further capture mutations at that limit. These bounds apply to the experiment, not the planned release capacity. Missing dependencies or unsupported sidecars abort the enabled mutation. An absent or disabled profile does not read the project graph or append a capture.
+One operation key spans native, prepared and published phases. Preparation replaces the native snapshot with exact portable bytes. Publication replaces portable bytes with compact publication facts and immutable file descriptors. Publication replay uses stable identity in every phase. Queue controls and history do not require an old full snapshot.
 
-Pending captures retain physical assets through the existing asset retention authority. Invalid capture data refuses physical cleanup. No verified remote settlement exists in this experiment, so pending claims do not expire. Native media bytes remain in OPFS. The capture store contains metadata and references without media Blobs. The test-only frozen database adapter reuses the existing backup inventory and codecs. The test-only apply command reuses canonical restore and commits its provenance receipt with the native replacement. Neither test-only command provides a product runtime route.
+The bounded capture path accepts at most 32 rows in each collection and 1 MiB of metadata per native snapshot. No fixed operation-count limit blocks saving. Actual storage failure aborts the native transaction. Missing dependencies or unsupported sidecars refuse the enabled mutation. An absent or disabled profile does not read the graph or append an operation.
+
+Native and prepared phases retain file claims. Published operations retain explicit compact pins until checked release. Unknown prototype records remain unchanged and refuse sync and destructive cleanup. Native media bytes remain in OPFS. Sync records contain metadata and references without media Blobs. Existing backup codecs supply the portable representation.
 
 ## Prepared Montage revision publication
 
@@ -749,7 +751,7 @@ Project publication, detached private-resource release and the application recei
 
 The enabled experimental profile captures a published project-asset Library source in its native publication transaction. The capture has an independent operation identity. Pending media captures retain their physical files through the existing asset retention authority.
 
-Project capture records the causal heads of its editing dependencies in the same transaction. It compares the current normalized source snapshot with the digest of the accepted media head. A metadata change without a matching media revision causes refusal. Legacy experimental captures remain readable for retention, but do not supply this new dependency evidence.
+Project capture records the causal heads of its editing dependencies in the same transaction. It compares the current normalized source snapshot with the digest of the accepted media head. A metadata change without a matching media revision causes refusal. Unknown prototype records remain unchanged and prevent destructive cleanup. They do not supply admitted dependency evidence.
 
 The media replica command accepts a prepared original-only project-asset source whose native identity is absent. It publishes the Library row, child, ref, owner, causal state and receipt atomically. An exact receipt retry returns a duplicate. A retained deleted identity, existing native source, local pending change or changed connection causes refusal. This command does not replace existing roots or release staged files. The caller must verify bytes and retain durable staging protection until publication commits.
 
@@ -760,21 +762,23 @@ This bounded integration does not implement all media writers, existing-data boo
 
 ## Durable outgoing preparation
 
-The `syncCapture` contract version 2 owns `sync_outbox` and `sync_capture` in physical database version 41. The additive migration creates an empty outbox and preserves released rows and immutable objects. Older clients refuse the newer database. The profile remains disabled unless explicitly enabled.
+The existing sync_capture and sync_outbox stores retain the operation and a compact operation locator. The locator contains no portable payload. This first release format does not convert unsupported prototype records or change released native storage.
 
-The outbox retains exact prepared record text, its SHA256, the remote attempt key, and immutable source bindings. Record text has a 4 MiB UTF8 bound. Each operation admits at most 64 object bindings. The persistence owner checks primitive fields, the actual record digest, and exact captured source references. The workflow owns portable representation and protocol parsing.
+Preparation detaches inputs before database admission. The owner checks the exact normalized native source, its immutable fingerprint and enrollment lifetime. One transaction replaces the native phase with accepted portable text and immutable object bindings. It does not require the latest root generation. Earlier operations remain valid after later editing, deletion or recreation.
 
-Preparation detaches both inputs before database admission. The owner generates `captureSha256` from the normalized capture and stores this digest with the accepted record. An accepted record must retain this exact snapshot binding, including native metadata. One native transaction checks the enabled profile, space, connection generation, and exact normalized retained capture. It does not compare the capture with the latest root generation. Thus, an earlier retained capture remains usable after later edits, deletion, or recreation. The first accepted materialization wins. Every caller must use the returned accepted record, including its original bytes and keys. A changed capture or contradictory existing operation refuses without mutation. Native failure preserves capture records, source claims, and accepted outgoing records. Reads perform no writes. Preparation neither settles operations nor releases source claims.
+The first accepted encoding wins. Every caller uses the returned accepted value. Portable text has a 4 MiB UTF8 bound and at most 64 object bindings. The workflow owns portable and wire parsing. Physical attempt keys do not belong to preparation.
 
+A refused preparation preserves the native snapshot and claims. Repeated preparation returns accepted bytes without reading a newer live source. Reads perform no writes. Preparation does not authorize source release.
 
 ## Durable physical dispatch attempts
 
-The sync persistence owner stores immutable dispatch-attempt rows in the existing sync_outbox store. Each row retains the complete physical manifest text, its digest, remote manifest key and exact object-key map. Admission detaches inputs before awaits. One native transaction checks the enabled profile, space, connection generation, unchanged preparation and retained capture. An earlier retained capture remains admissible after later root editing, deletion or recreation.
+The sync persistence owner stores immutable attempt identities, digests, remote manifest keys and object mappings in sync_outbox. Attempts contain no portable or manifest text. The dispatcher reconstructs exact manifest text in memory from the accepted preparation and canonical wire encoder.
 
-The native command returns whether it inserted the attempt. An exact repeated attempt identity returns the accepted row with created false. Contradictory reuse refuses without replacement. The workflow uses this result to reserve the prepared initial physical attempt once. Each later explicit dispatch reserves a fresh manifest UUID before network writes. Files without checked completion evidence receive independent new paths. Native failure aborts and preserves every source claim and prepared operation. Reading evidence grants no dispatch authority.
+Admission detaches inputs before waits. The native transaction checks current enrollment, exact preparation and physical bindings. Exact attempt replay returns accepted metadata. Contradictory identity reuse refuses without replacement. Later dispatches reserve independent physical paths for unfinished files.
 
-The versioned workflow keeps exact logical operation bytes separate from the physical manifest. Domain metadata uses the existing portable backup codecs. Physical manifests map logical object IDs to ordinary remote files and carry the unchanged logical record text. Neither native file locations nor credentials enter remote records. The workflow checks actual source bytes and verifies remote files with streamed size and SHA checks. It uploads new files before publishing and checking the manifest. A failed or ambiguous dispatch preserves durable evidence and local sources. Verified dispatch does not settle or release a capture. Runtime authorization, scheduling, catalog conflict admission, source release and product enablement remain separate requirements.
+The wire format still carries unchanged logical operation text and ordinary remote file mappings. Native file locations and credentials do not enter remote records. Existing transfer adapters send the files. New files require acknowledged PUT and streamed size/SHA readback before completion evidence. Manifest publication follows file preparation.
 
+Unknown outcomes preserve the single prepared payload and physical attempt identities for recovery. Verified publication compacts the operation without granting source-release authority.
 
 ## Metadata catalog and selected replica preparation
 
@@ -787,13 +791,15 @@ Selected preparation refuses deleted, blocked, conflicting or unavailable roots.
 
 ## Checked remote file reuse
 
-The outgoing-attempt owner records completed files separately from immutable attempt rows in the existing sync_outbox store. The workflow admits this evidence only after an acknowledged file PUT and complete size and SHA readback. An unknown-outcome PUT does not supply completion evidence, even if a later read observes the expected bytes. A server-side write can remain pending after the client loses its response. Such a path receives no new references through local reuse discovery.
+The outgoing-attempt owner records compact completed-file facts after acknowledged PUT and complete size/SHA readback. Each fact retains enrollment, immutable source binding, digest, ordinary filename and remote path. It does not require a retained snapshot, portable text or physical manifest text.
 
-Completion admission checks the enabled profile, exact connection, retained preparation, capture and immutable attempt in one native transaction. Exact retry returns accepted evidence. Failure preserves attempts, preparations and source claims. Later deletion or recreation does not change retained capture evidence or grant authority over a new operation. Read-only reuse discovery checks stored evidence and its referenced records. It grants no dispatch or publication authority. The current bounded lookup remains a pilot capacity limit, not full R1 qualification.
+Unknown-outcome PUT does not supply completion evidence. A server write can remain pending after a lost response. Reuse never assigns new references to that uncertain path.
 
-The workflow compares candidate digest, size, MIME type and ordinary filename with the selected source. Normal reference reuse checks current existence and size through provider stat. Explicit content recheck verifies current candidate bytes before freezing the mapping. Missing or corrupt candidates receive independent replacement paths. The sender does not overwrite the candidate. Temporary failures, authorization failures and cancellation stop the affected dispatch. Each application dispatch keeps an independent manifest even when several revisions reference the same completed file. Wire admission confines mappings to the same space Files namespace and preserves canonical record bytes. Incoming preparation checks these retained mappings through the same wire owner before existing staging and journal admission.
+Completion admission checks the current enrollment, exact preparation and immutable attempt in one transaction. Exact retry returns accepted evidence. Failure preserves prior successful evidence and source claims. Read-only discovery checks compact descriptors. The current bounded lookup remains a capacity gate for the full release.
 
-This correction prevents repeated remote copies of checked unchanged files. It does not qualify incremental catalog performance, persisted cross-browser candidate discovery or full outbox retention. Local source validation costs still require capacity qualification before broad enablement.
+The workflow checks digest, size, MIME type and filename against the selected source. The wire owner confines retained mappings to the same space Files namespace. Normal reuse checks current existence and size. Explicit content recheck verifies bytes. Missing or corrupt candidates receive independent replacement paths. Temporary failures, authorization failures and cancellation stop the affected dispatch.
+
+Independent revisions retain independent manifests even when they reference the same completed file. Historical completion and provider stat grant no release authority. Local file retirement requires its own current integrity check.
 
 ## Metadata-cost reference publication
 
@@ -803,7 +809,7 @@ Outgoing reference selection accepts native acknowledged completion evidence and
 
 Normal metadata publication uses stat instead of downloading unchanged files. A missing file or changed size causes a fresh upload path. Unavailable or malformed metadata, authentication failure and cancellation stop dispatch. New uploads still require acknowledged PUT and streamed size and SHA readback before native completion admission. Reused catalog paths do not create native completion evidence.
 
-A same-size external change can pass stat. Successful reference publication does not attest current file bytes. Actual hydration still checks streamed size and SHA before staging finalization or native publication. Explicit content recheck remains available for outgoing integrity checks. Neither dispatch policy settles captures, releases source claims or permits unload. Any later operation that can reclaim local files must independently establish its exact release conditions and current remote integrity.
+A same-size external change can pass stat. Successful reference publication does not attest current file bytes. Actual hydration still checks streamed size and SHA before staging finalization or native publication. Explicit content recheck remains available for outgoing integrity checks. Reference publication does not release source claims or permit unload. Any later operation that can reclaim local files must independently establish its exact release conditions and current remote integrity.
 
 This bounded flow supports another browser through a fresh checked metadata scan, including after restart. It does not persist the catalog or qualify incremental lookup capacity. Preparation still requires local originals and hashes their bytes. It does not enable metadata editing while originals are absent locally. The experimental profile remains disabled until the remaining R1 gates pass.
 
@@ -821,25 +827,25 @@ Normal cache hits assume immutable manifest keys. They do not detect a same-key,
 
 Physical database version 43 advances syncCapture to contract version 4. The migration checks the three existing sync stores without rewriting rows. It adds no store. Older clients refuse the newer database.
 
-The sync-capture owner stores queue controls and verified manifest results under disjoint keys in sync_outbox. Connection controls bind the space, namespace generation and profile creation timestamp. Operation controls also bind the retained capture digest. Owner revisions reject stale commands. Each execution receives a fresh run ID. Stage events preserve that command revision.
+The sync-capture owner stores queue controls in sync_outbox. Compact publication facts belong to the operation in sync_capture. Connection controls bind space, namespace generation and profile creation timestamp. Operation controls bind the immutable native-source fingerprint across every phase. Owner revisions reject stale commands. Each execution receives a fresh run ID. Stage events preserve that command revision.
 
-The native queue offers bounded pages and an exact operation reader. Each read checks the current profile and retained capture joins. A page contains at most 128 operations and an explicit continuation cursor. The reader checks one additional row to determine continuation. The cursor binds the enrollment lifetime and last operation key. It grants no mutation authority.
+The native queue offers bounded pages and an exact operation reader. Each read checks the current profile and stable operation header. A page contains at most 128 operations and an explicit continuation cursor. The reader checks one additional row to determine continuation. The cursor binds the enrollment lifetime and last operation key. It grants no mutation authority.
 
 Each page uses one readonly transaction. Multiple pages do not share a snapshot. Refresh from the beginning to discover later insertions before the cursor. Changed enrollment refuses an old cursor. Selected execution and recovery read only the requested operation. Unrelated invalid rows cannot prevent that selection. The legacy pilot projection retains its explicit 128-entry refusal.
 
-Queue pause does not disable capture enrollment. Accepted local edits and tombstones still enter native capture while transfer is paused. Operation pause and cancellation fence late callbacks. They preserve captures, preparations, physical attempts, checked files and source claims. An issued write can retain an unknown outcome. Cancellation promises no remote rollback.
+Queue pause does not disable capture enrollment. Accepted local edits and tombstones still enter native capture while transfer is paused. Operation pause and cancellation fence late callbacks. Unpublished operations preserve their payload, attempts, checked files and claims. Late acknowledged publication can compact payload while preserving paused or cancelled controls. An issued write can retain an unknown outcome. Cancellation promises no remote rollback.
 
 The transfer workflow holds one native exclusive lock per operation. Independent operations can execute concurrently. Recovery requires an available lock and the exact interrupted run. A timer cannot prove that a server writer stopped. Lock identities encode scope primitives in a fixed order.
 
-Acknowledged manifest PUT and full size/SHA readback precede the immutable verified result. Native admission joins the exact retained capture, preparation and physical attempt. The first accepted valid result remains authoritative across alternative physical attempts. A restarted queue can consume that result without another transfer. This historical evidence grants no settlement, source release or unload authority.
+Acknowledged manifest PUT and full size/SHA readback precede compact verified publication. Native admission checks the exact prepared operation and physical attempt. One transaction replaces prepared payload with publication facts and immutable file pins. The first accepted valid publication remains authoritative across alternative attempts. Restart can consume this fact without another transfer. Historical publication grants no source release or unload authority.
 
-A checked ready catalog can establish observed publication of the exact prepared logical bytes. The workflow excludes pending, quarantined, invalid, foreign and contradictory records. Native completion joins the retained preparation and capture. Observed publication does not create acknowledged dispatch evidence or checked-file receipts.
+A checked ready catalog can establish observed publication of the exact prepared logical bytes. The workflow excludes pending, quarantined, invalid, foreign and contradictory records. Native completion checks the exact prepared operation and observed physical binding before compacting payload. Observed publication does not create acknowledged dispatch evidence or checked-file receipts.
 
 Every queue mutation retains bounded diagnostic transition markers in the same transaction. Markers contain fixed codes, stages, sequence numbers, hashed operation references and safe attempt IDs. Overflow retains an explicit history-gap count. Later delivery must use the existing event-history owner. These markers do not create another archive.
 
 Queue history delivery stores one monotonic cursor per native source under a disjoint sync_outbox key. Existing queue rows and retained markers keep their formats. The cursor binds the source key digest and enrollment lifetime. Reads create no cursor. Acknowledgement joins the current profile, retained source and selected markers in one write transaction. It uses the caller's active mutation permit.
 
-The delivery workflow opens the database before it requests that permit. It publishes fixed runtime rows through the existing event-history archive and recent runtime-log tail. Both writes must succeed before acknowledgement. The archive keeps its existing retention policy. A failed archive, tail or acknowledgement leaves native delivery eligible for retry. Logging failure cannot change transfer success or release source bytes.
+The delivery workflow opens the database before it requests that permit. Native history reads and acknowledgement reuse the same active permit. They do not enter shared admission again while exclusive admission can wait. It publishes fixed runtime rows through the existing event-history archive and recent runtime-log tail. Both writes must succeed before acknowledgement. The archive keeps its existing retention policy. A failed archive, tail or acknowledgement leaves native delivery eligible for retry. Logging failure cannot change transfer success or release source bytes.
 
 Delivery is at least once. A restart after archive publication can repeat a row with the same source digest and sequence. The journal timestamp identifies delivery observation because native markers contain no original event timestamp. Explicit gap rows report markers outside bounded retention. The workflow preserves every retained native marker after acknowledgement.
 
@@ -857,6 +863,18 @@ Discovery counts them and advances past their native keys. A backend failure or 
 
 This experimental runner requires an explicitly admitted provider client. Production credentials, request authorization, offscreen lifecycle, Settings controls and event-history delivery remain separate release requirements. Capture enrollment is not network authorization. Future lifecycle admission must check its own revision at every actual HTTP request. The profile remains disabled by default.
 
+
+## Published source pin release
+
+Published operations retain explicit immutable file pins after payload compaction. A pin is a local retention claim. A publication digest or queue status alone cannot remove it.
+
+The workflow checks current remote size and SHA before native release admission. The existing asset lifecycle owner then checks exact operation identity, current connection authority and native retention evidence. Active readers, native owners, projected dependencies, rollback claims and staged publications prevent affected pin release. Cancellation before commit preserves pins. The native owner holds the existing transition lease through pin mutation and physical cleanup. Remote verification precedes that lease.
+
+Eligible pin removal and the intent for physical removal commit in one transaction. Another sync operation can continue to retain the same file. Releasing one checked pin does not promise physical eviction. Releasing the final pin lets the existing deletion owner complete its intent after fresh retention checks.
+
+Physical failure retains the durable intent for existing recovery. Concurrent edits, replacement enrollment or changed immutable bindings refuse delayed release. Unknown prototype records make destructive retention authority invalid and preserve bytes.
+
+This command releases only native bytes without local owners. Remote-only residency for an active media or project owner requires the later hydration contract. This stage does not remove current project files or add remote garbage collection.
 
 ## Native sync connection authorization
 
@@ -991,17 +1009,28 @@ The queue accepts invalid-workspace as a bounded failure code. Marker verificati
 
 A supported native project save can reference a Library original from before sync enrollment. If its causal state is absent, the sync-capture owner records that original in the same project transaction. The project references the actual media operation and generation from that transaction. Later saves reuse the accepted head only while its native metadata digest matches. Malformed, empty or mismatched existing evidence still refuses the complete transaction.
 
-The native transaction commits the dependency and project together. A later capture failure, including queue capacity, rolls back both captures and the project mutation. Parallel saves share the initial media head through native transaction serialization. Local-only saving creates no capture rows. Enrollment does not scan or upload the existing Library.
+The native transaction commits the dependency and project together. A later capture write failure rolls back both captures and the project mutation. Parallel saves share the initial media head through native transaction serialization. Local-only saving creates no capture rows. Enrollment does not scan or upload the existing Library.
 
 This change freezes native metadata and immutable file references, not file bytes inside IndexedDB. The existing capture claims retain those files. Outgoing preparation checks their bytes through the existing codecs. Production activation still requires a producer that enqueues dependency operations before dependent publication.
 
 
 ## Retained capture queue reconciliation
 
-The native queue owner reconciles bounded retained capture keys into its existing operations. Each capture uses the same admission writer as explicit enqueue. Discovery reads keys through the kind index, then handles one metadata body at a time. The current capture limit bounds this pass. Oversized state refuses without repair.
+The native queue owner reconciles retained capture keys into its existing operations. Each capture uses the same admission writer as explicit enqueue. Discovery reads at most 64 primary keys and one continuation lookahead. It handles one metadata body at a time. The budget counts all physical entries, including noncapture and refused rows.
 
 The command captures the prepared database handle before mutation admission. Each operation checks the exact profile lifetime, enabled capture and active connection authorization. Erasure closes that handle. Delayed work cannot reopen a replacement database. Each transaction commits or aborts independently. A refused capture retains its evidence and does not suppress other valid captures.
 
 Repeated reconciliation preserves operation controls, history, retry budgets and deadlines. Queue refusal leaves committed native content and capture rows unchanged. The existing wakeup reconciles before due discovery and recovers missed notifications after restart. A reconciliation failure does not suppress independently admitted queued retries. Native project saving does not wait for enqueue, hashing or network IO.
 
 The security qualification composition uses the existing coordinator and wakeup. Automatic capture discovery requires checked CREATE or JOIN workspace identity. Legacy experimental connections retain explicit enqueue and existing due retries. Production activation remains a separate gate. Immutable records can arrive out of order because catalog and incoming admission reject incomplete dependency closure. Publication of one operation does not establish complete project readiness or current remote file integrity.
+
+
+## Offline capture capacity and continuation
+
+Native saves do not depend on the number of retained captures or remote availability. Per-snapshot graph and metadata checks remain authoritative. The native transaction preserves its source mutation, capture and causal root state together. A genuine storage failure aborts that complete transaction.
+
+Capture discovery retains its own authorization, revision and native-key position on the existing queue connection. It does not replace scheduling or due-discovery positions. Each pass attempts one bounded page. At the end, the position resets so a later pass can find earlier insertions and revisit refused items. The existing startup and periodic wakeup drive continuation. They add no new alarm or service.
+
+Progress commits after the item attempts and rechecks current admission. A concurrent pass cannot overwrite a newer position. A failed progress commit preserves earlier admissions and the previous committed position. Replaying that page preserves existing operation controls, history and retry deadlines. Erasure closes the captured database handle and prevents delayed reopening.
+
+This change retains immutable full snapshots, preparations, physical attempts and asset claims. It grants no settlement or byte-release authority. Terminal compaction and safe unload remain release gates. The legacy whole-queue pilot projection keeps its explicit limit. Production queue consumers use bounded pages or exact operation reads.

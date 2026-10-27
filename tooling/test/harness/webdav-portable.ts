@@ -78,7 +78,7 @@ async function latest(rootId: string) {
   const rows = (await db.getAll(SYNC_CAPTURE_STORE))
     .flatMap((raw) => {
       const row = parseSyncCaptureRecord(raw);
-      return row?.kind === 'captured-change' && row.rootId === rootId ? [row] : [];
+      return row?.kind === 'sync-operation' && row.rootId === rootId ? [row] : [];
     })
     .sort((a, b) => b.generation - a.generation);
   check(rows[0], 'Native capture is missing.');

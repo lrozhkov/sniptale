@@ -132,10 +132,11 @@ it('captures a duplicated restored original before a project borrows its accepte
   await mediaLibraryRootPublisher.publish(input);
   const captures = [...fixture.rows.get('sync_capture')!.values()]
     .map(parseSyncCaptureRecord)
-    .filter((row) => row?.kind === 'captured-change');
+    .filter((row) => row?.kind === 'sync-operation');
   expect(captures).toHaveLength(1);
   const captured = captures[0];
-  if (captured?.change.kind !== 'media') throw new Error('Restored media capture is missing.');
+  if (captured?.phase !== 'native' || captured.change.kind !== 'media')
+    throw new Error('Restored media capture is missing.');
   expect(captured).toMatchObject({ origin: 'local-restore', generation: 1, basis: [] });
   expect(captured.rootId).not.toBe(entry.id);
   expect(captured.change.rows.ref).toEqual(input.staged[0]!.ref);
@@ -180,7 +181,7 @@ it('aborts restored native rows and archive receipt when supported capture canno
   expect(
     [...fixture.rows.get('sync_capture')!.values()]
       .map(parseSyncCaptureRecord)
-      .filter((row) => row?.kind === 'captured-change')
+      .filter((row) => row?.kind === 'sync-operation')
   ).toHaveLength(1);
   expect([...fixture.rows.get('asset_operations')!.values()]).toEqual([
     { operationId: 'archive-receipt', type: 'test-receipt' },
@@ -193,7 +194,7 @@ it('keeps restored originals usable without capture when the experimental profil
   expect(
     [...fixture.rows.get('sync_capture')!.values()]
       .map(parseSyncCaptureRecord)
-      .filter((row) => row?.kind === 'captured-change')
+      .filter((row) => row?.kind === 'sync-operation')
   ).toEqual([]);
 });
 
@@ -213,6 +214,6 @@ it('keeps broad restored media outside the original-only pilot without inventing
   expect(
     [...fixture.rows.get('sync_capture')!.values()]
       .map(parseSyncCaptureRecord)
-      .filter((row) => row?.kind === 'captured-change')
+      .filter((row) => row?.kind === 'sync-operation')
   ).toEqual([]);
 });

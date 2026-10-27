@@ -32,7 +32,7 @@ test('durable queue preserves paused edits, fences two pages and survives browse
       (credentials) => window.webdavTransferHarness.connect(credentials),
       lab.credentials
     );
-    lab.proxy.armFault({ method: 'PUT', key: seed.prepared.objects[0]!.key, kind: 'hold' });
+    lab.proxy.armFault({ method: 'PUT', key: '*', kind: 'hold' });
     const pending = browser.page.evaluate(
       ({ operationId, revision }) =>
         window.webdavTransferHarness.portable.outgoing.queueRun(operationId, revision),
@@ -51,6 +51,13 @@ test('durable queue preserves paused edits, fences two pages and survives browse
     );
     const active = running.operations.find((item) => item.operationId === seed.first.operationId)!;
     expect(active.status).toBe('running');
+    if (!active.attemptId) throw new Error('Admitted physical attempt is missing.');
+    const initialAttempt = await other.evaluate(
+      ({ spaceId, operationId, attemptId }) =>
+        window.webdavTransferHarness.portable.outgoing.attempt(spaceId, operationId, attemptId!),
+      active
+    );
+    if (!initialAttempt) throw new Error('Retained physical attempt is missing.');
     expect(
       await other.evaluate(
         ({ operationId, revision }) =>
@@ -83,7 +90,7 @@ test('durable queue preserves paused edits, fences two pages and survives browse
       status: 'finished',
       operation: { status: 'paused', outcome: 'unknown' },
     });
-    expect(lab.proxy.counts.putBodies.some((item) => item.key === seed.prepared.attemptKey)).toBe(
+    expect(lab.proxy.counts.putBodies.some((item) => item.key === initialAttempt.recordKey)).toBe(
       false
     );
     await browser.context.close();
@@ -109,7 +116,7 @@ test('durable queue preserves paused edits, fences two pages and survives browse
     if (completed.status !== 'finished' || !completed.operation.attemptId)
       throw new Error('Queue completion is missing.');
     const finished = completed.operation;
-    expect(finished.attemptId).not.toBe(seed.prepared.attemptKey.split('/').at(-1)!.slice(0, 36));
+    expect(finished.attemptId).not.toBe(initialAttempt.attemptId);
     const attempt = await browser.page.evaluate(
       ({ spaceId, operationId, attemptId }) =>
         window.webdavTransferHarness.portable.outgoing.attempt(spaceId, operationId, attemptId!),

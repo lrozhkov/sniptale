@@ -1,3 +1,4 @@
+import { parseAssetRef } from '../assets/guards';
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -8,7 +9,7 @@ import { parseSyncCaptureRecord } from './guards';
 import {
   matchesCapture,
   parsePrepared,
-  preparedOutgoingOperationKey,
+  projectPreparedOperation,
   type PreparedOutgoingOperation,
 } from './outgoing';
 
@@ -25,7 +26,8 @@ export interface OutgoingDispatchAttempt {
   connectionGeneration: number;
   attemptId: string;
   preparedSha256: string;
-  recordText: string;
+  profileCreatedAt: number;
+  captureSha256: string;
   recordSha256: string;
   recordKey: string;
   objects: { objectId: string; remoteKey: string }[];
@@ -34,8 +36,8 @@ export interface OutgoingDispatchAttempt {
 /** The persistence owner supplies the storage identity and acceptance time. */
 export type OutgoingDispatchAttemptDraft = Omit<
   OutgoingDispatchAttempt,
-  'kind' | 'key' | 'createdAt'
->;
+  'kind' | 'key' | 'createdAt' | 'profileCreatedAt' | 'captureSha256'
+> & { recordText: string };
 
 function bounded(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max;
@@ -92,9 +94,10 @@ export function parseOutgoingDispatchAttempt(value: unknown): OutgoingDispatchAt
     connectionGeneration,
     attemptId,
     createdAt,
-    recordText,
     recordSha256,
     preparedSha256,
+    profileCreatedAt,
+    captureSha256,
     recordKey,
   } = value;
   if (
@@ -113,15 +116,10 @@ export function parseOutgoingDispatchAttempt(value: unknown): OutgoingDispatchAt
     !digest(preparedSha256) ||
     !digest(recordSha256) ||
     !relativeKey(recordKey) ||
-    typeof recordText !== 'string' ||
-    recordText.length > MAX_RECORD_BYTES
-  )
-    return null;
-  const bytes = new TextEncoder().encode(recordText);
-  if (
-    bytes.byteLength > MAX_RECORD_BYTES ||
-    Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('') !==
-      recordSha256
+    typeof profileCreatedAt !== 'number' ||
+    !Number.isSafeInteger(profileCreatedAt) ||
+    profileCreatedAt < 0 ||
+    !digest(captureSha256)
   )
     return null;
   const objects = parseObjects(value['objects']);
@@ -136,7 +134,8 @@ export function parseOutgoingDispatchAttempt(value: unknown): OutgoingDispatchAt
     connectionGeneration,
     attemptId,
     preparedSha256,
-    recordText,
+    profileCreatedAt,
+    captureSha256,
     recordSha256,
     recordKey,
     objects,
@@ -153,11 +152,40 @@ export function matchesOutgoingDispatchPrepared(
     attempt.operationId === prepared.operationId &&
     attempt.connectionGeneration === prepared.connectionGeneration &&
     attempt.preparedSha256 === prepared.recordSha256 &&
+    attempt.profileCreatedAt === prepared.profileCreatedAt &&
+    attempt.captureSha256 === prepared.captureSha256 &&
     attempt.objects.length === prepared.objects.length &&
     attempt.objects.every((item) =>
       prepared.objects.some((source) => source.objectId === item.objectId)
     )
   );
+}
+
+/** Check transient manifest bytes before they are discarded from durable physical facts. */
+export function validateOutgoingDispatchBytes(
+  recordText: unknown,
+  prepared: PreparedOutgoingOperation,
+  attempt: OutgoingDispatchAttempt
+): void {
+  if (
+    typeof recordText !== 'string' ||
+    new TextEncoder().encode(recordText).byteLength > MAX_RECORD_BYTES ||
+    Array.from(sha256(new TextEncoder().encode(recordText)), (byte) =>
+      byte.toString(16).padStart(2, '0')
+    ).join('') !== attempt.recordSha256
+  )
+    throw new Error('Invalid outgoing dispatch bytes.');
+  const physical: unknown = JSON.parse(recordText);
+  if (
+    !isRecord(physical) ||
+    physical['format'] !== 'sniptale-sync-attempt' ||
+    physical['version'] !== 1 ||
+    physical['operationText'] !== prepared.recordText ||
+    physical['operationSha256'] !== prepared.recordSha256 ||
+    physical['attemptId'] !== attempt.attemptId ||
+    JSON.stringify(physical['objects']) !== JSON.stringify(attempt.objects)
+  )
+    throw new Error('Invalid outgoing dispatch bindings.');
 }
 
 /** Read validated evidence. This read does not authorize a new network dispatch. */
@@ -200,6 +228,8 @@ export async function commitOutgoingDispatchAttempt(
     uuid(detached['attemptId'])
       ? parseOutgoingDispatchAttempt({
           ...detached,
+          profileCreatedAt: expected?.profileCreatedAt,
+          captureSha256: expected?.captureSha256,
           kind: 'dispatch-attempt',
           key: attemptKey(detached['spaceId'], detached['operationId'], detached['attemptId']),
           createdAt: Date.now(),
@@ -207,6 +237,8 @@ export async function commitOutgoingDispatchAttempt(
       : null;
   if (!expected || !proposed || !matchesOutgoingDispatchPrepared(proposed, expected))
     throw new Error('Invalid outgoing dispatch preparation.');
+  if (!isRecord(detached)) throw new Error('Invalid outgoing dispatch bytes.');
+  validateOutgoingDispatchBytes(detached['recordText'], expected, proposed);
   return runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readwrite');
     try {
@@ -214,17 +246,21 @@ export async function commitOutgoingDispatchAttempt(
       const profile = parseSyncCaptureRecord(await captures.get('profile'));
       const capture = parseSyncCaptureRecord(await captures.get(expected.captureKey));
       const store = tx.objectStore(SYNC_OUTBOX_STORE);
-      const current = parsePrepared(await store.get(expected.key));
+      const current =
+        capture?.kind === 'sync-operation' && capture.phase === 'prepared'
+          ? projectPreparedOperation(capture)
+          : null;
       if (
         !profile ||
         profile.kind !== 'profile' ||
         !profile.enabled ||
         profile.spaceId !== expected.spaceId ||
         profile.connectionGeneration !== expected.connectionGeneration ||
+        profile.createdAt !== expected.profileCreatedAt ||
         !current ||
         JSON.stringify(current) !== JSON.stringify(expected) ||
         !capture ||
-        capture.kind !== 'captured-change' ||
+        capture.kind !== 'sync-operation' ||
         !matchesCapture(current, capture)
       )
         throw new Error('Outgoing dispatch evidence changed.');
@@ -261,6 +297,11 @@ interface CompletedOutgoingFile {
   objectId: string;
   attemptSha256: string;
   captureSha256: string;
+  profileCreatedAt: number;
+  ref: import('../assets/contracts').AssetRef;
+  filename: string;
+  sha256: string;
+  remoteKey: string;
 }
 
 function completionPrefix(spaceId: string, connectionGeneration: number) {
@@ -282,29 +323,38 @@ function parseCompletion(value: unknown): CompletedOutgoingFile | null {
     typeof value['connectionGeneration'] !== 'number' ||
     !Number.isSafeInteger(value['connectionGeneration']) ||
     value['connectionGeneration'] < 1 ||
+    typeof value['profileCreatedAt'] !== 'number' ||
+    !Number.isSafeInteger(value['profileCreatedAt']) ||
+    value['profileCreatedAt'] < 0 ||
     !digest(value['attemptSha256']) ||
-    !digest(value['captureSha256'])
+    !digest(value['captureSha256']) ||
+    !digest(value['sha256']) ||
+    !bounded(value['filename'], 2048) ||
+    !relativeKey(value['remoteKey'])
   )
     return null;
-  const completion: CompletedOutgoingFile = {
+  const ref = parseAssetRef(value['ref']);
+  if (!ref || (ref.sha256 !== null && ref.sha256 !== value['sha256'])) return null;
+  const identity = [value['operationId'], value['attemptId'], value['objectId']];
+  const key = `${completionPrefix(value['spaceId'], value['connectionGeneration'])}${JSON.stringify(identity)}`;
+  if (value['key'] !== key) return null;
+  return {
     version: 1,
     kind: 'completed-file',
-    key: '',
+    key,
     spaceId: value['spaceId'],
     connectionGeneration: value['connectionGeneration'],
+    profileCreatedAt: value['profileCreatedAt'],
     operationId: value['operationId'],
     attemptId: value['attemptId'],
     objectId: value['objectId'],
     attemptSha256: value['attemptSha256'],
     captureSha256: value['captureSha256'],
+    filename: value['filename'],
+    ref,
+    sha256: value['sha256'],
+    remoteKey: value['remoteKey'],
   };
-  const identity = JSON.stringify([
-    completion.operationId,
-    completion.attemptId,
-    completion.objectId,
-  ]);
-  completion.key = `${completionPrefix(completion.spaceId, completion.connectionGeneration)}${identity}`;
-  return value['key'] === completion.key ? completion : null;
 }
 
 /** Admit only acknowledged and digest-checked PUT evidence; never alter the frozen attempt. */
@@ -322,7 +372,10 @@ export async function commitCompletedOutgoingFile(
     !attempt.objects.some((item) => item.objectId === objectId)
   )
     throw new Error('Invalid completed outgoing file.');
-  const proposed: CompletedOutgoingFile = {
+  const source = expected.objects.find((item) => item.objectId === objectId);
+  const binding = attempt.objects.find((item) => item.objectId === objectId);
+  if (!source || !binding) throw new Error('Missing completed object binding.');
+  const proposedInput: CompletedOutgoingFile = {
     version: 1,
     kind: 'completed-file',
     key: completionKey(attempt, objectId),
@@ -333,7 +386,14 @@ export async function commitCompletedOutgoingFile(
     objectId,
     attemptSha256: attempt.recordSha256,
     captureSha256: expected.captureSha256,
+    profileCreatedAt: expected.profileCreatedAt,
+    ref: source.ref,
+    filename: source.filename,
+    sha256: source.sha256,
+    remoteKey: binding.remoteKey,
   };
+  const proposed = parseCompletion(proposedInput);
+  if (!proposed) throw new Error('Invalid completed outgoing file.');
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readwrite');
     try {
@@ -341,7 +401,10 @@ export async function commitCompletedOutgoingFile(
       const store = tx.objectStore(SYNC_OUTBOX_STORE);
       const profile = parseSyncCaptureRecord(await captures.get('profile'));
       const capture = parseSyncCaptureRecord(await captures.get(expected.captureKey));
-      const current = parsePrepared(await store.get(expected.key));
+      const current =
+        capture?.kind === 'sync-operation' && capture.phase === 'prepared'
+          ? projectPreparedOperation(capture)
+          : null;
       const storedAttempt = parseOutgoingDispatchAttempt(await store.get(attempt.key));
       if (
         !profile ||
@@ -349,8 +412,9 @@ export async function commitCompletedOutgoingFile(
         !profile.enabled ||
         profile.spaceId !== expected.spaceId ||
         profile.connectionGeneration !== expected.connectionGeneration ||
+        profile.createdAt !== expected.profileCreatedAt ||
         !capture ||
-        capture.kind !== 'captured-change' ||
+        capture.kind !== 'sync-operation' ||
         !matchesCapture(expected, capture) ||
         !current ||
         JSON.stringify(current) !== JSON.stringify(expected) ||
@@ -394,46 +458,6 @@ async function listConnectionCompletions(
   return completions;
 }
 
-async function readCompletedFileJoin(
-  tx: CompletionReadTransaction,
-  completed: CompletedOutgoingFile,
-  preparedCache: Map<string, PreparedOutgoingOperation>,
-  attemptCache: Map<string, OutgoingDispatchAttempt>
-) {
-  const store = tx.objectStore(SYNC_OUTBOX_STORE);
-  const preparedKey = preparedOutgoingOperationKey(completed.spaceId, completed.operationId);
-  let prepared = preparedCache.get(preparedKey);
-  if (!prepared) {
-    const candidate = parsePrepared(await store.get(preparedKey));
-    if (!candidate) throw new Error('Invalid completed outgoing preparation.');
-    const capture = parseSyncCaptureRecord(
-      await tx.objectStore(SYNC_CAPTURE_STORE).get(candidate.captureKey)
-    );
-    if (!capture || capture.kind !== 'captured-change' || !matchesCapture(candidate, capture))
-      throw new Error('Invalid completed outgoing capture.');
-    prepared = candidate;
-    preparedCache.set(preparedKey, prepared);
-  }
-  const key = attemptKey(completed.spaceId, completed.operationId, completed.attemptId);
-  let attempt = attemptCache.get(key);
-  if (!attempt) {
-    const candidate = parseOutgoingDispatchAttempt(await store.get(key));
-    if (!candidate) throw new Error('Invalid completed outgoing attempt.');
-    attempt = candidate;
-    attemptCache.set(key, attempt);
-  }
-  if (
-    prepared.spaceId !== completed.spaceId ||
-    prepared.connectionGeneration !== completed.connectionGeneration ||
-    prepared.captureSha256 !== completed.captureSha256 ||
-    !matchesOutgoingDispatchPrepared(attempt, prepared) ||
-    attempt.recordSha256 !== completed.attemptSha256 ||
-    !attempt.objects.some((item) => item.objectId === completed.objectId)
-  )
-    throw new Error('Invalid completed outgoing file join.');
-  return { prepared, attempt, objectId: completed.objectId };
-}
-
 /** Read bounded completed-file joins. Consumers must parse manifests and recheck remote bytes. */
 export async function loadCompletedOutgoingFiles(spaceId: string, connectionGeneration: number) {
   if (
@@ -456,18 +480,17 @@ export async function loadCompletedOutgoingFiles(spaceId: string, connectionGene
     throw new Error('Completed outgoing file connection changed.');
   }
   const completions = await listConnectionCompletions(tx, spaceId, connectionGeneration);
-  const preparedCache = new Map<string, PreparedOutgoingOperation>();
-  const attemptCache = new Map<string, OutgoingDispatchAttempt>();
   const result = [];
   for (const raw of completions) {
     const completed = parseCompletion(raw);
     if (
       !completed ||
       completed.spaceId !== spaceId ||
-      completed.connectionGeneration !== connectionGeneration
+      completed.connectionGeneration !== connectionGeneration ||
+      completed.profileCreatedAt !== profile.createdAt
     )
       throw new Error('Invalid completed outgoing file.');
-    result.push(await readCompletedFileJoin(tx, completed, preparedCache, attemptCache));
+    result.push(completed);
   }
   await tx.done;
   return result;

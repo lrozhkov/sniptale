@@ -9,6 +9,35 @@ async function upload(page: Page, key: string) {
   return page.evaluate((key) => window.webdavTransferHarness.uploadSource(key), key);
 }
 
+async function holdAdmittedSend(page: Page, prepared: { spaceId: string; operationId: string }) {
+  await page.evaluate(() => window.webdavTransferHarness.portable.outgoing.holdNextAdmission());
+  const pending = page.evaluate(
+    ({ spaceId, operationId }) =>
+      window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
+    prepared
+  );
+  void pending.catch(() => undefined);
+  await expect
+    .poll(() => page.evaluate(() => window.webdavTransferHarness.portable.outgoing.admitted()))
+    .not.toBeNull();
+  const attempt = await page.evaluate(() =>
+    window.webdavTransferHarness.portable.outgoing.admitted()
+  );
+  if (!attempt) throw new Error('Actual admitted physical attempt is missing.');
+  return {
+    pending,
+    attempt,
+    release: () =>
+      page.evaluate(() => window.webdavTransferHarness.portable.outgoing.releaseAdmission()),
+  };
+}
+async function manifestText(page: Page, key: string) {
+  return page.evaluate(
+    (key) => window.webdavTransferHarness.portable.outgoing.manifestText(key),
+    key
+  );
+}
+
 test('ordinary originals and exports survive native Blob transfer and an empty browser profile', async ({
   lab,
 }, info) => {
@@ -221,26 +250,17 @@ for (const viewport of [
       const seed = await window.webdavTransferHarness.portable.source();
       const media = await window.webdavTransferHarness.portable.outgoing.sendHistory(seed.mediaId);
       const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
-        seed.projectId
+        seed.projectId,
+        true
       );
-      const prepared = await window.webdavTransferHarness.portable.outgoing.prepare(seed.projectId);
-      const duplicate = await window.webdavTransferHarness.portable.outgoing.send(
-        prepared.spaceId,
-        prepared.operationId
-      );
-      const duplicateFiles = duplicate.objects.map((binding) => {
-        const source = prepared.objects.find((item) => item.objectId === binding.objectId)!;
-        return { key: binding.remoteKey, size: source.size, sha256: source.sha256 };
-      });
       return {
         ...seed,
-        spaceId: prepared.spaceId,
-        metadataAttempts: media.length + projects.length + 1,
-        logicalOperations: media.length + projects.length,
+        spaceId: projects.at(-1)!.spaceId,
+        metadataAttempts: media.length + projects.length,
+        logicalOperations: media.length + projects.length - 1,
         objects: [
           ...media.flatMap((item) => item.files),
           ...projects.flatMap((item) => item.files),
-          ...duplicateFiles,
         ],
       };
     });
@@ -431,45 +451,46 @@ test('durable dispatch keeps original and export bytes after lost response and f
         window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
       borrowed
     );
-    for (const object of borrowed.objects)
-      expect(await lab.externalProof(object.key)).toEqual({
+    for (const binding of borrowedAttempt.objects) {
+      const object = borrowed.objects.find((item) => item.objectId === binding.objectId)!;
+      expect(await lab.externalProof(binding.remoteKey)).toEqual({
         size: object.size,
         sha256: object.sha256,
       });
+    }
     expect([...prepared.objects, ...borrowed.objects].map((item) => item.sha256).sort()).toEqual(
       [...seeded.editing.map((item) => item.sha256), seeded.exported.sha256].sort()
     );
+    const held = await holdAdmittedSend(sender.page, prepared);
     lab.proxy.armFault({
       method: 'PUT',
-      key: prepared.attemptKey,
+      key: held.attempt.recordKey,
       kind: 'lost-response',
       repeat: true,
     });
-    await expect(
-      sender.page.evaluate(
-        (input) =>
-          window.webdavTransferHarness.portable.outgoing.send(input.spaceId, input.operationId),
-        prepared
-      )
-    ).rejects.toThrow();
+    await held.release();
+    await expect(held.pending).rejects.toThrow();
     await lab.proxy.waitForFault();
     lab.proxy.releaseFault();
-    const initialId = prepared.attemptKey.split('/').at(-1)!.slice(0, 36);
+    const initialId = held.attempt.attemptId;
     const first = await sender.page.evaluate(
       ({ spaceId, operationId, initialId }) =>
         window.webdavTransferHarness.portable.outgoing.attempt(spaceId, operationId, initialId),
       { ...prepared, initialId }
     );
     expect(first).not.toBeNull();
-    expect(await lab.externalProof(prepared.attemptKey)).toEqual({
-      size: Buffer.byteLength(first!.recordText),
+    const firstText = await manifestText(sender.page, first!.recordKey);
+    expect(await lab.externalProof(first!.recordKey)).toEqual({
+      size: Buffer.byteLength(firstText),
       sha256: first!.recordSha256,
     });
-    for (const object of prepared.objects)
-      expect(await lab.externalProof(object.key)).toEqual({
+    for (const binding of first!.objects) {
+      const object = prepared.objects.find((item) => item.objectId === binding.objectId)!;
+      expect(await lab.externalProof(binding.remoteKey)).toEqual({
         size: object.size,
         sha256: object.sha256,
       });
+    }
     expect(prepared.objects.some((object) => object.sha256 === seeded.exported.sha256)).toBe(true);
     await sender.context.close();
     sender = await openProvider(lab, info, 'durable-dispatch');
@@ -486,7 +507,8 @@ test('durable dispatch keeps original and export bytes after lost response and f
       prepared
     );
     expect(recovered.recordKey).not.toBe(first!.recordKey);
-    expect(JSON.parse(recovered.recordText)['operationText']).toBe(prepared.recordText);
+    const recoveredText = await manifestText(sender.page, recovered.recordKey);
+    expect(JSON.parse(recoveredText)['operationText']).toBe(prepared.recordText);
     expect(
       new Set([...first!.objects, ...recovered.objects].map((item) => item.remoteKey)).size
     ).toBe(prepared.objects.length);
@@ -499,39 +521,18 @@ test('durable dispatch keeps original and export bytes after lost response and f
       });
     }
     expect(await lab.externalProof(recovered.recordKey)).toEqual({
-      size: Buffer.byteLength(recovered.recordText),
+      size: Buffer.byteLength(recoveredText),
       sha256: recovered.recordSha256,
     });
-    const concurrentPutStart = lab.proxy.counts.puts;
-    const concurrent = await sender.page.evaluate(
-      async ({ spaceId, operationId }) =>
-        Promise.all(
-          [1, 2].map(() =>
-            window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId)
-          )
-        ),
-      prepared
-    );
-    expect(
-      new Set([first!.recordKey, recovered.recordKey, ...concurrent.map((item) => item.recordKey)])
-        .size
-    ).toBe(4);
-    expect(lab.proxy.counts.puts - concurrentPutStart).toBe(2);
-    for (const attempt of concurrent) {
-      expect(attempt.objects).toEqual(recovered.objects);
-      expect(JSON.parse(attempt.recordText)['operationText']).toBe(prepared.recordText);
-      expect(await lab.externalProof(attempt.recordKey)).toEqual({
-        size: Buffer.byteLength(attempt.recordText),
-        sha256: attempt.recordSha256,
-      });
-      for (const object of attempt.objects) {
-        const expected = prepared.objects.find((item) => item.objectId === object.objectId)!;
-        expect(await lab.externalProof(object.remoteKey)).toEqual({
-          size: expected.size,
-          sha256: expected.sha256,
-        });
-      }
-    }
+    const publishedPutCount = lab.proxy.counts.puts;
+    await expect(
+      sender.page.evaluate(
+        ({ spaceId, operationId }) =>
+          window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
+        prepared
+      )
+    ).rejects.toThrow();
+    expect(lab.proxy.counts.puts).toBe(publishedPutCount);
     const retained = await sender.page.evaluate(
       ({ spaceId, operationId, initialId }) =>
         window.webdavTransferHarness.portable.outgoing.attempt(spaceId, operationId, initialId),
@@ -571,7 +572,7 @@ test('durable dispatch keeps original and export bytes after lost response and f
           originalAndExportObjects: prepared.objects,
           first,
           recovered,
-          concurrent,
+          publishedRedispatch: { refused: true, additionalPuts: 0 },
           borrowedAttempt,
           revisionAttempt,
           reusePuts: { recovered: 1, concurrent: 2, metadataRevision: 1 },
@@ -601,27 +602,28 @@ test('partial dispatch reuses completed bytes after restart and isolates the los
     const [completed, ambiguous] = prepared.objects;
     expect(completed).toBeDefined();
     expect(ambiguous).toBeDefined();
-    lab.proxy.armFault({
-      method: 'PUT',
-      key: ambiguous!.key,
-      kind: 'lost-response',
-      repeat: true,
-    });
-    await expect(
-      sender.page.evaluate(
-        ({ spaceId, operationId }) =>
-          window.webdavTransferHarness.portable.outgoing.send(spaceId, operationId),
-        prepared
-      )
-    ).rejects.toThrow();
+    const held = await holdAdmittedSend(sender.page, prepared);
+    const completedKey = held.attempt.objects.find(
+      (item) => item.objectId === completed!.objectId
+    )!.remoteKey;
+    const ambiguousKey = held.attempt.objects.find(
+      (item) => item.objectId === ambiguous!.objectId
+    )!.remoteKey;
+    lab.proxy.armFault({ method: 'PUT', key: ambiguousKey, kind: 'lost-response', repeat: true });
+    await held.release();
+    await expect(held.pending).rejects.toThrow();
     await lab.proxy.waitForFault();
     lab.proxy.releaseFault();
-    for (const object of prepared.objects)
-      expect(await lab.externalProof(object.key)).toEqual({
+    for (const binding of held.attempt.objects) {
+      const object = prepared.objects.find((item) => item.objectId === binding.objectId)!;
+      expect(await lab.externalProof(binding.remoteKey)).toEqual({
         size: object.size,
         sha256: object.sha256,
       });
-    expect(lab.proxy.counts.putBodies.some((body) => body.key === prepared.attemptKey)).toBe(false);
+    }
+    expect(lab.proxy.counts.putBodies.some((body) => body.key === held.attempt.recordKey)).toBe(
+      false
+    );
     await sender.context.close();
     sender = await openProvider(lab, info, 'partial-file-reuse');
     const before = lab.proxy.counts.putBodies.length;
@@ -634,8 +636,8 @@ test('partial dispatch reuses completed bytes after restart and isolates the los
       (item) => item.objectId === completed!.objectId
     );
     const replacedBinding = recovered.objects.find((item) => item.objectId === ambiguous!.objectId);
-    expect(completedBinding?.remoteKey).toBe(completed!.key);
-    expect(replacedBinding?.remoteKey).not.toBe(ambiguous!.key);
+    expect(completedBinding?.remoteKey).toBe(completedKey);
+    expect(replacedBinding?.remoteKey).not.toBe(ambiguousKey);
     expect(lab.proxy.counts.putBodies.slice(before).map((body) => body.key)).toEqual([
       replacedBinding!.remoteKey,
       recovered.recordKey,
@@ -670,9 +672,10 @@ test('another browser reuses published files without media transfer and still re
       const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
         seed.projectId
       );
-      const prepared = await window.webdavTransferHarness.portable.outgoing.prepare(seed.projectId);
-      await window.webdavTransferHarness.portable.outgoing.refresh(prepared.spaceId);
-      return { ...seed, spaceId: prepared.spaceId, lastFiles: projects.at(-1)!.files };
+      const published = projects.at(-1);
+      if (!published) throw new Error('Published project identity is missing.');
+      await window.webdavTransferHarness.portable.outgoing.refresh(published.spaceId);
+      return { ...seed, spaceId: published.spaceId, lastFiles: published.files };
     });
   } finally {
     await source.context.close();
@@ -851,8 +854,18 @@ test('another browser reuses published files without media transfer and still re
         operationId: attempts.at(-1)!.operationId,
       }
     );
-    // Each outgoing attempt still has its own native preparation and retained capture.
-    expect(retained?.recordSha256).toBe(attempts.at(-1)!.preparedSha256);
+    expect(retained).toBeNull();
+    const publication = await browser.page.evaluate(
+      ({ spaceId, operationId }) =>
+        window.webdavTransferHarness.portable.outgoing.published(spaceId, 3, operationId),
+      { spaceId: sent.spaceId, operationId: attempts.at(-1)!.operationId }
+    );
+    expect(publication).toMatchObject({
+      publicationKind: 'verified',
+      preparedSha256: attempts.at(-1)!.preparedSha256,
+      remoteManifestKey: attempts.at(-1)!.recordKey,
+    });
+    expect(publication).not.toHaveProperty('recordText');
     await writeFile(
       info.outputPath('metadata-reuse-proof.json'),
       JSON.stringify(

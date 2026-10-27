@@ -8,7 +8,6 @@ import type {
 
 export const SYNC_CAPTURE_PROFILE_KEY = 'profile';
 export const MAX_CAPTURE_ROWS = 32;
-export const MAX_PENDING_CAPTURES = 128;
 export const MAX_CAPTURE_METADATA_BYTES = 1024 * 1024;
 
 /** The experiment admits only an explicitly enabled, local capture profile. */
@@ -64,10 +63,13 @@ export interface SyncCaptureRootState {
   nativeDigest?: string;
 }
 
-/** Pending snapshots retain their bytes until a future verified settlement owner admits release. */
-export interface CapturedChange {
+/** Stable enrollment, causal identity, fingerprint and display source survive payload replacement. */
+export interface CaptureOperationHeader {
   version: 1;
-  kind: 'captured-change';
+  kind: 'sync-operation';
+  profileCreatedAt: number;
+  sourceSha256: string;
+  source: { changeKind: 'media' | 'video-project' | 'tombstone'; label: string };
   key: string;
   createdAt: number;
   spaceId: string;
@@ -80,11 +82,52 @@ export interface CapturedChange {
   basis: string[];
   origin: CaptureOrigin;
   publicationId: string | null;
+}
+
+/** Native source exists only until portable preparation is accepted. */
+export interface CapturedChange extends CaptureOperationHeader {
+  phase: 'native';
   change:
     | { kind: 'video-project'; rows: CapturedVideoProjectRows }
     | { kind: 'media'; rows: CapturedMediaRows }
     | { kind: 'tombstone' };
 }
+
+/** Immutable portable content and local file bindings. Physical keys belong to attempts. */
+export interface PreparedCaptureOperation extends CaptureOperationHeader {
+  phase: 'prepared';
+  prepared: {
+    recordText: string;
+    recordSha256: string;
+    objects: { objectId: string; ref: AssetRef; sha256: string; filename: string }[];
+  };
+}
+
+/** Publication facts replace portable bytes while retaining explicit immutable local pins. */
+export interface PublishedCaptureOperation extends CaptureOperationHeader {
+  phase: 'published';
+  publication: {
+    kind: 'verified' | 'observed';
+    acceptedAt: number;
+    preparedSha256: string;
+    attemptId: string;
+    recordKey: string;
+    recordSha256: string;
+  };
+  objects: {
+    objectId: string;
+    ref: AssetRef;
+    sha256: string;
+    filename: string;
+    remoteKey: string;
+    pinned: boolean;
+  }[];
+}
+
+export type CaptureOperation =
+  | CapturedChange
+  | PreparedCaptureOperation
+  | PublishedCaptureOperation;
 
 /** The local receipt records one checked application and prevents an outgoing echo. */
 export interface SyncCaptureAppliedOperation {
@@ -102,7 +145,7 @@ export interface SyncCaptureAppliedOperation {
 export type SyncCaptureRecord =
   | SyncCaptureProfile
   | SyncCaptureRootState
-  | CapturedChange
+  | CaptureOperation
   | SyncCaptureAppliedOperation;
 
 /** Tuple encoding prevents delimiter collisions in local native-store keys. */

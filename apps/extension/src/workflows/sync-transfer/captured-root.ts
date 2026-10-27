@@ -24,7 +24,12 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
   bindings: { objectId: string; ref: AssetRef }[];
 }> {
   const parsed = parseSyncCaptureRecord(value);
-  if (!parsed || parsed.kind !== 'captured-change' || parsed.change.kind === 'tombstone')
+  if (
+    !parsed ||
+    parsed.kind !== 'sync-operation' ||
+    parsed.phase !== 'native' ||
+    parsed.change.kind === 'tombstone'
+  )
     throw new Error('Unsupported portable capture.');
   // Parsers can retain nested values. Detach the entire accepted snapshot before the first read.
   const capture = structuredClone(parsed);

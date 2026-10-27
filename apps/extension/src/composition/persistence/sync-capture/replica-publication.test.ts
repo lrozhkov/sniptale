@@ -108,7 +108,7 @@ it('publishes a prepared media journal through the native command and retains it
   expect(io.remove).toHaveBeenCalledWith(journal.journalId);
   expect(
     [...f.table('sync_capture').values()].filter(
-      (row) => isRecord(row) && row['kind'] === 'captured-change'
+      (row) => isRecord(row) && row['kind'] === 'sync-operation'
     )
   ).toEqual([]);
 });

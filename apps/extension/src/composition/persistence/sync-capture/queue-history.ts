@@ -136,12 +136,13 @@ function historyBatchInput(value: unknown): SyncQueueHistoryBatch {
 /** Read a bounded undelivered suffix without creating or repairing persisted rows. */
 export async function loadSyncQueueHistoryBatch(
   value: SyncQueueScope,
-  selectedSource: SyncQueueHistorySource
+  selectedSource: SyncQueueHistorySource,
+  permit?: PersistenceMutationPermit
 ): Promise<SyncQueueHistoryBatch> {
   const scope = scopeInput(value);
   const source = historySourceInput(selectedSource);
   const sourceRef = historySourceRef(scope, source);
-  const db = await initDB();
+  const db = await initDB(permit);
   const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
   const row = await readHistorySource(tx, scope, source);
   const deliveredSequence = await readSyncQueueHistoryProgressInTransaction(
@@ -168,7 +169,7 @@ export async function acknowledgeSyncQueueHistory(
   const batch = historyBatchInput(value);
   if (!isActivePersistenceMutationPermit(permit))
     throw new Error('Sync queue history mutation permit required.');
-  const db = await initDB();
+  const db = await initDB(permit);
   if (!isActivePersistenceMutationPermit(permit))
     throw new Error('Sync queue history mutation permit required.');
   const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readwrite');

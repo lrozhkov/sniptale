@@ -1,3 +1,4 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
@@ -93,9 +94,9 @@ async function setup(count: number, changes: CapturedChange['change'][] = []) {
         : change.kind === 'video-project'
           ? change.rows.project.id
           : 'root';
-    const capture: CapturedChange = {
+    const capture: CapturedChange = createNativeCapture({
       version: 1,
-      kind: 'captured-change',
+      kind: 'sync-operation',
       key: JSON.stringify(['change', id]),
       createdAt: index + 1,
       spaceId: 'space',
@@ -109,7 +110,7 @@ async function setup(count: number, changes: CapturedChange['change'][] = []) {
       origin: 'local-edit',
       publicationId: null,
       change,
-    };
+    });
     table('sync_capture').set(capture.key, capture);
     await enqueueSyncQueueOperation(capture);
   }

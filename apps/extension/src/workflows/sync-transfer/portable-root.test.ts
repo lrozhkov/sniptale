@@ -1,3 +1,4 @@
+import { createNativeCapture } from '../../composition/persistence/sync-capture/test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
@@ -67,9 +68,9 @@ function capture(change: CapturedChange['change']): CapturedChange {
         ? change.rows.project.id
         : 'deleted';
   const rootKey = captureRootKey('space', rootKind, rootId);
-  return {
+  return createNativeCapture({
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
     key: JSON.stringify(['captured-change', 'op']),
     createdAt: 1,
     spaceId: 'space',
@@ -83,7 +84,7 @@ function capture(change: CapturedChange['change']): CapturedChange {
     origin: 'local-edit',
     publicationId: null,
     change,
-  };
+  });
 }
 function admission(): PortableReplicaAdmission {
   return {

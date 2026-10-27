@@ -1,3 +1,4 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { SyncConnectionIdentity } from '../remote-connection/model';
@@ -14,7 +15,6 @@ import { installPersistenceLockManagerForTests } from '../infrastructure/mutatio
 import {
   queueConnectionKey,
   queueOperationKey,
-  queueHash,
   parseSyncQueueOperation,
   parseSyncQueueConnection,
   type SyncQueueScope,
@@ -230,24 +230,26 @@ function fixture() {
   };
   table('sync_connection').set('connection', connection);
   const operation = (id: string, extra: Partial<SyncQueueOperation> = {}) => {
-    const capture = parseSyncCaptureRecord({
-      version: 1,
-      kind: 'captured-change',
-      key: JSON.stringify(['change', id]),
-      createdAt: 1,
-      spaceId: 'space',
-      connectionGeneration: 3,
-      rootKind: 'media',
-      rootId: 'root',
-      rootKey: captureRootKey('space', 'media', 'root'),
-      generation: 1,
-      operationId: id,
-      basis: [],
-      origin: 'local-edit',
-      publicationId: null,
-      change: { kind: 'tombstone' },
-    });
-    if (!capture || capture.kind !== 'captured-change') throw new Error('Invalid capture fixture.');
+    const capture = parseSyncCaptureRecord(
+      createNativeCapture({
+        version: 1,
+        kind: 'sync-operation',
+        key: JSON.stringify(['change', id]),
+        createdAt: 1,
+        spaceId: 'space',
+        connectionGeneration: 3,
+        rootKind: 'media',
+        rootId: 'root',
+        rootKey: captureRootKey('space', 'media', 'root'),
+        generation: 1,
+        operationId: id,
+        basis: [],
+        origin: 'local-edit',
+        publicationId: null,
+        change: { kind: 'tombstone' },
+      })
+    );
+    if (!capture || capture.kind !== 'sync-operation') throw new Error('Invalid capture fixture.');
     const row: SyncQueueOperation = {
       ...scope,
       version: 1,
@@ -255,7 +257,7 @@ function fixture() {
       key: queueOperationKey(scope, id),
       operationId: id,
       captureKey: capture.key,
-      captureSha256: queueHash(JSON.stringify(capture)),
+      captureSha256: capture.sourceSha256,
       rootKey: capture.rootKey,
       generation: 1,
       revision: 1,

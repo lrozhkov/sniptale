@@ -1,3 +1,7 @@
+import {
+  initDB,
+  SYNC_CAPTURE_STORE,
+} from '../../composition/persistence/infrastructure/indexed-db/core';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import {
   advanceSyncQueueRun,
@@ -101,7 +105,6 @@ export async function runSyncQueueOperation(input: {
   operationId: string;
   expectedRevision: number;
   authorization?: SyncConnectionIdentity;
-  capture: unknown;
   remote: SyncRemoteStore;
   signal: AbortSignal;
   authorize: () => Promise<void>;
@@ -111,17 +114,8 @@ export async function runSyncQueueOperation(input: {
   const operationId = input.operationId;
   const expectedRevision = input.expectedRevision;
   const authorization = input.authorization ? structuredClone(input.authorization) : undefined;
-  const capture = parseSyncCaptureRecord(structuredClone(input.capture));
   const catalog = input.catalog ? structuredClone(input.catalog) : undefined;
   const { signal, remote, authorize } = input;
-  if (
-    !capture ||
-    capture.kind !== 'captured-change' ||
-    capture.operationId !== operationId ||
-    capture.spaceId !== scope.spaceId ||
-    capture.connectionGeneration !== scope.connectionGeneration
-  )
-    throw new Error('Invalid sync queue source.');
   signal.throwIfAborted();
   return navigator.locks.request(
     lockName(scope, operationId),
@@ -131,6 +125,22 @@ export async function runSyncQueueOperation(input: {
       const current = await loadSyncQueueOperation(scope, operationId);
       if (current.revision !== expectedRevision) throw new Error('Stale sync queue execution.');
       if (current.status === 'published') return { status: 'finished', operation: current };
+      const db = await initDB();
+      const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+      const capture = parseSyncCaptureRecord(
+        await tx.objectStore(SYNC_CAPTURE_STORE).get(current.captureKey)
+      );
+      await tx.done;
+      if (
+        !capture ||
+        capture.kind !== 'sync-operation' ||
+        capture.operationId !== operationId ||
+        capture.spaceId !== scope.spaceId ||
+        capture.connectionGeneration !== scope.connectionGeneration ||
+        capture.profileCreatedAt !== scope.profileCreatedAt ||
+        capture.sourceSha256 !== current.captureSha256
+      )
+        throw new Error('Invalid sync queue source.');
       const run = await beginSyncQueueRun(scope, operationId, expectedRevision, authorization);
       try {
         const accepted = await loadVerifiedOutgoingResult(

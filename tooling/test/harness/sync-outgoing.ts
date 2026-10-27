@@ -27,7 +27,10 @@ async function hash(blob: Blob): Promise<string> {
 /** Fixture bytes exercise storage identity, not the production remote protocol. */
 async function draft(value: unknown, marker: string): Promise<PreparedOutgoingOperationDraft> {
   const capture = parseSyncCaptureRecord(value);
-  check(capture?.kind === 'captured-change', 'The native outgoing capture is missing.');
+  check(
+    capture?.kind === 'sync-operation' && capture.phase === 'native',
+    'The native outgoing capture is missing.'
+  );
   const refs =
     capture.change.kind === 'media'
       ? [capture.change.rows.ref]
@@ -39,7 +42,7 @@ async function draft(value: unknown, marker: string): Promise<PreparedOutgoingOp
     const file = await readAssetFile(ref, 'original 100%.bin');
     objects.push({
       objectId: `object-${index}`,
-      remoteKey: `Files/${ref.assetId}/original 100%.bin`,
+      filename: 'original 100%.bin',
       ref,
       sha256: await hash(file),
     });
@@ -57,7 +60,6 @@ async function draft(value: unknown, marker: string): Promise<PreparedOutgoingOp
     operationId: capture.operationId,
     recordText,
     recordSha256: await hash(new Blob([recordText])),
-    attemptKey: `.sniptale/operations/${capture.operationId}/${marker}.json`,
     objects,
   };
 }
@@ -65,7 +67,9 @@ async function draft(value: unknown, marker: string): Promise<PreparedOutgoingOp
 async function recreate(value: unknown) {
   const capture = parseSyncCaptureRecord(value);
   check(
-    capture?.kind === 'captured-change' && capture.change.kind === 'media',
+    capture?.kind === 'sync-operation' &&
+      capture.phase === 'native' &&
+      capture.change.kind === 'media',
     'The native outgoing source is missing.'
   );
   const { rows } = capture.change;
@@ -82,14 +86,17 @@ async function recreate(value: unknown) {
   const captures = (await db.getAll(SYNC_CAPTURE_STORE))
     .flatMap((raw) => {
       const parsed = parseSyncCaptureRecord(raw);
-      return parsed?.kind === 'captured-change' && parsed.rootKey === capture.rootKey
+      return parsed?.kind === 'sync-operation' &&
+        parsed.phase === 'native' &&
+        parsed.rootKey === capture.rootKey
         ? [parsed]
         : [];
     })
     .sort((left, right) => right.generation - left.generation);
   const current = captures[0];
   check(
-    current?.change.kind === 'media' &&
+    current?.phase === 'native' &&
+      current.change.kind === 'media' &&
       current.operationId !== capture.operationId &&
       current.generation > capture.generation,
     'Native recreation did not create a new source revision.'

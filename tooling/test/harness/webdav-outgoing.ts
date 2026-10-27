@@ -1,3 +1,4 @@
+import { parseSyncAttemptText } from '../../../apps/extension/src/workflows/sync-transfer/wire-record';
 import { loadSyncConnection } from '../../../apps/extension/src/composition/persistence/remote-connection/store';
 import {
   initDB,
@@ -21,8 +22,9 @@ import { scanSyncCatalog } from '../../../apps/extension/src/workflows/sync-tran
 import { refreshPersistedSyncCatalog } from '../../../apps/extension/src/workflows/sync-transfer/catalog-refresh';
 import { syncCatalogRootKey } from '../../../apps/extension/src/workflows/sync-transfer/catalog-graph';
 import { prepareCatalogReplica } from '../../../apps/extension/src/workflows/sync-transfer/incoming';
-import type { CapturedChange } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
+import type { CaptureOperation } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
 import { loadPreparedOutgoingOperation } from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing';
+import { loadVerifiedOutgoingResult } from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing-results';
 import {
   loadOutgoingDispatchAttempt,
   loadCompletedOutgoingFiles,
@@ -48,8 +50,12 @@ import {
 /** Runs production encoding and dispatch over actual captured native sources. */
 export function createWebdavOutgoingHarness(
   connected: () => SyncRemoteStore,
-  latest: (rootId: string) => Promise<CapturedChange>
+  latest: (rootId: string) => Promise<CaptureOperation>
 ) {
+  let admitted:
+    | import('../../../apps/extension/src/composition/persistence/sync-capture/outgoing-attempts').OutgoingDispatchAttempt
+    | null = null;
+  let admissionHold: { promise: Promise<void>; release: () => void } | null = null;
   let catalog: Awaited<ReturnType<typeof scanSyncCatalog>> | null = null;
   const signal = () => new AbortController().signal;
   const check = (condition: unknown) => {
@@ -90,6 +96,19 @@ export function createWebdavOutgoingHarness(
     };
   }
   return {
+    holdNextAdmission() {
+      let release!: () => void;
+      const promise = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      admissionHold = { promise, release };
+      admitted = null;
+    },
+    admitted: () => structuredClone(admitted),
+    releaseAdmission() {
+      admissionHold?.release();
+      admissionHold = null;
+    },
     queueEnqueue: async (rootId: string) => enqueueSyncQueueOperation(await latest(rootId)),
     queueState: async () => loadSyncQueue(await queueScope()),
     queueControl: async (revision: number, command: 'pause' | 'resume') =>
@@ -107,14 +126,11 @@ export function createWebdavOutgoingHarness(
         (item) => item.operationId === operationId
       );
       if (!row) throw new Error('Native queue operation is missing.');
-      const db = await initDB();
-      const capture: unknown = await db.get(SYNC_CAPTURE_STORE, row.captureKey);
       return runSyncQueueOperation({
         scope,
         operationId,
         expectedRevision: revision,
         authorization: (await loadSyncConnection())?.identity,
-        capture,
         remote: connected(),
         signal: signal(),
         authorize: async () => {},
@@ -133,33 +149,55 @@ export function createWebdavOutgoingHarness(
         }
       );
     },
-    async sendHistory(rootId: string) {
+    async sendHistory(rootId: string, duplicateLatest = false) {
       const db = await initDB();
       const captures = (await db.getAll(SYNC_CAPTURE_STORE))
         .flatMap((raw) => {
           const parsed = parseSyncCaptureRecord(raw);
-          return parsed?.kind === 'captured-change' && parsed.rootId === rootId ? [parsed] : [];
+          return parsed?.kind === 'sync-operation' &&
+            parsed.phase !== 'published' &&
+            parsed.rootId === rootId
+            ? [parsed]
+            : [];
         })
         .sort((left, right) => left.generation - right.generation);
       const sent = [];
-      for (const capture of captures) {
+      for (const [index, capture] of captures.entries()) {
         const prepared = await prepareCapturedOutgoing(capture);
-        const attempt = await dispatchPreparedOutgoing(
-          prepared.spaceId,
-          prepared.operationId,
-          connected(),
-          signal()
-        );
-        sent.push({
-          spaceId: prepared.spaceId,
-          operationId: prepared.operationId,
-          recordKey: attempt.recordKey,
-          files: attempt.objects.map((binding) => {
-            const source = prepared.objects.find((item) => item.objectId === binding.objectId);
-            if (!source) throw new Error('Prepared source is missing.');
-            return { key: binding.remoteKey, size: source.ref.size, sha256: source.sha256 };
-          }),
+        const count = duplicateLatest && index === captures.length - 1 ? 2 : 1;
+        let release!: () => void;
+        let admittedCount = 0;
+        const ready = new Promise<void>((resolve) => {
+          release = resolve;
         });
+        const attempts = await Promise.all(
+          Array.from({ length: count }, () =>
+            dispatchPreparedOutgoing(
+              prepared.spaceId,
+              prepared.operationId,
+              connected(),
+              signal(),
+              {
+                admitAttempt: async () => {
+                  if (++admittedCount === count) release();
+                  await ready;
+                },
+              }
+            )
+          )
+        );
+        for (const attempt of attempts) {
+          sent.push({
+            spaceId: prepared.spaceId,
+            operationId: prepared.operationId,
+            recordKey: attempt.recordKey,
+            files: attempt.objects.map((binding) => {
+              const source = prepared.objects.find((item) => item.objectId === binding.objectId);
+              if (!source) throw new Error('Prepared source is missing.');
+              return { key: binding.remoteKey, size: source.ref.size, sha256: source.sha256 };
+            }),
+          });
+        }
       }
       return sent;
     },
@@ -249,25 +287,32 @@ export function createWebdavOutgoingHarness(
         operationId: prepared.operationId,
         recordText: prepared.recordText,
         recordSha256: prepared.recordSha256,
-        attemptKey: prepared.attemptKey,
         objects: prepared.objects.map((item) => ({
           objectId: item.objectId,
-          key: item.remoteKey,
+          filename: item.filename,
           size: item.ref.size,
           sha256: item.sha256,
         })),
       };
     },
     send: (spaceId: string, operationId: string) =>
-      dispatchPreparedOutgoing(
-        spaceId,
-        operationId,
-        connected(),
-        new AbortController().signal,
-        catalog ? { catalog } : undefined
-      ),
+      dispatchPreparedOutgoing(spaceId, operationId, connected(), new AbortController().signal, {
+        ...(catalog ? { catalog } : {}),
+        admitAttempt: async (attempt) => {
+          admitted = structuredClone(attempt);
+          const hold = admissionHold;
+          if (hold) await hold.promise;
+        },
+      }),
+    manifestText: async (key: string) => {
+      const text = await new Response(await connected().read(key, signal())).text();
+      const parsed = await parseSyncAttemptText(text);
+      if (parsed.recordKey !== key) throw new Error('Remote manifest path differs from its bytes.');
+      return text;
+    },
     completed: loadCompletedOutgoingFiles,
     prepared: loadPreparedOutgoingOperation,
+    published: loadVerifiedOutgoingResult,
     attempt: loadOutgoingDispatchAttempt,
   };
 }

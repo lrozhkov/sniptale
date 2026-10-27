@@ -78,7 +78,9 @@ async function changes(rootId?: string): Promise<CapturedChange[]> {
     .flatMap((value) => {
       const row = parseSyncCaptureRecord(value);
       check(row, 'Stored capture admission failed.');
-      return row.kind === 'captured-change' && (rootId === undefined || row.rootId === rootId)
+      return row.kind === 'sync-operation' &&
+        row.phase === 'native' &&
+        (rootId === undefined || row.rootId === rootId)
         ? [row]
         : [];
     })
@@ -195,7 +197,7 @@ async function preProfileDependenciesProof() {
     return next;
   };
   const failed = candidate('Rolled back dependency genesis');
-  await withCaptureWriteFailure('captured-change', 2, () =>
+  await withCaptureWriteFailure('sync-operation', 2, () =>
     refused(() =>
       saveVideoProject(failed, { expectedWorkspaceRevision: null, expectedProject: null })
     )
@@ -320,7 +322,7 @@ async function saveProof() {
   );
   const initial = await changes(first.id);
   check(initial.length === 1, 'Enabled save must create one capture.');
-  await withCaptureWriteFailure('captured-change', 1, () =>
+  await withCaptureWriteFailure('sync-operation', 1, () =>
     refused(() =>
       saveVideoProject(
         { ...first.project, name: 'Must roll back' },
@@ -483,7 +485,7 @@ async function cascadeProof() {
     { id: entry.id, kind: 'video' as const, name: entry.project.name, primary: false },
   ];
   const before = (await changes()).length;
-  await withCaptureWriteFailure('captured-change', 2, () =>
+  await withCaptureWriteFailure('sync-operation', 2, () =>
     refused(() => deleteMediaAssetWithProjectCascade(mediaId, usage))
   );
   check(
@@ -646,7 +648,7 @@ async function restoreProof() {
     journalId: crypto.randomUUID(),
     payload: null,
   };
-  await withCaptureWriteFailure('captured-change', 1, () =>
+  await withCaptureWriteFailure('sync-operation', 1, () =>
     refused(() => videoProjectRootPublisher.publish({ envelope, session, journal, staged: [] }))
   );
   check(
@@ -1041,7 +1043,9 @@ async function prepareTransferredMediaReplica(payload: unknown) {
   );
   const capture = parseSyncCaptureRecord(payload['capture']);
   check(
-    capture?.kind === 'captured-change' && capture.change.kind === 'media',
+    capture?.kind === 'sync-operation' &&
+      capture.phase === 'native' &&
+      capture.change.kind === 'media',
     'The transferred source capture is invalid.'
   );
   await installExperimentalCaptureProfile({

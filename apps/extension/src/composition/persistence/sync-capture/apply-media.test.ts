@@ -96,7 +96,7 @@ it('admits a Library source with a real causal head and no outgoing echo', async
   });
   expect(
     [...f.table('sync_capture').values()].some(
-      (row) => parseSyncCaptureRecord(row)?.kind === 'captured-change'
+      (row) => parseSyncCaptureRecord(row)?.kind === 'sync-operation'
     )
   ).toBe(false);
   expect([...f.table('asset_owners').values()]).toEqual([

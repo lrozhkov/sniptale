@@ -1,3 +1,4 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { captureRootKey, type CapturedChange } from './contracts';
@@ -53,9 +54,9 @@ function setup() {
     connectionGeneration: 3,
   };
   table('sync_capture').set('profile', profile);
-  const capture: CapturedChange = {
+  const capture: CapturedChange = createNativeCapture({
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
     key: '["change","op"]',
     createdAt: 1,
     spaceId: 'space',
@@ -69,7 +70,7 @@ function setup() {
     origin: 'local-edit',
     publicationId: null,
     change: { kind: 'tombstone' },
-  };
+  });
   table('sync_capture').set(capture.key, structuredClone(capture));
   return {
     ...fixture,
@@ -265,7 +266,7 @@ it('retains preparations attempts and claims through cancel and leaves independe
   for (const row of sourceEvidence) f.table('sync_outbox').set(row.key, row);
   f.table('asset_owners').set('claim', { ownerKind: 'capture', ownerId: 'op', role: 'source' });
   await enqueueSyncQueueOperation(f.capture);
-  const sibling = {
+  const sibling = createNativeCapture({
     ...f.capture,
     operationId: 'sibling',
     key: '["change","sibling"]',
@@ -273,7 +274,7 @@ it('retains preparations attempts and claims through cancel and leaves independe
     rootKey: captureRootKey('space', 'media', 'other'),
     generation: 1,
     basis: [],
-  };
+  });
   f.table('sync_capture').set(sibling.key, sibling);
   await enqueueSyncQueueOperation(sibling);
   await commandSyncQueueOperation(scope, 'op', 1, 'cancel');
@@ -302,7 +303,6 @@ async function publication(f: ReturnType<typeof setup>) {
     operationId: 'op',
     recordText: logical,
     recordSha256: queueHash(logical),
-    attemptKey: 'records/initial.json',
     objects: [],
   });
   const attemptId = '11111111-1111-4111-8111-111111111111';
@@ -326,7 +326,7 @@ async function publication(f: ReturnType<typeof setup>) {
     recordKey: 'records/physical.json',
     objects: [],
   });
-  return { prepared, attempt };
+  return { prepared, attempt: { ...attempt, recordText } };
 }
 it('completes from exact native verified joins and refuses retry of published work', async () => {
   const f = setup();
@@ -342,11 +342,13 @@ it('completes from exact native verified joins and refuses retry of published wo
     revision: run.revision + 1,
   });
   expect(f.table('sync_capture')).toEqual(sources.get('sync_capture'));
-  expect(f.table('sync_outbox').get(result.key)).toEqual(result);
+  expect(f.table('sync_outbox').get(result.key)).toBeUndefined();
   await expect(commandSyncQueueOperation(scope, 'op', row.revision, 'retry')).rejects.toThrow(
     'refused'
   );
-  await expect(completeSyncQueueRun(run, { kind: 'verified', result })).rejects.toThrow('Stale');
+  await expect(completeSyncQueueRun(run, { kind: 'verified', result })).resolves.toMatchObject({
+    status: 'published',
+  });
 });
 it('accepts observed publication without a receipt or retained foreign attempt', async () => {
   const f = setup();
@@ -359,7 +361,7 @@ it('accepts observed publication without a receipt or retained foreign attempt',
   expect(f.table('sync_outbox').has(attempt.key)).toBe(false);
   expect(f.table('sync_outbox').has(verifiedOutgoingResultKey('space', 3, 'op'))).toBe(false);
 });
-it.each(['missing-receipt', 'changed-attempt', 'changed-logical-bytes'] as const)(
+it.each(['missing-publication', 'changed-publication', 'changed-logical-bytes'] as const)(
   'refuses completion with %s',
   async (change) => {
     const f = setup();
@@ -367,45 +369,52 @@ it.each(['missing-receipt', 'changed-attempt', 'changed-logical-bytes'] as const
     const run = await beginSyncQueueRun(scope, 'op', 1);
     const { prepared, attempt } = await publication(f);
     const { result } = await commitVerifiedOutgoingResult(prepared, attempt);
-    if (change === 'missing-receipt') f.table('sync_outbox').delete(result.key);
-    if (change === 'changed-attempt')
-      f.table('sync_outbox').set(attempt.key, { ...attempt, recordSha256: 'a'.repeat(64) });
+    if (change === 'missing-publication') f.table('sync_capture').delete(f.capture.key);
+    if (change === 'changed-publication')
+      f.table('sync_capture').set(f.capture.key, { ...f.capture, sourceSha256: 'a'.repeat(64) });
     const before = structuredClone(f.rows);
     if (change === 'changed-logical-bytes') {
       const recordText = JSON.stringify({ operationText: 'different' });
-      const other = { ...attempt, recordText, recordSha256: queueHash(recordText) };
       await expect(
-        completeSyncQueueRun(run, { kind: 'observed', prepared, attempt: other })
+        completeSyncQueueRun(run, {
+          kind: 'observed',
+          prepared,
+          attempt: { ...attempt, recordText, recordSha256: queueHash(recordText) },
+        })
       ).rejects.toThrow();
     } else await expect(completeSyncQueueRun(run, { kind: 'verified', result })).rejects.toThrow();
     expect(f.rows).toEqual(before);
   }
 );
 it.each(['pause', 'cancel'] as const)(
-  'refuses delayed publication callbacks after operation %s',
+  'compacts late observed publication after operation %s without changing its controls',
   async (command) => {
     const f = setup();
     await enqueueSyncQueueOperation(f.capture);
     const run = await beginSyncQueueRun(scope, 'op', 1);
     const { prepared, attempt } = await publication(f);
-    const { result } = await commitVerifiedOutgoingResult(prepared, attempt);
-    await commandSyncQueueOperation(scope, 'op', run.revision, command);
-    await expect(completeSyncQueueRun(run, { kind: 'verified', result })).rejects.toThrow('Stale');
-    await expect(
-      completeSyncQueueRun(run, { kind: 'observed', prepared, attempt })
-    ).rejects.toThrow('Stale');
+    const control = await commandSyncQueueOperation(scope, 'op', run.revision, command);
+    expect(await completeSyncQueueRun(run, { kind: 'observed', prepared, attempt })).toEqual(
+      control
+    );
+    expect(f.table('sync_capture').get(f.capture.key)).toMatchObject({ phase: 'published' });
+    expect(f.table('sync_outbox').get(control.key)).toEqual(control);
   }
 );
-it('global pause permits completion of previously admitted publication', async () => {
+it('global pause retains its controls after publication is compacted', async () => {
   const f = setup();
   await enqueueSyncQueueOperation(f.capture);
   const run = await beginSyncQueueRun(scope, 'op', 1);
   const { prepared, attempt } = await publication(f);
   const { result } = await commitVerifiedOutgoingResult(prepared, attempt);
-  await commandSyncQueue(scope, 1, 'pause');
-  await expect(completeSyncQueueRun(run, { kind: 'verified', result })).resolves.toMatchObject({
-    outcome: 'verified',
+  const paused = await commandSyncQueue(scope, 1, 'pause');
+  const before = structuredClone(f.rows);
+  expect(await completeSyncQueueRun(run, { kind: 'verified', result })).toMatchObject({
+    status: 'running',
+    runId: run.runId,
   });
+  expect(f.rows).toEqual(before);
+  expect(paused.paused).toBe(true);
 });
 it('persists only fixed failure codes and marks explicit recovery interrupted', async () => {
   const f = setup();
@@ -542,20 +551,20 @@ it.each(['active', 'paused', 'updating-auth'] as const)(
     await advanceSyncQueueRun(run, 'writing');
     const { prepared, attempt } = await publication(f);
     f.table('asset_owners').set('claim', { ownerKind: 'capture', ownerId: 'op', role: 'source' });
-    const captures = structuredClone(f.table('sync_capture'));
     const claims = structuredClone(f.table('asset_owners'));
     const rotated = { ...authorization, revision: 2 };
     configureConnection(f, rotated, phase);
     const { result } = await commitVerifiedOutgoingResult(prepared, attempt);
     const evidence = structuredClone(f.rows);
     await expect(advanceSyncQueueRun(run, 'verifying')).rejects.toThrow();
-    await expect(completeSyncQueueRun(run, { kind: 'verified', result })).rejects.toThrow();
+    await expect(completeSyncQueueRun(run, { kind: 'verified', result })).resolves.toMatchObject({
+      status: 'running',
+    });
     expect(f.rows).toEqual(evidence);
-    expect(f.table('sync_capture')).toEqual(captures);
     expect(f.table('asset_owners')).toEqual(claims);
     expect(f.table('sync_capture').get('profile')).toEqual(f.profile);
     expect((await loadSyncQueue(scope)).operations[0]!.generation).toBe(1);
-    expect(f.table('sync_outbox').get(result.key)).toEqual(result);
+    expect(f.table('sync_outbox').get(result.key)).toBeUndefined();
     const failed = await failSyncQueueRun(run, 'authentication');
     expect(failed).toMatchObject({ outcome: 'unknown', authorization });
     const retry = await commandSyncQueueOperation(scope, 'op', failed.revision, 'retry');
@@ -566,11 +575,14 @@ it.each(['active', 'paused', 'updating-auth'] as const)(
     const replacement = structuredClone(f.rows);
     await expect(failSyncQueueRun(run)).rejects.toThrow('Stale');
     await expect(recoverSyncQueueRun(run)).rejects.toThrow('Stale');
-    await expect(completeSyncQueueRun(run, { kind: 'verified', result })).rejects.toThrow('Stale');
+    await expect(completeSyncQueueRun(run, { kind: 'verified', result })).resolves.toMatchObject({
+      status: 'running',
+      runId: next.runId,
+    });
     expect(f.rows).toEqual(replacement);
-    expect(f.table('sync_outbox').get(prepared.key)).toEqual(prepared);
-    expect(f.table('sync_outbox').get(attempt.key)).toEqual(attempt);
-    expect(f.table('sync_outbox').get(result.key)).toEqual(result);
+    expect(f.table('sync_outbox').get(prepared.key)).toMatchObject({ kind: 'operation-locator' });
+    expect(f.table('sync_outbox').get(attempt.key)).not.toHaveProperty('recordText');
+    expect(f.table('sync_outbox').get(result.key)).toBeUndefined();
   }
 );
 it('recovers an exact obsolete run after connection recreation without granting it admission', async () => {
@@ -619,9 +631,10 @@ it('refuses a delayed selected command after enrollment erasure and recreation',
   f.table('sync_capture').clear();
   f.table('sync_outbox').clear();
   f.table('sync_capture').set('profile', { ...f.profile, createdAt: 2 });
-  f.table('sync_capture').set(f.capture.key, structuredClone(f.capture));
+  const recreatedCapture = createNativeCapture({ ...f.capture, profileCreatedAt: 2 });
+  f.table('sync_capture').set(recreatedCapture.key, recreatedCapture);
   const replacement = { ...scope, profileCreatedAt: 2 };
-  await enqueueSyncQueueOperation(f.capture);
+  await enqueueSyncQueueOperation(recreatedCapture);
   const before = structuredClone(f.rows);
   gate.resolve(f.database);
   await refusal;

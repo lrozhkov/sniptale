@@ -78,6 +78,12 @@ export interface SyncQueueScheduleProgress {
   complete: boolean;
   dueAfter: { dueAt: number; key: IDBValidKey } | null;
 }
+/** Durable continuation for bounded retained capture discovery. */
+export interface SyncQueueCaptureProgress {
+  authorization: SyncConnectionIdentity;
+  revision: number;
+  afterKey: IDBValidKey | null;
+}
 export interface SyncQueueConnection extends SyncQueueScope, QueueHistory {
   version: 1;
   kind: 'queue-connection';
@@ -85,6 +91,7 @@ export interface SyncQueueConnection extends SyncQueueScope, QueueHistory {
   revision: number;
   paused: boolean;
   scheduleProgress: SyncQueueScheduleProgress | null;
+  captureProgress?: SyncQueueCaptureProgress;
 }
 export interface SyncQueueOperation extends SyncQueueScope, QueueHistory {
   version: 1;
@@ -278,9 +285,25 @@ function parseScheduleProgress(value: unknown): SyncQueueScheduleProgress | null
     dueAfter,
   };
 }
+function parseCaptureProgress(value: unknown): SyncQueueCaptureProgress | null {
+  if (!isRecord(value)) return null;
+  const authorization = parseSyncConnectionIdentity(value['authorization']);
+  if (
+    !authorization ||
+    !queueOrdinal(value['revision']) ||
+    value['revision'] < 1 ||
+    !(value['afterKey'] === null || queueNativeCursorKey(value['afterKey']))
+  )
+    return null;
+  return { authorization, revision: value['revision'], afterKey: value['afterKey'] };
+}
 export function parseSyncQueueConnection(value: unknown): SyncQueueConnection | null {
   const scope = parseSyncQueueScope(value);
   if (!scope || !isRecord(value)) return null;
+  const captureProgress = Object.hasOwn(value, 'captureProgress')
+    ? parseCaptureProgress(value['captureProgress'])
+    : undefined;
+  if (captureProgress === null) return null;
   const history = parseHistory(value);
   const scheduleProgress =
     value['scheduleProgress'] == null ? null : parseScheduleProgress(value['scheduleProgress']);
@@ -310,6 +333,7 @@ export function parseSyncQueueConnection(value: unknown): SyncQueueConnection | 
     revision: value['revision'],
     paused: value['paused'],
     scheduleProgress,
+    ...(captureProgress === undefined ? {} : { captureProgress }),
   };
 }
 export function parseSyncQueueOperation(value: unknown): SyncQueueOperation | null {

@@ -1,3 +1,4 @@
+import { createNativeCapture } from '../../composition/persistence/sync-capture/test-support/frozen-snapshot-database';
 import { expect, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
@@ -49,6 +50,7 @@ vi.mock('../../composition/persistence/sync-capture/outgoing', async (original) 
     const accepted = io.prepared.get(draft.operationId) ?? {
       ...structuredClone(draft),
       captureSha256: 'a'.repeat(64),
+      profileCreatedAt: 1,
     };
     io.prepared.set(accepted.operationId, accepted);
     return structuredClone(accepted);
@@ -70,11 +72,21 @@ vi.mock('../../composition/persistence/sync-capture/outgoing-attempts', () => ({
             .filter((object) =>
               io.completed.has(JSON.stringify([attempt.attemptId, object.objectId]))
             )
-            .map((object) => ({
-              attempt: structuredClone(attempt),
-              prepared: structuredClone(io.prepared.get(attempt.operationId)!),
-              objectId: object.objectId,
-            }))
+            .map((object) => {
+              const prepared = io.prepared.get(attempt.operationId)!;
+              const source = prepared.objects.find((item) => item.objectId === object.objectId)!;
+              return {
+                spaceId,
+                connectionGeneration,
+                profileCreatedAt: 1,
+                operationId: attempt.operationId,
+                objectId: object.objectId,
+                ref: structuredClone(source.ref),
+                filename: source.filename,
+                sha256: source.sha256,
+                remoteKey: object.remoteKey,
+              };
+            })
         : []
     ),
   commitOutgoingDispatchAttempt: async (
@@ -84,8 +96,11 @@ vi.mock('../../composition/persistence/sync-capture/outgoing-attempts', () => ({
     if (io.refuse) throw new Error('Native refusal.');
     const old = io.attempts.get(draft.attemptId);
     if (old) return { attempt: structuredClone(old), created: false };
-    const attempt = {
-      ...structuredClone(draft),
+    const { recordText: _text, ...metadata } = structuredClone(draft);
+    const attempt: OutgoingDispatchAttempt = {
+      ...metadata,
+      profileCreatedAt: 1,
+      captureSha256: 'a'.repeat(64),
       kind: 'dispatch-attempt' as const,
       key: draft.attemptId,
       createdAt: 1,
@@ -104,9 +119,9 @@ export function capture(): CapturedChange {
     sha256: null,
   };
   const rootId = 'project-asset:source';
-  return {
+  return createNativeCapture({
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
     key: 'capture',
     createdAt: 1,
     spaceId: 'space',
@@ -141,7 +156,7 @@ export function capture(): CapturedChange {
         }),
       },
     },
-  };
+  });
 }
 export function remote() {
   const objects = new Map<string, Blob>();
@@ -219,7 +234,7 @@ export function nextRevision(value: CapturedChange) {
   next.operationId += '-next';
   next.generation++;
   next.basis = [value.operationId];
-  return next;
+  return createNativeCapture(next);
 }
 export function projectCapture(): CapturedChange {
   const base = capture();
@@ -230,7 +245,7 @@ export function projectCapture(): CapturedChange {
   asset.type = VideoProjectAssetType.IMAGE;
   asset.source = { kind: 'project-asset', projectAssetId: 'source' };
   asset.metadata = { ...asset.metadata, mimeType: ref.mimeType, size: ref.size, duration: null };
-  return {
+  return createNativeCapture({
     ...base,
     rootKind: 'video-project',
     rootId: project.id,
@@ -262,5 +277,5 @@ export function projectCapture(): CapturedChange {
         mediaDependencies: [],
       },
     },
-  };
+  });
 }

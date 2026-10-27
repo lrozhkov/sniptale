@@ -5,7 +5,10 @@ import {
   queueOperationKey,
 } from '../../../../apps/extension/src/composition/persistence/sync-capture/queue-model';
 import type { CapturedChange } from '../../../../apps/extension/src/composition/persistence/sync-capture/contracts';
-import { parseSyncCaptureRecord } from '../../../../apps/extension/src/composition/persistence/sync-capture/guards';
+import {
+  fingerprintNativeCapture,
+  parseSyncCaptureRecord,
+} from '../../../../apps/extension/src/composition/persistence/sync-capture/guards';
 import { DB_NAME } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores';
 
 for (const config of [
@@ -51,9 +54,12 @@ for (const config of [
     const scope = { spaceId: 'settings-proof', connectionGeneration: 1, profileCreatedAt: 1 };
     const captures: CapturedChange[] = Array.from({ length: 132 }, (_, index) => {
       const id = `proof-${String(index).padStart(3, '0')}`;
-      return {
+      const native: Omit<CapturedChange, 'sourceSha256'> = {
         version: 1,
-        kind: 'captured-change',
+        kind: 'sync-operation',
+        phase: 'native',
+        profileCreatedAt: scope.profileCreatedAt,
+        source: { changeKind: 'tombstone', label: `Example ${id}.png` },
         key: JSON.stringify(['change', id]),
         createdAt: 1,
         spaceId: scope.spaceId,
@@ -68,10 +74,12 @@ for (const config of [
         publicationId: null,
         change: { kind: 'tombstone' },
       };
+      return { ...native, sourceSha256: fingerprintNativeCapture(native) };
     });
     const normalized = captures.map((capture) => {
       const parsed = parseSyncCaptureRecord(capture);
-      if (!parsed || parsed.kind !== 'captured-change') throw new Error('Invalid queue fixture');
+      if (!parsed || parsed.kind !== 'sync-operation' || parsed.phase !== 'native')
+        throw new Error('Invalid queue fixture');
       return parsed;
     });
     const operations = normalized.map((capture) => ({
@@ -81,7 +89,7 @@ for (const config of [
       key: queueOperationKey(scope, capture.operationId),
       operationId: capture.operationId,
       captureKey: capture.key,
-      captureSha256: queueHash(JSON.stringify(capture)),
+      captureSha256: capture.sourceSha256,
       rootKey: capture.rootKey,
       generation: 1,
       revision: 1,

@@ -1,3 +1,5 @@
+import { hashCaptureText } from './guards';
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
@@ -178,23 +180,26 @@ it('refuses a local pending edit and a stale native project revision', async () 
   expect(stale.rows).toEqual(beforeStale);
   const pending = setup();
   const rootKey = captureRootKey(spaceId, 'video-project', projectId);
-  pending.table('sync_capture').set('pending', {
-    version: 1,
-    kind: 'captured-change',
-    key: 'pending',
-    createdAt: 1,
-    spaceId,
-    connectionGeneration: 3,
-    rootKind: 'video-project',
-    rootId: projectId,
-    rootKey,
-    generation: 1,
-    operationId: 'local-deletion',
-    basis: [],
-    origin: 'local-edit',
-    publicationId: null,
-    change: { kind: 'tombstone' },
-  });
+  pending.table('sync_capture').set(
+    'pending',
+    createNativeCapture({
+      version: 1,
+      kind: 'sync-operation',
+      key: 'pending',
+      createdAt: 1,
+      spaceId,
+      connectionGeneration: 3,
+      rootKind: 'video-project',
+      rootId: projectId,
+      rootKey,
+      generation: 1,
+      operationId: 'local-deletion',
+      basis: [],
+      origin: 'local-edit',
+      publicationId: null,
+      change: { kind: 'tombstone' },
+    })
+  );
   const beforePending = structuredClone(pending.rows);
   await expect(applyPreparedVideoProjectRevision(pending.input)).rejects.toMatchObject({
     code: 'pending-local-change',
@@ -574,3 +579,76 @@ it('forwards the active lifecycle permit to detached cleanup after commit', asyn
     expect(fixture.table('project_assets').has('private-copy')).toBe(false);
   });
 });
+
+it.each(['native', 'prepared', 'published'] as const)(
+  'treats only unpublished local deletion as pending before incoming restore: %s',
+  async (phase) => {
+    const f = setup();
+    const rootKey = captureRootKey(spaceId, 'video-project', projectId);
+    const native = createNativeCapture({
+      version: 1,
+      kind: 'sync-operation',
+      key: 'local-deletion',
+      createdAt: 1,
+      spaceId,
+      connectionGeneration: 3,
+      rootKind: 'video-project',
+      rootId: projectId,
+      rootKey,
+      generation: 1,
+      operationId: 'local-deletion',
+      basis: [],
+      origin: 'local-edit',
+      publicationId: null,
+      change: { kind: 'tombstone' },
+    });
+    const { change: _change, phase: _phase, ...header } = native;
+    const prepared = {
+      ...header,
+      phase: 'prepared',
+      prepared: { recordText: '{}', recordSha256: hashCaptureText('{}'), objects: [] },
+    };
+    const published = {
+      ...header,
+      phase: 'published',
+      publication: {
+        kind: 'verified',
+        acceptedAt: 2,
+        preparedSha256: hashCaptureText('{}'),
+        attemptId: '11111111-1111-4111-8111-111111111111',
+        recordKey: 'records/deletion.json',
+        recordSha256: 'a'.repeat(64),
+      },
+      objects: [],
+    };
+    f.table('sync_capture').set(
+      native.key,
+      phase === 'native' ? native : phase === 'prepared' ? prepared : published
+    );
+    f.table('sync_capture').set(JSON.stringify(['root-state', rootKey]), {
+      version: 1,
+      kind: 'root-state',
+      key: JSON.stringify(['root-state', rootKey]),
+      createdAt: 1,
+      spaceId,
+      rootKind: 'video-project',
+      rootId: projectId,
+      rootKey,
+      generation: 1,
+      basis: [native.operationId],
+    });
+    f.input.expectedLocalGeneration = 1;
+    if (phase === 'published')
+      await expect(applyPreparedVideoProjectRevision(f.input)).resolves.toMatchObject({
+        status: 'applied',
+        generation: 2,
+      });
+    else {
+      const before = structuredClone(f.rows);
+      await expect(applyPreparedVideoProjectRevision(f.input)).rejects.toMatchObject({
+        code: 'pending-local-change',
+      });
+      expect(f.rows).toEqual(before);
+    }
+  }
+);

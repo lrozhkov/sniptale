@@ -12,9 +12,13 @@ function record(value: unknown): Record<string, unknown> {
   return value;
 }
 function call(driver: Driver, method: keyof Window['webdavLifecycle'], argument?: unknown) {
-  return driver.evaluate(
-    `window.webdavLifecycle.${method}(${argument === undefined ? '' : JSON.stringify(argument)})`
-  );
+  return driver
+    .evaluate(
+      `window.webdavLifecycle.${method}(${argument === undefined ? '' : JSON.stringify(argument)})`
+    )
+    .catch((error: unknown) => {
+      throw new Error(`WebDAV lifecycle command failed: ${method}`, { cause: error });
+    });
 }
 async function inspect(driver: Driver) {
   const envelope = record(await call(driver, 'inspect'));
@@ -129,16 +133,40 @@ for (const kind of ['allocation', 'join'] as const) {
         password: 'different-synthetic-password',
       });
       expect(replay).toEqual(enrolled);
-      const source = sourceResult(await call(active, 'prepareEnrolledSource'));
+      const preparedSource = record(await call(active, 'prepareEnrolledSource'));
+      const operationId = preparedSource['operationId'];
+      if (typeof operationId !== 'string')
+        throw new Error('Prepared operation identity is missing.');
       await call(active, 'start');
       await expect
-        .poll(async () => record(await operation(active, source.operationId))['status'])
+        .poll(async () => record(await operation(active, operationId))['status'])
         .toBe('published');
+      const source = sourceResult(await call(active, 'enrolledCaptureResult', operationId));
       const external = [];
       for (const object of source.objects) {
         const result = await lab.externalProof(`${rootKey}${object.key}`);
         expect(result).toEqual({ size: object.size, sha256: object.sha256 });
         external.push(result);
+      }
+      let retirement = null;
+      if (kind === 'allocation') {
+        const putsBeforeRetirement = lab.proxy.counts.puts;
+        retirement = record(await call(active, 'retirePublishedOriginal', operationId));
+        expect(retirement).toMatchObject({
+          before: [true],
+          protectedAfterNativeRemoval: [true],
+          after: [false],
+          released: 1,
+          nativeMediaRemoved: true,
+        });
+        expect(record(retirement['publication'])).toMatchObject({
+          phase: 'published',
+          hasNativePayload: false,
+          hasPreparedPayload: false,
+          objects: [expect.objectContaining({ pinned: false })],
+        });
+        expect(lab.proxy.counts.puts).toBe(putsBeforeRetirement);
+        expect(await lab.externalProof(`${rootKey}${source.objects[0]!.key}`)).toEqual(external[0]);
       }
       const execution = await inspect(active);
       expect(execution?.workspace).toBeNull();
@@ -152,18 +180,28 @@ for (const kind of ['allocation', 'join'] as const) {
           status: 404,
           repeat: true,
         });
-        const refusedSource = sourceResult(await call(active, 'prepareEnrolledSource'));
+        const refusedSource = record(await call(active, 'prepareEnrolledSource'));
+        const refusedOperationId = refusedSource['operationId'];
+        if (typeof refusedOperationId !== 'string')
+          throw new Error('Refused source identity is missing.');
         await call(active, 'start');
         await expect
-          .poll(
-            async () => record(await operation(active, refusedSource.operationId))['failureCode']
-          )
+          .poll(async () => record(await operation(active, refusedOperationId))['failureCode'])
           .toBe('invalid-workspace');
         expect(lab.proxy.counts.puts).toBe(before);
         markerRefusal = { failureCode: 'invalid-workspace', noWrites: true };
         lab.proxy.releaseFault();
       }
-      await saveProof(info, { kind, enrolled, replay, source, external, execution, markerRefusal });
+      await saveProof(info, {
+        kind,
+        enrolled,
+        replay,
+        source,
+        external,
+        execution,
+        markerRefusal,
+        retirement,
+      });
     } finally {
       lab.proxy.releaseFault();
       await joined?.close();
@@ -243,7 +281,13 @@ test('committed capture enters the queue after browser restart without enqueue o
         { timeout: 150_000 }
       )
       .toBe(true);
-    const published = sourceResult(await call(driver, 'enrolledCaptureResult', operationId));
+    const publication = record(await call(driver, 'enrolledCaptureResult', operationId));
+    expect(publication).toMatchObject({
+      phase: 'published',
+      hasNativePayload: false,
+      hasPreparedPayload: false,
+    });
+    const published = sourceResult(publication);
     expect(published.objects).toHaveLength(1);
     const expected = captured['expectedOriginal'];
     expect({ size: published.objects[0]!.size, sha256: published.objects[0]!.sha256 }).toEqual(
@@ -319,6 +363,138 @@ test('committed capture enters the queue after browser restart without enqueue o
       duplicateRestartNoWrites: true,
     });
   } finally {
+    await driver.close();
+  }
+});
+
+test('offline saves exceed 128 captures and discovery resumes bounded pages after browser restart', async ({
+  lab,
+}, info) => {
+  test.setTimeout(300_000);
+  const options = {
+    extensionBuildDir: '.tmp/e2e-builds/security',
+    ignoreHTTPSErrors: true as const,
+    userDataDir: info.outputPath('capture-capacity-browser-profile'),
+  };
+  let driver = await launchWebdavWorkerDriver(options);
+  const pages: unknown[] = [];
+  try {
+    await driver.grantOrigin(new URL(lab.credentials.rootUrl).origin);
+    const authentication = {
+      kind: 'basic',
+      username: lab.credentials.username,
+      password: lab.credentials.password,
+    };
+    const created = record(
+      await call(driver, 'prepareWorkspace', { rootUrl: lab.credentials.rootUrl, authentication })
+    );
+    const rootKey = created['rootKey'];
+    if (typeof rootKey !== 'string') throw new Error('Workspace path is missing.');
+    await call(driver, 'startWorkspace', authentication);
+    await waitReady(driver, info);
+    await call(driver, 'enrollWorkspace', authentication);
+    await driver.evaluate("chrome.alarms.clear('sniptale:sync-queue-retry')");
+    const putsBeforeCapture = lab.proxy.counts.puts;
+    const fixture = record(await call(driver, 'prepareCapacity'));
+    const source = record(fixture['source']);
+    const operationId = source['operationId'];
+    const projectId = fixture['projectId'];
+    if (typeof operationId !== 'string' || typeof projectId !== 'string')
+      throw new Error('Capacity fixture identities are missing.');
+    for (let index = 1; index < 132; index += 1) {
+      const saved = record(await call(driver, 'appendCapacityRevision', { projectId, index }));
+      expect(saved['name']).toBe(`Offline ${index}`);
+    }
+    await saveProof(info, { stage: 'offline-native-saves', acceptedRevisions: 132, projectId });
+    const before = record(await call(driver, 'capacityState', projectId));
+    await saveProof(info, { stage: 'before-restart', before });
+    expect(before['captureCount']).toBe(133);
+    expect(record(record(before['project'])['project'])['name']).toBe('Offline 131');
+    expect(before['operations']).toEqual([]);
+    const extensionId = driver.extensionId;
+    let previousCaptureRevision = 0;
+    for (const count of [64, 128, 133]) {
+      await saveProof(info, { stage: 'before-page-restart', expectedCount: count, pages });
+      await driver.evaluate("chrome.alarms.clear('sniptale:sync-queue-retry')");
+      await driver.close();
+      await rm(join(options.userDataDir, 'DevToolsActivePort'), { force: true });
+      driver = await launchWebdavWorkerDriver({ ...options, restoreExtensionId: extensionId });
+      await expect
+        .poll(
+          async () => {
+            const state = record(await call(driver, 'capacityState', projectId));
+            const rows = state['operations'];
+            const progress = record(state['connection'])['captureProgress'];
+            return Array.isArray(rows) &&
+              isRecord(progress) &&
+              typeof progress['revision'] === 'number' &&
+              progress['revision'] > previousCaptureRevision
+              ? rows.length
+              : null;
+          },
+          { timeout: 60_000 }
+        )
+        .toBe(count);
+      const state = record(await call(driver, 'capacityState', projectId));
+      const progress = record(record(state['connection'])['captureProgress']);
+      if (typeof progress['revision'] !== 'number')
+        throw new Error('Capture progress revision is missing.');
+      previousCaptureRevision = progress['revision'];
+      expect(state['captureCount']).toBe(133);
+      expect(record(state['connection'])['paused']).toBe(true);
+      const rows = state['operations'];
+      if (!Array.isArray(rows)) throw new Error('Capacity queue is missing.');
+      expect(new Set(rows.map((row) => record(row)['operationId'])).size).toBe(count);
+      expect(rows.every((row) => record(row)['status'] === 'queued')).toBe(true);
+      pages.push(state);
+    }
+    expect(lab.proxy.counts.puts).toBe(putsBeforeCapture);
+    const finalPage = record(pages.at(-1));
+    expect(record(record(finalPage['connection'])['captureProgress'])['afterKey']).toBeNull();
+    await call(driver, 'resumeCapacityOriginal', operationId);
+    await driver.evaluate("chrome.alarms.clear('sniptale:sync-queue-retry')");
+    await driver.close();
+    await rm(join(options.userDataDir, 'DevToolsActivePort'), { force: true });
+    driver = await launchWebdavWorkerDriver({ ...options, restoreExtensionId: extensionId });
+    try {
+      await expect
+        .poll(
+          async () => {
+            return record(await call(driver, 'capacityOperation', operationId))['status'];
+          },
+          { timeout: 120_000 }
+        )
+        .toBe('published');
+    } catch (error) {
+      const locks = await driver.evaluate(`navigator.locks.query().then(state => ({
+        held: state.held.filter(lock => lock.name.startsWith('sniptale:persistence')).map(({name,mode}) => ({name,mode})),
+        pending: state.pending.filter(lock => lock.name.startsWith('sniptale:persistence')).map(({name,mode}) => ({name,mode}))
+      }))`);
+      await saveProof(info, { stage: 'selected-native-read-refused', locks, pages });
+      throw error;
+    }
+    const publication = record(await call(driver, 'enrolledCaptureResult', operationId));
+    expect(publication).toMatchObject({
+      phase: 'published',
+      hasNativePayload: false,
+      hasPreparedPayload: false,
+    });
+    const published = sourceResult(publication);
+    const external = await lab.externalProof(`${rootKey}${published.objects[0]!.key}`);
+    expect(external).toEqual(source['expectedOriginal']);
+    const final = record(await call(driver, 'capacityState', projectId));
+    expect(final['captureCount']).toBe(133);
+    expect(record(record(final['project'])['project'])['name']).toBe('Offline 131');
+    await saveProof(info, {
+      before,
+      pages,
+      final,
+      external,
+      browserRestarts: 4,
+      explicitEnqueueOrStart: false,
+    });
+  } finally {
+    lab.proxy.releaseFault();
     await driver.close();
   }
 });

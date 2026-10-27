@@ -1,3 +1,4 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
@@ -22,7 +23,7 @@ function draft(capture: CapturedChange, text = '{"record":1}'): PreparedOutgoing
   return {
     version: 1,
     key: preparedOutgoingOperationKey(capture.spaceId, capture.operationId),
-    createdAt: 2,
+    createdAt: capture.createdAt,
     spaceId: capture.spaceId,
     connectionGeneration: capture.connectionGeneration,
     captureKey: capture.key,
@@ -33,10 +34,9 @@ function draft(capture: CapturedChange, text = '{"record":1}'): PreparedOutgoing
     recordSha256: Array.from(sha256(new TextEncoder().encode(text)), (byte) =>
       byte.toString(16).padStart(2, '0')
     ).join(''),
-    attemptKey: `attempts/${capture.operationId}/record.json`,
     objects: refs.map((ref) => ({
       objectId: 'body',
-      remoteKey: 'objects/body',
+      filename: 'original.png',
       ref,
       sha256: 'b'.repeat(64),
     })),
@@ -72,9 +72,9 @@ function setup() {
     size: ref.size,
     lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
   });
-  const capture: CapturedChange = {
+  const capture: CapturedChange = createNativeCapture({
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
     key: '["change","op"]',
     createdAt: 1,
     spaceId: 'space',
@@ -101,7 +101,7 @@ function setup() {
         },
       },
     },
-  };
+  });
   table('sync_capture').set(capture.key, structuredClone(capture));
   return {
     ...fixture,
@@ -113,79 +113,99 @@ function setup() {
   };
 }
 
-it('detaches the draft and expected capture before awaiting database admission', async () => {
+it('detaches admission inputs and replaces native rows with one portable payload', async () => {
   const f = setup();
   const proposed = draft(f.capture);
   const expected = structuredClone(proposed);
   const pending = commitPreparedOutgoingOperation(f.capture, proposed);
-  proposed.recordText = 'caller changed';
-  proposed.objects[0]!.ref.location.objectKey = 'objects/changed';
-  f.capture.generation = 100;
+  proposed.recordText = 'changed';
+  f.capture.generation++;
   expect(await pending).toMatchObject(expected);
+  const stored = f.table('sync_capture').get(f.capture.key);
+  expect(stored).toMatchObject({
+    phase: 'prepared',
+    prepared: {
+      recordText: expected.recordText,
+      recordSha256: expected.recordSha256,
+      objects: expected.objects,
+    },
+  });
+  expect(stored).not.toHaveProperty('change');
+  expect([...f.table('sync_outbox').values()]).toEqual([
+    expect.objectContaining({ kind: 'operation-locator' }),
+  ]);
+  expect(
+    JSON.stringify([...f.rows.values()].flatMap((table) => [...table.values()])).match(
+      /recordText/gu
+    )
+  ).toHaveLength(1);
 });
 
-it('returns the first accepted bytes, objects, and attempt key for a different repeated proposal', async () => {
+it('returns the first accepted encoding on retry and controlled concurrent preparation', async () => {
   const f = setup();
-  const first = await commitPreparedOutgoingOperation(f.capture, draft(f.capture));
-  const alternative = draft(f.capture, '{"record":2}');
-  alternative.attemptKey = 'attempts/different.json';
-  alternative.objects[0]!.remoteKey = 'objects/different';
-  expect(await commitPreparedOutgoingOperation(f.capture, alternative)).toEqual(first);
-  expect([...f.table('sync_outbox').values()]).toEqual([first]);
+  let release!: () => void;
+  io.database.mockResolvedValueOnce(f.database).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(f.database);
+      })
+  );
+  const first = commitPreparedOutgoingOperation(f.capture, draft(f.capture));
+  const second = commitPreparedOutgoingOperation(f.capture, draft(f.capture, '{"record":2}'));
+  const accepted = await first;
+  release();
+  expect(await second).toEqual(accepted);
+  expect(await loadPreparedOutgoingOperation('space', 'op')).toEqual(accepted);
 });
 
-it.each(['capture', 'profile', 'connection', 'space', 'missing'])(
-  'refuses changed %s evidence without mutation',
-  async (change) => {
+it.each(['capture', 'missing', 'disabled', 'connection', 'lifetime', 'space'])(
+  'refuses changed %s before replacing valid source data',
+  async (kind) => {
     const f = setup();
-    const proposed = draft(f.capture);
-    if (change === 'capture')
+    if (kind === 'capture')
       f.table('sync_capture').set(f.capture.key, { ...f.capture, createdAt: 9 });
-    if (change === 'missing') f.table('sync_capture').delete(f.capture.key);
-    if (change === 'profile' || change === 'connection' || change === 'space')
+    if (kind === 'missing') f.table('sync_capture').delete(f.capture.key);
+    if (!['capture', 'missing'].includes(kind))
       f.table('sync_capture').set('profile', {
         version: 1,
         kind: 'profile',
         key: 'profile',
-        createdAt: 1,
-        enabled: change !== 'profile',
-        spaceId: change === 'space' ? 'other' : 'space',
-        connectionGeneration: change === 'connection' ? 4 : 3,
+        createdAt: kind === 'lifetime' ? 99 : 1,
+        enabled: kind !== 'disabled',
+        spaceId: kind === 'space' ? 'other' : 'space',
+        connectionGeneration: kind === 'connection' ? 4 : 3,
       });
     const before = structuredClone(f.rows);
-    await expect(commitPreparedOutgoingOperation(f.capture, proposed)).rejects.toThrow('changed');
+    await expect(commitPreparedOutgoingOperation(f.capture, draft(f.capture))).rejects.toThrow();
     expect(f.rows).toEqual(before);
   }
 );
 
-it('keeps an earlier capture usable after deletion and recreation with independent operation IDs', async () => {
+it('retains accepted older operations after deletion and recreation under the same root identity', async () => {
   const f = setup();
-  const deletion: CapturedChange = {
+  const deletion = createNativeCapture({
     ...f.capture,
-    key: 'deleted',
-    operationId: 'deleted',
+    key: 'deletion',
+    operationId: 'deletion',
     generation: 2,
     change: { kind: 'tombstone' },
-  };
-  const recreated: CapturedChange = {
+  });
+  const recreated = createNativeCapture({
     ...f.capture,
     key: 'recreated',
     operationId: 'recreated',
     generation: 3,
-  };
+  });
   f.table('sync_capture').set(deletion.key, deletion);
   f.table('sync_capture').set(recreated.key, recreated);
-  f.table('sync_capture').set('latest', { kind: 'root-state', generation: 3 });
   const earlier = await commitPreparedOutgoingOperation(f.capture, draft(f.capture));
-  const newer = await commitPreparedOutgoingOperation(recreated, draft(recreated));
-  expect(newer.key).not.toBe(earlier.key);
+  expect(await commitPreparedOutgoingOperation(recreated, draft(recreated))).not.toEqual(earlier);
   expect(await commitPreparedOutgoingOperation(deletion, draft(deletion))).toMatchObject({
     objects: [],
   });
-  expect(f.table('sync_outbox').size).toBe(3);
 });
 
-it('rolls back a failed commit and permits retry while preserving capture and source claims', async () => {
+it('rolls back source replacement and locator on write failure, then permits retry', async () => {
   const f = setup();
   const before = structuredClone(f.rows);
   f.failWrites(true);
@@ -194,70 +214,53 @@ it('rolls back a failed commit and permits retry while preserving capture and so
   );
   expect(f.rows).toEqual(before);
   f.failWrites(false);
-  expect(await commitPreparedOutgoingOperation(f.capture, draft(f.capture))).toMatchObject(
-    draft(f.capture)
-  );
-  expect(f.table('sync_capture')).toEqual(before.get('sync_capture'));
+  await commitPreparedOutgoingOperation(f.capture, draft(f.capture));
+  expect(f.table('sync_capture').get(f.capture.key)).toMatchObject({ phase: 'prepared' });
 });
 
-it('refuses contradictory accepted identity and preserves the original evidence', async () => {
-  const f = setup();
-  const accepted = await commitPreparedOutgoingOperation(f.capture, draft(f.capture));
-  const corrupted = { ...accepted, captureKey: 'other' };
-  f.table('sync_outbox').set(corrupted.key, corrupted);
-  const before = structuredClone(f.rows);
-  await expect(commitPreparedOutgoingOperation(f.capture, draft(f.capture))).rejects.toThrow(
-    'Invalid accepted'
-  );
-  expect(f.rows).toEqual(before);
-});
-
-it('loads accepted bytes without writes and refuses corrupt stored bytes', async () => {
-  const f = setup();
-  expect(await loadPreparedOutgoingOperation('space', 'op')).toBeNull();
-  const accepted = await commitPreparedOutgoingOperation(f.capture, draft(f.capture));
-  const before = structuredClone(f.rows);
-  f.failWrites(true);
-  expect(await loadPreparedOutgoingOperation('space', 'op')).toEqual(accepted);
-  expect(f.rows).toEqual(before);
-  f.table('sync_outbox').set(accepted.key, { ...accepted, recordText: 'corrupt' });
-  await expect(loadPreparedOutgoingOperation('space', 'op')).rejects.toThrow('Invalid prepared');
-});
-
-it.each(['digest', 'ref', 'path', 'count', 'record-size', 'tombstone'])(
+it.each(['digest', 'ref', 'filename', 'count', 'record-size', 'tombstone'])(
   'refuses invalid %s before database admission',
   async (kind) => {
     const f = setup();
     const proposed = draft(f.capture);
     if (kind === 'digest') proposed.recordSha256 = 'a'.repeat(64);
     if (kind === 'ref') proposed.objects[0]!.ref.size++;
-    if (kind === 'path') proposed.attemptKey = '../outside';
+    if (kind === 'filename') proposed.objects[0]!.filename = '';
     if (kind === 'count') proposed.objects = Array.from({ length: 65 }, () => proposed.objects[0]!);
     if (kind === 'record-size') proposed.recordText = 'x'.repeat(4 * 1024 * 1024 + 1);
     if (kind === 'tombstone') f.capture.change = { kind: 'tombstone' };
-    await expect(commitPreparedOutgoingOperation(f.capture, proposed)).rejects.toThrow(
-      'Invalid outgoing'
-    );
+    await expect(commitPreparedOutgoingOperation(f.capture, proposed)).rejects.toThrow('Invalid');
     expect(io.database).not.toHaveBeenCalled();
   }
 );
 
-it('refuses accepted bytes after retained capture metadata changes under identical IDs and refs', async () => {
-  const f = setup();
-  await commitPreparedOutgoingOperation(f.capture, draft(f.capture));
-  const changed = { ...f.capture, createdAt: 99 };
-  f.table('sync_capture').set(changed.key, structuredClone(changed));
-  const before = structuredClone(f.rows);
-  await expect(commitPreparedOutgoingOperation(changed, draft(changed))).rejects.toThrow(
-    'Invalid accepted'
-  );
-  expect(f.rows).toEqual(before);
-});
-
-it('retains ordinary filename spaces and literal percent characters in relative remote keys', async () => {
-  const f = setup();
-  const proposed = draft(f.capture);
-  proposed.attemptKey = 'attempts/100% original.json';
-  proposed.objects[0]!.remoteKey = 'objects/original 100%.png';
-  expect(await commitPreparedOutgoingOperation(f.capture, proposed)).toMatchObject(proposed);
-});
+it.each(['locator', 'payload', 'lifetime'])(
+  'refuses corrupted %s on write-free reads',
+  async (kind) => {
+    const f = setup();
+    expect(await loadPreparedOutgoingOperation('space', 'op')).toBeNull();
+    const prepared = await commitPreparedOutgoingOperation(f.capture, draft(f.capture));
+    if (kind === 'locator')
+      f.table('sync_outbox').set(prepared.key, { key: prepared.key, kind: 'old-experiment' });
+    if (kind === 'lifetime')
+      f.table('sync_outbox').set(prepared.key, {
+        key: prepared.key,
+        kind: 'operation-locator',
+        captureKey: f.capture.key,
+        spaceId: 'space',
+        operationId: 'op',
+        profileCreatedAt: 99,
+        connectionGeneration: 3,
+        sourceSha256: f.capture.sourceSha256,
+      });
+    if (kind === 'payload')
+      f.table('sync_capture').set(f.capture.key, {
+        ...f.capture,
+        phase: 'prepared',
+        prepared: { ...prepared, recordText: 'changed' },
+      });
+    const before = structuredClone(f.rows);
+    await expect(loadPreparedOutgoingOperation('space', 'op')).rejects.toThrow('Invalid');
+    expect(f.rows).toEqual(before);
+  }
+);

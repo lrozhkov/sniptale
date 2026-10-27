@@ -330,7 +330,11 @@ async function assertNoPendingLocalCapture(tx: ApplyTransaction, rootKey: string
     .getAll(rootKey)) {
     const capture = parseSyncCaptureRecord(rawCapture);
     if (!capture) throw new VideoProjectApplyConflictError('pending-local-change');
-    if (capture.kind === 'captured-change' && capture.rootKey === rootKey)
+    if (
+      capture.kind === 'sync-operation' &&
+      capture.phase !== 'published' &&
+      capture.rootKey === rootKey
+    )
       throw new VideoProjectApplyConflictError('pending-local-change');
   }
 }

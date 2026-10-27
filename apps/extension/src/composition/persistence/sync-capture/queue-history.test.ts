@@ -1,3 +1,4 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
@@ -59,9 +60,9 @@ function setup() {
     connectionGeneration: 3,
   };
   table('sync_capture').set('profile', profile);
-  const capture: CapturedChange = {
+  const capture: CapturedChange = createNativeCapture({
     version: 1,
-    kind: 'captured-change',
+    kind: 'sync-operation',
     key: '["change","op"]',
     createdAt: 1,
     spaceId: 'space',
@@ -75,7 +76,7 @@ function setup() {
     origin: 'local-edit',
     publicationId: null,
     change: { kind: 'tombstone' },
-  };
+  });
   table('sync_capture').set(capture.key, structuredClone(capture));
   return { ...fixture, table, capture, profile, failWrites: (value: boolean) => (fail = value) };
 }
@@ -120,6 +121,18 @@ it('reads virtual and retained history without writes and acknowledges only a di
   expect(await loadSyncQueueHistoryBatch(scope, { kind: 'connection' })).toMatchObject({
     deliveredSequence: 0,
     throughSequence: 1,
+  });
+});
+it('reuses active admission for history read and acknowledgement instead of entering the database again', async () => {
+  const f = setup();
+  await enqueueSyncQueueOperation(f.capture);
+  const batch = await loadSyncQueueHistoryBatch(scope, source);
+  await runWithPersistenceMutationPermit(async (permit) => {
+    io.database.mockClear();
+    await loadSyncQueueHistoryBatch(scope, source, permit);
+    await acknowledgeSyncQueueHistory(batch, permit);
+    expect(io.database).toHaveBeenCalledTimes(2);
+    expect(io.database.mock.calls.every((call) => call[0] === permit)).toBe(true);
   });
 });
 it('keeps parallel and repeated acknowledgements monotonic without losing newer transitions', async () => {
@@ -193,8 +206,9 @@ it('refuses delayed acknowledgement after erasure and after enrollment recreatio
   await expect(acknowledge(batch)).rejects.toThrow('profile changed');
   expect(f.table('sync_outbox').size).toBe(0);
   f.table('sync_capture').set('profile', { ...f.profile, createdAt: 2 });
-  f.table('sync_capture').set(f.capture.key, f.capture);
-  await enqueueSyncQueueOperation(f.capture);
+  const recreatedCapture = createNativeCapture({ ...f.capture, profileCreatedAt: 2 });
+  f.table('sync_capture').set(recreatedCapture.key, recreatedCapture);
+  await enqueueSyncQueueOperation(recreatedCapture);
   const before = structuredClone(f.rows);
   await expect(acknowledge(batch)).rejects.toThrow('profile changed');
   expect(f.rows).toEqual(before);

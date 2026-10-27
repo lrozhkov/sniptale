@@ -1,9 +1,13 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
+import { commitPreparedOutgoingOperation, preparedOutgoingOperationKey } from './outgoing';
+import { commitOutgoingDispatchAttempt } from './outgoing-attempts';
+import { commitVerifiedOutgoingResult } from './outgoing-results';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { createVideoProject } from '../projects/index.test-support';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { saveVideoProject, deleteVideoProject } from '../projects/index';
-import { parseSyncCaptureRecord } from './guards';
+import { hashCaptureText, parseSyncCaptureRecord } from './guards';
 import { captureVideoProjectInTransaction } from './capture';
 import { createProjectMutationStores } from '../projects/mutation-stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -26,6 +30,7 @@ vi.mock('../projects/asset-publication', async (importOriginal) => ({
 }));
 
 let failCaptureWrite = false;
+let captureWritesBeforeFailure: number | null = null;
 let fixture: ReturnType<typeof createReviewWorkspaceStoreFixture>;
 const projectId = 'capture-owner-project';
 
@@ -52,7 +57,7 @@ function captures(): CapturedChange[] {
   for (const raw of table('sync_capture').values()) {
     const parsed = parseSyncCaptureRecord(raw);
     if (!parsed) throw new Error('Owner committed invalid capture data');
-    if (parsed.kind === 'captured-change') output.push(parsed);
+    if (parsed.kind === 'sync-operation' && parsed.phase === 'native') output.push(parsed);
   }
   return output.sort((a, b) => a.generation - b.generation);
 }
@@ -66,9 +71,18 @@ function currentProject() {
 beforeEach(async () => {
   vi.clearAllMocks();
   failCaptureWrite = false;
-  fixture = createReviewWorkspaceStoreFixture(
-    (name) => failCaptureWrite && name === 'sync_capture'
-  );
+  captureWritesBeforeFailure = null;
+  fixture = createReviewWorkspaceStoreFixture((name) => {
+    if (name !== 'sync_capture') return false;
+    if (captureWritesBeforeFailure !== null) {
+      if (captureWritesBeforeFailure === 0) {
+        captureWritesBeforeFailure = null;
+        return true;
+      }
+      captureWritesBeforeFailure -= 1;
+    }
+    return failCaptureWrite;
+  });
   nativeOwnerMocks.initDB.mockResolvedValue(fixture.database);
   await installExperimentalCaptureProfile(profile());
 });
@@ -458,34 +472,52 @@ it('captures a pre-profile Library dependency with its project in one native sav
   expect(table('media_library').get(data.mediaId)).toEqual(nativeMedia);
 });
 
-it('rolls back dependency genesis when the following project capture exceeds capacity', async () => {
+it('rolls back dependency genesis and native project when the project capture append fails', async () => {
   table('sync_capture').clear();
   const data = await publishDependency();
   await installExperimentalCaptureProfile(profile());
-  const { MAX_PENDING_CAPTURES } = await import('./contracts');
-  const seed = await saveVideoProject(createVideoProject({ id: 'capacity-seed' }), {
-    expectedWorkspaceRevision: null,
-  });
-  const template = captures()[0]!;
-  for (let index = 1; index < MAX_PENDING_CAPTURES - 1; index++) {
-    const operationId = crypto.randomUUID();
-    const key = JSON.stringify(['change', operationId]);
-    table('sync_capture').set(key, { ...template, key, operationId });
-  }
   const before = structuredClone(fixture.rows);
-  await expect(saveVideoProject(data.project, { expectedWorkspaceRevision: null })).rejects.toThrow(
-    'sync capture queue is full'
-  );
+  // The dependency capture and its root state succeed before the project capture add fails.
+  captureWritesBeforeFailure = 2;
+  await expect(
+    saveVideoProject(data.project, { expectedWorkspaceRevision: null })
+  ).rejects.toMatchObject({
+    name: 'QuotaExceededError',
+  });
   expect(fixture.rows).toEqual(before);
   expect(table('video_projects').has(data.project.id)).toBe(false);
-  expect(table('video_projects').has(seed.id)).toBe(true);
-  for (const [key, raw] of table('sync_capture')) {
-    const row = parseSyncCaptureRecord(raw);
-    if (row?.kind === 'captured-change') table('sync_capture').delete(key);
-  }
   await saveVideoProject(data.project, { expectedWorkspaceRevision: null });
   expect(captures().filter((row) => row.rootId === data.mediaId)).toHaveLength(1);
   expect(captures().filter((row) => row.rootId === data.project.id)).toHaveLength(1);
+});
+
+it('accepts dependency genesis and its project beyond the former 128 capture boundary', async () => {
+  table('sync_capture').clear();
+  const data = await publishDependency();
+  await installExperimentalCaptureProfile(profile());
+  await saveVideoProject(createVideoProject({ id: 'capacity-seed' }), {
+    expectedWorkspaceRevision: null,
+  });
+  const template = captures()[0]!;
+  for (let index = 1; index < 127; index += 1) {
+    const operationId = crypto.randomUUID();
+    const key = JSON.stringify(['change', operationId]);
+    table('sync_capture').set(key, createNativeCapture({ ...template, key, operationId }));
+  }
+  await saveVideoProject(data.project, { expectedWorkspaceRevision: null });
+  expect(captures()).toHaveLength(129);
+  const media = captures().find((row) => row.rootId === data.mediaId)!;
+  const project = captures().find((row) => row.rootId === data.project.id)!;
+  expect(project).toMatchObject({
+    change: {
+      rows: {
+        mediaDependencies: [
+          { mediaId: data.mediaId, generation: media.generation, basis: [media.operationId] },
+        ],
+      },
+    },
+  });
+  expect(table('video_projects').has(data.project.id)).toBe(true);
 });
 
 it.each(['malformed', 'empty-basis', 'wrong-digest'])(
@@ -513,3 +545,89 @@ it.each(['malformed', 'empty-basis', 'wrong-digest'])(
     expect(fixture.rows).toEqual(before);
   }
 );
+
+it('keeps saving offline past 128 retained revisions without losing causal history', async () => {
+  let entry = await saveVideoProject(createVideoProject({ id: projectId, name: 'Offline 0' }), {
+    expectedWorkspaceRevision: null,
+  });
+  for (let index = 1; index < 132; index += 1) {
+    entry = await saveVideoProject(
+      { ...entry.project, name: `Offline ${index}` },
+      { expectedWorkspaceRevision: entry.workspaceRevision ?? 0, expectedProject: entry.project }
+    );
+  }
+  const retained = captures();
+  expect(retained).toHaveLength(132);
+  expect(new Set(retained.map((row) => row.operationId)).size).toBe(132);
+  for (let index = 1; index < retained.length; index += 1) {
+    expect(retained[index]!.generation).toBe(retained[index - 1]!.generation + 1);
+    expect(retained[index]!.basis).toEqual([retained[index - 1]!.operationId]);
+  }
+  expect(currentProject().project.name).toBe('Offline 131');
+});
+
+it('preserves publication identity and its causal successor across all phases', async () => {
+  const saved = await saveVideoProject(
+    createVideoProject({ id: projectId, name: 'Publication source' })
+  );
+  const native = await publicationCapture('phase-replay');
+  const prepared = await commitPreparedOutgoingOperation(native, {
+    version: 1,
+    key: preparedOutgoingOperationKey(native.spaceId, native.operationId),
+    createdAt: native.createdAt,
+    spaceId: native.spaceId,
+    connectionGeneration: native.connectionGeneration,
+    captureKey: native.key,
+    rootKey: native.rootKey,
+    generation: native.generation,
+    operationId: native.operationId,
+    recordText: '{}',
+    recordSha256: hashCaptureText('{}'),
+    objects: [],
+  });
+  expect(await publicationCapture('phase-replay')).toMatchObject({
+    phase: 'prepared',
+    operationId: native.operationId,
+    sourceSha256: native.sourceSha256,
+  });
+  const attemptId = '11111111-1111-4111-8111-111111111111';
+  const recordText = JSON.stringify({
+    format: 'sniptale-sync-attempt',
+    version: 1,
+    attemptId,
+    operationText: prepared.recordText,
+    operationSha256: prepared.recordSha256,
+    objects: [],
+  });
+  const { attempt } = await commitOutgoingDispatchAttempt(prepared, {
+    version: 1,
+    spaceId: native.spaceId,
+    operationId: native.operationId,
+    connectionGeneration: native.connectionGeneration,
+    attemptId,
+    preparedSha256: prepared.recordSha256,
+    recordText,
+    recordSha256: hashCaptureText(recordText),
+    recordKey: 'records/publication.json',
+    objects: [],
+  });
+  await commitVerifiedOutgoingResult(prepared, attempt);
+  const beforeReplay = structuredClone(fixture.rows);
+  const replay = await publicationCapture('phase-replay');
+  expect(replay).toMatchObject({
+    phase: 'published',
+    operationId: native.operationId,
+    sourceSha256: native.sourceSha256,
+  });
+  expect(replay).not.toHaveProperty('change');
+  expect(replay).not.toHaveProperty('prepared');
+  expect(fixture.rows).toEqual(beforeReplay);
+  await saveVideoProject(
+    { ...saved.project, name: 'Next local edit' },
+    { expectedWorkspaceRevision: saved.workspaceRevision ?? 0, expectedProject: saved.project }
+  );
+  expect(captures().at(-1)).toMatchObject({
+    generation: native.generation + 1,
+    basis: [native.operationId],
+  });
+});
