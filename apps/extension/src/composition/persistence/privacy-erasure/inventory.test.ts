@@ -30,6 +30,7 @@ it('uses the canonical IndexedDB store inventory for local data erasure', () => 
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('aggregate_presentations');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('recording_recovery_sessions');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('recording_recovery_blocks');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('sync_connection');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).not.toContain('editor_sessions');
 });
 
@@ -167,3 +168,16 @@ it('erases page recovery records and identity claims while preferences are prese
   expect(plan.session).toContain('sniptale_page_recovery_claims');
   expect(plan.local).not.toContain('sniptale_drawing_palette');
 });
+
+it.each([true, false])(
+  'always erases native connection authority when preservePreferences is %s',
+  (preservePreferences) => {
+    const plan = buildBrowserStorageErasurePlan({
+      includeAiProviderSecrets: false,
+      preservePreferences,
+    });
+    expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('sync_connection');
+    if (preservePreferences) expect(plan.local).not.toContain('sniptale-theme-preference');
+    else expect(plan.local).toContain('sniptale-theme-preference');
+  }
+);

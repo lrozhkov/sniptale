@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: This chronological registry owns schema descriptors. The candidate appends DB42-to-43 validation of the three existing sync stores without reads, row rewrites or new stores. Migration planning, execution order, contract writes and transaction abort remain with their existing owners. The descriptor adds no independent writer, state authority or recovery lifetime. Splitting it would distribute one chronological history. Direct inspection confirms Keep, score 2, delta 0 and cohesion 1.00. Final independent architecture review must validate this exact classification.",
+      "reason": "tool-noise: This chronological registry owns schema descriptors. The candidate appends DB43-to-44 creation of one empty connection authorization store and validation of the four sync stores. It reads and rewrites no source rows. Migration planning, execution order, contract writes and transaction abort remain with their existing owners. The descriptor adds no independent writer, state authority or recovery lifetime. Splitting it would distribute one chronological history. Direct inspection confirms Keep, score 2, delta 0 and cohesion 1.00. Final independent architecture review must validate this exact classification.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent writer, state authority, execution or recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry.",
       "reviewDate": "2026-10-27",
-      "astHash": "ac66e2a172024124248a6429dd909c72a58cbae3374d94c64de2513830d3ef04",
+      "astHash": "b189e0485810a920ac0944a5c32dfb4bc3fb7eb146a7cc009fd01d1e3639305a",
       "signatureHash": "07c774e9a0b3f74167f16d2ba52e7b0fa3c0fe23d1d97eda8352dd7c8c08b5a4"
     },
     {

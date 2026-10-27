@@ -834,3 +834,20 @@ A checked ready catalog can establish observed publication of the exact prepared
 Every queue mutation retains bounded diagnostic transition markers in the same transaction. Markers contain fixed codes, stages, sequence numbers, hashed operation references and safe attempt IDs. Overflow retains an explicit history-gap count. Later delivery must use the existing event-history owner. These markers do not create another archive.
 
 This experimental runner requires an explicitly admitted provider client. Production credentials, request authorization, offscreen lifecycle, Settings controls and event-history delivery remain separate release requirements. Capture enrollment is not network authorization. Future lifecycle admission must check its own revision at every actual HTTP request. The profile remains disabled by default.
+
+
+## Native sync connection authorization
+
+Physical database version 44 adds the empty sync_connection store under syncCapture contract version 5. The migration preserves existing captures, claims, queue rows, receipts and immutable files. The store contains durable authorization state. It is not a derived cache.
+
+The connection owner separates metadata from credentials. Metadata binds one provider root and account to the native space, namespace generation and profile creation timestamp. A random incarnation and increasing revision reject stale commands and results after recreation. Pause and same-binding authentication changes preserve capture enrollment and namespace generation. An implicit root, account or space change is refused.
+
+An authentication update first reserves the updating-auth phase with a fresh nonce. WebCrypto runs outside the native transaction. One final transaction joins the exact reservation and current profile before it publishes encrypted credentials and the active revision. Missing or replaced state refuses a delayed result. Reads do not repair storage. A failed update remains closed until an explicit update succeeds.
+
+Credentials use the platform AES-GCM owner and version 2 context-bound envelopes. The store retains a non-exportable random CryptoKey and its encrypted envelope. The additional authenticated data binds the provider, root, account, native scope, incarnation and credential identity. A decrypt rechecks the current durable identity before returning credentials. Backups, Settings transfer, remote sync, diagnostics and logs exclude all connection rows. Core local-data erasure removes the store even when preferences remain.
+
+Every actual HTTP request requires the exact active connection identity and current origin permission. The native admission lock covers the final checks and fetch invocation only. Headers and response bodies complete outside that lock, so independent transfers can overlap. The request executor tracks issued requests and bodies separately. After durable revocation, its caller must abort and drain the executor before reporting closure. Failed containment cannot report successful closure. A timeout supplies no containment proof.
+
+Queue begin, effect admission and completion check connection identity inside the same transaction as their queue mutation. Missing authorization remains valid only for legacy pilot runs before any connection exists. Obsolete runs can retain failure uncertainty and historical verification evidence. They cannot complete under a replacement connection.
+
+This foundation enables no production network ingress. Offscreen lifecycle, background permission IPC, privacy producer containment and Settings controls remain required release gates. The experimental profile remains disabled by default.

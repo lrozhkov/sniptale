@@ -20,6 +20,12 @@ Write a transition marker before changing protection mode or resetting secrets. 
 
 An unlock request may persist session metadata under `AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY`. Limit the record to request identity, extension-page owner, purpose, status, timestamps, and a fixed failure reason. Route unlock through the background owner and the Settings page. Do not render an unlock prompt in a content page.
 
+## Sync connection secrets
+
+The native remote-connection owner stores metadata separately from WebDAV credentials. Credentials use the platform AES-GCM owner, unique IVs and version 2 context-bound encrypted envelopes. A non-exportable random CryptoKey remains in the dedicated native store. This transparent local encryption limits accidental disclosure. It does not protect a compromised browser profile. Remote originals and saved exports remain ordinary files. This mechanism adds no remote end-to-end encryption.
+
+Raw credentials, exported key material and derived headers must not persist. Backup, Settings transfer, remote sync, diagnostics and logs exclude connection records. Verified local-data erasure removes the store even when preferences remain. Each actual HTTP request requires current durable connection identity and origin permission. The WebDAV owner resolves credentials in memory, omits cookies and refuses redirects. Lifecycle closure first revokes durable authorization, then aborts and drains issued requests and response bodies. Failed containment must not report successful closure. Production ingress remains disabled until runtime and privacy producer integration pass their acceptance checks.
+
 ## Retention
 
 Temporary material expiry moves eligible roots to Trash without releasing bytes. Maintenance repairs retained project sources before expiry. Failure or an uncertain dependency graph retains unverified data. Automatic Trash deletion remains a separate opt-in operation with its own retention period.

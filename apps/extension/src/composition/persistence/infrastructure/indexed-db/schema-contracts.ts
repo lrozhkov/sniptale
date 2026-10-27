@@ -36,6 +36,7 @@ import {
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
+  SYNC_CONNECTION_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -66,11 +67,12 @@ interface StoredSchemaContract {
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
     domainId: 'syncCapture',
-    schemaVersion: 4,
+    schemaVersion: 5,
     stores: [
       { storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' },
       { storeName: SYNC_OUTBOX_STORE, dataClass: 'durable-authority' },
       { storeName: SYNC_CATALOG_CACHE_STORE, dataClass: 'derived-rebuildable' },
+      { storeName: SYNC_CONNECTION_STORE, dataClass: 'durable-authority' },
     ],
   },
   {

@@ -6,6 +6,7 @@ import {
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
+  SYNC_CONNECTION_STORE,
   ASSET_OPERATIONS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -976,6 +977,26 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         db,
         [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CATALOG_CACHE_STORE],
         'Sync queue control stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 4, to: 5 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 43,
+    toDatabaseVersion: 44,
+    risk: 'additive',
+    stores: [SYNC_CONNECTION_STORE],
+    migrate(db) {
+      db.createObjectStore(SYNC_CONNECTION_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CATALOG_CACHE_STORE, SYNC_CONNECTION_STORE],
+        'Sync connection stores are unavailable.'
       );
     },
   },

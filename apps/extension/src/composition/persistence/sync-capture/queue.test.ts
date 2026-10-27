@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { captureRootKey, type CapturedChange } from './contracts';
+import type { SyncConnectionIdentity, SyncConnectionMetadata } from '../remote-connection/model';
 import {
   enqueueSyncQueueOperation,
   loadSyncQueue,
@@ -34,6 +35,7 @@ const scope: SyncQueueScope = { spaceId: 'space', connectionGeneration: 3, profi
 function setup() {
   let fail = false;
   const fixture = createReviewWorkspaceStoreFixture((name) => fail && name === 'sync_outbox');
+  if (!fixture.rows.has('sync_connection')) fixture.rows.set('sync_connection', new Map());
   const table = (name: string) => fixture.rows.get(name)!;
   io.database.mockResolvedValue(fixture.database);
   const profile = {
@@ -433,4 +435,171 @@ it('admits manifest readback after publishing and refuses backwards publication 
   expect(verifying.revision).toBe(run.revision);
   await expect(advanceSyncQueueRun(run, 'publishing')).rejects.toThrow('refused');
   expect((await loadSyncQueue(scope)).operations[0]).toEqual(verifying);
+});
+
+const authorization: SyncConnectionIdentity = {
+  incarnation: '22222222-2222-4222-8222-222222222222',
+  revision: 1,
+};
+function configureConnection(
+  f: ReturnType<typeof setup>,
+  identity: SyncConnectionIdentity = authorization,
+  phase: SyncConnectionMetadata['phase'] = 'active'
+) {
+  const metadata: SyncConnectionMetadata = {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding: {
+      ...scope,
+      provider: 'webdav',
+      rootUrl: 'https://dav.example.test/root/',
+      accountId: 'user',
+    },
+    identity: structuredClone(identity),
+    phase,
+    updateNonce: phase === 'updating-auth' ? '33333333-3333-4333-8333-333333333333' : null,
+    credentialId: '44444444-4444-4444-8444-444444444444',
+  };
+  f.table('sync_connection').set(metadata.key, metadata);
+  return metadata;
+}
+it('preserves legacy unbound pilot rows only while no connection is configured', async () => {
+  const f = setup();
+  const queued = await enqueueSyncQueueOperation(f.capture);
+  const { authorization: ignored, ...legacy } = queued;
+  void ignored;
+  f.table('sync_outbox').set(queued.key, legacy);
+  expect((await loadSyncQueue(scope)).operations[0]!.authorization).toBeNull();
+  const run = await beginSyncQueueRun(scope, 'op', 1);
+  expect(run.authorization).toBeNull();
+  await advanceSyncQueueRun(run, 'checking');
+  const interrupted = await recoverSyncQueueRun(run);
+  const retry = await commandSyncQueueOperation(scope, 'op', interrupted.revision, 'retry');
+  configureConnection(f);
+  const before = structuredClone(f.rows);
+  await expect(beginSyncQueueRun(scope, 'op', retry.revision)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  await expect(
+    beginSyncQueueRun(scope, 'op', retry.revision, authorization)
+  ).resolves.toMatchObject({
+    authorization,
+  });
+});
+it('detaches begin authorization before awaiting storage and checks the current identity', async () => {
+  const f = setup();
+  await enqueueSyncQueueOperation(f.capture);
+  configureConnection(f);
+  const supplied = structuredClone(authorization);
+  const gate = deferred<typeof f.database>();
+  io.database.mockImplementationOnce(() => gate.promise);
+  const delayed = beginSyncQueueRun(scope, 'op', 1, supplied);
+  supplied.revision = 2;
+  gate.resolve(f.database);
+  expect((await delayed).authorization).toEqual(authorization);
+});
+it.each(['revision', 'incarnation', 'null'] as const)(
+  'refuses active run authorization spoof by %s',
+  async (change) => {
+    const f = setup();
+    await enqueueSyncQueueOperation(f.capture);
+    configureConnection(f);
+    const run = await beginSyncQueueRun(scope, 'op', 1, authorization);
+    const { prepared, attempt } = await publication(f);
+    const spoofed = {
+      ...run,
+      authorization:
+        change === 'null'
+          ? null
+          : {
+              ...authorization,
+              ...(change === 'revision'
+                ? { revision: 2 }
+                : { incarnation: '55555555-5555-4555-8555-555555555555' }),
+            },
+    };
+    const before = structuredClone(f.rows);
+    await expect(advanceSyncQueueRun(spoofed, 'writing')).rejects.toThrow('Stale');
+    await expect(
+      completeSyncQueueRun(spoofed, { kind: 'observed', prepared, attempt })
+    ).rejects.toThrow('Stale');
+    await expect(failSyncQueueRun(spoofed)).rejects.toThrow('Stale');
+    expect(f.rows).toEqual(before);
+  }
+);
+it.each(['active', 'paused', 'updating-auth'] as const)(
+  'refuses old authorization after connection becomes %s and retains historical verified evidence',
+  async (phase) => {
+    const f = setup();
+    await enqueueSyncQueueOperation(f.capture);
+    configureConnection(f);
+    const run = await beginSyncQueueRun(scope, 'op', 1, authorization);
+    await advanceSyncQueueRun(run, 'writing');
+    const { prepared, attempt } = await publication(f);
+    f.table('asset_owners').set('claim', { ownerKind: 'capture', ownerId: 'op', role: 'source' });
+    const captures = structuredClone(f.table('sync_capture'));
+    const claims = structuredClone(f.table('asset_owners'));
+    const rotated = { ...authorization, revision: 2 };
+    configureConnection(f, rotated, phase);
+    const { result } = await commitVerifiedOutgoingResult(prepared, attempt);
+    const evidence = structuredClone(f.rows);
+    await expect(advanceSyncQueueRun(run, 'verifying')).rejects.toThrow();
+    await expect(completeSyncQueueRun(run, { kind: 'verified', result })).rejects.toThrow();
+    expect(f.rows).toEqual(evidence);
+    expect(f.table('sync_capture')).toEqual(captures);
+    expect(f.table('asset_owners')).toEqual(claims);
+    expect(f.table('sync_capture').get('profile')).toEqual(f.profile);
+    expect((await loadSyncQueue(scope)).operations[0]!.generation).toBe(1);
+    expect(f.table('sync_outbox').get(result.key)).toEqual(result);
+    const failed = await failSyncQueueRun(run, 'authentication');
+    expect(failed).toMatchObject({ outcome: 'unknown', authorization });
+    const retry = await commandSyncQueueOperation(scope, 'op', failed.revision, 'retry');
+    await expect(beginSyncQueueRun(scope, 'op', retry.revision, authorization)).rejects.toThrow();
+    configureConnection(f, rotated);
+    const next = await beginSyncQueueRun(scope, 'op', retry.revision, rotated);
+    expect(next.authorization).toEqual(rotated);
+    const replacement = structuredClone(f.rows);
+    await expect(failSyncQueueRun(run)).rejects.toThrow('Stale');
+    await expect(recoverSyncQueueRun(run)).rejects.toThrow('Stale');
+    await expect(completeSyncQueueRun(run, { kind: 'verified', result })).rejects.toThrow('Stale');
+    expect(f.rows).toEqual(replacement);
+    expect(f.table('sync_outbox').get(prepared.key)).toEqual(prepared);
+    expect(f.table('sync_outbox').get(attempt.key)).toEqual(attempt);
+    expect(f.table('sync_outbox').get(result.key)).toEqual(result);
+  }
+);
+it('recovers an exact obsolete run after connection recreation without granting it admission', async () => {
+  const f = setup();
+  await enqueueSyncQueueOperation(f.capture);
+  configureConnection(f);
+  const run = await beginSyncQueueRun(scope, 'op', 1, authorization);
+  await advanceSyncQueueRun(run, 'writing');
+  f.table('sync_connection').delete('connection');
+  configureConnection(f, { incarnation: '66666666-6666-4666-8666-666666666666', revision: 1 });
+  await expect(advanceSyncQueueRun(run, 'writing')).rejects.toThrow();
+  await expect(recoverSyncQueueRun(run)).resolves.toMatchObject({
+    status: 'interrupted',
+    outcome: 'unknown',
+    authorization,
+  });
+});
+
+it('checks begin authorization after a delayed database admission and permits an explicit retry', async () => {
+  const f = setup();
+  await enqueueSyncQueueOperation(f.capture);
+  configureConnection(f);
+  const gate = deferred<typeof f.database>();
+  io.database.mockImplementationOnce(() => gate.promise);
+  const delayed = beginSyncQueueRun(scope, 'op', 1, authorization);
+  const rotated = { ...authorization, revision: 2 };
+  configureConnection(f, rotated);
+  gate.resolve(f.database);
+  await expect(delayed).rejects.toThrow();
+  expect((await loadSyncQueue(scope)).operations[0]).toMatchObject({
+    status: 'queued',
+    revision: 1,
+  });
+  await expect(beginSyncQueueRun(scope, 'op', 1, rotated)).resolves.toMatchObject({
+    authorization: rotated,
+  });
 });

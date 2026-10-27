@@ -33,6 +33,7 @@ import {
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
+  SYNC_CONNECTION_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -152,6 +153,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, SYNC_CAPTURE_STORE, 'key', ['kind', 'rootKey', 'createdAt']);
   createStore(db, SYNC_OUTBOX_STORE, 'key');
   createStore(db, SYNC_CATALOG_CACHE_STORE, 'key');
+  createStore(db, SYNC_CONNECTION_STORE, 'key');
   const contracts = db.createObjectStore(SCHEMA_CONTRACTS_STORE, { keyPath: 'domainId' });
   for (const contract of CURRENT_SCHEMA_CONTRACTS) contracts.put(contract);
 }

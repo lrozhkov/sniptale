@@ -1,5 +1,9 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import {
+  parseSyncConnectionIdentity,
+  type SyncConnectionIdentity,
+} from '../remote-connection/model';
 
 /** Exact native enrollment lifetime; this contains no transport configuration. */
 export interface SyncQueueScope {
@@ -84,6 +88,7 @@ export interface SyncQueueOperation extends SyncQueueScope, QueueHistory {
   status: SyncQueueStatus;
   stage: SyncQueueStage;
   runId: string | null;
+  authorization: SyncConnectionIdentity | null;
   writeStarted: boolean;
   outcome: 'none' | 'unknown' | 'verified' | 'observed';
   attemptId: string | null;
@@ -94,6 +99,7 @@ export interface SyncQueueRun {
   scope: SyncQueueScope;
   operationId: string;
   runId: string;
+  authorization: SyncConnectionIdentity | null;
   revision: number;
 }
 export const SYNC_QUEUE_STAGES: readonly SyncQueueStage[] = [
@@ -244,6 +250,12 @@ export function parseSyncQueueOperation(value: unknown): SyncQueueOperation | nu
   const scope = parseSyncQueueScope(value);
   if (!scope || !isRecord(value)) return null;
   const history = parseHistory(value);
+  const authorization =
+    value['authorization'] === undefined || value['authorization'] === null
+      ? null
+      : parseSyncConnectionIdentity(value['authorization']);
+  if (value['authorization'] !== undefined && value['authorization'] !== null && !authorization)
+    return null;
   const status = statuses.find((candidate) => candidate === value['status']);
   const stage = SYNC_QUEUE_STAGES.find((candidate) => candidate === value['stage']);
   const failureCode =
@@ -295,6 +307,7 @@ export function parseSyncQueueOperation(value: unknown): SyncQueueOperation | nu
     stage,
     outcome,
     runId: value['runId'],
+    authorization,
     writeStarted: value['writeStarted'],
     attemptId: value['attemptId'],
     failureCode,

@@ -1,7 +1,17 @@
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { initDB } from '../infrastructure/indexed-db/core';
-import { SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE } from '../infrastructure/indexed-db/core.stores';
+import {
+  SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
+  SYNC_OUTBOX_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import {
+  parseSyncConnectionIdentity,
+  sameSyncConnectionIdentity,
+  type SyncConnectionIdentity,
+} from '../remote-connection/model';
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseSyncCaptureRecord } from './guards';
 import { matchesCapture, parsePrepared, preparedOutgoingOperationKey } from './outgoing';
@@ -117,7 +127,10 @@ async function withSyncQueueTransaction<T>(
   mutate: (tx: IDBPTransaction<unknown, string[], 'readwrite'>) => Promise<T>
 ): Promise<T> {
   return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readwrite');
+    const tx = db.transaction(
+      [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CONNECTION_STORE],
+      'readwrite'
+    );
     try {
       const result = await mutate(tx);
       await tx.done;
@@ -213,6 +226,7 @@ export async function enqueueSyncQueueOperation(value: unknown): Promise<SyncQue
         status: 'queued',
         stage: 'queued',
         runId: null,
+        authorization: null,
         writeStarted: false,
         outcome: 'none',
         attemptId: null,
@@ -304,9 +318,16 @@ export async function commandSyncQueueOperation(
 export async function beginSyncQueueRun(
   value: SyncQueueScope,
   id: string,
-  expectedRevision: number
+  expectedRevision: number,
+  authorization?: SyncConnectionIdentity
 ): Promise<SyncQueueRun> {
   const scope = scopeInput(value);
+  const acceptedAuthorization =
+    authorization === undefined
+      ? null
+      : parseSyncConnectionIdentity(structuredClone(authorization));
+  if (authorization !== undefined && !acceptedAuthorization)
+    throw new Error('Invalid sync queue authorization.');
   if (!queueIdentity(id) || !queueOrdinal(expectedRevision))
     throw new Error('Invalid sync queue run claim.');
   return mutateQueue(scope, async (tx) => {
@@ -314,6 +335,7 @@ export async function beginSyncQueueRun(
     const current = await readOperation(tx, scope, id);
     if (connection.paused || current.revision !== expectedRevision || current.status !== 'queued')
       throw new Error('Sync queue run claim refused.');
+    await checkSyncConnectionAdmission(tx, scope, acceptedAuthorization);
     const runId = crypto.randomUUID();
     const row = recordQueueTransition(
       {
@@ -321,6 +343,7 @@ export async function beginSyncQueueRun(
         status: 'running',
         stage: 'preparing',
         runId,
+        authorization: acceptedAuthorization,
         revision: nextRevision(current.revision),
         writeStarted: false,
         attemptId: null,
@@ -329,23 +352,40 @@ export async function beginSyncQueueRun(
       'started'
     );
     await tx.objectStore(SYNC_OUTBOX_STORE).put(row);
-    return { scope, operationId: id, runId, revision: row.revision };
+    return {
+      scope,
+      operationId: id,
+      runId,
+      revision: row.revision,
+      authorization: acceptedAuthorization,
+    };
   });
 }
 function runInput(value: SyncQueueRun): SyncQueueRun {
   const detached = structuredClone(value);
   const scope = scopeInput(detached.scope);
+  const authorization =
+    detached.authorization === null ? null : parseSyncConnectionIdentity(detached.authorization);
   if (
+    (detached.authorization !== null && !authorization) ||
     !queueIdentity(detached.operationId) ||
     !queueUuid(detached.runId) ||
     !queueOrdinal(detached.revision)
   )
     throw new Error('Invalid sync queue run.');
-  return { ...detached, scope };
+  return { ...detached, scope, authorization };
 }
 async function readRun(tx: QueueTransaction, run: SyncQueueRun): Promise<SyncQueueOperation> {
   const row = await readOperation(tx, run.scope, run.operationId);
-  if (row.status !== 'running' || row.runId !== run.runId || row.revision !== run.revision)
+  if (
+    row.status !== 'running' ||
+    row.runId !== run.runId ||
+    row.revision !== run.revision ||
+    (row.authorization === null
+      ? run.authorization !== null
+      : run.authorization === null ||
+        !sameSyncConnectionIdentity(row.authorization, run.authorization))
+  )
     throw new Error('Stale sync queue run.');
   return row;
 }
@@ -366,6 +406,7 @@ export async function advanceSyncQueueRun(
   return mutateQueue(run.scope, async (tx) => {
     const connection = await readConnection(tx, run.scope);
     const current = await readRun(tx, run);
+    await checkSyncConnectionAdmission(tx, run.scope, current.authorization);
     if (
       connection.paused ||
       SYNC_QUEUE_STAGES.indexOf(stage) < SYNC_QUEUE_STAGES.indexOf(current.stage) ||
@@ -540,6 +581,7 @@ export async function completeSyncQueueRun(
   else throw new Error('Invalid sync queue completion witness.');
   return mutateQueue(run.scope, async (tx) => {
     const current = await readRun(tx, run);
+    await checkSyncConnectionAdmission(tx, run.scope, current.authorization);
     const store = tx.objectStore(SYNC_OUTBOX_STORE);
     const prepared = await readQueuePreparation(tx, current);
     const attempt = await readQueueCompletionAttempt(tx, prepared, acceptedWitness);

@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.1` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `43` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `44` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -87,6 +87,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/quick-preview-preferences`
 - `apps/extension/src/composition/persistence/recent-colors`
 - `apps/extension/src/composition/persistence/recordings`
+- `apps/extension/src/composition/persistence/remote-connection`
 - `apps/extension/src/composition/persistence/review-workspaces`
 - `apps/extension/src/composition/persistence/scenario`
 - `apps/extension/src/composition/persistence/settings`

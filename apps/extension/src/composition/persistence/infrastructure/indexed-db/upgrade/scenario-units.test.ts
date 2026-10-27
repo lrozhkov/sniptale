@@ -5,6 +5,7 @@ import {
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
+  SYNC_CONNECTION_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
@@ -39,6 +40,7 @@ it('adds only an empty indexed unit store before publishing the current scenario
     [VIDEO_PROJECT_REVISIONS_STORE, { keyPath: 'projectId' }],
     [SYNC_OUTBOX_STORE, { keyPath: 'key' }],
     [SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' }],
+    [SYNC_CONNECTION_STORE, { keyPath: 'key' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],

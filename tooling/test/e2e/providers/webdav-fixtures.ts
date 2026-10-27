@@ -108,7 +108,7 @@ export const test = base.extend<{ lab: Lab }>({
   },
 });
 
-export async function openProvider(lab: Lab, info: TestInfo, name: string) {
+export async function openProvider(lab: Lab, info: TestInfo, name: string, connect = true) {
   const loaded = await launchExtensionBrowser({
     extensionBuildDir: process.env['SNIPTALE_EXTENSION_BUILD_DIR'] ?? '.tmp/e2e-builds/test',
     userDataDir: info.outputPath(name),
@@ -134,10 +134,12 @@ export async function openProvider(lab: Lab, info: TestInfo, name: string) {
     const grant = page.getByRole('button', { name: 'Grant provider test origin', exact: true });
     await grant.click();
     await expect(grant).toHaveAttribute('data-granted', 'true');
-    await page.evaluate(
-      (credentials) => window.webdavTransferHarness.connect(credentials),
-      lab.credentials
-    );
+    if (connect) {
+      await page.evaluate(
+        (credentials) => window.webdavTransferHarness.connect(credentials),
+        lab.credentials
+      );
+    }
     return { ...loaded, page };
   } catch (error) {
     await loaded.context.close();

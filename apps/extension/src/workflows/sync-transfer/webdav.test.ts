@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { createWebdavRemoteStore } from './webdav';
+import { SyncRemoteError } from './remote-store';
 
 const signal = () => new AbortController().signal;
 const auth = { kind: 'basic' as const, username: 'alice', password: 'private-password' };
@@ -24,7 +25,10 @@ function urlOf(input: RequestInfo | URL): string {
 }
 const fetchMock = vi.fn<typeof fetch>();
 async function store(rootUrl = 'https://dav.example/root/') {
-  return createWebdavRemoteStore({ rootUrl, authentication: auth }, signal());
+  return createWebdavRemoteStore(
+    { rootUrl, authentication: auth, request: (requestSignal, issue) => issue(requestSignal) },
+    signal()
+  );
 }
 
 beforeEach(() => {
@@ -203,6 +207,7 @@ it('keeps independent roots and auth while concurrent clients read streams', asy
       {
         rootUrl: 'https://dav.example/bob/',
         authentication: { kind: 'bearer', accessToken: 'bob-token' },
+        request: (requestSignal, issue) => issue(requestSignal),
       },
       signal()
     ),
@@ -227,7 +232,11 @@ it('uses explicit cancellation during root discovery and every parent operation'
   });
   await expect(
     createWebdavRemoteStore(
-      { rootUrl: 'https://dav.example/root/', authentication: auth },
+      {
+        rootUrl: 'https://dav.example/root/',
+        authentication: auth,
+        request: (requestSignal, issue) => issue(requestSignal),
+      },
       controller.signal
     )
   ).rejects.toMatchObject({ code: 'cancelled' });
@@ -544,4 +553,56 @@ it('refuses malformed stat XML and sanitizes transport exceptions', async () => 
     code: 'transport',
     message: 'transport',
   });
+});
+
+it('resolves credentials and admits every actual DAV subrequest including the initial probe', async () => {
+  const authentication = vi.fn(async () => auth);
+  const admitted = vi.fn(
+    async (requestSignal: AbortSignal, issue: (signal: AbortSignal) => Promise<Response>) =>
+      issue(requestSignal)
+  );
+  const remote = await createWebdavRemoteStore(
+    {
+      rootUrl: 'https://dav.example/root/',
+      authentication,
+      request: admitted,
+    },
+    signal()
+  );
+  expect(admitted).toHaveBeenCalledOnce();
+  await remote.write('one/two/file.bin', new Blob(['bytes']), signal());
+  expect(fetchMock.mock.calls.map(([, options]) => options?.method)).toEqual([
+    'PROPFIND',
+    'PROPFIND',
+    'PROPFIND',
+    'PUT',
+  ]);
+  expect(authentication).toHaveBeenCalledTimes(4);
+  expect(admitted).toHaveBeenCalledTimes(4);
+});
+
+it('refuses the initial probe and later subrequests before native fetch when admission closes', async () => {
+  let open = false;
+  const request = async (
+    requestSignal: AbortSignal,
+    issue: (signal: AbortSignal) => Promise<Response>
+  ) => {
+    if (!open) throw new SyncRemoteError('authentication');
+    return issue(requestSignal);
+  };
+  const options = { rootUrl: 'https://dav.example/root/', authentication: auth, request };
+  await expect(createWebdavRemoteStore(options, signal())).rejects.toMatchObject({
+    code: 'authentication',
+  });
+  expect(fetchMock).not.toHaveBeenCalled();
+  open = true;
+  const remote = await createWebdavRemoteStore(options, signal());
+  fetchMock.mockImplementationOnce(async () => {
+    open = false;
+    return xml(entry('/root/one/'));
+  });
+  await expect(
+    remote.write('one/two/file.bin', new Blob(['bytes']), signal())
+  ).rejects.toMatchObject({ code: 'authentication' });
+  expect(fetchMock.mock.calls.map(([, init]) => init?.method)).toEqual(['PROPFIND', 'PROPFIND']);
 });

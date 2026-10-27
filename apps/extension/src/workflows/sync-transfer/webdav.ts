@@ -6,10 +6,16 @@ import type { SyncRemotePage, SyncRemoteStore } from './remote-store';
 /** Credentials are supplied by an authorized lifecycle owner and remain in this client only. */
 interface WebdavRemoteStoreOptions {
   rootUrl: string;
-  authentication:
-    | { kind: 'basic'; username: string; password: string }
-    | { kind: 'bearer'; accessToken: string };
+  authentication: WebdavAuthentication | (() => Promise<WebdavAuthentication>);
+  request: (
+    signal: AbortSignal,
+    issue: (signal: AbortSignal) => Promise<Response>
+  ) => Promise<Response>;
 }
+
+type WebdavAuthentication =
+  | { kind: 'basic'; username: string; password: string }
+  | { kind: 'bearer'; accessToken: string };
 
 const METADATA_LIMIT = 8 * 1024 * 1024;
 
@@ -207,19 +213,9 @@ function entries(value: unknown): Record<string, unknown>[] {
   });
 }
 
-function clientFetch(
-  root: URL,
-  authentication: WebdavRemoteStoreOptions['authentication']
-): typeof fetch {
-  const authenticationHeaders =
-    authentication.kind === 'basic'
-      ? getBasicAuthHeaders({
-          username: authentication.username,
-          password: authentication.password,
-        })
-      : { authorization: `Bearer ${authentication.accessToken}` };
-  const authorization = new Headers(authenticationHeaders).get('authorization');
-  if (!authorization) throw new SyncRemoteError('invalid-configuration');
+function clientFetch(root: URL, options: WebdavRemoteStoreOptions): typeof fetch {
+  const authentication = options.authentication;
+  const request = options.request;
   return async (input, options) => {
     if (typeof input !== 'string' || !(options?.signal instanceof AbortSignal)) {
       throw new SyncRemoteError('invalid-response');
@@ -237,15 +233,26 @@ function clientFetch(
     // Admit the exact encoded path before dispatch; URL normalization must not hide traversal.
     listedKey(input, root);
     options.signal.throwIfAborted();
+    const resolved = typeof authentication === 'function' ? await authentication() : authentication;
+    options.signal.throwIfAborted();
+    const authenticationHeaders =
+      resolved.kind === 'basic'
+        ? getBasicAuthHeaders({ username: resolved.username, password: resolved.password })
+        : { authorization: `Bearer ${resolved.accessToken}` };
+    const authorization = new Headers(authenticationHeaders).get('authorization');
+    if (!authorization) throw new SyncRemoteError('invalid-configuration');
     const requestHeaders = new Headers(options.headers);
     requestHeaders.set('Authorization', authorization);
     const response = nativeResponse(
-      await globalThis.fetch(input, {
-        ...options,
-        headers: requestHeaders,
-        credentials: 'omit',
-        redirect: 'error',
-      })
+      await request(options.signal, (admittedSignal) =>
+        globalThis.fetch(input, {
+          ...options,
+          signal: admittedSignal,
+          headers: requestHeaders,
+          credentials: 'omit',
+          redirect: 'error',
+        })
+      )
     );
     if (!response.ok) {
       await discard(response);
@@ -319,7 +326,7 @@ export async function createWebdavRemoteStore(
   try {
     signal.throwIfAborted();
     const root = rootURL(options.rootUrl);
-    const guardedFetch = clientFetch(root, options.authentication);
+    const guardedFetch = clientFetch(root, options);
     const objectUrl = (key: string, allowEmpty = false) => {
       const parts = segments(key, allowEmpty);
       return `${root.href}${parts.map((part) => encodeURIComponent(part)).join('/')}`;

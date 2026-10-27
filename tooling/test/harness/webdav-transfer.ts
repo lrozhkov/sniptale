@@ -1,3 +1,4 @@
+import { createWebdavConnectionHarness } from './webdav-connection';
 import { createWebdavPortableHarness } from './webdav-portable';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { createWebdavRemoteStore } from '../../../apps/extension/src/workflows/sync-transfer/webdav';
@@ -39,6 +40,7 @@ async function connect(input: { rootUrl: string; username: string; password: str
     {
       rootUrl: input.rootUrl,
       authentication: { kind: 'basic', username: input.username, password: input.password },
+      request: (signal, issue) => issue(signal),
     },
     new AbortController().signal
   );
@@ -128,6 +130,9 @@ async function readProof(key: string, expectedSize: number) {
 
 const webdavTransferHarness = {
   connect,
+  connection: createWebdavConnectionHarness((remote) => {
+    store = remote;
+  }),
   portable: createWebdavPortableHarness(connected),
   nativePutCalls: () => nativePutCalls,
   prepareSource,

@@ -13,6 +13,7 @@ import {
 } from '../../composition/persistence/sync-capture/queue';
 import type { SyncQueueFailureCode } from '../../composition/persistence/sync-capture/queue-model';
 import { loadVerifiedOutgoingResult } from '../../composition/persistence/sync-capture/outgoing-results';
+import type { SyncConnectionIdentity } from '../../composition/persistence/remote-connection/model';
 import type { scanSyncCatalog } from './catalog';
 import {
   dispatchPreparedOutgoing,
@@ -86,6 +87,7 @@ export async function recoverInterruptedSyncQueueOperation(
         operationId,
         revision: row.revision,
         runId: row.runId,
+        authorization: row.authorization,
       });
       return { status: 'finished', operation: recovered };
     }
@@ -97,6 +99,7 @@ export async function runSyncQueueOperation(input: {
   scope: SyncQueueScope;
   operationId: string;
   expectedRevision: number;
+  authorization?: SyncConnectionIdentity;
   capture: unknown;
   remote: SyncRemoteStore;
   signal: AbortSignal;
@@ -106,6 +109,7 @@ export async function runSyncQueueOperation(input: {
   const scope = structuredClone(input.scope);
   const operationId = input.operationId;
   const expectedRevision = input.expectedRevision;
+  const authorization = input.authorization ? structuredClone(input.authorization) : undefined;
   const capture = parseSyncCaptureRecord(structuredClone(input.capture));
   const catalog = input.catalog ? structuredClone(input.catalog) : undefined;
   const { signal, remote, authorize } = input;
@@ -126,7 +130,7 @@ export async function runSyncQueueOperation(input: {
       const current = await operation(scope, operationId);
       if (current.revision !== expectedRevision) throw new Error('Stale sync queue execution.');
       if (current.status === 'published') return { status: 'finished', operation: current };
-      const run = await beginSyncQueueRun(scope, operationId, expectedRevision);
+      const run = await beginSyncQueueRun(scope, operationId, expectedRevision, authorization);
       try {
         const accepted = await loadVerifiedOutgoingResult(
           scope.spaceId,

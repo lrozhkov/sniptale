@@ -25,7 +25,7 @@
       "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
       "owner": "sync-webdav-provider",
       "justification": "The WebDAV adapter owns resolved provider authentication for one explicitly selected HTTPS root.",
-      "reviewNote": "The lifecycle caller supplies host authorization and cancellation. Keep credentials in memory, omit cookies, reject redirects, and restrict every request to the selected root. Bound DAV metadata before parsing. Never log response bodies, addresses, filenames or raw errors."
+      "reviewNote": "Resolve credentials in memory for each HTTP request. Require injected durable connection and origin-permission admission at actual fetch invocation, including the initial probe and DAV subrequests. Omit cookies, reject redirects and restrict requests to the selected root. Bound DAV metadata before parsing. Never log response bodies, addresses, filenames or raw errors. Track and drain issued requests outside the short admission lock."
     }
   ],
   "credentialedFetchOwners": [

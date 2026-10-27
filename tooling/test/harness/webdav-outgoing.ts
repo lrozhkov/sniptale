@@ -1,3 +1,4 @@
+import { loadSyncConnection } from '../../../apps/extension/src/composition/persistence/remote-connection/store';
 import {
   initDB,
   SYNC_CAPTURE_STORE,
@@ -112,6 +113,7 @@ export function createWebdavOutgoingHarness(
         scope,
         operationId,
         expectedRevision: revision,
+        authorization: (await loadSyncConnection())?.identity,
         capture,
         remote: connected(),
         signal: signal(),
