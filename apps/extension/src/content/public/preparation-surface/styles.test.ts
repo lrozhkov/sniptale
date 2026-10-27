@@ -136,9 +136,9 @@ describe('content entrypoint styles', () => {
     expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-header');
     expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-icon-action');
     expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-source-switch');
-    expect(settingsPopoverStyles).toContain('min-height: 24px;');
+    expect(settingsPopoverStyles).toContain('height: 28px;');
     expect(settingsPopoverStyles).toContain('align-items: center;');
-    expect(settingsPopoverStyles).toContain('padding-bottom: 4px;');
+    expect(settingsPopoverStyles).toContain('padding-block: 2px;');
     expect(settingsPopoverStyles).not.toMatch(
       /\.sniptale-settings-popover-header \.sniptale-toolbar-menu-title\s*\{[^}]*font-size:/s
     );
@@ -292,7 +292,11 @@ it('keeps embedded settings header commands neutral and aligned', () => {
     'align-items': 'center',
   });
   const header = styleDeclarations(styles, '.sniptale-settings-popover-header');
-  expect(header).toMatchObject({ 'min-height': '32px', 'align-items': 'center' });
+  expect(header).toMatchObject({
+    'min-height': '32px',
+    'align-items': 'center',
+    'padding-block': '2px',
+  });
 });
 
 it('includes the shared disclosure geometry in isolated content UI styles', () => {

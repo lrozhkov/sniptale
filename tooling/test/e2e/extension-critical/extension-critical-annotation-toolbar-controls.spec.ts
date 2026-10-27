@@ -216,6 +216,68 @@ async function verifyCreation(page: Page, toolbar: Locator, info: TestInfo) {
     await expect(primary).toHaveAttribute('aria-pressed', before === 'true' ? 'false' : 'true');
     await toolbar.locator(`[data-ui="content.toolbar.future-frame-${kind}.menu"]`).click();
     await expect(panel(page)).toHaveCount(1);
+    const sourceToggle = panel(page).locator('[data-settings-action="toggle-template-source"]');
+    const hasSourceControl = (await toolbar.getAttribute('data-ui')) === 'content.toolbar.root';
+    await expect(sourceToggle).toHaveCount(hasSourceControl ? 1 : 0);
+    if (hasSourceControl) {
+      const linked = (await sourceToggle.getAttribute('aria-pressed')) === 'true';
+      await expect(sourceToggle).toHaveAttribute(
+        'title',
+        linked
+          ? /Frame link on|Связь с рамкой включена/u
+          : /Frame link off|Связь с рамкой выключена/u
+      );
+      await sourceToggle.click();
+      await expect(sourceToggle).toHaveAttribute('aria-pressed', String(!linked));
+      await expect(sourceToggle).toHaveAttribute(
+        'title',
+        linked
+          ? /Frame link off|Связь с рамкой выключена/u
+          : /Frame link on|Связь с рамкой включена/u
+      );
+      await capture(page, info, `creation-${kind}-source-toggle.png`);
+      await sourceToggle.click();
+      await expect(sourceToggle).toHaveAttribute('aria-pressed', String(linked));
+    }
+    await capture(page, info, `creation-${kind}-header.png`);
+    const header = panel(page).locator('.sniptale-settings-popover-header');
+    const geometry = await header.evaluate((element) => ({
+      padding: [getComputedStyle(element).paddingTop, getComputedStyle(element).paddingBottom],
+      actions: [...element.querySelectorAll('.sniptale-settings-popover-icon-action')].map(
+        (button) => {
+          const rect = button.getBoundingClientRect();
+          const icon = button.querySelector('svg')!.getBoundingClientRect();
+          return {
+            width: rect.width,
+            height: rect.height,
+            iconWidth: icon.width,
+            iconHeight: icon.height,
+          };
+        }
+      ),
+    }));
+    expect(geometry.padding).toEqual(['2px', '2px']);
+    for (const button of geometry.actions) {
+      expect(Math.abs(button.width - 28)).toBeLessThanOrEqual(1);
+      expect(Math.abs(button.height - 28)).toBeLessThanOrEqual(1);
+      expect(Math.abs(button.iconWidth - 16)).toBeLessThanOrEqual(1);
+      expect(Math.abs(button.iconHeight - 16)).toBeLessThanOrEqual(1);
+    }
+    if (kind === 'callout' && page.viewportSize()!.width === 1280) {
+      const original = page.viewportSize()!;
+      await page.setViewportSize({ width: 1024, height: original.height });
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth))
+        .toBeLessThanOrEqual(1);
+      await expect
+        .poll(async () => {
+          const bounds = (await panel(page).boundingBox())!;
+          return Math.max(-bounds.x, bounds.x + bounds.width - 1024);
+        })
+        .toBeLessThanOrEqual(1);
+      await capture(page, info, 'annotation-header-narrow.png');
+      await page.setViewportSize(original);
+    }
     await toolbar.locator(`[data-ui="content.toolbar.future-frame-${kind}.menu"]`).click();
     await primary.click();
   }
@@ -225,6 +287,10 @@ async function verifySelected(page: Page, info: TestInfo) {
   const toolbar = page.locator('.sniptale-action-toolbar:visible');
   await expect(toolbar).toHaveCount(1);
   await verifyCompoundHover(page, toolbar, info, 'selected');
+  await expect(toolbar.locator('.lucide-move')).toHaveCount(
+    page.url().includes(EDITOR_HARNESS_PATH) ? 0 : 1
+  );
+  await expect(toolbar.locator('.lucide-scaling')).toHaveCount(0);
   for (const mode of ['blur', 'focus', 'border'] as const) {
     const option = toolbar.locator(`[data-frame-effect="${mode}"]`);
     await option.click();

@@ -17,12 +17,12 @@ export const contentCalloutMessages = defineMessageSource({
   templateSourceFrame: { ru: 'Рамка', en: 'Frame' },
   templateSourceForced: { ru: 'По умолчанию', en: 'Default' },
   templateSourceFrameHint: {
-    ru: 'Переключить на шаблон выноски из настроек рамки.',
-    en: 'Switch to the callout template from the frame settings.',
+    ru: 'Связь с рамкой включена. Новые рамки используют связанный шаблон выноски, а при его отсутствии — основной. Нажмите, чтобы всегда использовать основной.',
+    en: 'Frame link on. New frames use their linked callout template, or the default when no link exists. Click to always use the default template.',
   },
   templateSourceForcedHint: {
-    ru: 'Переключить на основной шаблон выноски независимо от настроек рамки.',
-    en: 'Switch to the default callout template regardless of the frame settings.',
+    ru: 'Связь с рамкой выключена. Новые рамки используют основной шаблон выноски. Нажмите, чтобы использовать шаблон из рамки.',
+    en: 'Frame link off. New frames use the default callout template. Click to use the template linked to the frame.',
   },
   italicTitle: { ru: 'Курсив', en: 'Italic' },
   underlineTitle: { ru: 'Подчёркнутый', en: 'Underline' },

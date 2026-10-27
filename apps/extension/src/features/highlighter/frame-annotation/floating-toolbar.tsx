@@ -1,15 +1,5 @@
 import React from 'react';
-import {
-  ChevronDown,
-  Eye,
-  EyeOff,
-  ListOrdered,
-  Minus,
-  Scaling,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, ListOrdered, Minus, Move, Plus, Trash2, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { AddFrameCommentIcon, FrameCommentIcon } from './icons';
 import {
@@ -245,7 +235,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
           onMouseDown={props.onMouseDown}
           title={labels.get('edit')}
         >
-          <Scaling size={16} />
+          <Move size={16} />
         </ProductGlassToolbarButton>
       ) : null}
       {props.onCaptureVisibilityChange ? (

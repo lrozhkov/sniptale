@@ -75,7 +75,7 @@ it('projects optional template-source and reorder controls through the future po
   );
 
   const source = portal.querySelector<HTMLButtonElement>(
-    '[data-ui="shared.annotation-template-source"] button[aria-pressed="false"]'
+    '[data-ui="shared.annotation-template-source"] button[aria-pressed="true"]'
   );
   act(() => source?.click());
   expect(onSourceChange).toHaveBeenCalledWith('forced');
