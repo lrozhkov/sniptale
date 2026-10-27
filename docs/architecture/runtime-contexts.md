@@ -313,3 +313,14 @@ Stop closes workspace request admission synchronously. It waits for the creation
 Permission queries check the native allocation incarnation and selected origin without the coordinator queue or connection lock. The request owner checks exact phase and revision around permission admission. Permission removal and erasure revoke the allocation lifetime across phase revisions. Ordinary journal commands retain exact revision checks.
 
 The security-only lifecycle fixture can start workspace creation. Production Settings enrollment and start ingress remain disabled. This execution boundary does not install a profile or connection.
+
+
+## Sync retry wake-up
+
+The background sync owner composes bounded retry maintenance through the existing coordinator. The coordinator still selects the offscreen executor. That executor retains complete transfer, verification and cancellation ownership. No alarm owns credentials or an independent transfer client.
+
+A distinct periodic alarm wakes retry maintenance. A synchronous browser startup listener also supplies a wake-up when that alarm is absent. Startup recreates a missing alarm and reads the native schedule. Overlapping passes coalesce. Each pass bounds initialization, discovery and dispatch. The history alarm delivers local history only. It cannot start transfer work.
+
+A running executor job causes native metadata deferral. Missing execution permits recovery only through the workflow operation lock. Elapsed time cannot establish containment. Failed observation preserves work for a later wake-up.
+
+Automatic execution remains inside the security qualification boundary. This change does not activate production enrollment or unrestricted start ingress.

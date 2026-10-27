@@ -151,7 +151,18 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, ASSET_OPERATIONS_STORE, 'operationId', ['status', 'updatedAt']);
   createStore(db, VOICE_INPUT_HISTORY_STORE, 'id');
   createStore(db, SYNC_CAPTURE_STORE, 'key', ['kind', 'rootKey', 'createdAt']);
-  createStore(db, SYNC_OUTBOX_STORE, 'key');
+  db.createObjectStore(SYNC_OUTBOX_STORE, { keyPath: 'key' }).createIndex(
+    'syncQueueDue',
+    [
+      'spaceId',
+      'connectionGeneration',
+      'profileCreatedAt',
+      'authorization.incarnation',
+      'nextDueAt',
+      'key',
+    ],
+    { unique: false }
+  );
   createStore(db, SYNC_CATALOG_CACHE_STORE, 'key');
   createStore(db, SYNC_CONNECTION_STORE, 'key');
   const contracts = db.createObjectStore(SCHEMA_CONTRACTS_STORE, { keyPath: 'domainId' });

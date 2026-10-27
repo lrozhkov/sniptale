@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: This chronological registry owns schema descriptors. The candidate appends DB43-to-44 creation of one empty connection authorization store and validation of the four sync stores. It reads and rewrites no source rows. Migration planning, execution order, contract writes and transaction abort remain with their existing owners. The descriptor adds no independent writer, state authority or recovery lifetime. Splitting it would distribute one chronological history. Direct inspection confirms Keep, score 2, delta 0 and cohesion 1.00. Final independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent writer, state authority, execution or recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry.",
+      "reason": "tool-noise: One chronological migration registry adds only the synchronous DB44-to-45 due index. Existing upgrade execution owns ordering, abort and contract publication. Score2, delta0 and cohesion1.00 retain the same owner. Independent wrapper diagnosis confirms Keep. A line-count split would distribute that contract. Fresh complete-candidate architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent writer, recovery authority, public contract or fixture lifetime. Remove when the analyzer models this cohesive contract.",
       "reviewDate": "2026-10-27",
-      "astHash": "b189e0485810a920ac0944a5c32dfb4bc3fb7eb146a7cc009fd01d1e3639305a",
+      "astHash": "5f66b5d376d493683f947fb149ecdff08f733a5da4e90bbac532277b48941efd",
       "signatureHash": "07c774e9a0b3f74167f16d2ba52e7b0fa3c0fe23d1d97eda8352dd7c8c08b5a4"
     },
     {
@@ -2816,6 +2816,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "5a9a5a04e7fc53e8303803aa77a963f4e07b1c3cdd5bd1ded08177b729c23397",
       "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One schema admission suite proves synchronous index creation, abort and retry, preservation, and fresh-database parity. Each case retains its local fixture lifetime. Score2, delta0 and cohesion1.00 retain the same owner. Independent wrapper diagnosis confirms Keep. A line-count split would distribute that contract. Fresh complete-candidate architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent writer, recovery authority, public contract or fixture lifetime. Remove when the analyzer models this cohesive contract.",
+      "reviewDate": "2026-10-27",
+      "astHash": "03a4e1c96caa3b3ddf28f6278da45fb7a3d22a64cbdd48dd74985616ac8a4d5a",
+      "signatureHash": "2f7df5c56a3f68284b51613fbf87463eb059de5185d079f2749d29b4e57c2cef"
     }
   ]
 }

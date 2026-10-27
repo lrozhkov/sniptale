@@ -93,6 +93,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   const transaction = {
     abort: vi.fn(),
     objectStore: vi.fn((_name: string) => ({
+      createIndex: vi.fn(),
       put,
       clear: vi.fn(),
       delete: vi.fn(),
@@ -109,7 +110,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   expect(plan?.[2]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 15, to: 16 }]);
   expect(plan?.[3]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 16, to: 17 }]);
   handleDatabaseUpgrade(db, 14, DB_VERSION, transaction);
-  expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(transaction.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(db.createObjectStore.mock.calls).toEqual([
     ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
@@ -209,6 +210,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['video_workspaces'],
     ['project_assets'],
     ['scenario_assets'],
+    ['sync_outbox'],
     [SCHEMA_CONTRACTS_STORE],
   ]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
@@ -302,7 +304,13 @@ it('admits compact source gain without workspace migration and refuses incompati
   const put = vi.fn();
   const tx = {
     abort: vi.fn(),
-    objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+    objectStore: vi.fn(() => ({
+      createIndex: vi.fn(),
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
   };
   const names = new Set<string>(betaV16Fixture.stores);
   const db = {
@@ -316,7 +324,7 @@ it('admits compact source gain without workspace migration and refuses incompati
     deleteObjectStore: vi.fn(),
   };
   handleDatabaseUpgrade(db, 16, DB_VERSION, tx);
-  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(tx.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(db.createObjectStore.mock.calls).toEqual([
     ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
@@ -352,6 +360,7 @@ it('annotation admission preserves rows and aborts before publishing contracts o
   const tx = {
     abort: vi.fn(),
     objectStore: vi.fn((_name: string) => ({
+      createIndex: vi.fn(),
       put,
       clear: vi.fn(),
       delete: vi.fn(),
@@ -387,7 +396,7 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['sync_connection', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
-  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(tx.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   put.mockClear();
   tx.objectStore.mockClear();
@@ -549,7 +558,13 @@ it.each(['sync_capture', 'sync_outbox', 'sync_catalog_cache'])(
     };
     const failedTx = {
       abort: vi.fn(),
-      objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+      objectStore: vi.fn(() => ({
+        createIndex: vi.fn(),
+        put,
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
     };
     expect(() => handleDatabaseUpgrade(db, 42, 43, failedTx)).toThrow(
       'Sync queue control stores are unavailable.'
@@ -560,7 +575,13 @@ it.each(['sync_capture', 'sync_outbox', 'sync_catalog_cache'])(
     names.add(missingStore);
     const retryTx = {
       abort: vi.fn(),
-      objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+      objectStore: vi.fn(() => ({
+        createIndex: vi.fn(),
+        put,
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
     };
     handleDatabaseUpgrade(db, 42, 43, retryTx);
     expect(retryTx.abort).not.toHaveBeenCalled();
@@ -629,8 +650,8 @@ it('adds connection authority without reading or rewriting populated version 43 
       return { put, getAll: sourceAccess, clear: sourceAccess, delete: sourceAccess };
     }),
   };
-  expect(buildDatabaseMigrationPlan(43, DB_VERSION)).toHaveLength(1);
-  handleDatabaseUpgrade(db, 43, DB_VERSION, tx);
+  expect(buildDatabaseMigrationPlan(43, 44)).toHaveLength(1);
+  handleDatabaseUpgrade(db, 43, 44, tx);
   expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('sync_connection', {
     keyPath: 'key',
   });
@@ -670,9 +691,15 @@ it.each(['sync_capture', 'sync_outbox', 'sync_catalog_cache', 'sync_connection']
     };
     const failedTx = {
       abort: vi.fn(),
-      objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+      objectStore: vi.fn(() => ({
+        createIndex: vi.fn(),
+        put,
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
     };
-    expect(() => handleDatabaseUpgrade(db, 43, DB_VERSION, failedTx)).toThrow(
+    expect(() => handleDatabaseUpgrade(db, 43, 44, failedTx)).toThrow(
       'Sync connection stores are unavailable.'
     );
     expect(failedTx.abort).toHaveBeenCalledOnce();
@@ -684,12 +711,133 @@ it.each(['sync_capture', 'sync_outbox', 'sync_catalog_cache', 'sync_connection']
     creationInterrupted = false;
     const retryTx = {
       abort: vi.fn(),
-      objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+      objectStore: vi.fn(() => ({
+        createIndex: vi.fn(),
+        put,
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
     };
-    handleDatabaseUpgrade(db, 43, DB_VERSION, retryTx);
+    handleDatabaseUpgrade(db, 43, 44, retryTx);
     expect(retryTx.abort).not.toHaveBeenCalled();
     expect(retryTx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
     expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
     expect(sourceAccess).not.toHaveBeenCalled();
   }
 );
+
+it('adds the exact nonunique due index synchronously without reading or backfilling version 44 rows', () => {
+  const createIndex = vi.fn();
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Due indexing must not read or change source rows.');
+  });
+  const put = vi.fn();
+  const db = {
+    objectStoreNames: {
+      contains: (name: string) => EXPECTED_STORES.some((store) => store === name),
+    },
+    createObjectStore: sourceAccess,
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn((name: string) => ({
+      createIndex,
+      put: name === SCHEMA_CONTRACTS_STORE ? put : sourceAccess,
+      clear: sourceAccess,
+      delete: sourceAccess,
+      getAll: sourceAccess,
+    })),
+  };
+  expect(handleDatabaseUpgrade(db, 44, DB_VERSION, tx)).toBeUndefined();
+  expect(tx.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
+  expect(createIndex).toHaveBeenCalledExactlyOnceWith(
+    'syncQueueDue',
+    [
+      'spaceId',
+      'connectionGeneration',
+      'profileCreatedAt',
+      'authorization.incarnation',
+      'nextDueAt',
+      'key',
+    ],
+    { unique: false }
+  );
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(sourceAccess).not.toHaveBeenCalled();
+  expect(tx.abort).not.toHaveBeenCalled();
+});
+
+it('aborts due index creation failure before publishing contracts and permits a fresh upgrade attempt', () => {
+  const createIndex = vi.fn(() => {
+    throw new Error('Interrupted due index creation');
+  });
+  const put = vi.fn();
+  const db = {
+    objectStoreNames: { contains: () => true },
+    createObjectStore: vi.fn(() => ({ createIndex, put })),
+    deleteObjectStore: vi.fn(),
+  };
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn(() => ({
+      createIndex,
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
+  };
+  expect(() => handleDatabaseUpgrade(db, 44, DB_VERSION, tx)).toThrow(
+    'Interrupted due index creation'
+  );
+  expect(tx.abort).toHaveBeenCalledOnce();
+  expect(put).not.toHaveBeenCalled();
+  expect(tx.objectStore.mock.calls).toEqual([['sync_outbox']]);
+  const retryIndex = vi.fn();
+  const retryTx = {
+    abort: vi.fn(),
+    objectStore: vi.fn(() => ({
+      createIndex: retryIndex,
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
+  };
+  handleDatabaseUpgrade(db, 44, DB_VERSION, retryTx);
+  expect(retryIndex).toHaveBeenCalledOnce();
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(retryTx.abort).not.toHaveBeenCalled();
+  expect(db.createObjectStore).not.toHaveBeenCalled();
+  expect(db.deleteObjectStore).not.toHaveBeenCalled();
+});
+
+it('creates the same exact nonunique due index for a fresh database', () => {
+  const dueIndex = vi.fn();
+  const put = vi.fn();
+  const db = {
+    objectStoreNames: { contains: () => false },
+    createObjectStore: vi.fn((name: string) => ({
+      createIndex: name === 'sync_outbox' ? dueIndex : vi.fn(),
+      put,
+    })),
+    deleteObjectStore: vi.fn(),
+  };
+  const tx = { abort: vi.fn(), objectStore: vi.fn() };
+  handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
+  expect(dueIndex).toHaveBeenCalledExactlyOnceWith(
+    'syncQueueDue',
+    [
+      'spaceId',
+      'connectionGeneration',
+      'profileCreatedAt',
+      'authorization.incarnation',
+      'nextDueAt',
+      'key',
+    ],
+    { unique: false }
+  );
+  expect(tx.objectStore).not.toHaveBeenCalled();
+});

@@ -1000,4 +1000,37 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       );
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 5, to: 6 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 44,
+    toDatabaseVersion: 45,
+    risk: 'additive',
+    stores: [SYNC_OUTBOX_STORE],
+    migrate(_db, transaction) {
+      const store = transaction.objectStore(SYNC_OUTBOX_STORE);
+      if (!store.createIndex) throw new Error('Sync queue due index creation unavailable.');
+      store.createIndex(
+        'syncQueueDue',
+        [
+          'spaceId',
+          'connectionGeneration',
+          'profileCreatedAt',
+          'authorization.incarnation',
+          'nextDueAt',
+          'key',
+        ],
+        { unique: false }
+      );
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_OUTBOX_STORE],
+        'Sync queue due store is unavailable.'
+      );
+    },
+  },
 ];

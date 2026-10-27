@@ -67,7 +67,7 @@ interface StoredSchemaContract {
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
     domainId: 'syncCapture',
-    schemaVersion: 5,
+    schemaVersion: 6,
     stores: [
       { storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' },
       { storeName: SYNC_OUTBOX_STORE, dataClass: 'durable-authority' },

@@ -139,6 +139,20 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/sync-capture/queue-schedule.ts",
+      "owner": "sync-queue-native-control-and-delivery",
+      "justification": "tool-noise: authorization contains only native incarnation and revision. Its closed parser rejects extra credential fields. This owner writes scheduling metadata only.",
+      "reviewNote": "Only store.put into SYNC_OUTBOX_STORE is admitted. Credentials, HTTP headers, URLs, accounts and content remain forbidden. Reassess or remove this entry when the DTO, parser, meaning, sink, store or authority changes. Fresh security review must check this exact boundary.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": [
+            "SYNC_OUTBOX_STORE"
+          ]
+        }
+      ]
     }
   ],
   "sensitiveRetentionOwners": [
@@ -550,6 +564,20 @@
           "sink": "tx.objectStore(SYNC_CONNECTION_STORE).put",
           "keys": [
             "SYNC_CONNECTION_STORE"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/sync-capture/queue-schedule.ts",
+      "owner": "sync-queue-native-control-and-delivery",
+      "justification": "tool-noise: authorization contains only native incarnation and revision. Its closed parser rejects extra credential fields. This owner writes scheduling metadata only.",
+      "reviewNote": "Only store.put into SYNC_OUTBOX_STORE is admitted. Credentials, HTTP headers, URLs, accounts and content remain forbidden. Reassess or remove this entry when the DTO, parser, meaning, sink, store or authority changes. Fresh security review must check this exact boundary.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": [
+            "SYNC_OUTBOX_STORE"
           ]
         }
       ]

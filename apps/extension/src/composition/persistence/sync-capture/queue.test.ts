@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { captureRootKey, type CapturedChange } from './contracts';
 import type { SyncConnectionIdentity, SyncConnectionMetadata } from '../remote-connection/model';
@@ -30,6 +30,10 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IDBKeyRange', { bound: (lower: string, upper: string) => ({ lower, upper }) });
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 const scope: SyncQueueScope = { spaceId: 'space', connectionGeneration: 3, profileCreatedAt: 1 };
 function setup() {
@@ -627,3 +631,86 @@ it('refuses a delayed selected command after enrollment erasure and recreation',
     revision: 1,
   });
 });
+
+it('records atomic temporary retry deadlines and exhausts five persisted automatic retries', async () => {
+  let now = 1_000;
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  vi.spyOn(Math, 'random').mockReturnValue(0);
+  const f = setup();
+  configureConnection(f);
+  const enqueued = await enqueueSyncQueueOperation(f.capture);
+  expect(enqueued).toMatchObject({ authorization, nextDueAt: now, automaticRetryCount: 0 });
+  let run = await beginSyncQueueRun(scope, 'op', 1, authorization);
+  for (let count = 1; count <= 5; count += 1) {
+    const failed = await failSyncQueueRun(run, 'temporary');
+    expect(failed.automaticRetryCount).toBe(count);
+    expect(failed.nextDueAt).toBe(now + Math.min(300_000, 30_000 * 2 ** (count - 1)));
+    await expect(beginSyncQueueRun(scope, 'op', failed.revision, authorization)).rejects.toThrow(
+      'refused'
+    );
+    now = failed.nextDueAt!;
+    run = await beginSyncQueueRun(scope, 'op', failed.revision, authorization);
+  }
+  const exhausted = await failSyncQueueRun(run, 'temporary');
+  expect(exhausted).toMatchObject({ status: 'failed', automaticRetryCount: 5, nextDueAt: null });
+  await expect(beginSyncQueueRun(scope, 'op', exhausted.revision, authorization)).rejects.toThrow(
+    'refused'
+  );
+  expect(f.table('sync_capture').get(f.capture.key)).toEqual(f.capture);
+  const retried = await commandSyncQueueOperation(scope, 'op', exhausted.revision, 'retry');
+  expect(retried).toMatchObject({ nextDueAt: now, automaticRetryCount: 0 });
+});
+it.each(['authentication', 'access-denied', 'storage-full', 'source', 'internal'] as const)(
+  'does not schedule automatic retry for %s',
+  async (code) => {
+    const f = setup();
+    configureConnection(f);
+    await enqueueSyncQueueOperation(f.capture);
+    const run = await beginSyncQueueRun(scope, 'op', 1, authorization);
+    expect(await failSyncQueueRun(run, code)).toMatchObject({
+      nextDueAt: null,
+      automaticRetryCount: 0,
+    });
+  }
+);
+it('refuses binding a queued operation to a replacement connection incarnation', async () => {
+  const f = setup();
+  configureConnection(f);
+  await enqueueSyncQueueOperation(f.capture);
+  const replacement = { incarnation: '66666666-6666-4666-8666-666666666666', revision: 1 };
+  configureConnection(f, replacement);
+  const before = structuredClone(f.rows);
+  await expect(beginSyncQueueRun(scope, 'op', 1, replacement)).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
+});
+it('preserves failure evidence after authority revocation and clears deadlines for manual pause', async () => {
+  const f = setup();
+  configureConnection(f);
+  await enqueueSyncQueueOperation(f.capture);
+  const run = await beginSyncQueueRun(scope, 'op', 1, authorization);
+  configureConnection(f, { ...authorization, revision: 2 }, 'paused');
+  const failed = await failSyncQueueRun(run, 'temporary');
+  expect(failed.nextDueAt).not.toBeNull();
+  await expect(beginSyncQueueRun(scope, 'op', failed.revision, authorization)).rejects.toThrow();
+  const paused = await commandSyncQueueOperation(scope, 'op', failed.revision, 'pause');
+  expect(paused.nextDueAt).toBeNull();
+  const resumed = await commandSyncQueueOperation(scope, 'op', paused.revision, 'resume');
+  expect(resumed.automaticRetryCount).toBe(0);
+  expect(resumed.nextDueAt).not.toBeNull();
+});
+it.each(['paused', 'updating-auth'] as const)(
+  'binds new queued work to the existing incarnation while connection is %s',
+  async (phase) => {
+    const f = setup();
+    configureConnection(f, authorization, phase);
+    const queued = await enqueueSyncQueueOperation(f.capture);
+    expect(queued).toMatchObject({ authorization, nextDueAt: null });
+    const replacement = { incarnation: '66666666-6666-4666-8666-666666666666', revision: 1 };
+    configureConnection(f, replacement);
+    const before = structuredClone(f.rows);
+    await expect(beginSyncQueueRun(scope, 'op', queued.revision, replacement)).rejects.toThrow(
+      'refused'
+    );
+    expect(f.rows).toEqual(before);
+  }
+);

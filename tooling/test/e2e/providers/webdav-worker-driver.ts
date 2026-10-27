@@ -16,6 +16,8 @@ interface PendingCommand {
 interface DriverOptions {
   extensionBuildDir: string;
   userDataDir?: string;
+  /** Restore the command-line installation without another install or permission grant. */
+  restoreExtensionId?: string;
   /** This browser is restricted to the loopback provider suite. */
   ignoreHTTPSErrors: true;
 }
@@ -30,6 +32,11 @@ function field(value: unknown, name: string): string {
 
 /** Raw browser/page CDP driver. It never attaches to, evaluates, or polls inside a worker. */
 export async function launchWebdavWorkerDriver(options: DriverOptions) {
+  if (
+    options.restoreExtensionId !== undefined &&
+    (!options.userDataDir || !/^[a-p]{32}$/u.test(options.restoreExtensionId))
+  )
+    throw new Error('Restored extension requires its existing profile and identity');
   const ownProfile = options.userDataDir === undefined;
   const profile = options.userDataDir ?? (await mkdtemp(join(tmpdir(), 'sniptale-webdav-worker-')));
   const browser = spawn(
@@ -42,6 +49,7 @@ export async function launchWebdavWorkerDriver(options: DriverOptions) {
       '--disable-sync',
       '--disable-crash-reporter',
       '--enable-unsafe-extension-debugging',
+      ...(options.userDataDir ? [`--load-extension=${resolve(options.extensionBuildDir)}`] : []),
       '--disable-background-networking',
       '--disable-component-extensions-with-background-pages',
       '--disable-component-update',
@@ -172,10 +180,34 @@ export async function launchWebdavWorkerDriver(options: DriverOptions) {
       if (value['error'] !== undefined) entry.reject(new Error('Browser CDP command refused'));
       else entry.resolve(value['result']);
     });
-    const loaded = await call('Extensions.loadUnpacked', {
-      path: resolve(options.extensionBuildDir),
-    });
-    const extensionId = field(loaded, 'id');
+    let extensionId = '';
+    if (options.userDataDir) {
+      let restored = false;
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const installed = await call('Extensions.getExtensions');
+        if (!isRecord(installed) || !Array.isArray(installed['extensions']))
+          throw new Error('Restored extension inventory is invalid');
+        const selected = installed['extensions'].find(
+          (entry) =>
+            isRecord(entry) &&
+            typeof entry['path'] === 'string' &&
+            resolve(entry['path']) === resolve(options.extensionBuildDir) &&
+            (options.restoreExtensionId === undefined || entry['id'] === options.restoreExtensionId)
+        );
+        if (isRecord(selected) && typeof selected['id'] === 'string') {
+          extensionId = selected['id'];
+          restored = true;
+          break;
+        }
+        await pause(100);
+      }
+      if (!restored) throw new Error('Existing extension installation did not survive restart');
+    } else {
+      const loaded = await call('Extensions.loadUnpacked', {
+        path: resolve(options.extensionBuildDir),
+      });
+      extensionId = field(loaded, 'id');
+    }
     if (!/^[a-p]{32}$/u.test(extensionId)) throw new Error('Invalid loaded extension identity');
 
     async function workerTargets(): Promise<WorkerTarget[]> {

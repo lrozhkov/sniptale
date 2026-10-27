@@ -8,6 +8,8 @@ import {
 } from '../infrastructure/indexed-db/core.stores';
 import {
   parseSyncConnectionIdentity,
+  parseConnectionMetadata,
+  sameConnectionScope,
   sameSyncConnectionIdentity,
   type SyncConnectionIdentity,
 } from '../remote-connection/model';
@@ -35,6 +37,7 @@ import {
   queueIdentity,
   queueUuid,
   recordQueueTransition,
+  queueRetrySchedule,
   SYNC_QUEUE_STAGES,
   SYNC_QUEUE_FAILURE_CODES,
   type SyncQueueScope,
@@ -72,6 +75,7 @@ function defaultConnection(scope: SyncQueueScope): SyncQueueConnection {
     key: queueConnectionKey(scope),
     revision: 0,
     paused: false,
+    scheduleProgress: null,
     eventSequence: 0,
     pendingTransitions: [],
     droppedTransitions: 0,
@@ -330,6 +334,11 @@ export async function enqueueSyncQueueOperation(value: unknown): Promise<SyncQue
     const connection = await readConnection(tx, scope);
     const store = tx.objectStore(SYNC_OUTBOX_STORE);
     const key = queueOperationKey(scope, capture.operationId);
+    const configured = parseConnectionMetadata(
+      await tx.objectStore(SYNC_CONNECTION_STORE).get('connection')
+    );
+    const authorization =
+      configured && sameConnectionScope(configured.binding, scope) ? configured.identity : null;
     const raw: unknown = await store.get(key);
     if (raw !== undefined) {
       const accepted = await readOperation(tx, scope, capture.operationId);
@@ -350,7 +359,9 @@ export async function enqueueSyncQueueOperation(value: unknown): Promise<SyncQue
         status: 'queued',
         stage: 'queued',
         runId: null,
-        authorization: null,
+        authorization,
+        nextDueAt: authorization && configured?.phase === 'active' ? Date.now() : null,
+        automaticRetryCount: 0,
         writeStarted: false,
         outcome: 'none',
         attemptId: null,
@@ -423,6 +434,8 @@ export async function commandSyncQueueOperation(
         ...current,
         revision: nextRevision(current.revision),
         status,
+        nextDueAt: status === 'queued' ? Date.now() : null,
+        automaticRetryCount: status === 'queued' ? 0 : current.automaticRetryCount,
         runId: null,
         outcome: current.writeStarted ? 'unknown' : current.outcome,
       },
@@ -457,7 +470,25 @@ export async function beginSyncQueueRun(
   return mutateQueue(scope, async (tx) => {
     const connection = await readConnection(tx, scope);
     const current = await readOperation(tx, scope, id);
-    if (connection.paused || current.revision !== expectedRevision || current.status !== 'queued')
+    const now = Date.now();
+    const due = current.nextDueAt !== null && current.nextDueAt <= now;
+    const retryable =
+      (current.status === 'failed' && current.failureCode === 'temporary') ||
+      current.status === 'interrupted';
+    if (
+      connection.paused ||
+      current.revision !== expectedRevision ||
+      !(current.status === 'queued'
+        ? current.nextDueAt === null || due
+        : retryable &&
+          acceptedAuthorization !== null &&
+          due &&
+          current.automaticRetryCount > 0 &&
+          current.automaticRetryCount <= 5) ||
+      (current.authorization !== null &&
+        (acceptedAuthorization === null ||
+          current.authorization.incarnation !== acceptedAuthorization.incarnation))
+    )
       throw new Error('Sync queue run claim refused.');
     await checkSyncConnectionAdmission(tx, scope, acceptedAuthorization);
     const runId = crypto.randomUUID();
@@ -465,6 +496,7 @@ export async function beginSyncQueueRun(
       {
         ...current,
         status: 'running',
+        nextDueAt: now + 30_000,
         stage: 'preparing',
         runId,
         authorization: acceptedAuthorization,
@@ -566,6 +598,7 @@ export async function failSyncQueueRun(
       {
         ...current,
         failureCode,
+        ...(failureCode === 'temporary' ? queueRetrySchedule(current) : { nextDueAt: null }),
         status: 'failed',
         revision: nextRevision(current.revision),
         runId: null,
@@ -586,6 +619,7 @@ export async function recoverSyncQueueRun(value: SyncQueueRun): Promise<SyncQueu
       {
         ...current,
         failureCode: 'interrupted',
+        ...queueRetrySchedule(current),
         status: 'interrupted',
         revision: nextRevision(current.revision),
         runId: null,
@@ -713,6 +747,7 @@ export async function completeSyncQueueRun(
       {
         ...current,
         status: 'published',
+        nextDueAt: null,
         stage: 'published',
         outcome: result ? 'verified' : 'observed',
         runId: null,

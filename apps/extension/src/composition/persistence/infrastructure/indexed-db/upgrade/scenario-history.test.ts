@@ -21,7 +21,13 @@ it('adds only an empty scenario history store before publishing the current cont
   const put = vi.fn();
   const tx = {
     abort: vi.fn(),
-    objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+    objectStore: vi.fn(() => ({
+      createIndex,
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
   };
   const db = {
     objectStoreNames: { contains: (name: string) => names.has(name) },
@@ -52,8 +58,20 @@ it('adds only an empty scenario history store before publishing the current cont
     ['kind', 'kind'],
     ['rootKey', 'rootKey'],
     ['createdAt', 'createdAt'],
+    [
+      'syncQueueDue',
+      [
+        'spaceId',
+        'connectionGeneration',
+        'profileCreatedAt',
+        'authorization.incarnation',
+        'nextDueAt',
+        'key',
+      ],
+      { unique: false },
+    ],
   ]);
-  expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
+  expect(tx.objectStore.mock.calls).toEqual([[SYNC_OUTBOX_STORE], ['schema_contracts']]);
   expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 8 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();

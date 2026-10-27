@@ -1,4 +1,7 @@
 import { expect } from '@playwright/test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { test, saveProof } from './webdav-fixtures';
 import { launchWebdavWorkerDriver } from './webdav-worker-driver';
@@ -6,6 +9,26 @@ import { launchWebdavWorkerDriver } from './webdav-worker-driver';
 function record(value: unknown) {
   if (!isRecord(value)) throw new Error('Lifecycle proof expected an object.');
   return value;
+}
+function nativeRunSnapshot(value: unknown) {
+  const native = record(value);
+  const queue = record(native['queue']);
+  const { scheduleProgress, ...connection } = record(queue['connection']);
+  void scheduleProgress;
+  const operations = queue['operations'];
+  if (!Array.isArray(operations)) throw new Error('Native queue operations are missing.');
+  return {
+    ...native,
+    queue: {
+      ...queue,
+      connection,
+      operations: operations.map((value) => {
+        const { nextDueAt, ...operation } = record(value);
+        void nextDueAt;
+        return operation;
+      }),
+    },
+  };
 }
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 async function open(credentials: { rootUrl: string; username: string; password: string }) {
@@ -57,7 +80,32 @@ test('offscreen retains one native run through a real worker restart and 38 seco
     expect(targets.every((worker) => worker.targetId !== stopped.oldTargetId)).toBe(true);
     const after = await driver.evaluate('window.webdavLifecycle.inspect()');
     expect(record(after)['sync']).toEqual(record(before)['sync']);
-    expect(await driver.evaluate('window.webdavLifecycle.state()')).toEqual(nativeBefore);
+    const nativeAfter = await driver.evaluate('window.webdavLifecycle.state()');
+    expect(nativeRunSnapshot(nativeAfter)).toEqual(nativeRunSnapshot(nativeBefore));
+    const oldProgress = record(record(record(nativeBefore)['queue'])['connection'])[
+      'scheduleProgress'
+    ];
+    const newProgress = record(record(record(nativeAfter)['queue'])['connection'])[
+      'scheduleProgress'
+    ];
+    if (oldProgress !== null) {
+      const prior = record(oldProgress);
+      const current = record(newProgress);
+      expect(current['authorization']).toEqual(prior['authorization']);
+      const revision = prior['revision'];
+      if (typeof revision !== 'number') throw new Error('Native schedule revision is missing.');
+      expect(current['revision']).toBeGreaterThanOrEqual(revision);
+    }
+    const oldOperations = record(record(nativeBefore)['queue'])['operations'];
+    const newOperations = record(record(nativeAfter)['queue'])['operations'];
+    if (!Array.isArray(oldOperations) || !Array.isArray(newOperations))
+      throw new Error('Native queue operations are missing.');
+    expect(newOperations).toHaveLength(oldOperations.length);
+    for (const [index, row] of oldOperations.entries()) {
+      const dueAt = record(row)['nextDueAt'];
+      if (typeof dueAt !== 'number') throw new Error('Native recovery deadline is missing.');
+      expect(record(newOperations[index])['nextDueAt']).toBeGreaterThanOrEqual(dueAt);
+    }
     lab.proxy.releaseFault();
     await expect
       .poll(
@@ -88,6 +136,7 @@ test('offscreen retains one native run through a real worker restart and 38 seco
       before,
       after,
       nativeBefore,
+      nativeAfter,
       stopped,
       heldMilliseconds: Date.now() - heldAt,
       workerTargets: targets,
@@ -585,3 +634,169 @@ test('offscreen queue verifies publication after an externally delayed retry of 
     await driver.close();
   }
 });
+
+function selectedNativeOperation(value: unknown, operationId: string) {
+  const operations = record(record(value)['queue'])['operations'];
+  if (!Array.isArray(operations)) throw new Error('Native lifecycle queue is missing.');
+  expect(operations).toHaveLength(1);
+  return record(operations.find((row) => isRecord(row) && row['operationId'] === operationId));
+}
+
+for (const restartBrowser of [false, true]) {
+  test(`temporary PUT 423 retries automatically${restartBrowser ? ' after browser restart without its alarm' : ''}`, async ({
+    lab,
+  }, info) => {
+    test.setTimeout(240_000);
+    const profile = await mkdtemp(join(tmpdir(), 'sniptale-webdav-retry-'));
+    const options = {
+      extensionBuildDir:
+        process.env['SNIPTALE_WEBDAV_LIFECYCLE_BUILD_DIR'] ?? '.tmp/e2e-builds/security',
+      ignoreHTTPSErrors: true as const,
+      userDataDir: profile,
+    };
+    let driver = await launchWebdavWorkerDriver(options);
+    let failedNative: unknown = null;
+    let completedNative: unknown = null;
+    try {
+      await driver.grantOrigin(new URL(lab.credentials.rootUrl).origin);
+      const seeded = record(
+        await driver.evaluate(
+          `window.webdavLifecycle.prepare(${JSON.stringify({
+            rootUrl: lab.credentials.rootUrl,
+            authentication: {
+              kind: 'basic',
+              username: lab.credentials.username,
+              password: lab.credentials.password,
+            },
+          })})`
+        )
+      );
+      const operationId = record(seeded['selection'])['operationId'];
+      if (typeof operationId !== 'string') throw new Error('Native operation is missing.');
+      lab.proxy.armFault({ method: 'PUT', key: '*', kind: 'status', status: 423, repeat: true });
+      expect(await driver.evaluate('window.webdavLifecycle.start()')).toMatchObject({ ok: true });
+      await expect.poll(() => lab.proxy.counts.puts, { timeout: 30_000 }).toBeGreaterThan(0);
+      await lab.proxy.waitForFault();
+      await expect
+        .poll(
+          async () => {
+            failedNative = await driver.evaluate('window.webdavLifecycle.state()');
+            const operation = selectedNativeOperation(failedNative, operationId);
+            return { status: operation['status'], failureCode: operation['failureCode'] };
+          },
+          { timeout: 30_000 }
+        )
+        .toEqual({ status: 'failed', failureCode: 'temporary' });
+      const failed = selectedNativeOperation(failedNative, operationId);
+      const dueAt = failed['nextDueAt'];
+      if (typeof dueAt !== 'number') throw new Error('Native retry deadline is missing.');
+      expect(dueAt).toBeGreaterThan(Date.now());
+      const countsBeforeRetry = requestCounts(lab.proxy.counts);
+      const retainedSource = record(failedNative)['source'];
+      expect(retainedSource).toMatchObject({ mediaExists: true, projectExists: true });
+      const retainedObjects = record(retainedSource)['objects'];
+      expect(
+        Array.isArray(retainedObjects) &&
+          retainedObjects.length > 0 &&
+          retainedObjects.every((object) => isRecord(object) && object['readable'] === true)
+      ).toBe(true);
+      // The history alarm is not a transfer wake-up or authority.
+      await driver.evaluate(
+        "chrome.alarms.create('sniptale:sync-queue-history',{when:Date.now()+100})"
+      );
+      await delay(1_000);
+      expect(requestCounts(lab.proxy.counts)).toEqual(countsBeforeRetry);
+      lab.proxy.releaseFault();
+      const bodyStart = lab.proxy.counts.putBodies.length;
+      if (restartBrowser) {
+        expect(await driver.evaluate("chrome.alarms.clear('sniptale:sync-queue-retry')")).toBe(
+          true
+        );
+        const extensionId = driver.extensionId;
+        await driver.close();
+        // This test owns the profile. Require a fresh CDP endpoint after the old browser exits.
+        await rm(join(profile, 'DevToolsActivePort'), { force: true });
+        driver = await launchWebdavWorkerDriver({ ...options, restoreExtensionId: extensionId });
+        expect(driver.extensionId).toBe(extensionId);
+        expect(
+          await driver.evaluate(
+            `chrome.permissions.contains({origins:[${JSON.stringify(new URL(lab.credentials.rootUrl).origin + '/*')}]})`
+          )
+        ).toBe(true);
+        await expect
+          .poll(() => driver.evaluate("chrome.alarms.get('sniptale:sync-queue-retry')"), {
+            timeout: 15_000,
+          })
+          .toMatchObject({ periodInMinutes: 1 });
+      }
+      // These page-owned native reads send no command or keepalive to the worker.
+      while (Date.now() < dueAt - 1_000) {
+        expect(requestCounts(lab.proxy.counts)).toEqual(countsBeforeRetry);
+        await delay(Math.min(1_000, dueAt - 1_000 - Date.now()));
+      }
+      expect(requestCounts(lab.proxy.counts)).toEqual(countsBeforeRetry);
+      await expect
+        .poll(
+          async () => {
+            completedNative = await driver.evaluate('window.webdavLifecycle.state()');
+            return selectedNativeOperation(completedNative, operationId)['status'];
+          },
+          { timeout: 150_000, intervals: [1_000] }
+        )
+        .toBe('published');
+      expect(selectedNativeOperation(completedNative, operationId)).toMatchObject({
+        operationId,
+        outcome: 'verified',
+        failureCode: null,
+        nextDueAt: null,
+        automaticRetryCount: 1,
+      });
+      expect(record(record(completedNative)['source'])['captureCount']).toBeGreaterThan(0);
+      const external = [];
+      for (const body of lab.proxy.counts.putBodies
+        .slice(bodyStart)
+        .filter((body) => body.complete && body.key.startsWith('Files/'))) {
+        const proof = await lab.externalProof(body.key);
+        expect(proof).toEqual({ size: body.bytes, sha256: body.sha256 });
+        external.push({ key: body.key, ...proof });
+      }
+      expect(external.map(({ size, sha256 }) => ({ size, sha256 }))).toContainEqual(
+        record(seeded['source'])['original']
+      );
+      await saveProof(info, {
+        seeded,
+        failedNative,
+        completedNative,
+        countsBeforeRetry,
+        dueAt,
+        restartBrowser,
+        external,
+        driverRetry: false,
+        driverRestartStart: false,
+        workerEvaluation: false,
+      });
+    } catch (error) {
+      const diagnostics = await driver
+        .evaluate(`Promise.all([
+        chrome.alarms.getAll(),
+        chrome.permissions.contains({origins:[${JSON.stringify(new URL(lab.credentials.rootUrl).origin + '/*')}]}),
+        chrome.storage.local.get('sniptale_runtime_diagnostic_log').then(value => value.sniptale_runtime_diagnostic_log?.entries?.filter(entry => ['SyncQueueRetry','BackgroundRuntimeWiring','BackgroundOffscreenDocument'].includes(entry.source))),
+        window.webdavLifecycle.inspect().then(value => value, () => ({ inspectionRefused: true }))
+      ])`)
+        .catch(() => ({ diagnosticsUnavailable: true }));
+      await saveProof(info, {
+        failed: true,
+        diagnosticsAfterFailure: diagnostics,
+        failedNative,
+        completedNative,
+        counts: requestCounts(lab.proxy.counts),
+        restartBrowser,
+      });
+      throw error;
+    } finally {
+      lab.proxy.releaseFault();
+      await driver.close();
+      await rm(profile, { recursive: true, force: true });
+    }
+  });
+}

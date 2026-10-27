@@ -941,3 +941,14 @@ Runtime workspace snapshots are disposable projections. They do not replace nati
 An explicit MKCOL 423 response grants no ownership. The creation owner records that refusal against the exact allocating revision. The native transaction restores planned with the same root, lifetime and workspace identifiers. It advances the revision and creates no new allocation. A later attempt still requires its own positive 201 response. A 405 collision never authorizes adoption or cleanup.
 
 Only numeric status 423 admits this refusal transition. Missing responses, transport failures and other statuses cannot invoke it. A lost acknowledgement therefore retains allocating uncertainty. Native replacement, abandonment, enrollment and erasure refuse delayed refusal callbacks.
+
+
+## Durable queue retry schedule
+
+DB45 adds the nonunique syncQueueDue index to sync_outbox. Its keys contain enrollment scope, connection incarnation, deadline and native primary key. The synchronous upgrade preserves existing rows and bytes. It advances the syncCapture contract to6.
+
+The native queue owns deadlines, automatic retry counts and bounded schedule progress. Legacy readers supply schedule defaults without writes. Explicit maintenance initializes old rows under current native admission. Discovery advances a durable cursor through bounded index pages. Native index keys preserve progress past malformed rows and order equal deadlines. Discovery wraps to revisit earlier insertions. It preserves malformed evidence.
+
+Native time and the existing operation lock control run admission. An alarm grants no authority. Temporary failures retain source evidence and store a delayed retry atomically. Retry delays start at30seconds, increase exponentially and stop after five automatic retries. A manual retry resets this budget. Permanent failures require explicit action.
+
+Running rows retain their exact run authorization and a future recovery-check time. Metadata deferral cannot change their command revision. Recovery requires the existing exclusive operation lock. Pause, cancel, replacement and erasure refuse stale claims. Published operations have no retry deadline.

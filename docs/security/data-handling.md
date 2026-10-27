@@ -353,3 +353,12 @@ The security-only test Port accepts workspace start for lifecycle proof. Product
 ## Temporary allocation refusal
 
 Workspace creation distinguishes an explicit 423 refusal from an unknown remote outcome. Only exact native refusal evidence restores the same plan for another exclusive MKCOL. The transition grants no ownership and cannot select a different root. A later collision preserves the remote folder and its files. Unknown outcomes cannot adopt an existing folder.
+
+
+## Automatic sync retry authority
+
+Retry metadata contains native identities, deadlines, counters and cursor positions. It contains no credentials, remote URLs, source names or raw exceptions. The wake-up owner reads connection metadata only. Existing admitted execution resolves credentials and checks permission before each request.
+
+Every automatic claim requires current enrollment and exact active connection authority. A different connection incarnation cannot inherit old work. Recovery preserves unknown remote outcomes and requires the native operation lock. Local erasure prevents delayed maintenance from recreating native state.
+
+An alarm or a deadline grants no permission to send data. Temporary refusal receives a bounded delayed retry. Authentication, access, storage, source and internal failures require explicit action. All retained source evidence remains under existing queue ownership.

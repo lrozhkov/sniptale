@@ -68,12 +68,21 @@ interface QueueHistory {
   pendingTransitions: SyncQueueTransition[];
   droppedTransitions: number;
 }
+/** Durable continuation for bounded native metadata maintenance. */
+export interface SyncQueueScheduleProgress {
+  authorization: SyncConnectionIdentity;
+  revision: number;
+  afterKey: string | null;
+  complete: boolean;
+  dueAfter: { dueAt: number; key: IDBValidKey } | null;
+}
 export interface SyncQueueConnection extends SyncQueueScope, QueueHistory {
   version: 1;
   kind: 'queue-connection';
   key: string;
   revision: number;
   paused: boolean;
+  scheduleProgress: SyncQueueScheduleProgress | null;
 }
 export interface SyncQueueOperation extends SyncQueueScope, QueueHistory {
   version: 1;
@@ -93,6 +102,8 @@ export interface SyncQueueOperation extends SyncQueueScope, QueueHistory {
   outcome: 'none' | 'unknown' | 'verified' | 'observed';
   attemptId: string | null;
   failureCode: SyncQueueFailureCode | null;
+  nextDueAt: number | null;
+  automaticRetryCount: number;
 }
 /** Stage events do not change this command revision. */
 export interface SyncQueueRun {
@@ -223,10 +234,62 @@ function parseHistory(value: Record<string, unknown>): QueueHistory | null {
   }
   return { eventSequence: sequence, droppedTransitions: dropped, pendingTransitions: transitions };
 }
+/** Validate durable native cursor keys with the browser's IndexedDB key contract. */
+export function queueNativeCursorKey(value: unknown): value is IDBValidKey {
+  try {
+    IDBKeyRange.only(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function parseScheduleProgress(value: unknown): SyncQueueScheduleProgress | null {
+  if (!isRecord(value)) return null;
+  const authorization = parseSyncConnectionIdentity(value['authorization']);
+  const rawDueAfter = value['dueAfter'];
+  let dueAfter: SyncQueueScheduleProgress['dueAfter'] = null;
+  if (rawDueAfter !== null) {
+    if (!isRecord(rawDueAfter)) return null;
+    const dueAt = rawDueAfter['dueAt'];
+    const key = rawDueAfter['key'];
+    if (
+      typeof dueAt !== 'number' ||
+      !Number.isFinite(dueAt) ||
+      dueAt < 0 ||
+      !queueNativeCursorKey(key)
+    )
+      return null;
+    dueAfter = { dueAt, key };
+  }
+  if (
+    !authorization ||
+    !queueOrdinal(value['revision']) ||
+    !(value['afterKey'] === null || typeof value['afterKey'] === 'string') ||
+    typeof value['complete'] !== 'boolean'
+  )
+    return null;
+  return {
+    authorization,
+    revision: value['revision'],
+    afterKey: value['afterKey'],
+    complete: value['complete'],
+    dueAfter,
+  };
+}
 export function parseSyncQueueConnection(value: unknown): SyncQueueConnection | null {
   const scope = parseSyncQueueScope(value);
   if (!scope || !isRecord(value)) return null;
   const history = parseHistory(value);
+  const scheduleProgress =
+    value['scheduleProgress'] == null ? null : parseScheduleProgress(value['scheduleProgress']);
+  if (value['scheduleProgress'] != null && !scheduleProgress) return null;
+  const prefix = queueOperationPrefix(scope);
+  if (
+    scheduleProgress?.afterKey !== null &&
+    scheduleProgress?.afterKey !== undefined &&
+    !scheduleProgress.afterKey.startsWith(prefix)
+  )
+    return null;
   if (
     !history ||
     value['version'] !== 1 ||
@@ -244,6 +307,7 @@ export function parseSyncQueueConnection(value: unknown): SyncQueueConnection | 
     key: value['key'],
     revision: value['revision'],
     paused: value['paused'],
+    scheduleProgress,
   };
 }
 export function parseSyncQueueOperation(value: unknown): SyncQueueOperation | null {
@@ -255,6 +319,16 @@ export function parseSyncQueueOperation(value: unknown): SyncQueueOperation | nu
       ? null
       : parseSyncConnectionIdentity(value['authorization']);
   if (value['authorization'] !== undefined && value['authorization'] !== null && !authorization)
+    return null;
+  const legacySchedule =
+    !Object.hasOwn(value, 'nextDueAt') && !Object.hasOwn(value, 'automaticRetryCount');
+  const nextDueAt = legacySchedule ? null : value['nextDueAt'];
+  const automaticRetryCount = legacySchedule ? 0 : value['automaticRetryCount'];
+  if (
+    !(nextDueAt === null || queueOrdinal(nextDueAt)) ||
+    !queueOrdinal(automaticRetryCount) ||
+    automaticRetryCount > 5
+  )
     return null;
   const status = statuses.find((candidate) => candidate === value['status']);
   const stage = SYNC_QUEUE_STAGES.find((candidate) => candidate === value['stage']);
@@ -311,6 +385,8 @@ export function parseSyncQueueOperation(value: unknown): SyncQueueOperation | nu
     writeStarted: value['writeStarted'],
     attemptId: value['attemptId'],
     failureCode,
+    nextDueAt,
+    automaticRetryCount,
   };
 }
 /** Append only fixed safe fields, retaining the explicit history gap. */
@@ -339,4 +415,17 @@ export function recordQueueTransition<T extends SyncQueueConnection | SyncQueueO
     pendingTransitions: pending.slice(overflow),
     droppedTransitions: row.droppedTransitions + overflow,
   };
+}
+
+/** Positive native deadlines retain the bounded retry policy across restarts. */
+export function queueRetrySchedule(
+  current: SyncQueueOperation
+): Pick<SyncQueueOperation, 'nextDueAt' | 'automaticRetryCount'> {
+  if (current.automaticRetryCount >= 5)
+    return { nextDueAt: null, automaticRetryCount: current.automaticRetryCount };
+  const delay = Math.min(
+    300_000,
+    30_000 * 2 ** current.automaticRetryCount + Math.floor(Math.random() * 3_001)
+  );
+  return { nextDueAt: Date.now() + delay, automaticRetryCount: current.automaticRetryCount + 1 };
 }

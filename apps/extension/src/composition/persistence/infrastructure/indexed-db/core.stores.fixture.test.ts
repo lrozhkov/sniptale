@@ -421,7 +421,7 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   });
   expect(PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'syncCapture')).toEqual({
     domainId: 'syncCapture',
-    schemaVersion: 5,
+    schemaVersion: 6,
     stores: [
       { storeName: 'sync_capture', dataClass: 'durable-authority' },
       { storeName: 'sync_outbox', dataClass: 'durable-authority' },
@@ -574,5 +574,26 @@ it('adds empty connection authority without changing version 43 source rows or i
     domainVersions: [{ domainId: 'syncCapture', from: 4, to: 5 }],
     stores: ['sync_connection'],
     toDatabaseVersion: 44,
+  });
+});
+
+it('adds only due indexing without rewriting version 44 rows or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 44
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 45
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual({ ...source.indexes, sync_outbox: ['syncQueueDue'] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 6 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 44)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [{ domainId: 'syncCapture', from: 5, to: 6 }],
+    stores: ['sync_outbox'],
+    toDatabaseVersion: 45,
   });
 });

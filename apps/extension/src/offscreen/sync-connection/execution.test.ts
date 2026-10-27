@@ -111,6 +111,8 @@ function operation(overrides: Partial<SyncQueueOperation> = {}): SyncQueueOperat
     outcome: 'none',
     attemptId: null,
     failureCode: null,
+    nextDueAt: null,
+    automaticRetryCount: 0,
     eventSequence: 0,
     pendingTransitions: [],
     droppedTransitions: 0,

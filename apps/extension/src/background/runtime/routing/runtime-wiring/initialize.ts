@@ -3,6 +3,15 @@ import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import { createSyncConnectionCoordinator } from '../../../sync-connection/coordinator';
 import { createSyncOffscreenGateway } from '../../../sync-connection/offscreen-gateway';
+import { createSyncQueueRetryWakeup } from '../../../sync-connection/retry-wakeup';
+import { subscribeToChromeEvent } from '@sniptale/platform/browser/callback';
+import {
+  loadSyncQueueScheduleProgress,
+  initializeSyncQueueSchedulePage,
+  discoverDueSyncQueueOperations,
+  deferDueSyncQueueOperation,
+} from '../../../../composition/persistence/sync-capture/queue-schedule';
+import { recoverInterruptedSyncQueueOperation } from '../../../../workflows/sync-transfer/queue';
 import {
   loadSyncConnection,
   commandSyncConnection,
@@ -133,8 +142,27 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   registerPageRecoveryPorts();
   registerExtensionCommandListener(state);
   if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
+    const retryWakeup = createSyncQueueRetryWakeup({
+      loadConnection: loadSyncConnection,
+      loadProgress: loadSyncQueueScheduleProgress,
+      initializePage: initializeSyncQueueSchedulePage,
+      discoverDue: discoverDueSyncQueueOperations,
+      deferDue: deferDueSyncQueueOperation,
+      recoverInterrupted: recoverInterruptedSyncQueueOperation,
+      coordinator: sync,
+      getAlarm: (name) => chrome.alarms.get(name),
+      createAlarm: (name, options) => chrome.alarms.create(name, options),
+      subscribeAlarm: (listener) => subscribeToChromeEvent(chrome.alarms?.onAlarm, listener),
+      subscribeStartup: (listener) => subscribeToChromeEvent(chrome.runtime?.onStartup, listener),
+    });
+    void retryWakeup.run();
     registerSecurityE2EControl({
       ...sync,
+      start: async (input) => {
+        const receipt = await sync.start(input);
+        void retryWakeup.run();
+        return receipt;
+      },
       erase: async () =>
         (
           await eraseLocalExtensionDataFromBackground(

@@ -22,7 +22,13 @@ it('adds only empty indexed history stores and publishes the current contracts a
   const puts = vi.fn();
   const tx = {
     abort: vi.fn(),
-    objectStore: vi.fn(() => ({ put: puts, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+    objectStore: vi.fn(() => ({
+      createIndex: indexes,
+      put: puts,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
   };
   const db = {
     objectStoreNames: { contains: (name: string) => names.has(name) },
@@ -55,8 +61,20 @@ it('adds only empty indexed history stores and publishes the current contracts a
     ['kind', 'kind'],
     ['rootKey', 'rootKey'],
     ['createdAt', 'createdAt'],
+    [
+      'syncQueueDue',
+      [
+        'spaceId',
+        'connectionGeneration',
+        'profileCreatedAt',
+        'authorization.incarnation',
+        'nextDueAt',
+        'key',
+      ],
+      { unique: false },
+    ],
   ]);
-  expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
+  expect(tx.objectStore.mock.calls).toEqual([[SYNC_OUTBOX_STORE], ['schema_contracts']]);
   expect(puts.mock.calls.map(([contract]) => contract)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();

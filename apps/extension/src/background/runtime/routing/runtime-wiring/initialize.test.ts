@@ -26,6 +26,8 @@ const {
   registerSecurityE2EControl,
   initializeNativeAppPermissionLifecycle,
   subscribeToLocaleChanges,
+  createRetryWakeup,
+  runRetryWakeup,
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
   configureAudioJobPrivacyErasurePort: vi.fn(),
@@ -45,6 +47,17 @@ const {
   registerSecurityE2EControl: vi.fn(),
   initializeNativeAppPermissionLifecycle: vi.fn(),
   subscribeToLocaleChanges: vi.fn(() => vi.fn()),
+  createRetryWakeup: vi.fn(),
+  runRetryWakeup: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('../../../sync-connection/retry-wakeup', () => ({
+  createSyncQueueRetryWakeup: createRetryWakeup,
+}));
+vi.mock('../../../../composition/persistence/sync-capture/queue-schedule', () => ({
+  loadSyncQueueScheduleProgress: vi.fn(),
+  initializeSyncQueueSchedulePage: vi.fn(),
+  discoverDueSyncQueueOperations: vi.fn(),
+  deferDueSyncQueueOperation: vi.fn(),
 }));
 const syncWiring = vi.hoisted(() => ({
   createCoordinator:
@@ -205,6 +218,8 @@ import {
 import { initializeBackgroundRuntime } from './initialize';
 
 beforeEach(() => {
+  createRetryWakeup.mockReturnValue({ run: runRetryWakeup, dispose: vi.fn() });
+  runRetryWakeup.mockResolvedValue(undefined);
   syncWiring.createGateway.mockReturnValue({
     ensureDocument: syncWiring.ensureDocument,
     inspectExecutor: syncWiring.inspectExecutor,
@@ -275,6 +290,8 @@ it('registers all background listeners through the runtime-wiring owner', () => 
   expect(subscribeToLocaleChanges).toHaveBeenCalledOnce();
   expect(nativeAppConnect).toHaveBeenCalledTimes(1);
   expect(registerWebSnapshotViewerPorts).toHaveBeenCalledWith(state.webSnapshotViewerPorts);
+  expect(createRetryWakeup).not.toHaveBeenCalled();
+  expect(runRetryWakeup).not.toHaveBeenCalled();
   expect(initializeBackgroundContextMenus).toHaveBeenCalledWith({
     captureGuardState: state.captureGuardState,
     screenshotModeState: state.screenshotModeState,
@@ -300,9 +317,45 @@ it('registers the security control only in the security E2E build', () => {
   try {
     initializeBackgroundRuntime(createModeState());
     expect(registerSecurityE2EControl).toHaveBeenCalledOnce();
+    expect(createRetryWakeup).toHaveBeenCalledOnce();
+    expect(createRetryWakeup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        loadConnection: syncWiring.loadConnection,
+        coordinator: expect.objectContaining({
+          start: syncWiring.start,
+          inspect: syncWiring.inspect,
+        }),
+      })
+    );
+    expect(runRetryWakeup).toHaveBeenCalledOnce();
   } finally {
     Reflect.deleteProperty(globalThis, '__SNIPTALE_SECURITY_E2E__');
   }
+});
+
+it('wakes newly activated queue work only after the security start is accepted', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  initializeBackgroundRuntime(createModeState());
+  const control = registerSecurityE2EControl.mock.calls[0]?.[0];
+  expect(control).toBeDefined();
+  const input = {
+    scope: { spaceId: 'space', connectionGeneration: 3, profileCreatedAt: 1 },
+    authorization: nativeConnection().identity,
+    operationId: 'operation',
+    expectedRevision: 2,
+  };
+  const receipt = { executorId: 'executor', executorRevision: 3 };
+  const accepted = deferred<typeof receipt>();
+  syncWiring.start.mockReturnValueOnce(accepted.promise);
+  const completion = control.start(input);
+  expect(runRetryWakeup).toHaveBeenCalledOnce();
+  accepted.resolve(receipt);
+  expect(await completion).toEqual(receipt);
+  expect(syncWiring.start).toHaveBeenCalledWith(input);
+  expect(runRetryWakeup).toHaveBeenCalledTimes(2);
+  syncWiring.start.mockRejectedValueOnce(new Error('Start refused'));
+  await expect(control.start(input)).rejects.toThrow('Start refused');
+  expect(runRetryWakeup).toHaveBeenCalledTimes(2);
 });
 
 function deferred<T>() {
