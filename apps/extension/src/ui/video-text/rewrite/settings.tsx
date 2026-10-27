@@ -24,6 +24,7 @@ export function TextRewriteSettings(props: {
   catalogError: boolean;
   selectionPending: boolean;
   selectionUnavailable: boolean;
+  unavailableModelName?: string | null | undefined;
   selectionFailed: boolean;
   onOptionsChange(change: Partial<TextRewriteOptions>): void;
   onModelChange(id: string): void;
@@ -61,6 +62,7 @@ export function TextRewriteSettings(props: {
       )}
       {props.selectionUnavailable && (
         <p role="status" className="text-xs">
+          <bdi className="[overflow-wrap:anywhere]">{props.unavailableModelName}</bdi>{' '}
           {translate('aiModal.modelSelectionUnavailable')}
         </p>
       )}

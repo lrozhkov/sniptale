@@ -191,7 +191,7 @@ export function TourNarrationAI({
       )}
       {selection.selectionUnavailable && (
         <p role="status" className="guide-inspector-hint">
-          {selection.configuration?.remembered?.displayName}{' '}
+          <bdi className="[overflow-wrap:anywhere]">{selection.unavailableModelName}</bdi>{' '}
           {t('scenario.editor.guideAiModelUnavailable')}
         </p>
       )}

@@ -70,6 +70,7 @@ function createState(): ReturnType<typeof useAIModalState> {
       modelId: null,
       selectionPending: false,
       selectionUnavailable: false,
+      unavailableModelName: null,
       selectionFailed: false,
       configurationFailed: false,
       chooseModel: vi.fn(),

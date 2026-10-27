@@ -53,6 +53,7 @@ function createController(): VideoProjectRecognitionController {
     configurationFailed: false,
     selectionFailed: false,
     selectionUnavailable: false,
+    unavailableModelName: null,
     selectionPending: false,
     catalog: {
       scenario: 'video-transcription',
@@ -493,6 +494,7 @@ it.each(['configurationFailed', 'selectionFailed', 'selectionUnavailable'] as co
     controller[failure] = true;
     if (failure === 'selectionUnavailable') {
       controller.modelId = '';
+      controller.unavailableModelName = 'Frozen recognition model';
       controller.catalog = { ...controller.catalog!, models: [] };
     }
     render(props);
@@ -503,6 +505,10 @@ it.each(['configurationFailed', 'selectionFailed', 'selectionUnavailable'] as co
           ? 'aiModal.modelSelectionSaveFailed'
           : 'aiModal.modelSelectionUnavailable';
     expect(host.querySelector('[role="alert"]')?.textContent).toContain(expected);
+    if (failure === 'selectionUnavailable')
+      expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+        'Frozen recognition model'
+      );
     expect(
       host.querySelector<HTMLInputElement>(
         'input[aria-label="gallery.videoReview.textFragmentStart"]'

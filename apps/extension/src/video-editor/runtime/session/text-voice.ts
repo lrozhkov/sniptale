@@ -605,6 +605,7 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
     configurationFailed: selection.configurationFailed,
     selectionFailed: selection.selectionFailed,
     selectionUnavailable: selection.selectionUnavailable,
+    unavailableModelName: selection.unavailableModelName,
     selectionPending: selection.selectionPending,
     target,
     preview,

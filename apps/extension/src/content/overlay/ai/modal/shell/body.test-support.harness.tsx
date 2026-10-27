@@ -58,6 +58,7 @@ function createBodyState(args: {
     modelSelection: {
       selectionPending: false,
       selectionUnavailable: false,
+      unavailableModelName: null,
       selectionFailed: false,
       configurationFailed: false,
       retryConfiguration: vi.fn(),

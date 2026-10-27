@@ -74,6 +74,7 @@ async function renderFooter(
           selectionPending: false,
           selectionFailed: false,
           selectionUnavailable: false,
+          unavailableModelName: null,
           chooseModel: vi.fn(),
           prepareModelSelection: vi.fn(),
           retryConfiguration: vi.fn(),

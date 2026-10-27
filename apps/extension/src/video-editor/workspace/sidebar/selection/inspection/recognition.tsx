@@ -296,9 +296,12 @@ function RecognitionStatus({ controller }: { controller: VideoProjectRecognition
                 ? 'aiModal.modelSelectionSaveFailed'
                 : 'aiModal.modelSelectionUnavailable'
           )}
-          {controller.selectionUnavailable && controller.catalog?.remembered?.displayName
-            ? ` ${controller.catalog.remembered.displayName}`
-            : ''}
+          {controller.selectionUnavailable && controller.unavailableModelName ? (
+            <>
+              {' '}
+              <bdi className="[overflow-wrap:anywhere]">{controller.unavailableModelName}</bdi>
+            </>
+          ) : null}
         </p>
       ) : null}
       {controller.selectionPending && !controller.running ? (

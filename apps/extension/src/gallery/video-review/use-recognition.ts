@@ -375,7 +375,7 @@ export function useReviewRecognition(args: ReviewRecognitionAccess) {
     selectionFailed: selection.selectionFailed,
     selectionPending: selection.selectionPending,
     modelUnavailable: selection.selectionUnavailable,
-    rememberedModelName: selection.configuration?.remembered?.displayName,
+    rememberedModelName: selection.unavailableModelName,
     snapshot,
     multimodal:
       catalogs?.transcription.models.find((entry) => entry.id === modelId)?.audio?.transcription

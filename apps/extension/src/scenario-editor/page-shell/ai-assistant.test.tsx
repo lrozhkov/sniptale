@@ -534,3 +534,33 @@ it.each([
   expect(io.request).toHaveBeenCalledTimes(1);
   expect(button('Get suggestions').disabled).toBe(false);
 });
+
+it('shows the saved unavailable model name through the Scenario session without a request', async () => {
+  io.configuration.mockResolvedValue({
+    scenario: 'scenario-edit',
+    providers: [],
+    models: [],
+    remembered: {
+      modelId: 'removed-model',
+      modelCode: 'removed-code',
+      providerId: 'provider',
+      providerIncarnation: 'one',
+      displayName: 'Saved Scenario model',
+      selectedAt: 1,
+      source: 'explicit',
+    },
+    resolution: {
+      status: 'unavailable',
+      modelId: null,
+      previousSelection: null,
+      reason: 'missing',
+    },
+  });
+  await open();
+  const dialog = document.querySelector('[role="dialog"]');
+  expect(dialog?.textContent).toContain('Saved Scenario model');
+  expect(button('Get suggestions').disabled).toBe(true);
+  expect(io.request).not.toHaveBeenCalled();
+  expect(io.remember).not.toHaveBeenCalled();
+  expect(change).not.toHaveBeenCalled();
+});

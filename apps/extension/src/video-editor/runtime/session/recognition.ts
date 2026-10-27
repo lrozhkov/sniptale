@@ -215,6 +215,7 @@ export function useVideoProjectRecognition(project: VideoProject) {
     configurationFailed: selection.configurationFailed,
     selectionFailed: selection.selectionFailed,
     selectionUnavailable: selection.selectionUnavailable,
+    unavailableModelName: selection.unavailableModelName,
     selectionPending: selection.selectionPending,
     setModelId(id: string | null) {
       if (!owner.current.mounted || owner.current.active || selection.selectionPending) return;

@@ -69,6 +69,13 @@ function TextRequestFeedback({ session }: { session: Session }) {
               : 'text-[var(--sniptale-color-danger)]',
           ].join(' ')}
         >
+          {error === 'model-unavailable' && session.models.unavailableModelName ? (
+            <>
+              <bdi className="[overflow-wrap:anywhere]">
+                {session.models.unavailableModelName}
+              </bdi>{' '}
+            </>
+          ) : null}
           {translate(providerKey ?? errorKeys[error])}
         </p>
       ) : null}
@@ -79,6 +86,7 @@ function TextRequestFeedback({ session }: { session: Session }) {
       ) : null}
       {session.models.unavailable && error !== 'model-unavailable' ? (
         <p role="status" className="mt-2 text-xs">
+          <bdi className="[overflow-wrap:anywhere]">{session.models.unavailableModelName}</bdi>{' '}
           {translate('aiModal.modelSelectionUnavailable')}
         </p>
       ) : null}

@@ -43,6 +43,7 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
     prepareModelSelection,
     retryConfiguration,
     selectionUnavailable,
+    unavailableModelName,
     selectionFailed,
     selectionPending,
   } = modelSelection;
@@ -154,6 +155,7 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
     includeImages,
     pending: pending || selectionPending,
     selectionUnavailable,
+    unavailableModelName,
     selectionFailed,
     failure,
     proposal,

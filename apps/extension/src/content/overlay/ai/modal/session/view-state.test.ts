@@ -35,6 +35,7 @@ function createStateProps() {
         configurationFailed: false,
         modelId: null,
         selectionUnavailable: false,
+        unavailableModelName: null,
         selectionFailed: false,
         selectionPending: false,
         chooseModel: vi.fn(),

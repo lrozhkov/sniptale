@@ -72,7 +72,12 @@ export function GuideAiRequestForm({
         </p>
       )}
       {selectionFailed && <p role="alert">{t('scenario.editor.guideAiSelectionFailed')}</p>}
-      {selectionUnavailable && <p role="status">{t('scenario.editor.guideAiModelUnavailable')}</p>}
+      {selectionUnavailable && (
+        <p role="status">
+          <bdi className="[overflow-wrap:anywhere]">{session.unavailableModelName}</bdi>{' '}
+          {t('scenario.editor.guideAiModelUnavailable')}
+        </p>
+      )}
       {configurationFailed && (
         <ProductActionButton compact tone="secondary" onClick={retryConfiguration}>
           {t('scenario.editor.guideAiRetry')}

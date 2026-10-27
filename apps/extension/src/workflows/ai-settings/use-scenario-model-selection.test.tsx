@@ -37,6 +37,26 @@ function context(): Context {
     resolution: { status: 'initial', modelId: 'first', previousSelection: null, reason: null },
   };
 }
+function rememberedContext(modelId: string, displayName: string, unavailable = false): Context {
+  const next = context();
+  next.remembered = {
+    providerIncarnation: 'first-incarnation',
+    modelId,
+    modelCode: modelId,
+    providerId: 'provider',
+    displayName,
+    selectedAt: 1,
+    source: 'explicit',
+  };
+  next.resolution = {
+    status: unavailable ? 'unavailable' : 'remembered',
+    modelId: unavailable ? null : modelId,
+    previousSelection: next.remembered,
+    reason: unavailable ? 'model-unavailable' : null,
+  };
+  if (unavailable) next.models = next.models.filter((model) => model.id !== modelId);
+  return next;
+}
 let host: HTMLDivElement;
 let root: Root;
 let selection: ReturnType<typeof useAIScenarioModelSelection>;
@@ -112,6 +132,81 @@ it('requires explicit replacement after the mounted model disappears', async () 
   await act(async () => selection.chooseModel('second'));
   expect(selection.modelId).toBe('second');
   expect(selection.selectionUnavailable).toBe(false);
+});
+it('shows an initially unavailable remembered snapshot name without selecting or writing', async () => {
+  io.read.mockResolvedValue(rememberedContext('first', 'Saved model A', true));
+  await open();
+  expect(selection).toMatchObject({
+    modelId: null,
+    selectionUnavailable: true,
+    unavailableModelName: 'Saved model A',
+  });
+  await expect(selection.prepareModelSelection()).rejects.toThrow('model-unavailable');
+  expect(io.remember).not.toHaveBeenCalled();
+});
+it.each(['preparation', 'reload'] as const)(
+  'retains mounted choice A name when %s receives another window preference B without A',
+  async (action) => {
+    const initial = context();
+    initial.models[0]!.displayName = 'Mounted model A';
+    io.read.mockResolvedValue(initial);
+    await open();
+    const next = rememberedContext('second', 'Other window model B');
+    next.models = next.models.filter((model) => model.id !== 'first');
+    io.read.mockResolvedValue(next);
+    await act(async () => {
+      if (action === 'preparation')
+        await expect(selection.prepareModelSelection()).rejects.toThrow('model-unavailable');
+      else await selection.retryConfiguration();
+    });
+    expect(selection).toMatchObject({
+      modelId: null,
+      selectionUnavailable: true,
+      unavailableModelName: 'Mounted model A',
+    });
+    expect(io.remember).not.toHaveBeenCalled();
+    await act(async () => selection.chooseModel('second'));
+    expect(selection).toMatchObject({
+      modelId: 'second',
+      selectionUnavailable: false,
+      unavailableModelName: null,
+    });
+    expect(io.remember).toHaveBeenCalledTimes(1);
+  }
+);
+it('does not replace initially unavailable remembered A when another window saves B and refresh runs', async () => {
+  io.read.mockResolvedValue(rememberedContext('first', 'Saved model A', true));
+  await open();
+  io.read.mockResolvedValue(rememberedContext('second', 'Other window model B'));
+  await act(async () => selection.retryConfiguration());
+  expect(selection.modelId).toBeNull();
+  expect(selection).toMatchObject({
+    selectionUnavailable: true,
+    unavailableModelName: 'Saved model A',
+  });
+  await expect(selection.prepareModelSelection()).rejects.toThrow('model-unavailable');
+  expect(io.remember).not.toHaveBeenCalled();
+});
+it('freezes a normal mounted choice name across catalog changes before it becomes unavailable', async () => {
+  const initial = context();
+  initial.models[0]!.displayName = 'Original model A';
+  io.read.mockResolvedValue(initial);
+  await open();
+  const renamed = context();
+  renamed.models[0]!.displayName = 'Changed catalog name';
+  io.read.mockResolvedValue(renamed);
+  await act(async () => selection.retryConfiguration());
+  expect(selection.modelId).toBe('first');
+  const removed = rememberedContext('second', 'Other window model B');
+  removed.models = removed.models.filter((model) => model.id !== 'first');
+  io.read.mockResolvedValue(removed);
+  await act(async () => selection.retryConfiguration());
+  expect(selection).toMatchObject({
+    modelId: null,
+    selectionUnavailable: true,
+    unavailableModelName: 'Original model A',
+  });
+  expect(io.remember).not.toHaveBeenCalled();
 });
 it('refuses recreation of the same provider and model identities', async () => {
   await open();
@@ -342,4 +437,28 @@ it('does not wait for remote maintenance before preparing the visible model', as
   );
   expect(io.remember).toHaveBeenCalledTimes(1);
   await act(async () => release());
+});
+
+it('keeps an unavailable remembered identity inert when current records reuse its IDs', async () => {
+  const next = rememberedContext('first', 'Saved original model', true);
+  next.models = context().models;
+  next.models[0]!.displayName = 'Recreated model';
+  next.providers[0]!.incarnation = 'recreated-provider';
+  io.read.mockResolvedValue(next);
+  await open();
+  expect(selection).toMatchObject({
+    modelId: null,
+    selectionUnavailable: true,
+    unavailableModelName: 'Saved original model',
+  });
+  await act(async () => selection.retryConfiguration());
+  await expect(selection.prepareModelSelection()).rejects.toThrow('model-unavailable');
+  expect(io.remember).not.toHaveBeenCalled();
+  await act(async () => selection.chooseModel('first'));
+  expect(selection).toMatchObject({
+    modelId: 'first',
+    selectionUnavailable: false,
+    unavailableModelName: null,
+  });
+  expect(io.remember).toHaveBeenCalledTimes(1);
 });

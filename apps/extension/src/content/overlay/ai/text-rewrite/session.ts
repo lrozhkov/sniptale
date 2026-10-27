@@ -31,6 +31,7 @@ function useTextReplacementModels(active: boolean) {
     failed: selection.configurationFailed,
     pending: selection.selectionPending,
     unavailable: selection.selectionUnavailable,
+    unavailableModelName: selection.unavailableModelName,
     selectionFailed: selection.selectionFailed,
     select: selection.chooseModel,
     reload: selection.retryConfiguration,

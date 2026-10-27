@@ -54,6 +54,7 @@ export function AIModalSelectionFeedback({
       ) : null}
       {selection.selectionUnavailable ? (
         <p role="status" className="mt-2 text-xs">
+          <bdi className="[overflow-wrap:anywhere]">{selection.unavailableModelName}</bdi>{' '}
           {translate('aiModal.modelSelectionUnavailable')}
         </p>
       ) : null}

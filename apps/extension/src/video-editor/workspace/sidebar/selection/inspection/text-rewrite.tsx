@@ -70,6 +70,7 @@ export function ProjectTextRewritePanel(props: {
         catalogError={operation.catalogError}
         selectionPending={operation.selectionPending}
         selectionUnavailable={operation.selectionUnavailable}
+        unavailableModelName={operation.unavailableModelName}
         selectionFailed={operation.selectionFailed}
         onOptionsChange={(change) => operation.setOptions((value) => ({ ...value, ...change }))}
         onModelChange={operation.setModelId}

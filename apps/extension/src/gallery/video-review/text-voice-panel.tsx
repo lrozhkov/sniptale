@@ -356,7 +356,7 @@ function TextVoiceParameters(props: {
       )}
       {settings.selectionUnavailable && (
         <p role="status" className="text-xs">
-          {settings.catalog?.remembered?.displayName}{' '}
+          <bdi className="[overflow-wrap:anywhere]">{settings.unavailableModelName}</bdi>{' '}
           {translate('aiModal.modelSelectionUnavailable')}
         </p>
       )}

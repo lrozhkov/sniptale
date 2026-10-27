@@ -26,6 +26,7 @@ function createModalState() {
       modelId: 'model-1',
       selectionPending: false,
       selectionUnavailable: false,
+      unavailableModelName: null,
       selectionFailed: false,
       configurationFailed: false,
       chooseModel: vi.fn(),

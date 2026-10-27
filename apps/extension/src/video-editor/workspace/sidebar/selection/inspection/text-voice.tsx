@@ -202,9 +202,12 @@ function VoiceSourceControls({
                 ? 'aiModal.modelSelectionSaveFailed'
                 : 'aiModal.modelSelectionUnavailable'
           )}
-          {op.selectionUnavailable && op.catalog?.remembered?.displayName
-            ? ` ${op.catalog.remembered.displayName}`
-            : ''}
+          {op.selectionUnavailable && op.unavailableModelName ? (
+            <>
+              {' '}
+              <bdi className="[overflow-wrap:anywhere]">{op.unavailableModelName}</bdi>
+            </>
+          ) : null}
         </p>
       ) : null}
       {op.selectionPending ? (

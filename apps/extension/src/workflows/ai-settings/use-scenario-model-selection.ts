@@ -7,9 +7,41 @@ import {
 } from './query';
 
 type Context = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
-type Choice = { context: Context; modelId: string; source: 'explicit' | 'initial' };
+type Choice = {
+  context: Context | null;
+  modelId: string;
+  displayName: string | null;
+  source: 'explicit' | 'initial';
+};
+
+function captureChoice(context: Context, modelId: string, source: Choice['source']): Choice {
+  return {
+    context,
+    modelId,
+    displayName:
+      context.models.find((model) => model.id === modelId)?.displayName ??
+      context.remembered?.displayName ??
+      null,
+    source,
+  };
+}
+
+function captureInitialChoice(context: Context): Choice | null {
+  const modelId = context.resolution.modelId;
+  if (modelId) return captureChoice(context, modelId, context.remembered?.source ?? 'initial');
+  const remembered = context.remembered;
+  if (!remembered) return null;
+  return {
+    // An unavailable saved identity cannot authorize recreated current records.
+    context: null,
+    modelId: remembered.modelId,
+    displayName: remembered.displayName,
+    source: remembered.source,
+  };
+}
 
 function hasSameModel(choice: Choice, context: Context): boolean {
+  if (!choice.context) return false;
   const before = choice.context.models.find((model) => model.id === choice.modelId);
   const after = context.models.find((model) => model.id === choice.modelId);
   const previousProvider = choice.context.providers.find(
@@ -56,12 +88,7 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario, enabl
         setSelectionUnavailable(!usable);
       } else {
         const candidate = next.resolution.modelId;
-        if (candidate)
-          choice.current = {
-            context: next,
-            modelId: candidate,
-            source: next.remembered?.source ?? 'initial',
-          };
+        choice.current = captureInitialChoice(next);
         setModelId(candidate);
         setSelectionUnavailable(next.resolution.status === 'unavailable');
       }
@@ -107,7 +134,7 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario, enabl
     void rememberAIScenarioModelSelection(current, scenario, id, 'explicit')
       .then(() => {
         if (!active.current || context.current?.scenario !== scenario) return;
-        const selected: Choice = { context: current, modelId: id, source: 'explicit' };
+        const selected = captureChoice(current, id, 'explicit');
         choice.current = selected;
         const usable = context.current !== null && hasSameModel(selected, context.current);
         setModelId(usable ? id : null);
@@ -171,6 +198,7 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario, enabl
     configurationFailed,
     modelId,
     selectionUnavailable,
+    unavailableModelName: selectionUnavailable ? (choice.current?.displayName ?? null) : null,
     selectionFailed,
     selectionPending,
     chooseModel,

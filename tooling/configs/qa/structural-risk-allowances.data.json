@@ -2756,10 +2756,10 @@
       "file": "apps/extension/src/video-editor/runtime/session/text-voice.ts",
       "symbol": "useVideoProjectTextVoice",
       "owner": "extension:video-editor:runtime",
-      "reason": "tool-noise: This existing project voice coordinator retains one attempt, consent, placement, preview and acceptance lifetime. Its existing refs hold current presentation state, project lifetime and command ports. Provider failure feedback shares the existing attempt state and alert receiver. The candidate adds no controller, durable writer, egress, resource or recovery authority. The 226-line body has 25 statements, cyclomatic 10, cognitive 9, nesting 1, no recovery and score 4 with delta 0. Shared scenario selection and workflows retain catalog, preference, source Save, history and byte publication authority. Splitting these closures would distribute the same project identity, cancellation and acquired-take locks. Main inspection and current mounted refusal, source-preservation and error-clearing proof support Keep, subject to fresh independent architecture review.",
+      "reason": "tool-noise: This existing Video coordinator retains one project lifetime for speech consent, audition, placement and explicit acceptance. Stage 33 adds only a returned presentation field from the existing scenario selection hook. State, effects, statements and owner groups remain unchanged. The hook retains choice identity and name authority. Existing workflows retain provider admission, persistence, byte publication and history authority. Splitting these closures for one returned field would distribute the same project lifetime. Main inspection, 449 receiving tests and native retained-source recovery proof support Keep. Fresh independent architecture review must assess this exact classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state receiver, writer, resource, consent, cancellation or recovery authority. Remove when the analyzer models this cohesive project-operation coordinator. Independent architecture review must assess this classification.",
-      "reviewDate": "2026-10-27",
-      "astHash": "bafcd894661a7f8abdd4ebfd6ac6ba86bb88c7456ed28f729d482cda5a4f16db",
+      "reviewDate": "2026-10-28",
+      "astHash": "c040d4ef8b856dd7fc136dccadf561cd5d26af8a3ac5cdac56dd5f5193352978",
       "signatureHash": "3d132dfa67d78dcd46b3165ccd760a4a9e28bc02659d1cc11292861bb070a33e"
     },
     {
@@ -2778,10 +2778,10 @@
       "file": "apps/extension/src/video-editor/runtime/session/recognition.ts",
       "symbol": "useVideoProjectRecognition",
       "owner": "extension:video-editor:runtime",
-      "reason": "tool-noise: This existing Video recognition coordinator retains one project lifetime for source admission, cancellation, proposals, explicit retry, history and Save acknowledgement. Provider failure feedback shares its existing attempt state and alert receiver. The candidate adds no controller, durable writer, egress, resource or recovery authority. The 157-line body has 15 statements, cyclomatic 2, cognitive 1, nesting 0 and score 1 with delta 0. Shared selection and workflows retain catalog, preferences, source Save, extraction and publication. Line-only extraction would distribute one registered operation. Main inspection and current mounted source-preservation and error-clearing proof support Keep, subject to fresh independent architecture review.",
+      "reason": "tool-noise: This existing Video coordinator retains one project lifetime for recognition source admission, cancellation, proposal and explicit acceptance. Stage 33 adds only a returned presentation field from the existing scenario selection hook. State, effects, statements and owner groups remain unchanged. The hook retains choice identity and name authority. Existing workflows retain provider admission, persistence, byte publication and history authority. Splitting these closures for one returned field would distribute the same project lifetime. Main inspection, 449 receiving tests and native retained-source recovery proof support Keep. Fresh independent architecture review must assess this exact classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any new independent state receiver, request controller, persistence writer, consent, retry, history or publication authority. Remove when the analyzer models this cohesive coordinator.",
-      "reviewDate": "2026-10-27",
-      "astHash": "402ed15211eca0a02222f991e8b7a1412c974bc2d865755191d7611074bb8edc",
+      "reviewDate": "2026-10-28",
+      "astHash": "42d0540ee873cfb1d53434457ed2c335e56d3756a1c60a5962c1ad7e4213d08c",
       "signatureHash": "244a6f71f8761ae14a154a5611135a3a0a58bd0e2d84eca6c943ce77b68d4c48"
     },
     {
@@ -2800,10 +2800,10 @@
       "file": "apps/extension/src/video-editor/runtime/session/text-rewrite.ts",
       "symbol": "useVideoProjectTextRewrite",
       "owner": "extension:video-editor:runtime",
-      "reason": "tool-noise: This existing Video text rewrite hook retains one project identity, draft, cancellation, prepared proposal and explicit Apply lifetime. Provider evidence accompanies existing error state and its alert receiver. Its body grows from 145 to 162 lines while score 1, delta 0, twenty statements, one effect, one state authority and three owner groups remain unchanged. Current workflows retain source Save, authorization, provider egress, receipt acknowledgement and publication. The candidate adds no writer, resource or independent recovery authority. Mounted failure, unchanged-source and explicit-choice proof supports Keep. Line-only extraction would distribute the same operation receiver. Fresh independent architecture review must assess this exact classification.",
+      "reason": "tool-noise: This existing Video coordinator retains one project lifetime for text rewrite draft, cancellation, proposal and explicit Apply. Stage 33 adds only a returned presentation field from the existing scenario selection hook. State, effects, statements and owner groups remain unchanged. The hook retains choice identity and name authority. Existing workflows retain provider admission, persistence, byte publication and history authority. Splitting these closures for one returned field would distribute the same project lifetime. Main inspection, 449 receiving tests and native retained-source recovery proof support Keep. Fresh independent architecture review must assess this exact classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any new independent state receiver, writer, resource, consent, cancellation or recovery authority. Remove when the analyzer models this cohesive project text operation.",
-      "reviewDate": "2026-10-27",
-      "astHash": "891380ad29c06db68036481e4fa89261face4509106a4e43dbf5c01c3ec328b1",
+      "reviewDate": "2026-10-28",
+      "astHash": "474a5f79ffa28b471e345c29d923ac2702f4a31873996913b21362329b44dccf",
       "signatureHash": "a5862144e94f8138df1a63d57fe224b924d30f6e9ba423e165911b926efaaad4"
     }
   ]

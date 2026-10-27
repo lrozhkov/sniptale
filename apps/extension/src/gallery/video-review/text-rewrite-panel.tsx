@@ -70,6 +70,7 @@ export function ReviewTextRewriteForm(props: {
         catalogError={operation.catalogError}
         selectionPending={operation.selectionPending}
         selectionUnavailable={operation.selectionUnavailable}
+        unavailableModelName={operation.unavailableModelName}
         selectionFailed={operation.selectionFailed}
         onOptionsChange={(change) => operation.setOptions((current) => ({ ...current, ...change }))}
         onModelChange={operation.setModelId}

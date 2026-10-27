@@ -286,6 +286,7 @@ export function useVideoProjectTextRewrite(project: VideoProject) {
     loadModels: selection.retryConfiguration,
     selectionPending: selection.selectionPending,
     selectionUnavailable: selection.selectionUnavailable,
+    unavailableModelName: selection.unavailableModelName,
     selectionFailed: selection.selectionFailed,
     catalogError: selection.configurationFailed,
     disclosure,
