@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { fixture } from './project-text-voice.test-support';
+import { fixture, approvedSelection } from './project-text-voice.test-support';
 import { captureProjectTextVoiceQueue, runProjectTextVoiceQueue } from './project-text-voice';
 import { cleanupProjectVoiceTakePreview, type ProjectVoiceTakePreview } from './project-voice-take';
 import { runReviewSpeechJob } from '../audio-jobs/client';
@@ -92,7 +92,7 @@ it('freezes ordered document-scoped selection and profile without saving or star
 it('generates two independent takes sequentially and hands them off without project insertion', async () => {
   const f = queueFixture();
   const plan = await f.captureQueue();
-  await runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events);
+  await runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events);
   expect(plan.phase).toBe('complete');
   expect(vi.mocked(runReviewSpeechJob).mock.calls.map(([request]) => request)).toMatchObject([
     { text: 'Speak this', approvedProviderId: 'provider' },
@@ -113,7 +113,7 @@ it('generates two independent takes sequentially and hands them off without proj
   );
   expect(f.previews[1]!.closed).not.toBe(true);
   await expect(
-    runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events)
+    runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events)
   ).rejects.toThrow('invalid-request');
   expect(runReviewSpeechJob).toHaveBeenCalledTimes(2);
 });
@@ -125,14 +125,14 @@ it('preserves a completed take after a later paid failure and refuses implicit r
     .mockResolvedValueOnce({ type: 'audio', staged: first })
     .mockRejectedValueOnce(new Error('interrupted'));
   await expect(
-    runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events)
+    runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events)
   ).rejects.toThrow('interrupted');
   expect(plan.phase).toBe('failed');
   expect(f.previews).toHaveLength(1);
   expect(f.previews[0]!.textSnapshot.text.text).toBe('Speak this');
   expect(discardAudioStaging).not.toHaveBeenCalled();
   await expect(
-    runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events)
+    runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events)
   ).rejects.toThrow('invalid-request');
   expect(runReviewSpeechJob).toHaveBeenCalledTimes(2);
 });
@@ -146,7 +146,7 @@ it('cancels remaining work while keeping an already admitted preview', async () 
     return f.previews.length;
   });
   await expect(
-    runProjectTextVoiceQueue(f.access, plan, 'provider', controller.signal, f.events)
+    runProjectTextVoiceQueue(f.access, plan, approvedSelection, controller.signal, f.events)
   ).rejects.toMatchObject({ name: 'AbortError' });
   expect(f.previews).toHaveLength(1);
   expect(runReviewSpeechJob).toHaveBeenCalledOnce();
@@ -166,7 +166,13 @@ it('discards a late second response after cancellation without releasing the fir
       await hold.promise;
       return { type: 'audio', staged: second };
     });
-  const pending = runProjectTextVoiceQueue(f.access, plan, 'provider', controller.signal, f.events);
+  const pending = runProjectTextVoiceQueue(
+    f.access,
+    plan,
+    approvedSelection,
+    controller.signal,
+    f.events
+  );
   await entered.promise;
   expect(f.previews).toHaveLength(1);
   controller.abort();
@@ -188,7 +194,7 @@ it('disposes only a preview refused by its synchronous ownership handoff', async
       throw new Error('closed');
     });
   await expect(
-    runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events)
+    runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events)
   ).rejects.toThrow('closed');
   expect(f.previews).toHaveLength(1);
   expect(discardAudioStaging).toHaveBeenCalledExactlyOnceWith(second, expect.anything());
@@ -203,9 +209,9 @@ it('blocks concurrent starts of the same plan while the first Save waits', async
     await hold.promise;
     await save();
   });
-  const pending = runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events);
+  const pending = runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events);
   await expect(
-    runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events)
+    runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events)
   ).rejects.toThrow('invalid-request');
   hold.release();
   await pending;
@@ -220,7 +226,7 @@ it('rejects edited local text before another Save or paid request and keeps the 
     return f.previews.length;
   });
   await expect(
-    runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events)
+    runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events)
   ).rejects.toThrow('stale');
   expect(f.save).toHaveBeenCalledOnce();
   expect(runReviewSpeechJob).toHaveBeenCalledOnce();
@@ -238,7 +244,7 @@ it.each(['remove', 'trash', 'restore', 'recreate'] as const)(
       return f.previews.length;
     });
     await expect(
-      runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events)
+      runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events)
     ).rejects.toThrow('stale');
     expect(runReviewSpeechJob).toHaveBeenCalledOnce();
     expect(f.previews).toHaveLength(1);
@@ -263,14 +269,20 @@ it('refuses missing selection, profile, target, foreign access and expired work 
   ).rejects.toThrow();
   const plan = await f.captureQueue();
   await expect(
-    runProjectTextVoiceQueue({ ...f.access }, plan, 'provider', signal(), f.events)
+    runProjectTextVoiceQueue({ ...f.access }, plan, approvedSelection, signal(), f.events)
   ).rejects.toThrow('invalid-request');
-  await expect(runProjectTextVoiceQueue(f.access, plan, ' ', signal(), f.events)).rejects.toThrow(
-    'invalid-request'
-  );
+  await expect(
+    runProjectTextVoiceQueue(
+      f.access,
+      plan,
+      { ...approvedSelection, approvedProviderId: ' ' },
+      signal(),
+      f.events
+    )
+  ).rejects.toThrow('invalid-request');
   plan.items[1]!.capture.expiresAt = 0;
   await expect(
-    runProjectTextVoiceQueue(f.access, plan, 'provider', signal(), f.events)
+    runProjectTextVoiceQueue(f.access, plan, approvedSelection, signal(), f.events)
   ).rejects.toThrow('stale');
   expect(f.save).not.toHaveBeenCalled();
   expect(runReviewSpeechJob).not.toHaveBeenCalled();
@@ -296,4 +308,20 @@ it('rejects a changed project while capture hashing waits without saving or requ
   } finally {
     spy.mockRestore();
   }
+});
+
+it('keeps one approved destination for every queued narration request', async () => {
+  const f = queueFixture();
+  const plan = await f.captureQueue();
+  const selection = { ...approvedSelection };
+  f.events.ready.mockImplementation((preview) => {
+    f.previews.push(preview);
+    selection.approvedDestination = `sha256:${'b'.repeat(64)}`;
+    selection.approvedModelCode = 'replacement';
+    return f.previews.length;
+  });
+  await runProjectTextVoiceQueue(f.access, plan, selection, signal(), f.events);
+  expect(runReviewSpeechJob).toHaveBeenCalledTimes(2);
+  for (const [request] of vi.mocked(runReviewSpeechJob).mock.calls)
+    expect(request).toMatchObject({ approvedSelection });
 });

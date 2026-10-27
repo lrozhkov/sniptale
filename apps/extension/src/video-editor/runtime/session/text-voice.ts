@@ -1,3 +1,4 @@
+import type { VoiceProviderSelection } from '@sniptale/runtime-contracts/voice-input';
 import { hasCurrentOriginalAudioTargets } from '../../../features/video/project/timeline/original-audio';
 import {
   useCallback,
@@ -54,6 +55,7 @@ interface VoiceState {
     capture: VoiceCapture;
     queue: VoiceQueue;
     providerId: string;
+    approvedSelection: VoiceProviderSelection;
     providerName: string;
   } | null;
   activeId: string;
@@ -188,11 +190,23 @@ async function prepareVoiceConsent(
 ): Promise<NonNullable<VoiceState['consent']>> {
   const model = catalog?.models.find((entry) => entry.id === profile.modelId);
   const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
-  if (!provider) throw new Error('model-unavailable');
+  if (!model || !provider?.destinationBinding) throw new Error('model-unavailable');
+  const approvedSelection = {
+    modelId: model.id,
+    approvedProviderId: provider.id,
+    approvedModelCode: model.modelCode,
+    approvedDestination: provider.destinationBinding,
+  };
   const queue = await captureProjectTextVoiceQueue(access, selected, profile, signal);
   signal.throwIfAborted();
   const capture = queue.items[0]!.capture;
-  return { capture, queue, providerId: provider.id, providerName: provider.name };
+  return {
+    capture,
+    queue,
+    providerId: provider.id,
+    providerName: provider.name,
+    approvedSelection,
+  };
 }
 
 function voiceItemKey(item: VoiceTarget) {
@@ -250,7 +264,7 @@ async function generateVoiceBatch(
   signal: AbortSignal,
   setState: Dispatch<SetStateAction<VoiceState>>
 ) {
-  await runProjectTextVoiceQueue(access, consent.queue, consent.providerId, signal, {
+  await runProjectTextVoiceQueue(access, consent.queue, consent.approvedSelection, signal, {
     ready: (preview) => {
       if (
         signal.aborted ||
@@ -658,10 +672,13 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
         setState((value) => ({ ...value, consent: null, progress: null }));
         const prepared = await selection.prepareModelSelection(signal);
         const model = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
+        const provider = prepared.catalog.providers.find((entry) => entry.id === model?.providerId);
         if (!access.getProject()) throw new Error('stale');
         if (
           prepared.modelId !== consent.capture.profile.modelId ||
-          model?.providerId !== consent.providerId
+          model?.providerId !== consent.providerId ||
+          model.modelCode !== consent.approvedSelection.approvedModelCode ||
+          provider?.destinationBinding !== consent.approvedSelection.approvedDestination
         )
           throw new Error('model-unavailable');
         await generateVoiceBatch(access, lifetime, consent, signal, setState);

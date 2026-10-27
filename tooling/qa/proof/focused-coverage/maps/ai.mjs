@@ -118,6 +118,28 @@ export const AI_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'montage-narration-approved-destination',
+    productionFile: 'apps/extension/src/workflows/video/project-text-voice.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted voice and inspector proof cover consent, acquisition, selection and cancellation. Shared preference proof covers concurrent choices, deletion, recreation and retry.',
+    testFiles: [
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/background/ai/audio/model-config.test.ts',
+      'apps/extension/src/contracts/ai/audio.test.ts',
+      'apps/extension/src/workflows/audio-jobs/client.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-selection.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
     owner: 'montage-authored-speech-selection',
     productionFile: 'apps/extension/src/video-editor/runtime/session/text-voice.ts',
     exclusive: true,
@@ -125,6 +147,11 @@ export const AI_OWNER_MAPPINGS = [
     reason:
       'Mounted voice and inspector proof cover consent, acquisition, selection and cancellation. Shared preference proof covers concurrent choices, deletion, recreation and retry.',
     testFiles: [
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/background/ai/audio/model-config.test.ts',
+      'apps/extension/src/contracts/ai/audio.test.ts',
+      'apps/extension/src/workflows/audio-jobs/client.test.ts',
       'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
       'apps/extension/src/video-editor/runtime/session/text-voice-selection.test.tsx',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',

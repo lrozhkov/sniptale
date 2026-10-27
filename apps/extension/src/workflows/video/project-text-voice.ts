@@ -1,4 +1,8 @@
 import {
+  parseVoiceProviderSelection,
+  type VoiceProviderSelection,
+} from '@sniptale/runtime-contracts/voice-input';
+import {
   AUDIO_STAGING_TTL_MS,
   type AudioStagedHandle,
   type ProjectAudioTextJobScope,
@@ -80,7 +84,7 @@ export async function captureProjectTextVoice(
 export async function generateProjectTextVoice(
   access: ProjectVoiceReadAccess,
   capture: ProjectTextVoiceCapture,
-  approvedProviderId: string,
+  approvedSelection: VoiceProviderSelection,
   signal: AbortSignal
 ): Promise<
   ProjectVoiceTakePreview & {
@@ -88,7 +92,12 @@ export async function generateProjectTextVoice(
   }
 > {
   signal.throwIfAborted();
-  if (capture.phase !== 'captured' || !approvedProviderId.trim())
+  const approved = parseVoiceProviderSelection(approvedSelection);
+  if (
+    capture.phase !== 'captured' ||
+    !approved?.approvedProviderId.trim() ||
+    approved.modelId !== capture.profile.modelId
+  )
     throw new Error('invalid-request');
   assertLocal(access, capture);
   capture.phase = 'preparing';
@@ -128,7 +137,8 @@ export async function generateProjectTextVoice(
         operation: 'speech',
         requestId: crypto.randomUUID(),
         modelId,
-        approvedProviderId,
+        approvedProviderId: approved.approvedProviderId,
+        approvedSelection: approved,
         scope,
         phraseId: capture.basis.fragment.id,
         textRevision: capture.basis.fragment.revision,
@@ -237,7 +247,7 @@ export async function captureProjectTextVoiceQueue(
 export async function runProjectTextVoiceQueue(
   access: ProjectVoiceReadAccess,
   plan: ProjectTextVoiceQueuePlan,
-  approvedProviderId: string,
+  approvedSelection: VoiceProviderSelection,
   signal: AbortSignal,
   events: {
     ready(preview: ProjectVoiceTakePreview): void;
@@ -246,7 +256,13 @@ export async function runProjectTextVoiceQueue(
   }
 ): Promise<void> {
   signal.throwIfAborted();
-  if (plan.origin !== access || plan.phase !== 'captured' || !approvedProviderId.trim())
+  const approved = parseVoiceProviderSelection(approvedSelection);
+  if (
+    plan.origin !== access ||
+    plan.phase !== 'captured' ||
+    !approved?.approvedProviderId.trim() ||
+    plan.items.some((item) => item.capture.profile.modelId !== approved.modelId)
+  )
     throw new Error('invalid-request');
   for (const item of plan.items) assertLocal(access, item.capture);
   plan.phase = 'running';
@@ -257,7 +273,7 @@ export async function runProjectTextVoiceQueue(
       {
         validate: (item) => assertLocal(access, item.capture),
         generate: (item, activeSignal) =>
-          generateProjectTextVoice(access, item.capture, approvedProviderId, activeSignal),
+          generateProjectTextVoice(access, item.capture, approved, activeSignal),
         cleanup: cleanupProjectVoiceTakePreview,
       },
       events

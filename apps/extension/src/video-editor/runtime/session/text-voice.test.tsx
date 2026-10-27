@@ -175,6 +175,8 @@ beforeEach(() => {
       {
         id: 'provider',
         name: 'Provider',
+        incarnation: 'one',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
         connectionType: 'openai-compatible',
         hasStoredApiKey: true,
         createdAt: 1,

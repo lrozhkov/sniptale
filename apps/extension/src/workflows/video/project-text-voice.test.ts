@@ -1,5 +1,5 @@
 import { cleanupProjectVoiceTakePreview } from './project-voice-take';
-import { fixture } from './project-text-voice.test-support';
+import { fixture, approvedSelection } from './project-text-voice.test-support';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isCurrentVideoProjectSnapshot } from '../../composition/persistence/projects/revision';
 import { runReviewSpeechJob } from '../audio-jobs/client';
@@ -45,7 +45,7 @@ afterEach(() => vi.unstubAllGlobals());
 it('saves before one text-only job and returns an independent long audition without choosing placement', async () => {
   const f = fixture();
   const capture = await f.capture();
-  const preview = await generateProjectTextVoice(f.access, capture, 'provider', signal());
+  const preview = await generateProjectTextVoice(f.access, capture, approvedSelection, signal());
   expect(f.save).toHaveBeenCalledOnce();
   expect(runReviewSpeechJob).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({
@@ -75,9 +75,9 @@ it('saves before one text-only job and returns an independent long audition with
   f.change();
   expect(preview.textSnapshot.text.text).toBe('Speak this');
   expect(capture.phase).toBe('complete');
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'invalid-request'
-  );
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('invalid-request');
   expect(runReviewSpeechJob).toHaveBeenCalledOnce();
 });
 it('freezes profile inputs and refuses later local edits before Save', async () => {
@@ -87,9 +87,9 @@ it('freezes profile inputs and refuses later local edits before Save', async () 
   input.voiceId = 'Other';
   expect(capture.profile.voiceId).toBe('voice');
   f.change();
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'stale'
-  );
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('stale');
   expect(f.save).not.toHaveBeenCalled();
   expect(runReviewSpeechJob).not.toHaveBeenCalled();
 });
@@ -98,10 +98,10 @@ it('blocks concurrent generation of one capture while Save is pending', async ()
   const capture = await f.capture();
   const hold = gate();
   f.save.mockImplementationOnce(() => hold.promise);
-  const pending = generateProjectTextVoice(f.access, capture, 'provider', signal());
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'invalid-request'
-  );
+  const pending = generateProjectTextVoice(f.access, capture, approvedSelection, signal());
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('invalid-request');
   hold.release();
   await pending;
   expect(runReviewSpeechJob).toHaveBeenCalledOnce();
@@ -110,12 +110,12 @@ it('allows explicit retry after a pre-request Save failure without a paid retry'
   const f = fixture();
   const capture = await f.capture();
   f.save.mockRejectedValueOnce(new Error('storage'));
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'storage'
-  );
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('storage');
   expect(capture.phase).toBe('captured');
   expect(runReviewSpeechJob).not.toHaveBeenCalled();
-  await generateProjectTextVoice(f.access, capture, 'provider', signal());
+  await generateProjectTextVoice(f.access, capture, approvedSelection, signal());
   expect(runReviewSpeechJob).toHaveBeenCalledOnce();
 });
 it.each(['remove', 'trash', 'restore', 'recreate'] as const)(
@@ -126,9 +126,9 @@ it.each(['remove', 'trash', 'restore', 'recreate'] as const)(
     f.save.mockImplementationOnce(async () => {
       f[operation]();
     });
-    await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-      'stale'
-    );
+    await expect(
+      generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+    ).rejects.toThrow('stale');
     expect(runReviewSpeechJob).not.toHaveBeenCalled();
   }
 );
@@ -144,7 +144,7 @@ it.each(['remove', 'trash', 'restore', 'recreate', 'change', 'close'] as const)(
       await hold.promise;
       return { type: 'audio', staged };
     });
-    const pending = generateProjectTextVoice(f.access, capture, 'provider', signal());
+    const pending = generateProjectTextVoice(f.access, capture, approvedSelection, signal());
     await started.promise;
     f[operation]();
     hold.release();
@@ -163,14 +163,14 @@ it('rejects a canonical change during decoding and keeps a paid failure terminal
     f.restore();
     return 12;
   });
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'stale'
-  );
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('stale');
   expect(discardAudioStaging).toHaveBeenCalledOnce();
   expect(capture.phase).toBe('failed');
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'invalid-request'
-  );
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('invalid-request');
 });
 it('cleans output after cancellation even when the decoder ignores its signal', async () => {
   const f = fixture();
@@ -181,7 +181,7 @@ it('cleans output after cancellation even when the decoder ignores its signal', 
     return 12;
   });
   await expect(
-    generateProjectTextVoice(f.access, capture, 'provider', controller.signal)
+    generateProjectTextVoice(f.access, capture, approvedSelection, controller.signal)
   ).rejects.toThrow();
   expect(discardAudioStaging).toHaveBeenCalledOnce();
   expect(URL.createObjectURL).not.toHaveBeenCalled();
@@ -191,26 +191,31 @@ it('cleans a malformed decoded response without replacing the failure with clean
   const capture = await f.capture();
   vi.mocked(decodeReviewSpeechDuration).mockRejectedValueOnce(new Error('decode'));
   vi.mocked(discardAudioStaging).mockRejectedValueOnce(new Error('cleanup'));
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'decode'
-  );
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('decode');
   expect(capture.phase).toBe('failed');
 });
 it('never automatically retries an ambiguous paid failure', async () => {
   const f = fixture();
   const capture = await f.capture();
   vi.mocked(runReviewSpeechJob).mockRejectedValueOnce(new Error('interrupted'));
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'interrupted'
-  );
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'invalid-request'
-  );
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('interrupted');
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('invalid-request');
   expect(runReviewSpeechJob).toHaveBeenCalledOnce();
 });
 it('revokes audition URL even when stale target cleanup fails', async () => {
   const f = fixture();
-  const preview = await generateProjectTextVoice(f.access, await f.capture(), 'provider', signal());
+  const preview = await generateProjectTextVoice(
+    f.access,
+    await f.capture(),
+    approvedSelection,
+    signal()
+  );
   f.remove();
   vi.mocked(discardAudioStaging).mockRejectedValueOnce(new Error('storage'));
   await expect(cleanupProjectVoiceTakePreview(preview)).rejects.toThrow('storage');
@@ -227,7 +232,7 @@ it('blocks a restored canonical head during the last metadata admission await', 
     await hold.promise;
     return current(...args);
   });
-  const pending = generateProjectTextVoice(f.access, capture, 'provider', signal());
+  const pending = generateProjectTextVoice(f.access, capture, approvedSelection, signal());
   await started.promise;
   f.restore();
   hold.release();
@@ -244,8 +249,8 @@ it('allows independent captures to use separate jobs and cleanup handles', async
     .mockResolvedValueOnce({ type: 'audio', staged })
     .mockResolvedValueOnce({ type: 'audio', staged: other });
   const previews = await Promise.all([
-    generateProjectTextVoice(f.access, first, 'provider', signal()),
-    generateProjectTextVoice(f.access, second, 'provider', signal()),
+    generateProjectTextVoice(f.access, first, approvedSelection, signal()),
+    generateProjectTextVoice(f.access, second, approvedSelection, signal()),
   ]);
   expect(runReviewSpeechJob).toHaveBeenCalledTimes(2);
   await cleanupProjectVoiceTakePreview(previews[0]!);
@@ -255,13 +260,18 @@ it('allows independent captures to use separate jobs and cleanup handles', async
 it('refuses expired capture and missing provider without Save or request', async () => {
   const f = fixture();
   const capture = await f.capture();
-  await expect(generateProjectTextVoice(f.access, capture, ' ', signal())).rejects.toThrow(
-    'invalid-request'
-  );
+  await expect(
+    generateProjectTextVoice(
+      f.access,
+      capture,
+      { ...approvedSelection, approvedProviderId: ' ' },
+      signal()
+    )
+  ).rejects.toThrow('invalid-request');
   capture.expiresAt = 0;
-  await expect(generateProjectTextVoice(f.access, capture, 'provider', signal())).rejects.toThrow(
-    'stale'
-  );
+  await expect(
+    generateProjectTextVoice(f.access, capture, approvedSelection, signal())
+  ).rejects.toThrow('stale');
   expect(f.save).not.toHaveBeenCalled();
   expect(runReviewSpeechJob).not.toHaveBeenCalled();
 });
@@ -273,8 +283,45 @@ it('does not issue a job after cancellation during Save', async () => {
     controller.abort();
   });
   await expect(
-    generateProjectTextVoice(f.access, capture, 'provider', controller.signal)
+    generateProjectTextVoice(f.access, capture, approvedSelection, controller.signal)
   ).rejects.toThrow();
   expect(runReviewSpeechJob).not.toHaveBeenCalled();
   expect(capture.phase).toBe('captured');
+});
+
+it('retains the approved destination when the caller changes it during deferred Save', async () => {
+  const f = fixture();
+  const capture = await f.capture();
+  const selection = { ...approvedSelection };
+  const entered = gate();
+  const hold = gate();
+  const save = f.save.getMockImplementation()!;
+  f.save.mockImplementationOnce(async () => {
+    entered.release();
+    await hold.promise;
+    await save();
+  });
+  const pending = generateProjectTextVoice(f.access, capture, selection, signal());
+  await entered.promise;
+  selection.approvedDestination = `sha256:${'b'.repeat(64)}`;
+  hold.release();
+  await pending;
+  expect(runReviewSpeechJob).toHaveBeenCalledWith(
+    expect.objectContaining({ approvedSelection }),
+    expect.anything()
+  );
+});
+it('refuses a foreign approved model before Save or generation', async () => {
+  const f = fixture();
+  const capture = await f.capture();
+  await expect(
+    generateProjectTextVoice(
+      f.access,
+      capture,
+      { ...approvedSelection, modelId: 'other' },
+      signal()
+    )
+  ).rejects.toThrow('invalid-request');
+  expect(f.save).not.toHaveBeenCalled();
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
 });

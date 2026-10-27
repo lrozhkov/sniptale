@@ -341,3 +341,36 @@ it('restores an editable AI selector after leaving during an explicit preference
   expect(operation.modelId).toBe('first');
   noWork();
 });
+
+it.each(['destination', 'model-code'] as const)(
+  'rejects a changed %s after narration consent before Save',
+  async (change) => {
+    await voice();
+    await act(async () => operation.prepare());
+    expect(operation.consent).not.toBeNull();
+    const next = context();
+    if (change === 'destination')
+      next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+    else next.models[0]!.modelCode = 'replacement';
+    io.read.mockResolvedValue(next);
+    await act(async () => operation.start());
+    expect(operation.consent).toBeNull();
+    expect(operation.error).toBe('model-unavailable');
+    expect(operation.profile?.voiceId).toBe('Draft voice');
+    noWork();
+  }
+);
+
+it('captures the approved narration destination before presenting consent', async () => {
+  await voice();
+  await act(async () => operation.prepare());
+  expect(operation.consent).toMatchObject({
+    approvedSelection: {
+      modelId: 'first',
+      approvedProviderId: 'provider',
+      approvedModelCode: 'first',
+      approvedDestination: `sha256:${'a'.repeat(64)}`,
+    },
+  });
+  noWork();
+});
