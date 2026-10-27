@@ -338,3 +338,66 @@ it('remembers Chrome page editing through the existing writer and refuses use af
     })
   ).toMatchObject({ status: 'unavailable', modelId: null });
 });
+
+it.each([
+  { createdAt: 2, enabled: true, expected: 'new-model' },
+  { createdAt: 1, enabled: true, expected: 'a-model' },
+  { createdAt: 2, enabled: false, expected: 'a-model' },
+])(
+  'resolves connection recency without changing ties or eligibility: $createdAt/$enabled',
+  ({ createdAt, enabled, expected }) => {
+    const providers = [
+      ...selectorProviders(),
+      { ...selectorProviders()[0]!, id: 'new-provider', createdAt, enabled },
+    ];
+    const available = [...models, { ...models[0]!, id: 'new-model', providerId: 'new-provider' }];
+    expect(
+      resolveAIScenarioModel({
+        scenario: 'page-edit',
+        models: available,
+        providers,
+        selection: null,
+      })
+    ).toMatchObject({ status: 'initial', modelId: expected });
+    expect(
+      resolveAIScenarioModel({
+        scenario: 'voice-recognition',
+        models: available,
+        providers,
+        selection: null,
+      })
+    ).toMatchObject({ status: 'empty', modelId: null });
+    expect(
+      resolveAIScenarioModel({
+        scenario: 'page-edit',
+        models: available,
+        providers,
+        selection: null,
+        preferredProviderId: provider.id,
+      })
+    ).toMatchObject({ status: 'initial', modelId: 'a-model' });
+  }
+);
+
+it('retains connection order when the latest connection has no compatible model', () => {
+  const providers = [
+    ...selectorProviders(),
+    { ...selectorProviders()[0]!, id: 'new-provider', createdAt: 2 },
+  ];
+  expect(
+    resolveAIScenarioModel({ scenario: 'page-edit', models, providers, selection: null })
+  ).toMatchObject({ status: 'initial', modelId: 'a-model' });
+});
+
+it('keeps a remembered identity unresolved instead of replacing it with a newer connection', async () => {
+  await remember('page-edit');
+  const selection = await loadAIScenarioSelection('page-edit');
+  const providers = [
+    { ...selectorProviders()[0]!, enabled: false },
+    { ...selectorProviders()[0]!, id: 'new-provider', createdAt: 2 },
+  ];
+  const available = [...models, { ...models[0]!, id: 'new-model', providerId: 'new-provider' }];
+  expect(
+    resolveAIScenarioModel({ scenario: 'page-edit', models: available, providers, selection })
+  ).toMatchObject({ status: 'unavailable', modelId: null, previousSelection: selection });
+});

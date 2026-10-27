@@ -47,10 +47,16 @@ export function resolveAIScenarioModel(input: {
   }
   if (input.scenario === 'voice-recognition' || input.scenario === 'voice-correction')
     return { status: 'empty', modelId: null, previousSelection: null, reason: null };
-  const providers = input.preferredProviderId
+  const latest = input.providers.reduce<AIProviderSelectorEntry | undefined>(
+    (current, provider) =>
+      !current || provider.createdAt > current.createdAt ? provider : current,
+    undefined
+  );
+  const preferredProviderId = input.preferredProviderId ?? latest?.id;
+  const providers = preferredProviderId
     ? [
-        ...input.providers.filter((provider) => provider.id === input.preferredProviderId),
-        ...input.providers.filter((provider) => provider.id !== input.preferredProviderId),
+        ...input.providers.filter((provider) => provider.id === preferredProviderId),
+        ...input.providers.filter((provider) => provider.id !== preferredProviderId),
       ]
     : input.providers;
   for (const provider of providers) {

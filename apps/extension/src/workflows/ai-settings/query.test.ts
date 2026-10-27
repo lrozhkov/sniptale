@@ -340,3 +340,35 @@ it('reports a refused maintenance command without retrying', async () => {
   await expect(refreshManagedAICatalogs()).rejects.toThrow('Refused');
   expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
 });
+
+it('presents the latest configured connection through the normal first-use query without writing', async () => {
+  mockScenarioCatalog();
+  const original = queryMocks.sendRuntimeMessage.getMockImplementation()!;
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) => {
+    const response = await original(message);
+    if (!response.modelSelection) return response;
+    const base = response.modelSelection;
+    return {
+      ...response,
+      modelSelection: {
+        ...base,
+        models: [
+          ...base.models,
+          { ...base.models[0], id: 'new-model', providerId: 'new-provider' },
+        ],
+        providers: [
+          ...base.providers,
+          { ...base.providers[0], id: 'new-provider', name: 'New connection', createdAt: 2 },
+        ],
+      },
+    };
+  });
+  const context = await requestAIScenarioModelSelection('scenario-edit');
+  expect(context.resolution).toMatchObject({ status: 'initial', modelId: 'new-model' });
+  expect(context.remembered).toBeNull();
+  expect(
+    queryMocks.sendRuntimeMessage.mock.calls.every(
+      ([message]) => message.type === MessageType.AI_SETTINGS_QUERY
+    )
+  ).toBe(true);
+});
