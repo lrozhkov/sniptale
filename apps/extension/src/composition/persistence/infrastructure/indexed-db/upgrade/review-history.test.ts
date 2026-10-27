@@ -4,6 +4,7 @@ import {
   SYNC_CAPTURE_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_OUTBOX_STORE,
+  SYNC_CATALOG_CACHE_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -41,6 +42,7 @@ it('adds only empty indexed history stores and publishes the current contracts a
     [SYNC_CAPTURE_STORE, { keyPath: 'key' }],
     [VIDEO_PROJECT_REVISIONS_STORE, { keyPath: 'projectId' }],
     [SYNC_OUTBOX_STORE, { keyPath: 'key' }],
+    [SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' }],
   ]);
   expect(indexes.mock.calls).toEqual([
     ['aggregateId', 'aggregateId'],

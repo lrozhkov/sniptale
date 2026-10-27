@@ -421,10 +421,11 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   });
   expect(PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'syncCapture')).toEqual({
     domainId: 'syncCapture',
-    schemaVersion: 2,
+    schemaVersion: 3,
     stores: [
       { storeName: 'sync_capture', dataClass: 'durable-authority' },
       { storeName: 'sync_outbox', dataClass: 'durable-authority' },
+      { storeName: 'sync_catalog_cache', dataClass: 'derived-rebuildable' },
     ],
   });
 });
@@ -489,5 +490,46 @@ it('retains populated version 40 capture rows and profiles during outgoing admis
   expect(migration.validate(db, tx)).toBeUndefined();
   expect(rows.get('sync_capture')).toEqual(before.get('sync_capture'));
   expect(rows.get('sync_outbox')).toEqual([]);
+  expect(sourceAccess).not.toHaveBeenCalled();
+});
+
+it('adds an empty derived catalog cache without rewriting version 41 rows or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 41
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 42
+  )!;
+  expect(target.records).toEqual({ ...source.records, sync_catalog_cache: [] });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'sync_catalog_cache')).toEqual(source.stores);
+  expect(target.indexes).toEqual({ ...source.indexes, sync_catalog_cache: [] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 3 });
+});
+
+it('retains populated native and outgoing rows during version 41 cache admission', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 41
+  )!;
+  const rows = new Map<string, readonly unknown[]>(Object.entries(source.records));
+  rows.set('sync_capture', [{ key: 'profile', retained: 'native profile and capture evidence' }]);
+  rows.set('sync_outbox', [{ key: 'prepared', retained: 'dispatch and source evidence' }]);
+  const before = structuredClone(rows);
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Released rows must remain untouched.');
+  });
+  const db = {
+    objectStoreNames: { contains: (name: string) => rows.has(name) },
+    createObjectStore(name: string) {
+      rows.set(name, []);
+      return { createIndex: sourceAccess, put: sourceAccess };
+    },
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = { abort: vi.fn(), objectStore: sourceAccess };
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 41)!;
+  expect(migration.migrate(db, tx)).toBeUndefined();
+  expect(migration.validate(db, tx)).toBeUndefined();
+  expect(rows).toEqual(new Map([...before, ['sync_catalog_cache', []]]));
   expect(sourceAccess).not.toHaveBeenCalled();
 });

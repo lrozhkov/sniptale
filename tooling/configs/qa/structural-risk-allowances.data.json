@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The chronological registry owns schema descriptors. This candidate appends DB40-to-41 creation and validation of the empty sync_outbox store. Migration planning, execution order, schema-contract writes, and transaction abort remain in their existing owners. Splitting this descriptor would distribute chronological schema history without separating authority or dependencies. Fresh read-only outgoing_structural_diagnosis inspected this exact scope. Final candidate architecture review must validate this classification.",
+      "reason": "tool-noise: This chronological registry owns schema descriptors. The candidate appends DB41-to-42 creation and validation of the empty derived sync_catalog_cache store. Migration planning, execution order, contract writes and transaction abort remain with their existing owners. The descriptor adds no independent writer, state authority or recovery lifetime. Splitting it would distribute one chronological history. Read-only catalog_cache_registry_diagnosis confirmed Keep. Final architecture review must validate this exact classification.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent writer, state authority, execution or recovery lifetime, or public contract. Remove when the analyzer models this cohesive registry.",
       "reviewDate": "2026-10-27",
-      "astHash": "b334e130c691de16bea7601379809906cfdb7790de16165cd577f0bdafa21c3a",
+      "astHash": "1a5de51204253856ea5f7b5d526192e124db1ed4458ad995e0731d79567e1ffb",
       "signatureHash": "07c774e9a0b3f74167f16d2ba52e7b0fa3c0fe23d1d97eda8352dd7c8c08b5a4"
     },
     {

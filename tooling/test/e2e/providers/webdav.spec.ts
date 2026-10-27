@@ -828,6 +828,7 @@ test('another browser reuses published files without media transfer and still re
         seed.projectId
       );
       const prepared = await window.webdavTransferHarness.portable.outgoing.prepare(seed.projectId);
+      await window.webdavTransferHarness.portable.outgoing.refresh(prepared.spaceId);
       return { ...seed, spaceId: prepared.spaceId, lastFiles: projects.at(-1)!.files };
     });
   } finally {
@@ -848,6 +849,32 @@ test('another browser reuses published files without media transfer and still re
         input.projectId
       );
     }, sent);
+    const coldStart = lab.proxy.counts.getKeys.length;
+    const coldCatalog = await browser.page.evaluate(
+      (spaceId) => window.webdavTransferHarness.portable.outgoing.refresh(spaceId),
+      sent.spaceId
+    );
+    const coldCatalogReads = lab.proxy.counts.getKeys.slice(coldStart);
+    expect(coldCatalogReads).toHaveLength(coldCatalog.attempts);
+    expect(
+      coldCatalogReads.every((key) => key.startsWith('.sniptale/') && key.endsWith('.json'))
+    ).toBe(true);
+    expect(coldCatalog.pending).toEqual([]);
+    expect(coldCatalog.quarantined).toEqual([]);
+    expect(coldCatalog.invalid).toEqual([]);
+    await browser.context.close();
+    browser = await openProvider(lab, info, 'metadata-target');
+    const restartedStart = lab.proxy.counts.getKeys.length;
+    const restartedCatalog = await browser.page.evaluate(
+      (spaceId) => window.webdavTransferHarness.portable.outgoing.refresh(spaceId),
+      sent.spaceId
+    );
+    const restartedCatalogReads = lab.proxy.counts.getKeys.slice(restartedStart);
+    expect(restartedCatalogReads).toEqual([]);
+    expect(restartedCatalog).toEqual(coldCatalog);
+    const addedCatalogReads: string[] = [];
+    const warmCatalogReads: string[] = [];
+    const otherBrowserCatalogReads: string[] = [];
     const attempts: Awaited<
       ReturnType<typeof window.webdavTransferHarness.portable.outgoing.send>
     >[] = [];
@@ -855,10 +882,22 @@ test('another browser reuses published files without media transfer and still re
       if (step === 1) {
         await browser.context.close();
         browser = await openProvider(lab, info, 'metadata-target');
-        await browser.page.evaluate(
-          (spaceId) => window.webdavTransferHarness.portable.outgoing.scan(spaceId),
+        const addedStart = lab.proxy.counts.getKeys.length;
+        const addedCatalog = await browser.page.evaluate(
+          (spaceId) => window.webdavTransferHarness.portable.outgoing.refresh(spaceId),
           sent.spaceId
         );
+        addedCatalogReads.push(...lab.proxy.counts.getKeys.slice(addedStart));
+        expect(addedCatalogReads).toEqual([attempts[0]!.recordKey]);
+        expect(addedCatalog.attempts).toBe(coldCatalog.attempts + 1);
+        const warmStart = lab.proxy.counts.getKeys.length;
+        const warmCatalog = await browser.page.evaluate(
+          (spaceId) => window.webdavTransferHarness.portable.outgoing.refresh(spaceId),
+          sent.spaceId
+        );
+        warmCatalogReads.push(...lab.proxy.counts.getKeys.slice(warmStart));
+        expect(warmCatalogReads).toEqual([]);
+        expect(warmCatalog).toEqual(addedCatalog);
       }
       if (step === 2) {
         const key = attempts[0]!.objects[0]!.remoteKey;
@@ -892,6 +931,21 @@ test('another browser reuses published files without media transfer and still re
       expect(next.objects).toHaveLength(1);
       expect(sent.lastFiles.some((file) => file.key === next.objects[0]!.remoteKey)).toBe(true);
       attempts.push(next);
+      if (step === 0) {
+        const otherBrowser = await openProvider(lab, info, 'metadata-source');
+        try {
+          const otherStart = lab.proxy.counts.getKeys.length;
+          const otherCatalog = await otherBrowser.page.evaluate(
+            (spaceId) => window.webdavTransferHarness.portable.outgoing.refresh(spaceId),
+            sent.spaceId
+          );
+          otherBrowserCatalogReads.push(...lab.proxy.counts.getKeys.slice(otherStart));
+          expect(otherBrowserCatalogReads).toEqual([next.recordKey]);
+          expect(otherCatalog.attempts).toBe(coldCatalog.attempts + 1);
+        } finally {
+          await otherBrowser.context.close();
+        }
+      }
     }
     expect(new Set(attempts.map((attempt) => attempt.recordKey)).size).toBe(3);
     expect(new Set(attempts.map((attempt) => attempt.objects[0]!.remoteKey)).size).toBe(1);
@@ -963,6 +1017,15 @@ test('another browser reuses published files without media transfer and still re
           sent,
           attempts,
           local,
+          catalogCache: {
+            coldCatalogReads,
+            restartedCatalogReads,
+            addedCatalogReads,
+            warmCatalogReads,
+            otherBrowserCatalogReads,
+            coldCatalog,
+            restartedCatalog,
+          },
           fullBrowserRestart: true,
           sameSizeCorruptionRejectedAtHydration: true,
           corruptHydrationReads,

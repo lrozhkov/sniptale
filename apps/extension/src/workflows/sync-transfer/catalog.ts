@@ -1,3 +1,4 @@
+import type { CachedSyncManifest } from '../../composition/persistence/sync-catalog/catalog-cache';
 import { projectSyncCatalog, type CatalogAttempt } from './catalog-graph';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
 import { hashSyncText, parseSyncAttemptText } from './wire-record';
@@ -68,16 +69,48 @@ async function readMetadata(
   }
 }
 
-/** Complete bounded metadata enumeration. This function never reads media or mutates local data. */
+async function checkedManifest(text: string, key: string, spaceId: string) {
+  if (!key.endsWith(`-${hashSyncText(text)}.json`)) throw new InvalidManifestError();
+  try {
+    const parsed = await parseSyncAttemptText(text);
+    if (parsed.recordKey !== key || parsed.operation.spaceId !== spaceId)
+      throw new InvalidManifestError();
+    return parsed;
+  } catch {
+    throw new InvalidManifestError();
+  }
+}
+
+/** Complete bounded metadata enumeration without native persistence or media reads. */
 export async function scanSyncCatalog(
   remote: SyncRemoteStore,
   spaceId: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  options: { cachedManifests?: readonly CachedSyncManifest[] } = {}
+) {
+  return (await scanSyncCatalogSnapshot(remote, spaceId, signal, options.cachedManifests)).catalog;
+}
+
+/** Raw checked manifests accompany only a complete scan; derived graph state is never cached. */
+export async function scanSyncCatalogSnapshot(
+  remote: SyncRemoteStore,
+  spaceId: string,
+  signal: AbortSignal,
+  cachedManifests: readonly CachedSyncManifest[] = []
 ) {
   if (!spaceId || spaceId.length > 256) throw new SyncCatalogError('invalid-space');
   signal.throwIfAborted();
   const prefix = `.sniptale/${hashSyncText(spaceId)}/records/`;
   const attempts: CatalogAttempt[] = [];
+  const manifests: CachedSyncManifest[] = [];
+  const cached = new Map(
+    cachedManifests
+      .slice(0, MAX_MANIFESTS)
+      .map((entry) => [
+        entry.manifestKey,
+        { manifestKey: entry.manifestKey, size: entry.size, text: entry.text },
+      ])
+  );
   const invalid: { key: string; code: 'invalid-key' | 'invalid-manifest' }[] = [];
   const visitedCursors = new Set<string>();
   const visitedKeys = new Map<string, number>();
@@ -112,16 +145,26 @@ export async function scanSyncCatalog(
         continue;
       }
       try {
-        const text = await readMetadata(remote, item.key, item.size, budget, signal);
-        if (!item.key.endsWith(`-${hashSyncText(text)}.json`)) throw new InvalidManifestError();
-        let parsed;
-        try {
-          parsed = await parseSyncAttemptText(text);
-        } catch {
-          throw new InvalidManifestError();
+        let text: string | undefined;
+        let parsed: Awaited<ReturnType<typeof checkedManifest>> | undefined;
+        const entry = cached.get(item.key);
+        if (entry && entry.size === item.size && entry.text.length <= MAX_MANIFEST_BYTES) {
+          try {
+            if (new TextEncoder().encode(entry.text).byteLength !== item.size)
+              throw new InvalidManifestError();
+            parsed = await checkedManifest(entry.text, item.key, spaceId);
+            text = entry.text;
+            budget.bytes += item.size;
+            if (budget.bytes > MAX_SCAN_BYTES) throw new SyncCatalogError('metadata-limit');
+          } catch (error) {
+            if (!(error instanceof InvalidManifestError)) throw error;
+          }
         }
-        if (parsed.recordKey !== item.key || parsed.operation.spaceId !== spaceId)
-          throw new InvalidManifestError();
+        if (text === undefined || parsed === undefined) {
+          text = await readMetadata(remote, item.key, item.size, budget, signal);
+          parsed = await checkedManifest(text, item.key, spaceId);
+        }
+        manifests.push({ manifestKey: item.key, size: item.size, text });
         attempts.push({
           operationText: JSON.stringify(parsed.operation),
           operation: parsed.operation,
@@ -141,5 +184,13 @@ export async function scanSyncCatalog(
     cursor = page.nextCursor;
   }
   signal.throwIfAborted();
-  return { ...projectSyncCatalog(spaceId, attempts), invalid, metadataBytes: budget.bytes, pages };
+  return {
+    catalog: {
+      ...projectSyncCatalog(spaceId, attempts),
+      invalid,
+      metadataBytes: budget.bytes,
+      pages,
+    },
+    manifests,
+  };
 }

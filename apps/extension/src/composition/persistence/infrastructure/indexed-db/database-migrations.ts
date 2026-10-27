@@ -5,6 +5,7 @@ import {
   VOICE_INPUT_HISTORY_STORE,
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
+  SYNC_CATALOG_CACHE_STORE,
   ASSET_OPERATIONS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -937,6 +938,26 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     },
     validate(db) {
       return requireMigrationStores(db, [SYNC_OUTBOX_STORE], 'Sync outbox store is unavailable.');
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 2, to: 3 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 41,
+    toDatabaseVersion: 42,
+    risk: 'additive',
+    stores: [SYNC_CATALOG_CACHE_STORE],
+    migrate(db) {
+      db.createObjectStore(SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CATALOG_CACHE_STORE],
+        'Sync catalog cache store is unavailable.'
+      );
     },
   },
 ];

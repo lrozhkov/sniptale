@@ -17,6 +17,7 @@ import {
 } from '../../../apps/extension/src/composition/persistence/assets';
 import { publishPreparedReplicaJournal } from '../../../apps/extension/src/composition/persistence/sync-capture/replica-publication';
 import { scanSyncCatalog } from '../../../apps/extension/src/workflows/sync-transfer/catalog';
+import { refreshPersistedSyncCatalog } from '../../../apps/extension/src/workflows/sync-transfer/catalog-refresh';
 import { syncCatalogRootKey } from '../../../apps/extension/src/workflows/sync-transfer/catalog-graph';
 import { prepareCatalogReplica } from '../../../apps/extension/src/workflows/sync-transfer/incoming';
 import type { CapturedChange } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
@@ -50,6 +51,20 @@ export function createWebdavOutgoingHarness(
       )
     );
     return row?.kind === 'root-state' ? row : null;
+  }
+  function catalogProof(current: NonNullable<typeof catalog>) {
+    return {
+      operations: current.operations.size,
+      attempts: [...current.operations.values()].reduce(
+        (total, operation) => total + operation.attempts.length,
+        0
+      ),
+      roots: [...current.roots.values()],
+      pending: current.pending,
+      quarantined: current.quarantined,
+      invalid: current.invalid,
+      metadataBytes: current.metadataBytes,
+    };
   }
   return {
     async reviseMetadata(rootId: string) {
@@ -96,18 +111,21 @@ export function createWebdavOutgoingHarness(
     },
     async scan(spaceId: string) {
       catalog = await scanSyncCatalog(connected(), spaceId, signal());
-      return {
-        operations: catalog.operations.size,
-        attempts: [...catalog.operations.values()].reduce(
-          (total, operation) => total + operation.attempts.length,
-          0
-        ),
-        roots: [...catalog.roots.values()],
-        pending: catalog.pending,
-        quarantined: catalog.quarantined,
-        invalid: catalog.invalid,
-        metadataBytes: catalog.metadataBytes,
-      };
+      return catalogProof(catalog);
+    },
+    async refresh(spaceId: string, bypassCache = false) {
+      const db = await initDB();
+      const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
+      if (!profile || profile.kind !== 'profile' || !profile.enabled || profile.spaceId !== spaceId)
+        throw new Error('Target capture profile differs.');
+      catalog = await refreshPersistedSyncCatalog(
+        connected(),
+        spaceId,
+        profile.connectionGeneration,
+        signal(),
+        { bypassCache }
+      );
+      return catalogProof(catalog);
     },
     async receive(spaceId: string, rootKind: 'media' | 'video-project', rootId: string) {
       check(catalog);

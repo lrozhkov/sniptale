@@ -167,3 +167,55 @@ it('refuses the manifest count budget before returning partial state', async () 
   await expect(failure).rejects.toMatchObject({ code: 'metadata-limit' });
   expect(io.reads).toEqual([]);
 });
+
+it('reuses checked raw manifests after a fresh listing without unchanged GETs', async () => {
+  const first = await fixture();
+  const body = new Blob([first.recordText]);
+  const io = memory(
+    [[{ key: first.recordKey, size: body.size }]],
+    new Map([[first.recordKey, body]])
+  );
+  const cold = await scanSyncCatalog(io.remote, 'space', new AbortController().signal);
+  io.reads.length = 0;
+  const warm = await Reflect.apply(scanSyncCatalog, undefined, [
+    io.remote,
+    'space',
+    new AbortController().signal,
+    {
+      cachedManifests: [{ manifestKey: first.recordKey, size: body.size, text: first.recordText }],
+    },
+  ]);
+  expect(io.reads).toEqual([]);
+  expect(io.prefixes).toHaveLength(2);
+  expect(warm).toEqual(cold);
+});
+
+it('detaches caller cache bytes before awaiting the fresh listing', async () => {
+  const first = await fixture();
+  const body = new Blob([first.recordText]);
+  const io = memory(
+    [[{ key: first.recordKey, size: body.size }]],
+    new Map([[first.recordKey, body]])
+  );
+  const cached = { manifestKey: first.recordKey, size: body.size, text: first.recordText };
+  let releaseListing: () => void = () => {};
+  const listing = new Promise<void>((resolve) => {
+    releaseListing = resolve;
+  });
+  const list = io.remote.list;
+  io.remote.list = async (prefix, options) => {
+    await listing;
+    return list(prefix, options);
+  };
+  const pending = scanSyncCatalog(io.remote, 'space', new AbortController().signal, {
+    cachedManifests: [cached],
+  });
+  cached.manifestKey = 'changed-key';
+  cached.size = 1;
+  cached.text = 'changed text';
+  releaseListing();
+  const result = await pending;
+  expect(result.operations.get('operation')?.attempts[0]?.recordKey).toBe(first.recordKey);
+  expect(result.invalid).toEqual([]);
+  expect(io.reads).toEqual([]);
+});

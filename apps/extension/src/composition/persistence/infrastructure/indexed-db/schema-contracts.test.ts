@@ -119,6 +119,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['sync_capture', { keyPath: 'key' }],
     ['video_project_revisions', { keyPath: 'projectId' }],
     ['sync_outbox', { keyPath: 'key' }],
+    ['sync_catalog_cache', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -196,6 +197,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['sync_capture', { keyPath: 'key' }],
     ['video_project_revisions', { keyPath: 'projectId' }],
     ['sync_outbox', { keyPath: 'key' }],
+    ['sync_catalog_cache', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual([
@@ -276,6 +278,8 @@ it('upgrades each retained source contract only after all required stores valida
       ]);
     else if (migration.fromDatabaseVersion === 40)
       expect(db.createObjectStore.mock.calls).toEqual([['sync_outbox', { keyPath: 'key' }]]);
+    else if (migration.fromDatabaseVersion === 41)
+      expect(db.createObjectStore.mock.calls).toEqual([['sync_catalog_cache', { keyPath: 'key' }]]);
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -318,6 +322,7 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['sync_capture', { keyPath: 'key' }],
     ['video_project_revisions', { keyPath: 'projectId' }],
     ['sync_outbox', { keyPath: 'key' }],
+    ['sync_catalog_cache', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -371,6 +376,7 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['sync_capture', { keyPath: 'key' }],
     ['video_project_revisions', { keyPath: 'projectId' }],
     ['sync_outbox', { keyPath: 'key' }],
+    ['sync_catalog_cache', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
