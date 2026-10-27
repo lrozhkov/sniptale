@@ -220,7 +220,7 @@ function ModeMenuItem(props: {
     >
       {getModeIcon(props.mode)}
       <ProductToolbarMenuItemCopy hint={copy.hint} label={copy.label} />
-      <kbd className="sniptale-mode-shortcut">
+      <kbd className="sniptale-toolbar-menu-shortcut">
         {TOOLBAR_INTERACTION_MODES.indexOf(props.mode) + 1}
       </kbd>
       <span className="inline-flex w-4 shrink-0">

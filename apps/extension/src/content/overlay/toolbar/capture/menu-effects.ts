@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { isEditableElementTarget } from '../../../../ui/keyboard/editable-target';
+import { isTrustedKeyboardEvent } from '../../../platform/trusted-events';
 import {
   getContentEventTargetElement,
   isContentEventWithinElement,
@@ -189,4 +191,61 @@ export function useToolbarClickOutsideDismissal(params: {
 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, menuRef, closeMenus]);
+}
+
+/** The mounted capture menu owns digit choices; mode shortcuts yield while it is open. */
+export function useCaptureMenuDigits(params: {
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  optionCount: number;
+  onSelect(index: number): void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const index = event.key === '0' ? 9 : Number(event.key) - 1;
+      const trigger = params.triggerRef.current;
+      const menu = params.menuRef.current;
+      if (
+        !/^[0-9]$/.test(event.key) ||
+        index >= params.optionCount ||
+        !isTrustedKeyboardEvent(event) ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.shiftKey ||
+        event.composedPath().some(isEditableElementTarget) ||
+        !menu ||
+        menu.getClientRects().length === 0 ||
+        getComputedStyle(menu).visibility === 'hidden' ||
+        !trigger ||
+        trigger.matches(':disabled') ||
+        trigger.getClientRects().length === 0 ||
+        getComputedStyle(trigger).visibility === 'hidden' ||
+        trigger.closest('[inert], [data-page-customizing="true"], [data-dragging="true"]')
+      )
+        return;
+      const root = trigger.getRootNode();
+      if (!(root instanceof Document || root instanceof ShadowRoot)) return;
+      if (
+        [
+          ...root.querySelectorAll<HTMLElement>(
+            '[aria-modal="true"], [role="dialog"], [role="listbox"]'
+          ),
+        ].some(
+          (layer) =>
+            layer.getClientRects().length > 0 && getComputedStyle(layer).visibility !== 'hidden'
+        )
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      trigger.focus({ preventScroll: true });
+      params.onSelect(index);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [params]);
 }

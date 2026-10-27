@@ -13,6 +13,7 @@ import {
   ToolbarMenuDropdown,
 } from '../menu/dropdown';
 import { renderMenuCheck } from './options';
+import { useCaptureMenuDigits } from './menu-effects';
 
 type TimerDropdownProps = {
   timerDropdownMenuRef: React.RefObject<HTMLDivElement | null>;
@@ -38,7 +39,7 @@ function TimerDropdownItems(props: {
 }) {
   return (
     <>
-      {props.timerOptions.map((option) => {
+      {props.timerOptions.map((option, index) => {
         const isSelected = props.timerDelay === option.value;
 
         return (
@@ -52,7 +53,10 @@ function TimerDropdownItems(props: {
             selected={isSelected}
           >
             <ProductToolbarMenuItemCopy label={option.label} hint={option.hint} />
-            {isSelected && renderMenuCheck()}
+            {index < 10 ? (
+              <kbd className="sniptale-toolbar-menu-shortcut">{index === 9 ? '0' : index + 1}</kbd>
+            ) : null}
+            <span className="sniptale-popover-check">{isSelected && renderMenuCheck()}</span>
           </ProductToolbarMenuItem>
         );
       })}
@@ -82,6 +86,17 @@ export function resolveTimerMenuLayout(
 
 export function TimerDropdown(props: TimerDropdownProps) {
   const adopted = React.useContext(CommandPressScope);
+  useCaptureMenuDigits({
+    menuRef: props.timerDropdownMenuRef,
+    triggerRef: props.timerButtonRef,
+    optionCount: props.timerOptions.length,
+    onSelect: (index) => {
+      const option = props.timerOptions[index];
+      if (!option) return;
+      props.onTimerDelayChange(option.value);
+      props.closeMenus(null);
+    },
+  });
   const { placement: menuPlacement, style } = resolveTimerMenuLayout(props);
 
   if (!style) {

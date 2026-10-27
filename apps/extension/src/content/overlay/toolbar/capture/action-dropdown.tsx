@@ -13,6 +13,7 @@ import {
   ToolbarMenuDropdown,
 } from '../menu/dropdown';
 import { renderMenuCheck } from './options';
+import { useCaptureMenuDigits } from './menu-effects';
 
 type CaptureActionDropdownProps = {
   captureDropdownMenuRef: React.RefObject<HTMLDivElement | null>;
@@ -39,7 +40,7 @@ function CaptureActionDropdownItems(props: {
   captureActionOptions: CaptureActionDropdownProps['captureActionOptions'];
   onSelect: (value: string) => void;
 }) {
-  return props.captureActionOptions.map((option) => {
+  return props.captureActionOptions.map((option, index) => {
     const isSelected = props.captureAction === option.value;
 
     return (
@@ -52,7 +53,10 @@ function CaptureActionDropdownItems(props: {
       >
         {option.icon}
         <ProductToolbarMenuItemCopy label={option.label} hint={option.hint} />
-        {isSelected && renderMenuCheck()}
+        {index < 10 ? (
+          <kbd className="sniptale-toolbar-menu-shortcut">{index === 9 ? '0' : index + 1}</kbd>
+        ) : null}
+        <span className="sniptale-popover-check">{isSelected && renderMenuCheck()}</span>
       </ProductToolbarMenuItem>
     );
   });
@@ -81,6 +85,16 @@ export function resolveCaptureActionMenuLayout(
 
 export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
   const adopted = React.useContext(CommandPressScope);
+  useCaptureMenuDigits({
+    menuRef: props.captureDropdownMenuRef,
+    triggerRef: props.captureButtonRef,
+    optionCount: props.captureActionOptions.length,
+    onSelect: (index) => {
+      const option = props.captureActionOptions[index];
+      if (!option) return;
+      props.onSelect(option.value);
+    },
+  });
   const [menuHeight, setMenuHeight] = React.useState(340);
   React.useLayoutEffect(() => {
     const surface = props.captureDropdownMenuRef.current?.firstElementChild;

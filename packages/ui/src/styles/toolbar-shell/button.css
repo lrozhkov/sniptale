@@ -551,7 +551,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sniptale-mode-shortcut {
+.sniptale-toolbar-menu-shortcut {
   margin-inline-start: auto;
   font: inherit;
   font-variant-numeric: tabular-nums;
