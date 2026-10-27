@@ -32,6 +32,7 @@ export type SyncQueueFailureCode =
   | 'authentication'
   | 'access-denied'
   | 'storage-full'
+  | 'invalid-workspace'
   | 'source'
   | 'internal'
   | 'interrupted';
@@ -40,6 +41,7 @@ export const SYNC_QUEUE_FAILURE_CODES: readonly SyncQueueFailureCode[] = [
   'authentication',
   'access-denied',
   'storage-full',
+  'invalid-workspace',
   'source',
   'internal',
   'interrupted',

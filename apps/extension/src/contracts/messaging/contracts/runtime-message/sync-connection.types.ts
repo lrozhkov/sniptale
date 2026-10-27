@@ -3,6 +3,7 @@ import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-
 import type {
   SyncConnectionAuthentication,
   SyncConnectionIdentity,
+  SyncWorkspaceSource,
 } from '../../../../composition/persistence/remote-connection/model';
 import type {
   SyncQueueFailureCode,
@@ -36,9 +37,10 @@ export type SyncWorkspaceFailureCode =
   | 'interrupted'
   | 'internal';
 
-/** Safe projection of the selected workspace allocation; carries no authentication. */
+/** Safe projection of the selected workspace source; carries no authentication. */
 export interface SyncWorkspaceJobSnapshot {
-  allocationIncarnation: string;
+  sourceKind: SyncWorkspaceSource['kind'];
+  selectionIncarnation: string;
   selectionRevision: number;
   state: 'running' | 'ready' | 'failed' | 'interrupted';
   failureCode: SyncWorkspaceFailureCode | null;
@@ -72,7 +74,7 @@ export interface SyncWorkspaceStartRequest extends SyncCommandEnvelope {
   type: typeof MessageType.OFFSCREEN_SYNC_WORKSPACE_START;
   executorId: string;
   executorRevision: number;
-  allocation: SyncConnectionIdentity;
+  source: SyncWorkspaceSource;
   authentication: SyncConnectionAuthentication;
 }
 export interface SyncInspectRequest extends SyncCommandEnvelope {
@@ -91,11 +93,12 @@ export interface SyncOriginPermissionRequest {
   authorization: SyncConnectionIdentity;
   origin: string;
 }
-/** Background checks the exact native allocation and canonical HTTPS root origin. */
+/** Background checks the exact native selection and canonical HTTPS root origin. */
 export interface SyncWorkspaceOriginPermissionRequest {
   type: typeof MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION;
   requestId: string;
-  allocationIncarnation: string;
+  sourceKind: SyncWorkspaceSource['kind'];
+  selectionIncarnation: string;
   origin: string;
 }
 export type SyncStartResponse = RuntimeMessageResponse<{

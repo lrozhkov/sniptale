@@ -5,7 +5,7 @@ import type {
   SyncOriginPermissionRequest,
   SyncWorkspaceOriginPermissionRequest,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
-import type { SyncWorkspaceAllocation } from '../../composition/persistence/remote-connection/workspace-allocation';
+import type { SyncWorkspaceSelection } from '../../composition/persistence/remote-connection/workspace-selection';
 import { routeSyncConnectionOriginPermission } from './route';
 
 vi.mock('@sniptale/platform/browser/runtime', async (original) => ({
@@ -15,8 +15,8 @@ vi.mock('@sniptale/platform/browser/runtime', async (original) => ({
 vi.mock('../../composition/persistence/remote-connection/store', () => ({
   loadSyncConnection: vi.fn(),
 }));
-vi.mock('../../composition/persistence/remote-connection/workspace-allocation', () => ({
-  loadSyncWorkspaceAllocation: vi.fn(),
+vi.mock('../../composition/persistence/remote-connection/workspace-selection', () => ({
+  loadSyncWorkspaceSelection: vi.fn(),
 }));
 const authorization = { incarnation: '11111111-1111-4111-8111-111111111111', revision: 2 };
 const message: SyncOriginPermissionRequest = {
@@ -51,24 +51,18 @@ function connection(): SyncConnectionMetadata {
 const workspaceMessage: SyncWorkspaceOriginPermissionRequest = {
   type: MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION,
   requestId: message.requestId,
-  allocationIncarnation: authorization.incarnation,
+  sourceKind: 'allocation',
+  selectionIncarnation: authorization.incarnation,
   origin: message.origin,
 };
-function workspace(): SyncWorkspaceAllocation {
+function workspace(): SyncWorkspaceSelection {
   return {
-    version: 2,
-    kind: 'sync-workspace-allocation',
-    key: 'workspace-allocation',
-    provider: 'webdav',
-    parentUrl: `${message.origin}/parent/`,
+    source: { kind: 'allocation', identity: { ...authorization } },
     rootUrl: `${message.origin}/parent/Sniptale-33333333-3333-4333-8333-333333333333/`,
     accountId: 'alice',
-    spaceId: authorization.incarnation,
-    bootstrapId: '33333333-3333-4333-8333-333333333333',
     createdAt: 1,
-    identity: { ...authorization },
+    bindingKey: 'allocation-binding',
     phase: 'allocating',
-    marker: null,
   };
 }
 function deferred<T>() {
@@ -83,7 +77,7 @@ function setup() {
     .fn<() => Promise<SyncConnectionMetadata | null>>()
     .mockResolvedValue(connection());
   const loadWorkspace = vi
-    .fn<() => Promise<SyncWorkspaceAllocation | null>>()
+    .fn<() => Promise<SyncWorkspaceSelection | null>>()
     .mockResolvedValue(workspace());
   const contains = vi
     .fn<(permissions: chrome.permissions.Permissions) => Promise<boolean>>()
@@ -257,13 +251,13 @@ it('checks workspace incarnation and root origin without a coordinator or native
   expect(f.contains).toHaveBeenCalledExactlyOnceWith({ origins: ['https://dav.example.test/*'] });
   expect(navigator.locks.request).not.toHaveBeenCalled();
 });
-it.each(['missing', 'abandoned', 'foreign', 'origin'] as const)(
+it.each(['missing', 'kind', 'foreign', 'origin'] as const)(
   'denies %s workspace before browser permission lookup',
   async (condition) => {
     const f = setup();
     const current = workspace();
-    if (condition === 'abandoned') current.phase = 'abandoned';
-    if (condition === 'foreign') current.identity.incarnation = crypto.randomUUID();
+    if (condition === 'kind') current.source.kind = 'join';
+    if (condition === 'foreign') current.source.identity.incarnation = crypto.randomUUID();
     if (condition === 'origin') current.rootUrl = 'https://other.example.test/root/';
     f.loadWorkspace.mockResolvedValue(condition === 'missing' ? null : current);
     expect(await f.query(workspaceMessage).response).toEqual({ success: true, allowed: false });
@@ -291,15 +285,15 @@ it.each([
   const query = f.query(workspaceMessage);
   await entered.promise;
   const updated = workspace();
-  if (change === 'abandon') updated.phase = 'abandoned';
-  if (change === 'recreate') updated.identity.incarnation = crypto.randomUUID();
+
+  if (change === 'recreate') updated.source.identity.incarnation = crypto.randomUUID();
   if (change === 'root') updated.rootUrl = `${message.origin}/other/`;
   if (change === 'account') updated.accountId = 'bob';
-  if (change === 'parent') updated.parentUrl = `${message.origin}/other/`;
-  if (change === 'space') updated.spaceId = crypto.randomUUID();
-  if (change === 'bootstrap') updated.bootstrapId = crypto.randomUUID();
+  if (change === 'parent') updated.bindingKey += '-parent';
+  if (change === 'space') updated.bindingKey += '-space';
+  if (change === 'bootstrap') updated.bindingKey += '-bootstrap';
   if (change === 'created') updated.createdAt += 1;
-  f.loadWorkspace.mockResolvedValue(change === 'delete' ? null : updated);
+  f.loadWorkspace.mockResolvedValue(change === 'delete' || change === 'abandon' ? null : updated);
   permission.resolve(true);
   expect(await query.response).toEqual({ success: true, allowed: false });
   expect(navigator.locks.request).not.toHaveBeenCalled();
@@ -308,17 +302,17 @@ it('leaves workspace phase and revision admission with the native request owner'
   const f = setup();
   const advanced = workspace();
   advanced.phase = 'allocated';
-  advanced.identity.revision += 1;
+  advanced.source.identity.revision += 1;
   f.loadWorkspace.mockResolvedValueOnce(workspace()).mockResolvedValueOnce(advanced);
   expect(await f.query(workspaceMessage).response).toEqual({ success: true, allowed: true });
 });
 it('detaches workspace input before native reads and denies missing browser permission', async () => {
   const f = setup();
-  const read = deferred<SyncWorkspaceAllocation>();
+  const read = deferred<SyncWorkspaceSelection>();
   f.loadWorkspace.mockReturnValueOnce(read.promise);
   const input = { ...workspaceMessage };
   const query = f.query(input);
-  input.allocationIncarnation = crypto.randomUUID();
+  input.selectionIncarnation = crypto.randomUUID();
   input.origin = 'https://other.example.test';
   read.resolve(workspace());
   expect(await query.response).toEqual({ success: true, allowed: true });
@@ -345,7 +339,8 @@ it.each(['load', 'contains', 'reread'] as const)(
 it.each([
   { origin: 'http://dav.example.test' },
   { origin: 'https://dav.example.test/' },
-  { allocationIncarnation: 'not-a-uuid' },
+  { selectionIncarnation: 'not-a-uuid' },
+  { sourceKind: 'foreign' },
   { password: 'private' },
 ])('refuses malformed workspace permission input %# before native reads', async (change) => {
   const f = setup();

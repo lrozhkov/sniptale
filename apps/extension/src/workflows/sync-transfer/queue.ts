@@ -21,6 +21,7 @@ import {
   prepareCapturedOutgoing,
 } from './outgoing';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
+import { SyncWorkspaceError } from './workspace';
 import { hashSyncText } from './wire-record';
 
 type QueueResult = { status: 'busy' } | { status: 'finished'; operation: SyncQueueOperation };
@@ -36,6 +37,11 @@ function lockName(scope: SyncQueueScope, operationId: string): string {
   return `sniptale-sync-operation:${hashSyncText(identity)}`;
 }
 function failureCode(error: unknown): SyncQueueFailureCode {
+  if (error instanceof SyncWorkspaceError) {
+    if (error.code === 'unavailable') return 'temporary';
+    if (error.code === 'cancelled') return 'interrupted';
+    return 'invalid-workspace';
+  }
   if (error instanceof SyncRemoteError) {
     switch (error.code) {
       case 'authentication':

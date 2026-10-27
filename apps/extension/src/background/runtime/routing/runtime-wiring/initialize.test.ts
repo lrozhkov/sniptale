@@ -5,7 +5,7 @@ vi.mock('../../../ai/audio/port', () => ({ registerAudioJobPorts: vi.fn() }));
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { SyncConnectionMetadata } from '../../../../composition/persistence/remote-connection/model';
-import type { SyncWorkspaceAllocation } from '../../../../composition/persistence/remote-connection/workspace-allocation';
+import type { SyncWorkspaceSelection } from '../../../../composition/persistence/remote-connection/workspace-selection';
 
 const {
   configureDownloadPort,
@@ -67,6 +67,9 @@ const syncWiring = vi.hoisted(() => ({
   inspect: vi.fn().mockResolvedValue(null),
   start: vi.fn(),
   startWorkspace: vi.fn(),
+  enrollWorkspace: vi.fn(),
+  enrollConnection: vi.fn(),
+  revokeJoin: vi.fn().mockResolvedValue(undefined),
   reserveErasure: vi.fn(),
   permissionsRemoved: vi.fn<(isAffected: (origin: string) => boolean) => Promise<void>>(),
   quiesce: vi.fn().mockResolvedValue(undefined),
@@ -82,7 +85,7 @@ const syncWiring = vi.hoisted(() => ({
   send: vi.fn().mockResolvedValue({ success: true }),
   loadConnection: vi.fn<() => Promise<SyncConnectionMetadata | null>>().mockResolvedValue(null),
   commandConnection: vi.fn().mockResolvedValue(undefined),
-  loadWorkspace: vi.fn<() => Promise<SyncWorkspaceAllocation | null>>().mockResolvedValue(null),
+  loadWorkspace: vi.fn<() => Promise<SyncWorkspaceSelection | null>>().mockResolvedValue(null),
   revokeWorkspace: vi.fn().mockResolvedValue(undefined),
   contains: vi.fn().mockResolvedValue(true),
   subscribeRemoved:
@@ -128,6 +131,7 @@ vi.mock('../../../../composition/persistence/remote-connection/store', async (or
   >()),
   loadSyncConnection: syncWiring.loadConnection,
   commandSyncConnection: syncWiring.commandConnection,
+  enrollSyncWorkspaceConnection: syncWiring.enrollConnection,
 }));
 vi.mock(
   '../../../../composition/persistence/remote-connection/workspace-allocation',
@@ -135,10 +139,15 @@ vi.mock(
     ...(await original<
       typeof import('../../../../composition/persistence/remote-connection/workspace-allocation')
     >()),
-    loadSyncWorkspaceAllocation: syncWiring.loadWorkspace,
     revokeSyncWorkspaceAllocation: syncWiring.revokeWorkspace,
   })
 );
+vi.mock('../../../../composition/persistence/remote-connection/workspace-selection', () => ({
+  loadSyncWorkspaceSelection: syncWiring.loadWorkspace,
+}));
+vi.mock('../../../../composition/persistence/remote-connection/workspace-join', () => ({
+  revokeSyncWorkspaceJoin: syncWiring.revokeJoin,
+}));
 vi.mock('@sniptale/platform/observability/logger', async (original) => {
   const actual = await original<typeof import('@sniptale/platform/observability/logger')>();
   return {
@@ -231,6 +240,7 @@ beforeEach(() => {
     inspect: syncWiring.inspect,
     start: syncWiring.start,
     startWorkspace: syncWiring.startWorkspace,
+    enrollWorkspace: syncWiring.enrollWorkspace,
     reserveErasure: syncWiring.reserveErasure,
     permissionsRemoved: syncWiring.permissionsRemoved,
   });
@@ -400,21 +410,17 @@ function nativeConnection(): SyncConnectionMetadata {
   };
 }
 
-function nativeWorkspace(): SyncWorkspaceAllocation {
+function nativeWorkspace(): SyncWorkspaceSelection {
   return {
-    version: 2,
-    kind: 'sync-workspace-allocation',
-    key: 'workspace-allocation',
-    provider: 'webdav',
-    parentUrl: 'https://dav.example.test/',
+    source: {
+      kind: 'allocation',
+      identity: { incarnation: '33333333-3333-4333-8333-333333333333', revision: 3 },
+    },
     rootUrl: 'https://dav.example.test/Sniptale-22222222-2222-4222-8222-222222222222/',
     accountId: 'alice',
-    spaceId: '11111111-1111-4111-8111-111111111111',
-    bootstrapId: '22222222-2222-4222-8222-222222222222',
     createdAt: 1,
-    identity: { incarnation: '33333333-3333-4333-8333-333333333333', revision: 3 },
+    bindingKey: 'allocation-binding',
     phase: 'allocated',
-    marker: null,
   };
 }
 
@@ -611,11 +617,11 @@ it('injects native workspace authority and the shared gateway into the same coor
   const committed = deferred<void>();
   syncWiring.revokeWorkspace.mockReturnValueOnce(committed.promise);
   let settled = false;
-  const revocation = deps.revokeWorkspace(allocation.identity.incarnation).then(() => {
+  const revocation = deps.revokeWorkspace(allocation.source).then(() => {
     settled = true;
   });
   expect(syncWiring.revokeWorkspace).toHaveBeenCalledExactlyOnceWith(
-    allocation.identity.incarnation
+    allocation.source.identity.incarnation
   );
   await Promise.resolve();
   expect(settled).toBe(false);
@@ -623,9 +629,7 @@ it('injects native workspace authority and the shared gateway into the same coor
   await revocation;
   expect(settled).toBe(true);
   syncWiring.revokeWorkspace.mockRejectedValueOnce(new Error('Native lifetime refusal'));
-  await expect(deps.revokeWorkspace(allocation.identity.incarnation)).rejects.toThrow(
-    'Native lifetime refusal'
-  );
+  await expect(deps.revokeWorkspace(allocation.source)).rejects.toThrow('Native lifetime refusal');
   const control = registerSecurityE2EControl.mock.calls[0]?.[0];
   expect(control.startWorkspace).toBe(syncWiring.startWorkspace);
 });
@@ -711,4 +715,21 @@ it('releases failed containment and reports only the fixed permission diagnostic
   await logged.promise;
   expect(syncWiring.release).toHaveBeenCalledOnce();
   expect(syncWiring.permissionsRemoved).not.toHaveBeenCalled();
+});
+
+it('wires JOIN revocation and enrollment through the shared coordinator', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  initializeBackgroundRuntime(createModeState());
+  const deps = coordinatorDependencies();
+  const selected = nativeWorkspace();
+  selected.source.kind = 'join';
+  await deps.revokeWorkspace(selected.source);
+  expect(syncWiring.revokeJoin).toHaveBeenCalledExactlyOnceWith(
+    selected.source.identity.incarnation
+  );
+  expect(deps.enrollConnection).toBe(syncWiring.enrollConnection);
+  expect(await deps.hasOriginPermission('https://dav.example.test')).toBe(true);
+  expect(syncWiring.contains).toHaveBeenCalledWith({ origins: ['https://dav.example.test/*'] });
+  const control = registerSecurityE2EControl.mock.calls[0]?.[0];
+  expect(control?.enrollWorkspace).toBe(syncWiring.enrollWorkspace);
 });

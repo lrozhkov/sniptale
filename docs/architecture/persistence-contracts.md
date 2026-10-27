@@ -974,3 +974,14 @@ Only exact checking evidence can become ready after the existing marker, catalog
 Ready JOIN uses the existing atomic connection installer and receipt. It derives endpoint, account and workspace identity from native evidence. Retained abandoned allocation evidence cannot select the joined root or adopt old outbox data. Receipt replay checks source kind as well as identity and binding.
 
 The read-only workflow drains issued requests before it records readiness. Active close revokes the intent, aborts and drains IO. A settled, contained failure retains checking for explicit retry. Production producer registration and activation handoff remain separate required release gates.
+
+
+## Unified workspace source selection
+
+SyncWorkspaceSource identifies allocation or JOIN with an exact native identity. The strict parser reconstructs this value at storage and IPC boundaries. The native selection reader parses both rows in one readonly transaction. Conflicting live intents or malformed evidence refuse selection without repair. An abandoned allocation can coexist with JOIN but cannot choose its endpoint.
+
+The selection projection contains no credential or catalog payload. Its bindingKey encodes immutable parsed selection fields. Phase and revision changes do not change that token. It preserves permission consistency checks and grants no mutation authority. Retained native ready evidence remains readable after enrollment for receipt replay.
+
+Coordinator containment precedes the existing atomic enrollment installer. Native source checks, prepared database capture, credential protection and transaction rollback remain with that installer. No runtime snapshot replaces native readiness or the enrollment receipt.
+
+The queue accepts invalid-workspace as a bounded failure code. Marker verification occurs after claim and before the first remote effect. Temporary refusal retains the existing retry budget and deadlines. Invalid identity requires explicit action and preserves local source evidence.

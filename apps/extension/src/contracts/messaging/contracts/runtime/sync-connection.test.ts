@@ -32,17 +32,19 @@ const workspaceStart = {
   type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
   ...envelope,
   ...target,
-  allocation: authorization,
+  source: { kind: 'allocation', identity: authorization },
   authentication: { kind: 'basic', username: 'account', password: 'private-password' },
 };
 const workspacePermission = {
   type: MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION,
   requestId: id,
-  allocationIncarnation: id,
+  sourceKind: 'allocation',
+  selectionIncarnation: id,
   origin: 'https://dav.example',
 };
 const workspace = {
-  allocationIncarnation: id,
+  sourceKind: 'allocation',
+  selectionIncarnation: id,
   selectionRevision: 1,
   state: 'running',
   failureCode: null,
@@ -143,7 +145,7 @@ describe('sync lifecycle runtime boundary', () => {
     const parsed = parseSyncConnectionRuntimeMessage(workspaceStart);
     if (parsed?.type !== MessageType.OFFSCREEN_SYNC_WORKSPACE_START)
       throw new Error('Missing workspace start');
-    expect(parsed.allocation).not.toBe(workspaceStart.allocation);
+    expect(parsed.source).not.toBe(workspaceStart.source);
     expect(parsed.authentication).not.toBe(workspaceStart.authentication);
     const bearer = { kind: 'bearer', accessToken: 'private-token' };
     expect(
@@ -186,12 +188,18 @@ describe('sync lifecycle runtime boundary', () => {
       { incarnation: id, revision: 0 },
       { ...authorization, password: 'private' },
     ]) {
-      expect(parseSyncConnectionRuntimeMessage({ ...workspaceStart, allocation })).toBeNull();
+      expect(
+        parseSyncConnectionRuntimeMessage({
+          ...workspaceStart,
+          source: { kind: 'allocation', identity: allocation },
+        })
+      ).toBeNull();
     }
     expect(
       parseSyncConnectionRuntimeMessage({
         ...workspacePermission,
-        allocationIncarnation: 'arbitrary',
+        sourceKind: 'allocation',
+        selectionIncarnation: 'arbitrary',
       })
     ).toBeNull();
     for (const input of [workspaceStart, workspacePermission]) {
@@ -202,6 +210,51 @@ describe('sync lifecycle runtime boundary', () => {
         expect(parseSyncConnectionRuntimeMessage(incomplete)).toBeNull();
       }
     }
+  });
+
+  it('detaches both workspace source kinds and rejects foreign source or permission fields', () => {
+    for (const kind of ['allocation', 'join']) {
+      const source = { kind, identity: authorization };
+      const parsed = parseSyncConnectionRuntimeMessage({ ...workspaceStart, source });
+      if (parsed?.type !== MessageType.OFFSCREEN_SYNC_WORKSPACE_START)
+        throw new Error('Missing workspace start');
+      expect(parsed.source).toEqual(source);
+      expect(parsed.source).not.toBe(source);
+      expect(parsed.source.identity).not.toBe(authorization);
+      expect(
+        parseSyncConnectionRuntimeMessage({ ...workspacePermission, sourceKind: kind })
+      ).not.toBeNull();
+      expect(
+        parseSyncExecutorSnapshot({
+          ...snapshot,
+          jobs: [],
+          workspace: { ...workspace, sourceKind: kind },
+        })
+      ).not.toBeNull();
+    }
+    for (const source of [
+      { kind: 'future', identity: authorization },
+      { kind: 'join', identity: { ...authorization, password: 'private' } },
+      { kind: 'join', identity: authorization, authentication: workspaceStart.authentication },
+      { kind: 'join', identity: authorization, rootUrl: 'https://dav.example' },
+    ])
+      expect(parseSyncConnectionRuntimeMessage({ ...workspaceStart, source })).toBeNull();
+    expect(
+      parseSyncConnectionRuntimeMessage({ ...workspaceStart, allocation: authorization })
+    ).toBeNull();
+    expect(
+      parseSyncConnectionRuntimeMessage({ ...workspacePermission, sourceKind: 'future' })
+    ).toBeNull();
+    expect(
+      parseSyncConnectionRuntimeMessage({ ...workspacePermission, allocationIncarnation: id })
+    ).toBeNull();
+    expect(
+      parseSyncExecutorSnapshot({
+        ...snapshot,
+        jobs: [],
+        workspace: { ...workspace, sourceKind: 'future' },
+      })
+    ).toBeNull();
   });
 
   it('requires a bounded workspace projection and excludes credentials and mixed active jobs', () => {
@@ -230,7 +283,7 @@ describe('sync lifecycle runtime boundary', () => {
       ).toBeNull();
     }
     for (const value of [
-      { ...workspace, allocationIncarnation: 'arbitrary' },
+      { ...workspace, sourceKind: 'allocation', selectionIncarnation: 'arbitrary' },
       { ...workspace, selectionRevision: 0 },
       { ...workspace, selectionRevision: Number.MAX_SAFE_INTEGER + 1 },
       { ...workspace, selectionRevision: 1.5 },

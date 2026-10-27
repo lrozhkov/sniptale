@@ -1,4 +1,6 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { loadSyncWorkspaceSelection } from '../../../../composition/persistence/remote-connection/workspace-selection';
+import { revokeSyncWorkspaceJoin } from '../../../../composition/persistence/remote-connection/workspace-join';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import { createSyncConnectionCoordinator } from '../../../sync-connection/coordinator';
@@ -14,12 +16,10 @@ import {
 import { recoverInterruptedSyncQueueOperation } from '../../../../workflows/sync-transfer/queue';
 import {
   loadSyncConnection,
+  enrollSyncWorkspaceConnection,
   commandSyncConnection,
 } from '../../../../composition/persistence/remote-connection/store';
-import {
-  loadSyncWorkspaceAllocation,
-  revokeSyncWorkspaceAllocation,
-} from '../../../../composition/persistence/remote-connection/workspace-allocation';
+import { revokeSyncWorkspaceAllocation } from '../../../../composition/persistence/remote-connection/workspace-allocation';
 import {
   ensureOffscreenDocument,
   waitForOffscreenReady,
@@ -87,10 +87,14 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   const sync = createSyncConnectionCoordinator({
     ...syncGateway,
     loadConnection: loadSyncConnection,
-    loadWorkspace: loadSyncWorkspaceAllocation,
-    revokeWorkspace: async (incarnation) => {
-      await revokeSyncWorkspaceAllocation(incarnation);
+    loadWorkspace: loadSyncWorkspaceSelection,
+    revokeWorkspace: async (source) => {
+      if (source.kind === 'allocation')
+        await revokeSyncWorkspaceAllocation(source.identity.incarnation);
+      else await revokeSyncWorkspaceJoin(source.identity.incarnation);
     },
+    enrollConnection: enrollSyncWorkspaceConnection,
+    hasOriginPermission: (origin) => browserPermissions.contains({ origins: [origin + '/*'] }),
     revokeConnection: async (identity) => {
       await commandSyncConnection(identity, 'pause');
     },
@@ -102,7 +106,7 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
       let origin: string | null;
       try {
         const connection = await loadSyncConnection();
-        const workspace = connection ? null : await loadSyncWorkspaceAllocation();
+        const workspace = connection ? null : await loadSyncWorkspaceSelection();
         const rootUrl = connection?.binding.rootUrl ?? workspace?.rootUrl;
         origin = rootUrl ? new URL(rootUrl).origin : null;
         if (origin && (await browserPermissions.contains({ origins: [origin + '/*'] }))) return;

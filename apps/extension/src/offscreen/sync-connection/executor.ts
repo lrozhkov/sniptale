@@ -16,7 +16,7 @@ import type {
   SyncWorkspaceJobSnapshot,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import type {
-  SyncConnectionIdentity,
+  SyncWorkspaceSource,
   SyncConnectionAuthentication,
 } from '../../composition/persistence/remote-connection/model';
 
@@ -49,7 +49,7 @@ export interface SyncExecutorExecution {
 
 /** One workspace selection; credentials belong only to the synchronously constructed handle. */
 export interface SyncWorkspaceExecutionInput {
-  allocation: SyncConnectionIdentity;
+  source: SyncWorkspaceSource;
   authentication: SyncConnectionAuthentication;
 }
 
@@ -63,6 +63,7 @@ export interface SyncWorkspaceExecutionResult {
 
 interface WorkspaceJob {
   snapshot: SyncWorkspaceJobSnapshot;
+  source: SyncWorkspaceSource;
   execution: { run(): Promise<SyncWorkspaceExecutionResult>; drain(): Promise<void> };
   completion: Promise<void>;
   active: boolean;
@@ -200,14 +201,16 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
       stopping ||
       phase === 'stopping' ||
       phase === 'failed' ||
-      stoppedWorkspaceIncarnations.has(request.allocation.incarnation) ||
+      stoppedWorkspaceIncarnations.has(
+        JSON.stringify([request.source.kind, request.source.identity.incarnation])
+      ) ||
       [...jobs.values()].some((job) => job.active || job.unsafe)
     )
       return refused();
     if (workspace?.active) {
       if (
-        workspace.snapshot.allocationIncarnation !== request.allocation.incarnation ||
-        workspace.snapshot.selectionRevision !== request.allocation.revision
+        workspace.source.kind !== request.source.kind ||
+        !sameSyncConnectionIdentity(workspace.source.identity, request.source.identity)
       )
         return refused();
       return { success: true, result: 'accepted', executorId: ports.executorId, executorRevision };
@@ -216,16 +219,18 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
     let execution: WorkspaceJob['execution'];
     try {
       execution = ports.createWorkspaceExecution({
-        allocation: structuredClone(request.allocation),
+        source: structuredClone(request.source),
         authentication: structuredClone(request.authentication),
       });
     } catch {
       return refused();
     }
     const job: WorkspaceJob = {
+      source: structuredClone(request.source),
       snapshot: {
-        allocationIncarnation: request.allocation.incarnation,
-        selectionRevision: request.allocation.revision,
+        sourceKind: request.source.kind,
+        selectionIncarnation: request.source.identity.incarnation,
+        selectionRevision: request.source.identity.revision,
         state: 'running',
         failureCode: null,
       },
@@ -339,7 +344,12 @@ export function createSyncConnectionExecutor(ports: SyncExecutorPorts) {
     let workspaceDrain: Promise<void> | null = null;
     if (pendingWorkspace) {
       pendingWorkspace.stopped = true;
-      stoppedWorkspaceIncarnations.add(pendingWorkspace.snapshot.allocationIncarnation);
+      stoppedWorkspaceIncarnations.add(
+        JSON.stringify([
+          pendingWorkspace.snapshot.sourceKind,
+          pendingWorkspace.snapshot.selectionIncarnation,
+        ])
+      );
       // Close admission and abort issued IO before Stop yields to any detached run.
       try {
         workspaceDrain = pendingWorkspace.execution.drain();

@@ -124,7 +124,7 @@ it('signs a workspace selection and returns only the matching accepted receipt',
     offscreenStartupId: startup,
     executorId: executor,
     executorRevision: 1,
-    allocation: { incarnation: challenge, revision: 3 },
+    source: { kind: 'allocation' as const, identity: { incarnation: challenge, revision: 3 } },
     authentication: { kind: 'basic' as const, username: 'alice', password: 'private-password' },
   };
   deps.send.mockImplementation(async (message) => {
@@ -171,7 +171,7 @@ it.each([
       offscreenStartupId: startup,
       executorId: executor,
       executorRevision: 1,
-      allocation: { incarnation: challenge, revision: 3 },
+      source: { kind: 'allocation' as const, identity: { incarnation: challenge, revision: 3 } },
       authentication: { kind: 'bearer', accessToken: 'private-token' },
     })
   ).rejects.toThrow('Sync executor command refused');

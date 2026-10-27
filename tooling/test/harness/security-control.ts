@@ -77,7 +77,13 @@ function disconnectLegacy(): void {
 
 /** Each lifecycle command releases its named Port after the short runtime acknowledgement. */
 async function syncCommand(
-  type: 'sync-start' | 'sync-workspace-start' | 'sync-inspect' | 'sync-stop' | 'sync-erase',
+  type:
+    | 'sync-start'
+    | 'sync-workspace-start'
+    | 'sync-workspace-enroll'
+    | 'sync-inspect'
+    | 'sync-stop'
+    | 'sync-erase',
   payload?: unknown
 ): Promise<unknown> {
   const requestId = crypto.randomUUID();

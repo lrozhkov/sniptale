@@ -304,15 +304,27 @@ The lifecycle suite uses `.tmp/e2e-builds/security` by default. `SNIPTALE_WEBDAV
 
 ### Pre-enrollment workspace execution
 
-The same coordinator and offscreen executor own workspace creation before enrollment. The executor reserves one workspace execution handle before acknowledgement. A running queue job excludes workspace creation. A running or unsafe workspace excludes queue execution.
+The same coordinator and offscreen executor own CREATE and JOIN before enrollment. The executor reserves one workspace execution handle before acknowledgement. A running queue job excludes workspace execution. A running or unsafe workspace excludes queue execution.
 
-The native allocation journal remains authoritative. Worker restart challenges the surviving document and checks the current native allocation incarnation. Phase revisions can advance during execution. Missing, abandoned, replaced or unreadable native authority requires containment before adoption fails.
+A strict source contains kind and exact native identity. Native allocation and JOIN intents remain authoritative. Worker restart challenges the surviving document and checks source kind and current incarnation. Phase revisions can advance during execution. Missing, abandoned, replaced or unreadable authority requires containment before adoption fails.
 
-Stop closes workspace request admission synchronously. It waits for the creation workflow and response bodies to drain. A stopped allocation incarnation cannot restart in that document. A new native allocation requires its own identity. Safe terminal failure permits an explicit retry against the current native revision.
+Stop closes workspace request admission synchronously. It waits for workflow and response bodies to drain. A stopped source kind and incarnation cannot restart in that document. A new native intent requires its own identity. Safe terminal failure permits an explicit retry against the current native revision.
 
-Permission queries check the native allocation incarnation and selected origin without the coordinator queue or connection lock. The request owner checks exact phase and revision around permission admission. Permission removal and erasure revoke the allocation lifetime across phase revisions. Ordinary journal commands retain exact revision checks.
+Permission queries check source kind, incarnation and selected origin without the coordinator queue or connection lock. The native reader selects both intents in one readonly transaction. Its immutable binding token preserves allocation parent and workspace checks. The token grants no authorization. Exact phase and revision admission remains with the request owner.
 
-The security-only lifecycle fixture can start workspace creation. Production Settings enrollment and start ingress remain disabled. This execution boundary does not install a profile or connection.
+Permission removal and erasure revoke the selected intent lifetime across phase revisions. Ordinary native commands retain exact revision checks. The security-only lifecycle fixture can start and explicitly enroll either source. Production Settings and public Start ingress remain disabled.
+
+### Workspace enrollment handoff
+
+Coordinator enrollment requires exact native ready evidence. It refuses running workspace or queue execution and unsafe executor state. Challenge-bound positive absence or acknowledged stop must precede installation. Unknown observation or failed containment refuses enrollment.
+
+After containment, the coordinator checks current readiness, origin permission and its mutation-exclusion generation. The existing native installer owns credential protection, final source checks, atomic publication and receipt replay. A repeated source cannot replace installed credentials. A native ready source alone never starts a queue operation.
+
+Checked queue execution verifies its retained marker identity before the first remote operation effect. This check runs after native claim, through the existing tracked provider. Concurrent effect admission shares one verification promise. Each effect still checks current connection authority. The check reads no catalog or original file.
+
+Temporary marker refusal follows existing durable delayed retries. Invalid or missing identity records invalid-workspace and requires explicit action. No mismatch can initialize, overwrite or clean the selected server root. Legacy experimental connections without checked workspace metadata retain their previous behavior.
+
+This verifies an observed identity. It cannot guarantee that a server remains unchanged after the check.
 
 
 ## Sync retry wake-up

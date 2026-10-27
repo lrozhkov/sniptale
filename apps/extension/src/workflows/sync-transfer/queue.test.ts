@@ -19,6 +19,11 @@ import { scanSyncCatalog } from './catalog';
 import { dispatchPreparedOutgoing, prepareCapturedOutgoing } from './outgoing';
 import { recoverInterruptedSyncQueueOperation, runSyncQueueOperation } from './queue';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
+import { SyncWorkspaceError, verifySyncWorkspaceIdentity } from './workspace';
+import {
+  encodeSyncWorkspaceMarker,
+  SYNC_WORKSPACE_MARKER_KEY,
+} from '../../contracts/sync-workspace';
 import { createSyncAttempt } from './wire-record';
 
 const io = vi.hoisted(() => ({ database: vi.fn() }));
@@ -580,4 +585,77 @@ it('executes and recovers a selected operation with more than 128 unrelated queu
   });
   expect(remote.writes()).toHaveLength(1);
   expect(f.nativeSources()).toEqual(source);
+});
+
+it.each([
+  ['binding-mismatch', 'invalid-workspace'],
+  ['invalid-binding', 'invalid-workspace'],
+  ['marker-missing', 'invalid-workspace'],
+  ['invalid-marker', 'invalid-workspace'],
+  ['unsupported-format', 'invalid-workspace'],
+  ['workspace-changed', 'invalid-workspace'],
+  ['metadata-limit', 'invalid-workspace'],
+  ['unavailable', 'temporary'],
+  ['cancelled', 'interrupted'],
+] as const)(
+  'persists marker admission %s after native claim without operation effects',
+  async (code, failureCode) => {
+    const f = setup();
+    const capture = f.capture('operation');
+    await enqueueSyncQueueOperation(capture);
+    const remote = memoryRemote();
+    const source = f.nativeSources();
+    const authorize = vi.fn(async () => {
+      expect(await current()).toMatchObject({ status: 'running', stage: 'checking' });
+      expect(remote.calls).toEqual([]);
+      throw new SyncWorkspaceError(code);
+    });
+    const result = await execute(capture, remote.adapter, 1, { authorize });
+    expect(result).toMatchObject({
+      status: 'finished',
+      operation: { failureCode, writeStarted: false },
+    });
+    const failed = await current();
+    expect(failed.status).toBe('failed');
+    if (failureCode === 'temporary') expect(failed.nextDueAt).toEqual(expect.any(Number));
+    else expect(failed.nextDueAt).toBeNull();
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(remote.calls).toEqual([]);
+    expect(f.nativeSources()).toEqual(source);
+  }
+);
+
+it('refuses actual marker mismatch before queue publication effects', async () => {
+  const f = setup();
+  const capture = f.capture('operation');
+  await enqueueSyncQueueOperation(capture);
+  const remote = memoryRemote();
+  const marker = encodeSyncWorkspaceMarker(
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222'
+  );
+  remote.bodies.set(SYNC_WORKSPACE_MARKER_KEY, new Blob([marker.text]));
+  const result = await execute(capture, remote.adapter, 1, {
+    authorize: async () => {
+      expect(await current()).toMatchObject({ status: 'running', stage: 'checking' });
+      await verifySyncWorkspaceIdentity(
+        remote.adapter,
+        { ...marker.identity, fingerprint: 'a'.repeat(64) },
+        new AbortController().signal
+      );
+    },
+  });
+  expect(result).toMatchObject({
+    operation: {
+      status: 'failed',
+      failureCode: 'invalid-workspace',
+      writeStarted: false,
+      nextDueAt: null,
+    },
+  });
+  expect(remote.calls.map(({ key }) => key)).toEqual([
+    SYNC_WORKSPACE_MARKER_KEY,
+    SYNC_WORKSPACE_MARKER_KEY,
+  ]);
+  expect(remote.writes()).toEqual([]);
 });

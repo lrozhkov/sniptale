@@ -2778,10 +2778,10 @@
       "file": "apps/extension/src/offscreen/sync-connection/executor.ts",
       "symbol": "createSyncConnectionExecutor",
       "owner": "extension:offscreen:sync-connection",
-      "reason": "tool-noise: Queue and workspace slots share one disposable executor identity, revision, phase, mutual exclusion and Stop reservation. Stop owns synchronous admission closure and both workflow drainage outcomes. Native authority and HTTP resources remain in injected execution owners. Inclusive factory extent counts nested methods. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes or the symbol falls below the cap. Reassess any independent authority, resource lifetime or recovery owner. Remove when the analyzer models this cohesive factory.",
+      "reason": "tool-noise: Queue and CREATE/JOIN slots share one disposable identity, revision, phase, admission exclusion and Stop reservation. Stop closes admission and contains both slot lifetimes. Native authority and HTTP resources retain injected owners. Independent diagnosis classified this exact candidate as Keep. Fresh final architecture review must check this classification.",
+      "removalCondition": "Remove on exact AST or signature change, a new independent authority or lifetime, or analyzer support for this cohesive boundary.",
       "reviewDate": "2026-10-27",
-      "astHash": "70ee4806b3ce4cf5c86cec36c50d9407f7dde8adc41244ef9894e1411ae28a5e",
+      "astHash": "0aeb25b9763832ff5ef797bf01dab9e5a24c4fa0965afd05ad387e5606ca60a8",
       "signatureHash": "87de9e63d0bb330601835d536545f53642c845f667a8bdec466088e98dd813bf"
     },
     {
@@ -2789,10 +2789,10 @@
       "file": "apps/extension/src/background/sync-connection/coordinator.ts",
       "symbol": "createSyncConnectionCoordinator",
       "owner": "extension:background:sync-connection",
-      "reason": "tool-noise: One transition queue and generation exclusion own background admission, observation, revocation and containment for both execution kinds. Inclusive factory extent counts nested methods. Native authority and request resources retain their existing separate owners. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes or the symbol falls below the cap. Reassess any independent authority or separation of queue and exclusion ownership. Remove when the analyzer models this cohesive factory.",
+      "reason": "tool-noise: One transition queue and generation exclusion own command admission, observation, containment, enrollment, revocation and erasure. Native persistence and HTTP resources retain injected owners. Inclusive factory extent counts nested methods. Independent diagnosis classified this exact candidate as Keep. Fresh final architecture review must check this classification.",
+      "removalCondition": "Remove on exact AST or signature change, a new independent authority or lifetime, or analyzer support for this cohesive boundary.",
       "reviewDate": "2026-10-27",
-      "astHash": "dfc1bffe7acbe0f04aea54bd30f46b8b3c80ee3a3d22575dd4ccc59440e1a1d1",
+      "astHash": "65793896bb141453230f4d39f8002f9148e02994e3d3c372d021a0776e126bfb",
       "signatureHash": "3d813b90593606052dbadfec2df1799644761332a5b444d0c29802b689307186"
     },
     {
@@ -2811,10 +2811,10 @@
       "file": "apps/extension/src/contracts/messaging/contracts/runtime/sync-connection.test.ts",
       "symbol": "describe callback",
       "owner": "extension:app-core:contracts",
-      "reason": "tool-noise: This callback registers tests for one strict runtime contract family. Commands, authentication, snapshots and responses share the same boundary fixtures. Nested test bodies account for the inclusive extent. The callback creates no executable runtime authority. Independent read-only diagnosis classified this exact candidate as Keep. Fresh final architecture review must verify this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess executable callback state, effects or unrelated contract responsibility. Remove when the analyzer models declarative test registration.",
+      "reason": "tool-noise: This callback registers isolated tests for one strict lifecycle IPC family. Nested test bodies account for inclusive extent. The registration callback creates no product state or resource authority. Independent diagnosis classified this exact candidate as Keep. Fresh final architecture review must check this classification.",
+      "removalCondition": "Remove on exact AST or signature change, a new independent authority or lifetime, or analyzer support for this cohesive boundary.",
       "reviewDate": "2026-10-27",
-      "astHash": "5a9a5a04e7fc53e8303803aa77a963f4e07b1c3cdd5bd1ded08177b729c23397",
+      "astHash": "348ef123c64649b748856817d1efe3ea1b0de8ba50da188b0b646edab8600cac",
       "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
     },
     {
@@ -2827,6 +2827,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "03a4e1c96caa3b3ddf28f6278da45fb7a3d22a64cbdd48dd74985616ac8a4d5a",
       "signatureHash": "2f7df5c56a3f68284b51613fbf87463eb059de5185d079f2749d29b4e57c2cef"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/sync-connection/execution.test.ts",
+      "symbol": "describe callback",
+      "owner": "extension:offscreen:sync-connection",
+      "reason": "tool-noise: This callback registers isolated queue-adapter proof for marker admission, authorization continuity, cancellation and containment. Tests share the existing mock receiver and reset setup. Nested test bodies account for inclusive extent. Independent diagnosis classified this exact candidate as Keep. Fresh final architecture review must check this classification.",
+      "removalCondition": "Remove on exact AST or signature change, a new independent authority or lifetime, or analyzer support for this cohesive boundary.",
+      "reviewDate": "2026-10-27",
+      "astHash": "2d66002deaabe4b0283e726ad6ee9efde92eb680a9ae190d6b2589e4d058b992",
+      "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
     }
   ]
 }

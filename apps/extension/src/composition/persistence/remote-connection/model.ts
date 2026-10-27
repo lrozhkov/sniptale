@@ -18,6 +18,11 @@ export interface SyncConnectionIdentity {
   incarnation: string;
   revision: number;
 }
+/** Exact native workflow source. Endpoint and credential authority remain with native evidence. */
+export interface SyncWorkspaceSource {
+  kind: 'allocation' | 'join';
+  identity: SyncConnectionIdentity;
+}
 export interface SyncConnectionMetadata {
   version: 1;
   kind: 'sync-connection';
@@ -67,6 +72,17 @@ export function parseSyncConnectionIdentity(value: unknown): SyncConnectionIdent
   )
     return null;
   return { incarnation: value['incarnation'], revision: value['revision'] };
+}
+/** Parse a closed native source and reconstruct its nested identity without caller references. */
+export function parseSyncWorkspaceSource(value: unknown): SyncWorkspaceSource | null {
+  if (
+    !isRecord(value) ||
+    !exact(value, ['kind', 'identity']) ||
+    (value['kind'] !== 'allocation' && value['kind'] !== 'join')
+  )
+    return null;
+  const identity = parseSyncConnectionIdentity(value['identity']);
+  return identity ? { kind: value['kind'], identity } : null;
 }
 export function sameSyncConnectionIdentity(
   left: SyncConnectionIdentity,

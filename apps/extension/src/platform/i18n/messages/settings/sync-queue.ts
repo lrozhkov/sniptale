@@ -78,6 +78,10 @@ export const settingsSyncQueueMessages = defineMessageSource({
     'access-denied': { ru: 'Нет доступа', en: 'Access denied' },
     'storage-full': { ru: 'На сервере нет места', en: 'Server storage full' },
     source: { ru: 'Источник недоступен', en: 'Source unavailable' },
+    'invalid-workspace': {
+      ru: 'Не удалось проверить подключённое хранилище',
+      en: 'Cannot verify the connected storage.',
+    },
     internal: { ru: 'Внутренняя ошибка', en: 'Internal failure' },
     interrupted: { ru: 'Передача прервана', en: 'Transfer interrupted' },
   },

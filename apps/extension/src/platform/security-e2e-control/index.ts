@@ -3,6 +3,8 @@ import {
   connectionUuid,
   parseConnectionAuthentication,
   parseSyncConnectionIdentity,
+  parseSyncWorkspaceSource,
+  parseConnectionMetadata,
 } from '../../composition/persistence/remote-connection/model';
 import {
   parseSyncQueueScope,
@@ -13,6 +15,8 @@ import {
 import type {
   SyncConnectionAuthentication,
   SyncConnectionIdentity,
+  SyncWorkspaceSource,
+  SyncConnectionMetadata,
 } from '../../composition/persistence/remote-connection/model';
 import { parseSyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime/sync-connection';
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
@@ -126,7 +130,7 @@ export interface SecurityE2ESyncSelection {
 }
 
 export interface SecurityE2ESyncWorkspaceSelection {
-  allocation: SyncConnectionIdentity;
+  source: SyncWorkspaceSource;
   authentication: SyncConnectionAuthentication;
 }
 
@@ -138,6 +142,7 @@ export interface SecurityE2ESyncRuntime {
   startWorkspace(
     selection: SecurityE2ESyncWorkspaceSelection
   ): Promise<{ executorId: string; executorRevision: number }>;
+  enrollWorkspace(selection: SecurityE2ESyncWorkspaceSelection): Promise<SyncConnectionMetadata>;
   inspect(): Promise<SyncExecutorSnapshot | null>;
   reserveErasure(): { quiesce(): Promise<void>; release(): void };
   erase?(): Promise<boolean>;
@@ -176,7 +181,7 @@ function parseSyncSelection(value: unknown): SecurityE2ESyncSelection | null {
 type SyncControlCommand =
   | { type: 'sync-start'; requestId: string; selection: SecurityE2ESyncSelection }
   | {
-      type: 'sync-workspace-start';
+      type: 'sync-workspace-start' | 'sync-workspace-enroll';
       requestId: string;
       selection: SecurityE2ESyncWorkspaceSelection;
     }
@@ -185,11 +190,11 @@ type SyncControlCommand =
 function parseSyncControlCommand(value: unknown): SyncControlCommand | null {
   if (!isRecord(value) || !connectionUuid(value['requestId'])) return null;
   const requestId = value['requestId'];
-  if (value['type'] === 'sync-workspace-start') {
+  if (value['type'] === 'sync-workspace-start' || value['type'] === 'sync-workspace-enroll') {
     if (!exact(value, ['type', 'requestId', 'payload'])) return null;
     const payload = value['payload'];
-    if (!isRecord(payload) || !exact(payload, ['allocation', 'authentication'])) return null;
-    const allocation = parseSyncConnectionIdentity(payload['allocation']);
+    if (!isRecord(payload) || !exact(payload, ['source', 'authentication'])) return null;
+    const source = parseSyncWorkspaceSource(payload['source']);
     const rawAuthentication = payload['authentication'];
     if (!isRecord(rawAuthentication)) return null;
     const username = rawAuthentication['username'];
@@ -197,8 +202,8 @@ function parseSyncControlCommand(value: unknown): SyncControlCommand | null {
       rawAuthentication,
       typeof username === 'string' ? username : ''
     );
-    return allocation && authentication
-      ? { type: 'sync-workspace-start', requestId, selection: { allocation, authentication } }
+    return source && authentication
+      ? { type: value['type'], requestId, selection: { source, authentication } }
       : null;
   }
   if (value['type'] === 'sync-start') {
@@ -240,6 +245,11 @@ async function executeSyncCommand(command: SyncControlCommand, runtime: Security
       return projectSyncStartReceipt(await runtime.start(command.selection));
     case 'sync-workspace-start':
       return projectSyncStartReceipt(await runtime.startWorkspace(command.selection));
+    case 'sync-workspace-enroll': {
+      const connection = parseConnectionMetadata(await runtime.enrollWorkspace(command.selection));
+      if (!connection) throw new Error();
+      return connection;
+    }
     case 'sync-inspect':
       return projectSyncSnapshot(await runtime.inspect());
     case 'sync-erase':

@@ -1,3 +1,9 @@
+import { saveProjectAsset } from '../../../apps/extension/src/composition/persistence/projects';
+import {
+  createSyncWorkspaceJoin,
+  loadSyncWorkspaceJoin,
+} from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-join';
+import { loadSyncWorkspaceSelection } from '../../../apps/extension/src/composition/persistence/remote-connection/workspace-selection';
 import { createWebdavPortableHarness } from './webdav-portable';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -15,8 +21,9 @@ import {
 } from '../../../apps/extension/src/composition/persistence/remote-connection/store';
 import {
   connectionUuid,
-  type SyncConnectionIdentity,
   parseConnectionAuthentication,
+  parseConnectionMetadata,
+  type SyncWorkspaceSource,
 } from '../../../apps/extension/src/composition/persistence/remote-connection/model';
 import {
   commandSyncQueueOperation,
@@ -38,7 +45,13 @@ import type { SecurityE2ESyncSelection } from '../../../apps/extension/src/platf
 interface LifecycleControl {
   disconnectLegacy(): void;
   command(
-    type: 'sync-start' | 'sync-workspace-start' | 'sync-inspect' | 'sync-stop' | 'sync-erase',
+    type:
+      | 'sync-start'
+      | 'sync-workspace-start'
+      | 'sync-workspace-enroll'
+      | 'sync-inspect'
+      | 'sync-stop'
+      | 'sync-erase',
     payload?: unknown
   ): Promise<unknown>;
 }
@@ -49,7 +62,7 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     throw new Error('The native lifecycle fixture has no page-owned DAV client.');
   });
   let selection: SecurityE2ESyncSelection | null = null;
-  let workspaceSelection: SyncConnectionIdentity | null = null;
+  let workspaceSelection: SyncWorkspaceSource | null = null;
   let sourceIds: { mediaId: string; projectId: string } | null = null;
   let knownObjects: AssetRef[] = [];
 
@@ -135,7 +148,7 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
       parentUrl: input.rootUrl,
       accountId: authentication.username,
     });
-    workspaceSelection = structuredClone(allocation.identity);
+    workspaceSelection = { kind: 'allocation', identity: structuredClone(allocation.identity) };
     return {
       allocation: { identity: allocation.identity, phase: allocation.phase },
       rootKey: allocation.rootUrl.slice(allocation.parentUrl.length),
@@ -145,7 +158,7 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
   async function startWorkspace(authentication: unknown) {
     if (!workspaceSelection) throw new Error('Native workspace fixture is not prepared.');
     const receipt = await control.command('sync-workspace-start', {
-      allocation: workspaceSelection,
+      source: workspaceSelection,
       authentication,
     });
     if (
@@ -161,14 +174,101 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     };
   }
 
+  async function prepareJoin(input: { rootUrl: string; accountId: string }) {
+    control.disconnectLegacy();
+    await loadSyncWorkspaceJoin();
+    const intent = await createSyncWorkspaceJoin({ ...input, expected: null });
+    workspaceSelection = { kind: 'join', identity: intent.identity };
+    return { source: workspaceSelection };
+  }
+  async function enrollWorkspace(authentication: unknown) {
+    if (!workspaceSelection) throw new Error('Native workspace fixture is not prepared.');
+    const current = await loadSyncWorkspaceSelection();
+    if (
+      !current ||
+      current.phase !== 'ready' ||
+      current.source.kind !== workspaceSelection.kind ||
+      current.source.identity.incarnation !== workspaceSelection.identity.incarnation
+    )
+      throw new Error('Native workspace readiness is unavailable.');
+    const value = await control.command('sync-workspace-enroll', {
+      source: current.source,
+      authentication,
+    });
+    const connection = parseConnectionMetadata(value);
+    if (!connection?.workspace) throw new Error('Checked enrollment receipt is invalid.');
+    workspaceSelection = current.source;
+    return {
+      identity: connection.identity,
+      phase: connection.phase,
+      workspace: connection.workspace,
+    };
+  }
+  async function prepareEnrolledSource() {
+    const connection = await loadSyncConnection();
+    if (!connection?.workspace || connection.phase !== 'active')
+      throw new Error('Checked connection is required.');
+    const canvas = document.createElement('canvas');
+    canvas.width = 24;
+    canvas.height = 24;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('PNG fixture canvas is unavailable.');
+    context.fillStyle = 'rgb(20,180,60)';
+    context.fillRect(0, 0, 24, 24);
+    const file = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (value) => (value ? resolve(value) : reject(new Error('PNG fixture failed.'))),
+        'image/png'
+      )
+    );
+    const assetId = crypto.randomUUID();
+    await saveProjectAsset(assetId, file, file.type, 'handoff-original.png');
+    const mediaId = `project-asset:${assetId}`;
+    const db = await initDB();
+    const captures = (await db.getAll(SYNC_CAPTURE_STORE)).flatMap((raw) => {
+      const capture = parseSyncCaptureRecord(raw);
+      return capture?.kind === 'captured-change' &&
+        capture.rootKind === 'media' &&
+        capture.rootId === mediaId
+        ? [capture]
+        : [];
+    });
+    const capture = captures.sort((left, right) => right.generation - left.generation)[0];
+    if (!capture) throw new Error('Enrolled source capture is missing.');
+    const prepared = await prepareCapturedOutgoing(capture);
+    const queued = await enqueueSyncQueueOperation(capture);
+    const scope = {
+      spaceId: connection.binding.spaceId,
+      connectionGeneration: connection.binding.connectionGeneration,
+      profileCreatedAt: connection.binding.profileCreatedAt,
+    };
+    selection = {
+      scope,
+      authorization: connection.identity,
+      operationId: queued.operationId,
+      expectedRevision: queued.revision,
+    };
+    knownObjects = prepared.objects.map((object) => object.ref);
+    return {
+      operationId: prepared.operationId,
+      objects: prepared.objects.map((object) => ({
+        key: object.remoteKey,
+        size: object.ref.size,
+        sha256: object.sha256,
+      })),
+    };
+  }
   async function workspaceState() {
     const databasePresent = (await indexedDB.databases()).some((db) => db.name === DB_NAME);
     if (!databasePresent)
       return { databasePresent: false, allocation: null, profiles: 0, connections: 0 };
     const db = await initDB();
-    const allocation = await loadSyncWorkspaceAllocation();
+    const selected = await loadSyncWorkspaceSelection();
+    const allocation =
+      selected?.source.kind === 'join' ? null : await loadSyncWorkspaceAllocation();
     return {
       databasePresent,
+      selection: selected ? { source: selected.source, phase: selected.phase } : null,
       allocation: allocation ? { identity: allocation.identity, phase: allocation.phase } : null,
       profiles: await db.count(SYNC_CAPTURE_STORE),
       connections: (await db.getKey(SYNC_CONNECTION_STORE, 'connection')) === undefined ? 0 : 1,
@@ -317,6 +417,9 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
   return {
     prepare,
     prepareWorkspace,
+    prepareJoin,
+    enrollWorkspace,
+    prepareEnrolledSource,
     startWorkspace,
     workspaceState,
     start,

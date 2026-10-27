@@ -119,7 +119,10 @@ function parseJoin(value: unknown): SyncWorkspaceJoin | null {
     return null;
   }
 }
-async function readJoin(tx: JoinTransaction): Promise<SyncWorkspaceJoin | null> {
+/** Read JOIN evidence without repair inside the caller transaction. */
+export async function readSyncWorkspaceJoin(
+  tx: JoinTransaction
+): Promise<SyncWorkspaceJoin | null> {
   const raw: unknown = await tx.objectStore(SYNC_CONNECTION_STORE).get('workspace-join');
   return raw === undefined ? null : (parseJoin(raw) ?? refused());
 }
@@ -189,7 +192,7 @@ export async function createSyncWorkspaceJoin(
   }
   const accountId = detached['accountId'];
   return mutate(async (tx) => {
-    const current = await readJoin(tx);
+    const current = await readSyncWorkspaceJoin(tx);
     if (
       current
         ? !expectedIdentity || !sameSyncConnectionIdentity(current.identity, expectedIdentity)
@@ -220,7 +223,7 @@ export async function loadSyncWorkspaceJoin(): Promise<SyncWorkspaceJoin | null>
   const tx = db.transaction(stores, 'readonly');
   try {
     await checkUnenrolled(tx);
-    const join = await readJoin(tx);
+    const join = await readSyncWorkspaceJoin(tx);
     await tx.done;
     return join;
   } catch (error) {
@@ -233,7 +236,7 @@ export async function beginSyncWorkspaceJoin(identityInput: unknown): Promise<Sy
   const identity = parseSyncConnectionIdentity(structuredClone(identityInput));
   if (!identity || !Number.isSafeInteger(identity.revision + 1)) return refused();
   return mutate(async (tx) => {
-    const current = await readJoin(tx);
+    const current = await readSyncWorkspaceJoin(tx);
     if (!current || !sameSyncConnectionIdentity(current.identity, identity)) return refused();
     const join: SyncWorkspaceJoin = {
       ...current,
@@ -261,7 +264,7 @@ export async function completeSyncWorkspaceJoin(
   if (!identity || !evidence || !Number.isSafeInteger(identity.revision + 1)) return refused();
   const workspace = evidence;
   return mutate(async (tx) => {
-    const current = await readJoin(tx);
+    const current = await readSyncWorkspaceJoin(tx);
     if (
       !current ||
       current.phase !== 'checking' ||
@@ -285,7 +288,7 @@ export async function abandonSyncWorkspaceJoin(identityInput: unknown): Promise<
   const identity = parseSyncConnectionIdentity(structuredClone(identityInput));
   if (!identity) return refused();
   return mutate(async (tx) => {
-    const current = await readJoin(tx);
+    const current = await readSyncWorkspaceJoin(tx);
     if (!current || !sameSyncConnectionIdentity(current.identity, identity)) return refused();
     await tx.objectStore(SYNC_CONNECTION_STORE).delete('workspace-join');
   });
@@ -295,7 +298,7 @@ export async function revokeSyncWorkspaceJoin(incarnationInput: unknown): Promis
   const incarnation: unknown = structuredClone(incarnationInput);
   if (!connectionUuid(incarnation)) return refused();
   return mutate(async (tx) => {
-    const current = await readJoin(tx);
+    const current = await readSyncWorkspaceJoin(tx);
     if (!current) return;
     if (current.identity.incarnation !== incarnation) return refused();
     await tx.objectStore(SYNC_CONNECTION_STORE).delete('workspace-join');
@@ -306,7 +309,7 @@ export async function readReadySyncWorkspaceJoin(
   tx: JoinTransaction,
   expected: SyncConnectionIdentity
 ): Promise<SyncWorkspaceJoin> {
-  const current = await readJoin(tx);
+  const current = await readSyncWorkspaceJoin(tx);
   if (
     !current ||
     current.phase !== 'ready' ||

@@ -235,6 +235,7 @@ it('replays workspace admission by request identity without retaining authentica
   const message = {
     type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
     requestId: crypto.randomUUID(),
+    source: { kind: 'join', identity: { incarnation: crypto.randomUUID(), revision: 1 } },
     authentication: { kind: 'bearer', accessToken: 'private-workspace-token' },
   };
   const args = { capabilityGeneration: crypto.randomUUID(), message, execute };

@@ -4,6 +4,7 @@ import {
   parseSyncWorkspaceIdentity,
   parseSyncWorkspaceMarker,
   SyncWorkspaceMarkerError,
+  type SyncWorkspaceIdentity,
 } from '../../contracts/sync-workspace';
 import { scanSyncCatalog, SyncCatalogError } from './catalog';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
@@ -73,6 +74,40 @@ async function readMarker(remote: SyncRemoteStore, signal: AbortSignal) {
 }
 
 /**
+ * Check one exact marker binding with bounded reads and no catalog, media or write effects.
+ * The caller owns endpoint authorization. This observation grants no execution authority.
+ */
+export async function verifySyncWorkspaceIdentity(
+  remote: SyncRemoteStore,
+  expectedInput: unknown,
+  signal: AbortSignal
+): Promise<SyncWorkspaceIdentity> {
+  let expected;
+  try {
+    expected = parseSyncWorkspaceIdentity(expectedInput);
+    if (!expected) throw new SyncWorkspaceError('invalid-binding');
+  } catch {
+    throw new SyncWorkspaceError('invalid-binding');
+  }
+  try {
+    signal.throwIfAborted();
+    const identity = await readMarker(remote, signal);
+    signal.throwIfAborted();
+    if (
+      expected.spaceId !== identity.spaceId ||
+      expected.bootstrapId !== identity.bootstrapId ||
+      expected.fingerprint !== identity.fingerprint
+    )
+      throw new SyncWorkspaceError('binding-mismatch');
+    return identity;
+  } catch (error) {
+    if (signal.aborted) throw new SyncWorkspaceError('cancelled');
+    if (error instanceof SyncWorkspaceError || error instanceof SyncRemoteError) throw error;
+    throw new SyncWorkspaceError('unavailable');
+  }
+}
+
+/**
  * Inspect one exact workspace root without writes, enrollment or media reads.
  * The immutable marker commits even an empty workspace; it replaces no mutable HEAD.
  * The caller owns endpoint authorization. This snapshot grants no execution authority.
@@ -91,14 +126,9 @@ export async function prepareSyncWorkspaceJoin(
   }
   try {
     signal.throwIfAborted();
-    const identity = await readMarker(remote, signal);
-    if (
-      expected &&
-      (expected.spaceId !== identity.spaceId ||
-        expected.bootstrapId !== identity.bootstrapId ||
-        expected.fingerprint !== identity.fingerprint)
-    )
-      throw new SyncWorkspaceError('binding-mismatch');
+    const identity = expected
+      ? await verifySyncWorkspaceIdentity(remote, expected, signal)
+      : await readMarker(remote, signal);
     const catalog = await scanSyncCatalog(remote, identity.spaceId, signal);
     const confirmed = await readMarker(remote, signal);
     signal.throwIfAborted();

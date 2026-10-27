@@ -40,12 +40,14 @@ if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1
     executorId: crypto.randomUUID(),
     offscreenStartupId,
     createWorkspaceExecution: (input) => {
-      const allocationIncarnation = input.allocation.incarnation;
+      const selectionIncarnation = input.source.identity.incarnation;
+      const sourceKind = input.source.kind;
       return createSyncWorkspaceExecution(input, async (origin) => {
         const response = await messaging.sendRuntimeMessage({
           type: MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION,
           requestId: crypto.randomUUID(),
-          allocationIncarnation,
+          sourceKind,
+          selectionIncarnation,
           origin,
         });
         return response.success === true && response.allowed === true;

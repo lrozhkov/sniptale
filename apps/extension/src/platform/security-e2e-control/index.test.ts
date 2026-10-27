@@ -117,7 +117,10 @@ const syncSelection = {
   expectedRevision: 1,
 };
 const workspaceSelection = {
-  allocation: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 2 },
+  source: {
+    kind: 'allocation' as const,
+    identity: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 2 },
+  },
   authentication: { kind: 'basic' as const, username: 'alice', password: 'synthetic-secret' },
 };
 function deferred<T>() {
@@ -135,6 +138,23 @@ function syncRuntime() {
     startWorkspace: vi.fn(async (_selection: SecurityE2ESyncWorkspaceSelection) => ({
       executorId,
       executorRevision: 2,
+    })),
+    enrollWorkspace: vi.fn(async (_selection: SecurityE2ESyncWorkspaceSelection) => ({
+      version: 1 as const,
+      kind: 'sync-connection' as const,
+      key: 'connection' as const,
+      binding: {
+        provider: 'webdav' as const,
+        rootUrl: 'https://dav.example/root/',
+        accountId: 'alice',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+      identity: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 1 },
+      phase: 'active' as const,
+      updateNonce: null,
+      credentialId: '33333333-3333-4333-8333-333333333333',
     })),
     inspect: vi.fn(async () => ({
       offscreenStartupId: startupId,
@@ -346,14 +366,14 @@ it.each([
     runtime.startWorkspace.mockReturnValueOnce(receipt.promise);
     control.registerSecurityE2EControl(runtime);
     const port = syncPort();
-    const payload = { allocation: { ...workspaceSelection.allocation }, authentication };
+    const payload = { source: structuredClone(workspaceSelection.source), authentication };
     port.onMessage.emit({ type: 'sync-workspace-start', requestId: syncRequestId, payload });
     expect(runtime.startWorkspace).toHaveBeenCalledExactlyOnceWith(payload);
-    expect(runtime.startWorkspace.mock.calls[0]?.[0].allocation).not.toBe(payload.allocation);
+    expect(runtime.startWorkspace.mock.calls[0]?.[0].source).not.toBe(payload.source);
     expect(runtime.startWorkspace.mock.calls[0]?.[0].authentication).not.toBe(authentication);
     expect(port.postMessage).not.toHaveBeenCalled();
-    payload.allocation.revision = 99;
-    expect(runtime.startWorkspace.mock.calls[0]?.[0].allocation.revision).toBe(2);
+    payload.source.identity.revision = 99;
+    expect(runtime.startWorkspace.mock.calls[0]?.[0].source.identity.revision).toBe(2);
     receipt.resolve({ executorId, executorRevision: 2 });
     await expect(port.answer).resolves.toEqual({
       ok: true,
@@ -368,8 +388,14 @@ it.each([
   null,
   {},
   { ...workspaceSelection, extra: true },
-  { ...workspaceSelection, allocation: { ...workspaceSelection.allocation, revision: 0 } },
-  { ...workspaceSelection, allocation: { ...workspaceSelection.allocation, extra: true } },
+  {
+    ...workspaceSelection,
+    source: {
+      ...workspaceSelection.source,
+      identity: { ...workspaceSelection.source.identity, revision: 0 },
+    },
+  },
+  { ...workspaceSelection, source: { ...workspaceSelection.source, extra: true } },
   { ...workspaceSelection, authentication: { ...workspaceSelection.authentication, extra: true } },
   { ...workspaceSelection, authentication: { ...workspaceSelection.authentication, username: '' } },
   {
@@ -418,3 +444,24 @@ it('does not expose workspace credential failure text and refuses extra command 
   });
   await expect(port.answer).resolves.toEqual({ ok: false, requestId: syncRequestId, sync: null });
 });
+
+it.each(['allocation', 'join'] as const)(
+  'enrolls a detached %s source through the runtime handoff only',
+  async (kind) => {
+    const control = await import('.');
+    const runtime = syncRuntime();
+    control.registerSecurityE2EControl(runtime);
+    const port = syncPort();
+    const payload = {
+      source: { ...workspaceSelection.source, kind },
+      authentication: workspaceSelection.authentication,
+    };
+    port.onMessage.emit({ type: 'sync-workspace-enroll', requestId: syncRequestId, payload });
+    const response = await port.answer;
+    expect(runtime.enrollWorkspace).toHaveBeenCalledExactlyOnceWith(payload);
+    expect(runtime.enrollWorkspace.mock.calls[0]?.[0].source).not.toBe(payload.source);
+    expect(JSON.stringify(response)).not.toContain('synthetic-secret');
+    expect(runtime.start).not.toHaveBeenCalled();
+    expect(runtime.startWorkspace).not.toHaveBeenCalled();
+  }
+);

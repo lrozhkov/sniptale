@@ -35,12 +35,14 @@ import {
   parseConnectionMetadata,
   parseConnectionAuthentication,
   parseSyncConnectionIdentity,
+  parseSyncWorkspaceSource,
   sameConnectionBinding,
   sameConnectionScope,
   sameSyncConnectionIdentity,
   type SyncConnectionBinding,
   type SyncConnectionScope,
   type SyncConnectionIdentity,
+  type SyncWorkspaceSource,
   type SyncConnectionMetadata,
   type SyncConnectionAuthentication,
 } from './model';
@@ -295,21 +297,6 @@ export async function commitSyncConnectionAuthentication(
     return metadata;
   });
 }
-interface EnrollmentSource {
-  kind: 'allocation' | 'join';
-  identity: SyncConnectionIdentity;
-}
-function parseEnrollmentSource(value: unknown): EnrollmentSource {
-  if (
-    !isRecord(value) ||
-    Object.keys(value).length !== 2 ||
-    (value['kind'] !== 'allocation' && value['kind'] !== 'join')
-  )
-    return refused();
-  const identity = parseSyncConnectionIdentity(value['identity']);
-  if (!identity) return refused();
-  return { kind: value['kind'], identity };
-}
 interface ReadyEnrollmentSelection {
   native: SyncWorkspaceAllocation | SyncWorkspaceJoin;
   rootUrl: string;
@@ -323,7 +310,7 @@ interface EnrollmentEvidence {
 }
 async function readReadyEnrollmentSelection(
   tx: ConnectionTransaction,
-  source: EnrollmentSource
+  source: SyncWorkspaceSource
 ): Promise<ReadyEnrollmentSelection> {
   if (source.kind === 'allocation') {
     const native = await readReadySyncWorkspaceAllocation(tx, source.identity);
@@ -349,7 +336,7 @@ async function readReadyEnrollmentSelection(
 }
 async function readEnrollmentEvidence(
   tx: ConnectionTransaction,
-  source: EnrollmentSource
+  source: SyncWorkspaceSource
 ): Promise<EnrollmentEvidence> {
   const selection = await readReadyEnrollmentSelection(tx, source);
   const { workspace } = selection;
@@ -372,10 +359,11 @@ async function readEnrollmentEvidence(
     receipt['key'] !== 'workspace-enrollment'
   )
     return refused();
-  const recordedSource = parseEnrollmentSource(receipt['source']);
+  const recordedSource = parseSyncWorkspaceSource(receipt['source']);
   const enrolled = parseConnectionMetadata(receipt['connection']);
   const current = await readMetadata(tx);
   if (
+    !recordedSource ||
     recordedSource.kind !== source.kind ||
     !sameSyncConnectionIdentity(recordedSource.identity, source.identity) ||
     !enrolled ||
@@ -412,7 +400,8 @@ export async function enrollSyncWorkspaceConnection(
   const db = capturePreparedDatabase();
   if (!db) return refused();
   try {
-    const source = parseEnrollmentSource(structuredClone(sourceInput));
+    const source = parseSyncWorkspaceSource(structuredClone(sourceInput));
+    if (!source) return refused();
     const detachedAuthentication: unknown = structuredClone(authenticationInput);
     const initial = await withSyncConnectionAdmissionLock(() =>
       runWithPersistenceMutationPermit(async () => {

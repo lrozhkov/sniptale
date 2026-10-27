@@ -13,10 +13,15 @@ import type { createWebdavRemoteStore } from '../../workflows/sync-transfer/webd
 import { DIAGNOSTIC_LOG_PORT } from '../../contracts/diagnostics';
 import { SyncRemoteError, type SyncRemoteStore } from '../../workflows/sync-transfer/remote-store';
 import { createSyncQueueExecution, createSyncWorkspaceExecution } from './execution';
+import type { verifySyncWorkspaceIdentity } from '../../workflows/sync-transfer/workspace';
 import type { createWebdavWorkspaceCreation } from '../../workflows/sync-transfer/webdav-workspace';
+import type { createWebdavWorkspaceJoin } from '../../workflows/sync-transfer/webdav-workspace-join';
 import type { SyncExecutionInput } from './executor';
 
 const mocks = vi.hoisted(() => ({
+  verifyWorkspace: vi.fn<typeof verifySyncWorkspaceIdentity>(),
+  join: vi.fn<typeof createWebdavWorkspaceJoin>(),
+  joinRun: vi.fn<ReturnType<typeof createWebdavWorkspaceJoin>['run']>(),
   workspace: vi.fn<typeof createWebdavWorkspaceCreation>(),
   workspaceRun: vi.fn<ReturnType<typeof createWebdavWorkspaceCreation>['run']>(),
   workspaceClose: vi.fn<() => Promise<void>>(),
@@ -50,6 +55,12 @@ vi.mock('../../workflows/sync-transfer/connection-requests', () => ({
 vi.mock('../../workflows/sync-transfer/queue', () => ({ runSyncQueueOperation: mocks.run }));
 vi.mock('../../platform/runtime-messaging/diagnostic-capture', () => ({
   createDiagnosticPortWriter: mocks.writer,
+}));
+vi.mock('../../workflows/sync-transfer/workspace', () => ({
+  verifySyncWorkspaceIdentity: mocks.verifyWorkspace,
+}));
+vi.mock('../../workflows/sync-transfer/webdav-workspace-join', () => ({
+  createWebdavWorkspaceJoin: mocks.join,
 }));
 vi.mock('../../workflows/sync-transfer/webdav-workspace', () => ({
   createWebdavWorkspaceCreation: mocks.workspace,
@@ -129,6 +140,11 @@ const remote: SyncRemoteStore = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.verifyWorkspace.mockResolvedValue({
+    spaceId: 'space',
+    bootstrapId: 'bootstrap',
+    fingerprint: 'a'.repeat(64),
+  });
   mocks.connection.mockResolvedValue(connection());
   mocks.authentication.mockResolvedValue({ kind: 'bearer', accessToken: 'first' });
   mocks.queue.mockResolvedValue(operation());
@@ -203,6 +219,62 @@ describe('native sync execution adapter', () => {
     await admitted.authorize();
     mocks.connection.mockResolvedValueOnce({ ...connection(), phase: 'paused' });
     await expect(admitted.authorize()).rejects.toMatchObject({ code: 'authentication' });
+  });
+
+  it('checks a selected workspace only from native queue admission and coalesces concurrent effects', async () => {
+    const workspace = { spaceId: 'space', bootstrapId: 'bootstrap', fingerprint: 'a'.repeat(64) };
+    mocks.connection.mockResolvedValue({ ...connection(), workspace });
+    const held = deferred<void>();
+    const checking = deferred<void>();
+    mocks.verifyWorkspace.mockImplementation(async () => {
+      checking.resolve();
+      await held.promise;
+      return workspace;
+    });
+    const effect = vi.fn();
+    mocks.run.mockImplementation(async (selected) => {
+      expect(mocks.verifyWorkspace).not.toHaveBeenCalled();
+      const first = selected.authorize().then(effect);
+      const second = selected.authorize().then(effect);
+      await checking.promise;
+      expect(mocks.verifyWorkspace).toHaveBeenCalledOnce();
+      expect(effect).not.toHaveBeenCalled();
+      expect(mocks.verifyWorkspace).toHaveBeenCalledWith(remote, workspace, selected.signal);
+      held.resolve();
+      await Promise.all([first, second]);
+      await selected.authorize();
+      return { status: 'finished', operation: operation({ status: 'published' }) };
+    });
+    await createSyncQueueExecution(input(), async () => true).run();
+    expect(mocks.verifyWorkspace).toHaveBeenCalledOnce();
+    expect(effect).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not check a marker for a legacy connection', async () => {
+    mocks.run.mockImplementation(async (selected) => {
+      await selected.authorize();
+      return { status: 'finished', operation: operation({ status: 'published' }) };
+    });
+    await createSyncQueueExecution(input(), async () => true).run();
+    expect(mocks.verifyWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('rejects admission if the connection changes while marker verification is pending', async () => {
+    const workspace = { spaceId: 'space', bootstrapId: 'bootstrap', fingerprint: 'a'.repeat(64) };
+    mocks.connection.mockResolvedValue({ ...connection(), workspace });
+    mocks.verifyWorkspace.mockImplementation(async () => {
+      mocks.connection.mockResolvedValue({ ...connection(), phase: 'paused', workspace });
+      return workspace;
+    });
+    mocks.run.mockImplementation(async (selected) => {
+      await expect(selected.authorize()).rejects.toMatchObject({ code: 'authentication' });
+      return {
+        status: 'finished',
+        operation: operation({ status: 'failed', failureCode: 'authentication' }),
+      };
+    });
+    await createSyncQueueExecution(input(), async () => true).run();
+    expect(mocks.verifyWorkspace).toHaveBeenCalledOnce();
   });
 
   it.each(['missing', 'paused', 'identity', 'space', 'generation', 'profile'] as const)(
@@ -439,16 +511,67 @@ it('submits through actual runtime IPC when offscreen has no chrome.storage', as
   }
 });
 
-describe('workspace creation execution adapter', () => {
+describe('workspace execution adapter', () => {
   function workspaceInput() {
     return {
-      allocation: input().authorization,
+      source: { kind: 'allocation' as const, identity: input().authorization },
       authentication: { kind: 'bearer' as const, accessToken: 'private-workspace-secret' },
     };
   }
   beforeEach(() => {
     mocks.workspace.mockReturnValue({ run: mocks.workspaceRun, close: mocks.workspaceClose });
+    mocks.join.mockReturnValue({ run: mocks.joinRun, close: mocks.workspaceClose });
     mocks.workspaceClose.mockResolvedValue(undefined);
+  });
+
+  it.each(['join', 'allocation'] as const)('routes %s through the existing owner', async (kind) => {
+    const selected = { ...workspaceInput(), source: { kind, identity: input().authorization } };
+    const permission = vi.fn(async () => true);
+    const execution = createSyncWorkspaceExecution(selected, permission);
+    const factory = kind === 'join' ? mocks.join : mocks.workspace;
+    expect(factory).toHaveBeenCalledExactlyOnceWith({
+      identity: selected.source.identity,
+      authentication: selected.authentication,
+      hasOriginPermission: permission,
+    });
+    expect(await execution.run()).toEqual({
+      snapshot: { state: 'ready', failureCode: null },
+      containment: 'contained',
+    });
+  });
+
+  it.each([
+    ['marker-missing', 'invalid-workspace'],
+    ['binding-mismatch', 'invalid-workspace'],
+    ['unsupported-format', 'invalid-workspace'],
+    ['unavailable', 'temporary'],
+    ['cancelled', 'interrupted'],
+  ])('contains JOIN %s failures', async (code, failureCode) => {
+    mocks.joinRun.mockRejectedValue(Object.assign(new Error('private'), { code }));
+    const execution = createSyncWorkspaceExecution(
+      { ...workspaceInput(), source: { kind: 'join', identity: input().authorization } },
+      async () => true
+    );
+    expect(await execution.run()).toEqual({
+      snapshot: { state: failureCode === 'interrupted' ? 'interrupted' : 'failed', failureCode },
+      containment: 'contained',
+    });
+    expect(mocks.workspaceClose).toHaveBeenCalledOnce();
+  });
+
+  it('retains unsafe JOIN containment when its request drain fails', async () => {
+    mocks.joinRun.mockRejectedValue(
+      Object.assign(new Error('private'), { code: 'binding-mismatch' })
+    );
+    mocks.workspaceClose.mockRejectedValue(new Error('private drain'));
+    const execution = createSyncWorkspaceExecution(
+      { ...workspaceInput(), source: { kind: 'join', identity: input().authorization } },
+      async () => true
+    );
+    expect(await execution.run()).toMatchObject({
+      containment: 'unsafe',
+      snapshot: { failureCode: 'invalid-workspace' },
+    });
   });
 
   it('constructs the existing creation owner synchronously and returns only safe terminal evidence', async () => {
@@ -456,7 +579,7 @@ describe('workspace creation execution adapter', () => {
     const permission = vi.fn(async () => true);
     const execution = createSyncWorkspaceExecution(selected, permission);
     expect(mocks.workspace).toHaveBeenCalledExactlyOnceWith({
-      identity: selected.allocation,
+      identity: selected.source.identity,
       authentication: selected.authentication,
       hasOriginPermission: permission,
     });

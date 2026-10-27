@@ -111,7 +111,7 @@ function fixture() {
       ...base,
       type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
       executorRevision: inspect().executorRevision,
-      allocation: binding.authorization,
+      source: { kind: 'allocation', identity: binding.authorization },
       authentication: { kind: 'bearer', accessToken: 'workspace-private-token' },
       ...overrides,
     });
@@ -370,7 +370,8 @@ describe('workspace slot in the shared sync executor', () => {
       binding: null,
       jobs: [],
       workspace: {
-        allocationIncarnation: binding.authorization.incarnation,
+        sourceKind: 'allocation',
+        selectionIncarnation: binding.authorization.incarnation,
         selectionRevision: 1,
         state: 'running',
         failureCode: null,
@@ -390,7 +391,9 @@ describe('workspace slot in the shared sync executor', () => {
     expect(test.startWorkspace().success).toBe(true);
     expect(test.startWorkspace().success).toBe(true);
     expect(
-      test.startWorkspace({ allocation: { ...binding.authorization, revision: 2 } }).success
+      test.startWorkspace({
+        source: { kind: 'allocation', identity: { ...binding.authorization, revision: 2 } },
+      }).success
     ).toBe(false);
     expect(test.start().success).toBe(false);
     expect(test.createWorkspaceExecution).toHaveBeenCalledOnce();
@@ -411,6 +414,37 @@ describe('workspace slot in the shared sync executor', () => {
     await settleWorkflow();
   });
 
+  it('isolates CREATE and JOIN admission even when their native identities match', async () => {
+    const test = fixture();
+    expect(test.startWorkspace().success).toBe(true);
+    expect(
+      test.startWorkspace({ source: { kind: 'join', identity: binding.authorization } }).success
+    ).toBe(false);
+    const stopped = test.stop();
+    test.workspacePending[0]!.drainage.resolve();
+    await stopped;
+    expect(
+      test.startWorkspace({
+        source: { kind: 'allocation', identity: { ...binding.authorization, revision: 2 } },
+      }).success
+    ).toBe(false);
+    expect(
+      test.startWorkspace({ source: { kind: 'join', identity: binding.authorization } }).success
+    ).toBe(true);
+    expect(test.inspect().workspace).toMatchObject({
+      sourceKind: 'join',
+      selectionIncarnation: binding.authorization.incarnation,
+    });
+    expect(
+      test.startWorkspace({ source: { kind: 'join', identity: binding.authorization } }).success
+    ).toBe(true);
+    expect(test.startWorkspace().success).toBe(false);
+    await settleWorkflow();
+    test.workspacePending[1]!.result.resolve(ready);
+    await settleWorkflow();
+    expect(test.inspect().workspace?.state).toBe('ready');
+  });
+
   it('closes a reserved handle synchronously before the detached workspace can run', async () => {
     const test = fixture();
     test.startWorkspace();
@@ -424,9 +458,12 @@ describe('workspace slot in the shared sync executor', () => {
     expect(test.startWorkspace().success).toBe(false);
     expect(
       test.startWorkspace({
-        allocation: {
-          ...binding.authorization,
-          incarnation: '66666666-6666-4666-8666-666666666666',
+        source: {
+          kind: 'allocation',
+          identity: {
+            ...binding.authorization,
+            incarnation: '66666666-6666-4666-8666-666666666666',
+          },
         },
       }).success
     ).toBe(true);
@@ -479,7 +516,9 @@ describe('workspace slot in the shared sync executor', () => {
     });
     await settleWorkflow();
     expect(
-      test.startWorkspace({ allocation: { ...binding.authorization, revision: 4 } }).success
+      test.startWorkspace({
+        source: { kind: 'allocation', identity: { ...binding.authorization, revision: 4 } },
+      }).success
     ).toBe(true);
     expect(test.inspect().workspace?.selectionRevision).toBe(4);
     await settleWorkflow();

@@ -219,7 +219,8 @@ it.each(['failed', 'stopping', 'workspace', 'job'] as const)(
     if (state === 'failed' || state === 'stopping') current.phase = state;
     if (state === 'workspace')
       current.workspace = {
-        allocationIncarnation: 'workspace',
+        sourceKind: 'allocation',
+        selectionIncarnation: 'workspace',
         selectionRevision: 1,
         state: 'running',
         failureCode: null,

@@ -5,6 +5,7 @@ import {
   connectionUuid,
   parseConnectionAuthentication,
   parseSyncConnectionIdentity,
+  parseSyncWorkspaceSource,
 } from '../../../../composition/persistence/remote-connection/model';
 import {
   parseSyncQueueScope,
@@ -74,8 +75,15 @@ function job(input: unknown): SyncExecutorJobSnapshot | null {
 function workspace(input: unknown): SyncWorkspaceJobSnapshot | null {
   if (
     !isRecord(input) ||
-    !exact(input, ['allocationIncarnation', 'selectionRevision', 'state', 'failureCode']) ||
-    !connectionUuid(input['allocationIncarnation']) ||
+    !exact(input, [
+      'sourceKind',
+      'selectionIncarnation',
+      'selectionRevision',
+      'state',
+      'failureCode',
+    ]) ||
+    !member(['allocation', 'join'] as const, input['sourceKind']) ||
+    !connectionUuid(input['selectionIncarnation']) ||
     !positive(input['selectionRevision']) ||
     !member(['running', 'ready', 'failed', 'interrupted'] as const, input['state']) ||
     !(
@@ -96,7 +104,8 @@ function workspace(input: unknown): SyncWorkspaceJobSnapshot | null {
   )
     return null;
   return {
-    allocationIncarnation: input['allocationIncarnation'],
+    sourceKind: input['sourceKind'],
+    selectionIncarnation: input['selectionIncarnation'],
     selectionRevision: input['selectionRevision'],
     state: input['state'],
     failureCode: input['failureCode'],
@@ -165,15 +174,17 @@ export function parseSyncConnectionRuntimeMessage(
   const requestId = input['requestId'];
   if (input['type'] === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION) {
     if (
-      !exact(input, ['type', 'requestId', 'allocationIncarnation', 'origin']) ||
-      !connectionUuid(input['allocationIncarnation']) ||
+      !exact(input, ['type', 'requestId', 'sourceKind', 'selectionIncarnation', 'origin']) ||
+      !member(['allocation', 'join'] as const, input['sourceKind']) ||
+      !connectionUuid(input['selectionIncarnation']) ||
       !canonicalOrigin(input['origin'])
     )
       return null;
     return {
       type: input['type'],
       requestId,
-      allocationIncarnation: input['allocationIncarnation'],
+      sourceKind: input['sourceKind'],
+      selectionIncarnation: input['selectionIncarnation'],
       origin: input['origin'],
     };
   }
@@ -206,7 +217,7 @@ export function parseSyncConnectionRuntimeMessage(
     return { type: input['type'], ...common, ...target };
   }
   if (input['type'] === MessageType.OFFSCREEN_SYNC_WORKSPACE_START) {
-    const allocation = parseSyncConnectionIdentity(input['allocation']);
+    const source = parseSyncWorkspaceSource(input['source']);
     const rawAuthentication = input['authentication'];
     if (!isRecord(rawAuthentication)) return null;
     const username = rawAuthentication['username'];
@@ -216,18 +227,12 @@ export function parseSyncConnectionRuntimeMessage(
       typeof username === 'string' ? username : ''
     );
     if (
-      !exact(input, [
-        ...envelope,
-        'executorId',
-        'executorRevision',
-        'allocation',
-        'authentication',
-      ]) ||
-      !allocation ||
+      !exact(input, [...envelope, 'executorId', 'executorRevision', 'source', 'authentication']) ||
+      !source ||
       !authentication
     )
       return null;
-    return { type: input['type'], ...common, ...target, allocation, authentication };
+    return { type: input['type'], ...common, ...target, source, authentication };
   }
   if (input['type'] === MessageType.OFFSCREEN_SYNC_START) {
     const scope = parseScope(input['scope']);

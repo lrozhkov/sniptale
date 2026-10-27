@@ -17,19 +17,19 @@ import {
 } from '../../composition/persistence/remote-connection/model';
 import { loadSyncConnection } from '../../composition/persistence/remote-connection/store';
 import {
-  loadSyncWorkspaceAllocation,
-  type SyncWorkspaceAllocation,
-} from '../../composition/persistence/remote-connection/workspace-allocation';
+  loadSyncWorkspaceSelection,
+  type SyncWorkspaceSelection,
+} from '../../composition/persistence/remote-connection/workspace-selection';
 import { hasOffscreenRuntimeCapability } from '../offscreen-document/sender-policy';
 
 interface OriginPermissionDependencies {
   loadConnection(): Promise<SyncConnectionMetadata | null>;
-  loadWorkspace(): Promise<SyncWorkspaceAllocation | null>;
+  loadWorkspace(): Promise<SyncWorkspaceSelection | null>;
   contains(permissions: chrome.permissions.Permissions): Promise<boolean>;
 }
 const nativeDependencies: OriginPermissionDependencies = {
   loadConnection: loadSyncConnection,
-  loadWorkspace: loadSyncWorkspaceAllocation,
+  loadWorkspace: loadSyncWorkspaceSelection,
   contains: (permissions) => browserPermissions.contains(permissions),
 };
 const REFUSAL = 'Sync origin permission query refused';
@@ -69,16 +69,16 @@ async function queryPermission(
 }
 
 function matchesWorkspaceRequest(
-  allocation: SyncWorkspaceAllocation | null,
+  selection: SyncWorkspaceSelection | null,
   request: SyncWorkspaceOriginPermissionRequest
-): allocation is SyncWorkspaceAllocation {
+): selection is SyncWorkspaceSelection {
   if (
-    !allocation ||
-    allocation.phase === 'abandoned' ||
-    allocation.identity.incarnation !== request.allocationIncarnation
+    !selection ||
+    selection.source.kind !== request.sourceKind ||
+    selection.source.identity.incarnation !== request.selectionIncarnation
   )
     return false;
-  const root = new URL(allocation.rootUrl);
+  const root = new URL(selection.rootUrl);
   return root.protocol === 'https:' && root.origin === request.origin;
 }
 
@@ -96,13 +96,10 @@ async function queryWorkspacePermission(
       success: true,
       allowed:
         matchesWorkspaceRequest(after, request) &&
-        before.parentUrl === after.parentUrl &&
         before.rootUrl === after.rootUrl &&
         before.accountId === after.accountId &&
-        before.spaceId === after.spaceId &&
-        before.bootstrapId === after.bootstrapId &&
         before.createdAt === after.createdAt &&
-        before.provider === after.provider,
+        before.bindingKey === after.bindingKey,
     };
   } catch {
     return { success: false, error: REFUSAL };

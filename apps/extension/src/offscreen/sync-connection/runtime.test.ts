@@ -243,55 +243,63 @@ describe('offscreen sync receiver', () => {
   });
 });
 
-it('authorizes workspace admission and replays its signed ACK without duplicate execution or secrets', async () => {
-  const test = fixture();
-  const unsigned = {
-    type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
-    executorId,
-    offscreenStartupId,
-    executorRevision: 1,
-    requestId: crypto.randomUUID(),
-    allocation: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 1 },
-    authentication: { kind: 'bearer', accessToken: 'private-workspace-secret' },
-  };
-  const signed = attachOffscreenCommandCapability(unsigned);
-  const first = vi.fn();
-  const duplicate = vi.fn();
-  expect(test.listener(attachRuntimeMessageFreshness(signed), sender, first)).toBe(false);
-  expect(test.createWorkspaceExecution).toHaveBeenCalledOnce();
-  expect(test.listener(attachRuntimeMessageFreshness(signed), sender, duplicate)).toBe(true);
-  await Promise.resolve();
-  await Promise.resolve();
-  expect(duplicate).toHaveBeenCalledExactlyOnceWith(first.mock.calls[0]?.[0]);
-  expect(JSON.stringify(first.mock.calls)).not.toContain('private-workspace-secret');
-  expect(sendMessage).not.toHaveBeenCalled();
-  test.workspaceWorkflow.resolve({
-    snapshot: { state: 'failed', failureCode: 'temporary' },
-    containment: 'contained',
-  });
-  await Promise.resolve();
-  await Promise.resolve();
-  const completedReplay = vi.fn();
-  expect(test.listener(attachRuntimeMessageFreshness(signed), sender, completedReplay)).toBe(true);
-  await Promise.resolve();
-  expect(test.createWorkspaceExecution).toHaveBeenCalledOnce();
-  const current = test.executor.inspect({
-    type: MessageType.OFFSCREEN_SYNC_INSPECT,
-    capabilityToken: 'test',
-    requestId: crypto.randomUUID(),
-    offscreenStartupId,
-    challenge: crypto.randomUUID(),
-  });
-  if (!current.success) throw new Error('Inspect refused');
-  const retry = attachOffscreenCommandCapability({
-    ...unsigned,
-    requestId: crypto.randomUUID(),
-    executorRevision: current.snapshot.executorRevision,
-  });
-  const retryReply = vi.fn();
-  expect(test.listener(attachRuntimeMessageFreshness(retry), sender, retryReply)).toBe(false);
-  expect(test.createWorkspaceExecution).toHaveBeenCalledTimes(2);
-});
+it.each(['allocation', 'join'] as const)(
+  'authorizes %s admission and replays its signed ACK without duplicate execution or secrets',
+  async (kind) => {
+    const test = fixture();
+    const unsigned = {
+      type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+      executorId,
+      offscreenStartupId,
+      executorRevision: 1,
+      requestId: crypto.randomUUID(),
+      source: {
+        kind,
+        identity: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 1 },
+      },
+      authentication: { kind: 'bearer', accessToken: 'private-workspace-secret' },
+    };
+    const signed = attachOffscreenCommandCapability(unsigned);
+    const first = vi.fn();
+    const duplicate = vi.fn();
+    expect(test.listener(attachRuntimeMessageFreshness(signed), sender, first)).toBe(false);
+    expect(test.createWorkspaceExecution).toHaveBeenCalledOnce();
+    expect(test.listener(attachRuntimeMessageFreshness(signed), sender, duplicate)).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(duplicate).toHaveBeenCalledExactlyOnceWith(first.mock.calls[0]?.[0]);
+    expect(JSON.stringify(first.mock.calls)).not.toContain('private-workspace-secret');
+    expect(sendMessage).not.toHaveBeenCalled();
+    test.workspaceWorkflow.resolve({
+      snapshot: { state: 'failed', failureCode: 'temporary' },
+      containment: 'contained',
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    const completedReplay = vi.fn();
+    expect(test.listener(attachRuntimeMessageFreshness(signed), sender, completedReplay)).toBe(
+      true
+    );
+    await Promise.resolve();
+    expect(test.createWorkspaceExecution).toHaveBeenCalledOnce();
+    const current = test.executor.inspect({
+      type: MessageType.OFFSCREEN_SYNC_INSPECT,
+      capabilityToken: 'test',
+      requestId: crypto.randomUUID(),
+      offscreenStartupId,
+      challenge: crypto.randomUUID(),
+    });
+    if (!current.success) throw new Error('Inspect refused');
+    const retry = attachOffscreenCommandCapability({
+      ...unsigned,
+      requestId: crypto.randomUUID(),
+      executorRevision: current.snapshot.executorRevision,
+    });
+    const retryReply = vi.fn();
+    expect(test.listener(attachRuntimeMessageFreshness(retry), sender, retryReply)).toBe(false);
+    expect(test.createWorkspaceExecution).toHaveBeenCalledTimes(2);
+  }
+);
 
 it('refuses workspace commands with missing capability, stale freshness, foreign senders or unknown fields', () => {
   const test = fixture();
@@ -301,7 +309,10 @@ it('refuses workspace commands with missing capability, stale freshness, foreign
     offscreenStartupId,
     executorRevision: 1,
     requestId: crypto.randomUUID(),
-    allocation: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 1 },
+    source: {
+      kind: 'allocation',
+      identity: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 1 },
+    },
     authentication: { kind: 'bearer', accessToken: 'private-workspace-secret' },
   };
   for (const [message, originSender] of [

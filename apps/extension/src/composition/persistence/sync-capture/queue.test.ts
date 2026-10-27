@@ -14,6 +14,7 @@ import {
   completeSyncQueueRun,
 } from './queue';
 import {
+  parseSyncQueueOperation,
   queueConnectionKey,
   queueOperationKey,
   queueHash,
@@ -714,3 +715,16 @@ it.each(['paused', 'updating-auth'] as const)(
     expect(f.rows).toEqual(before);
   }
 );
+
+it('persists invalid workspace refusal without scheduling an automatic retry', async () => {
+  const f = setup();
+  await enqueueSyncQueueOperation(f.capture);
+  const run = await beginSyncQueueRun(scope, 'op', 1);
+  const failed = await failSyncQueueRun(run, 'invalid-workspace');
+  expect(failed).toMatchObject({
+    status: 'failed',
+    failureCode: 'invalid-workspace',
+    nextDueAt: null,
+  });
+  expect(parseSyncQueueOperation(failed)).toEqual(failed);
+});

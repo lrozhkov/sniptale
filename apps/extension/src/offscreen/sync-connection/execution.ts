@@ -23,7 +23,9 @@ import type {
   SyncWorkspaceExecutionInput,
   SyncWorkspaceExecutionResult,
 } from './executor';
+import { verifySyncWorkspaceIdentity } from '../../workflows/sync-transfer/workspace';
 import { createWebdavWorkspaceCreation } from '../../workflows/sync-transfer/webdav-workspace';
+import { createWebdavWorkspaceJoin } from '../../workflows/sync-transfer/webdav-workspace-join';
 
 function terminalSnapshot(
   result: Awaited<ReturnType<typeof runSyncQueueOperation>>,
@@ -99,6 +101,7 @@ export function createSyncQueueExecution(
           },
           signal
         );
+        let workspaceVerification: ReturnType<typeof verifySyncWorkspaceIdentity> | null = null;
         const result = await runSyncQueueOperation({
           ...selection,
           operationId,
@@ -107,7 +110,16 @@ export function createSyncQueueExecution(
           remote,
           signal,
           authorize: async () => {
-            await current();
+            const selected = await current();
+            if (selected.workspace) {
+              workspaceVerification ??= verifySyncWorkspaceIdentity(
+                remote,
+                selected.workspace,
+                signal
+              );
+              await workspaceVerification;
+              await current();
+            }
           },
         });
         snapshot = terminalSnapshot(result, operation.stage);
@@ -135,13 +147,15 @@ export function createSyncQueueExecution(
   };
 }
 
-/** Adapt the existing creation owner without duplicating its protocol or request lifetime. */
+/** Adapt the existing workspace owners without duplicating its protocol or request lifetime. */
 export function createSyncWorkspaceExecution(
   input: SyncWorkspaceExecutionInput,
   hasOriginPermission: (origin: string) => Promise<boolean>
 ) {
-  const creation = createWebdavWorkspaceCreation({
-    identity: input.allocation,
+  const create =
+    input.source.kind === 'allocation' ? createWebdavWorkspaceCreation : createWebdavWorkspaceJoin;
+  const creation = create({
+    identity: input.source.identity,
     authentication: input.authentication,
     hasOriginPermission,
   });

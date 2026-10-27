@@ -372,7 +372,7 @@ New checked connections retain the exact workspace identity. Credential addition
 
 The enrollment receipt contains native identity and binding metadata only. It contains no authentication, raw provider error, catalog payload or media. It remains in sync_connection under existing backup, Settings transfer, diagnostics and remote-export exclusions. Verified local-data erasure removes the receipt with the connection.
 
-Activation requires the owner-controlled native ready source. The browser fixture supplies explicit test-only ingress after creation requests drain. No production Settings or Start authority enters through this fixture. JOIN readiness and runtime activation remain separate gates.
+Activation requires the owner-controlled native ready source. The browser fixture supplies explicit test-only ingress after creation requests drain. No production Settings or Start authority enters through this fixture. Production Settings and public Start ingress remain separate gates.
 
 
 ## JOIN selection and credential lifetime
@@ -383,4 +383,17 @@ Each request checks exact native checking authority and current origin permissio
 
 A drained failed check retains retryable native evidence. A cancelled check cannot authorize enrollment. The common atomic installer accepts only exact native ready sources and retains the workspace-bound credential context. Structural identity supplied by a caller does not establish remote verification.
 
-No production ingress enters through the JOIN test fixture. Runtime producer containment, permission events and activation handoff remain closed release gates. Native readiness records a checked observation, not a guarantee against later hostile server changes.
+No production ingress enters through the JOIN test fixture. The unified runtime owns producer containment, permission events and activation handoff. Production ingress remains a closed release gate. Native readiness records a checked observation, not a guarantee against later hostile server changes.
+
+
+## Unified workspace handoff authority
+
+Workspace runtime commands carry a strict source kind and identity. Disposable snapshots contain source kind, incarnation, revision and fixed status only. They contain no credentials, selected URL, account, marker text or catalog payload. CREATE and JOIN share the existing executor slot and request containment owner.
+
+Permission queries read one native selection and check its immutable binding around the browser permission wait. Phase advancement cannot escape kind and lifetime checks. Permission removal and erasure revoke either native source before producer containment. Failure to revoke does not excuse a containment attempt or permit successful privacy completion.
+
+Explicit enrollment requires native ready evidence and current origin permission. The coordinator refuses running or unsafe execution. It requires challenge-bound executor absence or acknowledged stop before invoking the common atomic installer. Receipt replay cannot replace installed credentials. Production pages gain no enrollment authority through the security-only test Port.
+
+Each checked queue execution verifies its exact retained workspace identity through bounded marker reads. It uses the current tracked provider after native claim. A mismatch or missing marker cannot cause remote initialization, overwrite, cleanup or original-file writes. Temporary refusal follows the existing delayed queue policy. Invalid identity preserves local files and requires explicit action.
+
+The verifier establishes an observed identity, not future server stability. Production Settings and public Start ingress remain closed release gates.
