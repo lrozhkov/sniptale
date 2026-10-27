@@ -90,6 +90,7 @@ it('places Drafts immediately after Files and isolates its controls', async () =
     translate('settings.navigation.views.files'),
     translate('settings.navigation.views.drafts'),
     translate('settings.navigation.views.storage'),
+    translate('settings.syncQueue.title'),
     translate('settings.navigation.views.folderTemplates'),
   ]);
   expect(savePresetsSectionContentSpy).toHaveBeenCalledWith(

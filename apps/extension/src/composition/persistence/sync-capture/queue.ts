@@ -14,6 +14,7 @@ import {
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseSyncCaptureRecord } from './guards';
+import type { CapturedChange, CaptureRootKind } from './contracts';
 import { matchesCapture, parsePrepared, preparedOutgoingOperationKey } from './outgoing';
 import { matchesOutgoingDispatchPrepared, parseOutgoingDispatchAttempt } from './outgoing-attempts';
 import {
@@ -106,6 +107,13 @@ async function readOperation(
   scope: SyncQueueScope,
   id: string
 ): Promise<SyncQueueOperation> {
+  return (await readOperationCapture(tx, scope, id)).operation;
+}
+async function readOperationCapture(
+  tx: QueueTransaction,
+  scope: SyncQueueScope,
+  id: string
+): Promise<{ operation: SyncQueueOperation; capture: CapturedChange }> {
   const row = parseSyncQueueOperation(
     await tx.objectStore(SYNC_OUTBOX_STORE).get(queueOperationKey(scope, id))
   );
@@ -125,7 +133,7 @@ async function readOperation(
     queueHash(JSON.stringify(capture)) !== row.captureSha256
   )
     throw new Error('Sync queue capture changed.');
-  return row;
+  return { operation: row, capture };
 }
 async function withSyncQueueTransaction<T>(
   mutate: (tx: IDBPTransaction<unknown, string[], 'readwrite'>) => Promise<T>
@@ -235,6 +243,31 @@ function pageInput(scope: SyncQueueScope, options: unknown) {
   }
   return { limit, afterOperationId };
 }
+/** Display metadata from the exact retained capture admitted with its queue operation. */
+interface SyncQueueSource {
+  operationId: string;
+  rootKind: CaptureRootKind;
+  rootId: string;
+  changeKind: CapturedChange['change']['kind'];
+  label: string;
+  createdAt: number;
+}
+function queueSource(capture: CapturedChange): SyncQueueSource {
+  const label =
+    capture.change.kind === 'media'
+      ? capture.change.rows.media.filename
+      : capture.change.kind === 'video-project'
+        ? capture.change.rows.project.project.name
+        : capture.rootId;
+  return {
+    operationId: capture.operationId,
+    rootKind: capture.rootKind,
+    rootId: capture.rootId,
+    changeKind: capture.change.kind,
+    label: label.trim() || capture.rootId,
+    createdAt: capture.createdAt,
+  };
+}
 /** Read bounded native pages. Refresh from the beginning to discover earlier insertions. */
 export async function loadSyncQueuePage(value: SyncQueueScope, options: unknown = {}) {
   const scope = scopeInput(value);
@@ -251,18 +284,24 @@ export async function loadSyncQueuePage(value: SyncQueueScope, options: unknown 
   );
   const rows: unknown[] = await tx.objectStore(SYNC_OUTBOX_STORE).getAll(range, limit + 1);
   const operations: SyncQueueOperation[] = [];
+  const sources: SyncQueueSource[] = [];
   for (const raw of rows) {
     const row = parseSyncQueueOperation(raw);
     if (!row || !sameQueueScope(row, scope)) throw new Error('Invalid sync queue operation.');
-    operations.push(await readOperation(tx, scope, row.operationId));
+    const joined = await readOperationCapture(tx, scope, row.operationId);
+    operations.push(joined.operation);
+    sources.push(queueSource(joined.capture));
   }
   await tx.done;
   const more = operations.length > limit;
-  if (more) operations.pop();
+  if (more) {
+    operations.pop();
+    sources.pop();
+  }
   const last = operations.at(-1);
   const nextCursor: SyncQueueCursor | null =
     more && last ? { scope, afterOperationId: last.operationId } : null;
-  return { connection, operations, nextCursor };
+  return { connection, operations, nextCursor, sources };
 }
 /** Freeze the exact retained native capture identity; repeated enqueue is idempotent. */
 export async function enqueueSyncQueueOperation(value: unknown): Promise<SyncQueueOperation> {

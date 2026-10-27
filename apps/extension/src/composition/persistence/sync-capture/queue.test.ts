@@ -603,3 +603,27 @@ it('checks begin authorization after a delayed database admission and permits an
     authorization: rotated,
   });
 });
+
+it('refuses a delayed selected command after enrollment erasure and recreation', async () => {
+  const f = setup();
+  await enqueueSyncQueueOperation(f.capture);
+  const gate = deferred<typeof f.database>();
+  io.database.mockReturnValueOnce(gate.promise);
+  const delayed = commandSyncQueueOperation(scope, 'op', 1, 'cancel');
+  const refusal = expect(delayed).rejects.toThrow('profile changed');
+  f.table('sync_capture').clear();
+  f.table('sync_outbox').clear();
+  f.table('sync_capture').set('profile', { ...f.profile, createdAt: 2 });
+  f.table('sync_capture').set(f.capture.key, structuredClone(f.capture));
+  const replacement = { ...scope, profileCreatedAt: 2 };
+  await enqueueSyncQueueOperation(f.capture);
+  const before = structuredClone(f.rows);
+  gate.resolve(f.database);
+  await refusal;
+  expect(f.rows).toEqual(before);
+  await expect(commandSyncQueue(scope, 1, 'pause')).rejects.toThrow('profile changed');
+  expect((await loadSyncQueue(replacement)).operations[0]).toMatchObject({
+    status: 'queued',
+    revision: 1,
+  });
+});

@@ -1,3 +1,4 @@
+import { settingsSyncQueueMessages } from './sync-queue';
 import { eventsLogsMessages } from './events-logs';
 import { filenameRulesMessages } from './filename-rules';
 import { defineMessageSource } from '../source';
@@ -18,6 +19,7 @@ import { settingsStorageDraftsMessages } from './storage-drafts';
 import { settingsTransferMessages } from './transfer';
 
 export const settingsMessages = defineMessageSource({
+  syncQueue: settingsSyncQueueMessages,
   eventsLogs: eventsLogsMessages,
   filenameRules: filenameRulesMessages,
   collection: settingsCollectionMessages,

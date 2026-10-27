@@ -873,3 +873,12 @@ Every actual HTTP request requires the exact active connection identity and curr
 Queue begin, effect admission and completion check connection identity inside the same transaction as their queue mutation. Missing authorization remains valid only for legacy pilot runs before any connection exists. Obsolete runs can retain failure uncertainty and historical verification evidence. They cannot complete under a replacement connection.
 
 This foundation enables no production network ingress. Offscreen lifecycle, background permission IPC, privacy producer containment and Settings controls remain required release gates. The experimental profile remains disabled by default.
+
+
+## Settings sync queue management
+
+The native paged queue reader returns display metadata from each operation's admitted retained capture. It preserves the complete source label and performs no file read. Display sources follow the operation order and exclude the lookahead row. Failed capture admission refuses the complete page.
+
+The sync-transfer management workflow applies selected commands through existing native revision CAS. It attempts confirmed history delivery after a successful command. A history failure retains the applied command result and leaves native events eligible for automatic discovery. Commands grant no transport, settlement or source-release authority.
+
+Settings owns page selection, pending interaction and recovery feedback. Refresh starts a new live traversal. A stale command refuses without automatic mutation retry. The interface reloads native revisions before another command and restores keyboard focus. Queue pause controls future admissions. Cancellation retains local sources and promises no server rollback.

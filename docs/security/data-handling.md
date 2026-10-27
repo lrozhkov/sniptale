@@ -308,3 +308,6 @@ Automatic background discovery uses the existing alarm permission. It performs l
 
 Malformed evidence remains in place. Each publication rechecks native admission and retains the existing privacy mutation barrier. Disposal stops subsequent work. A delayed cursor save refuses erased or replaced enrollment.
 
+
+
+Settings queue display includes admitted source labels, source timestamps and fixed operation states. It excludes file bodies, resolved credentials and provider addresses. Labels remain plain text and do not enter diagnostic messages. Management commands retain existing native enrollment admission, revision CAS and privacy exclusion. A delayed command cannot mutate a replacement enrollment.
