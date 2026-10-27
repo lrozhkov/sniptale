@@ -1,6 +1,8 @@
-import type { ReviewSpeechAccess } from './use-speech';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { AudioRecognitionOptions } from '../../contracts/ai/audio';
+import type { AudioRecognitionOptions, ReviewSpeechTarget } from '../../contracts/ai/audio';
+import type { ReviewSpeechSession } from '../../workflows/video-review/speech-publication';
+import type { ReviewBeforeAction } from './note-transitions';
+import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import type { ReviewTextDocument } from '../../features/video/review/text-document';
 import {
   applyReviewRecognition,
@@ -14,7 +16,17 @@ import {
 
 import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
 
-export type ReviewRecognitionAccess = ReviewSpeechAccess;
+/** Current recognition access stays under its mounted operation owner. */
+export interface ReviewRecognitionAccess {
+  session: ReviewSpeechSession;
+  target: ReviewSpeechTarget;
+  original?: { file: Blob; sourceAssetId: string } | undefined;
+  selection?: { start: number; end: number } | undefined;
+  sourceAudioAvailable?: boolean | undefined;
+  beforeAction: ReviewBeforeAction;
+  flushAdvanced(): Promise<void>;
+  registerSpeechFlush(owner: ReviewSpeechFlushRegistration): () => void;
+}
 type RecognitionState = {
   proposal: ReviewRecognitionProposal | null;
   running: boolean;

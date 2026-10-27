@@ -11,7 +11,7 @@ import {
   type ReviewSpeechSession,
 } from './speech-publication';
 
-export interface ReviewSpeechQueueSelection {
+interface ReviewSpeechQueueSelection {
   target: ReviewSpeechTarget;
   phraseId: string;
 }
@@ -27,14 +27,14 @@ interface ReviewSpeechQueuePlan {
   profile: ReviewSpeechProfile;
   items: readonly QueueItem[];
 }
-export interface ReviewSpeechQueueProgress {
+interface ReviewSpeechQueueProgress {
   completed: number;
   total: number;
   current: ReviewSpeechQueueSelection;
 }
 
 /** Phrase ids are local to each transcript, including the original-audio transcript. */
-export function reviewSpeechQueueKey(selection: ReviewSpeechQueueSelection): string {
+function reviewSpeechQueueKey(selection: ReviewSpeechQueueSelection): string {
   return JSON.stringify([selection.target, selection.phraseId]);
 }
 

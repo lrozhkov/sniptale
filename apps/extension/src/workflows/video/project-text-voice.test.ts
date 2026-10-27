@@ -243,19 +243,27 @@ it('allows independent captures to use separate jobs and cleanup handles', async
   const f = fixture();
   const first = await f.capture();
   const second = await f.capture();
-  f.save.mockImplementation(async () => undefined);
+  const firstSave = gate();
+  const secondRequested = gate();
+  f.save.mockImplementationOnce(() => firstSave.promise).mockResolvedValue(undefined);
   const other = { ...staged, id: 'other-ticket' };
-  vi.mocked(runReviewSpeechJob)
-    .mockResolvedValueOnce({ type: 'audio', staged })
-    .mockResolvedValueOnce({ type: 'audio', staged: other });
-  const previews = await Promise.all([
-    generateProjectTextVoice(f.access, first, approvedSelection, signal()),
-    generateProjectTextVoice(f.access, second, approvedSelection, signal()),
-  ]);
+  const firstSignal = signal();
+  const secondSignal = signal();
+  vi.mocked(runReviewSpeechJob).mockImplementation(async (_request, options) => {
+    if (options?.signal === secondSignal) secondRequested.release();
+    return { type: 'audio', staged: options?.signal === firstSignal ? staged : other };
+  });
+  const firstPending = generateProjectTextVoice(f.access, first, approvedSelection, firstSignal);
+  const secondPending = generateProjectTextVoice(f.access, second, approvedSelection, secondSignal);
+  await secondRequested.promise;
+  firstSave.release();
+  const previews = await Promise.all([firstPending, secondPending]);
   expect(runReviewSpeechJob).toHaveBeenCalledTimes(2);
   await cleanupProjectVoiceTakePreview(previews[0]!);
   expect(discardAudioStaging).toHaveBeenCalledExactlyOnceWith(staged, previews[0]!.source.scope);
   expect(previews[1]!.source.staged).toEqual(other);
+  await cleanupProjectVoiceTakePreview(previews[1]!);
+  expect(discardAudioStaging).toHaveBeenNthCalledWith(2, other, previews[1]!.source.scope);
 });
 it('refuses expired capture and missing provider without Save or request', async () => {
   const f = fixture();

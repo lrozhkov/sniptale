@@ -250,7 +250,7 @@ function validateApplyGroup(session: ReviewSpeechSession, group: ReviewSpeechApp
 }
 
 /** Prepares every target before one durable action; explicit retry finishes the same attachment. */
-export async function applyReviewSpeechBatch(
+async function applyReviewSpeechBatch(
   session: ReviewSpeechSession,
   groups: readonly ReviewSpeechApplyGroup[],
   signal: AbortSignal,
