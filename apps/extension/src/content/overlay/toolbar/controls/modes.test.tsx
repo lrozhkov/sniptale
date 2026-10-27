@@ -10,6 +10,12 @@ import { useToolbarMenuState } from '../state/menu';
 import type { ToolbarModeButtonsProps } from './mode-types';
 import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 
+const trustedKeyboard = vi.hoisted(() => vi.fn(() => true));
+vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/trusted-events')>()),
+  isTrustedKeyboardEvent: trustedKeyboard,
+}));
+
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -47,14 +53,19 @@ function ModeButtonsHarness(params: {
   quickEditDocumentMode?: boolean;
   quickEditMode?: boolean;
   videoRecordingMode?: boolean;
+  videoRecordingModeLocked?: boolean;
+  onEnableCursorMode?: () => void;
+  onToggleHighlighter?: () => void;
+  isCursorMode?: boolean;
 }) {
   const toolbarMenuState = useToolbarMenuState();
   const props: ToolbarModeButtonsProps = {
-    isCursorMode: true,
+    isCursorMode: params.isCursorMode ?? true,
     aiPickMode: params.aiPickMode ?? false,
     designReviewMode: params.designReviewMode ?? false,
     drawingMode: params.drawingMode ?? false,
     videoRecordingMode: params.videoRecordingMode ?? false,
+    videoRecordingModeLocked: params.videoRecordingModeLocked ?? false,
     compactMenus: true,
     displayMode: 'vertical',
     sidebarVisible: true,
@@ -63,17 +74,24 @@ function ModeButtonsHarness(params: {
     highlighterMode: false,
     pendingMode: params.pendingMode ?? null,
     toolbarMenuState,
-    onEnableCursorMode: vi.fn(),
+    onEnableCursorMode: params.onEnableCursorMode ?? vi.fn(),
     onDisableAiPickMode: params.onDisableAiPickMode ?? vi.fn(),
     onSelectPageEditingMode: params.onSelectPageEditingMode ?? vi.fn(),
     onToggleDesignReview: params.onToggleDesignReview ?? vi.fn(),
     onToggleDrawing: params.onToggleDrawing ?? vi.fn(),
     onToggleQuickEdit: params.onToggleQuickEdit ?? vi.fn(),
-    onToggleHighlighter: vi.fn(),
+    onToggleHighlighter: params.onToggleHighlighter ?? vi.fn(),
     onToggleVideoRecording: params.onToggleVideoRecording ?? vi.fn(),
   };
 
-  return <ToolbarModeButtons {...props} />;
+  return (
+    <>
+      <button data-ui="test.other-menu" onClick={() => toolbarMenuState.setActiveMenuType('timer')}>
+        Timer
+      </button>
+      <ToolbarModeButtons {...props} />
+    </>
+  );
 }
 
 function renderModeButtons(
@@ -91,6 +109,10 @@ function renderModeButtons(
     quickEditDocumentMode?: boolean;
     quickEditMode?: boolean;
     videoRecordingMode?: boolean;
+    videoRecordingModeLocked?: boolean;
+    onEnableCursorMode?: () => void;
+    onToggleHighlighter?: () => void;
+    isCursorMode?: boolean;
   } = {}
 ) {
   if (!container) {
@@ -117,6 +139,13 @@ function queryQuickEditModeOption(): HTMLButtonElement | null {
 }
 
 beforeEach(() => {
+  trustedKeyboard.mockReturnValue(true);
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue({
+    0: new DOMRect(0, 0, 32, 32),
+    length: 1,
+    item: () => null,
+    [Symbol.iterator]: () => [new DOMRect(0, 0, 32, 32)][Symbol.iterator](),
+  });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('innerWidth', 1240);
   vi.stubGlobal('innerHeight', 900);
@@ -522,4 +551,201 @@ it('keeps the marker and the single-text AI picker mutually exclusive within Con
   act(() => direct?.click());
   expect(textAI?.getAttribute('aria-pressed')).toBe('false');
   expect(selectMode).toHaveBeenLastCalledWith('direct-text');
+});
+
+function pressDigit(key: string, init: KeyboardEventInit = {}, target: EventTarget = window) {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    composed: true,
+    cancelable: true,
+    ...init,
+  });
+  act(() => {
+    target.dispatchEvent(event);
+  });
+  return event;
+}
+
+it('shows the current name and six discoverable digit choices beside the mode glyphs', () => {
+  renderModeButtons({ drawingMode: true });
+  expect(queryModeSelectorButton()?.textContent).toContain('content.toolbar.drawingLabel');
+  act(() => queryModeSelectorButton()?.click());
+  const options = [...document.querySelectorAll('[data-ui^="content.toolbar.mode-option."]')];
+  expect(options.map((option) => option.querySelector('kbd')?.textContent)).toEqual([
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+  ]);
+  expect(options.every((option) => option.querySelector('svg'))).toBe(true);
+});
+
+it.each(['1', '2', '3', '4', '5', '6'])('selects mode %s through its existing callback', (key) => {
+  const callbacks = [vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn()] as const;
+  renderModeButtons({
+    drawingMode: key === '1',
+    isCursorMode: key !== '1',
+    onEnableCursorMode: callbacks[0],
+    onToggleDrawing: callbacks[1],
+    onToggleHighlighter: callbacks[2],
+    onToggleQuickEdit: callbacks[3],
+    onToggleDesignReview: callbacks[4],
+    onToggleVideoRecording: callbacks[5],
+  });
+  const event = pressDigit(key);
+  expect(callbacks.map((callback) => callback.mock.calls.length)).toEqual(
+    callbacks.map((_, index) => (index === Number(key) - 1 ? 1 : 0))
+  );
+  if (key === '6') expect(callbacks[5]).toHaveBeenCalledWith(event);
+  expect(event.defaultPrevented).toBe(true);
+});
+
+it.each([
+  { ctrlKey: true },
+  { altKey: true },
+  { metaKey: true },
+  { shiftKey: true },
+  { repeat: true },
+  { isComposing: true },
+  { key: '7' },
+])('leaves modified, repeated, composing and unrelated input untouched: %j', (init) => {
+  const onToggleDrawing = vi.fn();
+  renderModeButtons({ onToggleDrawing });
+  expect(pressDigit('2', init).defaultPrevented).toBe(false);
+  expect(onToggleDrawing).not.toHaveBeenCalled();
+});
+
+it('refuses untrusted events and keys already claimed by another owner', () => {
+  const onToggleDrawing = vi.fn();
+  renderModeButtons({ onToggleDrawing });
+  trustedKeyboard.mockReturnValue(false);
+  expect(pressDigit('2').defaultPrevented).toBe(false);
+  trustedKeyboard.mockReturnValue(true);
+  const event = new KeyboardEvent('keydown', { key: '2', cancelable: true });
+  event.preventDefault();
+  act(() => {
+    window.dispatchEvent(event);
+  });
+  expect(onToggleDrawing).not.toHaveBeenCalled();
+});
+
+it.each(['input', 'textarea', 'select', 'contenteditable', 'textbox', 'shadow-input'])(
+  'preserves digit input in %s',
+  (kind) => {
+    const onToggleDrawing = vi.fn();
+    renderModeButtons({ onToggleDrawing });
+    const target = document.createElement(
+      ['input', 'textarea', 'select'].includes(kind) ? kind : 'div'
+    );
+    if (kind === 'contenteditable') target.setAttribute('contenteditable', 'true');
+    if (kind === 'textbox') target.setAttribute('role', 'textbox');
+    document.body.append(target);
+    const input =
+      kind === 'shadow-input'
+        ? target.attachShadow({ mode: 'open' }).appendChild(document.createElement('input'))
+        : target;
+    expect(pressDigit('2', {}, input).defaultPrevented).toBe(false);
+    expect(onToggleDrawing).not.toHaveBeenCalled();
+  }
+);
+
+it('keeps digits inside another open toolbar menu and permits them inside the mode menu', () => {
+  const onToggleDrawing = vi.fn();
+  renderModeButtons({ onToggleDrawing });
+  act(() => container!.querySelector<HTMLButtonElement>('[data-ui="test.other-menu"]')!.click());
+  expect(pressDigit('2').defaultPrevented).toBe(false);
+  expect(onToggleDrawing).not.toHaveBeenCalled();
+  act(() => queryModeSelectorButton()?.click());
+  const event = pressDigit('2');
+  expect(event.defaultPrevented).toBe(true);
+  expect(onToggleDrawing).toHaveBeenCalledOnce();
+  expect(document.querySelector('[data-ui="content.toolbar.mode-option.drawing"]')).toBeNull();
+});
+
+it.each(['dialog', 'listbox', 'customizing', 'dragging', 'inert', 'hidden', 'pending', 'locked'])(
+  'does not change modes while %s owns the interaction',
+  (kind) => {
+    const onToggleDrawing = vi.fn();
+    renderModeButtons({
+      onToggleDrawing,
+      pendingMode: kind === 'pending' ? 'quick-edit' : null,
+      videoRecordingMode: kind === 'locked',
+      videoRecordingModeLocked: kind === 'locked',
+    });
+    if (kind === 'dialog' || kind === 'listbox') {
+      const layer = document.createElement('div');
+      layer.setAttribute('role', kind);
+      document.body.append(layer);
+    } else if (kind === 'customizing') container!.setAttribute('data-page-customizing', 'true');
+    else if (kind === 'dragging') container!.setAttribute('data-dragging', 'true');
+    else if (kind === 'inert') container!.setAttribute('inert', '');
+    else if (kind === 'hidden') queryModeSelectorButton()!.style.visibility = 'hidden';
+    expect(pressDigit('2').defaultPrevented).toBe(false);
+    expect(onToggleDrawing).not.toHaveBeenCalled();
+  }
+);
+
+it('ignores a selected mode, hidden toolbar geometry and a disposed toolbar', () => {
+  const onToggleDrawing = vi.fn();
+  renderModeButtons({ onToggleDrawing, drawingMode: true });
+  expect(pressDigit('2').defaultPrevented).toBe(true);
+  expect(onToggleDrawing).not.toHaveBeenCalled();
+  vi.spyOn(queryModeSelectorButton()!, 'getClientRects').mockReturnValue({
+    length: 0,
+    item: () => null,
+    [Symbol.iterator]: () => [][Symbol.iterator](),
+  });
+  expect(pressDigit('1').defaultPrevented).toBe(false);
+  act(() => root!.unmount());
+  root = null;
+  expect(pressDigit('2').defaultPrevented).toBe(false);
+});
+
+it.each(['refused', 'rejected', 'accepted'])(
+  'preserves the async recording exit contract when %s',
+  async (outcome) => {
+    const onToggleDrawing = vi.fn();
+    let resolve!: (value: boolean) => void;
+    let reject!: (reason: Error) => void;
+    const onToggleVideoRecording = vi.fn(
+      () =>
+        new Promise<boolean>((yes, no) => {
+          resolve = yes;
+          reject = no;
+        })
+    );
+    renderModeButtons({ onToggleDrawing, onToggleVideoRecording, videoRecordingMode: true });
+    const event = pressDigit('2');
+    expect(onToggleVideoRecording).toHaveBeenCalledWith(event);
+    expect(onToggleDrawing).not.toHaveBeenCalled();
+    await act(async () => {
+      if (outcome === 'rejected') reject(new Error('Exit refused'));
+      else resolve(outcome === 'accepted');
+    });
+    expect(onToggleDrawing).toHaveBeenCalledTimes(outcome === 'accepted' ? 1 : 0);
+  }
+);
+
+it('respects recording customization disabled fieldsets and resumes after customization', async () => {
+  const onToggleDrawing = vi.fn();
+  const onToggleVideoRecording = vi.fn();
+  renderModeButtons({ onToggleDrawing, onToggleVideoRecording, videoRecordingMode: true });
+  const fieldset = document.createElement('fieldset');
+  fieldset.disabled = true;
+  document.body.append(fieldset);
+  fieldset.append(container!);
+  expect(queryModeSelectorButton()!.disabled).toBe(false);
+  expect(queryModeSelectorButton()!.matches(':disabled')).toBe(true);
+  expect(pressDigit('2').defaultPrevented).toBe(false);
+  expect(onToggleVideoRecording).not.toHaveBeenCalled();
+  expect(onToggleDrawing).not.toHaveBeenCalled();
+  fieldset.disabled = false;
+  await act(async () => {
+    pressDigit('2');
+  });
+  expect(onToggleVideoRecording).toHaveBeenCalledOnce();
+  expect(onToggleDrawing).toHaveBeenCalledOnce();
 });
