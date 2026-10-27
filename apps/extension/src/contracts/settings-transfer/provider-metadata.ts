@@ -1,6 +1,9 @@
 import type { AIProvider } from '../settings';
 
-export type SettingsTransferProviderMetadata = Omit<AIProvider, 'hasStoredApiKey'>;
+export type SettingsTransferProviderMetadata = Pick<
+  AIProvider,
+  (typeof SETTINGS_TRANSFER_PROVIDER_METADATA_KEYS)[number]
+>;
 
 export const SETTINGS_TRANSFER_PROVIDER_METADATA_KEYS = [
   'id',
@@ -8,6 +11,8 @@ export const SETTINGS_TRANSFER_PROVIDER_METADATA_KEYS = [
   'connectionType',
   'baseUrl',
   'createdAt',
+  'management',
+  'enabled',
 ] as const;
 
 export function hasOnlySettingsTransferProviderMetadataKeys(
@@ -26,5 +31,7 @@ export function selectSettingsTransferProviderMetadata(
     connectionType: provider.connectionType,
     baseUrl: provider.baseUrl,
     createdAt: provider.createdAt,
+    ...(provider.management === undefined ? {} : { management: provider.management }),
+    ...(provider.enabled === undefined ? {} : { enabled: provider.enabled }),
   };
 }

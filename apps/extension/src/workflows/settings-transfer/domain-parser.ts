@@ -239,6 +239,8 @@ function parseAiDomain(
               connectionType: record['connectionType'],
               baseUrl: record['baseUrl'],
               createdAt: record['createdAt'],
+              ...(record['management'] === undefined ? {} : { management: record['management'] }),
+              ...(record['enabled'] === undefined ? {} : { enabled: record['enabled'] }),
               hasStoredApiKey: false,
             };
           })

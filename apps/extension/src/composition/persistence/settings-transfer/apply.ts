@@ -417,6 +417,13 @@ function readImportedProviders(
 }
 
 function toImportedProvider(imported: Record<string, unknown>): AIProvider {
+  const management = imported['management'];
+  const enabled = imported['enabled'];
+  if (
+    (management !== undefined && management !== 'automatic' && management !== 'manual') ||
+    (enabled !== undefined && typeof enabled !== 'boolean')
+  )
+    throw new TypeError('Invalid settings transfer AI provider controls');
   return {
     id: imported['id'] as string,
     name: imported['name'] as string,
@@ -424,6 +431,8 @@ function toImportedProvider(imported: Record<string, unknown>): AIProvider {
     baseUrl: imported['baseUrl'] as string,
     createdAt: imported['createdAt'] as number,
     hasStoredApiKey: false,
+    ...(management === undefined ? {} : { management }),
+    ...(enabled === undefined ? {} : { enabled }),
   };
 }
 

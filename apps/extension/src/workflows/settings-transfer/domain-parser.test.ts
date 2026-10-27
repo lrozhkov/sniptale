@@ -211,3 +211,62 @@ it.each([
     })
   ).toThrow();
 });
+
+it('retains model capabilities, ownership and independent audio blocks through domain admission', () => {
+  const model = {
+    id: 'configured',
+    providerId: 'provider',
+    modelCode: 'exact/code',
+    displayName: 'Configured',
+    source: 'manual',
+    propertySource: 'catalog',
+    enabled: false,
+    retirementOverride: false,
+    capabilities: {
+      operations: { text: 'supported', transcription: 'supported', speech: 'supported' },
+      input: { text: 'supported', audio: 'supported' },
+      output: { audio: 'supported' },
+      features: {},
+    },
+    audio: {
+      transcription: { language: 'en', responseFormat: 'json', timestampGranularity: 'none' },
+      speech: { voiceId: 'voice', responseFormat: 'mp3' },
+    },
+  };
+  const input = {
+    'ai.models': { schemaVersion: 1, data: { items: [model], defaultModelId: null } },
+  };
+  expect(parseSettingsTransferDomains(input)).toEqual(input);
+  expect(parseSettingsTransferDomains(parseSettingsTransferDomains(input))).toEqual(input);
+  expect(() =>
+    parseSettingsTransferDomains({
+      'ai.models': {
+        schemaVersion: 1,
+        data: { items: [{ ...model, catalog: { lifecycle: 'active' } }] },
+      },
+    })
+  ).toThrow();
+});
+
+it('round trips provider management and disabled state without admitting runtime evidence', () => {
+  const provider = {
+    id: 'provider',
+    name: 'Provider',
+    baseUrl: 'https://example.com/v1',
+    connectionType: 'openai-compatible',
+    createdAt: 1,
+    management: 'manual',
+    enabled: false,
+  };
+  const domain = (item: SettingsTransferDomainPayload['data']) => ({
+    'ai.providers': { schemaVersion: 1, data: { items: [item] } },
+  });
+  expect(parseSettingsTransferDomains(domain(provider))).toEqual(domain(provider));
+  for (const invalid of [
+    { enabled: 'false' },
+    { management: 'unknown' },
+    { incarnation: 'imported' },
+  ]) {
+    expect(() => parseSettingsTransferDomains(domain({ ...provider, ...invalid }))).toThrow();
+  }
+});

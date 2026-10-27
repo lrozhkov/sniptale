@@ -722,3 +722,61 @@ it('excludes quick-action artwork and keeps a valid projected transfer', async (
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII='
   );
 });
+
+it('exports configured model properties and audio without catalog cache or destination scope', async () => {
+  const current = await mocks.ai();
+  const capabilities = {
+    operations: { text: 'supported', transcription: 'supported', speech: 'supported' },
+    input: { text: 'supported', audio: 'supported' },
+    output: { audio: 'supported' },
+    features: {},
+  };
+  const model = {
+    id: 'configured',
+    providerId: 'provider-a',
+    modelCode: 'exact/code',
+    displayName: 'Configured',
+    source: 'manual',
+    propertySource: 'manual',
+    enabled: false,
+    retirementOverride: true,
+    capabilities,
+    systemPrompt: 'Authored instructions',
+    audio: {
+      transcription: { language: 'en', responseFormat: 'json', timestampGranularity: 'none' },
+      speech: { voiceId: 'voice', responseFormat: 'mp3' },
+    },
+    catalog: {
+      capabilities,
+      displayName: 'Remote',
+      lifecycle: 'active',
+      observedAt: 1,
+      scope: 'private-scope',
+    },
+  };
+  mocks.ai.mockResolvedValue({
+    ...current,
+    models: [model],
+    defaultModelId: null,
+    providers: current.providers.map((provider: { id: string }) => ({
+      ...provider,
+      management: 'manual',
+      enabled: false,
+      incarnation: 'local-only',
+    })),
+  });
+  const snapshot = await readSettingsTransferSnapshot();
+  const { catalog: _catalog, ...configuration } = model;
+  expect(snapshot.domains['ai.models']?.data).toEqual({
+    items: [configuration],
+    defaultModelId: null,
+  });
+  expect(parseSettingsTransferDomains(snapshot.domains)['ai.models']).toEqual(
+    snapshot.domains['ai.models']
+  );
+  expect(JSON.stringify(snapshot.domains)).not.toContain('private-scope');
+  expect(JSON.stringify(snapshot.domains)).not.toContain('local-only');
+  expect(snapshot.domains['ai.providers']?.data).toMatchObject({
+    items: [{ management: 'manual', enabled: false }],
+  });
+});

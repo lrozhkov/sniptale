@@ -875,6 +875,7 @@ unchanged project admission.',
     testFiles: [
       'apps/extension/src/composition/persistence/settings-transfer/read.test.ts',
       'apps/extension/src/composition/persistence/settings-transfer/apply.test.ts',
+      'apps/extension/src/composition/persistence/settings-transfer/apply-ai-configuration.test.ts',
       'apps/extension/src/composition/persistence/settings-transfer/page-launch-apply.integration.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/mutation-barrier.test.ts',
       'apps/extension/src/composition/persistence/settings/coordination.test.ts',
