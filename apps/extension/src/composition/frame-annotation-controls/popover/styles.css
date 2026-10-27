@@ -140,25 +140,27 @@
 }
 
 /* Embedded annotation chrome opts in without changing the rendered page annotation. */
-.sniptale-content-appearance-surface.sniptale-content-popover {
+.sniptale-content-appearance-surface.sniptale-content-popover.sniptale-content-popover--toolbar-menu {
   padding: 8px;
   border-radius: 4px;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-body {
+.sniptale-content-appearance-surface.sniptale-content-popover .sniptale-content-popover-body {
   gap: 8px;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-section {
+.sniptale-content-appearance-surface.sniptale-content-popover .sniptale-content-popover-section {
   gap: 8px;
   padding: 8px 0;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-section:first-child {
+.sniptale-content-appearance-surface.sniptale-content-popover
+  .sniptale-content-popover-section:first-child {
   padding-top: 0;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-section-label {
+.sniptale-content-appearance-surface.sniptale-content-popover
+  .sniptale-content-popover-section-label {
   color: var(--sniptale-color-text-secondary);
   font: 500 13px / 18px var(--sniptale-font-interface);
 }
