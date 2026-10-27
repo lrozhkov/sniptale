@@ -13,6 +13,7 @@ import type {
 import { translate } from '../../../../../platform/i18n';
 
 type Props = {
+  availableOperations?: readonly AIModelOperation[];
   operation: AIModelOperation;
   audio: AIModelAudioParameters | undefined;
   onOperationChange: ((operation: AIModelOperation) => void) | undefined;
@@ -270,7 +271,11 @@ export function ModelAudioFields(props: Props) {
               label: translate('settings.aiProviders.modelOperationTranscription'),
             },
             { value: 'speech', label: translate('settings.aiProviders.modelOperationSpeech') },
-          ]}
+          ].filter(
+            (option) =>
+              props.availableOperations === undefined ||
+              props.availableOperations.some((operation) => operation === option.value)
+          )}
           onChange={(value) => {
             if (value === 'text' || value === 'transcription' || value === 'speech')
               props.onOperationChange?.(value);

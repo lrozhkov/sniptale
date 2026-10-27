@@ -246,3 +246,27 @@ it('returns typed locked failures for protected AI secret mutations', async () =
     });
   });
 });
+
+it('returns the typed provider-change reason without exposing the submitted model draft', async () => {
+  const { AIModelProviderChangedError } =
+    await import('../../../composition/persistence/ai-settings/graph-mutation-types');
+  mutateAiSettingsMock.mockRejectedValueOnce(new AIModelProviderChangedError());
+  const sendResponse = vi.fn();
+  routeAiSettingsMutationMessage(
+    {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'update-model',
+      providerIncarnation: 'old',
+      model: { id: 'model', providerId: 'provider', modelCode: 'code', displayName: 'Name' },
+    },
+    { url: 'chrome-extension://extension-id/apps/extension/src/settings/index.html' },
+    sendResponse
+  );
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({
+      success: false,
+      reason: 'ai-provider-changed',
+      error: 'The AI provider changed after this model draft was prepared',
+    })
+  );
+});

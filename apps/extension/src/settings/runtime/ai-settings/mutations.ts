@@ -75,12 +75,16 @@ export function deleteAIProvider(providerId: string): Promise<void> {
   return sendAiSettingsMutation({ operation: 'delete-provider', providerId }).then(() => undefined);
 }
 
-export function addAIModel(model: AIModel): Promise<void> {
-  return sendAiSettingsMutation({ operation: 'add-model', model }).then(() => undefined);
+export function addAIModel(model: AIModel, providerIncarnation: string): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'add-model', model, providerIncarnation }).then(
+    () => undefined
+  );
 }
 
-export function updateAIModel(model: AIModel): Promise<void> {
-  return sendAiSettingsMutation({ operation: 'update-model', model }).then(() => undefined);
+export function updateAIModel(model: AIModel, providerIncarnation: string): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'update-model', model, providerIncarnation }).then(
+    () => undefined
+  );
 }
 
 export function deleteAIModel(modelId: string): Promise<void> {

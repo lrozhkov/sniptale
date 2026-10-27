@@ -30,6 +30,7 @@ it('delegates the complete mutation command to the persistence authority', async
       providerId: 'provider-1',
     },
     operation: 'add-model',
+    providerIncarnation: 'incarnation',
     type: 'AI_SETTINGS_MUTATION',
   } as const;
 

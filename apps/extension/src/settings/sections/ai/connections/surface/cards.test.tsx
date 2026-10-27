@@ -70,6 +70,7 @@ function createState(overrides: Partial<AiProvidersSectionState> = {}): AiProvid
     secretProtection: createMockSecretProtectionState(),
     providers: [PROVIDER],
     models: [MODEL],
+    catalogModels: [],
     isLoading: false,
     modelOptions: [],
     modals: {

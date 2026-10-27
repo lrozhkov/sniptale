@@ -572,3 +572,61 @@ it('retains valid stored property ownership and refuses malformed ownership with
   });
   expect(storage.state.local[AI_MODELS_KEY]).toEqual([]);
 });
+
+it.each(['add-model', 'update-model'] as const)(
+  'refuses an old form incarnation for queued %s after same-ID provider recreation',
+  async (operation) => {
+    const model = {
+      id: 'manual',
+      providerId: provider.id,
+      modelCode: 'custom',
+      displayName: 'Manual',
+    };
+    storage.state.local[AI_MODELS_KEY] = operation === 'update-model' ? [model] : [];
+    const previous = structuredClone(models());
+    const gate = await holdGraphTransition(() => {
+      storage.state.local[AI_PROVIDERS_KEY] = [{ ...provider, incarnation: 'replacement' }];
+    });
+    const pending = mutateStoredAISettings({
+      operation,
+      model,
+      providerIncarnation: provider.incarnation,
+    });
+    const refusal = expect(pending).rejects.toMatchObject({ reason: 'ai-provider-changed' });
+    await gate.requested;
+    gate.release();
+    await gate.transition;
+    await refusal;
+    expect(models()).toEqual(previous);
+  }
+);
+
+it('refuses stale queued creation after deletion and accepts a fresh same-ID retry', async () => {
+  const model = {
+    id: 'manual',
+    providerId: provider.id,
+    modelCode: 'custom',
+    displayName: 'Manual',
+  };
+  const gate = await holdGraphTransition(() => {
+    storage.state.local[AI_PROVIDERS_KEY] = [];
+  });
+  const pending = mutateStoredAISettings({
+    operation: 'add-model',
+    model,
+    providerIncarnation: provider.incarnation,
+  });
+  const refusal = expect(pending).rejects.toMatchObject({ reason: 'ai-provider-changed' });
+  await gate.requested;
+  gate.release();
+  await gate.transition;
+  await refusal;
+  expect(models()).toEqual([]);
+  storage.state.local[AI_PROVIDERS_KEY] = [{ ...provider, incarnation: 'replacement' }];
+  await mutateStoredAISettings({
+    operation: 'add-model',
+    model,
+    providerIncarnation: 'replacement',
+  });
+  expect(models()).toEqual([model]);
+});

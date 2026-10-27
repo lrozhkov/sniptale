@@ -55,7 +55,10 @@ import {
   type AICatalogRefreshOutcome,
 } from './managed-catalog';
 import { assertAISettingsGraphInvariants } from './graph-invariants';
-import type { AISettingsMutationCommand } from './graph-mutation-types';
+import {
+  AIModelProviderChangedError,
+  type AISettingsMutationCommand,
+} from './graph-mutation-types';
 
 // policyStateId: ai-settings-mutation-queue - durable storage remains authoritative while this
 // runtime-local queue serializes graph transitions and is recreated empty after runtime restart.
@@ -70,14 +73,20 @@ function queueAISettingsMutation<T>(run: () => Promise<T>): Promise<T> {
   return nextMutation;
 }
 
-async function assertModelProviderExists(model: AIModel): Promise<AIProvider> {
+async function assertModelProviderExists(
+  model: AIModel,
+  providerIncarnation?: string
+): Promise<AIProvider> {
   if (!isValidAIModelOperationConfiguration(model))
     throw new Error('Invalid AI model operation configuration');
   const providers = await loadAIProviders();
   const provider = providers.find((entry) => entry.id === model.providerId);
   if (!provider) {
+    if (providerIncarnation !== undefined) throw new AIModelProviderChangedError();
     throw new Error(`Provider ${model.providerId} not found for model ${model.id}`);
   }
+  if (providerIncarnation !== undefined && provider.incarnation !== providerIncarnation)
+    throw new AIModelProviderChangedError();
   return provider;
 }
 
@@ -140,8 +149,12 @@ async function resolveModelProperties(
   };
 }
 
-async function addModel(model: AIModel, permit: PersistenceMutationPermit): Promise<void> {
-  const provider = await assertModelProviderExists(model);
+async function addModel(
+  model: AIModel,
+  permit: PersistenceMutationPermit,
+  providerIncarnation?: string
+): Promise<void> {
+  const provider = await assertModelProviderExists(model, providerIncarnation);
   const models = await loadAIModels();
   if (models.some((current) => current.id === model.id)) {
     throw new Error(`Model ${model.id} already exists`);
@@ -149,8 +162,12 @@ async function addModel(model: AIModel, permit: PersistenceMutationPermit): Prom
   await saveAIModels([...models, await resolveModelProperties(model, models, provider)], permit);
 }
 
-async function updateModel(model: AIModel, permit: PersistenceMutationPermit): Promise<void> {
-  const provider = await assertModelProviderExists(model);
+async function updateModel(
+  model: AIModel,
+  permit: PersistenceMutationPermit,
+  providerIncarnation?: string
+): Promise<void> {
+  const provider = await assertModelProviderExists(model, providerIncarnation);
   const models = await loadAIModels();
   const index = models.findIndex((current) => current.id === model.id);
   if (index < 0) {
@@ -261,9 +278,9 @@ async function applyModelGraphMutation(
 ): Promise<void> {
   switch (command.operation) {
     case 'add-model':
-      return addModel(command.model, permit);
+      return addModel(command.model, permit, command.providerIncarnation);
     case 'update-model':
-      return updateModel(command.model, permit);
+      return updateModel(command.model, permit, command.providerIncarnation);
     case 'delete-model':
       return deleteModel(command.modelId, permit);
     case 'move-model':

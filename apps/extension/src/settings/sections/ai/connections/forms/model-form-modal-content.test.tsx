@@ -109,6 +109,16 @@ function createProps(
   overrides: Partial<Parameters<typeof ModelFormModalContent>[0]> = {}
 ): Parameters<typeof ModelFormModalContent>[0] {
   return {
+    catalog: {
+      mode: 'manual',
+      models: [],
+      onSelect: vi.fn(),
+      onManual: vi.fn(),
+      onReset: vi.fn(),
+      onCapabilitiesChange: vi.fn(),
+      onEnabledChange: vi.fn(),
+      onRetirementOverrideChange: vi.fn(),
+    },
     errors: {},
     formData: {
       displayName: 'Model One',

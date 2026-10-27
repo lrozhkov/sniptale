@@ -15,7 +15,11 @@ export type AISettingsMutationCommand =
       provider: AIProviderUpsertInput;
     }
   | { operation: 'clear-provider-secret' | 'delete-provider'; providerId: string }
-  | { operation: 'add-model' | 'update-model'; model: AIModel }
+  | {
+      operation: 'add-model' | 'update-model';
+      model: AIModel;
+      providerIncarnation?: string | undefined;
+    }
   | { operation: 'delete-model'; modelId: string }
   | { operation: 'move-model'; modelId: string; beforeModelId: string | null }
   | { operation: 'save-default-model'; defaultModelId: string | null }
@@ -45,3 +49,12 @@ export type AISettingsMutationCommand =
     }
   | { operation: 'lock-secret-passphrase-protection' }
   | { operation: 'reset-secret-passphrase-protection' };
+
+/** Refuses a model draft prepared for a replaced connection. */
+export class AIModelProviderChangedError extends Error {
+  readonly reason = 'ai-provider-changed';
+  constructor() {
+    super('The AI provider changed after this model draft was prepared');
+    this.name = 'AIModelProviderChangedError';
+  }
+}

@@ -61,8 +61,15 @@ const operationFields = {
   audio: z
     .custom<AIModelAudioParameters>(
       (value) =>
-        isValidAIModelOperationConfiguration({ operation: 'transcription', audio: value }) ||
-        isValidAIModelOperationConfiguration({ operation: 'speech', audio: value }),
+        isValidAIModelOperationConfiguration({
+          capabilities: {
+            operations: { transcription: 'supported', speech: 'supported' },
+            input: {},
+            output: {},
+            features: {},
+          },
+          audio: value,
+        }),
       { message: 'settings.aiProviders.modelAudioInvalid' }
     )
     .optional(),
@@ -119,15 +126,20 @@ export const ProviderFormSchema = z.object({
 export const ModelFormSchema = z
   .object({
     ...operationFields,
+    source: z.literal('manual').optional(),
+    propertySource: z.enum(['catalog', 'manual']).optional(),
+    capabilities: z.custom<AIModelCapabilities>(isAIModelCapabilities).optional(),
+    enabled: z.boolean().optional(),
+    retirementOverride: z.boolean().optional(),
     providerId: z.string().min(1, schemaMessageKey('validation.schemas.selectProvider')),
     displayName: z
       .string()
       .min(1, schemaMessageKey('validation.schemas.nameRequired'))
-      .max(100, schemaMessageKey('validation.schemas.max100Characters')),
+      .max(500, schemaMessageKey('settings.aiProviders.modelIdentityTooLong')),
     modelCode: z
       .string()
       .min(1, schemaMessageKey('validation.schemas.modelCodeRequired'))
-      .max(200, schemaMessageKey('validation.schemas.max200Characters')),
+      .max(500, schemaMessageKey('settings.aiProviders.modelIdentityTooLong')),
     systemPrompt: z
       .string()
       .max(10000, schemaMessageKey('validation.schemas.max10000Characters'))

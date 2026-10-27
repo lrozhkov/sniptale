@@ -103,6 +103,7 @@ export function createBaseSectionState(
     secretProtection: createMockSecretProtectionState(),
     providers: [PROVIDER],
     models: [MODEL],
+    catalogModels: [],
     isLoading: false,
     modelOptions: [],
     modals: baseModals,

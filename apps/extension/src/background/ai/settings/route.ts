@@ -7,6 +7,7 @@ import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/messa
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { respondAsyncSuccess } from '../../routing-contracts/response';
 import { mutateAiSettings } from './mutations';
+import { AIModelProviderChangedError } from '../../../composition/persistence/ai-settings/graph-mutation-types';
 import { isAISecretPassphraseLockedError } from '../../../composition/persistence/ai-settings/secret-protection.store.ts';
 import { loadAISecretProtectionStatus } from '../../../composition/persistence/ai-settings';
 import * as authorizationPreauthorization from './authorization/preauthorization';
@@ -72,7 +73,7 @@ function respondAsyncAiSettingsMutation(
       sendResponse({ success: true, result: 'accepted' });
     })
     .catch((error) => {
-      if (isAISecretPassphraseLockedError(error)) {
+      if (isAISecretPassphraseLockedError(error) || error instanceof AIModelProviderChangedError) {
         sendResponse({
           success: false,
           reason: error.reason,

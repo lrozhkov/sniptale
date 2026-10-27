@@ -202,7 +202,12 @@ it.each(['mp3', 'wav', 'pcm'])(
       operation: 'speech',
       audio: { speech: { voiceId: 'voice', responseFormat } },
     };
-    const message = { type: MessageType.AI_SETTINGS_MUTATION, operation: 'add-model', model };
+    const message = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'add-model',
+      providerIncarnation: 'incarnation',
+      model,
+    };
     expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
     expect(
       aiSettingsMutationMessageSchema.safeParse({
@@ -300,7 +305,12 @@ it.each(['add-model', 'update-model'] as const)(
       source: 'manual',
       propertySource: 'catalog',
     };
-    const message = { type: MessageType.AI_SETTINGS_MUTATION, operation, model };
+    const message = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation,
+      model,
+      providerIncarnation: 'incarnation',
+    };
     expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
     expect(
       aiSettingsMutationMessageSchema.safeParse({
@@ -308,5 +318,28 @@ it.each(['add-model', 'update-model'] as const)(
         model: { ...model, propertySource: 'invalid' },
       }).success
     ).toBe(false);
+  }
+);
+
+it.each(['add-model', 'update-model'])(
+  'requires captured provider incarnation for Settings %s',
+  (operation) => {
+    const model = {
+      id: '00000000-0000-4000-8000-000000000001',
+      providerId: '00000000-0000-4000-8000-000000000002',
+      displayName: 'Model',
+      modelCode: 'code',
+    };
+    const message = { type: MessageType.AI_SETTINGS_MUTATION, operation, model };
+    expect(aiSettingsMutationMessageSchema.safeParse(message).success).toBe(false);
+    expect(
+      aiSettingsMutationMessageSchema.safeParse({ ...message, providerIncarnation: '' }).success
+    ).toBe(false);
+    expect(
+      aiSettingsMutationMessageSchema.safeParse({
+        ...message,
+        providerIncarnation: 'current-incarnation',
+      }).success
+    ).toBe(true);
   }
 );

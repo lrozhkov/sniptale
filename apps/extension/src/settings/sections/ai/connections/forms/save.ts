@@ -84,6 +84,8 @@ function buildModelSaveErrorMessage(): string {
 }
 
 function buildMutationFailureMessage(error: unknown, fallbackMessage: string): string {
+  if (isAiSettingsMutationError(error) && error.reason === 'ai-provider-changed')
+    return translate('settings.aiProviders.modelProviderChanged');
   if (isAiSettingsMutationError(error) && error.reason === 'ai-secrets-locked') {
     return translate('settings.aiProviders.providerSaveSecretLocked');
   }
@@ -169,11 +171,24 @@ function buildModelFormRecord(args: {
     providerId: args.formData.providerId,
     displayName: args.formData.displayName,
     modelCode: args.formData.modelCode,
+    source: 'manual',
+    propertySource: args.formData.propertySource ?? 'manual',
+    ...(args.formData.capabilities === undefined
+      ? {}
+      : { capabilities: args.formData.capabilities }),
+    ...(args.formData.enabled === undefined ? {} : { enabled: args.formData.enabled }),
+    ...(args.formData.retirementOverride === undefined
+      ? {}
+      : { retirementOverride: args.formData.retirementOverride }),
     ...(args.formData.operation === undefined ? {} : { operation: args.formData.operation }),
     ...(args.formData.audio === undefined ? {} : { audio: args.formData.audio }),
-    ...((args.formData.operation ?? 'text') === 'text' && args.formData.systemPrompt
-      ? { systemPrompt: args.formData.systemPrompt }
-      : {}),
+    ...(args.formData.capabilities?.operations.text === 'supported'
+      ? { systemPrompt: args.formData.systemPrompt ?? '' }
+      : args.formData.capabilities === undefined &&
+          (args.formData.operation ?? 'text') === 'text' &&
+          args.formData.systemPrompt
+        ? { systemPrompt: args.formData.systemPrompt }
+        : {}),
   };
 }
 
@@ -181,10 +196,12 @@ export type ModelFormSaveSession = {
   modelId: string;
   pending: boolean;
   committedRecord?: string;
+  existingRecord?: boolean;
 };
 
 export type ModelFormSaveParams = {
   session: ModelFormSaveSession;
+  providerIncarnation: string;
   formData: ModelFormData;
   isEditing: boolean;
   model?: AIModel | null;
@@ -196,6 +213,10 @@ export type ModelFormSaveParams = {
 export async function saveModelForm(args: ModelFormSaveParams): Promise<void> {
   if (args.session.pending) return;
 
+  if (!args.providerIncarnation) {
+    args.setErrors({ submit: translate('settings.aiProviders.modelProviderChanged') });
+    return;
+  }
   const fieldErrors = mapModelFieldErrors(args.formData);
   if (fieldErrors) {
     args.setErrors(fieldErrors);
@@ -210,10 +231,14 @@ export async function saveModelForm(args: ModelFormSaveParams): Promise<void> {
     const nextModel = buildModelFormRecord(args);
     const record = JSON.stringify(nextModel);
     if (record !== args.session.committedRecord) {
-      if (args.isEditing || args.session.committedRecord !== undefined) {
-        await updateAIModel(nextModel);
+      if (
+        args.isEditing ||
+        args.session.existingRecord ||
+        args.session.committedRecord !== undefined
+      ) {
+        await updateAIModel(nextModel, args.providerIncarnation);
       } else {
-        await addAIModel(nextModel);
+        await addAIModel(nextModel, args.providerIncarnation);
       }
       // Reload can fail after publication. Retry must not create a second record.
       args.session.committedRecord = record;

@@ -71,6 +71,7 @@ it('builds the ai providers controller state from owner-local props', () => {
   buildMocks.buildAiProvidersModelOptionsMock.mockReturnValue([{ label: 'OpenAI / GPT 4.1' }]);
 
   const state = buildAiProvidersSectionControllerState(args);
+  expect(state.catalogModels).toBe(args.dataState.selection.models);
 
   expect(buildMocks.buildAiProvidersModelOptionsMock).toHaveBeenCalledWith({
     getProviderName,

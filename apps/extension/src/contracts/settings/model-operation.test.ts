@@ -171,3 +171,29 @@ it('admits catalog-owned properties on a manual allowlist without enabling autom
     false
   );
 });
+
+it('accepts independent speech and recognition parameters for a model with several declared operations', () => {
+  const capabilities = {
+    operations: { text: 'supported', speech: 'supported', transcription: 'supported' },
+    input: {},
+    output: {},
+    features: {},
+  };
+  expect(isValidAIModelOperationConfiguration({ capabilities })).toBe(true);
+  expect(
+    isValidAIModelOperationConfiguration({
+      capabilities,
+      operation: 'text',
+      audio: {
+        speech: { voiceId: 'voice', responseFormat: 'mp3' },
+        transcription: { responseFormat: 'json', timestampGranularity: 'none' },
+      },
+    })
+  ).toBe(true);
+  expect(
+    isValidAIModelOperationConfiguration({
+      capabilities: { ...capabilities, operations: { text: 'supported' } },
+      audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+    })
+  ).toBe(false);
+});

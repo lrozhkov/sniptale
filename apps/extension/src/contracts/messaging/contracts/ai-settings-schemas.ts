@@ -145,10 +145,18 @@ export const aiSettingsMutationMessageSchema = defineAiSettingsMutationMessageSc
       .extend({ operation: z.literal('delete-provider'), providerId: aiRecordIdSchema })
       .strict(),
     baseMutationSchema
-      .extend({ model: modelMutationSchema, operation: z.literal('add-model') })
+      .extend({
+        model: modelMutationSchema,
+        providerIncarnation: aiRecordIdSchema,
+        operation: z.literal('add-model'),
+      })
       .strict(),
     baseMutationSchema
-      .extend({ model: modelMutationSchema, operation: z.literal('update-model') })
+      .extend({
+        model: modelMutationSchema,
+        providerIncarnation: aiRecordIdSchema,
+        operation: z.literal('update-model'),
+      })
       .strict(),
     baseMutationSchema
       .extend({ modelId: aiRecordIdSchema, operation: z.literal('delete-model') })
@@ -239,7 +247,7 @@ export const aiSettingsMutationResponseSchema = defineAiSettingsMutationResponse
   z
     .object({
       error: z.string().optional(),
-      reason: z.literal('ai-secrets-locked').optional(),
+      reason: z.enum(['ai-secrets-locked', 'ai-provider-changed']).optional(),
       result: z.literal('accepted').optional(),
       secretProtectionStatus: secretProtectionStatusSchema.optional(),
       success: z.boolean(),

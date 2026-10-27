@@ -21,6 +21,7 @@ const provider: AIProvider = {
   hasStoredApiKey: false,
   id: 'provider-1',
   name: 'Provider 1',
+  incarnation: 'incarnation',
 };
 
 function createDeferred(): Deferred {
@@ -107,6 +108,7 @@ it('serializes background and persistence facade graph mutations without stale r
   const backgroundMutation = mutateAiSettings({
     model: createModel('model-1'),
     operation: 'add-model',
+    providerIncarnation: 'incarnation',
     type: 'AI_SETTINGS_MUTATION',
   });
   await waitForWrite(0);
@@ -127,6 +129,7 @@ it('orders secret-protection status reads after an in-flight settings mutation',
   const mutation = mutateAiSettings({
     model: createModel('model-1'),
     operation: 'add-model',
+    providerIncarnation: 'incarnation',
     type: 'AI_SETTINGS_MUTATION',
   });
   await waitForWrite(0);

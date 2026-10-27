@@ -75,6 +75,7 @@ export interface AiProvidersSectionState {
   secretProtection: AiSecretProtectionState;
   providers: AIProvider[];
   models: AIModel[];
+  catalogModels: AIModel[];
   isLoading: boolean;
   modelOptions: { value: string; label: string }[];
   modals: AiProvidersModalsState;

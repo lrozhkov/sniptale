@@ -46,6 +46,7 @@ function createState(): AiProvidersSectionState {
     },
     providers: [PROVIDER],
     models: [MODEL],
+    catalogModels: [],
     isLoading: false,
     modelOptions: [],
     modals: {

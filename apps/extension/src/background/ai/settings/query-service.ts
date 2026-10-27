@@ -86,6 +86,30 @@ async function loadSanitizedModelSelection(): Promise<AIModelSelectionBootstrapP
   };
 }
 
+async function projectCurrentSettingsCatalog(
+  models: AIModel[],
+  providers: AIProvider[]
+): Promise<AIModel[]> {
+  if (!models.some((model) => model.catalog)) return models;
+  const scopes = new Map(
+    await Promise.all(
+      providers.map(
+        async (provider) =>
+          [provider.id, await createAIProviderDestinationBinding(provider)] as const
+      )
+    )
+  );
+  return models.map((model) => {
+    if (
+      !model.catalog ||
+      (model.catalog.scope && model.catalog.scope === scopes.get(model.providerId))
+    )
+      return model;
+    const { catalog: _catalog, ...configured } = model;
+    return configured;
+  });
+}
+
 async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataPayload> {
   const [
     selectionBootstrap,
@@ -106,7 +130,13 @@ async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataP
     audioTranscriptionSystemPrompt,
     voiceInputCorrectionSystemPrompt,
     secretProtectionStatus,
-    selectionBootstrap,
+    selectionBootstrap: {
+      ...selectionBootstrap,
+      models: await projectCurrentSettingsCatalog(
+        selectionBootstrap.models,
+        selectionBootstrap.providers
+      ),
+    },
   };
 }
 

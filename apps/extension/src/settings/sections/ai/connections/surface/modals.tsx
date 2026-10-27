@@ -55,11 +55,20 @@ export function ProviderFormModal({
 interface ModelModalProps {
   model?: AIModel | null;
   providers: AIProvider[];
+  catalogModels?: AIModel[];
+  onReloadProviders?: (() => Promise<void>) | undefined;
   onClose: () => void;
   onSave: () => void | Promise<void>;
 }
 
-export function ModelFormModal({ model, providers, onClose, onSave }: ModelModalProps) {
+export function ModelFormModal({
+  model,
+  providers,
+  catalogModels = [],
+  onReloadProviders,
+  onClose,
+  onSave,
+}: ModelModalProps) {
   const {
     errors,
     formData,
@@ -72,18 +81,36 @@ export function ModelFormModal({ model, providers, onClose, onSave }: ModelModal
     isEditing,
     isSaving,
     textareaRef,
-  } = useModelFormState(model);
+    entryMode,
+    catalogModels: availableCatalog,
+    catalogModel,
+    lifecycle,
+    handleCatalogSelect,
+    handleManualEntry,
+    handleResetFromCatalog,
+    handleCapabilitiesChange,
+    handleEnabledChange,
+    handleRetirementOverrideChange,
+  } = useModelFormState(model, providers, catalogModels);
 
   return (
     <ModelFormModalContent
       errors={errors}
-      formData={{
-        displayName: formData.displayName,
-        modelCode: formData.modelCode,
-        providerId: formData.providerId,
-        systemPrompt: formData.systemPrompt ?? '',
-        ...(formData.operation === undefined ? {} : { operation: formData.operation }),
-        ...(formData.audio === undefined ? {} : { audio: formData.audio }),
+      formData={formData}
+      catalog={{
+        mode: entryMode,
+        models: availableCatalog,
+        selected: catalogModel,
+        lifecycle,
+        onSelect: handleCatalogSelect,
+        onManual: handleManualEntry,
+        onReset: handleResetFromCatalog,
+        onCapabilitiesChange: handleCapabilitiesChange,
+        onEnabledChange: handleEnabledChange,
+        onRetirementOverrideChange: handleRetirementOverrideChange,
+        ...(onReloadProviders
+          ? { onRefreshConnections: () => void onReloadProviders().catch(() => undefined) }
+          : {}),
       }}
       isEditing={isEditing}
       isSaving={isSaving}
@@ -144,6 +171,8 @@ export function AIProvidersSectionModals(props: { state: AiProvidersSectionState
       {modals.model.open ? (
         <ModelFormModal
           providers={props.state.providers}
+          catalogModels={props.state.catalogModels}
+          onReloadProviders={props.state.reloadData}
           onClose={modals.closeModelModal}
           onSave={async () => {
             await props.state.reloadData();

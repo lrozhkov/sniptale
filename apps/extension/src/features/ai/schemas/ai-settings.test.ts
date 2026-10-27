@@ -125,7 +125,7 @@ it('admits existing catalog identity bounds in runtime models without widening m
     displayName: 'n'.repeat(500),
   };
   expect(AIModelSchema.strict().safeParse(base).success).toBe(true);
-  expect(ModelFormSchema.safeParse(base).success).toBe(false);
+  expect(ModelFormSchema.safeParse(base).success).toBe(true);
   expect(AIModelSchema.strict().safeParse({ ...base, modelCode: 'c'.repeat(501) }).success).toBe(
     false
   );

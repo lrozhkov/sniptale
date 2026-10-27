@@ -1,5 +1,25 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'canonical-ai-model-selector',
+    productionFile: 'apps/extension/src/features/ai/model-selector/helpers.ts',
+    reason:
+      'Search grouping and selected labels require the mounted selector consumer and exact Model ID search proof.',
+    testFiles: [
+      'apps/extension/src/features/ai/model-selector/helpers.test.ts',
+      'apps/extension/src/features/ai/model-selector/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'settings-connection-catalog-maintenance',
+    productionFile: 'apps/extension/src/settings/sections/ai/connections/surface/test-support.ts',
+    reason:
+      'Mounted Settings composition and audio model consumers execute the shared catalog fixture factory.',
+    testFiles: [
+      'apps/extension/src/settings/sections/ai/connections/surface/content.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/audio-models.test.tsx',
+    ],
+  },
+  {
     owner: 'settings-connection-catalog-maintenance',
     productionFile:
       'apps/extension/src/settings/sections/ai/connections/controller/state/loader/use-loader.ts',

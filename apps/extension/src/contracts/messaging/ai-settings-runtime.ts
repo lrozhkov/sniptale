@@ -149,7 +149,10 @@ export type AiSettingsMutationMessage =
     })
   | (AiSettingsMutationBase<'clear-provider-secret'> & { providerId: string })
   | (AiSettingsMutationBase<'delete-provider'> & { providerId: string })
-  | (AiSettingsMutationBase<'add-model' | 'update-model'> & { model: AIModel })
+  | (AiSettingsMutationBase<'add-model' | 'update-model'> & {
+      model: AIModel;
+      providerIncarnation: string;
+    })
   | (AiSettingsMutationBase<'delete-model'> & { modelId: string })
   | (AiSettingsMutationBase<'move-model'> & {
       modelId: string;
@@ -187,7 +190,7 @@ export type AiSettingsMutationMessage =
 
 export type AiSettingsMutationResponse = {
   error?: string | undefined;
-  reason?: 'ai-secrets-locked' | undefined;
+  reason?: 'ai-secrets-locked' | 'ai-provider-changed' | undefined;
   result?: 'accepted' | undefined;
   secretProtectionStatus?: AISecretProtectionStatusPayload | undefined;
   success: boolean;

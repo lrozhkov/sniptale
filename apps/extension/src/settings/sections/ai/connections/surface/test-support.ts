@@ -28,6 +28,7 @@ export function createMockAiProvidersSectionState(): AiProvidersSectionState {
     secretProtection: createMockSecretProtectionState(),
     providers: [],
     models: [],
+    catalogModels: [],
     isLoading: false,
     modelOptions: [],
     modals: {

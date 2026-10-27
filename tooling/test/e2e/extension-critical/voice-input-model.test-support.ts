@@ -198,25 +198,63 @@ async function addNativeModel(page: Page, locale: AppLocale, operation: 'text' |
     .click();
   await page.getByRole('option', { name: PROVIDER_NAME, exact: true }).click();
   await dialog
+    .getByRole('button', {
+      name: label(locale, 'settings.aiProviders.modelManualEntry'),
+      exact: true,
+    })
+    .click();
+  await dialog
     .getByPlaceholder(label(locale, 'settings.aiProviders.modelNamePlaceholder'), { exact: true })
     .fill(operation === 'text' ? TEXT_MODEL_NAME : ASR_MODEL_NAME);
   await dialog
     .getByPlaceholder(label(locale, 'settings.aiProviders.modelCodePlaceholder'), { exact: true })
     .fill(operation === 'text' ? 'synthetic-text' : 'synthetic-asr');
-  await dialog
-    .getByLabel(label(locale, 'settings.aiProviders.modelOperationLabel'), { exact: true })
-    .click();
-  await page
-    .getByRole('option', {
-      name: label(
-        locale,
-        operation === 'text'
-          ? 'settings.aiProviders.modelOperationText'
-          : 'settings.aiProviders.modelOperationTranscription'
-      ),
-      exact: true,
-    })
-    .click();
+  if (operation === 'transcription') {
+    await dialog
+      .locator('summary')
+      .filter({ hasText: label(locale, 'settings.aiProviders.modelOperationsTitle') })
+      .click();
+    await dialog
+      .getByRole('button', {
+        name: `${label(locale, 'settings.aiProviders.modelOperationsTitle')}: ${label(locale, 'settings.aiProviders.modelOperationTranscription')}`,
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole('option', {
+        name: label(locale, 'settings.aiProviders.modelSupportYes'),
+        exact: true,
+      })
+      .click();
+    await dialog
+      .getByRole('button', {
+        name: `${label(locale, 'settings.aiProviders.modelOperationsTitle')}: ${label(locale, 'settings.aiProviders.modelOperationText')}`,
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole('option', {
+        name: label(locale, 'settings.aiProviders.modelSupportNo'),
+        exact: true,
+      })
+      .click();
+    await dialog
+      .locator('summary')
+      .filter({ hasText: label(locale, 'settings.aiProviders.modelInputTitle') })
+      .click();
+    await dialog
+      .getByRole('button', {
+        name: `${label(locale, 'settings.aiProviders.modelInputTitle')}: ${label(locale, 'settings.aiProviders.modelModalityAudio')}`,
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole('option', {
+        name: label(locale, 'settings.aiProviders.modelSupportYes'),
+        exact: true,
+      })
+      .click();
+  }
   const save = dialog.getByRole('button', {
     name: label(locale, 'common.actions.add'),
     exact: true,

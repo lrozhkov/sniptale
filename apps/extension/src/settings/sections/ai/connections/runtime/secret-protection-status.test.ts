@@ -98,8 +98,8 @@ it('routes provider, model, prompt, and default model mutations through the runt
   await updateAIProvider(provider);
   await clearAIProviderSecret('provider-1');
   await deleteAIProvider('provider-1');
-  await addAIModel(model);
-  await updateAIModel(model);
+  await addAIModel(model, 'incarnation');
+  await updateAIModel(model, 'incarnation');
   await deleteAIModel('model-1');
   await saveDefaultModelId('model-1');
   await saveGlobalSystemPrompt('global prompt');

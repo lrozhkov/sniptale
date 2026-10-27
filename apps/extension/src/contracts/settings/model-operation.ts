@@ -6,6 +6,7 @@ import {
 } from './ai-provider';
 import {
   getAIScenarioOperation,
+  isAIModelCapabilities,
   type AIScenario,
   type AIModelCapabilities,
   type AICatalogFacts,
@@ -156,6 +157,25 @@ export function isValidAIModelOperationConfiguration(value: unknown): value is R
   if (!isRecord(value)) return false;
   const operation = value['operation'];
   const audio = value['audio'];
+  if (
+    operation !== undefined &&
+    operation !== 'text' &&
+    operation !== 'transcription' &&
+    operation !== 'speech'
+  )
+    return false;
+  if (value['capabilities'] !== undefined) {
+    if (!isAIModelCapabilities(value['capabilities'])) return false;
+    if (audio === undefined) return true;
+    if (!isRecord(audio) || !hasOnlyKeys(audio, ['transcription', 'speech'])) return false;
+    const operations = value['capabilities'].operations;
+    return (
+      (audio['transcription'] === undefined ||
+        (operations.transcription === 'supported' && isTranscription(audio['transcription']))) &&
+      (audio['speech'] === undefined ||
+        (operations.speech === 'supported' && isSpeech(audio['speech'])))
+    );
+  }
   if (operation === undefined || operation === 'text') return audio === undefined;
   if (!isRecord(audio)) return false;
   if (operation === 'transcription') {

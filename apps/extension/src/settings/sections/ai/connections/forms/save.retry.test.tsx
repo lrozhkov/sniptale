@@ -33,7 +33,17 @@ let container: HTMLDivElement;
 let state: ReturnType<typeof useModelFormState>;
 
 function Harness(props: { model?: AIModel; onSave: () => Promise<void> }) {
-  state = useModelFormState(props.model);
+  state = useModelFormState(props.model, [
+    {
+      id: MODEL.providerId,
+      incarnation: 'incarnation',
+      name: 'Provider',
+      connectionType: 'openai-compatible',
+      baseUrl: 'https://example.test/v1',
+      hasStoredApiKey: false,
+      createdAt: 1,
+    },
+  ]);
   return (
     <form onSubmit={(event) => void state.handleSubmit(event, props.onSave)}>
       <input
@@ -113,7 +123,8 @@ it('updates an edited draft with the acknowledged record identity after reload f
   await submit();
   expect(addModel).toHaveBeenCalledTimes(1);
   expect(updateModel).toHaveBeenCalledWith(
-    expect.objectContaining({ id: saved.id, displayName: 'Changed' })
+    expect.objectContaining({ id: saved.id, displayName: 'Changed' }),
+    'incarnation'
   );
 });
 
@@ -156,7 +167,10 @@ it('keeps existing model edits on their original identity during reload retry', 
   await submit();
   expect(addModel).not.toHaveBeenCalled();
   expect(updateModel).toHaveBeenCalledTimes(1);
-  expect(updateModel).toHaveBeenCalledWith(expect.objectContaining({ id: MODEL.id }));
+  expect(updateModel).toHaveBeenCalledWith(
+    expect.objectContaining({ id: MODEL.id }),
+    'incarnation'
+  );
 });
 
 it('does not publish an invalid draft', async () => {
@@ -179,6 +193,7 @@ it('keeps the real modal editable after reload refusal and retries from its Save
           {
             id: MODEL.providerId,
             name: 'Provider',
+            incarnation: 'incarnation',
             connectionType: 'openai-compatible',
             baseUrl: 'https://example.test/v1',
             hasStoredApiKey: false,

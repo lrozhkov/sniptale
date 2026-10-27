@@ -33,6 +33,7 @@ export function buildAiProvidersSectionControllerState(
       models: props.dataState.selection.models,
     }),
     models: props.dataState.models,
+    catalogModels: props.dataState.selection.models,
     modals: props.modalState,
     providers: props.dataState.providers,
     reloadData: props.reloadData,

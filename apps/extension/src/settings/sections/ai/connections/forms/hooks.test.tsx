@@ -192,6 +192,16 @@ it('persists model hook updates through saveModelForm with current form values',
     displayName: 'GPT 4.1',
     modelCode: 'gpt-4.1',
     systemPrompt: 'Prompt',
+    source: 'manual',
+    propertySource: 'manual',
+    enabled: true,
+    retirementOverride: false,
+    capabilities: {
+      operations: { text: 'supported' },
+      input: { text: 'supported' },
+      output: { text: 'supported' },
+      features: {},
+    },
   });
 
   await act(async () => {
@@ -206,6 +216,11 @@ it('persists model hook updates through saveModelForm with current form values',
     displayName: 'GPT 4.1 mini',
     modelCode: 'gpt-4.1',
     systemPrompt: 'Prompt',
+    source: 'manual',
+    propertySource: 'manual',
+    enabled: true,
+    retirementOverride: false,
+    capabilities: { operations: {}, input: {}, output: {}, features: {} },
   });
 
   await act(async () => {
@@ -222,6 +237,11 @@ it('persists model hook updates through saveModelForm with current form values',
         displayName: 'GPT 4.1 mini',
         modelCode: 'gpt-4.1',
         systemPrompt: 'Prompt',
+        source: 'manual',
+        propertySource: 'manual',
+        enabled: true,
+        retirementOverride: false,
+        capabilities: { operations: {}, input: {}, output: {}, features: {} },
       },
       isEditing: true,
       model: MODEL,
@@ -261,30 +281,28 @@ it('omits optional provider and model params from save calls in create mode', as
   expect(saveModelFormMock).toHaveBeenCalledTimes(1);
 });
 
-it('switches purpose without keeping incompatible audio defaults', async () => {
+it('keeps capabilities and other audio parameters when switching the execution view', async () => {
   await renderModelHarness(MODEL);
-  await act(async () => {
-    latestModelState?.handleOperationChange('speech');
-  });
-  expect(latestModelState?.formData.audio).toEqual({
-    speech: { voiceId: '', responseFormat: 'mp3' },
-  });
-  await act(async () => {
+  const capabilities = latestModelState?.formData.capabilities;
+  await act(async () => latestModelState?.handleOperationChange('speech'));
+  expect(latestModelState?.formData.audio).toBeUndefined();
+  await act(async () =>
     latestModelState?.handleAudioChange({
       speech: { voiceId: 'custom', responseFormat: 'wav', speed: 1.2 },
-    });
-  });
-  expect(latestModelState?.formData.audio?.speech?.voiceId).toBe('custom');
-  await act(async () => {
-    latestModelState?.handleOperationChange('transcription');
-  });
+    })
+  );
+  await act(async () => latestModelState?.handleOperationChange('transcription'));
+  await act(async () =>
+    latestModelState?.handleAudioChange({
+      transcription: { responseFormat: 'json', timestampGranularity: 'none' },
+    })
+  );
+  await act(async () => latestModelState?.handleOperationChange('text'));
   expect(latestModelState?.formData.audio).toEqual({
-    transcription: { responseFormat: 'verbose_json', timestampGranularity: 'word' },
+    speech: { voiceId: 'custom', responseFormat: 'wav', speed: 1.2 },
+    transcription: { responseFormat: 'json', timestampGranularity: 'none' },
   });
-  await act(async () => {
-    latestModelState?.handleOperationChange('text');
-  });
-  expect(latestModelState?.formData.audio).toBeUndefined();
+  expect(latestModelState?.formData.capabilities).toEqual(capabilities);
 });
 
 it('selects a named provider with its endpoint and clears a credential from the previous destination', async () => {
