@@ -17,7 +17,10 @@ import {
   discardAudioStaging,
 } from '../../../composition/persistence/assets/audio-staging';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import {
+  requestAIScenarioModelSelection,
+  rememberAIScenarioModelSelection,
+} from '../../../workflows/ai-settings/query';
 import { runReviewSpeechJob } from '../../../workflows/audio-jobs/client';
 import { decodeReviewSpeechDuration } from '../../../workflows/video-review/speech-audio';
 import { useVideoEditorStore } from '../../state/store';
@@ -47,7 +50,8 @@ vi.mock('../../../composition/persistence/assets/audio-staging', () => ({
   discardAudioStaging: vi.fn(),
 }));
 vi.mock('../../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: vi.fn(),
+  requestAIScenarioModelSelection: vi.fn(),
+  rememberAIScenarioModelSelection: vi.fn(),
 }));
 vi.mock('../../../workflows/audio-jobs/client', () => ({ runReviewSpeechJob: vi.fn() }));
 vi.mock('../../../workflows/video-review/speech-audio', () => ({
@@ -162,9 +166,10 @@ beforeEach(() => {
     durable = structuredClone(useVideoEditorStore.getState().project!);
     revision++;
   });
-  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValue({
-    chromeAiEnabled: false,
-    defaultModelId: 'model',
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValue({
+    scenario: 'video-speech',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
     globalSystemPrompt: '',
     providers: [
       {
@@ -187,6 +192,7 @@ beforeEach(() => {
       },
     ],
   });
+  vi.mocked(rememberAIScenarioModelSelection).mockResolvedValue(undefined);
   vi.mocked(runReviewSpeechJob).mockResolvedValue({
     type: 'audio',
     staged: { id: 'staged', size: 4, mimeType: 'audio/mpeg' },
@@ -226,7 +232,6 @@ afterEach(() => {
 });
 async function mount() {
   await act(async () => root.render(<Harness />));
-  await act(async () => operation.loadModels());
   await act(async () => operation.open('script', 'phrase'));
 }
 async function generate() {
@@ -426,11 +431,11 @@ it('previews and stops speech, selects an existing lane and cancels consent with
   });
 });
 it('shows a model reload after catalog failure and keeps the form available', async () => {
-  vi.mocked(requestAIModelSelectionBootstrap).mockRejectedValueOnce(new Error('offline'));
+  vi.mocked(requestAIScenarioModelSelection).mockRejectedValueOnce(new Error('offline'));
   await act(async () => root.render(<Harness />));
   await act(async () => operation.open('script', 'phrase'));
   expect(host.querySelector('[role="alert"]')?.textContent).toBe(
-    translate('gallery.videoReview.speechMissingModel')
+    translate('aiModal.modelCatalogFailed')
   );
   await click('gallery.videoReview.speechReloadModels');
   expect(operation.catalog?.models).toHaveLength(1);
@@ -500,8 +505,8 @@ it('disposes a late local preparation after unmount without inserting', async ()
 });
 
 it('keeps a late AI catalog failure out of the local source state', async () => {
-  const catalog = gate<Awaited<ReturnType<typeof requestAIModelSelectionBootstrap>>>();
-  vi.mocked(requestAIModelSelectionBootstrap).mockReturnValueOnce(
+  const catalog = gate<Awaited<ReturnType<typeof requestAIScenarioModelSelection>>>();
+  vi.mocked(requestAIScenarioModelSelection).mockReturnValueOnce(
     catalog.promise.then(() => {
       throw new Error('offline');
     })
@@ -514,8 +519,9 @@ it('keeps a late AI catalog failure out of the local source state', async () => 
     catalog.resolve({
       providers: [],
       models: [],
-      chromeAiEnabled: false,
-      defaultModelId: null,
+      scenario: 'video-speech',
+      remembered: null,
+      resolution: { status: 'empty', modelId: null, previousSelection: null, reason: null },
       globalSystemPrompt: '',
     })
   );

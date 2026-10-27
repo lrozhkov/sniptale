@@ -1,5 +1,40 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'montage-authored-speech-selection',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/text-voice.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted voice and inspector proof cover consent, acquisition, selection and cancellation. Shared preference proof covers concurrent choices, deletion, recreation and retry.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-selection.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-authored-speech-selection',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted voice and inspector proof cover consent, acquisition, selection and cancellation. Shared preference proof covers concurrent choices, deletion, recreation and retry.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-selection.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
     owner: 'synthesis-field-selection-consumers',
     productionFile: 'apps/extension/src/ui/video-text/speech/profile.tsx',
     exclusive: true,
@@ -67,6 +102,16 @@ export const AI_OWNER_MAPPINGS = [
     reason:
       'Mounted selection and query tests cover admission. Persistence participants cover concurrent choices, deletion, recreation, restore, and retry across IPC.',
     testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-selection.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-rewrite.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/use-text-rewrite.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/ai-assistant.test.tsx',
+      'apps/extension/src/content/overlay/ai/modal/session/locals.test.tsx',
+      'apps/extension/src/content/overlay/ai/text-rewrite/view.test.tsx',
+
       'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
       'apps/extension/src/workflows/ai-settings/query.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',

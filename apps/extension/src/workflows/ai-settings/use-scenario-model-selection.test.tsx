@@ -223,3 +223,31 @@ it('does not read or write while disabled and loads a fresh choice on activation
   expect(selection.modelId).toBeNull();
   expect(io.remember).not.toHaveBeenCalled();
 });
+
+it.each(['choice', 'preparation'] as const)(
+  'clears pending when %s settles while the interface is disabled',
+  async (kind) => {
+    await open();
+    let resolve!: () => void;
+    io.remember.mockReturnValueOnce(
+      new Promise<void>((done) => {
+        resolve = done;
+      })
+    );
+    let prepared: ReturnType<typeof selection.prepareModelSelection> | undefined;
+    await act(async () => {
+      if (kind === 'choice') selection.chooseModel('second');
+      else prepared = selection.prepareModelSelection();
+    });
+    expect(selection.selectionPending).toBe(true);
+    await act(async () => root.render(<Surface enabled={false} />));
+    await act(async () => {
+      resolve();
+      await prepared;
+    });
+    await act(async () => root.render(<Surface />));
+    expect(selection.selectionPending).toBe(false);
+    await act(async () => selection.chooseModel('first'));
+    expect(selection.modelId).toBe('first');
+  }
+);

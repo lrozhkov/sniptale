@@ -169,32 +169,50 @@ function VoiceSourceControls({
   operation: VideoProjectTextVoiceController;
   hasText: boolean;
 }) {
-  const { loadModels, source } = op;
+  const { source } = op;
   const pauseTimeline = useVideoEditorPlaybackPort((port) => port.setPlaying);
   const locked =
     op.running ||
     op.recording.session.isSaving ||
     op.items.some((item) => !!item.preview) ||
     !!op.consent;
-  useEffect(() => {
-    if (source === 'ai') void loadModels();
-  }, [loadModels, source]);
   if (source === 'microphone')
     return op.preview ? null : <ProjectTextVoiceRecording recording={op.recording} />;
   return source === 'ai' ? (
     <>
-      <fieldset disabled={locked} className="min-w-0">
+      <fieldset disabled={locked || op.selectionPending} className="min-w-0">
         <SpeechSynthesisProfileFields
           catalog={op.catalog}
           profile={op.profile}
           onChange={op.changeProfile}
+          onSelectModel={op.chooseModel}
           onOpenModels={() => {
             void op.loadModels();
           }}
           preferenceId="project-text-voice.profile.advanced"
         />
       </fieldset>
-      {!op.catalog?.models.length && !locked ? (
+      {op.configurationFailed || op.selectionFailed || op.selectionUnavailable ? (
+        <p role="alert" className="text-xs">
+          {translate(
+            op.configurationFailed
+              ? 'aiModal.modelCatalogFailed'
+              : op.selectionFailed
+                ? 'aiModal.modelSelectionSaveFailed'
+                : 'aiModal.modelSelectionUnavailable'
+          )}
+          {op.selectionUnavailable && op.catalog?.remembered?.displayName
+            ? ` ${op.catalog.remembered.displayName}`
+            : ''}
+        </p>
+      ) : null}
+      {op.selectionPending ? (
+        <p role="status" className="text-xs">
+          {translate('common.states.saving')}
+        </p>
+      ) : null}
+      {(!op.catalog?.models.length || op.configurationFailed || op.selectionUnavailable) &&
+      !locked ? (
         <InspectorActionButton
           onClick={() => {
             void op.loadModels();
@@ -411,7 +429,12 @@ function VoiceRequest({
         !op.pendingApply &&
         op.items.some((item) => item.selected && !item.preview && !item.accepted) ? (
         <InspectorActionButton
-          disabled={!op.profile || !hasText}
+          disabled={
+            !op.profile?.voiceId.trim() ||
+            op.profile.modelId !== op.modelId ||
+            op.selectionPending ||
+            !hasText
+          }
           onClick={() => {
             void op.prepare();
           }}

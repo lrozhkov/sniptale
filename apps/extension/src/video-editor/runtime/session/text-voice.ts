@@ -9,11 +9,11 @@ import {
   type SetStateAction,
 } from 'react';
 import type { HistoryPort } from '../../contracts/controller-store';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
+import type { AIModelCatalogPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import type { ReviewSpeechProfile } from '../../../features/video/review/speech-transcript';
 import type { VideoProject } from '../../../features/video/project/types/model';
 import type { VideoProjectVoicePlacement } from '../../../features/video/project/text/authoring';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import { useAIScenarioModelSelection } from '../../../workflows/ai-settings/use-scenario-model-selection';
 import {
   captureProjectTextVoiceQueue,
   runProjectTextVoiceQueue,
@@ -50,7 +50,6 @@ interface VoiceItem extends VoiceTarget {
 interface VoiceState {
   source: 'ai' | 'microphone' | 'gallery';
   profile: ReviewSpeechProfile | undefined;
-  catalog: AIModelSelectionBootstrapPayload | null;
   consent: {
     capture: VoiceCapture;
     queue: VoiceQueue;
@@ -70,13 +69,12 @@ interface VoiceLifetime {
   active: AbortController | null;
   items: VoiceItem[];
   batch: boolean;
+  profileReset: string | null;
   pendingApply: { preview: VoicePreview; placement: VideoProjectVoicePlacement }[] | null;
-  catalogAttempt: number;
 }
 const initialState: VoiceState = {
   source: 'ai',
   profile: undefined,
-  catalog: null,
   consent: null,
   activeId: '',
   progress: null,
@@ -177,66 +175,15 @@ function runVoiceAttempt(
   })();
 }
 
-async function loadVoiceCatalog(
-  owner: { current: VoiceLifetime },
-  latest: { current: VoiceState },
-  setState: Dispatch<SetStateAction<VoiceState>>
-) {
-  const life = owner.current;
-  if (
-    !life.mounted ||
-    life.active ||
-    life.items.some((item) => item.preview) ||
-    latest.current.consent ||
-    latest.current.source !== 'ai'
-  )
-    return;
-  const attempt = ++life.catalogAttempt;
-  try {
-    const catalog = await requestAIModelSelectionBootstrap('speech');
-    if (
-      owner.current !== life ||
-      !life.mounted ||
-      attempt !== life.catalogAttempt ||
-      latest.current.source !== 'ai'
-    )
-      return;
-    const providers = catalog.providers.filter(
-      (entry) => entry.connectionType === 'openai-compatible'
-    );
-    const models = catalog.models.filter(
-      (entry) =>
-        entry.operation === 'speech' &&
-        entry.audio?.speech &&
-        providers.some((provider) => provider.id === entry.providerId)
-    );
-    setState((value) => {
-      const model = models.find((entry) => entry.id === catalog.defaultModelId);
-      return {
-        ...value,
-        catalog: { ...catalog, providers, models },
-        error: null,
-        profile:
-          value.profile ??
-          (model?.audio?.speech ? { modelId: model.id, ...model.audio.speech } : undefined),
-      };
-    });
-  } catch {
-    if (
-      owner.current === life &&
-      life.mounted &&
-      attempt === life.catalogAttempt &&
-      latest.current.source === 'ai'
-    )
-      setState((value) => ({ ...value, error: 'model-unavailable' }));
-  }
+function isVoiceCatalogOpen(lifetime: VoiceLifetime, state: Pick<VoiceState, 'source'>) {
+  return lifetime.mounted && lifetime.items.length > 0 && state.source === 'ai';
 }
 
 async function prepareVoiceConsent(
   access: ProjectVoiceTakeAccess,
   selected: readonly VoiceTarget[],
   profile: ReviewSpeechProfile,
-  catalog: VoiceState['catalog'],
+  catalog: AIModelCatalogPayload | null,
   signal: AbortSignal
 ): Promise<NonNullable<VoiceState['consent']>> {
   const model = catalog?.models.find((entry) => entry.id === profile.modelId);
@@ -460,7 +407,8 @@ function changeVoicePlacement(
 async function prepareVoiceBatch(
   access: ProjectVoiceTakeAccess,
   lifetime: VoiceLifetime,
-  state: Pick<VoiceState, 'profile' | 'catalog' | 'consent'>,
+  state: Pick<VoiceState, 'profile' | 'consent'>,
+  prepareSelection: ReturnType<typeof useAIScenarioModelSelection>['prepareModelSelection'],
   signal: AbortSignal,
   setState: Dispatch<SetStateAction<VoiceState>>
 ) {
@@ -468,7 +416,18 @@ async function prepareVoiceBatch(
     (item) => item.selected && !item.preview && !item.accepted
   );
   if (!state.profile || !selected.length || state.consent || lifetime.pendingApply) return;
-  const consent = await prepareVoiceConsent(access, selected, state.profile, state.catalog, signal);
+  if (!state.profile.voiceId.trim()) throw new Error('invalid-request');
+  const prepared = await prepareSelection(signal);
+  if (!access.getProject()) throw new Error('stale');
+  if (prepared.modelId !== state.profile.modelId || !state.profile.voiceId.trim())
+    throw new Error('model-unavailable');
+  const consent = await prepareVoiceConsent(
+    access,
+    selected,
+    state.profile,
+    prepared.catalog,
+    signal
+  );
   if (access.getProject()) setState((value) => ({ ...value, consent }));
 }
 
@@ -520,8 +479,8 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
       active: null,
       items: [],
       batch: false,
+      profileReset: null,
       pendingApply: null,
-      catalogAttempt: 0,
     }),
     [project.id, project.createdAt]
   );
@@ -558,13 +517,61 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
       );
     },
   });
-  const loadModels = useCallback(() => loadVoiceCatalog(owner, latest, setState), []);
+  const selection = useAIScenarioModelSelection(
+    'video-speech',
+    isVoiceCatalogOpen(lifetime, state)
+  );
+  useEffect(() => {
+    if (selection.selectionPending) return;
+    const replace = lifetime.profileReset === selection.modelId && !selection.selectionFailed;
+    lifetime.profileReset = null;
+    if (lifetime.active || lifetime.items.some((item) => item.preview) || state.consent) return;
+    const model = selection.configuration?.models.find((entry) => entry.id === selection.modelId);
+    if (!model || (state.profile?.modelId === model.id && !replace)) return;
+    const provider = selection.configuration?.providers.find(
+      (entry) => entry.id === model.providerId
+    );
+    const profile: ReviewSpeechProfile = model.audio?.speech
+      ? { modelId: model.id, ...model.audio.speech }
+      : {
+          modelId: model.id,
+          voiceId: '',
+          responseFormat: provider?.connectionType === 'google' ? 'wav' : 'mp3',
+        };
+    setState((value) => ({ ...value, profile }));
+  }, [
+    lifetime,
+    selection.configuration,
+    selection.modelId,
+    selection.selectionPending,
+    selection.selectionFailed,
+    state.profile,
+    state.consent,
+  ]);
+  const retryConfiguration = selection.retryConfiguration;
+  const loadModels = useCallback(async () => {
+    const life = owner.current;
+    if (
+      !isVoiceCatalogOpen(life, latest.current) ||
+      life.active ||
+      life.items.some((item) => item.preview) ||
+      latest.current.consent
+    )
+      return;
+    await retryConfiguration();
+  }, [retryConfiguration]);
   const run = (work: (signal: AbortSignal) => Promise<void | VoicePreview>, applying = false) =>
     runVoiceAttempt(owner, lifetime, setState, work, applying);
   const editable = () => current() && !lifetime.active && !lifetime.pendingApply;
   const acquired = () => lifetime.items.some((item) => item.preview);
   return {
     ...state,
+    catalog: selection.configuration,
+    modelId: selection.modelId,
+    configurationFailed: selection.configurationFailed,
+    selectionFailed: selection.selectionFailed,
+    selectionUnavailable: selection.selectionUnavailable,
+    selectionPending: selection.selectionPending,
     target,
     preview,
     items: lifetime.items,
@@ -611,6 +618,19 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
         run
       );
     },
+    chooseModel(id: string | null) {
+      if (
+        !editable() ||
+        acquired() ||
+        latest.current.consent ||
+        selection.selectionPending ||
+        !id ||
+        !selection.configuration?.models.some((entry) => entry.id === id)
+      )
+        return;
+      lifetime.profileReset = id;
+      selection.chooseModel(id);
+    },
     changeProfile(profile: ReviewSpeechProfile) {
       if (!editable() || acquired() || latest.current.consent) return;
       setState((value) => ({ ...value, profile, error: null }));
@@ -620,13 +640,30 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
         changeVoicePlacement(lifetime, setState, active, placement);
     },
     async prepare() {
-      await run((signal) => prepareVoiceBatch(access, lifetime, latest.current, signal, setState));
+      await run((signal) =>
+        prepareVoiceBatch(
+          access,
+          lifetime,
+          latest.current,
+          selection.prepareModelSelection,
+          signal,
+          setState
+        )
+      );
     },
     async start() {
       const consent = latest.current.consent;
       if (!consent || lifetime.pendingApply) return;
       await run(async (signal) => {
         setState((value) => ({ ...value, consent: null, progress: null }));
+        const prepared = await selection.prepareModelSelection(signal);
+        const model = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
+        if (!access.getProject()) throw new Error('stale');
+        if (
+          prepared.modelId !== consent.capture.profile.modelId ||
+          model?.providerId !== consent.providerId
+        )
+          throw new Error('model-unavailable');
         await generateVoiceBatch(access, lifetime, consent, signal, setState);
       });
     },

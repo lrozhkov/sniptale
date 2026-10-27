@@ -103,7 +103,7 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario, enabl
       })
       .finally(() => {
         busy.current = false;
-        if (active.current) setSelectionPending(false);
+        setSelectionPending(false);
       });
   };
 
@@ -147,7 +147,7 @@ export function useAIScenarioModelSelection(scenario: AIPersistedScenario, enabl
       return { modelId: selected.modelId, catalog: next };
     } finally {
       busy.current = false;
-      if (active.current) setSelectionPending(false);
+      setSelectionPending(false);
     }
   };
 

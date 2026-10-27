@@ -2750,6 +2750,17 @@
       "reviewDate": "2026-10-26",
       "astHash": "44279cdf2a63f65c1218261119337cf4c77b067824d2490b0c9fd946e7ea2158",
       "signatureHash": "e334f60762c5cd84fd18aa0402084a7fdff701dfec12d1adcc97957992db825f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/runtime/session/text-voice.ts",
+      "symbol": "useVideoProjectTextVoice",
+      "owner": "extension:video-editor:runtime",
+      "reason": "tool-noise: This existing project voice coordinator retains one attempt, consent, placement, preview and acceptance lifetime. Its three existing refs hold current presentation state, the project lifetime and current command ports; no new writer or state receiver was added. Shared scenario selection owns catalog and preference admission outside this hook. The candidate removes the duplicate catalog authority and keeps source Save, history and byte publication in their existing owners. The 221-line body has 25 statements, cyclomatic10, cognitive9, nesting1 and no recovery; score4 delta0. The remaining blocker is the function line limit. Splitting these closures would distribute the same project identity, cancellation and acquired-take locks. Main inspection and mounted cancellation, replacement, refusal, local-source and accepted-take proof support this classification. Fresh independent architecture review must assess the exact body and this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state receiver, writer, resource, consent, cancellation or recovery authority. Remove when the analyzer models this cohesive project-operation coordinator. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-27",
+      "astHash": "f42e4d49ec9f01724bcc3ca05de1583418a8ccd99a69cb606b7e893caa652147",
+      "signatureHash": "3d132dfa67d78dcd46b3165ccd760a4a9e28bc02659d1cc11292861bb070a33e"
     }
   ]
 }
