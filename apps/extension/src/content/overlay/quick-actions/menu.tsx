@@ -28,6 +28,7 @@ export function PageQuickActionsMenu(props: {
         dataUi="content.quick-actions.trigger"
         title={title}
         aria-label={title}
+        menuIndicator
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={busy}
@@ -51,7 +52,7 @@ export function PageQuickActionsMenu(props: {
               width: 280,
               minWidth: 0,
               maxWidth: 'calc(100vw - 16px)',
-              maxHeight: 'calc(100vh - 16px)',
+              maxHeight: dropdown.style.maxHeight ?? 'calc(100vh - 16px)',
               overflowY: 'auto',
             }}
           >

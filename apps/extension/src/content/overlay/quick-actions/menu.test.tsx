@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   attach: vi.fn(),
   send: vi.fn(),
   toast: vi.fn(),
+  layout: vi.fn(() => ({ menuPlacement: 'down', placement: 'down', style: { position: 'fixed' } })),
 }));
 vi.mock('../../../composition/persistence/quick-actions', () => ({ getQuickActions: mocks.list }));
 vi.mock('../../../composition/persistence/infrastructure/browser-storage', () => ({
@@ -24,7 +25,7 @@ vi.mock('../../application/runtime-services/services', () => ({
 }));
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.toast }));
 vi.mock('../toolbar/menu/dropdown', () => ({
-  resolveToolbarDropdownState: () => ({ menuPlacement: 'bottom', style: { position: 'fixed' } }),
+  resolveToolbarDropdownState: mocks.layout,
   ToolbarMenuDropdown: ({ children }: { children: React.ReactNode }) => (
     <div data-ui="test.dropdown">{children}</div>
   ),
@@ -51,6 +52,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 async function open() {
   await act(async () => root.render(<PageQuickActionsMenu />));
@@ -93,4 +95,32 @@ it('refuses untrusted sources, then permits an explicit retry after a native ref
   await open();
   await act(async () => item('Second action').click());
   expect(mocks.send).toHaveBeenCalledTimes(2);
+});
+
+it('exposes the shared disclosure indicator in both open and closed states', async () => {
+  await open();
+  const trigger = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.quick-actions.trigger"]'
+  )!;
+  expect(trigger.getAttribute('data-menu-indicator')).toBe('true');
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  await act(async () => trigger.click());
+  expect(trigger.getAttribute('data-menu-indicator')).toBe('true');
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+});
+
+it('aligns the menu start with adjacent toolbar menus', async () => {
+  await open();
+  expect(mocks.layout).toHaveBeenCalledWith(expect.objectContaining({ preferredAlign: 'start' }));
+});
+
+it('constrains the actual menu scroll surface to the space below its trigger', async () => {
+  vi.stubGlobal('innerHeight', 560);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(100, 300, 32, 32)
+  );
+  await open();
+  const menu = container.querySelector<HTMLElement>('.sniptale-popover-menu')!;
+  expect(menu.style.maxHeight).toBe('210px');
+  expect(menu.style.overflowY).toBe('auto');
 });

@@ -77,6 +77,33 @@ display:grid;
 
 place-items:center}
 
+button.actions{
+position:relative}
+
+button.actions::before{
+content:'';
+position:absolute;
+right:2px;
+bottom:2px;
+width:0;
+height:0;
+border-inline:2px solid transparent;
+border-top:3px solid currentColor;
+opacity:.42;
+pointer-events:none}
+
+button.actions[data-menu-side=up]::before{
+top:2px;
+bottom:auto;
+transform:rotate(180deg)}
+
+button.actions[aria-expanded=true]::before{
+border-top-color:#ea580c;
+opacity:1}
+
+:host([data-theme=dark]) button.actions[aria-expanded=true]::before{
+border-top-color:#f97316}
+
 button:hover{
 
 background:#8882}
@@ -187,6 +214,8 @@ max-width:min(300px,calc(100vw - 16px));
 max-height:calc(100vh - 96px);
 
 overflow:auto;
+
+overscroll-behavior:contain;
 
 background:rgba(255,252,248,.98);
 

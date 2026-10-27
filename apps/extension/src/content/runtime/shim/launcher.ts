@@ -53,7 +53,7 @@ function createLauncherElements() {
   group.className = 'group';
   group.setAttribute('role', 'toolbar');
   const open = button('main', ['M4 4h16v16H4z', 'M4 9h16']);
-  const actions = button('main', ['m13 2-9 12h7l-1 8 10-12h-7z']);
+  const actions = button('main actions', ['m13 2-9 12h7l-1 8 10-12h-7z']);
   const grip = button('grip', [
     'M10 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
     'M10 12a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
@@ -191,6 +191,7 @@ class ShimLauncherView {
     this.elements.actions.setAttribute('aria-label', this.label('actions'));
     this.elements.actions.title = this.label('actions');
     this.elements.actions.setAttribute('aria-haspopup', 'menu');
+    this.elements.actions.dataset['menuSide'] = corner.startsWith('bottom') ? 'up' : 'down';
     this.elements.actions.hidden = !preferences.quickActionsCorner;
     this.elements.open.disabled = this.pending;
     this.elements.actions.disabled = this.pending;
@@ -226,6 +227,36 @@ class ShimLauncherView {
       this.render();
     }
   }
+  private refreshMenu() {
+    if (!this.menu) return;
+    const previousItems = Array.from(this.menu.querySelectorAll<HTMLButtonElement>('button'));
+    const focusedIndex = previousItems.findIndex(
+      (item) => item === this.elements.shadow.activeElement
+    );
+    const focusedId = previousItems[focusedIndex]?.dataset['actionId'];
+    this.menu.replaceChildren();
+    const enabled = this.options.actions.filter((action) => action.status);
+    if (!enabled.length) this.menu.textContent = this.label('empty');
+    for (const action of enabled) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.setAttribute('role', 'menuitem');
+      item.dataset['actionId'] = action.id;
+      item.textContent = getShimQuickActionName(action, this.options.presentation.locale);
+      item.addEventListener('click', (click) => {
+        void this.run(click, () => this.options.trigger(action, click));
+      });
+      this.menu.append(item);
+    }
+    if (focusedIndex >= 0) {
+      const items = Array.from(this.menu.querySelectorAll<HTMLButtonElement>('button'));
+      const focus =
+        items.find((item) => item.dataset['actionId'] === focusedId) ??
+        items[Math.min(focusedIndex, items.length - 1)] ??
+        this.elements.actions;
+      focus.focus();
+    }
+  }
   private toggleMenu = (event: MouseEvent) => {
     if (!isTrustedDomEvent(event) || this.pending) return;
     if (this.menu) {
@@ -235,18 +266,7 @@ class ShimLauncherView {
     this.menu = document.createElement('div');
     this.menu.className = 'menu';
     this.menu.setAttribute('role', 'menu');
-    const enabled = this.options.actions.filter((action) => action.status);
-    if (!enabled.length) this.menu.textContent = this.label('empty');
-    for (const action of enabled) {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.setAttribute('role', 'menuitem');
-      item.textContent = getShimQuickActionName(action, this.options.presentation.locale);
-      item.addEventListener('click', (click) => {
-        void this.run(click, () => this.options.trigger(action, click));
-      });
-      this.menu.append(item);
-    }
+    this.refreshMenu();
     this.elements.shadow.append(this.menu);
     this.elements.actions.setAttribute('aria-expanded', 'true');
     this.render();
@@ -285,7 +305,7 @@ class ShimLauncherView {
     const menuChanged = this.menu && menuProjection(this.options) !== menuProjection(next);
     this.options = next;
     if (next.busy || !next.presentation.preferences.quickActionsCorner) this.closeMenu();
-    else if (menuChanged) this.closeMenu(true);
+    else if (menuChanged) this.refreshMenu();
     this.drag.refresh();
     this.render();
   };

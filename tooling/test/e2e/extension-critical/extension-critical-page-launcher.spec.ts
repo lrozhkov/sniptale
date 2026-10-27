@@ -105,8 +105,90 @@ async function checkCornerGrip(
   });
 }
 
+async function installLongQuickActionList(popup: Page) {
+  await popup.evaluate(async () =>
+    chrome.storage.local.set({
+      sniptale_quick_actions: Array.from({ length: 48 }, (_, index) => ({
+        id: `long-menu-${index}`,
+        name: `Action ${index + 1}`,
+        status: true,
+        customized: true,
+        hotkey: null,
+        icon: 'Camera',
+        screenshotMode: 'visible',
+        afterCapture: 'download_default',
+        exitAfterCapture: true,
+        imageFormat: 'png',
+        imageQuality: 100,
+      })),
+    })
+  );
+}
+
+async function checkLongQuickActionMenu(
+  page: Page,
+  menu: Locator,
+  items: Locator,
+  native: boolean,
+  prefix: string,
+  info: TestInfo
+) {
+  await expect.poll(() => items.count()).toBeGreaterThanOrEqual(48);
+  const viewport = page.viewportSize()!;
+  const bounds = (await menu.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
+  await page.evaluate(() => {
+    document.body.style.minHeight = '2000px';
+  });
+  const pageScroll = await page.evaluate(() => scrollY);
+  await menu.hover();
+  await page.mouse.wheel(0, 10000);
+  await expect.poll(() => menu.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await page.mouse.wheel(0, 10000);
+  expect(await page.evaluate(() => scrollY)).toBe(pageScroll);
+  await items.first().focus();
+  if (native) await page.keyboard.press('End');
+  else {
+    const count = await items.count();
+    for (let index = 1; index < count; index++) await page.keyboard.press('Tab');
+  }
+  await expect(items.last()).toBeFocused();
+  const last = (await items.last().boundingBox())!;
+  expect(last.y).toBeGreaterThanOrEqual(bounds.y);
+  expect(last.y + last.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+  await page.screenshot({ path: info.outputPath(`${prefix}-long-menu.png`), fullPage: false });
+  await page.setViewportSize({ width: 1024, height: 480 });
+  if (!native) {
+    await expect(menu).toHaveCount(0);
+    await page.locator('[data-ui="content.quick-actions.trigger"]:visible').click();
+  }
+  await expect
+    .poll(async () => {
+      const box = await menu.boundingBox();
+      return Boolean(
+        box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 1024 && box.y + box.height <= 480
+      );
+    })
+    .toBe(true);
+  await page.screenshot({ path: info.outputPath(`${prefix}-narrow-menu.png`), fullPage: false });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1024);
+  await page.setViewportSize(viewport);
+  if (!native) {
+    await expect(menu).toHaveCount(0);
+    await page.locator('[data-ui="content.quick-actions.trigger"]:visible').click();
+    await expect(menu).toBeVisible();
+  }
+  await page.evaluate(() => {
+    document.body.style.minHeight = '';
+  });
+}
+
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   test(`native page launcher handback, shared corner and quick actions ${name}`, async ({}, info) => {
+    test.setTimeout(120000);
     const host = await startHostServer();
     const browser = await launchExtensionBrowser({ viewport: size });
     try {
@@ -178,6 +260,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       const actions = launcher.getByRole('button', { name: /Quick actions|Быстрые действия/u });
       await actions.click();
       await expect(launcher.getByRole('menu')).toBeVisible();
+      const shimExpandedIndicator = await actions.evaluate(
+        (button) => getComputedStyle(button, '::before').borderTopColor
+      );
+      expect(
+        await actions.evaluate((button) => getComputedStyle(button, '::before').content)
+      ).not.toBe('none');
       await popup.evaluate(async () => {
         await chrome.storage.local.set({
           sniptale_quick_actions: [
@@ -198,16 +286,26 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           ],
         });
       });
-      await expect(launcher.getByRole('menu')).toHaveCount(0);
-      await expect(actions).toBeFocused();
-      await actions.click();
-      await expect(launcher.getByRole('menuitem', { name: 'Updated menu' })).toBeVisible();
+      await expect(launcher.getByRole('menu')).toBeVisible();
+      await expect(launcher.getByRole('menuitem', { name: 'Updated menu' })).toBeFocused();
       await popup.evaluate(async () => chrome.storage.local.remove('sniptale_quick_actions'));
-      await expect(launcher.getByRole('menu')).toHaveCount(0);
-      await expect(actions).toBeFocused();
-      await actions.click();
+      await expect(launcher.getByRole('menuitem', { name: 'Updated menu' })).toHaveCount(0);
+      await expect(launcher.getByRole('menu')).toBeVisible();
+      await installLongQuickActionList(popup);
+      await checkLongQuickActionMenu(
+        page,
+        launcher.getByRole('menu'),
+        launcher.getByRole('menuitem'),
+        true,
+        'shim',
+        info
+      );
+      await popup.evaluate(async () => chrome.storage.local.remove('sniptale_quick_actions'));
       await page.keyboard.press('Escape');
       await expect(launcher.getByRole('menu')).toHaveCount(0);
+      expect(
+        await actions.evaluate((button) => getComputedStyle(button, '::before').borderTopColor)
+      ).not.toBe(shimExpandedIndicator);
       // DOM-generated clicks cannot invoke the native opening capability.
       await open.evaluate((button: HTMLButtonElement) => button.click());
       await expect(page.locator('#sniptale-extension-root')).toHaveCount(0);
@@ -217,6 +315,27 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(launcher).toHaveCount(0);
       const menu = page.locator('[data-ui="content.quick-actions.trigger"]');
       await expect(menu).toBeVisible();
+      await page.mouse.move(size.width / 2, size.height / 2);
+      const iconStyles = [];
+      for (const dataUi of [
+        'content.toolbar.timer-button',
+        'content.toolbar.viewport-button',
+        'content.quick-actions.trigger',
+      ]) {
+        iconStyles.push(
+          await page.locator(`[data-ui="${dataUi}"] svg`).evaluate((svg) => {
+            const style = getComputedStyle(svg);
+            return {
+              stroke: style.strokeWidth,
+              color: style.color,
+              width: style.width,
+              height: style.height,
+            };
+          })
+        );
+      }
+      expect(iconStyles[0]).toEqual(iconStyles[1]);
+      expect(iconStyles[1]).toEqual(iconStyles[2]);
       await menu.click();
       await expect(
         page.locator('[data-ui="content.quick-actions.dropdown"] .sniptale-popover-menu')
@@ -225,12 +344,32 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       const menuBounds = (await page
         .locator('[data-ui="content.quick-actions.dropdown"] .sniptale-popover-menu')
         .boundingBox())!;
-      expect(menuBounds.x).toBeLessThanOrEqual(triggerBounds.x + triggerBounds.width);
+      expect(menuBounds.x).toBeCloseTo(Math.min(triggerBounds.x, size.width - 288), 0);
       expect(menuBounds.x + menuBounds.width).toBeGreaterThanOrEqual(triggerBounds.x);
       expect(menuBounds.y).toBeGreaterThanOrEqual(triggerBounds.y + triggerBounds.height);
       expect(menuBounds.y - triggerBounds.y - triggerBounds.height).toBeLessThan(20);
       await page.screenshot({ path: info.outputPath('toolbar-actions-menu.png'), fullPage: false });
+      const indicator = () =>
+        menu.evaluate((button) => {
+          const style = getComputedStyle(button, '::before');
+          return { content: style.content, opacity: style.opacity, color: style.borderTopColor };
+        });
+      const expandedIndicator = await indicator();
+      expect(expandedIndicator.content).not.toBe('none');
+      expect(expandedIndicator.opacity).toBe('1');
+      await installLongQuickActionList(popup);
+      await checkLongQuickActionMenu(
+        page,
+        page.locator('[data-ui="content.quick-actions.dropdown"] .sniptale-popover-menu'),
+        page.locator('[data-ui="content.quick-actions.dropdown"] .sniptale-toolbar-menu-item'),
+        false,
+        'toolbar',
+        info
+      );
+      await popup.evaluate(async () => chrome.storage.local.remove('sniptale_quick_actions'));
+
       await page.keyboard.press('Escape');
+      expect((await indicator()).color).not.toBe(expandedIndicator.color);
       await page.locator('[data-ui="content.toolbar.navigation.collapse"]').click();
       const collapsed = page.locator('[data-ui="content.collapsed-panels"]');
       await expect(collapsed).toBeVisible();
@@ -238,6 +377,20 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await collapsed.hover();
       const grip = collapsed.locator('[data-ui="content.collapsed-panels.drag-handle"]');
       await checkCornerGrip(page, popup, collapsed, grip, 'collapsed', info);
+      const collapsedActions = collapsed.locator('[data-ui="content.quick-actions.trigger"]');
+      await collapsedActions.click();
+      await installLongQuickActionList(popup);
+      await checkLongQuickActionMenu(
+        page,
+        page.locator('[data-ui="content.quick-actions.dropdown"] .sniptale-popover-menu'),
+        page.locator('[data-ui="content.quick-actions.dropdown"] .sniptale-toolbar-menu-item'),
+        false,
+        'collapsed',
+        info
+      );
+      await popup.evaluate(async () => chrome.storage.local.remove('sniptale_quick_actions'));
+      await page.keyboard.press('Escape');
+
       await grip.focus();
       await page.keyboard.press('ArrowLeft');
       await expect(collapsed).toHaveAttribute('data-corner', 'bottom-left');

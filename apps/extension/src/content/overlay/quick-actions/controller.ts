@@ -1,4 +1,9 @@
 import { flushSync } from 'react-dom';
+import {
+  projectClientRectToContentUi,
+  readContentUiScaleCompensation,
+  resolveContentUiViewport,
+} from '@sniptale/ui/floating-interactions/scale';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -77,8 +82,21 @@ export function usePageQuickActionsMenu(props: {
       getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
       menuHeight: Math.max(64, actions.length * 40 + 40),
       menuWidth: 280,
-      preferredAlign: 'end',
+      preferredAlign: 'start',
     });
+    const anchor = triggerRef.current;
+    if (anchor && dropdown.style && props.displayMode !== 'vertical') {
+      const scale = readContentUiScaleCompensation(anchor);
+      const rect = projectClientRectToContentUi(anchor.getBoundingClientRect(), scale);
+      const viewport = resolveContentUiViewport({
+        clientWidth: window.innerWidth,
+        clientHeight: window.innerHeight,
+        scale,
+      });
+      const space = dropdown.placement === 'up' ? rect.y : viewport.height - rect.y - rect.height;
+      // Reserve the existing 10px menu gap and 8px viewport margin.
+      dropdown.style.maxHeight = Math.max(0, space - 18);
+    }
     return { placement: dropdown.menuPlacement, style: dropdown.style };
   };
   const dropdown = resolveLayout();

@@ -168,12 +168,13 @@ it('reveals the entire hover group in its corner and keeps menus available while
   expect(shadow.querySelector('[role="menu"]')).not.toBeNull();
 });
 
-it('dismisses stale open actions after accepted list or locale updates and restores logical focus', async () => {
+it('refreshes accepted actions and locale without closing and preserves logical item focus', async () => {
   trusted.mockReturnValue(true);
   const source = options();
   source.actions.push({ id: 'second', status: true, name: 'Second', hotkey: null });
   launcher = createShimLauncher(source);
   namedButton('Quick actions').click();
+  const menu = currentShadow().querySelector('[role="menu"]');
   const next = {
     ...source,
     actions: [
@@ -183,25 +184,43 @@ it('dismisses stale open actions after accepted list or locale updates and resto
     ],
   };
   launcher.update(next);
-  expect(currentShadow().querySelector('[role="menu"]')).toBeNull();
-  expect(currentShadow().activeElement).toBe(namedButton('Quick actions'));
-  namedButton('Quick actions').click();
+  expect(currentShadow().querySelector('[role="menu"]')).toBe(menu);
+  expect(currentShadow().activeElement?.textContent).toBe('Renamed second');
   expect(
     [...currentShadow().querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
   ).toEqual(['Renamed second', 'Third']);
-  launcher.update({
-    ...next,
-    presentation: {
-      ...next.presentation,
-      preferences: { ...next.presentation.preferences, hoverOnly: true },
-    },
-  });
-  expect(currentShadow().querySelector('[role="menu"]')).not.toBeNull();
+  currentShadow().querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[1]!.focus();
   launcher.update({ ...next, presentation: { ...next.presentation, locale: 'ru' } });
-  expect(currentShadow().querySelector('[role="menu"]')).toBeNull();
-  expect(currentShadow().activeElement).toBe(namedButton('Быстрые действия'));
-  namedButton('Быстрые действия').click();
+  expect(currentShadow().querySelector('[role="menu"]')).toBe(menu);
+  expect(namedButton('Быстрые действия').getAttribute('aria-expanded')).toBe('true');
+  expect(currentShadow().activeElement?.textContent).toBe('Third');
   currentShadow().querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
   await flush();
   expect(source.trigger).toHaveBeenCalledWith(next.actions[0], expect.any(Event));
+});
+
+it('falls back to the nearest surviving item or trigger after removal without stealing outside focus', () => {
+  trusted.mockReturnValue(true);
+  const source = options();
+  source.actions = ['first', 'second', 'third'].map((id) => ({
+    id,
+    name: id,
+    status: true,
+    hotkey: null,
+  }));
+  launcher = createShimLauncher(source);
+  namedButton('Quick actions').click();
+  currentShadow().querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[1]!.focus();
+  const next = { ...source, actions: [source.actions[0]!, source.actions[2]!] };
+  launcher.update(next);
+  expect(currentShadow().activeElement?.textContent).toBe('third');
+  launcher.update({ ...source, actions: [] });
+  expect(currentShadow().querySelector('[role="menu"]')).not.toBeNull();
+  expect(currentShadow().activeElement).toBe(namedButton('Quick actions'));
+  const outside = document.createElement('button');
+  document.body.append(outside);
+  outside.focus();
+  launcher.update(next);
+  expect(document.activeElement).toBe(outside);
+  expect(currentShadow().querySelectorAll('[role="menuitem"]')).toHaveLength(2);
 });
