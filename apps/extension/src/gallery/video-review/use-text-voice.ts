@@ -1,3 +1,5 @@
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
+import { AudioJobProviderError } from '../../workflows/audio-jobs/failure';
 import {
   parseVoiceProviderSelection,
   type VoiceProviderSelection,
@@ -59,6 +61,7 @@ type VoiceState = {
   elapsed: number;
   completed: number;
   total: number;
+  providerFailureReason: AIConnectionReason | null;
   error: 'duration' | 'stale' | 'model' | 'failed' | null;
 };
 
@@ -72,6 +75,7 @@ function useTextVoiceAttempt(props: Options) {
     completed: 0,
     total: 0,
     error: null,
+    providerFailureReason: null,
   });
   const lifetime = useRef({
     active: null as AbortController | null,
@@ -97,10 +101,16 @@ function useTextVoiceAttempt(props: Options) {
         : cause instanceof Error && cause.message === 'stale'
           ? 'stale'
           : 'failed';
-    if (lifetime.current.mounted) setState((current) => ({ ...current, error }));
+    if (lifetime.current.mounted)
+      setState((current) => ({
+        ...current,
+        error,
+        providerFailureReason: cause instanceof AudioJobProviderError ? cause.reason : null,
+      }));
   };
   const modelError = useCallback(() => {
-    if (lifetime.current.mounted) setState((current) => ({ ...current, error: 'model' }));
+    if (lifetime.current.mounted)
+      setState((current) => ({ ...current, error: 'model', providerFailureReason: null }));
   }, []);
   const command = (
     work: (signal: AbortSignal) => Promise<void>,
@@ -119,6 +129,7 @@ function useTextVoiceAttempt(props: Options) {
       completed: 0,
       total: count,
       error: null,
+      providerFailureReason: null,
     }));
     const timer = setInterval(() => {
       if (owner.mounted)
@@ -165,7 +176,8 @@ function useTextVoiceAttempt(props: Options) {
     complete: (completed: number) => {
       if (lifetime.current.mounted) setState((current) => ({ ...current, completed }));
     },
-    clearError: () => setState((current) => ({ ...current, error: null })),
+    clearError: () =>
+      setState((current) => ({ ...current, error: null, providerFailureReason: null })),
     cancel: () => lifetime.current.active?.abort(),
     discard: (selected: readonly Preview[]) => {
       const ids = new Set(selected.map((preview) => preview.clipId));

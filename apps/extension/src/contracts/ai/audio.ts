@@ -1,3 +1,4 @@
+import { isAIConnectionReason, type AIConnectionReason } from '../settings/ai-catalog';
 import {
   isValidAIModelOperationConfiguration,
   type AISpeechModelParameters,
@@ -238,7 +239,12 @@ export type AudioJobServerMessage =
   | { type: 'progress'; requestId: string; phase: 'authorizing' | 'requesting' | 'receiving' }
   | { type: 'transcript'; requestId: string; result: AudioTranscriptResult }
   | { type: 'audio'; requestId: string; staged: AudioStagedHandle }
-  | { type: 'failure'; requestId: string; code: AudioJobFailureCode };
+  | {
+      type: 'failure';
+      requestId: string;
+      code: AudioJobFailureCode;
+      failureReason?: AIConnectionReason | undefined;
+    };
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -679,7 +685,14 @@ export function parseAudioJobServerMessage(value: unknown): AudioJobServerMessag
   }
   if (value['type'] === 'failure') {
     const code = parseAudioJobFailureCode(value['code']);
-    return code ? { type: 'failure', requestId, code } : null;
+    const failureReason = value['failureReason'];
+    if (!code || (failureReason !== undefined && !isAIConnectionReason(failureReason))) return null;
+    return {
+      type: 'failure',
+      requestId,
+      code,
+      ...(failureReason === undefined ? {} : { failureReason }),
+    };
   }
   return null;
 }

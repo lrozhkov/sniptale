@@ -1,3 +1,4 @@
+import { getReviewAIProviderFailureKey } from './ai-provider-error';
 import { useRef, useState, type ReactNode } from 'react';
 import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
 import { CheckboxField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
@@ -375,17 +376,18 @@ function RecognitionFeedback({ recognition }: { recognition: Recognition }) {
       {recognition.error && !modelError && (
         <p role="alert" className="text-xs">
           {translate(
-            recognition.error === 'too-large'
-              ? 'gallery.videoReview.recognitionTooLarge'
-              : recognition.error === 'invalid-response'
-                ? 'gallery.videoReview.recognitionInvalidResponse'
-                : recognition.error === 'selection'
-                  ? 'gallery.videoReview.recognitionSelectionMissing'
-                  : recognition.error === 'stale'
-                    ? 'gallery.videoReview.speechChanged'
-                    : recognition.error === 'model'
-                      ? 'gallery.videoReview.speechMissingModel'
-                      : 'gallery.videoReview.speechFailed'
+            getReviewAIProviderFailureKey(recognition.providerFailureReason) ??
+              (recognition.error === 'too-large'
+                ? 'gallery.videoReview.recognitionTooLarge'
+                : recognition.error === 'invalid-response'
+                  ? 'gallery.videoReview.recognitionInvalidResponse'
+                  : recognition.error === 'selection'
+                    ? 'gallery.videoReview.recognitionSelectionMissing'
+                    : recognition.error === 'stale'
+                      ? 'gallery.videoReview.speechChanged'
+                      : recognition.error === 'model'
+                        ? 'gallery.videoReview.speechMissingModel'
+                        : 'gallery.videoReview.speechFailed')
           )}
         </p>
       )}

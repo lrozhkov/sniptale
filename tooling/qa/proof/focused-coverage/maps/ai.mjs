@@ -1,5 +1,29 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'background-audio-job-coordinator',
+    productionFile: 'apps/extension/src/background/ai/audio/service.ts',
+    exclusive: true,
+    reason:
+      'The coordinator owns audio job admission, execution, cancellation, erasure exclusion and safe failure publication. Its lifecycle and project transport suites cover those receiving transitions.',
+    testFiles: [
+      'apps/extension/src/background/ai/audio/service.test.ts',
+      'apps/extension/src/background/ai/audio/service.lifecycle.test.ts',
+      'apps/extension/src/background/ai/audio/service.project-text.test.ts',
+      'apps/extension/src/background/ai/audio/service.project-transport.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-audio-provider-feedback',
+    productionFile: 'apps/extension/src/gallery/video-review/ai-provider-error.ts',
+    exclusive: true,
+    reason:
+      'The pure fixed-copy selector has two mounted Gallery consumers. Their tests cover distinct provider feedback and existing generic recovery without transport, source or publication effects.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+    ],
+  },
+  {
     owner: 'ai-request-operation-observation',
     productionFile: 'apps/extension/src/background/ai/operation-observation.ts',
     allowCrossOwner: true,

@@ -1,3 +1,5 @@
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
+import { AudioJobProviderError } from '../../workflows/audio-jobs/failure';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AudioRecognitionOptions, ReviewSpeechTarget } from '../../contracts/ai/audio';
 import type { ReviewSpeechSession } from '../../workflows/video-review/speech-publication';
@@ -35,6 +37,7 @@ type RecognitionState = {
   elapsed: number;
   completed: number;
   total: number;
+  providerFailureReason: AIConnectionReason | null;
   error: 'model' | 'selection' | 'stale' | 'failed' | 'too-large' | 'invalid-response' | null;
 };
 
@@ -63,6 +66,7 @@ function useRecognitionAttempt(args: ReviewRecognitionAccess) {
     completed: 0,
     total: 0,
     error: null,
+    providerFailureReason: null,
   });
   const lifetime = useRef({
     mounted: true,
@@ -97,7 +101,14 @@ function useRecognitionAttempt(args: ReviewRecognitionAccess) {
     const controller = new AbortController();
     owner.active = controller;
     const started = performance.now();
-    setState((current) => ({ ...current, running: true, applying, elapsed: 0, error: null }));
+    setState((current) => ({
+      ...current,
+      running: true,
+      applying,
+      elapsed: 0,
+      error: null,
+      providerFailureReason: null,
+    }));
     const timer = setInterval(() => {
       if (owner.mounted)
         setState((current) => ({
@@ -110,6 +121,7 @@ function useRecognitionAttempt(args: ReviewRecognitionAccess) {
         if (owner.mounted && !controller.signal.aborted)
           setState((current) => ({
             ...current,
+            providerFailureReason: cause instanceof AudioJobProviderError ? cause.reason : null,
             error:
               cause instanceof Error &&
               (cause.message === 'model' ||
@@ -144,9 +156,16 @@ function useRecognitionAttempt(args: ReviewRecognitionAccess) {
       lifetime.current.proposal = null;
       lifetime.current.job = undefined;
       lifetime.current.jobBinding = '';
-      setState((current) => ({ ...current, proposal: null, accepted: false, error: null }));
+      setState((current) => ({
+        ...current,
+        proposal: null,
+        accepted: false,
+        error: null,
+        providerFailureReason: null,
+      }));
     },
-    clearError: () => setState((current) => ({ ...current, error: null })),
+    clearError: () =>
+      setState((current) => ({ ...current, error: null, providerFailureReason: null })),
   };
 }
 
@@ -190,13 +209,13 @@ export function useReviewRecognition(args: ReviewRecognitionAccess) {
   const attempt = useRecognitionAttempt(args);
   const { state, setState, lifetime, command, acknowledge } = attempt;
   const modelError = useCallback(
-    () => setState((current) => ({ ...current, error: 'model' })),
+    () => setState((current) => ({ ...current, error: 'model', providerFailureReason: null })),
     [setState]
   );
   const selectionUnavailable = parameters.selectionOnly && !validSelectedScope(args);
   const recognize = (approvedProviderId: string) => {
     if (selectionUnavailable) {
-      setState((current) => ({ ...current, error: 'selection' }));
+      setState((current) => ({ ...current, error: 'selection', providerFailureReason: null }));
       return;
     }
     const model = catalogs?.transcription.models.find((entry) => entry.id === modelId);
@@ -349,6 +368,7 @@ export function useReviewRecognition(args: ReviewRecognitionAccess) {
     setModelId(id: string) {
       if (!lifetime.current.mounted || lifetime.current.active || selection.selectionPending)
         return;
+      attempt.clearError();
       selection.chooseModel(id || null);
     },
     configurationFailed: selection.configurationFailed,

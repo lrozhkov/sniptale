@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { AudioJobProviderError } from '../../workflows/audio-jobs/failure';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -703,4 +704,19 @@ it('retains the admitted destination through a deferred recognition flush', asyn
       approvedDestination: `sha256:${'a'.repeat(64)}`,
     },
   });
+});
+
+it('clears provider evidence before an explicit recognition retry', async () => {
+  const { access, proposal } = fixture();
+  await mount(access);
+  mocks.run.mockRejectedValueOnce(new AudioJobProviderError('quota-exceeded', 'provider-failed'));
+  await act(async () => current.recognize('provider'));
+  expect(current.providerFailureReason).toBe('quota-exceeded');
+  const gate = Promise.withResolvers<ReviewRecognitionProposal>();
+  mocks.run.mockReturnValueOnce(gate.promise);
+  await act(async () => current.recognize('provider'));
+  expect(current.running).toBe(true);
+  expect(current.providerFailureReason).toBeNull();
+  await act(async () => gate.resolve(proposal));
+  expect(current.proposal).toBe(proposal);
 });

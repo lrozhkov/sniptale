@@ -1,5 +1,29 @@
 export const SHARED_FACADE_OWNER_MAPPINGS = [
   {
+    owner: 'shared-audio-job-failure',
+    productionFile: 'apps/extension/src/workflows/audio-jobs/failure.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'The typed local failure contract retains bounded reasons and legacy audio codes. Port, mounted feedback, speech, recognition and cancellation consumers prove its current boundary.',
+    testFiles: [
+      'apps/extension/src/workflows/audio-jobs/client.test.ts',
+      'apps/extension/src/gallery/video-review/use-recognition.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/recognition-recovery.test.tsx',
+      'apps/extension/src/workflows/video/project-recognition.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/video-editor/runtime/session/recognition.test.tsx',
+      'apps/extension/src/workflows/scenario-narration/generation.test.ts',
+      'apps/extension/src/workflows/video-review/speech-publication.test.ts',
+      'apps/extension/src/workflows/video-review/speech-transcription.test.ts',
+      'apps/extension/src/workflows/video-review/recognition.test.ts',
+      'apps/extension/src/workflows/video-review/recognition-multimodal.test.ts',
+      'apps/extension/src/workflows/video-review/text-voice.test.ts',
+    ],
+  },
+  {
     owner: 'shared-video-text-rewrite-controls',
     productionFile: 'apps/extension/src/ui/video-text/rewrite/controls.tsx',
     reason:

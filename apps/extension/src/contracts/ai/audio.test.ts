@@ -448,3 +448,16 @@ it('preserves approved execution identity and refuses inconsistent audio starts'
     ).toBeNull();
   }
 });
+
+it('retains admitted provider reasons and refuses raw audio failure metadata', () => {
+  const failure = {
+    type: 'failure',
+    requestId: 'r',
+    code: 'provider-auth',
+    failureReason: 'permission-denied',
+  };
+  expect(parseAudioJobServerMessage(failure)).toEqual(failure);
+  for (const failureReason of ['private response', { status: 402 }, 402]) {
+    expect(parseAudioJobServerMessage({ ...failure, failureReason })).toBeNull();
+  }
+});

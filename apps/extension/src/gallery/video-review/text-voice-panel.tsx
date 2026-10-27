@@ -1,3 +1,4 @@
+import { getReviewAIProviderFailureKey } from './ai-provider-error';
 import type { VoiceProviderSelection } from '@sniptale/runtime-contracts/voice-input';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
@@ -148,7 +149,10 @@ export function ReviewTextVoiceForm(props: Props) {
       )}
       {operation.error && (operation.error !== 'model' || source === 'ai') && (
         <p role="alert" className="text-xs">
-          {translate(textVoiceErrors[operation.error])}
+          {translate(
+            getReviewAIProviderFailureKey(operation.providerFailureReason) ??
+              textVoiceErrors[operation.error]
+          )}
         </p>
       )}
       <TextVoiceResults operation={operation} disabled={props.disabled} source={source} />
@@ -217,6 +221,7 @@ function useTextVoiceProfile(operation: VoiceOperation) {
       if (!id || selection.selectionPending || !catalog?.models.some((entry) => entry.id === id))
         return;
       profileReset.current = id;
+      operation.clearError();
       selection.chooseModel(id);
     },
   };

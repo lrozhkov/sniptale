@@ -13,6 +13,7 @@ import type {
   ReviewRecognitionProposal,
 } from '../../workflows/video-review/recognition';
 import { translate } from '../../platform/i18n';
+import { AudioJobProviderError } from '../../workflows/audio-jobs/failure';
 import { createReviewSpeechEditGuard } from './speech-edit-guard';
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
@@ -552,3 +553,25 @@ it('requires fresh provider consent after its destination changes under the same
   await click(translate('gallery.videoReview.speechConsentContinue'));
   expect(mocks.prepare).toHaveBeenCalledTimes(2);
 });
+
+it.each([
+  ['invalid-credential', 'settings.aiProviders.providerStatusInvalidKey'],
+  ['permission-denied', 'settings.aiProviders.providerStatusDenied'],
+  ['model-unavailable', 'settings.aiProviders.providerStatusModelUnavailable'],
+  ['quota-exceeded', 'settings.aiProviders.providerStatusQuota'],
+  ['rate-limited', 'settings.aiProviders.providerStatusRate'],
+  ['network', 'settings.aiProviders.providerStatusNetwork'],
+  ['timeout', 'settings.aiProviders.providerStatusTimeout'],
+  ['service-error', 'settings.aiProviders.providerStatusUnavailable'],
+] as const)(
+  'explains %s in the mounted recognition panel without changing source',
+  async (reason, key) => {
+    const { session } = await mount();
+    const before = structuredClone(session.getSnapshot().snapshot);
+    mocks.run.mockRejectedValueOnce(new AudioJobProviderError(reason, 'provider-failed'));
+    await recognize();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(translate(key));
+    expect(session.getSnapshot().snapshot).toEqual(before);
+    expect(mocks.apply).not.toHaveBeenCalled();
+  }
+);

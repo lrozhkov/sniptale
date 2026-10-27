@@ -10,7 +10,12 @@ vi.mock('../../../composition/persistence/projects', () => ({
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAudioJobService } from './service';
 import { requestAudio } from './request';
-import type { AudioJobServerMessage, AudioJobStart } from '../../../contracts/ai/audio';
+import { AIProviderRequestError } from '../providers';
+import {
+  AUDIO_JOB_TIMEOUT_MS,
+  type AudioJobServerMessage,
+  type AudioJobStart,
+} from '../../../contracts/ai/audio';
 const request: AudioJobStart = {
   type: 'start',
   requestId: 'request',
@@ -381,3 +386,69 @@ it('publishes PCM only as a WAV staging handle through the real request implemen
   expect(write).toHaveBeenCalledOnce();
   await connection.disconnect();
 });
+
+it.each([
+  ['invalid-credential', 'provider-auth'],
+  ['permission-denied', 'provider-auth'],
+  ['model-unavailable', 'provider-not-found'],
+  ['quota-exceeded', 'provider-failed'],
+  ['rate-limited', 'provider-rate-limit'],
+  ['service-error', 'provider-failed'],
+] as const)(
+  'preserves the fixed %s provider reason through the audio port',
+  async (reason, code) => {
+    const post = vi.fn().mockRejectedValue(new AIProviderRequestError(reason, code));
+    const messages: AudioJobServerMessage[] = [];
+    const service = createAudioJobService({
+      authorize: vi.fn(async () => undefined),
+      resolveModel: vi.fn(async () => config),
+      request: post,
+    });
+    const connection = service.connect((message) => messages.push(message));
+    connection.receive(request);
+    await vi.waitFor(() =>
+      expect(messages).toContainEqual({
+        type: 'failure',
+        requestId: request.requestId,
+        code,
+        failureReason: reason,
+      })
+    );
+    expect(post).toHaveBeenCalledOnce();
+    await connection.disconnect();
+  }
+);
+
+it.each(['cancel', 'timeout'] as const)(
+  'keeps %s ahead of a late typed provider failure',
+  async (mode) => {
+    vi.useFakeTimers();
+    const gate = Promise.withResolvers<never>();
+    const post = vi.fn(() => gate.promise);
+    const messages: AudioJobServerMessage[] = [];
+    const service = createAudioJobService({
+      authorize: vi.fn(async () => undefined),
+      resolveModel: vi.fn(async () => config),
+      request: post,
+    });
+    const connection = service.connect((message) => messages.push(message));
+    try {
+      connection.receive(request);
+      await vi.waitFor(() => expect(post).toHaveBeenCalledOnce());
+      if (mode === 'cancel') connection.receive({ type: 'cancel', requestId: request.requestId });
+      else vi.advanceTimersByTime(AUDIO_JOB_TIMEOUT_MS);
+      gate.reject(new AIProviderRequestError('quota-exceeded', 'provider-failed'));
+      await vi.waitFor(() =>
+        expect(messages).toContainEqual({
+          type: 'failure',
+          requestId: request.requestId,
+          code: mode === 'cancel' ? 'cancelled' : 'timeout',
+        })
+      );
+      expect(messages.filter((message) => message.type === 'failure')).toHaveLength(1);
+    } finally {
+      await connection.disconnect();
+      vi.useRealTimers();
+    }
+  }
+);
