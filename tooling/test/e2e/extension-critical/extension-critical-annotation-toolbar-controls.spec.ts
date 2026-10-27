@@ -442,6 +442,33 @@ async function expectAnnotationCenter(annotation: Locator, point: { x: number; y
     .toBeLessThanOrEqual(1.5);
 }
 
+async function verifyFreeCommentTail(page: Page, comment: Locator, undo: Locator, redo: Locator) {
+  await comment.hover();
+  const tip = page.locator('.sniptale-callout-tail-frame-handle');
+  await expect(tip).toBeVisible();
+  const before = await annotationCenter(tip);
+  const bubble = await annotationCenter(comment);
+  await tip.hover();
+  await page.mouse.down();
+  await page.mouse.move(before.x + 70, before.y + 40, { steps: 5 });
+  await page.mouse.up();
+  await expectAnnotationCenter(tip, { x: before.x + 70, y: before.y + 40 });
+  await expectAnnotationCenter(comment, bubble);
+  await undo.click();
+  await comment.hover();
+  await expectAnnotationCenter(tip, before);
+  await redo.click();
+  await comment.hover();
+  await expectAnnotationCenter(tip, { x: before.x + 70, y: before.y + 40 });
+  await tip.hover();
+  await page.mouse.down();
+  await page.mouse.move(before.x + 110, before.y + 70, { steps: 3 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await comment.hover();
+  await expectAnnotationCenter(tip, { x: before.x + 70, y: before.y + 40 });
+}
+
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   test(`standalone annotations ${name}`, async ({ context, extensionId, hostOrigin }, info) => {
     const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
@@ -457,6 +484,9 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
     await page.locator('[data-ui="content.toolbar.mode-option.highlighter"]').click();
     const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+    const toolAccent = await toolbar
+      .locator('[data-frame-effect][aria-pressed="true"]')
+      .evaluate((element) => getComputedStyle(element).color);
     await toolbar.locator('[data-frame-effect][aria-pressed="true"]').click();
     const numberTool = toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge"]');
     const commentTool = toolbar.locator('[data-ui="content.toolbar.future-frame-callout"]');
@@ -465,6 +495,18 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await numberTool.click();
     await expect(numberTool).toHaveAttribute('aria-pressed', 'true');
     await expect(commentTool).toHaveAttribute('aria-pressed', 'false');
+    await expect.soft(numberTool).toHaveCSS('color', toolAccent);
+    await expect.soft(numberTool).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge.menu"]').click();
+    const initialPlacement = page.locator('[data-ui="content.annotation.creation-placement"]');
+    await expect
+      .soft(initialPlacement.getByRole('button', { name: /^(Free|Свободно)$/u }))
+      .toHaveAttribute('aria-pressed', 'true');
+    await initialPlacement.getByRole('button', { name: /^(On element|На элементе)$/u }).click();
+    await expect(
+      initialPlacement.getByRole('button', { name: /^(On element|На элементе)$/u })
+    ).toHaveCSS('outline-style', 'none');
+    await toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge.menu"]').click();
     await page.evaluate(() => {
       document.body.style.minHeight = '1800px';
       const scroller = document.createElement('div');
@@ -499,9 +541,15 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await number.hover();
     await capture(page, info, 'standalone-number-scrolled.png');
     const pencil = page.locator('.sniptale-step-badge-edit-handle');
+    await pencil.hover();
+    await expect.soft(pencil).toHaveCSS('border-top-color', toolAccent);
     await pencil.click();
     const inlineValue = page.locator('.sniptale-step-badge-value-editor');
     await expect(inlineValue).toBeFocused();
+    await expect.soft(pencil).toHaveAttribute('aria-pressed', 'true');
+    await numberTool.hover();
+    await expect(pencil).toHaveCSS('border-top-color', toolAccent);
+    await expect(pencil).toHaveCSS('outline-style', 'none');
     await inlineValue.fill('42');
     await inlineValue.press('Escape');
     await expect(number).toHaveText('1');
@@ -509,7 +557,10 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await pencil.click();
     await inlineValue.fill('42');
     await capture(page, info, 'standalone-number-inline-edit.png');
-    await inlineValue.press('Enter');
+    await numberTool.click();
+    await expect.soft(inlineValue).toHaveCount(0);
+    if (await inlineValue.count()) await inlineValue.press('Enter');
+    await numberTool.click();
     await expect(number).toHaveText('42');
     await number.hover();
     await page.locator('.sniptale-step-badge-settings-handle').click();
@@ -568,6 +619,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await commentTool.click();
     await expect(numberTool).toHaveAttribute('aria-pressed', 'false');
     await expect(commentTool).toHaveAttribute('aria-pressed', 'true');
+    await expect(commentTool).toHaveCSS('color', toolAccent);
+    await expect(commentTool).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await page.mouse.click(850, 350);
     const comment = page.locator('.sniptale-callout');
     await expect(comment).toHaveCount(1);
@@ -575,6 +628,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await body.fill('Standalone comment');
     await body.press('Escape');
     await expect(comment).toContainText('Standalone comment');
+    await verifyFreeCommentTail(page, comment, undo, redo);
     await comment.hover();
     await page.locator('.sniptale-callout-settings-handle').click();
     await page
@@ -614,6 +668,93 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
 
     await page.close();
     await popup.close();
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`standalone editor creation ${name}`, async ({ page, hostOrigin }, info) => {
+    await page.setViewportSize(size);
+    await applyHarnessBootstrap(page, { storage: { 'sniptale-locale-preference': 'en' } });
+    await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+    await expect(page.locator('[data-ui="editor.page.open-loading"]')).toBeHidden();
+    const toolbar = page.locator('[data-ui="editor.floating.tool-rail"]');
+    const numberTool = toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge"]');
+    const commentTool = toolbar.locator('[data-ui="content.toolbar.future-frame-callout"]');
+    await expect(numberTool).toBeVisible();
+    await expect(commentTool).toBeVisible();
+    await numberTool.click();
+    await expect(numberTool).toHaveAttribute('aria-pressed', 'true');
+    await expect(toolbar.locator('[data-frame-effect][aria-pressed="true"]')).toHaveCount(0);
+    await toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge.menu"]').click();
+    await expect(panel(page)).toBeVisible();
+    await expect(page.locator('[data-ui="content.annotation.creation-placement"]')).toHaveCount(0);
+    await toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge.menu"]').click();
+    const plane = (await page.locator('[data-ui="editor.frame-annotation-plane"]').boundingBox())!;
+    const point = { x: plane.x + plane.width * 0.4, y: plane.y + plane.height * 0.55 };
+    await page.mouse.click(point.x, point.y);
+    const badge = page.locator('.sniptale-step-badge');
+    await expect(badge).toHaveCount(1);
+    await expectAnnotationCenter(badge, point);
+    await expect(page.locator('.sniptale-interactive-frame')).toHaveCount(0);
+    await badge.hover();
+    await page.locator('.sniptale-step-badge-edit-handle').click();
+    await page.locator('.sniptale-step-badge-value-editor').fill('9');
+    await commentTool.click();
+    await expect(badge).toHaveText('9');
+    await expect(numberTool).toHaveAttribute('aria-pressed', 'false');
+    await expect(commentTool).toHaveAttribute('aria-pressed', 'true');
+    await page.mouse.click(plane.x + plane.width * 0.6, point.y);
+    const comment = page.locator('.sniptale-callout');
+    await expect(comment).toHaveCount(1);
+    const body = comment.locator('[contenteditable="true"]').first();
+    await body.fill('Created editor comment');
+    await body.press('Escape');
+    const undo = page.locator('[data-ui="editor.floating.tool-rail.history.undo"]');
+    const redo = page.locator('[data-ui="editor.floating.tool-rail.history.redo"]');
+    await verifyFreeCommentTail(page, comment, undo, redo);
+    await capture(page, info, 'standalone-editor-created.png');
+    for (const width of [1000, 1438, 1439, 1440, 1498, 1499, 1500, 1638, 1639, 1640]) {
+      await page.setViewportSize({ width, height: size.height });
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth))
+        .toBeLessThanOrEqual(1);
+      const bounds = (await toolbar.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(-1);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(width + 1);
+      const historyBounds = (await page
+        .locator('[data-ui="editor.floating.tool-rail.history"]')
+        .boundingBox())!;
+      const viewBounds = (await page
+        .locator('[data-ui="editor.floating.view-controls"]')
+        .boundingBox())!;
+      expect(
+        Math.min(
+          Math.min(historyBounds.x + historyBounds.width, viewBounds.x + viewBounds.width) -
+            Math.max(historyBounds.x, viewBounds.x),
+          Math.min(historyBounds.y + historyBounds.height, viewBounds.y + viewBounds.height) -
+            Math.max(historyBounds.y, viewBounds.y)
+        ),
+        `history and view controls do not overlap at width ${width}`
+      ).toBeLessThanOrEqual(1);
+
+      for (const control of [
+        undo,
+        page.locator('[data-ui="editor.floating.tool-rail.history.reset"]'),
+        toolbar.locator('[data-ui="content.toolbar.future-frame-callout"]'),
+        toolbar.locator('[data-ui="content.toolbar.future-frame-step-badge"]'),
+      ]) {
+        expect(
+          await control.evaluate((button) => {
+            const rect = button.getBoundingClientRect();
+            return button.contains(
+              document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
+            );
+          }),
+          `reachable control at width ${width}`
+        ).toBe(true);
+      }
+    }
+    await capture(page, info, 'standalone-editor-breakpoints.png');
   });
 }
 

@@ -4,30 +4,34 @@ import type { StandaloneAnnotationCreationOptions } from '../../features/highlig
 import { translate } from '../../platform/i18n';
 
 export interface AnnotationPlacementControl {
+  allowElementPlacement?: boolean;
   value: StandaloneAnnotationCreationOptions['placement'];
   onChange: (value: StandaloneAnnotationCreationOptions['placement']) => void;
 }
 
 export function AnnotationCreationPlacement(props: AnnotationPlacementControl) {
+  if (props.allowElementPlacement === false) return null;
   return (
     <ContentPopoverSection
       title={translate('content.interactiveFrame.annotationPlacement')}
       dataUi="content.annotation.creation-placement"
     >
-      <SegmentedSwitch
-        activeId={props.value}
-        ariaLabel={translate('content.interactiveFrame.annotationPlacement')}
-        density="compact"
-        appearance="neutral"
-        options={[
-          {
-            id: 'element',
-            label: translate('content.interactiveFrame.annotationPlacementElement'),
-          },
-          { id: 'free', label: translate('content.interactiveFrame.annotationPlacementFree') },
-        ]}
-        onChange={props.onChange}
-      />
+      <div onPointerDown={(event) => event.preventDefault()}>
+        <SegmentedSwitch
+          activeId={props.value}
+          ariaLabel={translate('content.interactiveFrame.annotationPlacement')}
+          density="compact"
+          appearance="neutral"
+          options={[
+            {
+              id: 'element',
+              label: translate('content.interactiveFrame.annotationPlacementElement'),
+            },
+            { id: 'free', label: translate('content.interactiveFrame.annotationPlacementFree') },
+          ]}
+          onChange={props.onChange}
+        />
+      </div>
     </ContentPopoverSection>
   );
 }

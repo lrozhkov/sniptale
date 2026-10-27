@@ -40,6 +40,7 @@ function useCreationMenuDirection(
 
 function CreationAnnotationButton(props: {
   active: boolean;
+  standalone?: boolean;
   children: ReactNode;
   dataUi: string;
   disabled?: boolean;
@@ -55,7 +56,8 @@ function CreationAnnotationButton(props: {
   return (
     <div className="sniptale-annotation-menu-control" data-active={props.active ? 'true' : 'false'}>
       <ContentToolbarButton
-        tone="property"
+        tone={props.standalone ? 'default' : 'property'}
+        data-content-tool={props.standalone ? 'true' : undefined}
         active={props.active}
         aria-pressed={props.active}
         dataUi={props.dataUi}
@@ -146,6 +148,7 @@ export function FrameStyleCreationButton(props: {
 }
 
 export function AnnotationCreationButtons(props: {
+  standalone?: boolean;
   calloutActive?: boolean;
   stepBadgeActive?: boolean;
   grouped?: boolean | undefined;
@@ -178,6 +181,7 @@ export function AnnotationCreationButtons(props: {
             'callout',
             <CreationAnnotationButton
               active={calloutActive}
+              standalone={props.standalone ?? false}
               dataUi={
                 props.contentContext
                   ? 'content.toolbar.future-frame-callout'
@@ -201,6 +205,7 @@ export function AnnotationCreationButtons(props: {
             'step-badge',
             <CreationAnnotationButton
               active={stepBadgeActive}
+              standalone={props.standalone ?? false}
               dataUi={
                 props.contentContext
                   ? 'content.toolbar.future-frame-step-badge'

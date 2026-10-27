@@ -105,6 +105,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
         <FrameStepBadgeControls
           drag={interaction.drag}
           editAnchorRef={editAnchorRef}
+          isEditingValue={isEditingValue}
           {...(props.onValueChange ? { onEditValue: () => setIsEditingValue(true) } : {})}
           visibility={interaction.visibility}
           portalTarget={props.controlsPortalTarget}
@@ -136,6 +137,16 @@ function StepBadgeInlineValueEditor(props: {
     const value = draft.trim();
     props.onFinish(accept && value ? value : null, restoreFocus);
   };
+  React.useEffect(() => {
+    const input = inputRef.current;
+    const owner = input?.ownerDocument.defaultView;
+    if (!input || !owner) return;
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (!event.composedPath().includes(input)) finish(true, false);
+    };
+    owner.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    return () => owner.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+  });
   return (
     <input
       ref={inputRef}

@@ -18,6 +18,9 @@ import type { CalloutDragBehavior } from '../../../features/highlighter/frame-an
 import { useContentUiScale } from '../../platform/dom-host';
 
 interface CalloutProps {
+  onAnchorPositionChange?: React.ComponentProps<
+    typeof FrameCalloutInteractiveSurface
+  >['onAnchorPositionChange'];
   frameId: string;
   frameBorderWidth: number;
   settings: CalloutSettings;
@@ -71,6 +74,9 @@ export const Callout: React.FC<CalloutProps> = (props) => {
   return (
     <FrameCalloutInteractiveSurface
       chromeScale={chromeScale}
+      {...(props.onAnchorPositionChange
+        ? { onAnchorPositionChange: props.onAnchorPositionChange }
+        : {})}
       editing={{
         events: {
           applyFormatting: editing.applyFormatting,

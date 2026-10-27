@@ -79,11 +79,12 @@
   border-color: transparent;
   border-radius: var(--sniptale-radius-sm, 4px);
 }
-.sniptale-annotation-menu-control > button[aria-pressed] {
+.sniptale-annotation-menu-control > button[aria-pressed]:not([data-content-tool='true']) {
   border-color: transparent !important;
   color: var(--sniptale-color-text-secondary) !important;
 }
-.sniptale-annotation-menu-control > button[aria-pressed]:is(:hover, [aria-pressed='true']) {
+.sniptale-annotation-menu-control
+  > button[aria-pressed]:not([data-content-tool='true']):is(:hover, [aria-pressed='true']) {
   background: var(--sniptale-color-surface-hover) !important;
   color: var(--sniptale-color-text-primary) !important;
 }
@@ -94,7 +95,13 @@
         [aria-expanded='true']
       )
   )
-  > button[aria-pressed] {
+  > button[aria-pressed]:not([data-content-tool='true']) {
+  background: transparent !important;
+}
+
+.sniptale-annotation-menu-control > button[data-content-tool='true'][aria-pressed='true'] {
+  border-color: var(--sniptale-color-accent) !important;
+  color: var(--sniptale-color-accent) !important;
   background: transparent !important;
 }
 

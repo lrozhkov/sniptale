@@ -115,6 +115,16 @@ export function EditorFrameCallout(props: {
   return (
     <>
       <FrameCalloutInteractiveSurface
+        {...(props.snapshot.annotationKind === 'callout'
+          ? {
+              onAnchorPositionChange: (point, placement) =>
+                props.onSnapshotChange({
+                  ...props.snapshot,
+                  ...point,
+                  callout: { ...callout, placement },
+                }),
+            }
+          : {})}
         chromeScale={1}
         coordinateSpace={props.coordinateSpace}
         {...(props.controlsPortalTarget

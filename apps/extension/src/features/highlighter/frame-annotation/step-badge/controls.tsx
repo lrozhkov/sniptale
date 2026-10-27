@@ -50,6 +50,7 @@ export function FrameStepBadgeControls(props: {
   visibility: ReturnType<typeof useTransientControlVisibility>;
   onSettingsClick?: () => void;
   onEditValue?: () => void;
+  isEditingValue?: boolean;
   editAnchorRef?: React.RefObject<HTMLButtonElement | null>;
   portalTarget: Element | DocumentFragment;
   portalTheme: AppTheme | null;
@@ -109,6 +110,7 @@ export function FrameStepBadgeControls(props: {
             ref={props.editAnchorRef}
             type="button"
             className="sniptale-step-badge-edit-handle"
+            aria-pressed={props.isEditingValue ?? false}
             aria-label={translate('content.stepBadge.editValue')}
             title={translate('content.stepBadge.editValue')}
             style={{ ...buttonStyle, cursor: 'pointer' }}

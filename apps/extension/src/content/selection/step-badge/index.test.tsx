@@ -306,7 +306,7 @@ it('omits interaction chrome for export and short-circuits a disabled shared bad
   document.body.replaceChildren();
 });
 
-it.each(['Enter', 'Escape', 'blur', 'empty'] as const)(
+it.each(['Enter', 'Escape', 'blur', 'empty', 'outside'] as const)(
   'edits a badge value in place with %s completion and owns input keys',
   (completion) => {
     const host = document.createElement('div');
@@ -352,7 +352,11 @@ it.each(['Enter', 'Escape', 'blur', 'empty'] as const)(
     act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true })));
     expect(bubble).not.toHaveBeenCalled();
     act(() => {
-      if (completion === 'blur') input.blur();
+      if (completion === 'outside') {
+        document.body.dispatchEvent(
+          new MouseEvent('pointerdown', { bubbles: true, composed: true })
+        );
+      } else if (completion === 'blur') input.blur();
       else
         input.dispatchEvent(
           new KeyboardEvent('keydown', {
@@ -361,13 +365,15 @@ it.each(['Enter', 'Escape', 'blur', 'empty'] as const)(
           })
         );
     });
+    if (completion === 'outside') expect(host.querySelector('input')).toBeNull();
     if (completion === 'Escape' || completion === 'empty')
       expect(onValueChange).not.toHaveBeenCalled();
     else expect(onValueChange).toHaveBeenCalledExactlyOnceWith('42');
     expect(host.querySelector('input')).toBeNull();
     expect(settings.value).toBe('7');
     expect(settings.sourcePresetId).toBe('system-classic');
-    if (completion !== 'blur') expect(document.activeElement).toBe(pencil);
+    if (completion !== 'blur' && completion !== 'outside')
+      expect(document.activeElement).toBe(pencil);
     document.removeEventListener('keydown', bubble);
     act(() => root.unmount());
     document.body.replaceChildren();

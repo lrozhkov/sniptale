@@ -9,6 +9,19 @@ afterEach(() => {
   useEditorStore.getState().resetDocumentState();
 });
 
+it('clears standalone annotation creation when another tool or document takes over', () => {
+  for (const switchTool of ['setActiveTool', 'syncActiveTool'] as const) {
+    useEditorStore.getState().setActiveTool('frame-annotation');
+    useEditorStore.getState().setFrameAnnotationCreationKind('callout');
+    useEditorStore.getState()[switchTool]('pencil');
+    expect(useEditorStore.getState().frameAnnotationCreationKind).toBeNull();
+  }
+  useEditorStore.getState().setActiveTool('frame-annotation');
+  useEditorStore.getState().setFrameAnnotationCreationKind('step-badge');
+  useEditorStore.getState().resetDocumentState();
+  expect(useEditorStore.getState().frameAnnotationCreationKind).toBeNull();
+});
+
 function registerDocumentDefaultsTests() {
   it('starts with outside shapes hidden and resets the toggle for a new document', () => {
     expect(useEditorStore.getState().showOutsideCanvas).toBe(false);

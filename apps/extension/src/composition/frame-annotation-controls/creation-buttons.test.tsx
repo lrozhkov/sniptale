@@ -312,14 +312,14 @@ it('keeps standalone tools visible and mutually exclusive when the frame is off'
   expect(callout.getAttribute('aria-pressed')).toBe('true');
   expect(onStandaloneCreationChange).toHaveBeenLastCalledWith({
     annotationKind: 'callout',
-    placement: 'element',
+    placement: 'free',
   });
   act(() => badge.click());
   expect(callout.getAttribute('aria-pressed')).toBe('false');
   expect(badge.getAttribute('aria-pressed')).toBe('true');
   expect(onStandaloneCreationChange).toHaveBeenLastCalledWith({
     annotationKind: 'step-badge',
-    placement: 'element',
+    placement: 'free',
   });
   act(() => badge.click());
   expect(badge.getAttribute('aria-pressed')).toBe('false');
@@ -334,6 +334,15 @@ it('offers explicit element and free placement through the existing segmented co
   expect(buttons).toHaveLength(2);
   expect(buttons[0]!.getAttribute('aria-pressed')).toBe('true');
   expect(buttons[1]!.getAttribute('aria-pressed')).toBe('false');
+  const pointer = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+  act(() => buttons[1]!.dispatchEvent(pointer));
+  expect(pointer.defaultPrevented).toBe(true);
   act(() => buttons[1]!.click());
   expect(onChange).toHaveBeenCalledWith('free');
+  act(() =>
+    root.render(
+      <AnnotationCreationPlacement value="free" onChange={onChange} allowElementPlacement={false} />
+    )
+  );
+  expect(host.querySelector('button')).toBeNull();
 });

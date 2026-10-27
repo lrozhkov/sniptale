@@ -123,6 +123,22 @@ export function InteractiveFrameCalloutOverlay(props: InteractiveFrameCalloutOve
 
   return (
     <Callout
+      {...(props.currentFrame.annotationKind === 'callout'
+        ? {
+            onAnchorPositionChange: (point, placement) => {
+              const update = (current: FrameData) => ({
+                ...current,
+                ...point,
+                callout: { ...getFrameCallout(current, calloutIndex)!, placement },
+              });
+              const next = props.stageCalloutFrame
+                ? props.stageCalloutFrame(update)
+                : update(props.currentFrame);
+              if (!props.stageCalloutFrame) props.setTempFrame(next);
+              props.onUpdate(next);
+            },
+          }
+        : {})}
       frameId={props.frame.id}
       frameBorderWidth={frameBorderWidth}
       settings={resolvedCallout}

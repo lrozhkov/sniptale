@@ -48,6 +48,30 @@ describe('frame annotation creation defaults', () => {
     });
   });
 
+  it.each(['callout', 'step-badge'] as const)(
+    'creates standalone %s without a companion or inherited frame style',
+    (annotationKind) => {
+      setFrameAnnotationCreationDefaults((current) => ({
+        ...current,
+        callout: createDefaultFrameCallout(),
+        stepBadge: createDefaultFrameStepBadge(),
+      }));
+      const snapshot = createFrameAnnotationFromDefaults({
+        id: 'standalone',
+        ordering: 1,
+        x: 120,
+        y: 90,
+        annotationKind,
+      });
+      expect(snapshot).toMatchObject({ annotationKind, x: 119.5, y: 89.5, width: 1, height: 1 });
+      expect(annotationKind === 'callout' ? snapshot.stepBadge : snapshot.callout).toBeUndefined();
+      if (annotationKind === 'step-badge') {
+        expect(snapshot.stepBadge?.anchor).toBe('center');
+        expect(snapshot.stepBadge?.style?.sizeSource).toBe('custom');
+      } else expect(snapshot.callout?.style.colorBindings?.accent).toBe('custom');
+    }
+  );
+
   it('does not expose mutable owner state to a consumer', () => {
     const first = getFrameAnnotationCreationDefaults();
     first.borderSettings.color = '#000000';

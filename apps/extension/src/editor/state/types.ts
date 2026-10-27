@@ -54,6 +54,7 @@ export interface EditorRichShapeToolSelection {
 
 interface EditorUiState {
   activeTool: EditorTool;
+  frameAnnotationCreationKind: 'callout' | 'step-badge' | null;
   inspector: EditorInspector;
   freshImageBackgroundPending: boolean;
   inspectorCollapsed: boolean;
@@ -90,6 +91,7 @@ interface EditorDocumentState {
 }
 
 interface EditorUiActions {
+  setFrameAnnotationCreationKind: (kind: EditorState['frameAnnotationCreationKind']) => void;
   setActiveTool: (tool: EditorTool) => void;
   syncActiveTool: (tool: EditorTool) => void;
   setInspector: (inspector: EditorInspector) => void;

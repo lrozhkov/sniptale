@@ -30,6 +30,8 @@ type FrameAnnotationCreationControlsProps = {
   /** Presentation owner may place frame and annotation controls in independent toolbar slots. */
   renderFrameControl?: ((control: ReactNode) => ReactNode) | undefined;
   groupAnnotations?: boolean | undefined;
+  allowElementPlacement?: boolean;
+  standaloneTool?: StandaloneAnnotationCreationOptions['annotationKind'] | null;
   renderAnnotationControl?:
     | ((menu: 'callout' | 'step-badge', control: ReactNode) => ReactNode)
     | undefined;
@@ -61,8 +63,7 @@ export function FrameAnnotationCreationControls(props: FrameAnnotationCreationCo
     null
   );
   const activeMenu = controlledActiveMenu === undefined ? internalActiveMenu : controlledActiveMenu;
-  const standalone = useStandaloneCreationSelection(props.onStandaloneCreationChange);
-  const { tool: standaloneTool, select: selectStandalone } = standalone;
+  const standalone = useStandaloneCreationSelection(props);
   const supportsStandalone = props.onStandaloneCreationChange !== undefined;
   const standaloneActive = !frameActive && supportsStandalone;
 
@@ -75,10 +76,10 @@ export function FrameAnnotationCreationControls(props: FrameAnnotationCreationCo
     props.onChange({ ...props.settings, ...patch });
     if (
       !frameActive &&
-      ((standaloneTool === 'callout' && patch.callout === null) ||
-        (standaloneTool === 'step-badge' && patch.stepBadge === null))
+      ((standalone.tool === 'callout' && patch.callout === null) ||
+        (standalone.tool === 'step-badge' && patch.stepBadge === null))
     )
-      selectStandalone(null);
+      standalone.select(null);
   };
   const setActiveMenu = (menu: FrameAnnotationCreationMenu | null) => {
     if (props.activeMenu === undefined) setInternalActiveMenu(menu);
@@ -114,13 +115,13 @@ export function FrameAnnotationCreationControls(props: FrameAnnotationCreationCo
   const toggleCallout = () => {
     if (standaloneActive) {
       if (!props.settings.callout) update({ callout: createCallout() });
-      selectStandalone(standaloneTool === 'callout' ? null : 'callout');
+      standalone.select(standalone.tool === 'callout' ? null : 'callout');
     } else update({ callout: toggleCreationAnnotation(props.settings.callout, createCallout) });
   };
   const toggleStepBadge = () => {
     if (standaloneActive) {
       if (!props.settings.stepBadge) update({ stepBadge: createStepBadge() });
-      selectStandalone(standaloneTool === 'step-badge' ? null : 'step-badge');
+      standalone.select(standalone.tool === 'step-badge' ? null : 'step-badge');
     } else
       update({ stepBadge: toggleCreationAnnotation(props.settings.stepBadge, createStepBadge) });
   };
@@ -156,10 +157,11 @@ export function FrameAnnotationCreationControls(props: FrameAnnotationCreationCo
       <AnnotationCreationButtons
         {...(standaloneActive
           ? {
-              calloutActive: standaloneTool === 'callout',
-              stepBadgeActive: standaloneTool === 'step-badge',
+              calloutActive: standalone.tool === 'callout',
+              stepBadgeActive: standalone.tool === 'step-badge',
             }
           : {})}
+        standalone={standaloneActive}
         grouped={props.groupAnnotations}
         renderControl={props.renderAnnotationControl}
         activeMenu={activeMenu}
@@ -214,14 +216,20 @@ function toggleCreationAnnotation<T extends { enabled?: boolean }>(
   return current ? { ...current, enabled: true } : create();
 }
 
-function useStandaloneCreationSelection(
-  onChange: FrameAnnotationCreationControlsProps['onStandaloneCreationChange']
-) {
-  const [tool, setTool] = useState<StandaloneAnnotationCreationOptions['annotationKind'] | null>(
-    null
-  );
+function useStandaloneCreationSelection({
+  onStandaloneCreationChange: onChange,
+  standaloneTool: controlledTool,
+  allowElementPlacement = true,
+}: Pick<
+  FrameAnnotationCreationControlsProps,
+  'onStandaloneCreationChange' | 'standaloneTool' | 'allowElementPlacement'
+>) {
+  const [internalTool, setTool] = useState<
+    StandaloneAnnotationCreationOptions['annotationKind'] | null
+  >(null);
+  const tool = controlledTool === undefined ? internalTool : controlledTool;
   const [placement, setPlacement] =
-    useState<StandaloneAnnotationCreationOptions['placement']>('element');
+    useState<StandaloneAnnotationCreationOptions['placement']>('free');
   return {
     tool,
     reset: () => setTool(null),
@@ -230,6 +238,7 @@ function useStandaloneCreationSelection(
       onChange?.(next ? { annotationKind: next, placement } : null);
     },
     placementControl: {
+      allowElementPlacement,
       value: placement,
       onChange: (value: StandaloneAnnotationCreationOptions['placement']) => {
         setPlacement(value);
