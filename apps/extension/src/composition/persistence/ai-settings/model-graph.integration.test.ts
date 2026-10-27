@@ -630,3 +630,18 @@ it('refuses stale queued creation after deletion and accepts a fresh same-ID ret
   });
   expect(models()).toEqual([model]);
 });
+
+it('ignores an obsolete dangling global selection during current graph mutations', async () => {
+  storage.state.local['sniptale_ai_default_model'] = 'retired-missing-model';
+  const next = {
+    id: 'manual-current',
+    providerId: provider.id,
+    modelCode: 'manual-current',
+    displayName: 'Current',
+  };
+  await mutateStoredAISettings({ operation: 'add-model', model: next });
+  expect(parseStoredAIModels(storage.state.local[AI_MODELS_KEY]).value).toContainEqual(next);
+  await mutateStoredAISettings({ operation: 'delete-model', modelId: next.id });
+  expect(parseStoredAIModels(storage.state.local[AI_MODELS_KEY]).value).not.toContainEqual(next);
+  expect(storage.state.local['sniptale_ai_default_model']).toBe('retired-missing-model');
+});

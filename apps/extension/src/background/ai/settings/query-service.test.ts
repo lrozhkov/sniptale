@@ -81,7 +81,6 @@ it('returns sanitized model selection bootstrap without provider base URLs', asy
   ).resolves.toEqual({
     modelSelection: {
       chromeAiEnabled: false,
-      defaultModelId: 'model-1',
       globalSystemPrompt: 'Global prompt',
       models: [
         expect.objectContaining({

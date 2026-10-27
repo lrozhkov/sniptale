@@ -6,11 +6,9 @@ import {
 import { supportsAIScenarioModel } from '../../contracts/settings/model-operation';
 import { resolveAIScenarioModel } from '../../features/ai/selection';
 import {
-  isChromeAiModelId,
   mergeChromeAiProviderSelectorEntries,
   mergeChromeAiSelectorEntries,
 } from '../../features/ai/chrome/constants';
-import { resolveSelectedAIModelId } from '../../features/ai/selection';
 import { loadChromeAiAvailability } from '@sniptale/platform/browser/chrome-ai';
 import type {
   AISettingsPageRuntimeDataPayload,
@@ -48,12 +46,7 @@ async function mergeSettingsPageModelSelection(
   selection: AISettingsPageModelSelectionBootstrapPayload
 ): Promise<AISettingsPageModelSelectionBootstrapPayload> {
   if (!(await canUseChromeAi(selection.chromeAiEnabled))) {
-    return {
-      ...selection,
-      defaultModelId: isChromeAiModelId(selection.defaultModelId)
-        ? resolveSelectedAIModelId(selection.models, null)
-        : selection.defaultModelId,
-    };
+    return selection;
   }
 
   const merged = mergeChromeAiSelectorEntries({

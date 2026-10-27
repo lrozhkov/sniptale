@@ -103,7 +103,6 @@ export const AISettingsSchema = z.object({
   chromeAiEnabled: z.boolean(),
   providers: z.array(AIProviderSchema),
   models: z.array(AIModelSchema),
-  defaultModelId: z.string().min(1).nullable(),
   globalSystemPrompt: z
     .string()
     .max(50000, schemaMessageKey('validation.schemas.max50000Characters')),

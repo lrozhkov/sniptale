@@ -191,7 +191,7 @@ async function verifyVersionedSkip() {
   expect(localState[AI_STORAGE_MIGRATION_PHASE_KEY]).toBe(AI_PROVIDER_STORAGE_MIGRATION_PHASE);
 }
 
-async function verifyLocalOnlyDefaultStorage() {
+async function verifyLocalOnlyPromptStorage() {
   installStorageState({
     local: {
       [AI_STORAGE_VERSION_KEY]: AI_STORAGE_VERSION,
@@ -202,33 +202,26 @@ async function verifyLocalOnlyDefaultStorage() {
   });
 
   const {
-    loadDefaultModelId,
     loadGlobalSystemPrompt,
     loadScenarioEditorSystemPrompt,
     resetGlobalSystemPrompt,
     resetScenarioEditorSystemPrompt,
-    saveDefaultModelId,
     saveGlobalSystemPrompt,
     saveScenarioEditorSystemPrompt,
   } = await import('./core');
 
-  await expect(loadDefaultModelId()).resolves.toBe('model-42');
   await expect(loadGlobalSystemPrompt()).resolves.toBe('Prompt text');
   await expect(loadScenarioEditorSystemPrompt()).resolves.toBe('Scenario prompt');
 
-  await saveDefaultModelId('model-99');
   await saveGlobalSystemPrompt('Updated prompt');
   await saveScenarioEditorSystemPrompt('Updated scenario prompt');
   await resetGlobalSystemPrompt();
   await resetScenarioEditorSystemPrompt();
 
   expect(localSetMock).toHaveBeenNthCalledWith(1, {
-    sniptale_ai_default_model: 'model-99',
-  });
-  expect(localSetMock).toHaveBeenNthCalledWith(2, {
     sniptale_ai_global_prompt: 'Updated prompt',
   });
-  expect(localSetMock).toHaveBeenNthCalledWith(3, {
+  expect(localSetMock).toHaveBeenNthCalledWith(2, {
     sniptale_ai_scenario_editor_prompt: 'Updated scenario prompt',
   });
   expect(syncSetMock).not.toHaveBeenCalled();
@@ -254,17 +247,11 @@ async function verifyInvalidStoredValuesFallback() {
     },
   });
 
-  const {
-    loadAIModels,
-    loadAIProviders,
-    loadDefaultModelId,
-    loadGlobalSystemPrompt,
-    loadScenarioEditorSystemPrompt,
-  } = await import('./core');
+  const { loadAIModels, loadAIProviders, loadGlobalSystemPrompt, loadScenarioEditorSystemPrompt } =
+    await import('./core');
 
   await expect(loadAIProviders()).resolves.toEqual([createStoredProvider('provider-1')]);
   await expect(loadAIModels()).resolves.toEqual([]);
-  await expect(loadDefaultModelId()).resolves.toBeNull();
   await expect(loadGlobalSystemPrompt()).resolves.toBe(DEFAULT_GLOBAL_SYSTEM_PROMPT);
   await expect(loadScenarioEditorSystemPrompt()).resolves.toBe(
     DEFAULT_SCENARIO_EDITOR_SYSTEM_PROMPT
@@ -289,7 +276,7 @@ describe('ai/core', () => {
 
   it('resets legacy AI state once and records the storage version', verifyOneTimeReset);
   it('skips the reset path when the version marker already exists', verifyVersionedSkip);
-  it('keeps default model and prompt storage local-only', verifyLocalOnlyDefaultStorage);
+  it('keeps default model and prompt storage local-only', verifyLocalOnlyPromptStorage);
   it(
     'drops invalid stored AI values and falls back on invalid scalar roots',
     verifyInvalidStoredValuesFallback

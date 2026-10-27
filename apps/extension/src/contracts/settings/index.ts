@@ -324,7 +324,6 @@ export interface AISettings {
   chromeAiEnabled: boolean;
   providers: AIProvider[];
   models: AIModel[];
-  defaultModelId: string | null;
   globalSystemPrompt: string;
   scenarioEditorSystemPrompt: string;
   audioTranscriptionSystemPrompt?: string;

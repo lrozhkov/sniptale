@@ -27,7 +27,6 @@ import {
   loadAISecretProtectionStatus as loadUnserializedAISecretProtectionStatus,
   loadAIModels,
   loadAIProviders,
-  loadDefaultModelId,
   lockAISecretProtection,
   resetAudioTranscriptionSystemPrompt,
   saveAudioTranscriptionSystemPrompt,
@@ -37,9 +36,7 @@ import {
   resetAISecretPassphraseProtection,
   resetScenarioEditorSystemPrompt,
   saveAIModels,
-  saveAIModelGraph,
   saveChromeAiEnabled,
-  saveDefaultModelId,
   saveGlobalSystemPrompt,
   saveScenarioEditorSystemPrompt,
   unlockAISecretProtection,
@@ -210,20 +207,13 @@ async function updateModel(
     models,
     provider
   );
-  const defaultModelId = await loadDefaultModelId();
-  await saveAIModelGraph(
-    nextModels,
-    defaultModelId === model.id && getAIModelOperation(model) !== 'text' ? null : defaultModelId,
-    permit
-  );
+  await saveAIModels(nextModels, permit);
 }
 
 async function deleteModel(modelId: string, permit: PersistenceMutationPermit): Promise<void> {
   const models = await loadAIModels();
-  const defaultModelId = await loadDefaultModelId();
-  await saveAIModelGraph(
+  await saveAIModels(
     models.filter((model) => model.id !== modelId),
-    defaultModelId === modelId ? null : defaultModelId,
     permit
   );
 }
@@ -253,18 +243,6 @@ async function moveModel(
   nextModels.splice(targetIndex, 0, source);
   if (nextModels.every((model, index) => model.id === models[index]?.id)) return;
   await saveAIModels(nextModels, permit);
-}
-
-async function saveDefaultModel(defaultModelId: string | null): Promise<void> {
-  if (defaultModelId) {
-    const models = await loadAIModels();
-    if (
-      !models.some((model) => model.id === defaultModelId && getAIModelOperation(model) === 'text')
-    ) {
-      throw new Error(`Default AI model ${defaultModelId} not found`);
-    }
-  }
-  await saveDefaultModelId(defaultModelId);
 }
 
 type GraphCommand = Extract<
@@ -345,8 +323,6 @@ async function applyAISettingsMutation(
       return runWithExclusivePersistenceMutationPermit((permit) =>
         setStoredAIProviderEnabled(command, permit)
       );
-    case 'save-default-model':
-      return saveDefaultModel(command.defaultModelId);
     case 'save-voice-input-correction-prompt':
       return saveVoiceInputCorrectionSystemPrompt(command.prompt);
     case 'reset-voice-input-correction-prompt':

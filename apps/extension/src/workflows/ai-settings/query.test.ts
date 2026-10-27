@@ -40,7 +40,6 @@ function mockScenarioCatalog(chromeAiEnabled = false) {
           success: true,
           modelSelection: {
             chromeAiEnabled,
-            defaultModelId: null,
             globalSystemPrompt: 'Prompt',
             models: [{ displayName: 'Model', id: 'model-1', modelCode: 'm', providerId: 'p' }],
             providers: [
@@ -127,7 +126,6 @@ it('keeps full provider metadata scoped to settings page runtime data', async ()
       secretProtectionStatus: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
       selectionBootstrap: {
         chromeAiEnabled: false,
-        defaultModelId: null,
         globalSystemPrompt: '',
         models: [],
         providers: [
@@ -238,7 +236,6 @@ it('resolves a first-use scenario candidate without inheriting or writing the gl
           success: true,
           modelSelection: {
             chromeAiEnabled: false,
-            defaultModelId: 'b-model',
             globalSystemPrompt: 'Retained global system prompt',
             models,
             providers: [
@@ -299,7 +296,6 @@ it('does not silently replace a retired remembered model in another scenario', a
           success: true,
           modelSelection: {
             chromeAiEnabled: false,
-            defaultModelId: 'replacement',
             globalSystemPrompt: '',
             models: [
               {

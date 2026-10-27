@@ -100,7 +100,6 @@ function expectParsedSanitizedModelSelection() {
     aiSettingsQueryResponseSchema.parse({
       modelSelection: {
         chromeAiEnabled: false,
-        defaultModelId: '00000000-0000-4000-8000-000000000001',
         globalSystemPrompt: 'Prompt',
         models: [
           {
@@ -131,7 +130,6 @@ function expectRejectsProviderBaseUrlLeak() {
     aiSettingsQueryResponseSchema.parse({
       modelSelection: {
         chromeAiEnabled: false,
-        defaultModelId: null,
         globalSystemPrompt: '',
         models: [],
         providers: [
@@ -167,7 +165,7 @@ it('rejects removed default-model capability messages', () => {
       operation: 'save-default-model',
       type: MessageType.AI_SETTINGS_MUTATION,
     })
-  ).toThrow(/capabilityToken/);
+  ).toThrow();
 });
 
 it('accepts bounded model reorder commands and rejects extra fields', () => {
@@ -343,3 +341,28 @@ it.each(['add-model', 'update-model'])(
     ).toBe(true);
   }
 );
+
+it('rejects the retired global-model writer without a compatibility capability', () => {
+  expect(
+    aiSettingsMutationMessageSchema.safeParse({
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'save-default-model',
+      defaultModelId: null,
+    }).success
+  ).toBe(false);
+});
+
+it('rejects retired global selection metadata in current catalog responses', () => {
+  expect(
+    aiSettingsQueryResponseSchema.safeParse({
+      success: true,
+      modelSelection: {
+        chromeAiEnabled: false,
+        globalSystemPrompt: '',
+        models: [],
+        providers: [],
+        defaultModelId: null,
+      },
+    }).success
+  ).toBe(false);
+});

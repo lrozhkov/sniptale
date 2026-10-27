@@ -5,19 +5,13 @@ import {
 } from '../infrastructure/mutation-barrier';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import {
-  parseStoredAIModels,
-  parseStoredChromeAiEnabled,
-  parseStoredDefaultModelId,
-  parseStoredSystemPrompt,
-} from './guards';
+import { parseStoredAIModels, parseStoredChromeAiEnabled, parseStoredSystemPrompt } from './guards';
 import {
   AI_AUDIO_TRANSCRIPTION_PROMPT_KEY,
   AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
   DEFAULT_VOICE_INPUT_CORRECTION_SYSTEM_PROMPT,
   DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT,
   AI_CHROME_ENABLED_KEY,
-  AI_DEFAULT_MODEL_KEY,
   AI_GLOBAL_PROMPT_KEY,
   AI_MODELS_KEY,
   AI_PROVIDERS_KEY,
@@ -97,22 +91,15 @@ export async function deleteAIProviderGraphRecord(
   permit?: PersistenceMutationPermit
 ): Promise<void> {
   await initializeAiStorageAccess();
-  const [providers, secrets, models, defaultModelId] = await Promise.all([
+  const [providers, secrets, models] = await Promise.all([
     readStoredProviderMetadata(),
     readStoredProviderSecrets(),
     loadAIModels(),
-    loadDefaultModelId(),
   ]);
-  const deletedModelIds = new Set(
-    models.filter((model) => model.providerId === providerId).map((model) => model.id)
-  );
   const nextModels = models.filter((model) => model.providerId !== providerId);
-  const nextDefaultModelId =
-    defaultModelId && deletedModelIds.has(defaultModelId) ? null : defaultModelId;
   const { [providerId]: _removedSecret, ...remainingSecrets } = secrets;
 
   const payload = {
-    [AI_DEFAULT_MODEL_KEY]: nextDefaultModelId,
     [AI_MODELS_KEY]: nextModels,
     [AI_PROVIDERS_KEY]: providers.filter((provider) => provider.id !== providerId),
     [AI_PROVIDER_SECRETS_KEY]: remainingSecrets,
@@ -191,35 +178,9 @@ export async function saveAIModels(
   return saveLocalValue(AI_MODELS_KEY, models, `AI models saved: ${models.length}`, permit);
 }
 
-/** Publishes models and their default reference together under an active caller permit or independent write. */
-export async function saveAIModelGraph(
-  models: AIModel[],
-  defaultModelId: string | null,
-  permit?: PersistenceMutationPermit
-): Promise<void> {
-  if (!isActivePersistenceMutationPermit(permit)) await initializeAiStorageAccess();
-  const values = { [AI_DEFAULT_MODEL_KEY]: defaultModelId, [AI_MODELS_KEY]: models };
-  if (isActivePersistenceMutationPermit(permit)) await browserStorage.local.set(values, permit);
-  else await browserStorage.local.set(values);
-}
-
-export async function loadDefaultModelId(): Promise<string | null> {
-  const result = await browserStorage.local.get([AI_DEFAULT_MODEL_KEY]);
-  return parseStoredDefaultModelId(result[AI_DEFAULT_MODEL_KEY]);
-}
-
 export async function loadChromeAiEnabled(): Promise<boolean> {
   const result = await browserStorage.local.get([AI_CHROME_ENABLED_KEY]);
   return parseStoredChromeAiEnabled(result[AI_CHROME_ENABLED_KEY]);
-}
-
-export async function saveDefaultModelId(modelId: string | null): Promise<void> {
-  await initializeAiStorageAccess();
-  return saveLocalValue(
-    AI_DEFAULT_MODEL_KEY,
-    modelId,
-    `Default model ID saved: ${String(modelId)}`
-  );
 }
 
 export async function saveChromeAiEnabled(enabled: boolean): Promise<void> {

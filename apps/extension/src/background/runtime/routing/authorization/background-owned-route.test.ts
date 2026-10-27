@@ -64,9 +64,9 @@ it('preauthorizes AI settings mutations only from the settings page', () => {
     prompt: 'Prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   };
-  const defaultModelMessage = {
-    defaultModelId: 'model-1',
-    operation: 'save-default-model',
+  const scenarioPromptMessage = {
+    prompt: 'Scenario prompt',
+    operation: 'save-scenario-editor-prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   };
 
@@ -82,11 +82,11 @@ it('preauthorizes AI settings mutations only from the settings page', () => {
   expect(
     authorizeIPCMessage({
       kind: 'background-owned',
-      message: defaultModelMessage,
+      message: scenarioPromptMessage,
       sender: sender({ url: SETTINGS_URL }),
     })
   ).toEqual({ authorized: true });
-  expect(hasPreauthorizedAiSettingsMutationMessage(defaultModelMessage)).toBe(true);
+  expect(hasPreauthorizedAiSettingsMutationMessage(scenarioPromptMessage)).toBe(true);
 });
 
 it('authorizes read-only AI settings queries without granting mutation authority', () => {
@@ -112,18 +112,18 @@ it('authorizes read-only AI settings queries without granting mutation authority
   expect(hasPreauthorizedAiSettingsMutationMessage(queryMessage)).toBe(false);
 });
 
-it('rejects content AI default-model mutation and capability requests', () => {
+it('rejects content AI scenario-prompt mutation and capability requests', () => {
   const contentSender = sender({ tabId: 7, url: CONTENT_URL });
-  const defaultModelMessage = {
-    defaultModelId: 'model-1',
-    operation: 'save-default-model',
+  const scenarioPromptMessage = {
+    prompt: 'Scenario prompt',
+    operation: 'save-scenario-editor-prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   };
 
   expect(
     authorizeIPCMessage({
       kind: 'background-owned',
-      message: defaultModelMessage,
+      message: scenarioPromptMessage,
       sender: contentSender,
     })
   ).toEqual({ authorized: false, reason: 'Unauthorized AI settings mutation sender' });

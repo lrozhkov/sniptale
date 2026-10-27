@@ -5,7 +5,6 @@ export {
   loadAIModels,
   loadAIProviders,
   loadChromeAiEnabled,
-  loadDefaultModelId,
   loadGlobalSystemPrompt,
   loadScenarioEditorSystemPrompt,
   resetGlobalSystemPrompt,

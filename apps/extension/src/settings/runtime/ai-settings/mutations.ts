@@ -97,13 +97,6 @@ export function moveAIModel(modelId: string, beforeModelId: string | null): Prom
   );
 }
 
-export function saveDefaultModelId(defaultModelId: string | null): Promise<void> {
-  return sendAiSettingsMutation({
-    defaultModelId,
-    operation: 'save-default-model',
-  }).then(() => undefined);
-}
-
 export function saveGlobalSystemPrompt(prompt: string): Promise<void> {
   return sendAiSettingsMutation({ operation: 'save-global-prompt', prompt }).then(() => undefined);
 }

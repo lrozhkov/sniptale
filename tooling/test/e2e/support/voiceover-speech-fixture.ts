@@ -20,7 +20,6 @@ export const speechModelResponse = aiSettingsQueryResponseSchema.parse({
   success: true,
   modelSelection: {
     chromeAiEnabled: false,
-    defaultModelId: null,
     globalSystemPrompt: '',
     providers: [
       {

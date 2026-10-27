@@ -22,7 +22,6 @@ export type AISettingsMutationCommand =
     }
   | { operation: 'delete-model'; modelId: string }
   | { operation: 'move-model'; modelId: string; beforeModelId: string | null }
-  | { operation: 'save-default-model'; defaultModelId: string | null }
   | {
       operation:
         | 'save-global-prompt'

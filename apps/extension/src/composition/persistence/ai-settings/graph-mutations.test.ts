@@ -14,13 +14,10 @@ const coreMocks = vi.hoisted(() => ({
   loadAISecretProtectionStatus: vi.fn(),
   loadAIModels: vi.fn(),
   loadAIProviders: vi.fn(),
-  loadDefaultModelId: vi.fn(),
   lockAISecretProtection: vi.fn(),
   resetAISecretPassphraseProtection: vi.fn(),
   saveAIModels: vi.fn(),
-  saveAIModelGraph: vi.fn(),
   saveChromeAiEnabled: vi.fn(),
-  saveDefaultModelId: vi.fn(),
   saveGlobalSystemPrompt: vi.fn(),
   saveScenarioEditorSystemPrompt: vi.fn(),
   unlockAISecretProtection: vi.fn(),
@@ -39,7 +36,6 @@ vi.mock('./init', async (importOriginal) => ({
 
 import { mutateStoredAISettings, resetAISettingsMutationQueueForTests } from './graph-mutations';
 
-let defaultModelId: string | null = null;
 let models: AIModel[] = [];
 let providers: AIProvider[] = [];
 
@@ -72,18 +68,8 @@ function createModel(id: string, providerId = 'provider-1'): AIModel {
 function installStatefulCoreMocks(): void {
   coreMocks.loadAIModels.mockImplementation(async () => [...models]);
   coreMocks.loadAIProviders.mockImplementation(async () => [...providers]);
-  coreMocks.loadDefaultModelId.mockImplementation(async () => defaultModelId);
   coreMocks.saveAIModels.mockImplementation(async (nextModels: AIModel[]) => {
     models = nextModels;
-  });
-  coreMocks.saveAIModelGraph.mockImplementation(
-    async (nextModels: AIModel[], nextDefaultModelId: string | null) => {
-      models = nextModels;
-      defaultModelId = nextDefaultModelId;
-    }
-  );
-  coreMocks.saveDefaultModelId.mockImplementation(async (nextDefaultModelId: string | null) => {
-    defaultModelId = nextDefaultModelId;
   });
   coreMocks.upsertAIProviderRecord.mockImplementation(async (input) => {
     const nextProvider = createProvider(input.id);
@@ -97,14 +83,8 @@ function installStatefulCoreMocks(): void {
     );
   });
   coreMocks.deleteAIProviderGraphRecord.mockImplementation(async (providerId: string) => {
-    const deletedModelIds = new Set(
-      models.filter((model) => model.providerId === providerId).map(({ id }) => id)
-    );
     providers = providers.filter(({ id }) => id !== providerId);
     models = models.filter((model) => model.providerId !== providerId);
-    if (defaultModelId && deletedModelIds.has(defaultModelId)) {
-      defaultModelId = null;
-    }
   });
 }
 
@@ -113,7 +93,6 @@ beforeEach(() => {
   resetAISettingsMutationQueueForTests();
   providers = [createProvider()];
   models = [];
-  defaultModelId = null;
   initializeAiStorageAccessMock.mockResolvedValue(undefined);
   invariantMock.mockResolvedValue(undefined);
   installStatefulCoreMocks();
@@ -196,38 +175,14 @@ it('preserves unknown stored model fields during compatible updates', async () =
   });
 });
 
-it('updates models and default model in one graph write when deleting the default', async () => {
+it('deletes only the requested model through the active graph permit', async () => {
   models = [createModel('model-1'), createModel('model-2')];
-  defaultModelId = 'model-1';
-
   await mutateStoredAISettings({ modelId: 'model-1', operation: 'delete-model' });
-
-  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith(
-    [createModel('model-2')],
-    null,
-    expect.anything()
-  );
+  expect(coreMocks.saveAIModels).toHaveBeenCalledWith([createModel('model-2')], expect.anything());
   expect(models).toEqual([createModel('model-2')]);
-  expect(defaultModelId).toBeNull();
 });
 
-it('preserves an unrelated default and accepts valid default changes', async () => {
-  models = [createModel('model-1'), createModel('model-2')];
-  defaultModelId = 'model-2';
-
-  await mutateStoredAISettings({ modelId: 'model-1', operation: 'delete-model' });
-  await mutateStoredAISettings({ defaultModelId: 'model-2', operation: 'save-default-model' });
-  await mutateStoredAISettings({ defaultModelId: null, operation: 'save-default-model' });
-
-  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith(
-    [createModel('model-2')],
-    'model-2',
-    expect.anything()
-  );
-  expect(defaultModelId).toBeNull();
-});
-
-it('validates provider and default-model commands before writing', async () => {
+it('validates provider commands before writing', async () => {
   const secret = 'provider-secret-value';
   await expect(
     mutateStoredAISettings({
@@ -235,9 +190,6 @@ it('validates provider and default-model commands before writing', async () => {
       provider: createProviderInput('provider-1', secret),
     })
   ).rejects.toThrow('Provider provider-1 already exists');
-  await expect(
-    mutateStoredAISettings({ defaultModelId: 'missing-model', operation: 'save-default-model' })
-  ).rejects.toThrow('Default AI model missing-model not found');
 
   expect(coreMocks.upsertAIProviderRecord).not.toHaveBeenCalled();
   await expect(
@@ -286,7 +238,6 @@ it('clears provider secrets only for existing providers and deletes their graph'
 
 it('cascades provider deletion and keeps the queue usable after a rejected write', async () => {
   models = [createModel('model-1')];
-  defaultModelId = 'model-1';
   coreMocks.deleteAIProviderGraphRecord.mockRejectedValueOnce(new Error('graph write failed'));
 
   await expect(
@@ -295,23 +246,17 @@ it('cascades provider deletion and keeps the queue usable after a rejected write
   await mutateStoredAISettings({ modelId: 'model-1', operation: 'delete-model' });
 
   expect(models).toEqual([]);
-  expect(defaultModelId).toBeNull();
 });
 
-it('atomically removes the text default and prompt when changing its operation to speech', async () => {
+it('removes the text-only prompt when changing a model operation to speech', async () => {
   models = [{ ...createModel('model-1'), systemPrompt: 'Text-only prompt' }];
-  defaultModelId = 'model-1';
   const speech: AIModel = {
     ...createModel('model-1'),
     operation: 'speech',
     audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
   };
   await mutateStoredAISettings({ operation: 'update-model', model: speech });
-  expect(coreMocks.saveAIModelGraph).toHaveBeenCalledWith([speech], null, expect.anything());
-  expect(defaultModelId).toBeNull();
-  await expect(
-    mutateStoredAISettings({ operation: 'save-default-model', defaultModelId: 'model-1' })
-  ).rejects.toThrow();
+  expect(coreMocks.saveAIModels).toHaveBeenCalledWith([speech], expect.anything());
   await mutateStoredAISettings({ operation: 'update-model', model: createModel('model-1') });
   expect(models).toEqual([createModel('model-1')]);
 });

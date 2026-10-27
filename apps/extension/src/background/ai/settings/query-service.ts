@@ -6,7 +6,6 @@ import {
   loadAIProviders,
   loadAISecretProtectionStatus,
   loadChromeAiEnabled,
-  loadDefaultModelId,
   loadGlobalSystemPrompt,
   loadScenarioEditorSystemPrompt,
   initializeAiStorageAccess,
@@ -53,24 +52,20 @@ async function createProviderSelectorEntry(provider: AIProvider): Promise<AIProv
 
 async function loadStoredModelSelection(): Promise<{
   chromeAiEnabled: boolean;
-  defaultModelId: string | null;
   globalSystemPrompt: string;
   models: AIModel[];
   providers: AIProvider[];
 }> {
   await initializeAiStorageAccess();
-  const [models, providers, chromeAiEnabled, defaultModelId, globalSystemPrompt] =
-    await Promise.all([
-      loadAIModels(),
-      loadAIProviders(),
-      loadChromeAiEnabled(),
-      loadDefaultModelId(),
-      loadGlobalSystemPrompt(),
-    ]);
+  const [models, providers, chromeAiEnabled, globalSystemPrompt] = await Promise.all([
+    loadAIModels(),
+    loadAIProviders(),
+    loadChromeAiEnabled(),
+    loadGlobalSystemPrompt(),
+  ]);
 
   return {
     chromeAiEnabled,
-    defaultModelId,
     globalSystemPrompt: globalSystemPrompt ?? '',
     models,
     providers,

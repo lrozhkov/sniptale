@@ -57,7 +57,6 @@ const rememberSelectionSchema = z
     source: z.enum(['explicit', 'initial']),
   })
   .strict();
-const defaultModelIdSchema = aiRecordIdSchema.nullable();
 const passphraseSchema = z.string().min(1).max(10000);
 const aiProviderSelectorEntrySchema = AIProviderSchema.omit({ baseUrl: true })
   .extend({
@@ -69,7 +68,6 @@ const aiProviderSelectorEntrySchema = AIProviderSchema.omit({ baseUrl: true })
 const aiModelSelectionBootstrapSchema = z
   .object({
     chromeAiEnabled: z.boolean(),
-    defaultModelId: defaultModelIdSchema,
     globalSystemPrompt: z.string(),
     models: z.array(AIModelSchema.strict()),
     providers: z.array(aiProviderSelectorEntrySchema),
@@ -166,12 +164,6 @@ export const aiSettingsMutationMessageSchema = defineAiSettingsMutationMessageSc
         beforeModelId: aiRecordIdSchema.nullable(),
         modelId: aiRecordIdSchema,
         operation: z.literal('move-model'),
-      })
-      .strict(),
-    baseMutationSchema
-      .extend({
-        defaultModelId: defaultModelIdSchema,
-        operation: z.literal('save-default-model'),
       })
       .strict(),
     baseMutationSchema

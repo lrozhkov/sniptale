@@ -4,7 +4,6 @@ import {
   parseStoredAIModels,
   parseStoredChromeAiEnabled,
   parseStoredAIProviders,
-  parseStoredDefaultModelId,
   parseStoredProviderSecretMap,
   parseStoredSystemPrompt,
 } from './guards';
@@ -78,8 +77,6 @@ describe('ai storage guards list parsing', () => {
 
 describe('ai storage guards scalar parsing', () => {
   it('parses scalar storage values', () => {
-    expect(parseStoredDefaultModelId('model-1')).toBe('model-1');
-    expect(parseStoredDefaultModelId(42)).toBeNull();
     expect(parseStoredChromeAiEnabled(true)).toBe(true);
     expect(parseStoredChromeAiEnabled('true')).toBe(false);
     expect(parseStoredSystemPrompt(undefined, 'fallback')).toBe('fallback');

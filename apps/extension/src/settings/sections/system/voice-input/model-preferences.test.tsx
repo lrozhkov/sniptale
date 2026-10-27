@@ -14,7 +14,6 @@ vi.mock('../../../../features/ai/model-selector', () => ({
 }));
 const empty = {
   chromeAiEnabled: false,
-  defaultModelId: null,
   globalSystemPrompt: '',
   models: [],
   providers: [],

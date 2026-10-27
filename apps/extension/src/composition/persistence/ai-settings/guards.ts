@@ -98,10 +98,6 @@ export function parseStoredAIModels(value: unknown): ParsedStoredListValue<AIMod
   return parseStoredList(value, isAIModel);
 }
 
-export function parseStoredDefaultModelId(value: unknown): string | null {
-  return value === null || isString(value) ? value : null;
-}
-
 export function parseStoredChromeAiEnabled(value: unknown): boolean {
   return isBoolean(value) ? value : false;
 }

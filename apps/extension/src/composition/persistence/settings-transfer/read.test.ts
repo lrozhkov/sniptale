@@ -150,7 +150,6 @@ beforeEach(() => {
         authorization: 'canary-secret',
       },
     ],
-    defaultModelId: 'model-a',
     chromeAiEnabled: true,
     globalSystemPrompt: 'Global',
     scenarioEditorSystemPrompt: 'Scenario',
@@ -758,7 +757,6 @@ it('exports configured model properties and audio without catalog cache or desti
   mocks.ai.mockResolvedValue({
     ...current,
     models: [model],
-    defaultModelId: null,
     providers: current.providers.map((provider: { id: string }) => ({
       ...provider,
       management: 'manual',

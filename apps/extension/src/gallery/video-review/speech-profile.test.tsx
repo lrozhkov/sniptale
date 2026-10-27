@@ -48,9 +48,6 @@ it('uses the current transcription selector through loading, selection, clear an
     );
     speech.catalogs = {
       transcription: {
-        chromeAiEnabled: false,
-        defaultModelId: 'model',
-        globalSystemPrompt: '',
         models: [
           { id: 'model', modelCode: 'fixture', displayName: 'Model', providerId: 'provider' },
         ],

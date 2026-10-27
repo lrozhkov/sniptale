@@ -31,7 +31,6 @@ export type AIModelCatalogPayload = {
 
 export type AIModelSelectionBootstrapPayload = AIModelCatalogPayload & {
   chromeAiEnabled: boolean;
-  defaultModelId: string | null;
   globalSystemPrompt: string;
 };
 
@@ -110,7 +109,6 @@ type AiSettingsMutationOperation =
   | 'update-model'
   | 'delete-model'
   | 'move-model'
-  | 'save-default-model'
   | 'save-voice-input-correction-prompt'
   | 'reset-voice-input-correction-prompt'
   | 'save-audio-transcription-prompt'
@@ -157,9 +155,6 @@ export type AiSettingsMutationMessage =
   | (AiSettingsMutationBase<'move-model'> & {
       modelId: string;
       beforeModelId: string | null;
-    })
-  | (AiSettingsMutationBase<'save-default-model'> & {
-      defaultModelId: string | null;
     })
   | (AiSettingsMutationBase<
       | 'save-global-prompt'

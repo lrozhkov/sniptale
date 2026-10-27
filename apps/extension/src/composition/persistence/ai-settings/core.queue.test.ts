@@ -151,7 +151,7 @@ it('persists, loads, and deletes provider records through the low-level storage 
   ]);
 });
 
-it('deletes provider metadata, secrets, owned models, and default in one graph write', async () => {
+it('deletes provider metadata, secrets and owned models in one graph write', async () => {
   installStorageState({
     local: {
       [AI_DEFAULT_MODEL_KEY]: 'model-1',
@@ -175,14 +175,13 @@ it('deletes provider metadata, secrets, owned models, and default in one graph w
   await deleteAIProviderGraphRecord('provider-1');
 
   expect(localSetMock).toHaveBeenCalledWith({
-    [AI_DEFAULT_MODEL_KEY]: null,
     [AI_MODELS_KEY]: [createStoredModel('model-2', 'provider-2')],
     [AI_PROVIDERS_KEY]: [createStoredProvider('provider-2')],
     [AI_PROVIDER_SECRETS_KEY]: {
       'provider-2': createStoredSecretEnvelope('provider-2'),
     },
   });
-  expect(localState[AI_DEFAULT_MODEL_KEY]).toBeNull();
+  expect(localState[AI_DEFAULT_MODEL_KEY]).toBe('model-1');
   expect(localState[AI_MODELS_KEY]).toEqual([createStoredModel('model-2', 'provider-2')]);
   expect(localState[AI_PROVIDERS_KEY]).toEqual([createStoredProvider('provider-2')]);
   expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual({
@@ -191,7 +190,7 @@ it('deletes provider metadata, secrets, owned models, and default in one graph w
   expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBe('transparent-key-material');
 });
 
-it('preserves the default model when deleting a provider that does not own it', async () => {
+it('preserves obsolete global selection bytes when deleting an unrelated provider', async () => {
   installStorageState({
     local: {
       [AI_DEFAULT_MODEL_KEY]: 'model-2',
@@ -217,17 +216,12 @@ it('preserves the default model when deleting a provider that does not own it', 
   expect(localState[AI_MODELS_KEY]).toEqual([createStoredModel('model-2', 'provider-2')]);
 });
 
-it('writes model and default-model updates through one graph mutation', async () => {
-  const { saveAIModelGraph } = await import('./core');
+it('writes model records without publishing an obsolete global selection', async () => {
+  const { saveAIModels } = await import('./core');
   const nextModels = [createStoredModel('model-2', 'provider-2')];
-
-  await saveAIModelGraph(nextModels, 'model-2');
-
-  expect(localSetMock).toHaveBeenCalledWith({
-    [AI_DEFAULT_MODEL_KEY]: 'model-2',
-    [AI_MODELS_KEY]: nextModels,
-  });
-  expect(localState[AI_DEFAULT_MODEL_KEY]).toBe('model-2');
+  await saveAIModels(nextModels);
+  expect(localSetMock).toHaveBeenCalledWith({ [AI_MODELS_KEY]: nextModels });
+  expect(localState).not.toHaveProperty(AI_DEFAULT_MODEL_KEY);
   expect(localState[AI_MODELS_KEY]).toEqual(nextModels);
 });
 

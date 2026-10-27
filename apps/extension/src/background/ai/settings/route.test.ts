@@ -77,11 +77,11 @@ it('allows settings page AI mutations', async () => {
   expect(mutateAiSettingsMock).toHaveBeenCalledWith(message);
 });
 
-it('allows settings page default model persistence', async () => {
+it('allows settings page scenario prompt persistence', async () => {
   const sendResponse = vi.fn();
   const message = {
-    defaultModelId: 'model-1',
-    operation: 'save-default-model',
+    prompt: 'Scenario prompt',
+    operation: 'save-scenario-editor-prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   } as const;
 
@@ -99,7 +99,7 @@ it('allows settings page default model persistence', async () => {
   expect(mutateAiSettingsMock).toHaveBeenCalledWith(message);
 });
 
-it('rejects content senders for default model persistence', () => {
+it('rejects content senders for scenario prompt persistence', () => {
   const sendResponse = vi.fn();
   hasPreauthorizedAiSettingsMutationMessageMock.mockReturnValue(false);
   const sender = { tab: { id: 7 } as chrome.tabs.Tab, url: 'https://example.test/page' };
@@ -107,8 +107,8 @@ it('rejects content senders for default model persistence', () => {
   expect(
     routeAiSettingsMutationMessage(
       {
-        defaultModelId: 'model-1',
-        operation: 'save-default-model',
+        prompt: 'Scenario prompt',
+        operation: 'save-scenario-editor-prompt',
         type: MessageType.AI_SETTINGS_MUTATION,
       },
       sender,

@@ -38,7 +38,6 @@ vi.mock('../../../../../workflows/ai-settings/query', () => ({
   })),
   requestAIModelSelectionBootstrap: vi.fn(async () => ({
     chromeAiEnabled: false,
-    defaultModelId: null,
     globalSystemPrompt: '',
     models: [],
     providers: [],

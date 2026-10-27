@@ -40,41 +40,18 @@ describe('ProviderFormSchema', () => {
 });
 
 describe('AISettingsSchema', () => {
-  it('accepts boolean chrome-ai toggle state and non-uuid default ids for virtual models', () => {
-    const result = AISettingsSchema.safeParse({
+  it('accepts current settings without a global model selection', () => {
+    const settings = {
       chromeAiEnabled: true,
       providers: [],
       models: [],
-      defaultModelId: 'chrome-ai-google-model',
       globalSystemPrompt: 'Global prompt',
       scenarioEditorSystemPrompt: 'Scenario prompt',
-    });
-
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects empty-string default model ids while still allowing null', () => {
-    expect(
-      AISettingsSchema.safeParse({
-        chromeAiEnabled: false,
-        providers: [],
-        models: [],
-        defaultModelId: '',
-        globalSystemPrompt: 'Global prompt',
-        scenarioEditorSystemPrompt: 'Scenario prompt',
-      }).success
-    ).toBe(false);
-
-    expect(
-      AISettingsSchema.safeParse({
-        chromeAiEnabled: true,
-        providers: [],
-        models: [],
-        defaultModelId: null,
-        globalSystemPrompt: 'Global prompt',
-        scenarioEditorSystemPrompt: 'Scenario prompt',
-      }).success
-    ).toBe(true);
+    };
+    expect(AISettingsSchema.parse(settings)).toEqual(settings);
+    expect(AISettingsSchema.parse({ ...settings, defaultModelId: 'obsolete' })).not.toHaveProperty(
+      'defaultModelId'
+    );
   });
 });
 

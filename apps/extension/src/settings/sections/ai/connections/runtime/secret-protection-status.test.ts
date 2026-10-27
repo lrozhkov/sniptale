@@ -25,7 +25,6 @@ import {
   lockAISecretPassphraseProtection,
   resetAISecretPassphraseProtection,
   saveChromeAiEnabled,
-  saveDefaultModelId,
   saveGlobalSystemPrompt,
   saveScenarioEditorSystemPrompt,
   unlockAISecretPassphraseProtection,
@@ -101,16 +100,12 @@ it('routes provider, model, prompt, and default model mutations through the runt
   await addAIModel(model, 'incarnation');
   await updateAIModel(model, 'incarnation');
   await deleteAIModel('model-1');
-  await saveDefaultModelId('model-1');
   await saveGlobalSystemPrompt('global prompt');
   await saveScenarioEditorSystemPrompt('scenario prompt');
   await saveChromeAiEnabled(true);
 
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ operation: 'update-provider', provider })
-  );
-  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
-    expect.objectContaining({ operation: 'save-default-model', defaultModelId: 'model-1' })
   );
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ operation: 'save-chrome-ai-enabled', enabled: true })
