@@ -166,6 +166,7 @@ class ShimLauncherView {
           : 'light'
         : theme;
     this.elements.host.setAttribute('data-theme', resolvedTheme);
+    this.elements.group.dataset['hoverOnly'] = String(preferences.hoverOnly);
     this.elements.group.dataset['left'] = String(corner.endsWith('left'));
     this.elements.group.dataset['dragging'] = String(this.dragState.dragging);
     this.elements.group.style.cssText = '';

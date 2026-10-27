@@ -45,6 +45,10 @@ it('has one named native group, updates accepted corner and disposes without wri
   const host = document.getElementById('sniptale-page-launcher')!;
   expect(host.getAttribute('data-floating-ui-capture-transient')).toBe('true');
   const group = host.shadowRoot!.querySelector<HTMLElement>('.group')!;
+  expect(group.dataset['hoverOnly']).toBe(String(source.presentation.preferences.hoverOnly));
+  source.presentation.preferences.hoverOnly = !source.presentation.preferences.hoverOnly;
+  launcher.update(source);
+  expect(group.dataset['hoverOnly']).toBe(String(source.presentation.preferences.hoverOnly));
   expect(group.style.right).toBe('20px');
   source.presentation.preferences.corner = 'top-left';
   launcher.update(source);

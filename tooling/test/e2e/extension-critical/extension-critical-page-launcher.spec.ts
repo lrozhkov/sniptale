@@ -50,6 +50,19 @@ async function checkCornerGrip(
         );
       })
       .toBe(true);
+    if (prefix === 'shim') {
+      const viewport = page.viewportSize()!;
+      await page.mouse.move(viewport.width / 2, viewport.height / 2);
+      await expect(grip).toHaveCSS('opacity', '0');
+    }
+    if (prefix === 'shim-auto') {
+      const viewport = page.viewportSize()!;
+      await page.mouse.move(
+        corner.endsWith('left') ? 20 : viewport.width - 20,
+        corner.startsWith('top') ? 20 : viewport.height - 20
+      );
+      await expect(group).toHaveAttribute('data-hidden', 'false');
+    }
     for (const background of ['#ffffff', '#111111']) {
       await page.evaluate((color) => {
         document.body.style.background = color;
@@ -73,7 +86,7 @@ async function checkCornerGrip(
           },
         });
       }
-      const geometry = await grip.evaluate((button) => {
+      const geometry = await grip.evaluate((button, integrated) => {
         const svg = button.querySelector('svg')!;
         const bounds = svg.getBoundingClientRect();
         const peer = Array.from(button.parentElement!.querySelectorAll('button')).find(
@@ -88,7 +101,15 @@ async function checkCornerGrip(
               : 1;
         const style = getComputedStyle(button);
         const before = getComputedStyle(button, '::before');
+        const panel = button.parentElement!;
+        const panelRect = panel.getBoundingClientRect();
+        const handleRect = button.getBoundingClientRect();
         return {
+          insidePanel:
+            handleRect.left >= panelRect.left - 1 &&
+            handleRect.right <= panelRect.right + 1 &&
+            handleRect.top >= panelRect.top - 1 &&
+            handleRect.bottom <= panelRect.bottom + 1,
           centerOffset: bounds.y + bounds.height / 2 - peerBounds.y - peerBounds.height / 2,
           cursors: [button, ...button.querySelectorAll('*')].map(
             (element) => getComputedStyle(element).cursor
@@ -97,10 +118,14 @@ async function checkCornerGrip(
           height: bounds.height,
           backing: Math.max(
             alpha(style.backgroundColor),
-            before.content !== 'none' ? alpha(before.backgroundColor) : 0
+            before.content !== 'none' ? alpha(before.backgroundColor) : 0,
+            integrated ? alpha(getComputedStyle(panel).backgroundColor) : 0
           ),
         };
-      });
+      }, prefix === 'shim-auto');
+      expect(geometry.insidePanel, `${prefix} ${corner} handle placement`).toBe(
+        prefix === 'shim-auto'
+      );
       expect
         .soft(Math.abs(geometry.centerOffset), `${prefix} ${corner} centered`)
         .toBeLessThanOrEqual(1);
@@ -491,8 +516,30 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           },
         });
       });
+      const group = launcher.locator('.group');
+      await expect(group).toHaveAttribute('data-hover-only', 'true');
+      await checkCornerGrip(page, popup, group, launcherGrip, 'shim-auto', info);
+      await launcherGrip.hover();
+      await page.mouse.down();
+      await expect(launcherGrip).toHaveCSS('cursor', 'grabbing');
+      await page.mouse.move(40, size.height - 40, { steps: 8 });
+      await expect(launcher.locator('.guide-zone')).toHaveCount(4);
+      await page.mouse.up();
+      await expect(group).toHaveCSS('left', '20px');
+      await expect(group).toHaveCSS('bottom', '20px');
+
+      await popup.evaluate(async () => {
+        const stored = await chrome.storage.sync.get('sniptale_settings');
+        await chrome.storage.sync.set({
+          sniptale_settings: {
+            ...stored['sniptale_settings'],
+            pageLaunch: { ...stored['sniptale_settings'].pageLaunch, corner: 'top-right' },
+          },
+        });
+      });
       await page.mouse.move(size.width / 2, size.height / 2);
-      await expect(launcher.locator('.group')).toHaveAttribute('data-hidden', 'true');
+      await expect(group).toHaveAttribute('data-hidden', 'true');
+      await expect(launcherGrip).toHaveCSS('pointer-events', 'none');
       await page.mouse.move(size.width - 20, 20);
       await expect(launcher.locator('.group')).toHaveAttribute('data-hidden', 'false');
       await page.screenshot({ path: info.outputPath('launcher-handback.png'), fullPage: false });

@@ -194,6 +194,28 @@ pointer-events:auto}
 cursor:grabbing}
 
 
+.group[data-hover-only=true] .grip{
+position:relative;
+top:auto;
+left:auto;
+right:auto;
+flex:0 0 20px;
+margin-inline-end:2px;
+opacity:1;
+pointer-events:inherit;
+background:transparent}
+
+.group[data-hover-only=true] .grip::after{
+content:'';
+position:absolute;
+inset-block:6px;
+inset-inline-end:-2px;
+width:1px;
+background:currentColor;
+opacity:.16;
+pointer-events:none}
+
+
 .group[data-hidden=true]{
 
 opacity:0;
