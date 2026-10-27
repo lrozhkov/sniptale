@@ -28,7 +28,7 @@ export const AUDIT_STORAGE_OWNER_MAPPINGS = [
       'apps/extension/src/composition/persistence/ai-settings/index.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/graph-mutations.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/graph-mutations.settings.test.ts',
-      'apps/extension/src/workflows/ai-settings/model-selection-bootstrap.test.ts',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/provider-secret-protection.transition.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/provider-secrets.key-material.test.ts',
       'apps/extension/src/composition/persistence/ai-settings/provider-secrets.read-state.test.ts',

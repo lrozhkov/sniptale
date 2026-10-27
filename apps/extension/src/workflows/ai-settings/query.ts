@@ -6,10 +6,6 @@ import {
 import { supportsAIScenarioModel } from '../../contracts/settings/model-operation';
 import { resolveAIScenarioModel } from '../../features/ai/selection';
 import {
-  filterAIModelsByOperation,
-  type AIModelOperation,
-} from '../../contracts/settings/model-operation';
-import {
   isChromeAiModelId,
   mergeChromeAiProviderSelectorEntries,
   mergeChromeAiSelectorEntries,
@@ -17,7 +13,6 @@ import {
 import { resolveSelectedAIModelId } from '../../features/ai/selection';
 import { loadChromeAiAvailability } from '@sniptale/platform/browser/chrome-ai';
 import type {
-  AIModelSelectionBootstrapPayload,
   AISettingsPageRuntimeDataPayload,
   AISettingsPageModelSelectionBootstrapPayload,
   AiSettingsQueryMessage,
@@ -49,26 +44,6 @@ async function canUseChromeAi(chromeAiEnabled: boolean): Promise<boolean> {
   return chromeAiEnabled && (await loadChromeAiAvailability()) === 'available';
 }
 
-async function mergeChromeAiModelSelection(
-  selection: AIModelSelectionBootstrapPayload
-): Promise<AIModelSelectionBootstrapPayload> {
-  if (!(await canUseChromeAi(selection.chromeAiEnabled))) {
-    return {
-      ...selection,
-      defaultModelId: isChromeAiModelId(selection.defaultModelId)
-        ? resolveSelectedAIModelId(selection.models, null)
-        : selection.defaultModelId,
-    };
-  }
-
-  const merged = mergeChromeAiProviderSelectorEntries({
-    models: selection.models,
-    providers: selection.providers,
-  });
-
-  return { ...selection, ...merged };
-}
-
 async function mergeSettingsPageModelSelection(
   selection: AISettingsPageModelSelectionBootstrapPayload
 ): Promise<AISettingsPageModelSelectionBootstrapPayload> {
@@ -87,31 +62,6 @@ async function mergeSettingsPageModelSelection(
   });
 
   return { ...selection, ...merged };
-}
-
-export async function requestAIModelSelectionBootstrap(
-  operation: AIModelOperation = 'text'
-): Promise<AIModelSelectionBootstrapPayload> {
-  const response = await sendAISettingsQuery({ operation: 'read-model-selection-bootstrap' });
-  if (!response.modelSelection) {
-    throw new Error('AI model selection bootstrap response missing payload');
-  }
-
-  const models = filterAIModelsByOperation(response.modelSelection.models, operation);
-  const selection = {
-    ...response.modelSelection,
-    models,
-    defaultModelId:
-      operation === 'text'
-        ? response.modelSelection.models.some(
-            (model) =>
-              model.id === response.modelSelection?.defaultModelId && !models.includes(model)
-          )
-          ? null
-          : response.modelSelection.defaultModelId
-        : (models[0]?.id ?? null),
-  };
-  return operation === 'text' ? mergeChromeAiModelSelection(selection) : selection;
 }
 
 export async function requestAISettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataPayload> {
