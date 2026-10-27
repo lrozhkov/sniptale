@@ -134,6 +134,11 @@ async function checkLongQuickActionMenu(
   info: TestInfo
 ) {
   await expect.poll(() => items.count()).toBeGreaterThanOrEqual(48);
+  expect(await items.locator('svg[aria-hidden="true"]').count()).toBe(await items.count());
+  const firstGlyph = items.first().locator('svg');
+  const glyphSize = (await firstGlyph.boundingBox())!;
+  expect(glyphSize.width).toBeGreaterThanOrEqual(16);
+  expect(glyphSize.height).toBeGreaterThanOrEqual(16);
   const viewport = page.viewportSize()!;
   const bounds = (await menu.boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
@@ -288,6 +293,20 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       });
       await expect(launcher.getByRole('menu')).toBeVisible();
       await expect(launcher.getByRole('menuitem', { name: 'Updated menu' })).toBeFocused();
+      const updatedItem = launcher.getByRole('menuitem', { name: 'Updated menu' });
+      const cameraGlyph = await updatedItem.locator('svg').innerHTML();
+      await popup.evaluate(async () => {
+        const stored = await chrome.storage.local.get('sniptale_quick_actions');
+        await chrome.storage.local.set({
+          sniptale_quick_actions: stored['sniptale_quick_actions'].map(
+            (action: { id: string; icon?: string }) =>
+              action.id === 'menu-refresh-proof' ? { ...action, icon: 'Zap' } : action
+          ),
+        });
+      });
+      await expect.poll(() => updatedItem.locator('svg').innerHTML()).not.toBe(cameraGlyph);
+      await expect(updatedItem).toBeFocused();
+
       await popup.evaluate(async () => chrome.storage.local.remove('sniptale_quick_actions'));
       await expect(launcher.getByRole('menuitem', { name: 'Updated menu' })).toHaveCount(0);
       await expect(launcher.getByRole('menu')).toBeVisible();
@@ -522,6 +541,54 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(popup).toHaveAttribute('aria-checked', 'false');
       await expect(corner).toHaveAttribute('aria-checked', 'true');
       await page.screenshot({ path: info.outputPath('placement-settings.png'), fullPage: false });
+      await page.getByRole('button', { name: /^(Add action|Добавить действие)$/u }).click();
+      const picker = page.locator('[data-ui="settings.quick-actions.icons"]');
+      const camera = picker.getByRole('button', { name: 'Camera', exact: true });
+      const download = picker.getByRole('button', { name: 'Download', exact: true });
+      await expect(camera.locator('svg[aria-hidden="true"]')).toBeVisible();
+      await download.click();
+      await expect(download).toHaveAttribute('aria-pressed', 'true');
+      const downloadGlyph = await download.locator('svg').innerHTML();
+      await camera.click();
+      await expect(camera).toHaveAttribute('aria-pressed', 'true');
+      expect(await camera.locator('svg').innerHTML()).not.toBe(downloadGlyph);
+      await page.screenshot({ path: info.outputPath('quick-action-picker.png'), fullPage: false });
+      await page.getByRole('button', { name: /^(Cancel|Отмена)$/u, exact: true }).click();
+      await popup.click();
+      await expect(popup).toHaveAttribute('aria-checked', 'true');
+      await page.evaluate(async () => {
+        await chrome.storage.local.set({
+          sniptale_quick_actions: [
+            {
+              id: 'popup-glyph-proof',
+              name: 'Popup glyph proof',
+              icon: 'Download',
+              status: true,
+              screenshotMode: 'visible',
+              afterCapture: 'download_default',
+              hotkey: null,
+              exitAfterCapture: true,
+              imageFormat: 'png',
+              imageQuality: 100,
+            },
+          ],
+        });
+      });
+      const popupPage = await browser.context.newPage();
+      await popupPage.goto(
+        `chrome-extension://${browser.extensionId}/apps/extension/src/popup/index.html`
+      );
+      await popupPage.getByRole('button', { name: /^(Screenshots|Снимки)$/u }).click();
+      await popupPage.getByRole('button', { name: /^(Shortcuts|Действия)$/u }).click();
+      const popupAction = popupPage.getByRole('button', { name: /Popup glyph proof/u });
+      await expect(popupAction.locator('svg[aria-hidden="true"]')).toBeVisible();
+      expect(await popupAction.locator('svg').first().innerHTML()).toBe(downloadGlyph);
+      await popupPage.screenshot({
+        path: info.outputPath('quick-action-popup.png'),
+        fullPage: false,
+      });
+      await popupPage.close();
+
       await page.setViewportSize({ width: 1000, height: 560 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
         false

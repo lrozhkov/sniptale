@@ -1,4 +1,4 @@
-import { Zap } from 'lucide-react';
+import { Icon, Zap } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ProductToolbarMenu,
@@ -6,6 +6,7 @@ import {
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
 import { translate } from '../../../platform/i18n';
+import { getQuickActionIconNode } from '../../../features/quick-actions-presets/icons';
 import { getQuickActionDisplayName } from '../../../features/quick-actions-presets/catalog';
 import { ToolbarMenuDropdown } from '../toolbar/menu/dropdown';
 import type { ToolbarMenuState } from '../toolbar/state/menu';
@@ -68,6 +69,7 @@ export function PageQuickActionsMenu(props: {
                   void trigger(action, event.nativeEvent);
                 }}
               >
+                <Icon iconNode={getQuickActionIconNode(action.icon)} size={18} aria-hidden="true" />
                 <ProductToolbarMenuItemCopy label={getQuickActionDisplayName(action)} />
               </ProductToolbarMenuItem>
             ))}

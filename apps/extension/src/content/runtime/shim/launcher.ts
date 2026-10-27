@@ -1,3 +1,5 @@
+import { createElement as createLucideElement } from 'lucide';
+import { getQuickActionIconNode } from '../../../features/quick-actions-presets/icons';
 import { isTrustedDomEvent } from '../../platform/trusted-events';
 import { PAGE_CORNERS, type PageCorner } from '../../../contracts/page-launch';
 import { pageLauncherMessages } from '../../../platform/i18n/messages/content/page-launcher';
@@ -25,7 +27,7 @@ function menuProjection(options: ShimLauncherOptions): string {
     locale,
     options.actions
       .filter((action) => action.status)
-      .map((action) => [action.id, getShimQuickActionName(action, locale)]),
+      .map((action) => [action.id, getShimQuickActionName(action, locale), action.icon]),
   ]);
 }
 
@@ -242,7 +244,12 @@ class ShimLauncherView {
       item.type = 'button';
       item.setAttribute('role', 'menuitem');
       item.dataset['actionId'] = action.id;
-      item.textContent = getShimQuickActionName(action, this.options.presentation.locale);
+      const glyph = createLucideElement(getQuickActionIconNode(action.icon), {
+        'aria-hidden': 'true',
+      });
+      const label = document.createElement('span');
+      label.textContent = getShimQuickActionName(action, this.options.presentation.locale);
+      item.append(glyph, label);
       item.addEventListener('click', (click) => {
         void this.run(click, () => this.options.trigger(action, click));
       });

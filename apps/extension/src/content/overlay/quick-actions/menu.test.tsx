@@ -124,3 +124,18 @@ it('constrains the actual menu scroll surface to the space below its trigger', a
   expect(menu.style.maxHeight).toBe('210px');
   expect(menu.style.overflowY).toBe('auto');
 });
+
+it('renders decorative configured and fallback glyphs beside the accessible action labels', async () => {
+  mocks.list.mockResolvedValue([
+    { id: 'configured', name: 'Configured', icon: 'Zap', status: true },
+    { id: 'fallback', name: 'Fallback', icon: '__proto__', status: true },
+  ]);
+  await open();
+  const configured = item('Configured').querySelector('svg');
+  const fallback = item('Fallback').querySelector('svg');
+  expect(configured).not.toBeNull();
+  expect(fallback).not.toBeNull();
+  expect(configured!.getAttribute('aria-hidden')).toBe('true');
+  expect(fallback!.getAttribute('aria-hidden')).toBe('true');
+  expect(configured!.innerHTML).not.toBe(fallback!.innerHTML);
+});

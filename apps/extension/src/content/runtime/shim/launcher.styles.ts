@@ -209,7 +209,9 @@ pointer-events:none}
 
 position:fixed;
 
-max-width:min(300px,calc(100vw - 16px));
+width:280px;
+
+max-width:calc(100vw - 16px);
 
 max-height:calc(100vh - 96px);
 
@@ -223,25 +225,39 @@ color:#3f3f46;
 
 box-shadow:0 4px 16px #0003;
 
-border-radius:8px;
+border-radius:4px;
 
-padding:4px;
+padding:5px;
 
 pointer-events:auto}
 
 .menu button{
 
-display:block;
+display:flex;
+
+align-items:center;
+
+gap:6px;
+
+min-height:32px;
+
+margin-top:2px;
 
 text-align:left;
 
 width:100%;
 
-padding:8px 12px;
+padding:6px 8px;
 
 white-space:normal;
 
 overflow-wrap:anywhere}
+
+.menu button:first-child{margin-top:0}
+
+.menu button svg{width:18px;height:18px;flex-shrink:0;stroke-width:1.75}
+
+.menu button span{min-width:0}
 
 .error{
 

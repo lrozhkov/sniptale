@@ -1,14 +1,17 @@
 import { useRef, useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import type { LucideIcon } from 'lucide-react';
-import { Camera, ChevronDown, ChevronUp } from 'lucide-react';
+import { Icon, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
 import { InspectorFieldClear } from '../../../../ui/compact-inspector-controls/text-field';
 import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { QuickAction, QuickActionDelay, ViewportPreset } from '../../../../contracts/settings';
 import { HotkeyInput } from './hotkey-input';
-import { allowedQuickActionIcons, delayOptions, quickActionIconMap } from './section/constants';
+import { delayOptions } from './section/constants';
+import {
+  allowedQuickActionIcons,
+  getQuickActionIconNode,
+} from '../../../../features/quick-actions-presets/icons';
 import { SettingsControlRow, settingsMetaLabelClassName } from '../../../section-surface';
 import { type QuickActionsSectionState } from './controller';
 import { getViewportPresetDisplayName } from '../../../../features/viewport-presets/display-name';
@@ -23,8 +26,13 @@ const activeIconButtonClassName = [
 ].join(' ');
 
 function DynamicIcon(props: { className?: string; name: string }) {
-  const Icon: LucideIcon = quickActionIconMap[props.name] || Camera;
-  return <Icon className={props.className} />;
+  return (
+    <Icon
+      iconNode={getQuickActionIconNode(props.name)}
+      aria-hidden="true"
+      className={props.className}
+    />
+  );
 }
 
 function buildViewportPresetOptions(viewportPresets: ViewportPreset[] | undefined) {

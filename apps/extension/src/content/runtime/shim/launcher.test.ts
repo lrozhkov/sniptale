@@ -224,3 +224,23 @@ it('falls back to the nearest surviving item or trigger after removal without st
   expect(document.activeElement).toBe(outside);
   expect(currentShadow().querySelectorAll('[role="menuitem"]')).toHaveLength(2);
 });
+
+it('refreshes decorative glyphs on icon-only updates while retaining focused action identity', () => {
+  trusted.mockReturnValue(true);
+  const source = options();
+  launcher = createShimLauncher(source);
+  namedButton('Quick actions').click();
+  const item = () => currentShadow().querySelector<HTMLButtonElement>('[role="menuitem"]')!;
+  const original = item().querySelector('svg');
+  expect(original).not.toBeNull();
+  expect(original!.getAttribute('aria-hidden')).toBe('true');
+  const originalGlyph = original!.innerHTML;
+  launcher.update({
+    ...source,
+    actions: source.actions.map((action) => ({ ...action, icon: 'Zap' })),
+  });
+  expect(item().querySelector('svg')!.innerHTML).not.toBe(originalGlyph);
+  expect(currentShadow().activeElement).toBe(item());
+  expect(item().textContent).toBe('<script>unsafe</script>');
+  expect(currentShadow().querySelector('script')).toBeNull();
+});

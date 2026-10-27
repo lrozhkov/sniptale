@@ -242,6 +242,19 @@
       "version": "3.3.0"
     },
     {
+      "archivePath": "LICENSES/dependencies/lucide-1.59.0.txt",
+      "licenseExpression": "ISC",
+      "licenseSource": "node_modules/lucide/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "lucide",
+      "packagePath": "node_modules/lucide",
+      "selectedLicense": "ISC",
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "sourceUrl": "https://github.com/lucide-icons/lucide.git",
+      "version": "1.59.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/lucide-react-1.59.0.txt",
       "licenseExpression": "ISC",
       "licenseSource": "node_modules/lucide-react/LICENSE",

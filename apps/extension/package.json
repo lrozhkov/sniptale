@@ -19,6 +19,7 @@
     "fabric": "^7.4.0",
     "idb": "^8.0.4",
     "jszip": "^3.10.2",
+    "lucide": "1.59.0",
     "lucide-react": "^1.59.0",
     "mediabunny": "1.61.6",
     "react": "^19.3.1",

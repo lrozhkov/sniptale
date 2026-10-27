@@ -111,24 +111,7 @@
         "end": 232
       }
     },
-    {
-      "id": "0591e1eda2b5044646eba9e7649e2fbdb72771ed0b70d605a071d8b243636297",
-      "classification": "tool-noise",
-      "owner": "popup quick-action icon catalog",
-      "reason": "One endpoint is a named lucide-react import list; the other is ICON_MAP shorthand registration of those imported values. Import and lookup-table roles require the same names but execute no duplicated behavior.",
-      "removalCondition": "Retain explicit imports and the allowlisted icon table. Remove this decision if the endpoints become executable lookup or selection logic.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
-        "start": 2,
-        "end": 39
-      },
-      "secondFile": {
-        "path": "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
-        "start": 77,
-        "end": 114
-      }
-    },
+
     {
       "id": "07e9c86fb0e10c170f1ed23c5a5cfa9c5ef51bbe3a08aee21737a45c34503970",
       "classification": "tool-noise",

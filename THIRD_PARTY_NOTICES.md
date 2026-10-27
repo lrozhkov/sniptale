@@ -251,6 +251,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `5c81b0caa98593408b03125efa25efe622341ed87ae55561968828cd887d64a4`
 - Repository/source: https://github.com/calvinmetcalf/lie.git
 
+### `lucide` 1.59.0
+
+- Installed path: `node_modules/lucide`
+- Declared license expression: `ISC`
+- Selected license: `ISC`
+- License source class: `installed-file`
+- License source: `node_modules/lucide/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/lucide-1.59.0.txt`](LICENSES/dependencies/lucide-1.59.0.txt)
+- License text SHA-256: `b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57`
+- Repository/source: https://github.com/lucide-icons/lucide.git
+
 ### `lucide-react` 1.59.0
 
 - Installed path: `node_modules/lucide-react`

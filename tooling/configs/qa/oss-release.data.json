@@ -117,6 +117,11 @@
       "source": "LICENSES/dependencies/lie-3.3.0.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/lucide-1.59.0.txt",
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "source": "LICENSES/dependencies/lucide-1.59.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/lucide-react-1.59.0.txt",
       "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
       "source": "LICENSES/dependencies/lucide-react-1.59.0.txt"
@@ -251,12 +256,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "bd8cc40ce59be43fa0f958c8916e578543547804ca4f26d8f9c9a97dc33a5293",
+      "sha256": "0abffc4c513c36cf14bf651e5b67c5027e2264044ee0d7eeef820129cade950a",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "bdf5787ad56c97f7631602bb437720ea96cc4bb2b1af28f105d8ab45a23bfa1b",
+      "sha256": "73fe9b568924dc2453ecd81aa82270ca9580c571a94093ddf95e04dd52e4ca42",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],
