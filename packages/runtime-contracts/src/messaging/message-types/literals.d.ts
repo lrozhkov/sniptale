@@ -1,5 +1,10 @@
 declare module './' {
   export namespace MessageType {
+    type OFFSCREEN_SYNC_START = typeof import('./').MessageType.OFFSCREEN_SYNC_START;
+    type OFFSCREEN_SYNC_INSPECT = typeof import('./').MessageType.OFFSCREEN_SYNC_INSPECT;
+    type OFFSCREEN_SYNC_STOP = typeof import('./').MessageType.OFFSCREEN_SYNC_STOP;
+    type SYNC_CONNECTION_ORIGIN_PERMISSION =
+      typeof import('./').MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION;
     type ENABLE_SCREENSHOT_MODE = typeof import('./').MessageType.ENABLE_SCREENSHOT_MODE;
     type DISABLE_SCREENSHOT_MODE = typeof import('./').MessageType.DISABLE_SCREENSHOT_MODE;
     type SCREENSHOT_MODE_STATUS = typeof import('./').MessageType.SCREENSHOT_MODE_STATUS;

@@ -2772,6 +2772,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "4cc609ad5b5acb78c71603f765c8efa95faba302d67e7dedd69c51875704b429",
       "signatureHash": "0ece55c51959c99f26c9a34d41fd6f591a383d1de0c56ee9ebefb3d6950ef887"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/sync-connection/executor.ts",
+      "symbol": "createSyncConnectionExecutor",
+      "owner": "extension:offscreen:sync-connection",
+      "reason": "tool-noise: This factory owns one disposable executor lifetime. Start, run completion, Inspect and Stop share jobs, binding, revision and phase. Transport validation and native HTTP resources have separate injected owners. Inclusive factory extent counts nested methods, while outer control metrics exclude their bodies. The result is 177 lines with seven statements, cyclomatic1, cognitive0, recovery0 and cohesion1. Moving the coupled methods would pass one mutable authority between helpers. Fresh read-only runtime_structure_diagnosis_sol inspected the source, consumers and metric calculation. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes, the symbol disappears or its extent falls below the limit. Reassess any new independent authority, persistence writer, resource lifetime or recovery operation. Remove when the analyzer models this cohesive factory shape.",
+      "reviewDate": "2026-10-27",
+      "astHash": "ebf4c7344e4af099ab564931003cc38eadee2fa6a6224e6839c134156ab8e63b",
+      "signatureHash": "87de9e63d0bb330601835d536545f53642c845f667a8bdec466088e98dd813bf"
     }
   ]
 }

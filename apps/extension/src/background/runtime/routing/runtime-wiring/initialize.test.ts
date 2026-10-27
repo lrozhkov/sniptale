@@ -1,10 +1,16 @@
+vi.mock('./startup', () => ({ runStartupMaintenance: vi.fn() }));
+vi.mock('../../../page-access/lifecycle', () => ({ initializePageAccessLifecycle: vi.fn() }));
 vi.mock('../../../page-recovery/ports', () => ({ registerPageRecoveryPorts: vi.fn() }));
 vi.mock('../../../ai/audio/port', () => ({ registerAudioJobPorts: vi.fn() }));
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { SyncConnectionMetadata } from '../../../../composition/persistence/remote-connection/model';
 
 const {
   configureDownloadPort,
   configureAudioJobPrivacyErasurePort,
+  configureSyncPrivacyErasurePort,
+  eraseLocalExtensionDataFromBackground,
   registerContentTextPorts,
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
@@ -22,6 +28,8 @@ const {
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
   configureAudioJobPrivacyErasurePort: vi.fn(),
+  configureSyncPrivacyErasurePort: vi.fn(),
+  eraseLocalExtensionDataFromBackground: vi.fn(),
   registerContentTextPorts: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort: vi.fn(),
   configureScreenshotPrivacyErasureCleanupPort: vi.fn(),
@@ -37,6 +45,84 @@ const {
   initializeNativeAppPermissionLifecycle: vi.fn(),
   subscribeToLocaleChanges: vi.fn(() => vi.fn()),
 }));
+const syncWiring = vi.hoisted(() => ({
+  createCoordinator:
+    vi.fn<typeof import('../../../sync-connection/coordinator').createSyncConnectionCoordinator>(),
+  createGateway:
+    vi.fn<typeof import('../../../sync-connection/offscreen-gateway').createSyncOffscreenGateway>(),
+  inspect: vi.fn().mockResolvedValue(null),
+  start: vi.fn(),
+  reserveErasure: vi.fn(),
+  permissionsRemoved: vi.fn<(isAffected: (origin: string) => boolean) => Promise<void>>(),
+  quiesce: vi.fn().mockResolvedValue(undefined),
+  release: vi.fn(),
+  ensureDocument: vi.fn().mockResolvedValue('11111111-1111-4111-8111-111111111111'),
+  inspectExecutor: vi.fn().mockResolvedValue({ kind: 'absent' }),
+  startExecutor: vi.fn(),
+  stopExecutor: vi.fn(),
+  ensureOffscreen: vi.fn().mockResolvedValue(false),
+  waitReady: vi.fn().mockResolvedValue(undefined),
+  getContexts: vi.fn().mockResolvedValue([]),
+  send: vi.fn().mockResolvedValue({ success: true }),
+  loadConnection: vi.fn<() => Promise<SyncConnectionMetadata | null>>().mockResolvedValue(null),
+  commandConnection: vi.fn().mockResolvedValue(undefined),
+  contains: vi.fn().mockResolvedValue(true),
+  subscribeRemoved:
+    vi.fn<(listener: (permissions: chrome.permissions.Permissions) => void) => () => void>(),
+  warn: vi.fn(),
+}));
+vi.mock('../../../sync-connection/coordinator', () => ({
+  createSyncConnectionCoordinator: syncWiring.createCoordinator,
+}));
+vi.mock('../../../sync-connection/offscreen-gateway', () => ({
+  createSyncOffscreenGateway: syncWiring.createGateway,
+}));
+vi.mock('../../../offscreen-document/service', async (original) => ({
+  ...(await original<typeof import('../../../offscreen-document/service')>()),
+  ensureOffscreenDocument: syncWiring.ensureOffscreen,
+  waitForOffscreenReady: syncWiring.waitReady,
+}));
+vi.mock('@sniptale/platform/browser/runtime', async (original) => {
+  const actual = await original<typeof import('@sniptale/platform/browser/runtime')>();
+  return {
+    ...actual,
+    browserRuntime: { ...actual.browserRuntime, getContexts: syncWiring.getContexts },
+  };
+});
+vi.mock('@sniptale/platform/browser/permissions', async (original) => {
+  const actual = await original<typeof import('@sniptale/platform/browser/permissions')>();
+  return {
+    ...actual,
+    browserPermissions: {
+      ...actual.browserPermissions,
+      contains: syncWiring.contains,
+      subscribeToRemoved: syncWiring.subscribeRemoved,
+    },
+  };
+});
+vi.mock('../../../routing-contracts/runtime-messaging/services', async (original) => ({
+  ...(await original<typeof import('../../../routing-contracts/runtime-messaging/services')>()),
+  getBackgroundRuntimeMessaging: () => ({ sendRuntimeMessage: syncWiring.send }),
+}));
+vi.mock('../../../../composition/persistence/remote-connection/store', async (original) => ({
+  ...(await original<
+    typeof import('../../../../composition/persistence/remote-connection/store')
+  >()),
+  loadSyncConnection: syncWiring.loadConnection,
+  commandSyncConnection: syncWiring.commandConnection,
+}));
+vi.mock('@sniptale/platform/observability/logger', async (original) => {
+  const actual = await original<typeof import('@sniptale/platform/observability/logger')>();
+  return {
+    ...actual,
+    createLogger: (options: Parameters<typeof actual.createLogger>[0]) => {
+      const logger = actual.createLogger(options);
+      return options.namespace === 'BackgroundRuntimeWiring'
+        ? { ...logger, warn: syncWiring.warn }
+        : logger;
+    },
+  };
+});
 vi.mock('../../../ai/llm/content-text-port', () => ({ registerContentTextPorts }));
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -57,8 +143,9 @@ vi.mock('../../../application/aggregate-promotion/ports', () => ({
 vi.mock('../../../application/privacy-erasure/composition', () => ({
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
-  eraseLocalExtensionDataFromBackground: vi.fn(),
+  eraseLocalExtensionDataFromBackground,
   configureAudioJobPrivacyErasurePort,
+  configureSyncPrivacyErasurePort,
 }));
 vi.mock('../../native-app/privacy-erasure', () => ({
   nativeIngestionPrivacyErasureCleanupAdapter: nativeIngestionCleanupAdapter,
@@ -101,6 +188,33 @@ import {
   updatedListenerRef,
 } from '../../../../../../../tooling/test/support/background-runtime-wiring.test-support';
 import { initializeBackgroundRuntime } from './initialize';
+
+beforeEach(() => {
+  syncWiring.createGateway.mockReturnValue({
+    ensureDocument: syncWiring.ensureDocument,
+    inspectExecutor: syncWiring.inspectExecutor,
+    startExecutor: syncWiring.startExecutor,
+    stopExecutor: syncWiring.stopExecutor,
+  });
+  syncWiring.createCoordinator.mockReturnValue({
+    inspect: syncWiring.inspect,
+    start: syncWiring.start,
+    reserveErasure: syncWiring.reserveErasure,
+    permissionsRemoved: syncWiring.permissionsRemoved,
+  });
+  syncWiring.inspect.mockResolvedValue(null);
+  syncWiring.reserveErasure.mockReturnValue({
+    quiesce: syncWiring.quiesce,
+    release: syncWiring.release,
+  });
+  syncWiring.permissionsRemoved.mockResolvedValue(undefined);
+  syncWiring.getContexts.mockResolvedValue([]);
+  syncWiring.loadConnection.mockResolvedValue(null);
+  syncWiring.contains.mockResolvedValue(true);
+  syncWiring.commandConnection.mockResolvedValue(undefined);
+  syncWiring.subscribeRemoved.mockReturnValue(vi.fn());
+});
+afterEach(() => vi.unstubAllGlobals());
 
 it('registers all background listeners through the runtime-wiring owner', () => {
   const state = createModeState();
@@ -170,3 +284,235 @@ it('registers the security control only in the security E2E build', () => {
     Reflect.deleteProperty(globalThis, '__SNIPTALE_SECURITY_E2E__');
   }
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+function gatewayDependencies() {
+  const deps = syncWiring.createGateway.mock.calls[0]?.[0];
+  if (!deps) throw new Error('Missing composed sync gateway');
+  return deps;
+}
+function coordinatorDependencies() {
+  const deps = syncWiring.createCoordinator.mock.calls[0]?.[0];
+  if (!deps) throw new Error('Missing composed sync coordinator');
+  return deps;
+}
+function removedPermissionListener() {
+  const listener = syncWiring.subscribeRemoved.mock.calls[0]?.[0];
+  if (!listener) throw new Error('Missing permission removal listener');
+  return listener;
+}
+function nativeConnection(): SyncConnectionMetadata {
+  return {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding: {
+      provider: 'webdav',
+      rootUrl: 'https://dav.example.test/root/',
+      accountId: 'alice',
+      spaceId: 'space',
+      connectionGeneration: 3,
+      profileCreatedAt: 1,
+    },
+    identity: { incarnation: '11111111-1111-4111-8111-111111111111', revision: 2 },
+    phase: 'active',
+    updateNonce: null,
+    credentialId: '22222222-2222-4222-8222-222222222222',
+  };
+}
+
+it('exposes synchronous privacy reservation while startup adoption is still pending', async () => {
+  const adoption = deferred<null>();
+  syncWiring.inspect.mockReturnValueOnce(adoption.promise);
+  initializeBackgroundRuntime(createModeState());
+  expect(syncWiring.inspect).toHaveBeenCalledOnce();
+  const port = configureSyncPrivacyErasurePort.mock.calls[0]?.[0];
+  expect(port).toBeDefined();
+  const reservation = port.reserveErasureExclusion();
+  expect(syncWiring.reserveErasure).toHaveBeenCalledOnce();
+  expect(reservation.quiesce).toBe(syncWiring.quiesce);
+  await reservation.quiesce();
+  reservation.release();
+  expect(syncWiring.release).toHaveBeenCalledOnce();
+  expect(syncWiring.start).not.toHaveBeenCalled();
+  expect(registerSecurityE2EControl).not.toHaveBeenCalled();
+  adoption.resolve(null);
+});
+
+it('preserves document discovery failure and missing identity instead of inventing an absent executor', async () => {
+  initializeBackgroundRuntime(createModeState());
+  const deps = gatewayDependencies();
+  syncWiring.getContexts.mockRejectedValueOnce(new Error('Browser context query unavailable'));
+  await expect(deps.getDocumentUrls()).rejects.toThrow('Browser context query unavailable');
+  syncWiring.getContexts.mockResolvedValueOnce([{}]);
+  await expect(deps.getDocumentUrls()).rejects.toThrow('Sync document identity unavailable');
+  const documentUrl =
+    'chrome-extension://test/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=live';
+  syncWiring.getContexts.mockResolvedValueOnce([{ documentUrl }]);
+  expect(await deps.getDocumentUrls()).toEqual([documentUrl]);
+  expect(syncWiring.getContexts).toHaveBeenLastCalledWith({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
+  syncWiring.getContexts.mockResolvedValueOnce([]);
+  expect(await deps.getDocumentUrls()).toEqual([]);
+});
+
+it('uses the existing document service and runtime transport without starting a page-owned client', async () => {
+  initializeBackgroundRuntime(createModeState());
+  const deps = gatewayDependencies();
+  await deps.ensureDocument();
+  expect(syncWiring.ensureOffscreen).toHaveBeenCalledWith('Transfer user-selected sync files');
+  await deps.waitForReady();
+  expect(syncWiring.waitReady).toHaveBeenCalledOnce();
+  const requestId = deps.createRequestId();
+  const challenge = coordinatorDependencies().createChallenge();
+  expect(requestId).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(challenge).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(challenge).not.toBe(requestId);
+  const message: Parameters<typeof deps.send>[0] = {
+    type: MessageType.OFFSCREEN_SYNC_INSPECT,
+    requestId,
+    challenge,
+    offscreenStartupId: '11111111-1111-4111-8111-111111111111',
+    capabilityToken: 'test-capability',
+  };
+  syncWiring.send.mockResolvedValueOnce({ success: true, challenge });
+  expect(await deps.send(message)).toEqual({ success: true, challenge });
+  expect(syncWiring.send).toHaveBeenCalledWith(message);
+  expect(syncWiring.start).not.toHaveBeenCalled();
+});
+
+it('awaits durable native pause before exposing revocation completion and propagates refusal', async () => {
+  initializeBackgroundRuntime(createModeState());
+  const deps = coordinatorDependencies();
+  const commit = deferred<void>();
+  syncWiring.commandConnection.mockReturnValueOnce(commit.promise);
+  let completed = false;
+  const revocation = deps.revokeConnection(nativeConnection().identity).then(() => {
+    completed = true;
+  });
+  expect(syncWiring.commandConnection).toHaveBeenCalledExactlyOnceWith(
+    nativeConnection().identity,
+    'pause'
+  );
+  await Promise.resolve();
+  expect(completed).toBe(false);
+  commit.resolve();
+  await revocation;
+  expect(completed).toBe(true);
+  syncWiring.commandConnection.mockRejectedValueOnce(new Error('Native pause refused'));
+  await expect(deps.revokeConnection(nativeConnection().identity)).rejects.toThrow(
+    'Native pause refused'
+  );
+});
+
+it('permission removal checks the retained origin and revokes only that origin after a missing grant', async () => {
+  initializeBackgroundRuntime(createModeState());
+  syncWiring.loadConnection.mockResolvedValue(nativeConnection());
+  const checked = deferred<void>();
+  const permission = deferred<boolean>();
+  syncWiring.contains.mockImplementationOnce(async () => {
+    checked.resolve();
+    return permission.promise;
+  });
+  const revoked = deferred<void>();
+  syncWiring.permissionsRemoved.mockImplementationOnce(async (isAffected) => {
+    expect(isAffected('https://dav.example.test')).toBe(true);
+    expect(isAffected('https://other.example.test')).toBe(false);
+    expect(isAffected('https://dav.example.test.evil')).toBe(false);
+    revoked.resolve();
+  });
+  removedPermissionListener()({ origins: ['https://unrelated.example.test/*'] });
+  await checked.promise;
+  expect(syncWiring.contains).toHaveBeenCalledWith({ origins: ['https://dav.example.test/*'] });
+  expect(syncWiring.permissionsRemoved).not.toHaveBeenCalled();
+  permission.resolve(false);
+  await revoked.promise;
+  expect(syncWiring.permissionsRemoved).toHaveBeenCalledOnce();
+});
+
+it('permission removal preserves an unaffected grant and does not activate absent native authority', async () => {
+  initializeBackgroundRuntime(createModeState());
+  const checked = deferred<void>();
+  syncWiring.loadConnection.mockResolvedValueOnce(nativeConnection());
+  syncWiring.contains.mockImplementationOnce(async () => {
+    checked.resolve();
+    return true;
+  });
+  removedPermissionListener()({ origins: ['https://unrelated.example.test/*'] });
+  await checked.promise;
+  await Promise.resolve();
+  expect(syncWiring.permissionsRemoved).not.toHaveBeenCalled();
+  const read = deferred<void>();
+  syncWiring.loadConnection.mockImplementationOnce(async () => {
+    read.resolve();
+    return null;
+  });
+  removedPermissionListener()({ origins: ['https://dav.example.test/*'] });
+  await read.promise;
+  await Promise.resolve();
+  expect(syncWiring.contains).toHaveBeenCalledOnce();
+  expect(syncWiring.start).not.toHaveBeenCalled();
+});
+
+it.each(['load', 'permission', 'revocation'] as const)(
+  'keeps %s failure in permission lifecycle local and logs a fixed diagnostic',
+  async (stage) => {
+    initializeBackgroundRuntime(createModeState());
+    syncWiring.loadConnection.mockResolvedValue(nativeConnection());
+    const privateFailure = new Error('Synthetic private root and credential');
+    if (stage === 'load') syncWiring.loadConnection.mockRejectedValueOnce(privateFailure);
+    if (stage === 'permission') syncWiring.contains.mockRejectedValueOnce(privateFailure);
+    if (stage === 'revocation') {
+      syncWiring.contains.mockResolvedValueOnce(false);
+      syncWiring.permissionsRemoved.mockRejectedValueOnce(privateFailure);
+    }
+    const logged = deferred<void>();
+    syncWiring.warn.mockImplementation((message: string) => {
+      if (message === 'Sync permission revocation failed') logged.resolve();
+    });
+    removedPermissionListener()({ origins: ['https://dav.example.test/*'] });
+    await logged.promise;
+    expect(syncWiring.warn).toHaveBeenCalledExactlyOnceWith('Sync permission revocation failed');
+  }
+);
+
+it('isolates failed startup adoption without starting another producer', async () => {
+  syncWiring.inspect.mockRejectedValueOnce(new Error('Synthetic private executor failure'));
+  const logged = deferred<void>();
+  syncWiring.warn.mockImplementation((message: string) => {
+    if (message === 'Sync executor adoption refused') logged.resolve();
+  });
+  initializeBackgroundRuntime(createModeState());
+  await logged.promise;
+  expect(syncWiring.warn).toHaveBeenCalledExactlyOnceWith('Sync executor adoption refused');
+  expect(syncWiring.start).not.toHaveBeenCalled();
+});
+
+it.each([true, false])(
+  'security-only erasure reports actual privacy result %s with complete owner options',
+  async (success) => {
+    vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+    const state = createModeState();
+    initializeBackgroundRuntime(state);
+    const control = registerSecurityE2EControl.mock.calls[0]?.[0];
+    expect(control).toBeDefined();
+    const erased = deferred<{ success: boolean }>();
+    eraseLocalExtensionDataFromBackground.mockReturnValueOnce(erased.promise);
+    const completion = control.erase();
+    expect(eraseLocalExtensionDataFromBackground).toHaveBeenCalledExactlyOnceWith(
+      {
+        type: MessageType.ERASE_LOCAL_EXTENSION_DATA,
+        includeAiProviderSecrets: true,
+        preservePreferences: false,
+      },
+      state
+    );
+    erased.resolve({ success });
+    expect(await completion).toBe(success);
+  }
+);

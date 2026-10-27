@@ -11,7 +11,13 @@ import { promisify } from 'node:util';
 type Fault = {
   method: 'PUT' | 'GET' | 'PROPFIND';
   key: string;
-  kind: 'status' | 'redirect' | 'lost-response' | 'hold';
+  kind:
+    | 'status'
+    | 'redirect'
+    | 'lost-response'
+    | 'hold'
+    | 'hold-response-headers'
+    | 'hold-response-body';
   status?: number;
   repeat?: boolean;
 };
@@ -133,7 +139,9 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
       }
       if (incoming.method === 'PROPFIND') counts.propfinds++;
       const fault =
-        armed && armed.method === incoming.method && armed.key === key ? armed : undefined;
+        armed && armed.method === incoming.method && (armed.key === key || armed.key === '*')
+          ? armed
+          : undefined;
       if (fault && !fault.repeat) armed = undefined;
       if (fault?.kind === 'status' || fault?.kind === 'redirect') {
         markReached();
@@ -194,6 +202,43 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
           response.on('end', () => {
             markReached();
             downstream.destroy();
+          });
+        } else if (fault?.kind === 'hold-response-headers') {
+          response.pause();
+          const resume = () => {
+            if (release === resume) release = undefined;
+            if (downstream.destroyed || response.destroyed) return;
+            downstream.writeHead(response.statusCode ?? 502, response.rawHeaders);
+            response.pipe(downstream);
+          };
+          release = resume;
+          markReached();
+        } else if (fault?.kind === 'hold-response-body') {
+          downstream.writeHead(response.statusCode ?? 502, response.rawHeaders);
+          downstream.flushHeaders();
+          let received = false;
+          response.once('data', (chunk: Buffer) => {
+            received = true;
+            response.pause();
+            // Withhold bytes even when the real server returns its complete XML in one chunk.
+            const split = Math.max(1, Math.floor(chunk.length / 2));
+            downstream.write(chunk.subarray(0, split));
+            const remainder = chunk.subarray(split);
+            const resume = () => {
+              if (release === resume) release = undefined;
+              if (!downstream.destroyed && !response.destroyed) {
+                downstream.write(remainder);
+                response.pipe(downstream);
+              }
+            };
+            release = resume;
+            markReached();
+          });
+          response.once('end', () => {
+            if (!received) {
+              downstream.end();
+              markReached();
+            }
           });
         } else {
           downstream.writeHead(response.statusCode ?? 502, response.rawHeaders);

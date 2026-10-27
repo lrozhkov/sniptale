@@ -7,7 +7,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 const logger = createLogger({ namespace: 'OffscreenDocument' });
 let currentStartupId: string | null = null;
 
-/** Publish transport readiness only after both runtime listeners have been registered. */
+/** Publish transport readiness only after all runtime listeners have been registered. */
 export function bootstrapOffscreenDocument(): void {
   installDiagnosticPortCapture();
   initTracer('off');

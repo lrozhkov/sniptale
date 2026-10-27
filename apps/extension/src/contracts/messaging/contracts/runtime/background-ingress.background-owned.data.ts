@@ -2,6 +2,28 @@ import type { BackgroundIngressRouteGroupData } from './background-ingress.types
 
 export const backgroundIngressBackgroundOwnedRouteGroups = [
   {
+    acceptedSenderClass: 'exact extension offscreen document without a tab',
+    actionKind: 'background-owned',
+    alternateAuthorizationPolicyIds: [],
+    alternateAuthorityFamilies: [],
+    authorizationPolicyId: 'background-owned',
+    boundary: 'background-runtime',
+    errorShape: 'standard runtime response with fixed sync origin permission refusal',
+    freshnessReplayPolicy:
+      'canonical runtime freshness and replay checks before read-only permission query',
+    handlerId: 'sync-connection-origin-permission',
+    keepChannelBehaviorSource: 'background-owned-route-handler',
+    ownerModule: 'apps/extension/src/background/sync-connection/route.ts',
+    policyAuthorityFamily: 'sync-connection-origin-permission',
+    policyStateIds: [],
+    requiredAuthority: 'exact offscreen sender and current durable connection identity and origin',
+    responseShape: 'allowed boolean or fixed sync origin permission refusal',
+    routeAuthorityFamily: 'background-owned-ipc',
+    sideEffects: 'read-only native connection and optional host permission query',
+    transitiveStateOwner: 'native remote-connection owner and browser permission authority',
+    messageTypes: ['SYNC_CONNECTION_ORIGIN_PERMISSION'],
+  },
+  {
     acceptedSenderClass: 'checked top-level content runtime including the owned shim sender',
     actionKind: 'background-owned',
     alternateAuthorizationPolicyIds: [],
@@ -272,6 +294,7 @@ export const backgroundIngressBackgroundOwnedRouteGroups = [
       'popup-export-erasure-exclusion',
       'project-export-capabilities',
       'project-export-job-ledger',
+      'sync-connection-erasure-exclusion',
       'tab-mode-runtime-state',
       'video-recording-control-lease',
       'voice-input-port-session-authority',

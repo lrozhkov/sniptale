@@ -278,3 +278,25 @@ The content shim reads `pageLaunch` preferences from the existing sync settings 
 The shim keeps its mount observer while the full content runtime is present. Initial passive wakeup completes before the launcher appears. The full runtime owns active UI and capture. Status and preset availability reads check page access without loading the full runtime. Explicit Close waits for page restoration, the unpin response, and scenario shutdown responses. The App owner then checks committed UI state before the existing cleanup callback can release the runtime. The callback removes the full host after it disposes listeners. A completed quick action requests the same guarded cleanup. Failed native commands request it after rollback. Active work prevents release.
 
 Quick-action placement has three independent settings: popup, corner group, and page toolbar. A corner menu requires the launcher group or a collapsed toolbar group. Menu commands use the existing trusted content capability flow. The full menu commits dismissal before it sends the capture command. The shim has no React, app persistence, parser, or full content service dependency. Its existing build limits and forbidden-input checks still apply.
+
+
+## WebDAV synchronization lifecycle
+
+The background sync coordinator controls admission, executor observation and erasure exclusion. The shared offscreen document owns each detached queue workflow and its HTTP requests. Commands carry native connection and queue identities. They carry no credentials, headers or file bodies.
+
+Start returns a short acknowledgement. Inspect returns a bounded disposable snapshot without waiting for IO. Stop aborts requests and waits for response bodies, workflows and native locks to drain. A timeout or missing response cannot prove containment.
+
+The executor identity lasts for one document. Its revision changes after a binding change or Stop reservation. Delayed commands must match both values. Native queue records remain authoritative after runtime termination. Worker restart requires a fresh startup challenge and a check of current durable authorization.
+
+The background origin-permission query accepts only the exact offscreen sender. It checks the native identity and canonical HTTPS origin before and after the browser permission query. It does not enter the coordinator queue or acquire the connection admission lock. Revocation must commit before Stop starts. Erasure must drain sync before mutation waits and media cleanup.
+
+Production pages cannot start synchronization in this slice. The separate provider suite uses a security-only control Port for lifecycle proof. Each lifecycle command closes its Port after its response. The driver never attaches to the worker.
+
+
+Build the lifecycle fixture with `npm run qa:e2e:build:security`. Run it with the separate configuration:
+
+```sh
+npm exec playwright test -- --config tooling/test/e2e/providers/webdav-lifecycle.config.ts
+```
+
+The lifecycle suite uses `.tmp/e2e-builds/security` by default. `SNIPTALE_WEBDAV_LIFECYCLE_BUILD_DIR` selects another security build. The existing provider command retains its test-e2e build and fixture list. Both suites require the explicit loopback server variables. Neither suite runs in the main pipeline.

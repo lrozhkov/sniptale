@@ -72,6 +72,7 @@ export const backgroundOwnedAuthorizationBindings = {
   'popup-export-job': authorizePopupExportJobRoute,
   'popup-tab-route-capability-issuance': authorizePopupTabRouteCapabilityIssuance,
   'settings-transfer': authorizeSettingsTransferRoute,
+  'sync-connection-origin-permission': authorizeSyncConnectionOriginPermission,
   'voice-input-offscreen-event': authorizeVoiceInputOffscreenEvent,
 } satisfies Record<
   BackgroundOwnedRouteInventoryEntry['handlerId'],
@@ -229,6 +230,23 @@ function authorizePopupTabRouteCapabilityIssuance(
   }
   markPreauthorizedPopupTabRouteCapabilityRequestMessage(request.message);
   return AUTHORIZED;
+}
+
+function authorizeSyncConnectionOriginPermission(
+  request: BackgroundOwnedAuthorizationRequest,
+  routeEntry: BackgroundOwnedRouteInventoryEntry
+): IpcAuthorizationResult {
+  if (request.sender.tab || !hasOffscreenRuntimeCapability(request.sender)) {
+    return reject('Sync origin permission query refused');
+  }
+  return authorize(
+    createBackgroundOwnedRoutePreauthorization({
+      entry: routeEntry,
+      handle: { kind: 'background-owned-route-policy' },
+      message: request.message,
+      senderClassification: 'offscreen-document',
+    })
+  );
 }
 
 function authorizeVoiceInputOffscreenEvent(

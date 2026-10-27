@@ -287,3 +287,13 @@ function action(type: MessageType): BackgroundOwnedAction {
     routeName: `background-owned:${type}`,
   };
 }
+
+it('dispatches the sync query to its exact-sender owner instead of granting page authority', () => {
+  const input = action(MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION);
+  const response = dispatchBackgroundOwnedRoute(input, null);
+  expect(response).toEqual({ handled: true, keepChannelOpen: true });
+  expect(sendResponse).toHaveBeenCalledExactlyOnceWith({
+    success: false,
+    error: 'Sync origin permission query refused',
+  });
+});

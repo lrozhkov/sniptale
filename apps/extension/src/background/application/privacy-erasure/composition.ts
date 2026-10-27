@@ -6,7 +6,7 @@ import { diagnosticsPrivacyErasureCleanupAdapter } from '../../diagnostics/priva
 import { mediaPrivacyErasureCleanupAdapter } from '../../media/privacy-erasure/cleanup';
 import { extensionPageLocalStorageErasureAdapter } from './page-local-storage';
 import type { BackgroundRuntimeState } from '../runtime-state';
-import type { NativeIngestionCleanupPort } from './ports';
+import type { NativeIngestionCleanupPort, SyncPrivacyErasurePort } from './ports';
 import {
   backgroundRuntimeCleanupAdapter,
   configureBackgroundRuntimeScreenshotCleanupPort,
@@ -29,6 +29,16 @@ const unavailableNativeIngestionCleanupPort: NativeIngestionCleanupPort = {
 };
 
 let nativeIngestionCleanupPort = unavailableNativeIngestionCleanupPort;
+let syncPrivacyErasurePort: SyncPrivacyErasurePort = {
+  reserveErasureExclusion() {
+    return {
+      release() {},
+      async quiesce() {
+        throw new Error('Sync privacy-erasure quiescence is unavailable');
+      },
+    };
+  },
+};
 
 const nativeIngestionCleanupProxy: NativeIngestionCleanupPort = {
   cleanup: () => nativeIngestionCleanupPort.cleanup(),
@@ -75,6 +85,9 @@ const privacyErasureUseCase = new PrivacyErasureUseCase({
     reserveErasureExclusion: () =>
       audioJobs?.reserveErasureExclusion() ?? { release() {}, async waitForActiveMutations() {} },
   },
+  sync: {
+    reserveErasureExclusion: () => syncPrivacyErasurePort.reserveErasureExclusion(),
+  },
   diagnostics: diagnosticsPrivacyErasureCleanupAdapter,
   media: mediaPrivacyErasureCleanupAdapter,
   nativeIngestion: nativeIngestionCleanupProxy,
@@ -86,6 +99,11 @@ const privacyErasureUseCase = new PrivacyErasureUseCase({
   runtime: backgroundRuntimeCleanupAdapter,
   storage: createPrivacyErasureStorageCleanupAdapter(extensionPageLocalStorageErasureAdapter),
 });
+
+/** Installs the runtime-owned sync exclusion before privacy erasure can remove local data. */
+export function configureSyncPrivacyErasurePort(port: SyncPrivacyErasurePort): void {
+  syncPrivacyErasurePort = port;
+}
 
 export function configureNativeIngestionPrivacyErasureCleanupPort(
   port: NativeIngestionCleanupPort

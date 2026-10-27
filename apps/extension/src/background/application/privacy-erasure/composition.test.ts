@@ -52,6 +52,7 @@ import {
   configureAudioJobPrivacyErasurePort,
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
+  configureSyncPrivacyErasurePort,
   eraseLocalExtensionDataFromBackground,
 } from './composition';
 
@@ -64,6 +65,9 @@ const verifiedParticipant = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  configureSyncPrivacyErasurePort({
+    reserveErasureExclusion: () => ({ release() {}, async quiesce() {} }),
+  });
   configureNativeIngestionPrivacyErasureCleanupPort({
     cleanup: nativeIngestionCleanupMock,
     reserveErasureExclusion: () => ({
@@ -181,4 +185,47 @@ it('cancels audio requests and waits for their staging writes before storage era
     'release-text',
   ]);
   expect(release).toHaveBeenCalledOnce();
+});
+
+it('uses the explicitly configured sync lifecycle port before cleanup', async () => {
+  const release = vi.fn();
+  const quiesce = vi.fn(async () => undefined);
+  const reserveErasureExclusion = vi.fn(() => ({ release, quiesce }));
+  configureSyncPrivacyErasurePort({ reserveErasureExclusion });
+
+  const operation = eraseLocalExtensionDataFromBackground(
+    {
+      type: MessageType.ERASE_LOCAL_EXTENSION_DATA,
+      includeAiProviderSecrets: false,
+      preservePreferences: true,
+    },
+    createBackgroundRuntimeState()
+  );
+  expect(reserveErasureExclusion).toHaveBeenCalledOnce();
+  await expect(operation).resolves.toEqual(expect.objectContaining({ success: true }));
+  expect(quiesce).toHaveBeenCalledBefore(mediaCleanupMock);
+  expect(quiesce).toHaveBeenCalledBefore(storageCleanupMock);
+  expect(release).toHaveBeenCalledOnce();
+});
+
+it('fails closed before any cleanup when runtime has not configured sync quiescence', async () => {
+  vi.resetModules();
+  const composition = await import('./composition');
+
+  const result = await composition.eraseLocalExtensionDataFromBackground(
+    {
+      type: MessageType.ERASE_LOCAL_EXTENSION_DATA,
+      includeAiProviderSecrets: true,
+      preservePreferences: false,
+    },
+    createBackgroundRuntimeState()
+  );
+
+  expect(result.success).toBe(false);
+  expect(result.failedRequiredParticipantIds).toEqual(['sync-runtime-state']);
+  expect(mediaCleanupMock).not.toHaveBeenCalled();
+  expect(diagnosticsCleanupMock).not.toHaveBeenCalled();
+  expect(nativeIngestionCleanupMock).not.toHaveBeenCalled();
+  expect(runtimeCleanupMock).not.toHaveBeenCalled();
+  expect(storageCleanupMock).not.toHaveBeenCalled();
 });

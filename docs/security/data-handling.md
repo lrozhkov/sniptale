@@ -285,3 +285,12 @@ Every request stays inside the selected root, omits browser cookies and rejects 
 DAV metadata responses have an eight MiB limit before XML parsing. Exceeding this limit refuses the listing rather than returning an incomplete successful catalog. Media transfers use native Blobs and response streams. The transfer caller must check actual size and digest before native publication or capture settlement.
 
 The provider test suite requires an explicit loopback Nextcloud endpoint and a separate command. Its TLS proxy preserves server XML and authentication behavior. Only the test browser can accept its temporary self-signed certificate. Production code requires HTTPS and does not bypass certificate validation.
+
+
+## Sync runtime containment
+
+Sync runtime messages contain selected native identities and bounded status codes only. The offscreen executor reads encrypted local credentials through the native connection owner. Credentials, Authorization headers, provider addresses and response bodies must not enter diagnostics.
+
+Every HTTP request checks current durable authorization and the optional origin grant. The permission query performs independent reads. It does not wait for the caller-held admission lock. Expected authentication, DAV and cancellation failures remain inside the sync executor. They do not mark the shared offscreen document as failed.
+
+Local-data erasure reserves sync exclusion before entering its execution queue. It revokes durable authorization and drains the observed executor before destructive cleanup. Failed or uncertain containment prevents erasure success and preserves local files and credentials. Native queue recovery requires the operation lock. Elapsed time does not authorize source release.
