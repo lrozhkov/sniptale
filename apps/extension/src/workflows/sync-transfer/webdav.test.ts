@@ -140,6 +140,7 @@ it.each([
 ])('rejects unsafe object keys before IO: %s', async (key) => {
   const remote = await store();
   fetchMock.mockClear();
+  await expect(remote.stat(key, signal())).rejects.toMatchObject({ code: 'invalid-key' });
   await expect(remote.read(key, signal())).rejects.toMatchObject({ code: 'invalid-key' });
   await expect(remote.write(key, new Blob(), signal())).rejects.toMatchObject({
     code: 'invalid-key',
@@ -388,4 +389,159 @@ it('admits an encoded literal percent in the configured root without changing th
   expect(urlOf(fetchMock.mock.calls.at(-1)![0])).toBe(
     'https://dav.example/100%25/root/capture.png'
   );
+});
+
+it.each(['0', '123', String(Number.MAX_SAFE_INTEGER)])(
+  'observes an ordinary file size %s with one guarded depth-zero SDK request and no media IO',
+  async (size) => {
+    const remote = await store();
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(xml(entry('/root/nested/file', false, size)));
+    const requestSignal = signal();
+    await expect(remote.stat('nested/file', requestSignal)).resolves.toEqual({
+      size: Number(size),
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [input, options] = fetchMock.mock.calls[0]!;
+    expect(urlOf(input)).toBe('https://dav.example/root/nested/file');
+    expect(options?.method).toBe('PROPFIND');
+    expect(new Headers(options?.headers).get('depth')).toBe('0');
+    expect(options?.body).toContain('resourcetype');
+    expect(options?.body).toContain('getcontentlength');
+    expect(options?.signal).toBe(requestSignal);
+    expect(options?.credentials).toBe('omit');
+    expect(options?.redirect).toBe('error');
+    expect(new Headers(options?.headers).get('authorization')).toBe(
+      `Basic ${btoa('alice:private-password')}`
+    );
+  }
+);
+
+it.each([
+  '',
+  entry('/root/file'),
+  entry('/root/other', false, '1'),
+  entry('https://elsewhere.example/root/file', false, '1'),
+  entry('/root2/file', false, '1'),
+  entry('/root/%2e%2e/file', false, '1'),
+  entry('/root/file', false, '1') + entry('/root/file', false, '1'),
+  entry('/root/file', false, '1') + entry('/root/other', false, '1'),
+  entry('/root/file', false, '1').replace('<d:resourcetype></d:resourcetype>', ''),
+  entry('/root/file', false, '1').replace('<d:getcontentlength>1</d:getcontentlength>', ''),
+  entry('/root/file', false, '1').replace('200 OK', '206 Partial Content'),
+  entry('/root/file', false, '1').replace('<d:resourcetype>', '<d:resourcetype><d:redirectref/>'),
+  entry('/root/file', false, '1').replace(
+    '<d:getcontentlength>1</d:getcontentlength>',
+    '<x:getcontentlength xmlns:x="urn:foreign">1</x:getcontentlength>'
+  ),
+])('refuses incomplete, ambiguous or foreign stat metadata: %s', async (responseEntries) => {
+  const remote = await store();
+  fetchMock.mockResolvedValueOnce(xml(responseEntries));
+  await expect(remote.stat('file', signal())).rejects.toMatchObject({ code: 'invalid-response' });
+});
+
+it.each(['-1', '1.5', 'NaN', '', '9007199254740992', ' 1', '1e2'])(
+  'refuses an invalid file size in stat: %s',
+  async (size) => {
+    const remote = await store();
+    fetchMock.mockResolvedValueOnce(xml(entry('/root/file', false, size)));
+    await expect(remote.stat('file', signal())).rejects.toMatchObject({ code: 'invalid-response' });
+  }
+);
+
+it.each([
+  [401, 'authentication'],
+  [403, 'access-denied'],
+  [404, 'missing'],
+  [429, 'temporary'],
+  [503, 'temporary'],
+  [302, 'invalid-response'],
+])('preserves stat refusal %s without retry or raw diagnostics', async (status, code) => {
+  const remote = await store();
+  fetchMock.mockClear();
+  const cancel = vi.fn();
+  fetchMock.mockResolvedValueOnce(
+    new Response(new ReadableStream({ cancel }), { status: Number(status) })
+  );
+  await expect(remote.stat('file', signal())).rejects.toMatchObject({ code, message: code });
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(cancel).toHaveBeenCalledOnce();
+});
+
+it.each([null, '1', '9000000'])('bounds stat metadata with content-length %s', async (length) => {
+  const remote = await store();
+  const cancel = vi.fn();
+  fetchMock.mockResolvedValueOnce(
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(8 * 1024 * 1024 + 1));
+        },
+        cancel,
+      }),
+      { status: 207, headers: length === null ? {} : { 'content-length': length } }
+    )
+  );
+  await expect(remote.stat('file', signal())).rejects.toMatchObject({ code: 'metadata-limit' });
+  await Promise.resolve();
+  expect(cancel).toHaveBeenCalledOnce();
+});
+
+it('cancels stat before dispatch and refuses a late metadata result after cancellation', async () => {
+  const remote = await store();
+  fetchMock.mockClear();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(remote.stat('file', controller.signal)).rejects.toMatchObject({ code: 'cancelled' });
+  expect(fetchMock).not.toHaveBeenCalled();
+  const active = new AbortController();
+  fetchMock.mockImplementationOnce(async (_input, init) => {
+    expect(init?.signal).toBe(active.signal);
+    active.abort();
+    return xml(entry('/root/file', false, '1'));
+  });
+  await expect(remote.stat('file', active.signal)).rejects.toMatchObject({ code: 'cancelled' });
+  expect(fetchMock).toHaveBeenCalledOnce();
+});
+
+it.each(['100%.png', 'literal%20.png', 'literal%2520.png'])(
+  'preserves literal percent names in stat: %s',
+  async (filename) => {
+    const remote = await store('https://dav.example/100%25/root/');
+    const path = `/100%25/root/${encodeURIComponent(filename)}`;
+    fetchMock.mockResolvedValueOnce(xml(entry(path, false, '12')));
+    await expect(remote.stat(filename, signal())).resolves.toEqual({ size: 12 });
+    expect(urlOf(fetchMock.mock.calls.at(-1)![0])).toBe(`https://dav.example${path}`);
+  }
+);
+
+it('refuses a failed required size property even when the resource type succeeds', async () => {
+  const remote = await store();
+  fetchMock.mockResolvedValueOnce(
+    xml(
+      [
+        '<d:response><d:href>/root/file</d:href><d:propstat><d:prop>',
+        '<d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>',
+        '<d:propstat><d:prop><d:getcontentlength/></d:prop>',
+        '<d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>',
+      ].join('')
+    )
+  );
+  await expect(remote.stat('file', signal())).rejects.toMatchObject({ code: 'invalid-response' });
+});
+
+it('refuses malformed stat XML and sanitizes transport exceptions', async () => {
+  const remote = await store();
+  fetchMock.mockResolvedValueOnce(
+    new Response('<d:multistatus xmlns:d="DAV:"><', {
+      status: 207,
+      headers: { 'content-type': 'application/xml' },
+    })
+  );
+  await expect(remote.stat('file', signal())).rejects.toHaveProperty('name', 'SyncRemoteError');
+  fetchMock.mockRejectedValueOnce(new Error('private URL and token'));
+  await expect(remote.stat('file', signal())).rejects.toMatchObject({
+    code: 'transport',
+    message: 'transport',
+  });
 });

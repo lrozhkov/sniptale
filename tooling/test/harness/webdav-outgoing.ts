@@ -21,7 +21,10 @@ import { syncCatalogRootKey } from '../../../apps/extension/src/workflows/sync-t
 import { prepareCatalogReplica } from '../../../apps/extension/src/workflows/sync-transfer/incoming';
 import type { CapturedChange } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
 import { loadPreparedOutgoingOperation } from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing';
-import { loadOutgoingDispatchAttempt } from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing-attempts';
+import {
+  loadOutgoingDispatchAttempt,
+  loadCompletedOutgoingFiles,
+} from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing-attempts';
 import {
   prepareCapturedOutgoing,
   dispatchPreparedOutgoing,
@@ -184,7 +187,14 @@ export function createWebdavOutgoingHarness(
       };
     },
     send: (spaceId: string, operationId: string) =>
-      dispatchPreparedOutgoing(spaceId, operationId, connected(), new AbortController().signal),
+      dispatchPreparedOutgoing(
+        spaceId,
+        operationId,
+        connected(),
+        new AbortController().signal,
+        catalog ? { catalog } : undefined
+      ),
+    completed: loadCompletedOutgoingFiles,
     prepared: loadPreparedOutgoingOperation,
     attempt: loadOutgoingDispatchAttempt,
   };

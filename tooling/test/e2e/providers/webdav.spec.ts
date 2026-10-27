@@ -62,6 +62,29 @@ async function createLab() {
       }
       return { size: bytes, sha256: hash.digest('hex') };
     },
+    async corruptFile(key: string) {
+      if (!key.startsWith('Files/'))
+        throw new Error('Only a synthetic media file can be corrupted.');
+      const url = new URL(key.split('/').map(encodeURIComponent).join('/'), root);
+      const response = await fetch(url, { headers: { authorization }, redirect: 'error' });
+      const size = Number(response.headers.get('content-length'));
+      if (!response.ok || !Number.isSafeInteger(size) || size < 1 || size > 1024 * 1024) {
+        await response.body?.cancel();
+        throw new Error('Synthetic corruption fixture is outside its byte budget.');
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length !== size) throw new Error('Synthetic file response size differs.');
+      bytes[0] = bytes[0]! ^ 255;
+      const changed = await fetch(url, {
+        method: 'PUT',
+        headers: { authorization },
+        body: bytes,
+        redirect: 'error',
+      });
+      await changed.body?.cancel();
+      if (!changed.ok) throw new Error('Synthetic external modification failed.');
+      return { size, sha256: createHash('sha256').update(bytes).digest('hex') };
+    },
     async close() {
       await proxy.close();
       const removed = await fetch(root, {
@@ -788,5 +811,167 @@ test('partial dispatch reuses completed bytes after restart and isolates the los
   } finally {
     lab.proxy.releaseFault();
     await sender.context.close();
+  }
+});
+
+test('another browser reuses published files without media transfer and still rejects corrupt hydration', async ({
+  lab,
+}, info) => {
+  test.setTimeout(240_000);
+  const source = await openProvider(lab, info, 'metadata-source');
+  let sent;
+  try {
+    sent = await source.page.evaluate(async () => {
+      const seed = await window.webdavTransferHarness.portable.source();
+      await window.webdavTransferHarness.portable.outgoing.sendHistory(seed.mediaId);
+      const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
+        seed.projectId
+      );
+      const prepared = await window.webdavTransferHarness.portable.outgoing.prepare(seed.projectId);
+      return { ...seed, spaceId: prepared.spaceId, lastFiles: projects.at(-1)!.files };
+    });
+  } finally {
+    await source.context.close();
+  }
+  let browser = await openProvider(lab, info, 'metadata-target');
+  try {
+    await browser.page.evaluate(async (input) => {
+      await window.webdavTransferHarness.portable.outgoing.scan(input.spaceId);
+      await window.webdavTransferHarness.portable.outgoing.receive(
+        input.spaceId,
+        'media',
+        input.mediaId
+      );
+      await window.webdavTransferHarness.portable.outgoing.receive(
+        input.spaceId,
+        'video-project',
+        input.projectId
+      );
+    }, sent);
+    const attempts: Awaited<
+      ReturnType<typeof window.webdavTransferHarness.portable.outgoing.send>
+    >[] = [];
+    for (const step of [0, 1, 2]) {
+      if (step === 1) {
+        await browser.context.close();
+        browser = await openProvider(lab, info, 'metadata-target');
+        await browser.page.evaluate(
+          (spaceId) => window.webdavTransferHarness.portable.outgoing.scan(spaceId),
+          sent.spaceId
+        );
+      }
+      if (step === 2) {
+        const key = attempts[0]!.objects[0]!.remoteKey;
+        const changed = await lab.corruptFile(key);
+        const original = sent.lastFiles.find((file) => file.key === key)!;
+        expect(changed.size).toBe(original.size);
+        expect(changed.sha256).not.toBe(original.sha256);
+      }
+      const completed = await browser.page.evaluate(
+        async (spaceId) =>
+          (await window.webdavTransferHarness.portable.outgoing.completed(spaceId, 3)).length,
+        sent.spaceId
+      );
+      expect(completed).toBe(0);
+      const beforeGets = lab.proxy.counts.getKeys.length;
+      const beforePuts = lab.proxy.counts.putBodies.length;
+      const next = await browser.page.evaluate(async (input) => {
+        await window.webdavTransferHarness.portable.outgoing.reviseMetadata(input.projectId);
+        const prepared = await window.webdavTransferHarness.portable.outgoing.prepare(
+          input.projectId
+        );
+        return window.webdavTransferHarness.portable.outgoing.send(
+          prepared.spaceId,
+          prepared.operationId
+        );
+      }, sent);
+      expect(lab.proxy.counts.getKeys.slice(beforeGets)).toEqual([next.recordKey]);
+      expect(lab.proxy.counts.putBodies.slice(beforePuts).map((body) => body.key)).toEqual([
+        next.recordKey,
+      ]);
+      expect(next.objects).toHaveLength(1);
+      expect(sent.lastFiles.some((file) => file.key === next.objects[0]!.remoteKey)).toBe(true);
+      attempts.push(next);
+    }
+    expect(new Set(attempts.map((attempt) => attempt.recordKey)).size).toBe(3);
+    expect(new Set(attempts.map((attempt) => attempt.objects[0]!.remoteKey)).size).toBe(1);
+    const local = await browser.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.proof(id),
+      sent.projectId
+    );
+    expect(local.objects.map((object) => object.sha256).sort()).toEqual(
+      sent.editing.map((object) => object.sha256).sort()
+    );
+    const corruptHydrationReads: string[] = [];
+    const verifier = await openProvider(lab, info, 'metadata-corrupt-target');
+    try {
+      const discovered = await verifier.page.evaluate(async (input) => {
+        const snapshot = await window.webdavTransferHarness.portable.outgoing.scan(input.spaceId);
+        await window.webdavTransferHarness.portable.outgoing.receive(
+          input.spaceId,
+          'media',
+          input.mediaId
+        );
+        return snapshot;
+      }, sent);
+      expect(discovered.pending).toEqual([]);
+      expect(discovered.quarantined).toEqual([]);
+      expect(discovered.invalid).toEqual([]);
+      expect(discovered.roots.find((root) => root.rootId === sent.projectId)).toMatchObject({
+        blocked: false,
+        conflict: false,
+        deleted: false,
+        unavailableDependencies: [],
+      });
+      const beforeHydration = lab.proxy.counts.getKeys.length;
+      await expect(
+        verifier.page.evaluate(
+          (input) =>
+            window.webdavTransferHarness.portable.outgoing.receive(
+              input.spaceId,
+              'video-project',
+              input.projectId
+            ),
+          sent
+        )
+      ).rejects.toThrow('Root object checksum does not match.');
+      corruptHydrationReads.push(...lab.proxy.counts.getKeys.slice(beforeHydration));
+      expect(corruptHydrationReads).toEqual([attempts.at(-1)!.objects[0]!.remoteKey]);
+      await expect(
+        verifier.page.evaluate(
+          (id) => window.webdavTransferHarness.portable.proof(id),
+          sent.projectId
+        )
+      ).rejects.toThrow('Native project is missing');
+    } finally {
+      await verifier.context.close();
+    }
+    const retained = await browser.page.evaluate(
+      ({ spaceId, operationId }) =>
+        window.webdavTransferHarness.portable.outgoing.prepared(spaceId, operationId),
+      {
+        spaceId: sent.spaceId,
+        operationId: attempts.at(-1)!.operationId,
+      }
+    );
+    // Each outgoing attempt still has its own native preparation and retained capture.
+    expect(retained?.recordSha256).toBe(attempts.at(-1)!.preparedSha256);
+    await writeFile(
+      info.outputPath('metadata-reuse-proof.json'),
+      JSON.stringify(
+        {
+          sent,
+          attempts,
+          local,
+          fullBrowserRestart: true,
+          sameSizeCorruptionRejectedAtHydration: true,
+          corruptHydrationReads,
+        },
+        null,
+        2
+      )
+    );
+  } finally {
+    await browser.context.close();
   }
 });

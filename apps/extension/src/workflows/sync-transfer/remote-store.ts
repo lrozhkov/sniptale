@@ -14,6 +14,8 @@ export interface SyncRemotePage {
 /** Provider-neutral object IO. Keys are relative; writes do not imply integrity or settlement. */
 export interface SyncRemoteStore {
   list(prefix: string, options: { signal: AbortSignal; cursor?: string }): Promise<SyncRemotePage>;
+  /** Observe existence and size only. This does not verify bytes or authorize settlement. */
+  stat(key: string, signal: AbortSignal): Promise<{ size: number }>;
   read(key: string, signal: AbortSignal): Promise<ReadableStream<Uint8Array>>;
   /** The browser can replay a PUT. Keep the attempt key and its frozen bytes identical. */
   write(key: string, body: Blob, signal: AbortSignal): Promise<void>;

@@ -13,6 +13,7 @@ import {
 } from '../../composition/persistence/sync-capture/outgoing-attempts';
 import { digestBackupObject } from '../media-hub-backup/v6/shared-objects';
 import { encodeCapturedPortableRoot } from './captured-root';
+import type { scanSyncCatalog } from './catalog';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
 import {
   createSyncAttempt,
@@ -205,7 +206,11 @@ async function readCompletedCandidate(
       physical.recordKey === candidate.attempt.recordKey &&
         physical.recordSha256 === candidate.attempt.recordSha256 &&
         JSON.stringify(physical.objects) === JSON.stringify(candidate.attempt.objects) &&
-        JSON.stringify(physical.operation) === candidate.prepared.recordText
+        JSON.stringify(physical.operation) === candidate.prepared.recordText &&
+        physical.operation.spaceId === candidate.attempt.spaceId &&
+        physical.operation.spaceId === candidate.prepared.spaceId &&
+        physical.operation.operationId === candidate.attempt.operationId &&
+        physical.operation.operationId === candidate.prepared.operationId
     );
     parsed.set(candidate.attempt.key, physical);
   }
@@ -223,10 +228,17 @@ async function canReuseRemoteFile(
   key: string,
   size: number,
   sha256: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  checkReusedContents: boolean
 ) {
   try {
-    await verifyRemote(remote, key, size, sha256, signal);
+    if (checkReusedContents) await verifyRemote(remote, key, size, sha256, signal);
+    else {
+      const observed = await remote.stat(key, signal);
+      if (!Number.isSafeInteger(observed.size) || observed.size < 0)
+        throw new SyncRemoteError('invalid-response');
+      if (observed.size !== size) return false;
+    }
     return true;
   } catch (error) {
     signal.throwIfAborted();
@@ -239,21 +251,120 @@ async function canReuseRemoteFile(
   }
 }
 
+type OutgoingCatalog = Awaited<ReturnType<typeof scanSyncCatalog>>;
+type CatalogCandidate = {
+  operationId: string;
+  operationText: string;
+  recordKey: string;
+  attemptId: string;
+  objects: { objectId: string; remoteKey: string }[];
+};
+
+function snapshotCatalogCandidates(catalog: OutgoingCatalog | undefined, spaceId: string) {
+  if (!catalog) return [];
+  const excluded = new Set([
+    ...catalog.pending,
+    ...catalog.quarantined,
+    ...catalog.invalidOperations,
+  ]);
+  const invalidKeys = new Set(catalog.invalid.map((item) => item.key));
+  const candidates: CatalogCandidate[] = [];
+  for (const [id, entry] of catalog.operations) {
+    if (
+      excluded.has(id) ||
+      entry.operation.operationId !== id ||
+      entry.operation.spaceId !== spaceId ||
+      JSON.stringify(entry.operation) !== entry.operationText
+    )
+      continue;
+    for (const attempt of entry.attempts) {
+      if (
+        invalidKeys.has(attempt.recordKey) ||
+        attempt.operationText !== entry.operationText ||
+        JSON.stringify(attempt.operation) !== entry.operationText
+      )
+        continue;
+      candidates.push({
+        operationId: id,
+        operationText: entry.operationText,
+        recordKey: attempt.recordKey,
+        attemptId: attempt.attemptId,
+        objects: attempt.objects.map(({ objectId, remoteKey }) => ({ objectId, remoteKey })),
+      });
+    }
+  }
+  return candidates;
+}
+
+async function readCatalogCandidates(candidates: CatalogCandidate[], spaceId: string) {
+  const physical: ParsedPhysicalAttempt[] = [];
+  for (const candidate of candidates) {
+    // Only the wire owner can validate canonical physical mappings and exact logical bytes.
+    try {
+      const attempt = await createSyncAttempt(
+        candidate.operationText,
+        candidate.attemptId,
+        candidate.objects
+      );
+      if (
+        attempt.recordKey !== candidate.recordKey ||
+        JSON.stringify(attempt.objects) !== JSON.stringify(candidate.objects)
+      )
+        continue;
+      const operation = await parseSyncOperationText(candidate.operationText);
+      if (operation.spaceId !== spaceId || operation.operationId !== candidate.operationId)
+        continue;
+      physical.push({ ...attempt, operation });
+    } catch {
+      // A malformed catalog alternative cannot supply file references.
+      continue;
+    }
+  }
+  return physical;
+}
+
+type RetainedFileCandidate = {
+  object: NonNullable<ParsedPhysicalAttempt['operation']['envelope']>['objects'][number];
+  digest: ParsedPhysicalAttempt['operation']['objects'][number];
+  binding: ParsedPhysicalAttempt['objects'][number];
+};
+
+async function readRetainedCandidates(
+  spaceId: string,
+  connectionGeneration: number,
+  catalog: CatalogCandidate[]
+) {
+  const candidates: RetainedFileCandidate[] = [];
+  const parsed = new Map<string, ParsedPhysicalAttempt>();
+  for (const candidate of await loadCompletedOutgoingFiles(spaceId, connectionGeneration))
+    candidates.push(await readCompletedCandidate(candidate, parsed));
+  for (const physical of await readCatalogCandidates(catalog, spaceId)) {
+    for (const object of physical.operation.envelope?.objects ?? []) {
+      const digest = physical.operation.objects.find((item) => item.objectId === object.objectId);
+      const binding = physical.objects.find((item) => item.objectId === object.objectId);
+      check(digest && binding);
+      candidates.push({ object, digest, binding });
+    }
+  }
+  return candidates;
+}
+
 async function selectRetainedFiles(
   spaceId: string,
   connectionGeneration: number,
   files: Awaited<ReturnType<typeof readDispatchSources>>,
   remote: SyncRemoteStore,
-  signal: AbortSignal
+  signal: AbortSignal,
+  catalog: CatalogCandidate[],
+  checkReusedContents: boolean
 ) {
-  const candidates = await loadCompletedOutgoingFiles(spaceId, connectionGeneration);
+  const candidates = await readRetainedCandidates(spaceId, connectionGeneration, catalog);
   const retained = new Map<string, string>();
-  const parsed = new Map<string, Awaited<ReturnType<typeof parseSyncAttemptText>>>();
   const checked = new Map<string, boolean>();
   for (const source of files) {
     for (const candidate of candidates) {
       signal.throwIfAborted();
-      const { object, digest, binding } = await readCompletedCandidate(candidate, parsed);
+      const { object, digest, binding } = candidate;
       if (
         digest.sha256 !== source.sha256 ||
         object.size !== source.expected.size ||
@@ -269,7 +380,8 @@ async function selectRetainedFiles(
           binding.remoteKey,
           object.size,
           digest.sha256,
-          signal
+          signal,
+          checkReusedContents
         );
         checked.set(verificationKey, valid);
       }
@@ -282,14 +394,17 @@ async function selectRetainedFiles(
   return retained;
 }
 
-/** Dispatch an independent frozen manifest; reuse only completed files with fresh digest checks. */
+/** Publish independent references. Reuse does not attest current bytes or authorize release. */
 export async function dispatchPreparedOutgoing(
   spaceId: string,
   operationId: string,
   remote: SyncRemoteStore,
-  signal: AbortSignal
+  signal: AbortSignal,
+  options: { catalog?: OutgoingCatalog; checkReusedContents?: boolean } = {}
 ) {
   signal.throwIfAborted();
+  const catalog = snapshotCatalogCandidates(options.catalog, spaceId);
+  const checkReusedContents = options.checkReusedContents === true;
   const prepared = await loadPreparedOutgoingOperation(spaceId, operationId);
   check(prepared);
   const files = await readDispatchSources(prepared, spaceId, operationId, signal);
@@ -299,7 +414,9 @@ export async function dispatchPreparedOutgoing(
     prepared.connectionGeneration,
     files,
     remote,
-    signal
+    signal,
+    catalog,
+    checkReusedContents
   );
   signal.throwIfAborted();
   const attempt = await reserveAttempt(prepared, retained);

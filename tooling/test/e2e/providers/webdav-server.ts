@@ -60,6 +60,7 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
   const counts = {
     puts: 0,
     gets: 0,
+    getKeys: [] as string[],
     propfinds: 0,
     sinkBytes: 0,
     putBodies: [] as { key: string; bytes: number; sha256: string; complete: boolean }[],
@@ -126,7 +127,10 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
           record(false);
         });
       }
-      if (incoming.method === 'GET') counts.gets++;
+      if (incoming.method === 'GET') {
+        counts.gets++;
+        counts.getKeys.push(key);
+      }
       if (incoming.method === 'PROPFIND') counts.propfinds++;
       const fault =
         armed && armed.method === incoming.method && armed.key === key ? armed : undefined;

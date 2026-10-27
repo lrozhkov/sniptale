@@ -174,6 +174,9 @@ async function fixture(project = false, duplicate = false) {
     )
   );
   const remote: SyncRemoteStore = {
+    stat: async () => {
+      throw new Error('This read workflow must not stat originals.');
+    },
     list: async () => ({ objects: [], prefixes: [], nextCursor: null }),
     write: async () => {
       throw new Error('Incoming must not write remotely.');

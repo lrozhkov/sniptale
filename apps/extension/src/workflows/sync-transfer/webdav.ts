@@ -189,6 +189,14 @@ function directory(item: Record<string, unknown>): boolean {
   return Object.hasOwn(resourceType, 'collection');
 }
 
+function fileSize(item: Record<string, unknown>): number {
+  const size = property(item, 'getcontentlength');
+  if (typeof size !== 'string' || !/^\d+$/.test(size) || !Number.isSafeInteger(Number(size))) {
+    throw new SyncRemoteError('invalid-response');
+  }
+  return Number(size);
+}
+
 function entries(value: unknown): Record<string, unknown>[] {
   if (!Array.isArray(value)) throw new SyncRemoteError('invalid-response');
   return value.map((item) => {
@@ -366,19 +374,33 @@ export async function createWebdavRemoteStore(
               throw new SyncRemoteError('invalid-response');
             }
             if (isDirectory) page.prefixes.push(`${key}/`);
-            else {
-              const size = property(item, 'getcontentlength');
-              if (
-                typeof size !== 'string' ||
-                !/^\d+$/.test(size) ||
-                !Number.isSafeInteger(Number(size))
-              ) {
-                throw new SyncRemoteError('invalid-response');
-              }
-              page.objects.push({ key, size: Number(size) });
-            }
+            else page.objects.push({ key, size: fileSize(item) });
           }
           return page;
+        } catch (error) {
+          throw failure(error, requestSignal);
+        }
+      },
+      async stat(key, requestSignal) {
+        try {
+          requestSignal.throwIfAborted();
+          const result: unknown = await propfind({
+            url: objectUrl(key),
+            depth: '0',
+            props: { 'd:resourcetype': {}, 'd:getcontentlength': {} },
+            fetchOptions: { signal: requestSignal },
+            fetch: guardedFetch,
+          });
+          requestSignal.throwIfAborted();
+          const values = entries(result);
+          if (values.length !== 1 || !values[0]) throw new SyncRemoteError('invalid-response');
+          const item = values[0];
+          if (listedKey(item['href'], root) !== key) throw new SyncRemoteError('invalid-response');
+          const resourceType = property(item, 'resourcetype');
+          if (!record(resourceType) || Object.keys(resourceType).length !== 0) {
+            throw new SyncRemoteError('invalid-response');
+          }
+          return { size: fileSize(item) };
         } catch (error) {
           throw failure(error, requestSignal);
         }

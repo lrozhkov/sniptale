@@ -29,6 +29,9 @@ function memory(pages: { key: string; size: number }[][], data: Map<string, Blob
   const reads: string[] = [];
   const prefixes: string[] = [];
   const remote: SyncRemoteStore = {
+    stat: async () => {
+      throw new Error('This read workflow must not stat originals.');
+    },
     list: async (prefix, options) => {
       prefixes.push(prefix);
       const index = options.cursor ? Number(options.cursor) : 0;
