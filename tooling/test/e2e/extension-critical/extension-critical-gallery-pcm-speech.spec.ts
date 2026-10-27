@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import type { AIScenarioSelection } from '../../../../apps/extension/src/contracts/settings/ai-catalog';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
@@ -9,8 +10,13 @@ import { persistedReviewContent, speechModelResponse } from '../support/voiceove
 
 const catalog = {
   ...speechModelResponse,
+  scenarioSelection: null,
   modelSelection: {
     ...speechModelResponse.modelSelection!,
+    providers: speechModelResponse.modelSelection!.providers.map((provider) => ({
+      ...provider,
+      incarnation: provider.id,
+    })),
     models: speechModelResponse.modelSelection!.models.map((model) =>
       model.operation === 'speech'
         ? {
@@ -41,7 +47,7 @@ async function setup(
       'sniptale-locale-preference': locale,
       'sniptale-theme-preference': locale === 'ru' ? 'light' : 'dark',
     },
-    runtimeResponses: { AI_SETTINGS_QUERY: catalog },
+    runtimeResponses: { AI_SETTINGS_QUERY: catalog, AI_SETTINGS_MUTATION: { success: true } },
   });
   await page.goto(
     `${origin}${GALLERY_HARNESS_PATH}?pcmSpeechFixture=1&theme=${locale === 'ru' ? 'light' : 'dark'}`
@@ -58,6 +64,7 @@ async function setup(
   const dialog = page.locator('dialog');
   const button = (key: Parameters<typeof translate>[0]) =>
     dialog.getByRole('button', { name: label(key), exact: true });
+  await expect(button('gallery.videoReview.advancedEditing')).toBeVisible();
   await activate(button('gallery.videoReview.advancedEditing'));
   await activate(button('gallery.videoReview.textTrackOpen'));
   const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
@@ -134,6 +141,115 @@ for (const variant of [
   { locale: 'ru' as const, width: 1280, height: 560 },
   { locale: 'en' as const, width: 1920, height: 900 },
 ]) {
+  test(`remembers authored Gallery voice choice without project changes ${variant.width}`, async ({
+    page,
+  }, info) => {
+    const host = await startHostServer();
+    try {
+      const { label, dialog, document } = await setup(
+        page,
+        host.origin,
+        variant.locale,
+        variant.width,
+        variant.height
+      );
+      await page.evaluate((response) => {
+        const primary = response.modelSelection.models.find(
+          (model) => model.operation === 'speech'
+        )!;
+        const second = {
+          ...primary,
+          id: '00000000-0000-4000-8000-000000000120',
+          displayName: 'Alternate speech',
+          modelCode: 'alternate-tts',
+        };
+        response.modelSelection.models.push(second);
+        let remembered: AIScenarioSelection | null = null;
+        window.__sniptaleHarness?.setRuntimeResponse('AI_SETTINGS_QUERY', () => ({
+          ...response,
+          scenarioSelection: remembered,
+        }));
+        window.__sniptaleHarness?.setRuntimeResponse('AI_SETTINGS_MUTATION', (message: unknown) => {
+          if (!message || typeof message !== 'object') return { success: false };
+          const choice: unknown = Reflect.get(message, 'selection');
+          if (
+            !choice ||
+            typeof choice !== 'object' ||
+            Reflect.get(choice, 'scenario') !== 'gallery-speech'
+          )
+            return { success: false };
+          const model = response.modelSelection.models.find(
+            (entry) => entry.id === Reflect.get(choice, 'modelId')
+          );
+          const provider = response.modelSelection.providers.find(
+            (entry) => entry.id === model?.providerId
+          );
+          if (!model || !provider) return { success: false };
+          remembered = {
+            modelId: model.id,
+            modelCode: model.modelCode,
+            providerId: provider.id,
+            providerIncarnation: provider.incarnation,
+            displayName: model.displayName,
+            source: 'explicit',
+            selectedAt: Date.now(),
+          };
+          return { success: true };
+        });
+      }, catalog);
+      const before = await persistedReviewContent(page);
+      const open = () =>
+        activate(
+          document.getByRole('button', {
+            name: label('gallery.videoReview.speechGenerate'),
+            exact: true,
+          })
+        );
+      await open();
+      const voice = dialog.locator('[data-ui="gallery.videoReview.textVoice"]');
+      const selector = voice.locator('.sniptale-ai-model-selector-trigger');
+      await activate(selector);
+      const menu = voice.locator('.sniptale-dropdown-menu');
+      await menu.getByRole('textbox').fill('Alternate');
+      const choice = menu.getByRole('button', { name: 'Alternate speech', exact: true });
+      await choice.focus();
+      await choice.press('Enter');
+      await expect(selector).toContainText('Alternate speech');
+      expect(await persistedReviewContent(page)).toEqual(before);
+      await page.screenshot({
+        path: info.outputPath('gallery-remembered-choice.png'),
+        fullPage: false,
+      });
+      await activate(
+        voice.getByRole('button', { name: label('gallery.videoReview.textVoiceBack'), exact: true })
+      );
+      await open();
+      await expect(selector).toContainText('Alternate speech');
+      expect(await persistedReviewContent(page)).toEqual(before);
+      if (variant.width === 1280) {
+        await page.setViewportSize({ width: 1100, height: 560 });
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+        ).toBe(true);
+        const workspaceScroll = dialog.locator('[data-ui="gallery.videoReview.workspaceScroll"]');
+        await workspaceScroll.evaluate((element) => {
+          element.scrollLeft = element.scrollWidth;
+        });
+        await expect(selector).toBeInViewport();
+        await activate(selector);
+        await expect(menu.getByRole('textbox')).toBeVisible();
+        await menu.getByRole('textbox').press('Escape');
+        await page.screenshot({
+          path: info.outputPath('gallery-narrow-choice.png'),
+          fullPage: false,
+        });
+      }
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+
   test(`PCM native request, preview, Apply, Undo/Redo, reopen and export ${variant.width}`, async ({
     page,
   }, info) => {

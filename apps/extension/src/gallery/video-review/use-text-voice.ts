@@ -363,10 +363,17 @@ export function useReviewTextVoiceOperation(props: Options) {
       if (!pending) throw new Error('stale');
       await pending;
     },
-    generate: (profile: ReviewSpeechProfile, approvedProviderId: string) => {
+    generate: (
+      profile: ReviewSpeechProfile,
+      approvedProviderId: string,
+      prepareSelection?: ((signal: AbortSignal) => Promise<void>) | undefined
+    ) => {
       const selected = [...remainingIds];
       const captured = structuredClone(profile);
       void command(async (signal) => {
+        await prepareSelection?.(signal);
+        signal.throwIfAborted();
+        if (!attempt.isCurrent()) throw new DOMException('Unmounted', 'AbortError');
         await attempt.beforeRequest();
         signal.throwIfAborted();
         const prepared = await prepareReviewTextVoiceBatch(props.access.session, selected, signal);

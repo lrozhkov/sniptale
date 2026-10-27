@@ -1,5 +1,34 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'synthesis-field-selection-consumers',
+    productionFile: 'apps/extension/src/ui/video-text/speech/profile.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Shared synthesis fields retain existing Gallery and video inspector profile behavior while Gallery authored narration delegates model choice to its scenario owner.',
+    testFiles: [
+      'apps/extension/src/ui/video-text/speech/profile.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-profile.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-authored-speech-selection',
+    productionFile: 'apps/extension/src/gallery/video-review/text-voice-panel.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted narration, shared selection and persistence proof cover opening, explicit use, cancellation, refusal, deletion, recreation and retry.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
     owner: 'scenario-narration-contextual-selection',
     exclusive: true,
     productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx',

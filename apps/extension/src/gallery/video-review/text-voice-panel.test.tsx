@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useEffect, type ComponentProps } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTextVoiceForm } from './text-voice-panel';
@@ -14,7 +14,7 @@ import {
   createReviewTextDocument,
 } from '../../features/video/review/text-document';
 import type { ReviewTextVoicePreview } from '../../workflows/video-review/text-voice';
-import type { SpeechProfileFields } from './speech-profile';
+import type { SpeechSynthesisProfileFields } from '../../ui/video-text/speech/profile';
 
 const mocks = vi.hoisted(() => ({
   generate: vi.fn(),
@@ -22,7 +22,8 @@ const mocks = vi.hoisted(() => ({
   batch: vi.fn(),
   pendingPublication: false,
   cleanup: vi.fn(),
-  reload: vi.fn(),
+  catalog: vi.fn(),
+  remember: vi.fn(),
   failCatalog: false,
   job: vi.fn(),
   staging: vi.fn(),
@@ -57,60 +58,42 @@ vi.mock('../../platform/i18n', async (original) => ({
         ? 'Send phrase text and voice parameters to {provider}'
         : key,
 }));
-vi.mock('./use-speech', () => ({
-  useReviewSpeechCatalog: (_setModel: unknown, onError: () => void) => {
-    useEffect(() => {
-      if (mocks.failCatalog) onError();
-    }, [onError]);
-    return {
-      catalogs: mocks.failCatalog
-        ? null
-        : {
-            transcription: { models: [], providers: [], defaultModelId: null },
-            speech: {
-              defaultModelId: 'model1',
-              providers: [
-                { id: 'provider1', name: 'Provider One' },
-                { id: 'provider2', name: 'Provider Two' },
-              ],
-              models: ['1', '2'].map((id) => ({
-                id: `model${id}`,
-                providerId: `provider${id}`,
-                displayName: `Model ${id}`,
-                audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
-              })),
-            },
-          },
-      reloadModels: mocks.reload,
-    };
-  },
+vi.mock('../../workflows/ai-settings/query', () => ({
+  requestAIScenarioModelSelection: mocks.catalog,
+  rememberAIScenarioModelSelection: mocks.remember,
 }));
-vi.mock('./speech-profile', () => ({
-  SpeechProfileFields: ({ speech }: ComponentProps<typeof SpeechProfileFields>) => (
+vi.mock('../../ui/video-text/speech/profile', () => ({
+  SpeechSynthesisProfileFields: ({
+    profile,
+    onChange,
+    onSelectModel,
+    onOpenModels,
+  }: ComponentProps<typeof SpeechSynthesisProfileFields>) => (
     <div>
+      <button onClick={onOpenModels}>Refresh model catalog</button>
       {(['mp3', 'wav', 'pcm'] as const).map((responseFormat) => (
         <button
           key={responseFormat}
           onClick={() => {
-            if (speech.profile) speech.changeProfile({ ...speech.profile, responseFormat });
+            if (profile) onChange({ ...profile, responseFormat });
           }}
         >
           {responseFormat}
         </button>
       ))}
-      <button
-        onClick={() => {
-          if (speech.profile) speech.changeProfile({ ...speech.profile, modelId: 'model2' });
+      <button onClick={() => onSelectModel?.('model2')}>Provider Two</button>
+      <input
+        aria-label="voice"
+        value={profile?.voiceId ?? ''}
+        onChange={(event) => {
+          if (profile) onChange({ ...profile, voiceId: event.target.value });
         }}
-      >
-        Provider Two
-      </button>
+      />
       <input
         aria-label="instructions"
-        value={speech.profile?.instructions ?? ''}
+        value={profile?.instructions ?? ''}
         onChange={(event) => {
-          if (speech.profile)
-            speech.changeProfile({ ...speech.profile, instructions: event.target.value });
+          if (profile) onChange({ ...profile, instructions: event.target.value });
         }}
       />
     </div>
@@ -213,6 +196,29 @@ const approve = () => click('gallery.videoReview.speechConsentContinue');
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.failCatalog = false;
+  mocks.remember.mockResolvedValue(undefined);
+  mocks.catalog.mockImplementation(async () => {
+    if (mocks.failCatalog) throw new Error('catalog');
+    return {
+      scenario: 'gallery-speech',
+      remembered: null,
+      resolution: { status: 'initial', modelId: 'model1', previousSelection: null, reason: null },
+      globalSystemPrompt: '',
+      providers: ['1', '2'].map((id) => ({
+        id: `provider${id}`,
+        name: id === '1' ? 'Provider One' : 'Provider Two',
+        incarnation: id,
+        connectionType: 'openai-compatible',
+      })),
+      models: ['1', '2'].map((id) => ({
+        id: `model${id}`,
+        providerId: `provider${id}`,
+        modelCode: `code${id}`,
+        displayName: `Model ${id}`,
+        audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+      })),
+    };
+  });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.append(host);
@@ -566,12 +572,11 @@ it('aborts on leaving the form and releases a late output without applying it', 
 it('stops the loader on failed model discovery and resumes it only for an explicit retry', async () => {
   mocks.failCatalog = true;
   await render();
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-    'gallery.videoReview.speechMissingModel'
-  );
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('aiModal.modelCatalogFailed');
   expect(host.querySelectorAll('svg.animate-spin')).toHaveLength(0);
+  mocks.catalog.mockImplementationOnce(() => new Promise(() => undefined));
   await click('gallery.videoReview.speechReloadModels');
-  expect(mocks.reload).toHaveBeenCalledOnce();
+  expect(mocks.catalog).toHaveBeenCalledTimes(2);
   expect(host.querySelectorAll('svg.animate-spin')).toHaveLength(1);
   expect(mocks.generate).not.toHaveBeenCalled();
 });
@@ -694,4 +699,98 @@ it('cancels the active batch without removing its ready take or starting remaini
   );
   expect(mocks.apply).not.toHaveBeenCalled();
   expect(mocks.batch).not.toHaveBeenCalled();
+});
+
+it('refuses preference persistence before source Save and preserves the profile for an explicit retry', async () => {
+  const { beforeRequest } = await render();
+  expect(mocks.remember).not.toHaveBeenCalled();
+  mocks.remember.mockRejectedValueOnce(new Error('refused'));
+  await start();
+  await approve();
+  expect(beforeRequest).not.toHaveBeenCalled();
+  expect(mocks.generate).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('aiModal.modelSelectionSaveFailed');
+  await start();
+  expect(beforeRequest).toHaveBeenCalledOnce();
+  expect(mocks.generate.mock.calls[0]?.[2]).toMatchObject({ modelId: 'model1', voiceId: 'voice' });
+});
+
+it.each(['cancel', 'close'] as const)(
+  'prevents late Save and generation after %s during preference preparation',
+  async (end) => {
+    const { beforeRequest } = await render();
+    let complete!: () => void;
+    mocks.remember.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          complete = resolve;
+        })
+    );
+    await start();
+    await approve();
+    expect(mocks.remember).toHaveBeenCalledOnce();
+    if (end === 'cancel') await click('common.actions.cancel');
+    else await act(async () => root.render(null));
+    await act(async () => complete());
+    expect(beforeRequest).not.toHaveBeenCalled();
+    expect(mocks.generate).not.toHaveBeenCalled();
+  }
+);
+
+it('retains the voice draft through unavailable catalog recovery and requires explicit replacement', async () => {
+  await render();
+  await click('Provider Two');
+  mocks.remember.mockClear();
+  const input = host.querySelector<HTMLInputElement>('input[aria-label="instructions"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      'retained instructions'
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const current = await mocks.catalog();
+  mocks.catalog.mockResolvedValueOnce({ ...current, models: [], providers: [] });
+  await click('Refresh model catalog');
+  expect(input.value).toBe('retained instructions');
+  expect(host.textContent).toContain('aiModal.modelSelectionUnavailable');
+  expect(mocks.remember).not.toHaveBeenCalled();
+  await click('gallery.videoReview.speechReloadModels');
+  expect(input.value).toBe('retained instructions');
+  const replacement = structuredClone(current);
+  replacement.models[1].modelCode = 'replacement-code';
+  mocks.catalog.mockResolvedValueOnce(replacement);
+  await click('Refresh model catalog');
+  expect(input.value).toBe('retained instructions');
+  mocks.remember.mockRejectedValueOnce(new Error('refused'));
+  await click('Provider Two');
+  expect(input.value).toBe('retained instructions');
+  await click('Provider Two');
+  expect(input.value).toBe('');
+});
+
+it('admits capability-only catalog speech after explicit voice entry', async () => {
+  const catalog = await mocks.catalog();
+  for (const model of catalog.models) delete model.audio;
+  mocks.catalog.mockResolvedValue(catalog);
+  await render();
+  const generate = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.textVoiceSaveStart"]'
+  )!;
+  expect(generate.disabled).toBe(true);
+  expect(mocks.remember).not.toHaveBeenCalled();
+  const voice = host.querySelector<HTMLInputElement>('input[aria-label="voice"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      voice,
+      'catalog voice'
+    );
+    voice.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await start();
+  await approve();
+  expect(mocks.generate.mock.calls[0]?.[2]).toMatchObject({
+    modelId: 'model1',
+    voiceId: 'catalog voice',
+  });
 });
