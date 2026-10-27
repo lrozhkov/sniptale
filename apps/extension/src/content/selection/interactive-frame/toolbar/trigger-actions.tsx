@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, ListOrdered, Scaling } from 'lucide-react';
+import { Eye, EyeOff, ListOrdered, Move } from 'lucide-react';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { FrameAnnotationEffectIcon } from '../../../../features/highlighter/frame-annotation/effect-icon';
 import { FrameCommentIcon } from '../../../../features/highlighter/frame-annotation/icons';
@@ -117,7 +117,7 @@ export function createFrameQuickActions(
         ]),
     {
       id: 'edit',
-      icon: <Scaling size={16} aria-hidden="true" style={frameTriggerIconStyle} />,
+      icon: <Move size={16} aria-hidden="true" style={frameTriggerIconStyle} />,
       label: translate('content.interactiveFrame.editButton'),
       onClick: props.handleStartEditing,
     },

@@ -362,6 +362,10 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         .toBeLessThanOrEqual(1);
       await verifyCreation(page, toolbar, info);
       const measurementTarget = page.locator('#measurement-target');
+      await measurementTarget.evaluate((element) => {
+        element.style.width = '240px';
+        element.style.height = '80px';
+      });
       const target = (await measurementTarget.boundingBox())!;
       const toolbarBounds = (await toolbar.boundingBox())!;
       const point = [target.x + 10, target.x + target.width - 10]
@@ -384,6 +388,13 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           return page.locator('.sniptale-frame-toolbar-trigger').isVisible();
         })
         .toBe(true);
+      await expect(
+        page.locator('.sniptale-frame-quick-action[data-quick-action="edit"] .lucide-move')
+      ).toHaveCount(1);
+      await expect(
+        page.locator('.sniptale-frame-quick-action[data-quick-action="edit"] .lucide-scaling')
+      ).toHaveCount(0);
+      await capture(page, info, 'mini-frame-edit.png');
       await page.locator('.sniptale-frame-toolbar-trigger').click();
       await verifySelected(page, info);
       if (orientation === 'horizontal' && size.width === 1280) {

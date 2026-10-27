@@ -432,7 +432,7 @@ describe('InteractiveFrameToolbarTrigger capture visibility', () => {
   });
 });
 
-it('uses the original border icon and dimension icon in frame quick actions', () => {
+it('uses the border icon and the shared move icon for frame editing', () => {
   act(() =>
     root.render(
       <InteractiveFrameToolbarTrigger
@@ -443,5 +443,6 @@ it('uses the original border icon and dimension icon in frame quick actions', ()
     )
   );
   expect(document.querySelector('[data-quick-action="settings"] .lucide-square')).not.toBeNull();
-  expect(document.querySelector('[data-quick-action="edit"] .lucide-scaling')).not.toBeNull();
+  expect(document.querySelector('[data-quick-action="edit"] .lucide-move')).not.toBeNull();
+  expect(document.querySelector('[data-quick-action="edit"] .lucide-scaling')).toBeNull();
 });
