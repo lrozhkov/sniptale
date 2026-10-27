@@ -287,7 +287,7 @@ export function renderDrawingSelection(
   applyDrawingObjectTransform(context, object, projection);
   context.strokeStyle = '#2563eb';
   context.lineWidth = 1;
-  if (object.kind !== 'arrow') {
+  if (object.kind !== 'arrow' && object.kind !== 'rectangle') {
     context.setLineDash([4, 3]);
     context.strokeRect(x, y, bounds.width, bounds.height);
     context.setLineDash([]);
