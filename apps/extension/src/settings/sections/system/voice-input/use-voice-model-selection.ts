@@ -5,6 +5,7 @@ import type {
 } from '@sniptale/runtime-contracts/voice-input';
 import type { AIModelCatalogPayload } from '../../../../contracts/messaging/ai-settings-runtime';
 import {
+  refreshManagedAICatalogs,
   requestAIScenarioModelSelection,
   requestAISettingsPageRuntimeData,
 } from '../../../../workflows/ai-settings/query';
@@ -18,6 +19,7 @@ const EMPTY_CATALOG: AIModelCatalogPayload = {
   providers: [],
 };
 const defaultDeps = {
+  maintain: refreshManagedAICatalogs,
   catalog: (scenario: 'voice-recognition' | 'voice-correction'): Promise<AIModelCatalogPayload> =>
     requestAIScenarioModelSelection(scenario),
   prompt: async () =>
@@ -89,8 +91,23 @@ export function useVoiceModelSelection(args: {
       setAcceptedPrompt(value);
     } catch {
       if (current === generation.current) setError(true);
+      return;
     } finally {
       if (current === generation.current) setLoading(false);
+    }
+    if (current !== generation.current) return;
+    try {
+      await deps.maintain();
+      if (current !== generation.current) return;
+      const [asr, text] = await Promise.all([
+        deps.catalog('voice-recognition'),
+        deps.catalog('voice-correction'),
+      ]);
+      if (current !== generation.current) return;
+      setTranscription(availableCatalog(asr));
+      setCorrection(availableCatalog(text));
+    } catch {
+      // Advisory metadata failure preserves saved catalogs and the independent prompt mutation.
     }
   }, [deps]);
   useEffect(() => {

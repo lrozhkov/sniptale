@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const loaderMocks = vi.hoisted(() => ({
   loadAiProvidersRuntimeDataMock: vi.fn(),
+  maintain: vi.fn(),
   applyLoadedAiProvidersRuntimeDataMock: vi.fn(),
   ensureDefaultAiProvidersModelMock: vi.fn(),
   reportAiProvidersLoaderErrorMock: vi.fn(),
@@ -15,6 +16,10 @@ const loaderMocks = vi.hoisted(() => ({
 vi.mock('./runtime-data', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./runtime-data')>()),
   loadAiProvidersRuntimeData: loaderMocks.loadAiProvidersRuntimeDataMock,
+}));
+
+vi.mock('../../../../../../../workflows/ai-settings/query', () => ({
+  refreshManagedAICatalogs: loaderMocks.maintain,
 }));
 
 vi.mock('./apply-loaded-data', () => ({
@@ -107,6 +112,7 @@ function renderLoaderHarness(
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  loaderMocks.maintain.mockReset().mockResolvedValue(undefined);
   loaderMocks.loadAiProvidersRuntimeDataMock.mockReset();
   loaderMocks.applyLoadedAiProvidersRuntimeDataMock.mockReset();
   loaderMocks.ensureDefaultAiProvidersModelMock.mockReset();
@@ -147,7 +153,7 @@ it('loads runtime data on mount without changing model preferences', async () =>
   await renderLoaderHarness(setters, secretSetters);
   await flushEffects();
 
-  expect(loaderMocks.loadAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(1);
+  expect(loaderMocks.loadAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(2);
   expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).toHaveBeenCalledWith(
     {
       ...setters,
@@ -197,4 +203,69 @@ it('rejects an explicit reload after reporting its failure', async () => {
 
   expect(loaderMocks.reportAiProvidersLoaderErrorMock).toHaveBeenLastCalledWith(reloadError);
   expect(setters.setIsLoading).toHaveBeenLastCalledWith(false);
+});
+
+function holdMaintenance() {
+  let release!: () => void;
+  loaderMocks.maintain.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      release = resolve;
+    })
+  );
+  return () => release();
+}
+it('applies saved connection data before remote maintenance and then reads the completed catalog', async () => {
+  const release = holdMaintenance();
+  const setters = createLoaderSetters();
+  await renderLoaderHarness(setters);
+  expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(1);
+  expect(setters.setIsLoading).toHaveBeenLastCalledWith(false);
+  expect(loaderMocks.maintain).toHaveBeenCalledTimes(1);
+  await act(async () => release());
+  expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(2);
+});
+it('preserves saved connection data when advisory maintenance fails', async () => {
+  loaderMocks.maintain.mockRejectedValueOnce(new Error('Metadata unavailable'));
+  const setters = createLoaderSetters();
+  await renderLoaderHarness(setters);
+  expect(loaderMocks.maintain).toHaveBeenCalledTimes(1);
+  expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(1);
+  expect(loaderMocks.reportAiProvidersLoaderErrorMock).not.toHaveBeenCalled();
+  await act(async () => latestReloadData?.reloadData());
+  expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(2);
+});
+it('discards maintenance projection after a newer explicit connection reload', async () => {
+  const release = holdMaintenance();
+  await renderLoaderHarness(createLoaderSetters());
+  await act(async () => latestReloadData?.reloadData());
+  await act(async () => release());
+  expect(loaderMocks.loadAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(2);
+});
+it('does not reload after maintenance completes for a disposed connection surface', async () => {
+  const release = holdMaintenance();
+  await renderLoaderHarness(createLoaderSetters());
+  await act(async () => root?.unmount());
+  root = null;
+  await act(async () => release());
+  expect(loaderMocks.loadAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(1);
+});
+it('discards an older local connection read that finishes after a newer reload', async () => {
+  await renderLoaderHarness(createLoaderSetters());
+  let release!: (value: unknown) => void;
+  loaderMocks.loadAiProvidersRuntimeDataMock.mockReturnValueOnce(
+    new Promise((resolve) => {
+      release = resolve;
+    })
+  );
+  let old: Promise<void> | undefined;
+  act(() => {
+    old = latestReloadData?.reloadData();
+  });
+  await act(async () => latestReloadData?.reloadData());
+  const applied = loaderMocks.applyLoadedAiProvidersRuntimeDataMock.mock.calls.length;
+  await act(async () => {
+    release([]);
+    await old;
+  });
+  expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(applied);
 });

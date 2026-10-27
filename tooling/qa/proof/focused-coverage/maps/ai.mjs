@@ -1,5 +1,55 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'settings-connection-catalog-maintenance',
+    productionFile:
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/use-loader.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted Settings consumers and catalog lifecycle proof cover cached data, form retention, stale responses, credentials, serialized writes, reset, recreation and retry.',
+    testFiles: [
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/use-loader.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/runtime-data.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/apply-loaded-data.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/error-handling.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/root.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/index.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/content.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/content.modals.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/content.secret-protection-dialog.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
+      'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
+    owner: 'settings-connection-catalog-maintenance',
+    productionFile: 'apps/extension/src/settings/sections/ai/connections/index.tsx',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Mounted Settings consumers and catalog lifecycle proof cover cached data, form retention, stale responses, credentials, serialized writes, reset, recreation and retry.',
+    testFiles: [
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/use-loader.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/runtime-data.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/apply-loaded-data.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader/error-handling.test.ts',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/loader.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/controller/state/root.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/index.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/content.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/content.modals.test.tsx',
+      'apps/extension/src/settings/sections/ai/connections/surface/content.secret-protection-dialog.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
+      'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+
+  {
     owner: 'canonical-voice-model-catalog',
     productionFile:
       'apps/extension/src/settings/sections/system/voice-input/use-voice-model-selection.ts',
@@ -8,6 +58,9 @@ export const AI_OWNER_MAPPINGS = [
     reason:
       'Voice catalog and mounted preferences use canonical approvals only. Query, settings serialization, reset, stale identity, failed writes and background egress proof cover the accepted selection lifecycle.',
     testFiles: [
+      'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
+      'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
       'apps/extension/src/settings/sections/system/voice-input/use-voice-model-selection.test.tsx',
       'apps/extension/src/settings/sections/system/voice-input/model-preferences.test.tsx',
       'apps/extension/src/settings/sections/system/voice-input/content.test.tsx',

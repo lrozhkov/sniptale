@@ -69,6 +69,7 @@ it('renders the loading owner state when ai providers data is still loading', as
   aiProvidersSectionMocks.useAiProvidersSectionMock.mockReturnValue({
     isLoading: true,
     models: [],
+    providers: [],
   });
 
   await renderSection();
@@ -112,4 +113,15 @@ it('renders the content owner state once ai providers data is ready', async () =
       view: 'security',
     })
   );
+});
+
+it('keeps automatic connection cards mounted while their catalog projection reloads', async () => {
+  const state = { isLoading: false, models: [], providers: [{ id: 'automatic' }] };
+  aiProvidersSectionMocks.useAiProvidersSectionMock.mockReturnValue(state);
+  await renderSection();
+  const content = container?.querySelector('[data-testid="ai-providers-content"]');
+  state.isLoading = true;
+  await renderSection();
+  expect(container?.querySelector('[data-testid="ai-providers-content"]')).toBe(content);
+  expect(aiProvidersSectionMocks.loadingStateMock).not.toHaveBeenCalled();
 });

@@ -35,6 +35,7 @@ let state: ReturnType<typeof useVoiceModelSelection> | null;
 let prefs: VoiceInputPreferences;
 const updatePreference = vi.fn().mockResolvedValue(undefined);
 const deps = {
+  maintain: vi.fn().mockResolvedValue(undefined),
   catalog: vi.fn(async (operation) =>
     catalog(operation === 'voice-recognition' ? 'transcription' : 'text')
   ),
@@ -59,6 +60,7 @@ beforeEach(() => {
   deps.catalog.mockImplementation(async (operation) =>
     catalog(operation === 'voice-recognition' ? 'transcription' : 'text')
   );
+  deps.maintain.mockResolvedValue(undefined);
   deps.resetPrompt.mockResolvedValue(undefined);
   deps.prompt.mockResolvedValue('Local instructions');
   deps.savePrompt.mockResolvedValue(undefined);
@@ -344,7 +346,7 @@ it.each([
       await mutation;
     });
     expect(state?.promptSaving).toBe(false);
-    expect(deps.catalog).toHaveBeenCalledTimes(2);
+    expect(deps.catalog).toHaveBeenCalledTimes(4);
     if (outcome === 'failure') {
       expect(state?.prompt).toBe('Keep this instruction draft');
       expect(state?.promptDirty).toBe(true);
@@ -354,8 +356,100 @@ it.each([
       expect(state?.promptDirty).toBe(false);
     }
     await act(async () => state?.refresh());
-    expect(deps.catalog).toHaveBeenCalledTimes(4);
+    expect(deps.catalog).toHaveBeenCalledTimes(8);
     expect(state?.loading).toBe(false);
     expect(state?.promptSaving).toBe(false);
   }
 );
+
+function holdMaintenance() {
+  let release!: () => void;
+  deps.maintain.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      release = resolve;
+    })
+  );
+  return () => release();
+}
+it('presents usable saved voice catalogs and instructions before metadata maintenance completes', async () => {
+  const release = holdMaintenance();
+  await render();
+  expect(deps.maintain).toHaveBeenCalledTimes(1);
+  expect(state?.loading).toBe(false);
+  expect(state?.transcription.models).toHaveLength(1);
+  expect(state?.prompt).toBe('Local instructions');
+  act(() => state?.setPrompt('Unsaved draft'));
+  await act(async () => release());
+  expect(state?.prompt).toBe('Unsaved draft');
+  expect(state?.promptDirty).toBe(true);
+  expect(deps.prompt).toHaveBeenCalledTimes(1);
+  expect(updatePreference).not.toHaveBeenCalled();
+});
+it.each(['save', 'reset'] as const)(
+  'preserves an active prompt %s when advisory metadata completes',
+  async (operation) => {
+    const release = holdMaintenance();
+    await render();
+    act(() => state?.setPrompt('Edited instructions'));
+    let finish!: () => void;
+    const writer = operation === 'save' ? deps.savePrompt : deps.resetPrompt;
+    writer.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+    );
+    let saving: Promise<void> | undefined;
+    act(() => {
+      saving = operation === 'save' ? state?.savePrompt() : state?.resetPrompt();
+    });
+    await act(async () => release());
+    expect(state?.promptSaving).toBe(true);
+    expect(state?.prompt).toBe('Edited instructions');
+    expect(deps.prompt).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish();
+      await saving;
+    });
+    expect(state?.promptSaving).toBe(false);
+    expect(state?.promptDirty).toBe(false);
+    expect(state?.prompt).toBe(operation === 'save' ? 'Edited instructions' : 'Local instructions');
+  }
+);
+it.each(['maintenance', 'read'] as const)(
+  'retains usable voice values after advisory %s failure',
+  async (failure) => {
+    if (failure === 'maintenance')
+      deps.maintain.mockRejectedValueOnce(new Error('Metadata failed'));
+    else {
+      deps.catalog
+        .mockResolvedValueOnce(catalog('transcription'))
+        .mockResolvedValueOnce(catalog('text'))
+        .mockRejectedValueOnce(new Error('Read failed'));
+    }
+    await render();
+    expect(state?.loading).toBe(false);
+    expect(state?.error).toBe(false);
+    expect(state?.transcription.models).toHaveLength(1);
+    await act(async () => state?.refresh());
+    expect(deps.maintain).toHaveBeenCalledTimes(2);
+  }
+);
+it('ignores old maintenance after a newer voice refresh', async () => {
+  const release = holdMaintenance();
+  await render();
+  await act(async () => state?.refresh());
+  const calls = deps.catalog.mock.calls.length;
+  await act(async () => release());
+  expect(deps.catalog).toHaveBeenCalledTimes(calls);
+  expect(deps.prompt).toHaveBeenCalledTimes(2);
+});
+
+it('does not read voice catalogs after maintenance completes for a disposed surface', async () => {
+  const release = holdMaintenance();
+  await render();
+  act(() => root.unmount());
+  const calls = deps.catalog.mock.calls.length;
+  await act(async () => release());
+  expect(deps.catalog).toHaveBeenCalledTimes(calls);
+  root = createRoot(container);
+});
