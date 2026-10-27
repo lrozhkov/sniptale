@@ -2,7 +2,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseBoundedJson } from '../media-hub-backup/v6/codec';
 import type { MediaHubBackupRootEnvelope } from '../media-hub-backup/v6/contracts';
-import { parsePortableSyncRoot } from './prepared-root';
+import { parsePortableSyncRoot, portableSyncDependencyIds } from './prepared-root';
 
 const MAX_TEXT_BYTES = 4 * 1024 * 1024;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u;
@@ -97,8 +97,11 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   check(identities(value['parents']) && !value['parents'].includes(value['operationId']));
   const dependencies = parseDependencies(value['dependencies']);
   const objects = parseObjects(value['objects']);
-  const envelope =
-    value['envelope'] === null ? null : (await parsePortableSyncRoot(value['envelope'])).envelope;
+  const portable =
+    value['envelope'] === null ? null : await parsePortableSyncRoot(value['envelope']);
+  const envelope = portable?.envelope ?? null;
+  const needed = portable ? portableSyncDependencyIds(portable) : [];
+  check(JSON.stringify(needed) === JSON.stringify(dependencies.map((item) => item.mediaId).sort()));
   if (value['kind'] === 'delete')
     check(envelope === null && objects.length === 0 && dependencies.length === 0);
   else {

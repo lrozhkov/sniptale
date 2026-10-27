@@ -103,6 +103,10 @@ export interface PortableReplicaAdmission {
 }
 
 type ParsedPortableRoot = Awaited<ReturnType<typeof parsePortableSyncRoot>>;
+// Native capture counters are optional legacy hints. Admission uses causal basis only.
+type PortableCausalDependency = Omit<CapturedMediaDependency, 'generation'> & {
+  generation?: number;
+};
 type VerifiedObjectResolver = (id: string) => AssetRef;
 
 function prepareMediaRows(
@@ -125,7 +129,7 @@ function prepareMediaRows(
 function assertCausalDependencies(
   needed: ReadonlySet<string>,
   dependencies: PortableReplicaAdmission['dependencies'],
-  sender: readonly CapturedMediaDependency[]
+  sender: readonly PortableCausalDependency[]
 ): void {
   if (
     needed.size !== dependencies.length ||
@@ -157,18 +161,29 @@ function assertCausalDependencies(
   }
 }
 
-function prepareVideoRoot(
-  parsed: Extract<ParsedPortableRoot, { kind: 'video-project' }>,
-  local: PortableReplicaAdmission,
-  sender: readonly CapturedMediaDependency[],
-  refFor: VerifiedObjectResolver
-): ApplyPreparedVideoProjectRevisionInput['root'] {
+/** Shared exact dependency inventory for wire admission and native portable preparation. */
+export function portableSyncDependencyIds(parsed: ParsedPortableRoot): string[] {
+  if (parsed.kind === 'media') return [];
   const needed = new Set<string>();
   for (const asset of parsed.entry.project.assets) {
     if (asset.source.kind === 'library-asset') needed.add(asset.source.mediaId);
     if (asset.source.kind === 'project-asset' && asset.source.originMediaId)
       needed.add(asset.source.originMediaId);
   }
+  for (const asset of parsed.metadata.projectAssets) {
+    if (asset.entry.originMediaId) needed.add(asset.entry.originMediaId);
+    if (asset.libraryMediaId) needed.add(asset.libraryMediaId);
+  }
+  return [...needed].sort();
+}
+
+function prepareVideoRoot(
+  parsed: Extract<ParsedPortableRoot, { kind: 'video-project' }>,
+  local: PortableReplicaAdmission,
+  sender: readonly PortableCausalDependency[],
+  refFor: VerifiedObjectResolver
+): ApplyPreparedVideoProjectRevisionInput['root'] {
+  const needed = new Set(portableSyncDependencyIds(parsed));
   const assets = parsed.metadata.projectAssets.map((asset) => {
     const ref = refFor(asset.objectId);
     const entry = preparePortableVideoProjectAsset({
@@ -176,9 +191,7 @@ function prepareVideoRoot(
       id: asset.entry.id,
       originalRef: ref,
     });
-    if (entry.originMediaId) needed.add(entry.originMediaId);
     if (asset.libraryMediaId) {
-      needed.add(asset.libraryMediaId);
       const dependency = local.dependencies.find((item) => item.entry.id === asset.libraryMediaId);
       if (
         !dependency ||
@@ -224,7 +237,7 @@ function prepareVideoRoot(
 export async function preparePortableReplica(args: {
   envelope: unknown;
   verifiedObjects: ReadonlyMap<string, AssetRef>;
-  senderDependencies: readonly CapturedMediaDependency[];
+  senderDependencies: readonly PortableCausalDependency[];
   admission: PortableReplicaAdmission;
 }): Promise<PreparedReplicaPayload> {
   // Detach all caller metadata before inventory validation yields.

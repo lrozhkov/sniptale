@@ -351,27 +351,80 @@ for (const viewport of [
   }, info) => {
     test.setTimeout(180_000);
     const sender = await openProvider(lab, info, 'portable-source');
-    const sent = await sender.page.evaluate(() => window.webdavTransferHarness.portable.source());
+    const sent = await sender.page.evaluate(async () => {
+      const seed = await window.webdavTransferHarness.portable.source();
+      const media = await window.webdavTransferHarness.portable.outgoing.sendHistory(seed.mediaId);
+      const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
+        seed.projectId
+      );
+      const prepared = await window.webdavTransferHarness.portable.outgoing.prepare(seed.projectId);
+      const duplicate = await window.webdavTransferHarness.portable.outgoing.send(
+        prepared.spaceId,
+        prepared.operationId
+      );
+      const duplicateFiles = duplicate.objects.map((binding) => {
+        const source = prepared.objects.find((item) => item.objectId === binding.objectId)!;
+        return { key: binding.remoteKey, size: source.size, sha256: source.sha256 };
+      });
+      return {
+        ...seed,
+        spaceId: prepared.spaceId,
+        metadataAttempts: media.length + projects.length + 1,
+        logicalOperations: media.length + projects.length,
+        objects: [
+          ...media.flatMap((item) => item.files),
+          ...projects.flatMap((item) => item.files),
+          ...duplicateFiles,
+        ],
+      };
+    });
     try {
       for (const object of sent.objects)
         expect(await lab.externalProof(object.key)).toEqual({
           size: object.size,
           sha256: object.sha256,
         });
-      expect(await lab.externalProof('Exports/saved-export.png')).toEqual(sent.exported);
+      const exported = sent.objects.find((object) => object.sha256 === sent.exported.sha256);
+      expect(exported).toBeDefined();
+      expect(await lab.externalProof(exported!.key)).toEqual(sent.exported);
     } finally {
       await sender.context.close();
     }
     let target = await openProvider(lab, info, 'portable-target');
     try {
       const beforeDownload = lab.proxy.counts.gets;
-      const admitted = await target.page.evaluate(() =>
-        window.webdavTransferHarness.portable.target()
+      const discovered = await target.page.evaluate(
+        (spaceId) => window.webdavTransferHarness.portable.outgoing.scan(spaceId),
+        sent.spaceId
+      );
+      expect(discovered.operations).toBe(sent.logicalOperations);
+      expect(discovered.attempts).toBe(sent.metadataAttempts);
+      expect(discovered.roots).toHaveLength(2);
+      expect(discovered.pending).toEqual([]);
+      expect(discovered.quarantined).toEqual([]);
+      expect(discovered.invalid).toEqual([]);
+      // Every GET so far is one bounded manifest. No original or export was read.
+      expect(lab.proxy.counts.gets - beforeDownload).toBe(sent.metadataAttempts);
+      await target.page.evaluate(async (input) => {
+        await window.webdavTransferHarness.portable.outgoing.receive(
+          input.spaceId,
+          'media',
+          input.mediaId
+        );
+        await window.webdavTransferHarness.portable.outgoing.receive(
+          input.spaceId,
+          'video-project',
+          input.projectId
+        );
+      }, sent);
+      const admitted = await target.page.evaluate(
+        (id) => window.webdavTransferHarness.portable.proof(id),
+        sent.projectId
       );
       expect(admitted.projectId).toBe(sent.projectId);
       expect(admitted.objects).toEqual(sent.editing);
-      // Two bounded metadata files and two editing originals; no saved export request.
-      expect(lab.proxy.counts.gets - beforeDownload).toBe(4);
+      // Discovery manifests plus exactly two editing originals; no saved export request.
+      expect(lab.proxy.counts.gets - beforeDownload).toBe(sent.metadataAttempts + 2);
       const editingProof = admitted.objects;
       await target.context.close();
       target = await openProvider(lab, info, 'portable-target');
@@ -478,7 +531,11 @@ for (const viewport of [
       expect(persisted.clipIds).toContain(sent.clipId);
       await writeFile(
         info.outputPath('portable-native-proof.json'),
-        JSON.stringify({ sent, persisted, backup, viewport, fullBrowserRestart: true }, null, 2)
+        JSON.stringify(
+          { sent, discovered, persisted, backup, viewport, fullBrowserRestart: true },
+          null,
+          2
+        )
       );
     } finally {
       await target.context.close();
@@ -491,9 +548,7 @@ test('durable dispatch keeps original and export bytes after lost response and f
 }, info) => {
   let sender = await openProvider(lab, info, 'durable-dispatch');
   try {
-    const seeded = await sender.page.evaluate(() =>
-      window.webdavTransferHarness.portable.source({ skipFixtureTransfer: true })
-    );
+    const seeded = await sender.page.evaluate(() => window.webdavTransferHarness.portable.source());
     const prepared = await sender.page.evaluate(
       (id) => window.webdavTransferHarness.portable.outgoing.prepare(id),
       seeded.projectId
