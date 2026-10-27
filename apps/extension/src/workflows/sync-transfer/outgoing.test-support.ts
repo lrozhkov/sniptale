@@ -25,10 +25,14 @@ const io = vi.hoisted(() => ({
   attempts: new Map<string, OutgoingDispatchAttempt>(),
   completed: new Set<string>(),
   failCompletion: false,
+  verified: vi.fn(),
   read: vi.fn(),
   refuse: false,
 }));
 export { io };
+vi.mock('../../composition/persistence/sync-capture/outgoing-results', () => ({
+  commitVerifiedOutgoingResult: io.verified,
+}));
 vi.mock('../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/assets')>()),
   readAssetFile: io.read,
@@ -201,6 +205,7 @@ export function resetOutgoingFixture() {
   io.completed.clear();
   io.failCompletion = false;
   io.refuse = false;
+  io.verified.mockResolvedValue(undefined);
   vi.clearAllMocks();
   io.read.mockImplementation(
     async (ref: AssetRef, filename: string) =>

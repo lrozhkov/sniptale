@@ -960,4 +960,23 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       );
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 3, to: 4 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 42,
+    toDatabaseVersion: 43,
+    risk: 'additive',
+    stores: [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CATALOG_CACHE_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CATALOG_CACHE_STORE],
+        'Sync queue control stores are unavailable.'
+      );
+    },
+  },
 ];

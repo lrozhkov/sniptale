@@ -7,6 +7,7 @@ import { betaV4Fixture } from './fixtures/beta-v4';
 import { betaV14Fixture } from './fixtures/beta-v14';
 import { betaV16Fixture } from './fixtures/beta-v16';
 import { betaV17Fixture } from './fixtures/beta-v17';
+import { betaV42Fixture } from './fixtures/beta-v42';
 import {
   CURRENT_SCHEMA_CONTRACTS,
   DATABASE_MIGRATIONS,
@@ -475,5 +476,89 @@ it.each([
       names.add(name);
     }
     expect(migration.validate(db, transaction)).toBeUndefined();
+  }
+);
+
+it('publishes queue control contracts without reading or rewriting version 42 native data', () => {
+  const names = new Set<string>(betaV42Fixture.stores);
+  const nativeRows = new Map<string, readonly unknown[]>(Object.entries(betaV42Fixture.records));
+  nativeRows.set('sync_capture', [{ key: 'profile', retained: 'capture profile and intent' }]);
+  nativeRows.set('sync_outbox', [
+    { key: 'prepared', retained: 'preparation bytes and source claims' },
+    { key: 'attempt', retained: 'attempts and checked-file evidence' },
+  ]);
+  nativeRows.set('sync_catalog_cache', [{ key: 'catalog', retained: 'advisory evidence' }]);
+  const before = structuredClone(nativeRows);
+  const put = vi.fn();
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Released native data must remain untouched.');
+  });
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.has(name) },
+    createObjectStore: sourceAccess,
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn((name: string) => {
+      if (name !== SCHEMA_CONTRACTS_STORE) return sourceAccess();
+      return { put, getAll: sourceAccess, clear: sourceAccess, delete: sourceAccess };
+    }),
+  };
+  const plan = buildDatabaseMigrationPlan(42, DB_VERSION)!;
+  expect(plan).toHaveLength(1);
+  expect(plan[0]?.domainVersions).toEqual([{ domainId: 'syncCapture', from: 3, to: 4 }]);
+  handleDatabaseUpgrade(db, 42, DB_VERSION, tx);
+  expect(tx.abort).not.toHaveBeenCalled();
+  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(nativeRows).toEqual(before);
+  expect([...names]).toEqual(betaV42Fixture.stores);
+  expect(sourceAccess).not.toHaveBeenCalled();
+  expect(
+    parseStoredSchemaContracts(
+      Object.entries(betaV42Fixture.domainVersions).map(([domainId, schemaVersion]) => ({
+        domainId,
+        schemaVersion,
+      }))
+    )
+  ).toBeNull();
+  expect(buildDatabaseMigrationPlan(DB_VERSION, 42)).toBeNull();
+});
+
+it.each(['sync_capture', 'sync_outbox', 'sync_catalog_cache'])(
+  'aborts queue admission without publishing contracts when %s is missing and permits retry',
+  (missingStore) => {
+    const names = new Set<string>(betaV42Fixture.stores);
+    names.delete(missingStore);
+    const put = vi.fn();
+    const sourceAccess = vi.fn(() => {
+      throw new Error('Queue admission must not change native stores.');
+    });
+    const db = {
+      objectStoreNames: { contains: (name: string) => names.has(name) },
+      createObjectStore: sourceAccess,
+      deleteObjectStore: sourceAccess,
+    };
+    const failedTx = {
+      abort: vi.fn(),
+      objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+    };
+    expect(() => handleDatabaseUpgrade(db, 42, DB_VERSION, failedTx)).toThrow(
+      'Sync queue control stores are unavailable.'
+    );
+    expect(failedTx.abort).toHaveBeenCalledOnce();
+    expect(failedTx.objectStore).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+    names.add(missingStore);
+    const retryTx = {
+      abort: vi.fn(),
+      objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+    };
+    handleDatabaseUpgrade(db, 42, DB_VERSION, retryTx);
+    expect(retryTx.abort).not.toHaveBeenCalled();
+    expect(retryTx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+    expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(sourceAccess).not.toHaveBeenCalled();
   }
 );

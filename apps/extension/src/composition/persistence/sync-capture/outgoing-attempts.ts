@@ -83,7 +83,8 @@ function parseObjects(value: unknown): OutgoingDispatchAttempt['objects'] | null
   return objects;
 }
 
-function parseAttempt(value: unknown): OutgoingDispatchAttempt | null {
+/** Validate detached physical attempt evidence for sibling persistence owners. */
+export function parseOutgoingDispatchAttempt(value: unknown): OutgoingDispatchAttempt | null {
   if (!isRecord(value)) return null;
   const {
     spaceId,
@@ -142,7 +143,8 @@ function parseAttempt(value: unknown): OutgoingDispatchAttempt | null {
   };
 }
 
-function matchesPrepared(
+/** Compare native physical attempt bindings with the exact logical preparation. */
+export function matchesOutgoingDispatchPrepared(
   attempt: OutgoingDispatchAttempt,
   prepared: PreparedOutgoingOperation
 ): boolean {
@@ -173,7 +175,7 @@ export async function loadOutgoingDispatchAttempt(
     .get(attemptKey(spaceId, operationId, attemptId));
   await tx.done;
   if (raw === undefined) return null;
-  const accepted = parseAttempt(raw);
+  const accepted = parseOutgoingDispatchAttempt(raw);
   if (
     !accepted ||
     accepted.spaceId !== spaceId ||
@@ -196,14 +198,14 @@ export async function commitOutgoingDispatchAttempt(
     bounded(detached['spaceId'], 256) &&
     bounded(detached['operationId'], 256) &&
     uuid(detached['attemptId'])
-      ? parseAttempt({
+      ? parseOutgoingDispatchAttempt({
           ...detached,
           kind: 'dispatch-attempt',
           key: attemptKey(detached['spaceId'], detached['operationId'], detached['attemptId']),
           createdAt: Date.now(),
         })
       : null;
-  if (!expected || !proposed || !matchesPrepared(proposed, expected))
+  if (!expected || !proposed || !matchesOutgoingDispatchPrepared(proposed, expected))
     throw new Error('Invalid outgoing dispatch preparation.');
   return runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readwrite');
@@ -227,7 +229,7 @@ export async function commitOutgoingDispatchAttempt(
       )
         throw new Error('Outgoing dispatch evidence changed.');
       const raw: unknown = await store.get(proposed.key);
-      const accepted = raw === undefined ? proposed : parseAttempt(raw);
+      const accepted = raw === undefined ? proposed : parseOutgoingDispatchAttempt(raw);
       if (
         !accepted ||
         JSON.stringify({ ...accepted, createdAt: proposed.createdAt }) !== JSON.stringify(proposed)
@@ -312,11 +314,11 @@ export async function commitCompletedOutgoingFile(
   objectId: string
 ): Promise<void> {
   const expected = parsePrepared(structuredClone(expectedPrepared));
-  const attempt = parseAttempt(structuredClone(expectedAttempt));
+  const attempt = parseOutgoingDispatchAttempt(structuredClone(expectedAttempt));
   if (
     !expected ||
     !attempt ||
-    !matchesPrepared(attempt, expected) ||
+    !matchesOutgoingDispatchPrepared(attempt, expected) ||
     !attempt.objects.some((item) => item.objectId === objectId)
   )
     throw new Error('Invalid completed outgoing file.');
@@ -340,7 +342,7 @@ export async function commitCompletedOutgoingFile(
       const profile = parseSyncCaptureRecord(await captures.get('profile'));
       const capture = parseSyncCaptureRecord(await captures.get(expected.captureKey));
       const current = parsePrepared(await store.get(expected.key));
-      const storedAttempt = parseAttempt(await store.get(attempt.key));
+      const storedAttempt = parseOutgoingDispatchAttempt(await store.get(attempt.key));
       if (
         !profile ||
         profile.kind !== 'profile' ||
@@ -415,7 +417,7 @@ async function readCompletedFileJoin(
   const key = attemptKey(completed.spaceId, completed.operationId, completed.attemptId);
   let attempt = attemptCache.get(key);
   if (!attempt) {
-    const candidate = parseAttempt(await store.get(key));
+    const candidate = parseOutgoingDispatchAttempt(await store.get(key));
     if (!candidate) throw new Error('Invalid completed outgoing attempt.');
     attempt = candidate;
     attemptCache.set(key, attempt);
@@ -424,7 +426,7 @@ async function readCompletedFileJoin(
     prepared.spaceId !== completed.spaceId ||
     prepared.connectionGeneration !== completed.connectionGeneration ||
     prepared.captureSha256 !== completed.captureSha256 ||
-    !matchesPrepared(attempt, prepared) ||
+    !matchesOutgoingDispatchPrepared(attempt, prepared) ||
     attempt.recordSha256 !== completed.attemptSha256 ||
     !attempt.objects.some((item) => item.objectId === completed.objectId)
   )

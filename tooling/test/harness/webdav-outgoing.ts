@@ -32,6 +32,18 @@ import {
 } from '../../../apps/extension/src/workflows/sync-transfer/outgoing';
 import type { SyncRemoteStore } from '../../../apps/extension/src/workflows/sync-transfer/remote-store';
 
+import {
+  enqueueSyncQueueOperation,
+  loadSyncQueue,
+  commandSyncQueue,
+  commandSyncQueueOperation,
+  type SyncQueueScope,
+} from '../../../apps/extension/src/composition/persistence/sync-capture/queue';
+import {
+  runSyncQueueOperation,
+  recoverInterruptedSyncQueueOperation,
+} from '../../../apps/extension/src/workflows/sync-transfer/queue';
+
 /** Runs production encoding and dispatch over actual captured native sources. */
 export function createWebdavOutgoingHarness(
   connected: () => SyncRemoteStore,
@@ -66,7 +78,47 @@ export function createWebdavOutgoingHarness(
       metadataBytes: current.metadataBytes,
     };
   }
+  async function queueScope(): Promise<SyncQueueScope> {
+    const db = await initDB();
+    const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
+    if (!profile || profile.kind !== 'profile') throw new Error('Native queue profile is missing.');
+    return {
+      spaceId: profile.spaceId,
+      connectionGeneration: profile.connectionGeneration,
+      profileCreatedAt: profile.createdAt,
+    };
+  }
   return {
+    queueEnqueue: async (rootId: string) => enqueueSyncQueueOperation(await latest(rootId)),
+    queueState: async () => loadSyncQueue(await queueScope()),
+    queueControl: async (revision: number, command: 'pause' | 'resume') =>
+      commandSyncQueue(await queueScope(), revision, command),
+    queueOperationControl: async (
+      operationId: string,
+      revision: number,
+      command: 'pause' | 'resume' | 'retry' | 'cancel'
+    ) => commandSyncQueueOperation(await queueScope(), operationId, revision, command),
+    queueRecover: async (operationId: string, revision: number) =>
+      recoverInterruptedSyncQueueOperation(await queueScope(), operationId, revision),
+    queueRun: async (operationId: string, revision: number) => {
+      const scope = await queueScope();
+      const row = (await loadSyncQueue(scope)).operations.find(
+        (item) => item.operationId === operationId
+      );
+      if (!row) throw new Error('Native queue operation is missing.');
+      const db = await initDB();
+      const capture: unknown = await db.get(SYNC_CAPTURE_STORE, row.captureKey);
+      return runSyncQueueOperation({
+        scope,
+        operationId,
+        expectedRevision: revision,
+        capture,
+        remote: connected(),
+        signal: signal(),
+        authorize: async () => {},
+        ...(catalog ? { catalog } : {}),
+      });
+    },
     async reviseMetadata(rootId: string) {
       const db = await initDB();
       const entry = parseVideoProjectEntry(await db.get('video_projects', rootId));

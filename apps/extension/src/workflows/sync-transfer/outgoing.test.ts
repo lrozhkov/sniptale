@@ -376,3 +376,35 @@ it('refuses failed completion admission without publishing a manifest and retrie
   );
   expect(next.objects[0]?.remoteKey).not.toBe(first.objects[0]?.remoteKey);
 });
+
+it('persists manifest evidence only after acknowledged PUT and exact full readback', async () => {
+  const value = capture();
+  value.change = { kind: 'tombstone' };
+  const prepared = await prepareCapturedOutgoing(value);
+  const dav = remote();
+  dav.corrupt();
+  await expect(
+    dispatchPreparedOutgoing('space', 'operation', dav.adapter, new AbortController().signal)
+  ).rejects.toThrow();
+  expect(io.verified).not.toHaveBeenCalled();
+  const clean = remote();
+  const attempt = await dispatchPreparedOutgoing(
+    'space',
+    'operation',
+    clean.adapter,
+    new AbortController().signal
+  );
+  expect(io.verified).toHaveBeenCalledExactlyOnceWith(prepared, attempt);
+});
+
+it('preserves prepared sources if receipt persistence fails after remote publication', async () => {
+  const prepared = await prepareCapturedOutgoing(capture());
+  const dav = remote();
+  io.verified.mockRejectedValueOnce(new Error('Receipt persistence refused.'));
+  await expect(
+    dispatchPreparedOutgoing('space', 'operation', dav.adapter, new AbortController().signal)
+  ).rejects.toThrow('Receipt persistence refused');
+  expect(dav.writes.at(-1)).toBe([...io.attempts.values()][0]!.recordKey);
+  expect(io.prepared.get('operation')).toEqual(prepared);
+  expect(io.completed.size).toBe(1);
+});

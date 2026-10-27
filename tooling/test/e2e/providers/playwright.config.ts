@@ -6,7 +6,7 @@ import base from '../../../../playwright.config';
 export default defineConfig({
   ...base,
   testDir: '.',
-  testMatch: 'webdav.spec.ts',
+  testMatch: ['webdav.spec.ts', 'webdav-queue.spec.ts'],
   testIgnore: [],
   outputDir: path.resolve('.tmp/webdav-provider-results'),
   reporter: [['list']],

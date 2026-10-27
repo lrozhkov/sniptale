@@ -10,7 +10,9 @@ import {
   commitOutgoingDispatchAttempt,
   commitCompletedOutgoingFile,
   loadCompletedOutgoingFiles,
+  type OutgoingDispatchAttempt,
 } from '../../composition/persistence/sync-capture/outgoing-attempts';
+import { commitVerifiedOutgoingResult } from '../../composition/persistence/sync-capture/outgoing-results';
 import { digestBackupObject } from '../media-hub-backup/v6/shared-objects';
 import { encodeCapturedPortableRoot } from './captured-root';
 import type { scanSyncCatalog } from './catalog';
@@ -400,11 +402,16 @@ export async function dispatchPreparedOutgoing(
   operationId: string,
   remote: SyncRemoteStore,
   signal: AbortSignal,
-  options: { catalog?: OutgoingCatalog; checkReusedContents?: boolean } = {}
+  options: {
+    catalog?: OutgoingCatalog;
+    checkReusedContents?: boolean;
+    admitAttempt?: (attempt: OutgoingDispatchAttempt) => Promise<void>;
+  } = {}
 ) {
   signal.throwIfAborted();
   const catalog = snapshotCatalogCandidates(options.catalog, spaceId);
   const checkReusedContents = options.checkReusedContents === true;
+  const admitAttempt = options.admitAttempt;
   const prepared = await loadPreparedOutgoingOperation(spaceId, operationId);
   check(prepared);
   const files = await readDispatchSources(prepared, spaceId, operationId, signal);
@@ -420,6 +427,7 @@ export async function dispatchPreparedOutgoing(
   );
   signal.throwIfAborted();
   const attempt = await reserveAttempt(prepared, retained);
+  await admitAttempt?.(attempt);
   for (const binding of attempt.objects) {
     signal.throwIfAborted();
     const source = files.find((item) => item.objectId === binding.objectId);
@@ -434,5 +442,41 @@ export async function dispatchPreparedOutgoing(
   const manifest = new Blob([attempt.recordText], { type: 'application/json' });
   await remote.write(attempt.recordKey, manifest, signal);
   await verifyRemote(remote, attempt.recordKey, manifest.size, attempt.recordSha256, signal);
+  signal.throwIfAborted();
+  await commitVerifiedOutgoingResult(prepared, attempt);
   return attempt;
+}
+
+/** Observe exact ready logical publication without minting acknowledged dispatch evidence. */
+export async function findObservedOutgoingPublication(
+  prepared: PreparedOutgoingOperation,
+  catalog: OutgoingCatalog | undefined
+): Promise<OutgoingDispatchAttempt | null> {
+  const candidates = snapshotCatalogCandidates(catalog, prepared.spaceId).filter(
+    (item) =>
+      item.operationId === prepared.operationId && item.operationText === prepared.recordText
+  );
+  const alternatives = await readCatalogCandidates(candidates, prepared.spaceId);
+  const physical = alternatives[0];
+  if (!physical) return null;
+  return {
+    version: 1,
+    kind: 'dispatch-attempt',
+    key: JSON.stringify([
+      'dispatch-attempt',
+      prepared.spaceId,
+      prepared.operationId,
+      physical.attemptId,
+    ]),
+    createdAt: Date.now(),
+    spaceId: prepared.spaceId,
+    operationId: prepared.operationId,
+    connectionGeneration: prepared.connectionGeneration,
+    preparedSha256: prepared.recordSha256,
+    attemptId: physical.attemptId,
+    recordText: physical.recordText,
+    recordSha256: physical.recordSha256,
+    recordKey: physical.recordKey,
+    objects: physical.objects,
+  };
 }

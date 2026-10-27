@@ -816,3 +816,21 @@ A snapshot contains exact manifest keys, declared sizes and raw text for one ena
 The transfer workflow performs a complete remote listing on every refresh. Only currently listed keys participate. Cached bytes must match the listed size, key digest, exact wire identity and selected space. The existing wire and domain parsers remain authoritative for admission. The workflow rebuilds causal heads, dependencies, conflicts and quarantine decisions from those checked manifests. A failed or cancelled scan returns no partial catalog and does not replace the previous cache. Cancellation during subsequent cache admission prevents graph return but can leave a complete advisory snapshot. Concurrent completed refreshes can replace this advisory snapshot in either order without changing domain state.
 
 Normal cache hits assume immutable manifest keys. They do not detect a same-key, same-size external rewrite. An explicit cache bypass reads and checks current remote manifest bytes. No ETag or CAS property grants integrity. Media hydration still checks streamed size and SHA before native publication. This cache removes repeated metadata GET within existing pilot limits. It does not optimize parsing or remote listing. Production connection lifecycle, offline admission and full capacity remain separate release gates.
+
+## Durable outgoing queue and verified publication
+
+Physical database version 43 advances syncCapture to contract version 4. The migration checks the three existing sync stores without rewriting rows. It adds no store. Older clients refuse the newer database.
+
+The sync-capture owner stores queue controls and verified manifest results under disjoint keys in sync_outbox. Connection controls bind the space, namespace generation and profile creation timestamp. Operation controls also bind the retained capture digest. Owner revisions reject stale commands. Each execution receives a fresh run ID. Stage events preserve that command revision.
+
+Queue pause does not disable capture enrollment. Accepted local edits and tombstones still enter native capture while transfer is paused. Operation pause and cancellation fence late callbacks. They preserve captures, preparations, physical attempts, checked files and source claims. An issued write can retain an unknown outcome. Cancellation promises no remote rollback.
+
+The transfer workflow holds one native exclusive lock per operation. Independent operations can execute concurrently. Recovery requires an available lock and the exact interrupted run. A timer cannot prove that a server writer stopped. Lock identities encode scope primitives in a fixed order.
+
+Acknowledged manifest PUT and full size/SHA readback precede the immutable verified result. Native admission joins the exact retained capture, preparation and physical attempt. The first accepted valid result remains authoritative across alternative physical attempts. A restarted queue can consume that result without another transfer. This historical evidence grants no settlement, source release or unload authority.
+
+A checked ready catalog can establish observed publication of the exact prepared logical bytes. The workflow excludes pending, quarantined, invalid, foreign and contradictory records. Native completion joins the retained preparation and capture. Observed publication does not create acknowledged dispatch evidence or checked-file receipts.
+
+Every queue mutation retains bounded diagnostic transition markers in the same transaction. Markers contain fixed codes, stages, sequence numbers, hashed operation references and safe attempt IDs. Overflow retains an explicit history-gap count. Later delivery must use the existing event-history owner. These markers do not create another archive.
+
+This experimental runner requires an explicitly admitted provider client. Production credentials, request authorization, offscreen lifecycle, Settings controls and event-history delivery remain separate release requirements. Capture enrollment is not network authorization. Future lifecycle admission must check its own revision at every actual HTTP request. The profile remains disabled by default.
