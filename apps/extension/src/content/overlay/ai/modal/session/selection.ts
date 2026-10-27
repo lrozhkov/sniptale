@@ -30,14 +30,6 @@ export function createTemplateSelectHandler(props: {
   };
 }
 
-export function createModelSelectHandler(
-  setSelectedModelId: React.Dispatch<React.SetStateAction<string | null>>
-) {
-  return (modelId: string | null) => {
-    setSelectedModelId(modelId);
-  };
-}
-
 export function createResizeStartHandler(props: {
   setIsResizing: React.Dispatch<React.SetStateAction<boolean>>;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;

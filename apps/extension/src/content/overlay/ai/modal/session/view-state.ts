@@ -70,6 +70,7 @@ function buildAIModalModelState(props: {
     handleModelSelect: props.handleModelSelect,
     providers: props.settings.providers,
     selectedModelId: props.settings.selectedModelId,
+    modelSelection: props.settings.selection,
   };
 }
 

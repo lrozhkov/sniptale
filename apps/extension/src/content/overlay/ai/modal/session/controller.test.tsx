@@ -61,6 +61,12 @@ vi.mock('./boot', async () => {
   };
 });
 
+const io = vi.hoisted(() => ({ read: vi.fn(), remember: vi.fn() }));
+vi.mock('../../../../../workflows/ai-settings/query', () => ({
+  requestAIScenarioModelSelection: io.read,
+  rememberAIScenarioModelSelection: io.remember,
+}));
+
 import { useAIModalState } from '.';
 
 let container: HTMLDivElement | null = null;
@@ -109,6 +115,15 @@ function getState() {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  io.read.mockResolvedValue({
+    scenario: 'page-extract',
+    globalSystemPrompt: '',
+    models: [{ id: 'model-1', modelCode: 'one', providerId: 'p', displayName: 'One' }],
+    providers: [{ id: 'p', connectionType: 'neuraldeep', incarnation: 'one' }],
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model-1' },
+  });
+  io.remember.mockResolvedValue(undefined);
   addTemplateMock.mockClear();
   estimateTokensMock.mockClear();
   removeTemplateMock.mockClear();
@@ -144,9 +159,9 @@ describe('useAIModalState controller', () => {
     );
     expect(getState()).toEqual(
       expect.objectContaining({
-        availableModels: [],
+        availableModels: expect.arrayContaining([expect.objectContaining({ id: 'model-1' })]),
         prompt: 'stored prompt',
-        selectedModelId: null,
+        selectedModelId: 'model-1',
         templateSubmitError: null,
         templates: [{ content: 'Template content', id: 'template-1', name: 'Template 1' }],
         templatesLoading: false,
@@ -164,15 +179,14 @@ describe('useAIModalState controller', () => {
     });
 
     expect(getState().totalTokens).toBe(10);
-    expect(estimateTokensMock).toHaveBeenNthCalledWith(4, 'prompt');
-    expect(estimateTokensMock).toHaveBeenNthCalledWith(5, 'json');
-    expect(estimateTokensMock).toHaveBeenNthCalledWith(6, '');
+    expect(estimateTokensMock).toHaveBeenCalledWith('prompt');
+    expect(estimateTokensMock).toHaveBeenCalledWith('json');
   });
 
   it('binds public actions directly to their state and persistence owners', async () => {
     await renderHarness();
 
-    act(() => {
+    await act(async () => {
       getState().handleAddTemplate();
       getState().handleModelSelect('model-1');
     });

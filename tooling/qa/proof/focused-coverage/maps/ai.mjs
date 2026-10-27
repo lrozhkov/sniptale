@@ -1,5 +1,21 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'content-ai-modal-scenario-selection',
+    productionFile: 'apps/extension/src/content/overlay/ai/modal/session/locals.ts',
+    allowCrossOwner: true,
+    reason:
+      'Modal and persistence tests cover opening, choice, concurrency, deletion, recreation, restore and retry.',
+    testFiles: [
+      'apps/extension/src/content/overlay/ai/modal/session/locals.test.tsx',
+      'apps/extension/src/content/overlay/ai/modal/session/controller.test.tsx',
+      'apps/extension/src/content/overlay/ai/modal/shell/index.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
     owner: 'ai-scenario-selection-consumers',
     productionFile: 'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.ts',
     allowCrossOwner: true,

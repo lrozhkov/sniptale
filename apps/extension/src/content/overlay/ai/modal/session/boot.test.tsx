@@ -41,12 +41,8 @@ function createBootProps(overrides: Partial<Parameters<typeof useAIModalBootEffe
     isOpen: true,
     lastPrompt: 'stored prompt',
     prompt: '',
-    setAvailableModels: vi.fn(),
-    setGlobalSystemPrompt: vi.fn(),
     setLastPrompt: vi.fn(),
     setPrompt: vi.fn(),
-    setProviders: vi.fn(),
-    setSelectedModelId: vi.fn(),
     textareaRef: { current: null } as RefObject<HTMLTextAreaElement | null>,
     ...overrides,
   };
@@ -104,11 +100,7 @@ describe('useAIModalBootEffect', () => {
       expect.objectContaining({
         isOpen: true,
         lastPrompt: 'stored prompt',
-        setAvailableModels: props.setAvailableModels,
-        setGlobalSystemPrompt: props.setGlobalSystemPrompt,
         setPrompt: props.setPrompt,
-        setProviders: props.setProviders,
-        setSelectedModelId: props.setSelectedModelId,
         textareaRef: props.textareaRef,
       })
     );

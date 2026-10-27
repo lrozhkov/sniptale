@@ -67,6 +67,17 @@ async function renderFooter(
     root.render(
       <AIModalFooter
         availableModels={models}
+        modelSelection={{
+          configuration: null,
+          modelId: null,
+          configurationFailed: false,
+          selectionPending: false,
+          selectionFailed: false,
+          selectionUnavailable: false,
+          chooseModel: vi.fn(),
+          prepareModelSelection: vi.fn(),
+          retryConfiguration: vi.fn(),
+        }}
         disabledSubmit={models.length === 0}
         isLoading={false}
         onClose={vi.fn()}

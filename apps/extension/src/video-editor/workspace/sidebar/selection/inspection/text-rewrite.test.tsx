@@ -51,6 +51,7 @@ vi.mock('../../../../../platform/i18n', async (original) => ({
 type SelectionContext = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
 const catalog: SelectionContext = {
   scenario: 'video-text-edit',
+  globalSystemPrompt: '',
   remembered: null,
   resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
   providers: [

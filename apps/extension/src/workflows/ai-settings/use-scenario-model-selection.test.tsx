@@ -13,6 +13,7 @@ type Context = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
 function context(): Context {
   return {
     scenario: 'scenario-edit',
+    globalSystemPrompt: '',
     providers: [
       {
         id: 'provider',

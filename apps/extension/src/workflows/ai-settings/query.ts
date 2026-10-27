@@ -176,6 +176,7 @@ export async function requestAIScenarioModelSelection(
   });
   return {
     scenario,
+    globalSystemPrompt: bootstrap.globalSystemPrompt ?? '',
     models,
     providers: entries.providers,
     remembered: remembered.scenarioSelection,

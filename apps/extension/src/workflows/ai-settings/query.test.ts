@@ -236,7 +236,7 @@ it('resolves a first-use scenario candidate without inheriting or writing the gl
           modelSelection: {
             chromeAiEnabled: false,
             defaultModelId: 'b-model',
-            globalSystemPrompt: '',
+            globalSystemPrompt: 'Retained global system prompt',
             models,
             providers: [
               {
@@ -254,6 +254,7 @@ it('resolves a first-use scenario candidate without inheriting or writing the gl
         }
   );
   const context = await requestAIScenarioModelSelection('page-edit');
+  expect(context.globalSystemPrompt).toBe('Retained global system prompt');
   expect(context.resolution).toMatchObject({ status: 'initial', modelId: 'a-model' });
   expect(
     queryMocks.sendRuntimeMessage.mock.calls.every(

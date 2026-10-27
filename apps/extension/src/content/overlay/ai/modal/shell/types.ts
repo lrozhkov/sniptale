@@ -23,4 +23,5 @@ export interface ModelSelectorProps {
   selectedModelId: string | null;
   onSelect: (modelId: string | null) => void;
   disabled?: boolean;
+  onOpen?: () => void;
 }

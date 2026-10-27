@@ -2,26 +2,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  createModelSelectHandler,
-  createResizeStartHandler,
-  createTemplateSelectHandler,
-} from './selection';
+import { createResizeStartHandler, createTemplateSelectHandler } from './selection';
 
 beforeEach(vi.clearAllMocks);
 
 afterEach(() => {
   document.body.innerHTML = '';
-});
-
-describe('createModelSelectHandler', () => {
-  it('updates the selected model locally', () => {
-    const setSelectedModelId = vi.fn();
-
-    createModelSelectHandler(setSelectedModelId)('model-1');
-
-    expect(setSelectedModelId).toHaveBeenCalledWith('model-1');
-  });
 });
 
 describe('createTemplateSelectHandler', () => {

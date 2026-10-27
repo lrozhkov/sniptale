@@ -23,7 +23,7 @@ for (const viewport of [
     extensionId,
     hostOrigin,
   }, info) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
     await page.setViewportSize(viewport);
     const url = `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=ai-connections`;
     await page.goto(url);
@@ -453,7 +453,7 @@ async function runRealPageText(
       text.textContent = 'Original synthetic page text';
       text.style.cssText =
         'position:absolute;left:32px;top:90px;background:white;color:black;padding:8px;font:20px Georgia;z-index:1';
-      document.body.append(text);
+      (document.querySelector('main') ?? document.body).append(text);
     });
     await ui('content.toolbar.mode-selector-button').click();
     await ui('content.toolbar.mode-option.quick-edit').click();
@@ -512,6 +512,12 @@ async function runRealPageText(
       )
     ).toEqual(remembered);
     await page.keyboard.press('Escape');
+    await runRealPageExtraction(
+      settings,
+      page,
+      model,
+      screenshotPath.replace('page-text-applied', 'page-extract-applied')
+    );
   } finally {
     await page.close();
     await popup.close();
@@ -557,4 +563,125 @@ async function runConcurrentProviderToggle(
   } finally {
     await other.close();
   }
+}
+
+async function runRealPageExtraction(
+  settings: Page,
+  page: Page,
+  model: { id: string; displayName: string },
+  screenshotPath: string
+) {
+  const original = 'Original synthetic page text';
+  const before = await settings.evaluate(
+    async () =>
+      (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+        'sniptale_ai_scenario_selections'
+      ]
+  );
+  await page.locator('[data-ui="content.toolbar.page-editing-mode.ai"]').click();
+  const modal = page.locator('.sniptale-ai-modal-root');
+  await expect(modal).toBeVisible();
+  expect(
+    await settings.evaluate(
+      async () =>
+        (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+          'sniptale_ai_scenario_selections'
+        ]
+    )
+  ).toEqual(before);
+  await modal.locator('.sniptale-ai-model-selector-trigger').click();
+  await page
+    .getByPlaceholder(translate('aiModal.modelSearchPlaceholder', 'en'), { exact: true })
+    .fill(model.displayName);
+  await page.getByTitle(model.displayName, { exact: true }).click();
+  await page.screenshot({ path: screenshotPath.replace('applied', 'prepared'), fullPage: false });
+  await modal
+    .locator('.sniptale-tree-row-field')
+    .filter({ hasText: original })
+    .getByRole('checkbox')
+    .check();
+  const previewToggle = modal.locator('.sniptale-ai-data-preview-toggle');
+  if ((await previewToggle.getAttribute('aria-pressed')) !== 'true') await previewToggle.click();
+  const payload: unknown = JSON.parse(await modal.locator('.sniptale-json-preview').innerText());
+  if (!payload || typeof payload !== 'object' || !('f' in payload) || !Array.isArray(payload.f))
+    throw new Error('Synthetic extraction payload has no fields');
+  const field: unknown = payload.f.find(
+    (entry: unknown) => entry && typeof entry === 'object' && 'c' in entry && entry.c === original
+  );
+  if (!field || typeof field !== 'object') throw new Error('Synthetic extraction field is absent');
+  const response = { i: '', f: [{ ...field, new: 'Updated synthetic extraction field' }], t: [] };
+  await page
+    .locator('#ai-prompt')
+    .fill(
+      'Return exactly this JSON object with no prose or code fences: ' + JSON.stringify(response)
+    );
+  const submit = modal.getByRole('button', {
+    name: translate('aiModal.submitShortcutTitle', 'en'),
+    exact: true,
+  });
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(page.locator('#live-page-text')).toHaveText('Updated synthetic extraction field', {
+    timeout: 60000,
+  });
+  await expect(modal).toHaveCount(0);
+  const after = await settings.evaluate(
+    async () =>
+      (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+        'sniptale_ai_scenario_selections'
+      ]
+  );
+  expect(after).toEqual(
+    expect.objectContaining({
+      ...before,
+      'page-extract': expect.objectContaining({ modelId: model.id }),
+    })
+  );
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#live-page-text')).toHaveText(original);
+  await page.locator('[data-ui="content.toolbar.page-editing-mode.ai"]').click();
+  await expect(modal.locator('.sniptale-ai-model-selector-trigger')).toContainText(
+    model.displayName
+  );
+  expect(
+    await settings.evaluate(
+      async () =>
+        (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+          'sniptale_ai_scenario_selections'
+        ]
+    )
+  ).toEqual(after);
+  await modal
+    .getByRole('button', { name: translate('aiModal.closeTitle', 'en'), exact: true })
+    .click();
+  await settings.bringToFront();
+  const enabled = settings
+    .getByRole('region', { name: 'Providers', exact: true })
+    .getByRole('switch');
+  await enabled.click();
+  await expect(enabled).not.toBeChecked();
+  await page.bringToFront();
+  await page.locator('[data-ui="content.toolbar.page-editing-mode.ai"]').click();
+  await expect(
+    modal.getByText(translate('aiModal.modelSelectionUnavailable', 'en'), { exact: true })
+  ).toBeVisible();
+  await expect(
+    modal.getByRole('button', { name: translate('aiModal.submitShortcutTitle', 'en'), exact: true })
+  ).toBeDisabled();
+  expect(
+    await settings.evaluate(
+      async () =>
+        (await chrome.storage.local.get('sniptale_ai_scenario_selections'))[
+          'sniptale_ai_scenario_selections'
+        ]
+    )
+  ).toEqual(after);
+  await page.screenshot({
+    path: screenshotPath.replace('applied', 'unavailable'),
+    fullPage: false,
+  });
+  await modal
+    .getByRole('button', { name: translate('aiModal.closeTitle', 'en'), exact: true })
+    .click();
 }

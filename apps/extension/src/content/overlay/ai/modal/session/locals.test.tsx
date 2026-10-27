@@ -76,12 +76,10 @@ describe('use-ai-modal-state local hooks', () => {
 
     act(() => {
       getState().editor.setIsEditorOpen(true);
-      getState().settings.setGlobalSystemPrompt('Updated system prompt');
-      getState().settings.setSelectedModelId('model-1');
     });
 
     expect(getState().editor.isEditorOpen).toBe(true);
-    expect(getState().settings.globalSystemPrompt).toBe('Updated system prompt');
-    expect(getState().settings.selectedModelId).toBe('model-1');
+    expect(getState().settings.globalSystemPrompt).toBe('');
+    expect(getState().settings.selectedModelId).toBeNull();
   });
 });
