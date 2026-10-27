@@ -73,7 +73,10 @@ async function setup(
   await expect
     .poll(async () => (await persistedReviewContent(page))?.text?.fragments[0]?.text)
     .toBe('PCM first');
-  return { label, open, dialog, button, document };
+  await activate(
+    document.getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+  );
+  return { label, dialog, button, document };
 }
 
 async function inspectAcceptedWav(page: Page, reference: string) {
@@ -137,7 +140,7 @@ for (const variant of [
     test.setTimeout(120_000);
     const host = await startHostServer();
     try {
-      const { label, open, dialog, button, document } = await setup(
+      const { label, dialog, button, document } = await setup(
         page,
         host.origin,
         variant.locale,
@@ -151,18 +154,19 @@ for (const variant of [
         })
       );
       const voice = dialog.locator('[data-ui="gallery.videoReview.textVoice"]');
-      const format = voice.getByRole('button', {
+      const formats = voice.getByRole('group', {
         name: label('gallery.videoReview.speechFormat'),
         exact: true,
       });
-      await expect(format).toContainText(label('settings.aiProviders.modelAudioPcm'));
+      const format = formats.getByRole('button', {
+        name: label('settings.aiProviders.modelAudioPcm'),
+        exact: true,
+      });
+      await expect(format).toHaveAttribute('aria-pressed', 'true');
       await activate(format);
-      await page
-        .getByRole('option', { name: label('settings.aiProviders.modelAudioPcm'), exact: true })
-        .press('Enter');
       await expect(format).toBeFocused();
       const generate = voice.getByRole('button', {
-        name: label('gallery.videoReview.speechGenerateSelected'),
+        name: label('gallery.videoReview.speechGenerate'),
         exact: true,
       });
       await activate(generate);
@@ -181,13 +185,9 @@ for (const variant of [
       await expect.poll(() => audio.evaluate((element) => element.currentTime)).toBeGreaterThan(0);
       await audio.evaluate((element) => element.pause());
       await page.screenshot({ path: info.outputPath('pcm-native-preview.png'), fullPage: false });
-      await activate(format);
-      await page.getByRole('option', { name: 'WAV', exact: true }).press('Enter');
+      await activate(formats.getByRole('button', { name: 'WAV', exact: true }));
       await expect(audio).toHaveCount(0);
       await activate(format);
-      await page
-        .getByRole('option', { name: label('settings.aiProviders.modelAudioPcm'), exact: true })
-        .press('Enter');
       await activate(generate);
       await expect(audio).toHaveCount(1);
       const apply = voice.getByRole('button', {
@@ -221,7 +221,7 @@ for (const variant of [
         .poll(async () => (await persistedReviewContent(page))?.audio.voiceover.length)
         .toBe(1);
       await page.reload();
-      await open();
+      await expect(dialog).toBeVisible();
       expect((await persistedReviewContent(page))!.audio.voiceover[0]).toEqual(clip);
       expect(await inspectAcceptedWav(page, clip.assetId)).toMatchObject({
         duration: 0.75,

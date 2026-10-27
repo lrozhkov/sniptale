@@ -89,6 +89,8 @@ export function installPcmSpeechFixture(consumer: AudioJobConsumer = 'gallery') 
     resolveModel: async (request) => {
       if (request.operation !== 'speech') throw new Error('invalid-request');
       return {
+        connectionType: 'openai-compatible',
+        baseUrl: 'https://pcm.fixture.invalid/v1',
         url,
         apiKey: 'fixture-only-no-secret',
         modelCode: 'fixture-tts',

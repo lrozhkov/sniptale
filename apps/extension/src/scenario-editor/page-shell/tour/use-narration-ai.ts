@@ -33,7 +33,12 @@ type State = {
 /** One form owns its sequential attempts and disposable previews through cancellation and explicit Apply. */
 export function useScenarioNarrationAI(
   access: ScenarioNarrationAccess,
-  targets: readonly ScenarioNarrationText[]
+  targets: readonly ScenarioNarrationText[],
+  prepareSelection?: (
+    profile: AISpeechModelParameters & { modelId: string },
+    providerId: string,
+    signal: AbortSignal
+  ) => Promise<void>
 ) {
   const [state, setState] = useState<State>({
     ready: [],
@@ -50,9 +55,11 @@ export function useScenarioNarrationAI(
     ready: [] as Ready[],
     access,
     targets,
+    prepareSelection,
   });
   owner.current.access = access;
   owner.current.targets = targets;
+  owner.current.prepareSelection = prepareSelection;
   useEffect(() => {
     const lifetime = owner.current;
     lifetime.mounted = true;
@@ -84,6 +91,10 @@ export function useScenarioNarrationAI(
     lifetime.active = controller;
     update({ running: true, failed: false, errors: {}, completed: 0, total: selected.length });
     try {
+      await lifetime.prepareSelection?.(frozenProfile, approvedProviderId, controller.signal);
+      controller.signal.throwIfAborted();
+      if (!lifetime.mounted || JSON.stringify(lifetime.targets) !== signature)
+        throw new Error('stale');
       const snapshot = await lifetime.access.prepareNarration(selected, controller.signal);
       controller.signal.throwIfAborted();
       if (!lifetime.mounted || JSON.stringify(lifetime.targets) !== signature)

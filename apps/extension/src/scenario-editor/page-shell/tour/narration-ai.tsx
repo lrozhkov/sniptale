@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { AIModelSelector } from '../../../features/ai/model-selector';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
+import type { AIModelCatalogPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import type { AISpeechModelParameters } from '../../../contracts/settings/model-operation';
 import type { ScenarioNarrationText } from '../../../features/scenario/project/public';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import { useAIScenarioModelSelection } from '../../../workflows/ai-settings/use-scenario-model-selection';
 import { InspectorParameterRow } from '../../../ui/compact-inspector-controls/layout';
 import { TextField, TextareaField, SelectField } from '../../../ui/compact-inspector-controls';
 import type { ScenarioNarrationPreview } from '../../../workflows/scenario-narration/generation';
@@ -33,42 +33,41 @@ export function TourNarrationAI({
   useEffect(() => {
     form.current?.focus();
   }, []);
-  const [catalog, setCatalog] = useState<AIModelSelectionBootstrapPayload | null>(null);
-  const [catalogError, setCatalogError] = useState(false);
-  const [reload, setReload] = useState(0);
+  const selection = useAIScenarioModelSelection('scenario-speech');
+  const catalog = selection.configuration;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [approved, setApproved] = useState<string | null>(null);
   const [selected, setSelected] = useState(() => new Set(targets.map(scenarioNarrationTargetKey)));
   const operation = useScenarioNarrationAI(
     access,
-    targets.filter((target) => selected.has(scenarioNarrationTargetKey(target)))
+    targets.filter((target) => selected.has(scenarioNarrationTargetKey(target))),
+    async (frozenProfile, providerId, signal) => {
+      const prepared = await selection.prepareModelSelection(signal);
+      const model = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
+      if (prepared.modelId !== frozenProfile.modelId || model?.providerId !== providerId)
+        throw new Error('model-unavailable');
+    }
   );
+  const { resetUnacceptedPreviews } = operation;
   useEffect(() => {
-    let current = true;
-    setCatalogError(false);
-    void requestAIModelSelectionBootstrap('speech')
-      .then((value) => {
-        if (!current) return;
-        setCatalog(value);
-        setProfile((previous) => {
-          if (previous && value.models.some((model) => model.id === previous.modelId))
-            return previous;
-          const model =
-            value.models.find((model) => model.id === value.defaultModelId) ?? value.models[0];
-          return model?.audio?.speech ? { modelId: model.id, ...model.audio.speech } : null;
-        });
-      })
-      .catch(() => {
-        if (current) setCatalogError(true);
-      });
-    return () => {
-      current = false;
-    };
-  }, [reload]);
+    const model = catalog?.models.find((entry) => entry.id === selection.modelId);
+    if (!model) return;
+    if (profile?.modelId === model.id) return;
+    const provider = catalog?.providers.find((entry) => entry.id === model.providerId);
+    const next: Profile = model.audio?.speech
+      ? { modelId: model.id, ...model.audio.speech }
+      : {
+          modelId: model.id,
+          voiceId: '',
+          responseFormat: provider?.connectionType === 'google' ? 'wav' : 'mp3',
+        };
+    if (resetUnacceptedPreviews()) setProfile(next);
+  }, [catalog, selection.modelId, profile, resetUnacceptedPreviews]);
   const model = catalog?.models.find((entry) => entry.id === profile?.modelId);
   const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
   useEffect(() => setApproved(null), [provider?.id]);
-  const busy = operation.running || operation.applying;
+  const attemptBusy = operation.running || operation.applying;
+  const busy = attemptBusy || selection.selectionPending;
   return (
     <section
       ref={form}
@@ -110,20 +109,48 @@ export function TourNarrationAI({
         profile={profile}
         disabled={busy || disabled}
         busy={busy}
+        onSelectModel={selection.chooseModel}
+        onOpenModels={() => void selection.retryConfiguration()}
         onChange={(next) => {
-          if (
-            JSON.stringify(next) !== JSON.stringify(profile) &&
-            operation.resetUnacceptedPreviews()
-          )
+          if (JSON.stringify(next) !== JSON.stringify(profile) && resetUnacceptedPreviews())
             setProfile(next);
         }}
         t={t}
       />
-      {(!catalog?.models.length || catalogError) && (
+      {!catalog && !selection.configurationFailed && (
+        <p role="status" className="guide-inspector-hint">
+          {t('scenario.editor.loading')}
+        </p>
+      )}
+      {selection.configurationFailed && (
+        <p role="alert" className="guide-inspector-hint">
+          {t('scenario.editor.guideAiConfigurationFailed')}
+        </p>
+      )}
+      {selection.selectionFailed && (
+        <p role="alert" className="guide-inspector-hint">
+          {t('scenario.editor.guideAiSelectionFailed')}
+        </p>
+      )}
+      {selection.selectionUnavailable && (
+        <p role="status" className="guide-inspector-hint">
+          {selection.configuration?.remembered?.displayName}{' '}
+          {t('scenario.editor.guideAiModelUnavailable')}
+        </p>
+      )}
+      {selection.selectionPending && (
+        <p role="status" className="guide-inspector-hint">
+          {t('scenario.editor.loading')}
+        </p>
+      )}
+      {(!catalog?.models.length ||
+        selection.configurationFailed ||
+        selection.selectionUnavailable) && (
         <ProductActionButton
           compact
           tone="secondary"
-          onClick={() => setReload((value) => value + 1)}
+          onClick={() => void selection.retryConfiguration()}
+          disabled={busy || disabled}
         >
           {t('gallery.videoReview.speechReloadModels')}
         </ProductActionButton>
@@ -160,18 +187,26 @@ export function TourNarrationAI({
             disabled ||
             busy ||
             !profile ||
+            !profile.voiceId.trim() ||
+            profile.modelId !== selection.modelId ||
             !provider ||
             approved !== provider.id ||
             !operation.remaining
           }
           onClick={() => {
-            if (profile && provider && approved === provider.id)
+            if (
+              profile &&
+              profile.voiceId.trim() &&
+              profile.modelId === selection.modelId &&
+              provider &&
+              approved === provider.id
+            )
               void operation.generate(profile, provider.id);
           }}
         >
           {t('gallery.videoReview.speechGenerateSelected')}
         </ProductActionButton>
-        {busy && (
+        {attemptBusy && (
           <ProductActionButton compact tone="secondary" onClick={operation.cancel}>
             {t('common.actions.cancel')}
           </ProductActionButton>
@@ -224,13 +259,17 @@ function NarrationVoiceParameters({
   disabled,
   busy,
   onChange,
+  onSelectModel,
+  onOpenModels,
   t,
 }: {
-  catalog: AIModelSelectionBootstrapPayload | null;
+  catalog: AIModelCatalogPayload | null;
   profile: Profile | null;
   disabled: boolean;
   busy: boolean;
   onChange(profile: Profile): void;
+  onSelectModel(id: string | null): void;
+  onOpenModels(): void;
   t: Translate;
 }) {
   const change = (patch: Partial<AISpeechModelParameters>) => {
@@ -244,11 +283,9 @@ function NarrationVoiceParameters({
             models={catalog.models}
             providers={catalog.providers}
             selectedModelId={profile?.modelId ?? null}
-            onSelect={(id) => {
-              const selected = catalog.models.find((entry) => entry.id === id);
-              if (selected?.audio?.speech)
-                onChange({ modelId: selected.id, ...selected.audio.speech });
-            }}
+            onSelect={onSelectModel}
+            onOpen={onOpenModels}
+            disabled={disabled}
           />
         )}
       </InspectorParameterRow>

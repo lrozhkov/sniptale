@@ -1,5 +1,21 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'scenario-narration-contextual-selection',
+    exclusive: true,
+    productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Narration and shared selection proof cover opening, explicit use, cancellation, and failure. Persistence participants cover concurrent choices, deletion, recreation, reset, and retry.',
+    testFiles: [
+      'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/use-narration-ai.test.tsx',
+      'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.test.tsx',
+      'apps/extension/src/workflows/ai-settings/query.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/scenario-selections.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/managed-catalog.test.ts',
+    ],
+  },
+  {
     owner: 'content-ai-modal-scenario-selection',
     productionFile: 'apps/extension/src/content/overlay/ai/modal/session/locals.ts',
     allowCrossOwner: true,
