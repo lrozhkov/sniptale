@@ -1,9 +1,9 @@
-import { generateSpeech, NoSpeechGeneratedError } from 'ai';
-import { APICallError, InvalidResponseDataError, TypeValidationError } from '@ai-sdk/provider';
+import { assertResponseStatus, failAudioProviderRequest } from './failure';
+import { getTranscriptionProviderOptions, admitSdkTranscript } from './transcription';
+import { generateSpeech } from 'ai';
 import { createAIProviderRuntime } from '../providers';
 import { createProviderSdkFetch } from '../llm/transport/http';
 import {
-  parseAudioJobFailureCode,
   AUDIO_JOB_TIMEOUT_MS,
   AUDIO_INPUT_MAX_BYTES,
   AUDIO_INPUT_MAX_SECONDS,
@@ -15,7 +15,7 @@ import {
   type AudioJobStart,
 } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
-import { parseAudioTranscriptResponse, validateAudioUpload } from './response';
+import { validateAudioUpload } from './response';
 import { encodeChatTranscription, parseChatTranscription } from './chat-transcription';
 import { isSupportedPcmContentType, PCM_WAV_HEADER_BYTES, wrapPcmWav } from './pcm-wav';
 
@@ -108,61 +108,27 @@ async function encodeTranscription(
   headers: Record<string, string>
 ): Promise<ArrayBuffer> {
   const params = args.config.transcription;
-  if (!args.input || !params) throw new Error('invalid-request');
+  if (!args.input || !params || params.transport !== 'audio-chat')
+    throw new Error('invalid-request');
   if (args.input.size > AUDIO_INPUT_MAX_BYTES) throw new Error('too-large');
   args.signal.throwIfAborted();
-  if (params.transport === 'audio-chat') {
-    if (!args.recognition) throw new Error('invalid-request');
-    const bytes = new Uint8Array(await args.input.arrayBuffer());
-    args.signal.throwIfAborted();
-    // Bounded blocks avoid spreading the complete audio into the JavaScript argument stack.
-    const parts: string[] = [];
-    // All nonfinal blocks contain a multiple of three bytes, so their base64 has no internal padding.
-    for (let offset = 0; offset < bytes.length; offset += 32766)
-      parts.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + 32766))));
-    const payload = encodeChatTranscription(
-      args.config,
-      args.recognition,
-      args.durationSeconds,
-      parts.join('')
-    );
-    args.signal.throwIfAborted();
-    headers['Content-Type'] = 'application/json';
-    return new TextEncoder().encode(payload).buffer;
-  }
-  const form = new FormData();
-  form.set('file', args.input);
-  form.set('model', args.config.modelCode);
-  form.set('response_format', params.responseFormat);
-  if (params.language) form.set('language', params.language);
-  if (params.prompt) form.set('prompt', params.prompt);
-  if (params.timestampGranularity !== 'none') {
-    form.append('timestamp_granularities[]', params.timestampGranularity);
-    if (params.timestampGranularity === 'word') form.append('timestamp_granularities[]', 'segment');
-  }
-  // Materialize the upload before fetch so network I/O never reads a live OPFS file.
-  // Response owns multipart encoding and the matching boundary; no headers are guessed.
-  const encoded = new Response(form);
-  const body = await encoded.arrayBuffer().catch(() => {
-    args.signal.throwIfAborted();
-    throw new Error('storage-failed');
-  });
+  if (!args.recognition) throw new Error('invalid-request');
+  const bytes = new Uint8Array(await args.input.arrayBuffer());
   args.signal.throwIfAborted();
-  const contentType = encoded.headers.get('Content-Type');
-  if (!contentType) throw new Error('invalid-request');
-  headers['Content-Type'] = contentType;
-  return body;
-}
-
-async function assertResponseStatus(response: Response): Promise<void> {
-  if (response.ok) return;
-  await response.body?.cancel().catch(() => undefined);
-  if (response.status === 401 || response.status === 403) throw new Error('provider-auth');
-  if (response.status === 400 || response.status === 422) throw new Error('provider-request');
-  if (response.status === 404 || response.status === 405) throw new Error('provider-not-found');
-  if (response.status === 413) throw new Error('too-large');
-  if (response.status === 429) throw new Error('provider-rate-limit');
-  throw new Error('provider-failed');
+  // Bounded blocks avoid spreading the complete audio into the JavaScript argument stack.
+  const parts: string[] = [];
+  // All nonfinal blocks contain a multiple of three bytes, so their base64 has no internal padding.
+  for (let offset = 0; offset < bytes.length; offset += 32766)
+    parts.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + 32766))));
+  const payload = encodeChatTranscription(
+    args.config,
+    args.recognition,
+    args.durationSeconds,
+    parts.join('')
+  );
+  args.signal.throwIfAborted();
+  headers['Content-Type'] = 'application/json';
+  return new TextEncoder().encode(payload).buffer;
 }
 
 async function decodeTranscription(response: Response, args: TranscriptionInput) {
@@ -173,12 +139,9 @@ async function decodeTranscription(response: Response, args: TranscriptionInput)
   } catch {
     throw new Error('invalid-response');
   }
-  const result =
-    args.config.transcription?.transport === 'audio-chat'
-      ? args.recognition
-        ? parseChatTranscription(raw, args.durationSeconds, args.recognition)
-        : null
-      : parseAudioTranscriptResponse(raw, args.durationSeconds);
+  const result = args.recognition
+    ? parseChatTranscription(raw, args.durationSeconds, args.recognition)
+    : null;
   if (!result) throw new Error('invalid-response');
   return result;
 }
@@ -245,6 +208,7 @@ async function postAudioProvider(
 }
 
 async function performTranscription(args: TranscriptionInput): Promise<AudioTranscriptResult> {
+  if (args.config.transcription?.transport !== 'audio-chat') return transcribeWithProviderSdk(args);
   const headers: Record<string, string> = { Authorization: `Bearer ${args.config.apiKey}` };
   const body = await encodeTranscription(args, headers);
   const response = await postAudioProvider(args, headers, body);
@@ -365,25 +329,8 @@ async function requestSpeech(args: AudioRequest) {
       args
     );
   } catch (error) {
-    return speechFailure(error, args.signal);
+    return failAudioProviderRequest(error, args.signal);
   }
-}
-
-function speechFailure(error: unknown, signal: AbortSignal): never {
-  signal.throwIfAborted();
-  const code = error instanceof Error ? error.message : '';
-  if (code === 'provider-response-too-large') throw new Error('too-large');
-  if (code === 'provider-redirect-refused') throw new Error('network-failed');
-  if (parseAudioJobFailureCode(code)) throw new Error(code);
-  if (
-    NoSpeechGeneratedError.isInstance(error) ||
-    InvalidResponseDataError.isInstance(error) ||
-    TypeValidationError.isInstance(error) ||
-    APICallError.isInstance(error)
-  )
-    throw new Error('invalid-response');
-  if (error instanceof Error && error.name === 'AbortError') throw new Error('timeout');
-  throw new Error('network-failed');
 }
 
 async function admitSpeechResponse(
@@ -406,4 +353,74 @@ async function admitSpeechResponse(
     throw new Error('invalid-response');
   }
   return contentType;
+}
+
+/** Uses the ready-made V4 provider once and retains documented raw timing data for compatible models. */
+async function transcribeWithProviderSdk(args: TranscriptionInput): Promise<AudioTranscriptResult> {
+  args.signal.throwIfAborted();
+  if (args.input.size === 0 || args.input.size > AUDIO_INPUT_MAX_BYTES)
+    throw new Error('too-large');
+  const params = args.config.transcription;
+  if (!params) throw new Error('invalid-request');
+  const providerOptions = getTranscriptionProviderOptions(args.config.connectionType, params);
+  let bytes: Uint8Array<ArrayBuffer>;
+  try {
+    bytes = new Uint8Array(await args.input.arrayBuffer());
+  } catch {
+    args.signal.throwIfAborted();
+    throw new Error('storage-failed');
+  }
+  args.signal.throwIfAborted();
+  const transport = createProviderSdkFetch({
+    baseUrl: args.config.baseUrl,
+    signal: args.signal,
+    timeoutMs: AUDIO_JOB_TIMEOUT_MS,
+    maxResponseBytes: 1024 * 1024,
+    ...(args.beforeSend ? { beforeSend: args.beforeSend } : {}),
+    transport: async (input, init) => {
+      let response: Response;
+      try {
+        response = await fetch(input, init);
+      } catch {
+        args.signal.throwIfAborted();
+        throw new Error('network-failed');
+      }
+      await assertResponseStatus(response);
+      if (
+        response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !==
+        'application/json'
+      ) {
+        await response.body?.cancel().catch(() => undefined);
+        throw new Error('invalid-response');
+      }
+      args.onReceiving();
+      return response;
+    },
+  });
+  try {
+    const provider = createAIProviderRuntime({
+      type: args.config.connectionType,
+      baseUrl: args.config.baseUrl,
+      apiKey: args.config.apiKey,
+      operation: 'transcription',
+      fetch: transport,
+    });
+    const model = provider.transcriptionModel?.(args.config.modelCode);
+    if (!model) throw new Error('model-unavailable');
+    const result = await model.doGenerate({
+      audio: bytes,
+      mediaType: args.input.type,
+      providerOptions,
+      abortSignal: args.signal,
+    });
+    args.signal.throwIfAborted();
+    return admitSdkTranscript(
+      result,
+      args.config.connectionType,
+      params.timestampGranularity,
+      args.durationSeconds
+    );
+  } catch (error) {
+    return failAudioProviderRequest(error, args.signal);
+  }
 }

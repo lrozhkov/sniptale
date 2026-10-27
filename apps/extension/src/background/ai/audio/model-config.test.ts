@@ -478,3 +478,42 @@ it('admits local LM Studio speech without a credential while retaining origin pe
   expect(permission).toHaveBeenCalledWith({ origins: ['http://localhost:1234/*'] });
   expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
 });
+
+it.each([
+  'openai',
+  'neuraldeep',
+  'lm-studio',
+  'google',
+  'elevenlabs',
+  'deepgram',
+  'mistral',
+  'xai',
+] as const)(
+  'retains exact private dictation approval for the %s SDK transcriber',
+  async (connectionType) => {
+    const selectedProvider: AIProvider = { ...provider, connectionType };
+    vi.mocked(loadAIProviders).mockResolvedValue([selectedProvider]);
+    vi.mocked(loadAIModels).mockResolvedValue([
+      {
+        ...model,
+        operation: 'transcription',
+        audio: { transcription: { responseFormat: 'json', timestampGranularity: 'none' } },
+      },
+    ]);
+    const selected = {
+      modelId: model.id,
+      approvedProviderId: provider.id,
+      approvedDestination: await createAIProviderDestinationBinding(selectedProvider),
+      approvedModelCode: model.modelCode,
+    };
+    await expect(
+      resolveTranscriptionModelConfig(selected, new AbortController().signal)
+    ).resolves.toMatchObject({ connectionType });
+    await expect(
+      resolveTranscriptionModelConfig(
+        { ...selected, approvedModelCode: 'changed' },
+        new AbortController().signal
+      )
+    ).rejects.toThrow('model-unavailable');
+  }
+);

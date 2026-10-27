@@ -157,7 +157,7 @@ it('requests segment fallback alongside explicitly configured word timing', asyn
     },
   });
   const verboseRequest = fetchMock.mock.calls[0]?.[1];
-  expect(verboseRequest?.body).toBeInstanceOf(ArrayBuffer);
+  expect(verboseRequest?.body).toBeInstanceOf(FormData);
   const verbose = await new Response(verboseRequest?.body, {
     headers: new Headers(verboseRequest?.headers),
   }).formData();
@@ -261,9 +261,7 @@ it('reports a fixed network failure without retrying or exposing the raw excepti
 it('rejects unreadable staged audio locally before making a paid request', async () => {
   const fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal('fetch', fetchMock);
-  vi.spyOn(Response.prototype, 'arrayBuffer').mockRejectedValueOnce(
-    new Error('private local path')
-  );
+  vi.spyOn(input, 'arrayBuffer').mockRejectedValueOnce(new Error('private local path'));
   await expect(run(transcription, transcriptionConfig)).rejects.toThrow(/^storage-failed$/);
   expect(fetchMock).not.toHaveBeenCalled();
 });
@@ -272,16 +270,10 @@ it('does not start a request when cancelled during multipart preparation', async
   const fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal('fetch', fetchMock);
   const controller = new AbortController();
-  vi.spyOn(input, 'stream').mockImplementation(
-    () =>
-      new ReadableStream({
-        start(stream) {
-          controller.abort();
-          stream.enqueue(new TextEncoder().encode('bytes'));
-          stream.close();
-        },
-      })
-  );
+  vi.spyOn(input, 'arrayBuffer').mockImplementationOnce(async () => {
+    controller.abort();
+    return new TextEncoder().encode('bytes').buffer;
+  });
   await expect(
     requestAudio({
       request: transcription,

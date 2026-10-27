@@ -280,7 +280,7 @@ it('sends prepared browser multipart and returns validated chunk-relative timing
     result: { text: 'hello', words: [{ text: 'hello', start: 0, end: 1 }] },
   });
   const init = fetchMock.mock.calls[0]?.[1];
-  expect(init?.body).toBeInstanceOf(ArrayBuffer);
+  expect(init?.body).toBeInstanceOf(FormData);
   const form = await new Response(init?.body, { headers: new Headers(init?.headers) }).formData();
   expect(form.get('timestamp_granularities[]')).toBe('word');
   expect(form.get('file')).toBeInstanceOf(File);

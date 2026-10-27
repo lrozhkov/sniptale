@@ -101,3 +101,28 @@ describe('audio response boundary', () => {
     expect(await validateAudioUpload(new Blob([bytes], { type: 'audio/wav' }), 1)).toBe(false);
   });
 });
+
+it('treats nullable timing arrays as absent while preserving valid fallback', () => {
+  const segments = [{ text: 'hello', start: 0, end: 1 }];
+  const words = [{ word: 'hello', start: 0.1, end: 0.9 }];
+  expect(parseAudioTranscriptResponse({ text: 'hello', words: null, segments }, 1)).toEqual({
+    text: 'hello',
+    segments,
+  });
+  expect(parseAudioTranscriptResponse({ text: 'hello', segments: null, words }, 1)).toEqual({
+    text: 'hello',
+    words: [{ text: 'hello', start: 0.1, end: 0.9 }],
+  });
+  expect(parseAudioTranscriptResponse({ text: 'hello', words: null, segments: null }, 1)).toEqual({
+    text: 'hello',
+  });
+  expect(
+    parseAudioTranscriptResponse({ text: 'hello', words: false, segments: null }, 1)
+  ).toBeNull();
+  expect(
+    parseAudioTranscriptResponse(
+      { text: 'hello', words: null, segments: [{ text: 'hello', start: 0, end: 1.027 }] },
+      1
+    )
+  ).toBeNull();
+});

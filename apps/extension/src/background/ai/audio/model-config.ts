@@ -64,13 +64,13 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   if (
     !provider ||
     provider.enabled === false ||
-    !getAIProviderOperations(provider.connectionType).includes(args.operation) ||
-    (args.operation === 'transcription' && provider.connectionType !== 'openai-compatible')
+    !getAIProviderOperations(provider.connectionType).includes(args.operation)
   )
     throw new Error('model-unavailable');
   const chat =
     args.operation === 'transcription' && model.audio?.transcription?.transport === 'audio-chat';
-  if (chat && !args.approvedProviderId) throw new Error('model-unavailable');
+  if (chat && (!args.approvedProviderId || provider.connectionType !== 'openai-compatible'))
+    throw new Error('model-unavailable');
   if (
     args.operation === 'transcription' &&
     args.recognition !== 'automatic' &&
@@ -80,7 +80,6 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   if (
     args.approved &&
     (!provider ||
-      provider.connectionType !== 'openai-compatible' ||
       model.modelCode !== args.approved.approvedModelCode ||
       (await createAIProviderDestinationBinding(provider)) !== args.approved.approvedDestination)
   )

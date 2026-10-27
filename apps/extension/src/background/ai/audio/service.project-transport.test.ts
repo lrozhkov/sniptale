@@ -107,23 +107,12 @@ it.each([
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    if (mode === 'multipart') {
-      const materialize = Response.prototype.arrayBuffer;
-      vi.spyOn(Response.prototype, 'arrayBuffer').mockImplementationOnce(async function (
-        this: Response
-      ) {
-        start();
-        await gate;
-        return materialize.call(this);
-      });
-    } else {
-      const materialize = job.wav.arrayBuffer.bind(job.wav);
-      vi.spyOn(job.wav, 'arrayBuffer').mockImplementationOnce(async () => {
-        start();
-        await gate;
-        return materialize();
-      });
-    }
+    const materialize = job.wav.arrayBuffer.bind(job.wav);
+    vi.spyOn(job.wav, 'arrayBuffer').mockImplementationOnce(async () => {
+      start();
+      await gate;
+      return materialize();
+    });
     const post = vi.fn<typeof fetch>(
       async () =>
         new Response(JSON.stringify({ text: 'Speech' }), {

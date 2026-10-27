@@ -37,7 +37,7 @@ export function parseAudioTranscriptResponse(
   const { result, value: fields } = header;
   for (const key of ['segments', 'words'] as const) {
     const raw = fields[key];
-    if (raw === undefined) continue;
+    if (raw === undefined || raw === null) continue;
     if (!Array.isArray(raw) || raw.length > 10000) return null;
     const parsed: AudioTranscriptTiming[] = [];
     for (const item of raw) {
