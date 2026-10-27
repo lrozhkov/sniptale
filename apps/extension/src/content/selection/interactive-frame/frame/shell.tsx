@@ -117,6 +117,12 @@ export function InteractiveFrameFrameShell(props: InteractiveFrameFrameShellProp
               settings: { manualPlacement },
             });
           }}
+          onValueChange={(value) =>
+            dispatchFrameStepBadgeChanged({
+              frameId: props.frame.id,
+              settings: { value, auto: false, sourcePresetId: undefined },
+            })
+          }
           onSettingsClick={() => toggleQuickPopover(props.frame.id, 'step-badge')}
           settingsAnchorRef={props.stepBadgePopoverAnchorRef}
           showSettingsHandle

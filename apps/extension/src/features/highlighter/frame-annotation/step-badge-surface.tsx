@@ -170,6 +170,7 @@ export function FrameStepBadgeSurface(props: {
   borderWidth: number;
   fillColor?: string;
   elementRef?: React.Ref<HTMLDivElement>;
+  valueEditor?: React.ReactNode;
   isDragging?: boolean;
   visualScale?: number;
   onClick?: () => void;
@@ -208,7 +209,9 @@ export function FrameStepBadgeSurface(props: {
       }}
       title={[translateStepBadgePrefix(), props.settings.value].filter(Boolean).join(' ')}
     >
-      <StepBadgeValue customStyle={customStyles.text} value={props.settings.value} />
+      {props.valueEditor ?? (
+        <StepBadgeValue customStyle={customStyles.text} value={props.settings.value} />
+      )}
     </div>
   );
 }

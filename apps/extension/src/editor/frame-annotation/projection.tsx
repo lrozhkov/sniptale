@@ -299,6 +299,12 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
         props.onSnapshotChange({ ...props.snapshot, stepBadge: { ...settings, manualPlacement } })
       }
       portalTheme={null}
+      onValueChange={(value) =>
+        props.onSnapshotChange({
+          ...props.snapshot,
+          stepBadge: { ...settings, value, auto: false, sourcePresetId: undefined },
+        })
+      }
       isSettingsOpen={props.settingsMenu === 'step'}
       onSettingsClick={() => {
         if (anchorRef.current) props.onOpenSettings('step', anchorRef.current);

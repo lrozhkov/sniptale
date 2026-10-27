@@ -546,6 +546,7 @@ it('keeps a selected standalone badge editable without frame resize or effect co
   const sceneRoot = document.createElement('div');
   document.body.append(host, controlsRoot, sceneRoot);
   const root = createRoot(host);
+  const onSnapshotChange = vi.fn();
   const snapshot = createFrameAnnotationSnapshot(
     {
       id: 'standalone',
@@ -554,7 +555,7 @@ it('keeps a selected standalone badge editable without frame resize or effect co
       y: 80,
       width: 1,
       height: 1,
-      stepBadge: createDefaultFrameStepBadge(),
+      stepBadge: { ...createDefaultFrameStepBadge(), value: '7', sourcePresetId: 'system-classic' },
     },
     0
   );
@@ -577,7 +578,7 @@ it('keeps a selected standalone badge editable without frame resize or effect co
         onOpenSettings={vi.fn()}
         onMoveStart={vi.fn()}
         onResizeStart={vi.fn()}
-        onSnapshotChange={vi.fn()}
+        onSnapshotChange={onSnapshotChange}
         onSnapshotPreview={vi.fn()}
         onStepBadgeReorder={vi.fn()}
       />
@@ -587,6 +588,22 @@ it('keeps a selected standalone badge editable without frame resize or effect co
   expect(sceneRoot.querySelector('.sniptale-resize-handle')).toBeNull();
   expect(sceneRoot.querySelector('.sniptale-step-badge')).not.toBeNull();
   expect(controlsRoot.querySelector('.sniptale-step-badge-settings-handle')).not.toBeNull();
+  act(() =>
+    controlsRoot.querySelector<HTMLButtonElement>('.sniptale-step-badge-edit-handle')!.click()
+  );
+  const input = sceneRoot.querySelector<HTMLInputElement>('input')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '42');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(onSnapshotChange).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      stepBadge: expect.objectContaining({ value: '42', auto: false, sourcePresetId: undefined }),
+    })
+  );
+  expect(snapshot.stepBadge).toMatchObject({ value: '7', sourcePresetId: 'system-classic' });
+
   act(() => root.unmount());
   host.remove();
   controlsRoot.remove();

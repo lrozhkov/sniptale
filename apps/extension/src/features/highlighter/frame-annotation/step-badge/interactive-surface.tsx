@@ -1,4 +1,5 @@
 import React from 'react';
+import { translate } from '../../../../platform/i18n';
 import { createPortal } from 'react-dom';
 import type { AppTheme } from '@sniptale/ui/theme/types';
 import type {
@@ -25,6 +26,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
   onPositionChange?: (placement: StepBadgeManualPlacement) => void;
   onFramePositionChange?: (point: { x: number; y: number }) => void;
   onSettingsClick?: () => void;
+  onValueChange?: (value: string) => void;
   portalTheme: AppTheme | null;
   settings: StepBadgeSettings;
   settingsAnchorRef?: React.RefObject<HTMLButtonElement | null>;
@@ -33,12 +35,15 @@ export function FrameStepBadgeInteractiveSurface(props: {
   surfacePortalTarget: Element | DocumentFragment;
   chrome?: 'export' | 'interactive';
 }) {
+  const [isEditingValue, setIsEditingValue] = React.useState(false);
+  const editAnchorRef = React.useRef<HTMLButtonElement | null>(null);
   const interaction = useStepBadgeInteraction({
+    canEditValue: Boolean(props.onValueChange),
     borderWidth: props.borderWidth,
     ...(props.chromeScale === undefined ? {} : { chromeScale: props.chromeScale }),
     ...(props.coordinateSpace ? { coordinateSpace: props.coordinateSpace } : {}),
     frameRect: props.frameRect,
-    isSettingsOpen: props.isSettingsOpen,
+    isSettingsOpen: isEditingValue || props.isSettingsOpen,
     onPositionChange: props.onPositionChange,
     ...(props.onFramePositionChange ? { onFramePositionChange: props.onFramePositionChange } : {}),
     settings: props.settings,
@@ -50,6 +55,20 @@ export function FrameStepBadgeInteractiveSurface(props: {
       borderColor={props.borderColor}
       borderWidth={props.borderWidth}
       elementRef={interaction.badgeRef}
+      {...(isEditingValue && props.chrome !== 'export' && props.onValueChange
+        ? {
+            valueEditor: (
+              <StepBadgeInlineValueEditor
+                value={String(props.settings.value ?? '')}
+                onFinish={(value, restoreFocus) => {
+                  setIsEditingValue(false);
+                  if (value !== null) props.onValueChange?.(value);
+                  if (restoreFocus) editAnchorRef.current?.focus();
+                }}
+              />
+            ),
+          }
+        : {})}
       isDragging={interaction.drag.isDragging}
       {...(props.onClick ? { onClick: props.onClick } : {})}
       onMouseEnter={interaction.visibility.handleMouseEnter}
@@ -85,6 +104,8 @@ export function FrameStepBadgeInteractiveSurface(props: {
       {props.chrome !== 'export' ? (
         <FrameStepBadgeControls
           drag={interaction.drag}
+          editAnchorRef={editAnchorRef}
+          {...(props.onValueChange ? { onEditValue: () => setIsEditingValue(true) } : {})}
           visibility={interaction.visibility}
           portalTarget={props.controlsPortalTarget}
           portalTheme={props.portalTheme}
@@ -95,5 +116,67 @@ export function FrameStepBadgeInteractiveSurface(props: {
         />
       ) : null}
     </>
+  );
+}
+
+function StepBadgeInlineValueEditor(props: {
+  value: string;
+  onFinish: (value: string | null, restoreFocus: boolean) => void;
+}) {
+  const [draft, setDraft] = React.useState(props.value.slice(0, 2));
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const finishedRef = React.useRef(false);
+  React.useLayoutEffect(() => {
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+  const finish = (accept: boolean, restoreFocus: boolean) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    const value = draft.trim();
+    props.onFinish(accept && value ? value : null, restoreFocus);
+  };
+  return (
+    <input
+      ref={inputRef}
+      className="sniptale-step-badge-value-editor"
+      aria-label={translate('content.stepBadge.editValue')}
+      autoComplete="off"
+      spellCheck={false}
+      maxLength={2}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value.slice(0, 2))}
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === 'Enter' || event.key === 'Escape') {
+          event.preventDefault();
+          finish(event.key === 'Enter', true);
+        }
+      }}
+      onBlur={() => finish(true, false)}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        boxSizing: 'border-box',
+        width: '100%',
+        height: '100%',
+        minWidth: 0,
+        padding: 0,
+        border: 0,
+        borderRadius: 'inherit',
+        background: 'transparent',
+        color: 'inherit',
+        font: 'inherit',
+        lineHeight: 1,
+        textAlign: 'center',
+        outline: '2px solid var(--sniptale-color-accent)',
+        outlineOffset: -2,
+        caretColor: 'currentColor',
+        userSelect: 'text',
+        WebkitUserSelect: 'text',
+      }}
+    />
   );
 }

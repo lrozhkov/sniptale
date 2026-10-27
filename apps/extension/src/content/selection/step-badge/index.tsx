@@ -25,6 +25,7 @@ interface StepBadgeProps {
   onPositionChange?: (placement: StepBadgeManualPlacement) => void;
   onFramePositionChange?: (point: { x: number; y: number }) => void;
   onSettingsClick?: () => void;
+  onValueChange?: (value: string) => void;
   settingsAnchorRef?: React.RefObject<HTMLButtonElement | null>;
   showSettingsHandle?: boolean;
 }
@@ -60,6 +61,7 @@ export const StepBadge: React.FC<StepBadgeProps> = (props) => {
         : {})}
       portalTheme={portalTheme}
       settings={props.settings}
+      {...(props.onValueChange ? { onValueChange: props.onValueChange } : {})}
       showSettingsHandle={Boolean(props.showSettingsHandle)}
       surfacePortalTarget={portalTarget}
       {...(props.fillColor ? { fillColor: props.fillColor } : {})}

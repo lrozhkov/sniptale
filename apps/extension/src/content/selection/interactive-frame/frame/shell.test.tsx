@@ -19,6 +19,7 @@ vi.mock('../../step-badge', () => ({
     onPositionChange: (placement: { position: number; side: 'bottom' }) => void;
     onFramePositionChange?: (point: { x: number; y: number }) => void;
     onSettingsClick: () => void;
+    onValueChange?: (value: string) => void;
     showSettingsHandle: boolean;
   }) => (
     <div data-ui="step-badge" data-show-settings={String(props.showSettingsHandle)}>
@@ -27,6 +28,7 @@ vi.mock('../../step-badge', () => ({
         data-ui="move-step"
         onClick={() => props.onPositionChange({ position: 0.7, side: 'bottom' })}
       />
+      <button type="button" data-ui="edit-step" onClick={() => props.onValueChange?.('42')} />
       <button type="button" data-ui="step-settings" onClick={props.onSettingsClick} />
       {props.onFramePositionChange ? (
         <button
@@ -225,6 +227,13 @@ describe('InteractiveFrameFrameShell step badge controls', () => {
     expect(stepBadgeListener).toHaveBeenCalledWith({
       frameId: frame.id,
       settings: { manualPlacement: { position: 0.7, side: 'bottom' } },
+    });
+
+    stepBadgeListener.mockClear();
+    act(() => host.querySelector<HTMLButtonElement>('[data-ui="edit-step"]')?.click());
+    expect(stepBadgeListener).toHaveBeenCalledExactlyOnceWith({
+      frameId: frame.id,
+      settings: { value: '42', auto: false, sourcePresetId: undefined },
     });
 
     act(() => host.querySelector<HTMLButtonElement>('[data-ui="step-settings"]')?.click());

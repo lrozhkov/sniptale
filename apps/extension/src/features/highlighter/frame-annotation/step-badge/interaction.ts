@@ -13,6 +13,7 @@ import type { FrameAnnotationCoordinateSpace } from '../coordinate-space';
 export function useStepBadgeInteraction(args: {
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   borderWidth: number;
+  canEditValue?: boolean;
   chromeScale?: number;
   frameRect: StepBadgeFrameRect | undefined;
   isSettingsOpen: boolean | undefined;
@@ -52,6 +53,7 @@ export function useStepBadgeInteraction(args: {
       : args.settings;
   const controlPosition = useStepBadgeControlPosition({
     badgeRef,
+    controlCount: args.canEditValue ? 3 : 2,
     isEnabled: hasControls,
     placementKey: JSON.stringify({
       anchor: effectiveSettings.anchor,

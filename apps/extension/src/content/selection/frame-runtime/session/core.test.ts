@@ -173,14 +173,16 @@ it('syncs frame and callout events through the shared frame-event seam', async (
   cleanup();
 });
 
-it('wraps only discrete non-step-badge session handlers with history commits', async () => {
+it('routes discrete badge edits through history without wrapping global defaults or reorder', async () => {
   const framesStore = createFramesStore();
+  const committedAction = vi.fn();
+  const updateFrameStepBadge = vi.fn();
   const withHistoryCommit = vi.fn(
-    (<T extends (...args: never[]) => unknown>(action: T): T => action) as <
-      T extends (...args: never[]) => unknown,
-    >(
-      action: T
-    ) => T
+    (<T extends (...args: never[]) => unknown>(action: T): T =>
+      ((...args: Parameters<T>) => {
+        committedAction();
+        return action(...args);
+      }) as T) as <T extends (...args: never[]) => unknown>(action: T) => T
   );
   const cleanup = setupFrameSessionSyncListeners({
     globalEffectModeRef: { current: 'border' },
@@ -192,7 +194,7 @@ it('wraps only discrete non-step-badge session handlers with history commits', a
     sessionFocusSettingsRef: { current: DEFAULT_SETTINGS.defaultFocusSettings },
     setFrames: framesStore.setFrames,
     syncFocusOpacity: vi.fn(),
-    updateFrameStepBadge: vi.fn(),
+    updateFrameStepBadge,
     updateGlobalStepBadgeSettings: vi.fn(),
     withHistoryCommit: withHistoryCommit as Parameters<
       typeof setupFrameSessionSyncListeners
@@ -201,7 +203,17 @@ it('wraps only discrete non-step-badge session handlers with history commits', a
 
   await Promise.resolve();
 
-  expect(withHistoryCommit).toHaveBeenCalledTimes(4);
+  expect(withHistoryCommit).toHaveBeenCalledTimes(5);
+  dispatchFrameStepBadgeChanged({
+    frameId: 'frame-1',
+    settings: { value: '42', auto: false, sourcePresetId: undefined },
+  });
+  expect(committedAction).toHaveBeenCalledOnce();
+  expect(updateFrameStepBadge).toHaveBeenCalledExactlyOnceWith('frame-1', {
+    value: '42',
+    auto: false,
+    sourcePresetId: undefined,
+  });
 
   cleanup();
 });

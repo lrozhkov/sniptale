@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const contentStepBadgeMessages = defineMessageSource({
+  editValue: { ru: 'Изменить значение номера', en: 'Edit number value' },
   settingsTitle: {
     ru: 'Нумерация',
     en: 'Numbering',
