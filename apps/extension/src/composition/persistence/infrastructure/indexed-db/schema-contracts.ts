@@ -34,6 +34,7 @@ import {
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STATE_MANAGER_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -64,8 +65,11 @@ interface StoredSchemaContract {
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
     domainId: 'syncCapture',
-    schemaVersion: 1,
-    stores: [{ storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' }],
+    schemaVersion: 2,
+    stores: [
+      { storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' },
+      { storeName: SYNC_OUTBOX_STORE, dataClass: 'durable-authority' },
+    ],
   },
   {
     domainId: 'voiceInputHistory',

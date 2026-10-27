@@ -220,3 +220,36 @@ it.each(['sync_capture', 'video_project_revisions'])(
     expect(harness.transaction.objectStore).not.toHaveBeenCalled();
   }
 );
+
+it('adds only the empty outgoing store before publishing syncCapture version 2', () => {
+  const harness = createUpgradeHarness();
+  const contracts = { put: vi.fn((_value: unknown) => undefined) };
+  harness.transaction.objectStore.mockReturnValue(contracts);
+  handleDatabaseUpgrade(harness.db, 40, 41, harness.transaction);
+  expect(harness.db.createObjectStore.mock.calls).toEqual([['sync_outbox', { keyPath: 'key' }]]);
+  expect(harness.stores.get('sync_outbox')?.createIndex).not.toHaveBeenCalled();
+  expect(harness.stores.get('sync_outbox')?.put).not.toHaveBeenCalled();
+  expect(contracts.put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(harness.db.deleteObjectStore).not.toHaveBeenCalled();
+});
+
+it('aborts failed outgoing store creation and permits retry without source mutation', () => {
+  const interrupted = createUpgradeHarness();
+  interrupted.db.createObjectStore.mockImplementation(() => {
+    throw new Error('outbox unavailable');
+  });
+  expect(() => handleDatabaseUpgrade(interrupted.db, 40, 41, interrupted.transaction)).toThrow(
+    'outbox unavailable'
+  );
+  expect(interrupted.transaction.abort).toHaveBeenCalledOnce();
+  expect(interrupted.transaction.objectStore).not.toHaveBeenCalled();
+  const retry = createUpgradeHarness();
+  retry.transaction.objectStore.mockReturnValue({ put: vi.fn() });
+  handleDatabaseUpgrade(retry.db, 40, 41, retry.transaction);
+  expect([...retry.stores.keys()]).toEqual(['sync_outbox']);
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 40)!;
+  expect(migration.domainVersions).toEqual([{ domainId: 'syncCapture', from: 1, to: 2 }]);
+  expect(() => migration.validate(interrupted.db, interrupted.transaction)).toThrow(
+    'Sync outbox store is unavailable.'
+  );
+});

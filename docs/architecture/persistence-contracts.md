@@ -724,7 +724,7 @@ Restore preserves authored project content and timestamps. It allocates local ad
 
 ## Experimental immutable sync capture
 
-The `syncCapture` contract version 1 owns `sync_capture` in physical database version 40. The additive migration creates empty stores and preserves released domain rows and immutable objects. Migration does not enable capture.
+The `syncCapture` contract version 1 introduced `sync_capture` in physical database version 40. The additive migration creates empty stores and preserves released domain rows and immutable objects. Migration does not enable capture.
 
 An explicit experimental profile enables capture for a bounded Montage graph. The domain transaction saves the accepted project and its immutable native source snapshot together. Publication replay retains its original snapshot under the stable publication identity. Capture root state retains generation and causal predecessors after ordinary deletion and recreation. Capture generation does not allocate native project admission revisions.
 
@@ -756,3 +756,12 @@ The media replica command accepts a prepared original-only project-asset source 
 The media source publication participant also serves backup restoration. Backup retains conflict policy, transaction completion, sidecars and cleanup. Its publication order remains Library source, thumbnail, project child, then other sidecars. The participant does not start transactions or transfer files.
 
 This bounded integration does not implement all media writers, existing-data bootstrap, remote catalog admission or network transfer. The experimental profile remains disabled by default.
+
+
+## Durable outgoing preparation
+
+The `syncCapture` contract version 2 owns `sync_outbox` and `sync_capture` in physical database version 41. The additive migration creates an empty outbox and preserves released rows and immutable objects. Older clients refuse the newer database. The profile remains disabled unless explicitly enabled.
+
+The outbox retains exact prepared record text, its SHA256, the remote attempt key, and immutable source bindings. Record text has a 4 MiB UTF8 bound. Each operation admits at most 64 object bindings. The persistence owner checks primitive fields, the actual record digest, and exact captured source references. The workflow owns portable representation and protocol parsing.
+
+Preparation detaches both inputs before database admission. The owner generates `captureSha256` from the normalized capture and stores this digest with the accepted record. An accepted record must retain this exact snapshot binding, including native metadata. One native transaction checks the enabled profile, space, connection generation, and exact normalized retained capture. It does not compare the capture with the latest root generation. Thus, an earlier retained capture remains usable after later edits, deletion, or recreation. The first accepted materialization wins. Every caller must use the returned accepted record, including its original bytes and keys. A changed capture or contradictory existing operation refuses without mutation. Native failure preserves capture records, source claims, and accepted outgoing records. Reads perform no writes. Preparation neither settles operations nor releases source claims.

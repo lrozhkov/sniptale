@@ -320,3 +320,105 @@ test('prepared replica recovery survives restart before and after native commit'
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+test('native outgoing bytes survive concurrent preparation, recreation and restart', async ({}, info) => {
+  test.setTimeout(120_000);
+  const host = await startHostServer();
+  const profile = info.outputPath('outgoing-profile');
+  let context: BrowserContext | undefined;
+  try {
+    context = await chromium.launchPersistentContext(profile, {
+      viewport: { width: 1920, height: 900 },
+      deviceScaleFactor: 1,
+      headless: true,
+    });
+    const page = await context.newPage();
+    await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
+    await page.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await page.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const source = await page.evaluate(() => window.syncCaptureHarness.mediaSourceProof());
+    const left = await page.evaluate(
+      (capture) => window.syncCaptureHarness.outgoing.draft(capture, 'left'),
+      source.capture
+    );
+    const right = await page.evaluate(
+      (capture) => window.syncCaptureHarness.outgoing.draft(capture, 'right'),
+      source.capture
+    );
+    const peer = await context.newPage();
+    await applyHarnessBootstrap(peer, { preserveMediaLibrary: true });
+    await peer.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await peer.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const [first, second] = await Promise.all([
+      page.evaluate(
+        ({ capture, draft }) => window.syncCaptureHarness.outgoing.commit(capture, draft),
+        { capture: source.capture, draft: left }
+      ),
+      peer.evaluate(
+        ({ capture, draft }) => window.syncCaptureHarness.outgoing.commit(capture, draft),
+        { capture: source.capture, draft: right }
+      ),
+    ]);
+    expect(second).toEqual(first);
+    expect([left.recordText, right.recordText]).toContain(first.recordText);
+    const recreated = await page.evaluate(
+      (capture) => window.syncCaptureHarness.outgoing.recreate(capture),
+      source.capture
+    );
+    const late = await page.evaluate(
+      (capture) => window.syncCaptureHarness.outgoing.draft(capture, 'late'),
+      source.capture
+    );
+    expect(
+      await page.evaluate(
+        ({ capture, draft }) => window.syncCaptureHarness.outgoing.commit(capture, draft),
+        { capture: source.capture, draft: late }
+      )
+    ).toEqual(first);
+    const newDraft = await page.evaluate(
+      (capture) => window.syncCaptureHarness.outgoing.draft(capture, 'recreated'),
+      recreated
+    );
+    const newRecord = await page.evaluate(
+      ({ capture, draft }) => window.syncCaptureHarness.outgoing.commit(capture, draft),
+      { capture: recreated, draft: newDraft }
+    );
+    expect(newRecord.operationId).not.toBe(first.operationId);
+    expect(newRecord.generation).toBeGreaterThan(first.generation);
+    expect(newRecord.objects[0]!.ref.assetId).not.toBe(first.objects[0]!.ref.assetId);
+    await context.close();
+    context = await chromium.launchPersistentContext(profile, {
+      viewport: { width: 1920, height: 900 },
+      deviceScaleFactor: 1,
+      headless: true,
+    });
+    const restarted = await context.newPage();
+    await applyHarnessBootstrap(restarted, { preserveMediaLibrary: true });
+    await restarted.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await restarted.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const restored = await restarted.evaluate(
+      ({ spaceId, operationId }) => window.syncCaptureHarness.outgoing.verify(spaceId, operationId),
+      first
+    );
+    const restoredNew = await restarted.evaluate(
+      ({ spaceId, operationId }) => window.syncCaptureHarness.outgoing.verify(spaceId, operationId),
+      newRecord
+    );
+    expect(restored.record).toEqual(first);
+    expect(restoredNew.record).toEqual(newRecord);
+    expect(restored.files).toEqual([{ size: source.bytes.length, sha256: source.hash }]);
+    expect(restoredNew.files).toEqual(restored.files);
+    await writeFile(
+      info.outputPath('outgoing-proof.json'),
+      JSON.stringify(
+        { first, newRecord, restored, restoredNew, parallel: true, fullBrowserRestart: true },
+        null,
+        2
+      )
+    );
+  } finally {
+    await context?.close();
+    host.server.closeAllConnections();
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

@@ -499,3 +499,24 @@ it('selects canonical scoped history and marker replay proof', async () => {
     ])
   );
 });
+
+it.each(['core.stores.ts', 'upgrade/core.ts'])(
+  'selects legacy-to-current upgrade consumers when %s changes',
+  async (owner) => {
+    const module = await importOwnerMap();
+    const root = 'apps/extension/src/composition/persistence/infrastructure/indexed-db';
+    expect(module.resolveMappedCoverageOwnerTests(`${root}/${owner}`)).toEqual(
+      expect.arrayContaining([
+        'apps/extension/src/composition/persistence/diagnostics/index.test.ts',
+        'apps/extension/src/composition/persistence/projects/index.read-guards.test.ts',
+        'apps/extension/src/composition/persistence/scenario/projects/assets.test.ts',
+        'apps/extension/src/composition/persistence/scenario/projects/exports.test.ts',
+        'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+        'apps/extension/src/composition/persistence/effect-bundles/index.test.ts',
+        `${root}/upgrade/review-history.test.ts`,
+        `${root}/upgrade/scenario-history.test.ts`,
+        `${root}/upgrade/scenario-units.test.ts`,
+      ])
+    );
+  }
+);

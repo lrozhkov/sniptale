@@ -421,7 +421,73 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   });
   expect(PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'syncCapture')).toEqual({
     domainId: 'syncCapture',
-    schemaVersion: 1,
-    stores: [{ storeName: 'sync_capture', dataClass: 'durable-authority' }],
+    schemaVersion: 2,
+    stores: [
+      { storeName: 'sync_capture', dataClass: 'durable-authority' },
+      { storeName: 'sync_outbox', dataClass: 'durable-authority' },
+    ],
   });
+});
+
+it('adds an empty outgoing store without rewriting version 40 rows or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 40
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 41
+  )!;
+  expect(target.records).toEqual({ ...source.records, sync_outbox: [] });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'sync_outbox')).toEqual(source.stores);
+  expect(target.indexes).toEqual({ ...source.indexes, sync_outbox: [] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 2 });
+});
+
+it('retains populated version 40 capture rows and profiles during outgoing admission', () => {
+  const profile = {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: true,
+    spaceId: 'retained',
+    connectionGeneration: 3,
+  };
+  const capture = {
+    version: 1,
+    kind: 'captured-change',
+    key: '["change","retained-op"]',
+    createdAt: 2,
+    spaceId: 'retained',
+    connectionGeneration: 3,
+    rootKind: 'media',
+    rootId: 'source',
+    rootKey: '["retained","media","source"]',
+    generation: 1,
+    operationId: 'retained-op',
+    basis: [],
+    origin: 'local-edit',
+    publicationId: null,
+    change: { kind: 'tombstone' },
+  };
+  const rows = new Map<string, unknown[]>([['sync_capture', [profile, capture]]]);
+  const before = structuredClone(rows);
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Released rows must remain untouched.');
+  });
+  const db = {
+    objectStoreNames: { contains: (name: string) => rows.has(name) },
+    createObjectStore(name: string) {
+      rows.set(name, []);
+      return { createIndex: sourceAccess, put: sourceAccess };
+    },
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = { abort: vi.fn(), objectStore: sourceAccess };
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 40)!;
+  expect(migration.migrate(db, tx)).toBeUndefined();
+  expect(migration.validate(db, tx)).toBeUndefined();
+  expect(rows.get('sync_capture')).toEqual(before.get('sync_capture'));
+  expect(rows.get('sync_outbox')).toEqual([]);
+  expect(sourceAccess).not.toHaveBeenCalled();
 });

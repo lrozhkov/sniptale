@@ -61,20 +61,42 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   },
   {
     owner: 'shared-db-core-upgrade-root',
+    exclusive: true,
     productionFile:
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts',
-    reason: 'DB schema upgrade dispatch is covered by core upgrade and provenance migration tests.',
+    reason:
+      'Preserve DB boundary proof and add legacy migrations, core admission, and provenance checks.',
     testFiles: [
+      'apps/extension/src/composition/persistence/diagnostics/index.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.read-guards.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/assets.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/exports.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+      'apps/extension/src/composition/persistence/effect-bundles/index.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/review-history.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/scenario-history.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/scenario-units.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.test.ts',
     ],
   },
   {
     owner: 'shared-db-core-stores-schema-version',
+    exclusive: true,
     productionFile:
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts',
-    reason: 'DB schema version changes are covered by core upgrade and migration tests.',
+    reason:
+      'Preserve DB boundary proof and add legacy migration store/index expectations for schema changes.',
     testFiles: [
+      'apps/extension/src/composition/persistence/diagnostics/index.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.read-guards.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/assets.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/exports.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+      'apps/extension/src/composition/persistence/effect-bundles/index.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/review-history.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/scenario-history.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/scenario-units.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.test.ts',
     ],

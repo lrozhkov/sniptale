@@ -46,6 +46,7 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
       'asset_refs',
       'asset_operations',
       'sync_capture',
+      'sync_outbox',
       'video_project_revisions',
     ].map((name): [string, Map<string, unknown>] => [name, new Map()]),
     ['video_workspaces', new Map()],
@@ -70,7 +71,7 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
             if (failure(name)) throw new DOMException('No space', 'QuotaExceededError');
             if (!isRecord(value)) throw new Error('Invalid fixture row');
             const key =
-              name === 'sync_capture'
+              name === 'sync_capture' || name === 'sync_outbox'
                 ? value['key']
                 : name === 'video_project_revisions'
                   ? value['projectId']

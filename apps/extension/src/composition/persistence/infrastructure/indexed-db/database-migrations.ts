@@ -4,6 +4,7 @@ import type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
   VOICE_INPUT_HISTORY_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   ASSET_OPERATIONS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -920,6 +921,22 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         [SYNC_CAPTURE_STORE, VIDEO_PROJECT_REVISIONS_STORE],
         'Sync capture or project revision store is unavailable.'
       );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 1, to: 2 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 40,
+    toDatabaseVersion: 41,
+    risk: 'additive',
+    stores: [SYNC_OUTBOX_STORE],
+    migrate(db) {
+      db.createObjectStore(SYNC_OUTBOX_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(db, [SYNC_OUTBOX_STORE], 'Sync outbox store is unavailable.');
     },
   },
 ];
