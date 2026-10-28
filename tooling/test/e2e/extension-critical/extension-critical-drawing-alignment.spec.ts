@@ -160,3 +160,77 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     }
   });
 }
+
+async function readTextLines(element: Locator) {
+  return element.evaluate((node) => {
+    const content =
+      node instanceof HTMLTextAreaElement
+        ? node.parentElement!.querySelector('[data-ui="content.drawing.text-mirror"]')!
+        : node.querySelector('span')!;
+    const range = document.createRange();
+    range.selectNodeContents(content);
+    const origin = content.getBoundingClientRect();
+    const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0);
+    return {
+      text: node instanceof HTMLTextAreaElement ? node.value : content.textContent,
+      width: origin.width,
+      usedWidth:
+        Math.max(...rects.map((rect) => rect.right - origin.left)) +
+        parseFloat(getComputedStyle(content).paddingRight),
+      lines: rects.map((rect) => ({ width: rect.width, top: rect.top - origin.top })),
+    };
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`page drawing fits committed text without changing line breaks ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+      for (const value of [
+        'Hi',
+        '          Hi',
+        'Hi          ',
+        'A longer first line\nShort\nFinal line',
+        'First\n\nLast',
+        'Wrapped words '.repeat(40).trim(),
+      ]) {
+        await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+        await page.mouse.click(350, 180);
+        const input = page.locator('[data-ui="content.drawing.text-input"]');
+        await input.fill(value);
+        await expect(input).toHaveValue(value);
+        const before = await readTextLines(input);
+        await page.keyboard.press('Enter');
+        const text = page.locator('[data-ui="content.drawing.text-object"]').last();
+        await expect(text).toBeVisible();
+        const after = await readTextLines(text);
+        expect(after.text).toBe(value.trim());
+        if (value === value.trim()) expect(after.lines).toEqual(before.lines);
+        else expect(after.lines).toHaveLength(1);
+        expect(after.width - after.usedWidth).toBeGreaterThanOrEqual(0);
+        expect(after.width - after.usedWidth).toBeLessThanOrEqual(1);
+        await page.screenshot({
+          path: info.outputPath(`text-fit-${value.length}.png`),
+          fullPage: false,
+        });
+        const box = (await text.boundingBox())!;
+        await page.mouse.dblclick(box.x + 12, box.y + 12);
+        await expect(input).toBeVisible();
+        await input.fill('Cancelled edit');
+        await page.keyboard.press('Escape');
+        expect(await readTextLines(text)).toEqual(after);
+        await page.keyboard.press('Control+z');
+        await expect(page.locator('[data-ui="content.drawing.text-object"]')).toHaveCount(0);
+      }
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}
